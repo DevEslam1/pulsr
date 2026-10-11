@@ -38,6 +38,7 @@ class _EntityByIdLoaderState<T> extends State<EntityByIdLoader<T>> {
   StreamSubscription? _sub;
   T? _entity;
   bool _done = false;
+  int _generation = 0;
 
   @override
   void initState() {
@@ -45,16 +46,39 @@ class _EntityByIdLoaderState<T> extends State<EntityByIdLoader<T>> {
     _subscribe();
   }
 
+  @override
+  void didUpdateWidget(covariant EntityByIdLoader<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A reused State for a different id must not keep the old entity or its
+    // stream subscription: the route closures are recreated per id, so a
+    // changed callback identity signals a different entity.
+    final resubscribe = oldWidget.fetchSingle != widget.fetchSingle ||
+        oldWidget.watch != widget.watch ||
+        oldWidget.match != widget.match;
+    if (!resubscribe) return;
+    _sub?.cancel();
+    _sub = null;
+    _generation++;
+    setState(() {
+      _entity = null;
+      _done = false;
+    });
+    _subscribe();
+  }
+
   void _subscribe() {
+    final generation = _generation;
     if (widget.fetchSingle != null) {
       widget.fetchSingle!().then((res) {
-        if (!mounted) return;
+        if (!mounted || generation != _generation) return;
         setState(() {
           _entity = res.fold((_) => null, (item) => item);
           _done = true;
         });
       }).catchError((_) {
-        if (mounted) setState(() => _done = true);
+        if (mounted && generation == _generation) {
+          setState(() => _done = true);
+        }
       });
       return;
     }
@@ -62,6 +86,7 @@ class _EntityByIdLoaderState<T> extends State<EntityByIdLoader<T>> {
     if (widget.watch != null) {
       _sub = widget.watch!().listen(
         (result) {
+          if (generation != _generation) return;
           result.fold((_) {}, (list) {
             for (final item in list) {
               if (widget.match!(item)) {
@@ -75,7 +100,9 @@ class _EntityByIdLoaderState<T> extends State<EntityByIdLoader<T>> {
           _sub?.cancel();
         },
         onError: (_) {
-          if (mounted) setState(() => _done = true);
+          if (mounted && generation == _generation) {
+            setState(() => _done = true);
+          }
         },
       );
     }

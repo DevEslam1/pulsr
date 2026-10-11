@@ -1,6 +1,7 @@
 // lib/features/player/presentation/widgets/now_playing_queue_view.dart
 import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -73,6 +74,71 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
         curve: context.motionCurve(Curves.easeOutCubic),
       );
     });
+  }
+
+  void _removeWithUndo(
+    BuildContext context,
+    PlayerCubit cubit,
+    int index,
+    SongsTableData song,
+    PlayerState state,
+  ) {
+    final prevQueue = List<SongsTableData>.from(state.queue);
+    final prevIndex = state.currentIndex;
+    cubit.removeQueueItem(index);
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          song.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        action: SnackBarAction(
+          label: context.l10n.undo,
+          onPressed: () {
+            cubit.restoreQueue(prevQueue, prevIndex);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showRowActions(
+    BuildContext context,
+    PlayerCubit cubit,
+    SongsTableData song,
+  ) {
+    HapticFeedback.selectionClick();
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        final p = sheetContext.palette;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.playlist_play_rounded, color: p.accent),
+                title: Text(sheetContext.l10n.playNext),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  cubit.playNext(song);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.queue_music_rounded, color: p.accent),
+                title: Text(sheetContext.l10n.addToQueue),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  cubit.addToQueue(song);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -293,41 +359,18 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (!isCurrent)
-                                    IconButton(
-                                      icon: Icon(Icons.close_rounded,
-                                          size: 18, color: p.textTertiary),
-                                      tooltip: context.l10n.remove,
-                                      constraints: const BoxConstraints(
-                                          minWidth: AppSpacing.minTouchTarget,
-                                          minHeight: AppSpacing.minTouchTarget),
-                                      onPressed: () {
-                                        final prevQueue =
-                                            List<SongsTableData>.from(
-                                                state.queue);
-                                        final prevIndex = state.currentIndex;
-                                        cubit.removeQueueItem(index);
-                                        ScaffoldMessenger.of(context)
-                                            .clearSnackBars();
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              song.title,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            action: SnackBarAction(
-                                              label: context.l10n.undo,
-                                              onPressed: () {
-                                                cubit.restoreQueue(
-                                                    prevQueue, prevIndex);
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                  IconButton(
+                                    icon: Icon(Icons.close_rounded,
+                                        size: 18, color: p.textTertiary),
+                                    tooltip: context.l10n.remove,
+                                    constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouchTarget,
+                                        minHeight: AppSpacing.minTouchTarget),
+                                    onPressed: () {
+                                      _removeWithUndo(
+                                          context, cubit, index, song, state);
+                                    },
+                                  ),
                                   ReorderableDragStartListener(
                                     index: index,
                                     child: Container(
@@ -346,6 +389,8 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                               onTap: () {
                                 cubit.playSong(song, queue: queue);
                               },
+                              onLongPress: () =>
+                                  _showRowActions(context, cubit, song),
                             ),
                           );
 
@@ -371,26 +416,8 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                   color: p.favorite),
                             ),
                             onDismissed: (_) {
-                              final prevQueue =
-                                  List<SongsTableData>.from(state.queue);
-                              final prevIndex = state.currentIndex;
-                              cubit.removeQueueItem(index);
-                              ScaffoldMessenger.of(context).clearSnackBars();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    song.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  action: SnackBarAction(
-                                    label: context.l10n.undo,
-                                    onPressed: () {
-                                      cubit.restoreQueue(prevQueue, prevIndex);
-                                    },
-                                  ),
-                                ),
-                              );
+                              _removeWithUndo(
+                                  context, cubit, index, song, state);
                             },
                             child: itemTile,
                           );

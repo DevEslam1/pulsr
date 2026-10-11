@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_section_header.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../../core/widgets/staggered_reveal.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/get_songs_usecase.dart';
@@ -47,6 +50,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
 
   @override
   void dispose() {
+    _loadMoreTimeoutTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -65,16 +69,80 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
   }
 
   bool _isLoadingMore = false;
+  // Set from the latest emission: only when the window was filled may more
+  // rows exist, so scroll notifications cannot grow the limit forever.
+  bool _hasMore = false;
+  Timer? _loadMoreTimeoutTimer;
 
   void _loadMore() {
-    if (_isLoadingMore) return;
-    _isLoadingMore = true;
+    if (_isLoadingMore || !_hasMore) return;
+    _loadMoreTimeoutTimer?.cancel();
     setState(() {
+      _isLoadingMore = true;
       _currentLimit += _pageSize;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _isLoadingMore = false;
+    // Safety net in case the stream never emits for the new limit.
+    _loadMoreTimeoutTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted && _isLoadingMore) {
+        setState(() => _isLoadingMore = false);
+      }
     });
+  }
+
+  /// Clears the in-flight guard once an emission for the new limit (or a
+  /// terminal error/empty state) arrives. Clearing in a post-frame callback
+  /// right after setState left a window where scroll notifications re-entered
+  /// and grew the limit repeatedly.
+  void _clearLoadingMore() {
+    _loadMoreTimeoutTimer?.cancel();
+    if (!_isLoadingMore) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isLoadingMore) {
+        setState(() => _isLoadingMore = false);
+      }
+    });
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    final size = widget.isTablet ? 158.0 : 138.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PulsrSectionHeader(title: context.l10n.recentlyPlayed),
+          SizedBox(
+            height: scaledCarouselHeight(context, widget.isTablet),
+            child: SkeletonShimmer(
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context)),
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Padding(
+                      padding:
+                          const EdgeInsetsDirectional.only(end: AppSpacing.s14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SkeletonBox(
+                              width: size, height: size, radius: AppRadii.r18),
+                          const SizedBox(height: AppSpacing.xs),
+                          SkeletonLine(width: size * 0.8, height: 12),
+                          const SizedBox(height: AppSpacing.s2),
+                          SkeletonLine(width: size * 0.5, height: 10),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -88,14 +156,31 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
           .distinct(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
+          _clearLoadingMore();
           return SectionError(onRetry: () => setState(() {}));
         }
         final songs =
             snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
-        if (songs.isEmpty) return const SizedBox.shrink();
+        // First frame: the drift stream has not emitted yet. Render a skeleton
+        // instead of collapsing (which caused a visible empty-library flash).
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return _buildSkeleton(context);
+        }
 
-        final hasMore = songs.length >= _currentLimit;
+        if (songs.isEmpty) {
+          _clearLoadingMore();
+          return const SizedBox.shrink();
+        }
+
+        _hasMore = songs.length >= _currentLimit;
+        if (_isLoadingMore &&
+            snapshot.connectionState != ConnectionState.waiting) {
+          _clearLoadingMore();
+        }
+
+        final hasMore = _hasMore;
         final size = widget.isTablet ? 158.0 : 138.0;
         final totalItemCount = songs.length + (hasMore ? 1 : 0);
 

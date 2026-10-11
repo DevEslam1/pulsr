@@ -97,31 +97,93 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
   late final HomeCubit _homeCubit;
 
-  // Shared cache for quick action songs (Daily Drive & Focus Flow) with a 60-second TTL
-  List<SongsTableData>? _cachedQuickSongs;
-  Stopwatch? _cachedQuickSongsStopwatch;
+  // Separate caches for the two quick actions (Daily Drive & Focus Flow) with
+  // a 60-second TTL. They read different sources, so they cannot share one.
+  List<SongsTableData>? _cachedDailyDriveSongs;
+  Stopwatch? _cachedDailyDriveStopwatch;
+  List<SongsTableData>? _cachedFocusFlowSongs;
+  Stopwatch? _cachedFocusFlowStopwatch;
   StreamSubscription? _librarySub;
 
-  Future<List<SongsTableData>> _getQuickActionSongs(
+  static const Duration _quickActionCacheTtl = Duration(seconds: 60);
+  static const int _dailyDriveLimit = 200;
+  static const int _focusFlowLimit = 50;
+
+  bool _cacheFresh(Stopwatch? stopwatch) =>
+      stopwatch != null &&
+      stopwatch.isRunning &&
+      stopwatch.elapsed < _quickActionCacheTtl;
+
+  /// Daily Drive: a broad, recently-played-first window (200 rows) so the
+  /// shuffle is not confined to the first 50 titles.
+  Future<List<SongsTableData>?> _fetchDailyDriveSongs(
       GetSongsUseCase useCase) async {
-    if (_cachedQuickSongs != null &&
-        _cachedQuickSongsStopwatch != null &&
-        _cachedQuickSongsStopwatch!.isRunning &&
-        _cachedQuickSongsStopwatch!.elapsed < const Duration(seconds: 60)) {
-      return _cachedQuickSongs!;
+    if (_cachedDailyDriveSongs != null &&
+        _cacheFresh(_cachedDailyDriveStopwatch)) {
+      return _cachedDailyDriveSongs;
     }
-    final res = await useCase.getAllSongs(limit: 50);
+    final res = await useCase.getAllSongs(
+      sortBy: 'lastPlayed',
+      ascending: false,
+      limit: _dailyDriveLimit,
+    );
     return res.fold(
-      (failure) {
-        // H-09: Do not cache on failure so next call retries rather than returning empty list for 60s
-        return <SongsTableData>[];
-      },
+      // Null means failure (distinct from a genuinely empty library) so the
+      // caller can surface an error instead of silently playing nothing.
+      (_) => null,
       (songs) {
-        _cachedQuickSongs = songs;
-        _cachedQuickSongsStopwatch = Stopwatch()..start();
+        _cachedDailyDriveSongs = songs;
+        _cachedDailyDriveStopwatch = Stopwatch()..start();
         return songs;
       },
     );
+  }
+
+  /// Focus Flow: the top-played source, not a title-ordered page.
+  Future<List<SongsTableData>?> _fetchTopPlayedSongs(
+      GetSongsUseCase useCase) async {
+    if (_cachedFocusFlowSongs != null &&
+        _cacheFresh(_cachedFocusFlowStopwatch)) {
+      return _cachedFocusFlowSongs;
+    }
+    List<SongsTableData>? songs;
+    try {
+      final res = await useCase
+          .watchTopPlayed(limit: _focusFlowLimit)
+          .first
+          .timeout(const Duration(seconds: 5));
+      songs = res.fold<List<SongsTableData>?>(
+        (_) => null,
+        (list) {
+          _cachedFocusFlowSongs = list;
+          _cachedFocusFlowStopwatch = Stopwatch()..start();
+          return list;
+        },
+      );
+    } catch (_) {
+      songs = null;
+    }
+    return songs;
+  }
+
+  void _invalidateQuickActionCaches() {
+    _cachedDailyDriveSongs = null;
+    _cachedDailyDriveStopwatch?.stop();
+    _cachedDailyDriveStopwatch = null;
+    _cachedFocusFlowSongs = null;
+    _cachedFocusFlowStopwatch?.stop();
+    _cachedFocusFlowStopwatch = null;
+  }
+
+  void _showQuickActionLoadError(BuildContext context) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.browseFailedToFetch),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   List<String> get _onlineCategories => _homeCubit.onlineCategories;
@@ -153,9 +215,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
             state.songs.length != lastSongs.length ||
             firstId != lastFirstId) {
           lastSongs = state.songs;
-          _cachedQuickSongs = null;
-          _cachedQuickSongsStopwatch?.stop();
-          _cachedQuickSongsStopwatch = null;
+          _invalidateQuickActionCaches();
         }
       });
     }
@@ -190,9 +250,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   @override
   void dispose() {
     _librarySub?.cancel();
-    _cachedQuickSongsStopwatch?.stop();
-    _cachedQuickSongsStopwatch = null;
-    _cachedQuickSongs = null;
+    _cachedDailyDriveStopwatch?.stop();
+    _cachedDailyDriveStopwatch = null;
+    _cachedDailyDriveSongs = null;
+    _cachedFocusFlowStopwatch?.stop();
+    _cachedFocusFlowStopwatch = null;
+    _cachedFocusFlowSongs = null;
     _ytmAccountService.loginState.removeListener(_onLoginStateChanged);
     super.dispose();
   }
@@ -628,7 +691,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 title: context.l10n.dailyDrive,
                 subtitle: context.l10n.autoMix,
                 onTap: () async {
-                  final list = await _getQuickActionSongs(getSongsUseCase);
+                  final list = await _fetchDailyDriveSongs(getSongsUseCase);
+                  if (!context.mounted) return;
+                  if (list == null) {
+                    _showQuickActionLoadError(context);
+                    return;
+                  }
                   if (list.isNotEmpty) {
                     final shuffled = List<SongsTableData>.from(list)..shuffle();
                     playerCubit.playSong(shuffled.first, queue: shuffled);
@@ -656,15 +724,17 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                       color: AppColors.mint,
                       onTap: () async {
                         final list =
-                            await _getQuickActionSongs(getSongsUseCase);
-                        final top = list.where((s) => s.playCount > 0).toList()
-                          ..sort((a, b) => b.playCount.compareTo(a.playCount));
-                        if (top.isNotEmpty) {
-                          final existingIds = top.map((s) => s.id).toSet();
-                          final remaining =
-                              list.where((s) => !existingIds.contains(s.id));
-                          playerCubit.playSong(top.first,
-                              queue: [...top, ...remaining]);
+                            await _fetchTopPlayedSongs(getSongsUseCase);
+                        if (!context.mounted) return;
+                        if (list == null) {
+                          _showQuickActionLoadError(context);
+                          return;
+                        }
+                        if (list.isNotEmpty) {
+                          final top = List<SongsTableData>.from(list)
+                            ..sort(
+                                (a, b) => b.playCount.compareTo(a.playCount));
+                          playerCubit.playSong(top.first, queue: top);
                         }
                       },
                     ),

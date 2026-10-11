@@ -266,4 +266,38 @@ void main() {
 
     verify(() => cubit.deleteDownload('vid1')).called(1);
   });
+
+  testWidgets(
+      'delete toast offers Retry (a fresh download), not Undo, for completed tasks',
+      (tester) async {
+    await pumpTile(tester, _task(status: DownloadStatus.complete));
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text(l10n.delete));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text(l10n.retry), findsOneWidget);
+    expect(find.text(l10n.undo), findsNothing);
+
+    await tester.tap(find.text(l10n.retry));
+    await tester.pump();
+    verify(() => cubit.queueDownload(any())).called(1);
+  });
+
+  testWidgets('delete toast keeps Undo for tasks that can be re-queued',
+      (tester) async {
+    await pumpTile(tester, _task(status: DownloadStatus.failed));
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text(l10n.delete));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text(l10n.undo), findsOneWidget);
+  });
 }

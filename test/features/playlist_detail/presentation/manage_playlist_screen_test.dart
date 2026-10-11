@@ -137,6 +137,26 @@ void main() {
     expect(calls, greaterThanOrEqualTo(2));
   });
 
+  testWidgets('a load timeout surfaces a retryable error instead of empty',
+      (tester) async {
+    useScreenSize(tester, const Size(800, 1400));
+    final controller = StreamController<Result<List<SongsTableData>>>();
+    addTearDown(controller.close);
+
+    when(() => playlists.watchPlaylistSongs(any()))
+        .thenAnswer((_) => controller.stream);
+    when(() => getSongs.watchSongs())
+        .thenAnswer((_) => Stream.value(const Right([])));
+
+    await tester.pumpWidget(build());
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(find.text('Failed to load playlist.'), findsOneWidget);
+    expect(find.textContaining('took too long'), findsOneWidget);
+    expect(find.text('No songs in library'), findsNothing);
+  });
+
   testWidgets('filters the song list as the user types', (tester) async {
     useScreenSize(tester, const Size(800, 1400));
     final songs = [

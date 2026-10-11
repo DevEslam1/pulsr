@@ -11,6 +11,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_static_grid.dart';
 import '../../../../core/widgets/pulsr_section_header.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../../core/widgets/song_tile.dart';
 import '../../../../core/widgets/staggered_reveal.dart';
 import '../../../../data/db/app_database.dart';
@@ -86,6 +87,20 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
         }
         final songs =
             snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+
+        // First frame before drift emits: show a lightweight skeleton instead
+        // of flashing the "No music yet / Scan Storage" empty state.
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return SkeletonList(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              Adaptive.pagePadding(context),
+              AppSpacing.xs,
+              Adaptive.pagePadding(context),
+              AppSpacing.xs,
+            ),
+          );
+        }
 
         if (songs.isEmpty) {
           if (_isLoadingMore) {

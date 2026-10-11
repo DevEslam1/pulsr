@@ -109,7 +109,7 @@ mixin SettingsScreenController on State<SettingsScreen> {
   /// Rebuilds the settings shell only when state this tree actually renders
   /// changes. Transient fields owned by other surfaces are ignored so an async
   /// probe or validation error can't force a full rebuild of the whole screen:
-  /// - `errorMessage` is surfaced by the app-level snackbar listener (main.dart).
+  /// - `errorMessage` is surfaced by [SettingsScreen]'s own `BlocListener`.
   /// - `isTestingAllProxies` drives the separate proxy screen's `BlocConsumer`.
   /// - `systemEffectsBundles` is not rendered here (only `systemEffectsStatus`).
   static bool _settingsBuildWhen(

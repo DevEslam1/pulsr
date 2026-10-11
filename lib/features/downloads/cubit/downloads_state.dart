@@ -33,12 +33,14 @@ class DownloadsState {
     bool? isLoading,
     String? errorMessage,
     bool clearErrorMessage = false,
+    List<DownloadTask>? cachedTaskList,
   }) {
     final nextTasks = tasks ?? this.tasks;
-    final precomputedList = tasks != null
-        ? (nextTasks.values.toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
-        : _cachedTaskList;
+    final precomputedList = cachedTaskList ??
+        (tasks != null
+            ? (nextTasks.values.toList()
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
+            : _cachedTaskList);
     return DownloadsState(
       tasks: nextTasks,
       storageStats: storageStats ?? this.storageStats,

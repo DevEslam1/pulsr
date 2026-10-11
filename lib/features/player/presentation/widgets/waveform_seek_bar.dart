@@ -36,6 +36,10 @@ class WaveformSeekBar extends StatefulWidget {
   final String? semanticLabel;
   final WaveformVisualizerStyle style;
 
+  /// When false the bar renders but ignores scrub/tap seeks (e.g. while the
+  /// engine is still loading/buffering). Pinch-to-zoom stays available.
+  final bool enabled;
+
   const WaveformSeekBar({
     super.key,
     required this.position,
@@ -51,6 +55,7 @@ class WaveformSeekBar extends StatefulWidget {
     this.crossfadeDuration,
     this.semanticLabel,
     this.style = WaveformVisualizerStyle.mirroredBars,
+    this.enabled = true,
   });
 
   @override
@@ -62,6 +67,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   ({int startIndex, int visibleCount})? _dragFrozenWindow;
   double _zoomScale = 1.0;
   int _lastScaleMs = 0;
+  bool _dragStarted = false;
 
   @override
   void didUpdateWidget(covariant WaveformSeekBar oldWidget) {
@@ -166,10 +172,14 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
         value: valueLabel,
         increasedValue: increasedLabel,
         decreasedValue: decreasedLabel,
-        onIncrease: () => widget.onSeek(
-            clampDuration(currentDuration + const Duration(seconds: 10))),
-        onDecrease: () => widget.onSeek(
-            clampDuration(currentDuration - const Duration(seconds: 10))),
+        onIncrease: widget.enabled
+            ? () => widget.onSeek(
+                clampDuration(currentDuration + const Duration(seconds: 10)))
+            : null,
+        onDecrease: widget.enabled
+            ? () => widget.onSeek(
+                clampDuration(currentDuration - const Duration(seconds: 10)))
+            : null,
         child: Directionality(
           textDirection: Directionality.of(context),
           child: RepaintBoundary(
@@ -215,6 +225,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           }
                         },
                         onHorizontalDragStart: (details) {
+                          if (!widget.enabled) return;
+                          _dragStarted = true;
                           if (trackWidth > 0 && maxDuration > 0) {
                             HapticFeedback.selectionClick();
                             _dragFrozenWindow = _visibleWindow(totalCount);
@@ -227,6 +239,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           }
                         },
                         onHorizontalDragUpdate: (details) {
+                          if (!widget.enabled) return;
                           if (trackWidth > 0 && maxDuration > 0) {
                             final ratio = _ratioForDx(details.localPosition.dx,
                                 trackWidth, totalCount);
@@ -237,6 +250,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           }
                         },
                         onHorizontalDragEnd: (details) {
+                          if (!widget.enabled) return;
+                          _dragStarted = false;
                           if (_dragValue != null) {
                             HapticFeedback.lightImpact();
                             widget.onSeek(
@@ -248,6 +263,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           }
                         },
                         onHorizontalDragCancel: () {
+                          if (!widget.enabled) return;
+                          _dragStarted = false;
                           if (_dragValue != null) {
                             setState(() {
                               _dragValue = null;
@@ -255,7 +272,13 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             });
                           }
                         },
-                        onTapDown: (details) {
+                        // A press that never becomes a drag seeks on release;
+                        // the tap recognizer's deadline fires onTapDown on a
+                        // slow press, so seeking there jumped playback before
+                        // the drag could win the arena.
+                        onTapUp: (details) {
+                          if (!widget.enabled) return;
+                          if (_dragStarted) return;
                           if (trackWidth > 0 && maxDuration > 0) {
                             HapticFeedback.selectionClick();
                             final ratio = _ratioForDx(details.localPosition.dx,
@@ -705,12 +728,14 @@ class _WaveformPainter extends CustomPainter {
         oldDelegate.activeColor != activeColor ||
         oldDelegate.inactiveColor != inactiveColor ||
         oldDelegate.chapterMarkers != chapterMarkers ||
+        oldDelegate.duration != duration ||
         oldDelegate.loopPointA != loopPointA ||
         oldDelegate.loopPointB != loopPointB ||
         oldDelegate.crossfadeDuration != crossfadeDuration ||
         oldDelegate.zoomScale != zoomScale ||
         oldDelegate.visibleStart != visibleStart ||
         oldDelegate.visibleCount != visibleCount ||
+        oldDelegate.style != style ||
         !listEquals(oldDelegate.samples, samples);
   }
 }

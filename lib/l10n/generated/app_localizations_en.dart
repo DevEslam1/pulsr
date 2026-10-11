@@ -8251,4 +8251,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compactView => 'Compact view';
+
+  @override
+  String get bootConfigurationError =>
+      'Pulsr cannot start with this configuration';
+
+  @override
+  String get bootStartupFailed => 'Pulsr could not finish starting up';
+
+  @override
+  String get bootStartupFailedMessage =>
+      'Playback components did not become ready in time. Retrying usually fixes a slow cold start.';
 }

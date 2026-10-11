@@ -86,8 +86,8 @@ void main() {
           identical(trim.clampedTo(const Duration(seconds: -1)), trim), isTrue);
 
       const empty = GaplessTrim();
-      expect(
-          identical(empty.clampedTo(const Duration(seconds: 10)), empty), isTrue);
+      expect(identical(empty.clampedTo(const Duration(seconds: 10)), empty),
+          isTrue);
     });
 
     test('clampedTo scales both sides when the total exceeds 20% of the track',
@@ -112,7 +112,8 @@ void main() {
 
   group('readHeaderGaplessTrimSync', () {
     test('reads a LAME MP3 header (delay + padding)', () {
-      final file = write('sync_lame.mp3', _lameMp3(delaySamples: 42, paddingSamples: 8));
+      final file =
+          write('sync_lame.mp3', _lameMp3(delaySamples: 42, paddingSamples: 8));
       final trim = GaplessTrimHandler.readHeaderGaplessTrimSync(file.path);
       expect(trim, isNotNull);
       expect(trim!.preSkip.inMicroseconds, greaterThan(0));
@@ -149,7 +150,8 @@ void main() {
     });
 
     test('a Xing magic header is honoured as well as Info', () {
-      final file = write('sync_xing.mp3', _lameMp3(magic: 'Xing', delaySamples: 10));
+      final file =
+          write('sync_xing.mp3', _lameMp3(magic: 'Xing', delaySamples: 10));
       final trim = GaplessTrimHandler.readHeaderGaplessTrimSync(file.path);
       expect(trim, isNotNull);
       expect(trim!.preSkip.inMicroseconds, greaterThan(0));
@@ -166,7 +168,8 @@ void main() {
     });
 
     test('m4a with zero delay and padding is not treated as a trim', () {
-      final file = write('sync_zero.m4a', _itunSmpb(delaySamples: 0, paddingSamples: 0));
+      final file =
+          write('sync_zero.m4a', _itunSmpb(delaySamples: 0, paddingSamples: 0));
       expect(GaplessTrimHandler.readHeaderGaplessTrimSync(file.path), isNull);
     });
   });
@@ -181,7 +184,8 @@ void main() {
     });
 
     test('reads an MP3 LAME header', () async {
-      final file = write('async.mp3', _lameMp3(delaySamples: 100, paddingSamples: 20));
+      final file =
+          write('async.mp3', _lameMp3(delaySamples: 100, paddingSamples: 20));
       final trim = await GaplessTrimHandler.readHeaderGaplessTrim(file.path);
       expect(trim, isNotNull);
       expect(trim!.preSkip.inMicroseconds, greaterThan(0));
@@ -243,7 +247,8 @@ void main() {
     test('detects Opus via path, codec and ogg-with-opus content', () {
       expect(GaplessTrimHandler.trimFor(path: '/x/a.opus').preSkip,
           GaplessTrimHandler.opusPreSkip);
-      expect(GaplessTrimHandler.trimFor(path: '/x/a.bin', codec: 'opus').preSkip,
+      expect(
+          GaplessTrimHandler.trimFor(path: '/x/a.bin', codec: 'opus').preSkip,
           GaplessTrimHandler.opusPreSkip);
       expect(
         GaplessTrimHandler.trimFor(path: '/x/opus_track.ogg').preSkip,
@@ -253,8 +258,7 @@ void main() {
 
     test('treats a plain ogg/oga without opus as Vorbis', () {
       // A bare .ogg with no codec hint is assumed Opus (the common case).
-      expect(
-          GaplessTrimHandler.trimFor(path: '/x/a.ogg').preSkip,
+      expect(GaplessTrimHandler.trimFor(path: '/x/a.ogg').preSkip,
           GaplessTrimHandler.opusPreSkip);
       final trim2 = GaplessTrimHandler.trimFor(path: '/x/a.oga');
       expect(trim2.preSkip, const Duration(microseconds: 11600));
@@ -283,7 +287,8 @@ void main() {
 
     test('a header override wins over the codec default', () {
       final file = write('override.mp3', _lameMp3(delaySamples: 42));
-      final trim = GaplessTrimHandler.trimFor(path: file.path, sampleRate: 44100);
+      final trim =
+          GaplessTrimHandler.trimFor(path: file.path, sampleRate: 44100);
       expect(trim.preSkip.inMicroseconds, closeTo(952, 2));
     });
   });
@@ -300,8 +305,8 @@ void main() {
       expect(GaplessTrimHandler.effectiveEnd(const Duration(seconds: 5), trim),
           Duration.zero);
       expect(
-        GaplessTrimHandler.effectiveEnd(
-            const Duration(seconds: 30), const GaplessTrim(postTrim: Duration(seconds: 4))),
+        GaplessTrimHandler.effectiveEnd(const Duration(seconds: 30),
+            const GaplessTrim(postTrim: Duration(seconds: 4))),
         const Duration(seconds: 26),
       );
     });

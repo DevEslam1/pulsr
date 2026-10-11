@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../domain/models/lyrics_line.dart';
@@ -40,16 +41,20 @@ class LrcParser {
         r'^\s*\[(ar|ti|al|by|offset|length):([^\]]*)\]',
         caseSensitive: false);
 
-    for (final line in lines) {
-      final trimmed = line.trim();
-      final metaMatch = metaExp.firstMatch(trimmed);
-      if (metaMatch != null) {
+    for (final rawLine in lines) {
+      var trimmed = rawLine.trim();
+      // Consecutive metadata tags ([ar:][ti:]) were previously recorded only
+      // up to the first match; strip them all so each is captured.
+      while (true) {
+        final metaMatch = metaExp.firstMatch(trimmed);
+        if (metaMatch == null) break;
         final key = metaMatch.group(1)!.toLowerCase();
         final value = metaMatch.group(2)!.trim();
         metadata[key] = value;
         if (key == 'offset') {
           offsetMs = int.tryParse(value) ?? 0;
         }
+        trimmed = trimmed.substring(metaMatch.end).trimLeft();
       }
     }
 
@@ -58,9 +63,16 @@ class LrcParser {
     final RegExp wordTagExp = RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,:]\d{1,3})?>');
 
     for (final rawLine in lines) {
-      final line = rawLine.trim();
+      var line = rawLine.trim();
       if (line.isEmpty) continue;
-      if (metaExp.hasMatch(line)) continue;
+      // Strip leading metadata tags instead of dropping the whole line, so
+      // `[ar:X][00:12.34]text` keeps its lyric.
+      while (true) {
+        final metaMatch = metaExp.firstMatch(line);
+        if (metaMatch == null) break;
+        line = line.substring(metaMatch.end).trimLeft();
+      }
+      if (line.isEmpty) continue;
 
       final matches = timeExp.allMatches(line).toList();
       if (matches.isEmpty) continue;
@@ -146,7 +158,17 @@ class LrcParser {
         final total = min * 60000 + sec * 1000 + frac + offsetMs;
         return total < 0 ? 0 : total;
       }
-      return lineStartMs;
+      // Minutes-less form (`<12.34>` / `<12>`): the value is seconds, not a
+      // line-start fallback — treating every such word tag as lineStartMs
+      // collapsed all enhanced-LRC word timings onto the line start.
+      final secParts = clean.split(RegExp(r'[.,]'));
+      final sec = int.tryParse(secParts[0]);
+      if (sec == null) return lineStartMs;
+      final frac = secParts.length > 1
+          ? (int.tryParse(secParts[1].padRight(3, '0').substring(0, 3)) ?? 0)
+          : 0;
+      final total = sec * 1000 + frac + offsetMs;
+      return total < 0 ? 0 : total;
     }
 
     final words = <WordTimestamp>[];
@@ -187,6 +209,59 @@ class LrcParser {
     return sb.toString();
   }
 
+  /// Decodes raw `.lrc` bytes into text. Byte-order marks win (UTF-8,
+  /// UTF-16LE, UTF-16BE — all common in real-world lyric files); without one
+  /// the chain is UTF-8 -> latin1 so legacy files never fail to load.
+  @visibleForTesting
+  static String decodeLrcBytes(List<int> bytes) {
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xEF &&
+        bytes[1] == 0xBB &&
+        bytes[2] == 0xBF) {
+      return _decodeUtf8OrLatin1(bytes.sublist(3));
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+      return _decodeUtf16(bytes.sublist(2), bigEndian: false);
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+      return _decodeUtf16(bytes.sublist(2), bigEndian: true);
+    }
+    return _decodeUtf8OrLatin1(bytes);
+  }
+
+  static String _decodeUtf8OrLatin1(List<int> bytes) {
+    try {
+      return utf8.decode(bytes);
+    } on FormatException {
+      return latin1.decode(bytes);
+    }
+  }
+
+  /// Manual UTF-16 decode (no extra dependency) that combines surrogate pairs
+  /// so supplementary-plane characters survive. A trailing odd byte is ignored.
+  static String _decodeUtf16(List<int> bytes, {required bool bigEndian}) {
+    final units = <int>[];
+    for (var i = 0; i + 1 < bytes.length; i += 2) {
+      units.add(bigEndian
+          ? (bytes[i] << 8) | bytes[i + 1]
+          : bytes[i] | (bytes[i + 1] << 8));
+    }
+    final sb = StringBuffer();
+    for (var i = 0; i < units.length; i++) {
+      final unit = units[i];
+      if (unit >= 0xD800 && unit <= 0xDBFF && i + 1 < units.length) {
+        final low = units[i + 1];
+        if (low >= 0xDC00 && low <= 0xDFFF) {
+          sb.writeCharCode(0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00));
+          i++;
+          continue;
+        }
+      }
+      sb.writeCharCode(unit);
+    }
+    return sb.toString();
+  }
+
   /// Parses plain text non-synced lyrics into a list of `LyricsLine`.
   static List<LyricsLine> parsePlainText(String text,
       {LyricsSource source = LyricsSource.embedded}) {
@@ -212,13 +287,8 @@ class LrcParser {
     try {
       final file = File(path);
       if (!await file.exists()) return null;
-      String content;
       final bytes = await file.readAsBytes();
-      try {
-        content = utf8.decode(bytes);
-      } on FormatException {
-        content = latin1.decode(bytes);
-      }
+      final content = decodeLrcBytes(bytes);
       final lines = parse(content, source: source);
       if (lines.isNotEmpty) return lines;
     } catch (_) {}
@@ -271,13 +341,8 @@ class LrcParser {
             File('${parentDir.path}${Platform.pathSeparator}$genericName');
         if (await genericLrc.exists()) {
           try {
-            String content;
             final bytes = await genericLrc.readAsBytes();
-            try {
-              content = utf8.decode(bytes);
-            } on FormatException {
-              content = latin1.decode(bytes);
-            }
+            final content = decodeLrcBytes(bytes);
             final lines = parse(content, source: source);
             if (lines.isNotEmpty) return lines;
             // If not synced, try plain-text fallback from generic file
@@ -396,22 +461,113 @@ class LrcParser {
     }
   }
 
+  /// Serializes a [LyricsResult] for the disk cache. Version 2 carries word
+  /// timestamps, translations, vocal flags and metadata; v1 only had
+  /// ms/text/source and silently dropped the enhanced data.
+  @visibleForTesting
+  static Map<String, dynamic> encodeDiskCachePayload(LyricsResult result) {
+    return {
+      'v': 2,
+      'source': result.source.name,
+      'metadata': result.metadata,
+      'lines': result.lines
+          .map((l) => {
+                'ms': l.timestamp.inMilliseconds,
+                'text': l.text,
+                'source': l.source.name,
+                'vocal': l.isVocal,
+                if (l.translation != null) 'translation': l.translation,
+                if (l.words.isNotEmpty)
+                  'words': l.words
+                      .map((w) => {
+                            'w': w.word,
+                            's': w.startMs,
+                            'e': w.endMs,
+                          })
+                      .toList(),
+              })
+          .toList(),
+    };
+  }
+
+  /// Decodes a disk cache payload. Unknown future versions are ignored
+  /// (returns null); legacy v1 payloads decode with defaults for the fields
+  /// they never stored.
+  @visibleForTesting
+  static LyricsResult? decodeDiskCachePayload(Map<String, dynamic> data) {
+    final version = data['v'];
+    if (version is int && version > 2) return null;
+
+    final rawSource = data['source'];
+    final source = LyricsSource.values.firstWhere(
+      (e) => e.name == rawSource,
+      orElse: () => LyricsSource.lrclib,
+    );
+
+    final rawLines = data['lines'];
+    if (rawLines is! List) return null;
+
+    final lines = <LyricsLine>[];
+    for (final item in rawLines) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final rawLineSource = map['source'];
+      final lineSource = LyricsSource.values.firstWhere(
+        (e) => e.name == rawLineSource,
+        orElse: () => source,
+      );
+
+      final words = <WordTimestamp>[];
+      final rawWords = map['words'];
+      if (rawWords is List) {
+        for (final w in rawWords) {
+          if (w is! Map) continue;
+          final word = w['w'];
+          if (word is! String || word.isEmpty) continue;
+          final rawStart = w['s'];
+          final rawEnd = w['e'];
+          final startMs = rawStart is num ? rawStart.toInt() : 0;
+          final endMs = rawEnd is num ? rawEnd.toInt() : startMs + 50;
+          words.add(WordTimestamp(
+            word: word,
+            startMs: startMs,
+            endMs: endMs > startMs ? endMs : startMs + 50,
+          ));
+        }
+      }
+
+      final rawMs = map['ms'];
+      final rawText = map['text'];
+      final rawTranslation = map['translation'];
+      final rawVocal = map['vocal'];
+      lines.add(LyricsLine(
+        timestamp: Duration(milliseconds: rawMs is num ? rawMs.toInt() : 0),
+        text: rawText is String ? rawText : '',
+        source: lineSource,
+        words: words,
+        translation: rawTranslation is String ? rawTranslation : null,
+        isVocal: rawVocal is bool ? rawVocal : true,
+      ));
+    }
+
+    final metadata = <String, String>{};
+    final rawMetadata = data['metadata'];
+    if (rawMetadata is Map) {
+      rawMetadata.forEach((k, v) {
+        if (k is String && v is String) metadata[k] = v;
+      });
+    }
+
+    return LyricsResult(lines: lines, source: source, metadata: metadata);
+  }
+
   static Future<void> _writeToDiskCache(
       String cacheKey, LyricsResult result) async {
     try {
       final dir = await _getDiskCacheDir();
       if (dir == null) return;
       final file = File('${dir.path}/${_diskCacheKey(cacheKey)}.json');
-      final payload = {
-        'source': result.source.name,
-        'lines': result.lines
-            .map((l) => {
-                  'ms': l.timestamp.inMilliseconds,
-                  'text': l.text,
-                  'source': l.source.name,
-                })
-            .toList(),
-      };
+      final payload = encodeDiskCachePayload(result);
       await file.writeAsString(jsonEncode(payload), flush: true);
     } catch (e) {
       // Disk-full / quota / permission — log once, never crash playback.
@@ -427,27 +583,9 @@ class LrcParser {
       final file = File('${dir.path}/${_diskCacheKey(cacheKey)}.json');
       if (!await file.exists()) return null;
       final raw = await file.readAsString();
-      final data = jsonDecode(raw) as Map<String, dynamic>;
-      final sourceName = data['source'] as String? ?? 'none';
-      final source = LyricsSource.values.firstWhere(
-        (e) => e.name == sourceName,
-        orElse: () => LyricsSource.lrclib,
-      );
-      final linesList = (data['lines'] as List<dynamic>?) ?? [];
-      final lines = linesList.map((item) {
-        final map = item as Map<String, dynamic>;
-        final lineSrcName = map['source'] as String? ?? sourceName;
-        final lineSrc = LyricsSource.values.firstWhere(
-          (e) => e.name == lineSrcName,
-          orElse: () => source,
-        );
-        return LyricsLine(
-          timestamp: Duration(milliseconds: map['ms'] as int? ?? 0),
-          text: map['text'] as String? ?? '',
-          source: lineSrc,
-        );
-      }).toList();
-      return LyricsResult(lines: lines, source: source);
+      final data = jsonDecode(raw);
+      if (data is! Map<String, dynamic>) return null;
+      return decodeDiskCachePayload(data);
     } catch (_) {
       return null;
     }

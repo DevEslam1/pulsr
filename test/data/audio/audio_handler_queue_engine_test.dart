@@ -150,8 +150,8 @@ void main() {
 
     test('updateFavorite mirrors the flag into queue and media item', () async {
       handler = await buildTestHandler(repository: repo, ytmService: ytm);
-      await handler!.loadQueue([localSong(1, isFavorite: false)],
-          autoPlay: false);
+      await handler!
+          .loadQueue([localSong(1, isFavorite: false)], autoPlay: false);
 
       handler!.updateFavorite(1, true);
       expect(handler!.queue.value.first.extras?['isFavorite'], isTrue);

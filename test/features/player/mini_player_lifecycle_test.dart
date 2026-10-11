@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -110,5 +112,67 @@ void main() {
       () => notifier.addListener(() {}),
       throwsA(isA<FlutterError>()),
     );
+  });
+
+  testWidgets(
+      'carousel swipe completing after dispose does not write to the disposed notifier',
+      (tester) async {
+    const secondSong = SongsTableData(
+      id: 202,
+      title: 'M17 Second Song',
+      artist: 'Artist',
+      album: 'Album',
+      durationMs: 180000,
+      path: '/path/202.mp3',
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      lastPositionMs: 0,
+      source: 'local',
+    );
+
+    when(() => mockPlayerCubit.state).thenReturn(
+      const PlayerState(
+        playback: PlaybackSlice(
+          currentSong: testSong,
+          isPlaying: true,
+          duration: Duration(minutes: 3),
+        ),
+        queueSlice: QueueSlice(
+          queue: [testSong, secondSong],
+          currentIndex: 0,
+        ),
+      ),
+    );
+
+    final skipCompleter = Completer<void>();
+    when(() => mockPlayerCubit.skipToQueueItem(any()))
+        .thenAnswer((_) => skipCompleter.future);
+
+    await tester.pumpWidget(
+      buildWidget(
+        child: MiniPlayer(onTap: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final state = tester.state<MiniPlayerState>(find.byType(MiniPlayer));
+    state.isInteractingNotifier.value = true;
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    pageView.onPageChanged!(1);
+    await tester.pump();
+
+    // Dispose the mini player while skipToQueueItem is still in flight.
+    await tester.pumpWidget(
+      buildWidget(
+        child: const SizedBox.shrink(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    skipCompleter.complete();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 }

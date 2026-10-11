@@ -4454,5 +4454,8 @@
   "upNext": "A CONTINUACIÓN",
   "proBadge": "PRO",
   "nowPlayingPreview": "▶ Reproduciendo ahora",
-  "compactView": "Vista compacta"
+  "compactView": "Vista compacta",
+  "bootConfigurationError": "Pulsr no puede iniciarse con esta configuración",
+  "bootStartupFailed": "Pulsr no pudo terminar de iniciarse",
+  "bootStartupFailedMessage": "Los componentes de reproducción no estuvieron listos a tiempo. Reintentar suele solucionar un inicio en frío lento."
 }

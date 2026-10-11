@@ -65,8 +65,13 @@ void main() {
     when(() => account.loginState).thenReturn(loginState);
     when(() => account.isLoggedIn).thenReturn(false);
 
-    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
-        .thenAnswer((_) async => const Right(<SongsTableData>[]));
+    when(() => getSongs.getAllSongs(
+          sortBy: any(named: 'sortBy'),
+          ascending: any(named: 'ascending'),
+          limit: any(named: 'limit'),
+        )).thenAnswer((_) async => const Right(<SongsTableData>[]));
+    when(() => getSongs.watchTopPlayed(limit: any(named: 'limit')))
+        .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyAdded(limit: any(named: 'limit')))
@@ -113,7 +118,11 @@ void main() {
   });
 
   testWidgets('the Daily Drive hero starts a shuffled queue', (tester) async {
-    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
+    when(() => getSongs.getAllSongs(
+              sortBy: any(named: 'sortBy'),
+              ascending: any(named: 'ascending'),
+              limit: any(named: 'limit'),
+            ))
         .thenAnswer((_) async =>
             Right([createTestSong(id: 1, title: 'A'), createTestSong(id: 2)]));
 
@@ -121,7 +130,11 @@ void main() {
     await tester.tap(find.text('Daily Drive'));
     await tester.pumpAndSettle();
 
-    verify(() => getSongs.getAllSongs(limit: 50)).called(1);
+    verify(() => getSongs.getAllSongs(
+          sortBy: 'lastPlayed',
+          ascending: false,
+          limit: 200,
+        )).called(1);
     verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);
   });
 
@@ -168,7 +181,8 @@ void main() {
 
   testWidgets('offline-only mode hides the online tab and shows the notice',
       (tester) async {
-    await pumpScreen(tester, settings: const SettingsState(offlineOnlyMode: true));
+    await pumpScreen(tester,
+        settings: const SettingsState(offlineOnlyMode: true));
     // The online/local segmented control is hidden in offline-only mode.
     expect(find.text('Online'), findsNothing);
     expect(find.text('Offline Only Mode'), findsOneWidget);

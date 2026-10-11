@@ -34,6 +34,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   int _pitchSemitones = 0;
   double _fontSize = 26.0;
   bool _practiceMode = false;
+  int _practiceLoopLine = -1;
+  bool _practiceLoopArmed = true;
   int? _lastScore;
   int _totalTaps = 0;
   int _scoreAccumulator = 0;
@@ -130,16 +132,40 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                       ? effectiveLyrics[0]
                       : null);
 
-          // Practice Mode: Loop current line
-          if (_practiceMode &&
-              activeLine != null &&
-              nextLine != null &&
-              pos >= nextLine.timestamp) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                context.read<PlayerCubit>().seek(activeLine.timestamp);
+          // Practice Mode: loop the line being practised back to its start.
+          // The old check compared against `nextLine.timestamp`, which the scan
+          // above has already passed by construction, so the loop could never
+          // fire. The line's end is the next line's timestamp (or a short
+          // fallback after the last line); the armed flag keeps a single seek
+          // in flight while the engine catches up instead of re-seeking on
+          // every position tick.
+          if (!_practiceMode) {
+            _practiceLoopLine = -1;
+            _practiceLoopArmed = true;
+          } else if (activeIdx >= 0) {
+            if (_practiceLoopLine < 0 || activeIdx < _practiceLoopLine) {
+              _practiceLoopLine = activeIdx;
+              _practiceLoopArmed = true;
+            }
+            final loopIndex = _practiceLoopLine;
+            if (loopIndex >= 0 && loopIndex < effectiveLyrics.length) {
+              final lineStart = effectiveLyrics[loopIndex].timestamp;
+              final nextIndex = loopIndex + 1;
+              final lineEnd = (nextIndex < effectiveLyrics.length &&
+                      effectiveLyrics[nextIndex].timestamp > lineStart)
+                  ? effectiveLyrics[nextIndex].timestamp
+                  : lineStart + const Duration(seconds: 4);
+              if (pos < lineEnd) {
+                _practiceLoopArmed = true;
+              } else if (_practiceLoopArmed) {
+                _practiceLoopArmed = false;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    context.read<PlayerCubit>().seek(lineStart);
+                  }
+                });
               }
-            });
+            }
           }
 
           final durationMs = state.duration.inMilliseconds;
@@ -525,6 +551,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                         // Transport Buttons (Shuffle, Prev, Play/Pause, Next, Repeat)
                         PlayerControls(
                           isPlaying: state.isPlaying,
+                          isBuffering: state.isBuffering,
                           isShuffle: state.isShuffle,
                           repeatMode: state.repeatMode,
                           hasPrevious: state.hasPreviousNeighbour,

@@ -223,9 +223,14 @@ class MusicRepository implements IMusicRepository {
         'SELECT s.* FROM songs s '
         'JOIN songs_fts f ON s.id = f.rowid '
         'WHERE songs_fts MATCH ? AND s.is_missing = 0 '
+        'AND s.source = ? '
+        "AND s.path NOT LIKE 'ytmusic://%' "
         'AND (s.cue_file IS NULL OR s.cue_start_ms IS NOT NULL) ',
       );
-      final vars = <Variable>[Variable.withString(ftsQuery)];
+      final vars = <Variable>[
+        Variable.withString(ftsQuery),
+        Variable.withString(SongSource.local),
+      ];
       for (final folder in excludedFolders.where((f) => f.trim().isNotEmpty)) {
         buffer.write(r"AND s.path NOT LIKE ? ESCAPE '\' ");
         final prefix = folder.endsWith(Platform.pathSeparator)
@@ -457,7 +462,7 @@ class MusicRepository implements IMusicRepository {
   Future<Result<SongsTableData?>> getSongByPath(String path) async {
     try {
       final song = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.equals(path))
+            ..where((t) => t.path.lower().equals(path.toLowerCase()))
             ..orderBy([
               (t) => OrderingTerm(
                   expression: t.cueStartMs, nulls: NullsOrder.first)
@@ -1434,41 +1439,90 @@ class MusicRepository implements IMusicRepository {
       // roll back the whole batch. Remap each incoming row onto the id already
       // owning that (path, cue) first, so the update lands on the existing row
       // and keeps its ratings/play history.
-      final remappedSongs = await _remapSongsOntoExistingPaths(songs);
       await _db.transaction(() async {
+        // Collapse legacy case-variant duplicates before remapping: the remap
+        // keys on lower(path), so a single owner must exist before the upsert
+        // can land on it without colliding with a loser's exact path.
+        await _dedupeSongsByPath();
+        final remappedSongs = await _remapSongsOntoExistingPaths(songs);
         await _db.batch((batch) {
           batch.insertAllOnConflictUpdate(_db.songsTable, remappedSongs);
           batch.insertAllOnConflictUpdate(_db.albumsTable, albums);
           batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
         });
+        // Defensive second pass: the incoming batch itself may contain
+        // case-variant duplicates.
+        await _dedupeSongsByPath();
       });
-      // FIX: Deduplicate by file path after scan — prevents a downloaded song
-      // appearing twice when the scanner inserts a new row for a path already
-      // owned by a reconciled YTM row. Keep, per path, a downloaded row in
-      // preference to a plain scanned row, then the lowest id so play history
-      // survives. Only touched when a path genuinely has >1 local row (the
-      // UNIQUE(path,cue) index makes this unreachable in normal operation, so
-      // this is purely defensive against pre-index rows).
-      try {
-        await _db.customStatement(
-          "DELETE FROM songs WHERE id NOT IN ("
-          "SELECT s1.id FROM songs s1 "
-          "WHERE s1.path != '' AND s1.path NOT LIKE 'ytmusic://%' AND s1.cue_start_ms IS NULL "
-          "AND NOT EXISTS ("
-          "SELECT 1 FROM songs s2 WHERE s2.path != '' AND s2.path NOT LIKE 'ytmusic://%' "
-          "AND s2.cue_start_ms IS NULL AND lower(s2.path) = lower(s1.path) "
-          "AND ((s2.is_downloaded = 1 AND s1.is_downloaded = 0) "
-          "OR (s2.is_downloaded = s1.is_downloaded AND s2.id < s1.id))"
-          ")) "
-          "AND path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL "
-          "AND lower(path) IN (SELECT lower(path) FROM songs "
-          "WHERE path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL "
-          "GROUP BY lower(path) HAVING COUNT(*) > 1);",
-        );
-      } catch (_) {}
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to sync scanned music', e));
+    }
+  }
+
+  /// Deduplicates local rows sharing a normalized path — prevents a downloaded
+  /// song appearing twice when the scanner inserts a new row for a path already
+  /// owned by a reconciled YTM row. Keep, per path, a downloaded row in
+  /// preference to a plain scanned row, then the lowest id so play history
+  /// survives. Child rows (playlist membership, queue slots, play history) are
+  /// re-pointed to the surviving id before the loser is deleted, so the FK
+  /// cascade cannot drop them. Only touched when a path genuinely has >1 local
+  /// row (the UNIQUE(path,cue) index makes this unreachable in normal
+  /// operation, so this is purely defensive against pre-index rows).
+  Future<void> _dedupeSongsByPath() async {
+    final rows = await _db
+        .customSelect(
+          "SELECT s1.id AS id, s1.is_downloaded AS downloaded, "
+          "lower(s1.path) AS path_key "
+          "FROM songs s1 "
+          "WHERE s1.path != '' AND s1.path NOT LIKE 'ytmusic://%' "
+          "AND s1.cue_start_ms IS NULL "
+          "AND lower(s1.path) IN ("
+          "SELECT lower(path) FROM songs "
+          "WHERE path != '' AND path NOT LIKE 'ytmusic://%' "
+          "AND cue_start_ms IS NULL "
+          "GROUP BY lower(path) HAVING COUNT(*) > 1)",
+        )
+        .get();
+    if (rows.isEmpty) return;
+
+    final groups = <String, List<(int, int)>>{};
+    for (final row in rows) {
+      groups
+          .putIfAbsent(row.read<String>('path_key'), () => [])
+          .add((row.read<int>('id'), row.read<int>('downloaded')));
+    }
+
+    for (final group in groups.values) {
+      // Downloaded rows win over plain scanned rows; then the lowest id.
+      group.sort((a, b) {
+        if (a.$2 != b.$2) return b.$2.compareTo(a.$2);
+        return a.$1.compareTo(b.$1);
+      });
+      final survivorId = group.first.$1;
+      for (final loser in group.skip(1)) {
+        await _db.customStatement(
+          'DELETE FROM playlist_entries WHERE song_id = ? AND playlist_id IN '
+          '(SELECT playlist_id FROM playlist_entries WHERE song_id = ?);',
+          [loser.$1, survivorId],
+        );
+        await _db.customStatement(
+          'UPDATE playlist_entries SET song_id = ? WHERE song_id = ?;',
+          [survivorId, loser.$1],
+        );
+        await _db.customStatement(
+          'UPDATE queue_items SET song_id = ? WHERE song_id = ?;',
+          [survivorId, loser.$1],
+        );
+        await _db.customStatement(
+          'UPDATE play_history SET song_id = ? WHERE song_id = ?;',
+          [survivorId, loser.$1],
+        );
+        await _db.customStatement(
+          'DELETE FROM songs WHERE id = ?;',
+          [loser.$1],
+        );
+      }
     }
   }
 
@@ -1493,6 +1547,11 @@ class MusicRepository implements IMusicRepository {
 
     for (var i = 0; i < pathList.length; i += batchSize) {
       final chunk = pathList.sublist(i, min(i + batchSize, pathList.length));
+      // Match on lower(path): the keys below are lowercased, and a
+      // case-insensitive filesystem reports the same file with different
+      // casing across scans. An exact-case IN would miss the owner row and
+      // insert a duplicate.
+      final lowerChunk = chunk.map((p) => p.toLowerCase()).toList();
       final query = _db.selectOnly(_db.songsTable)
         ..addColumns([
           _db.songsTable.id,
@@ -1500,7 +1559,7 @@ class MusicRepository implements IMusicRepository {
           _db.songsTable.cueStartMs,
         ])
         ..where(_db.songsTable.source.equals(SongSource.local) &
-            _db.songsTable.path.isIn(chunk));
+            _db.songsTable.path.lower().isIn(lowerChunk));
 
       final rows = await query.get();
       for (final row in rows) {
@@ -1555,6 +1614,33 @@ class MusicRepository implements IMusicRepository {
     final lastDot = audioPath.lastIndexOf('.');
     if (lastDot <= 0) return '';
     return '${audioPath.substring(0, lastDot)}.cue';
+  }
+
+  /// Paths already probed for an embedded CUE sheet with nothing found.
+  /// Negative-only and process-lifetime: every rescan must not re-open every
+  /// FLAC/WAV just to rediscover there is no embedded sheet. A file that gains
+  /// an embedded cue mid-process is picked up on the next app start.
+  static final Set<String> _embeddedCueMisses = {};
+  static const int _embeddedCueMissCacheMax = 20000;
+
+  /// Test seam: number of embedded-cue probes actually attempted.
+  @visibleForTesting
+  static int embeddedCueProbeCount = 0;
+
+  @visibleForTesting
+  static void resetEmbeddedCueProbeState() {
+    _embeddedCueMisses.clear();
+    embeddedCueProbeCount = 0;
+  }
+
+  static void _rememberEmbeddedCueMiss(String path) {
+    if (_embeddedCueMisses.length >= _embeddedCueMissCacheMax) {
+      final toRemove = (_embeddedCueMissCacheMax * 0.25).toInt();
+      for (final key in _embeddedCueMisses.take(toRemove).toList()) {
+        _embeddedCueMisses.remove(key);
+      }
+    }
+    _embeddedCueMisses.add(path);
   }
 
   /// Pure mapping: one container row + its parsed [chapters] -> virtual song
@@ -1637,12 +1723,15 @@ class MusicRepository implements IMusicRepository {
         if (cuePath.isNotEmpty && await File(cuePath).exists()) {
           chapters = await CueParser.findAndParseCue(container.path);
           effectiveCuePath = cuePath;
-        } else {
+        } else if (!_embeddedCueMisses.contains(container.path)) {
+          embeddedCueProbeCount++;
           final embedded =
               await CueParser.extractEmbeddedCueSheet(container.path);
           if (embedded != null && embedded.isNotEmpty) {
             chapters = CueParser.parse(embedded);
             effectiveCuePath = 'embedded://${container.path}';
+          } else {
+            _rememberEmbeddedCueMiss(container.path);
           }
         }
 
@@ -1789,8 +1878,10 @@ class MusicRepository implements IMusicRepository {
       // marked missing until the next scan. content: URIs skip disk I/O.
       final reverifiedMissing = <int>[];
       final reverifiedReappeared = <int>[];
+      final unscannedById = {for (final s in unscannedSongs) s.id: s};
       for (final id in trulyMissingIds) {
-        final song = unscannedSongs.firstWhere((s) => s.id == id);
+        final song = unscannedById[id];
+        if (song == null) continue;
         if (song.path.isEmpty || song.path.startsWith('content:')) {
           reverifiedMissing.add(id);
           continue;
@@ -2376,7 +2467,7 @@ class MusicRepository implements IMusicRepository {
     try {
       final existing = await (_db.select(_db.songsTable)
             ..where((t) =>
-                t.path.equals(path) &
+                t.path.lower().equals(path.toLowerCase()) &
                 t.source.equals(SongSource.local) &
                 t.cueStartMs.isNull()))
           .getSingleOrNull();

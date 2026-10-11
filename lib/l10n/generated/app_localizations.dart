@@ -14705,6 +14705,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Compact view'**
   String get compactView;
+
+  /// Terminal boot screen title when the app configuration is invalid
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr cannot start with this configuration'**
+  String get bootConfigurationError;
+
+  /// Recoverable boot screen title after a warm-up failure
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr could not finish starting up'**
+  String get bootStartupFailed;
+
+  /// Recoverable boot screen body explaining the retry
+  ///
+  /// In en, this message translates to:
+  /// **'Playback components did not become ready in time. Retrying usually fixes a slow cold start.'**
+  String get bootStartupFailedMessage;
 }
 
 class _AppLocalizationsDelegate

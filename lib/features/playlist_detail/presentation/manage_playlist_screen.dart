@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
-import 'package:fpdart/fpdart.dart' hide State;
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/search_algorithm_utils.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -68,15 +68,14 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     final stream = _playlistUseCases.watchPlaylistSongs(widget.playlist.id);
     Result<List<SongsTableData>> firstBatch;
     try {
-      firstBatch = await stream.first.timeout(
-        const Duration(seconds: 4),
-        onTimeout: () => const Right(<SongsTableData>[]),
-      );
+      firstBatch = await stream.first.timeout(const Duration(seconds: 4));
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _loadError = e.toString();
+        _loadError = e is TimeoutException
+            ? 'Loading the playlist took too long. Please retry.'
+            : e.toString();
       });
       return;
     }
@@ -105,11 +104,10 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
 
   List<SongsTableData> _filterSongs(List<SongsTableData> songs) {
     if (_searchQuery.isEmpty) return songs;
-    final query = _searchQuery.toLowerCase();
+    final query = SearchAlgorithmUtils.normalize(_searchQuery);
     return songs.where((s) {
-      final title = s.title.toLowerCase();
-      final artist = s.artist.toLowerCase();
-      return title.contains(query) || artist.contains(query);
+      return SearchAlgorithmUtils.normalize(s.title).contains(query) ||
+          SearchAlgorithmUtils.normalize(s.artist).contains(query);
     }).toList();
   }
 

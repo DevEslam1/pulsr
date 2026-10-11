@@ -52,6 +52,12 @@ class PlaybackBookmarkStore {
   static const int minDurationMs = 10 * 60 * 1000;
 
   final Map<String, PlaybackBookmark> _bookmarks = {};
+  late final Future<void> ready;
+  bool _clearedBeforeLoad = false;
+
+  PlaybackBookmarkStore() {
+    ready = load();
+  }
 
   Map<String, PlaybackBookmark> snapshot() => Map.unmodifiable(_bookmarks);
 
@@ -110,26 +116,43 @@ class PlaybackBookmarkStore {
   }
 
   void remove(String trackKey) => _bookmarks.remove(trackKey);
-  void clear() => _bookmarks.clear();
+
+  void clear() {
+    _clearedBeforeLoad = true;
+    _bookmarks.clear();
+  }
 
   Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(prefsKey);
       if (raw == null || raw.isEmpty) return;
+      if (_clearedBeforeLoad) return; // user cleared before load finished
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      _bookmarks.clear();
       decoded.forEach((k, v) {
         if (v is Map) {
           final b = PlaybackBookmark.fromMap(k, Map<String, dynamic>.from(v));
-          if (b != null) _bookmarks[k] = b;
+          // In-memory saves made before load completed win over stored data.
+          if (b != null) _bookmarks.putIfAbsent(k, () => b);
         }
       });
     } catch (_) {}
   }
 
+  /// Re-reads the persisted bookmarks, replacing the in-memory cache, so a
+  /// backup import is visible without an app restart. Safe to call repeatedly.
+  Future<void> reload() async {
+    await ready;
+    _clearedBeforeLoad = false;
+    _bookmarks.clear();
+    await load();
+  }
+
   Future<void> persist() async {
     try {
+      // Wait out the initial load so a pre-load save is never overwritten by a
+      // partial map serialized before stored entries were merged in.
+      await ready;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(prefsKey,
           jsonEncode(_bookmarks.map((k, v) => MapEntry(k, v.toMap()))));

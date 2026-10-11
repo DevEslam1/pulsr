@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -37,6 +39,12 @@ class PlayerSeekBar extends StatefulWidget {
   /// next track is visible without opening the queue.
   final bool showUpNext;
 
+  /// Test seam: when set, waveform decoding uses this loader instead of
+  /// [WaveformService.instance].
+  @visibleForTesting
+  static Future<List<double>> Function(int songId, String? filePath)?
+      waveformLoaderOverride;
+
   const PlayerSeekBar({
     super.key,
     this.position,
@@ -56,12 +64,52 @@ class PlayerSeekBar extends StatefulWidget {
 }
 
 class _PlayerSeekBarState extends State<PlayerSeekBar> {
+  static const Duration _waveformDebounceDelay = Duration(milliseconds: 160);
+
   double? _dragValue;
   bool _tapSeekPending = false;
   double? _tapSeekRatio;
   int? _lastSongId;
   String? _lastFilePath;
   Future<List<double>>? _cachedWaveformFuture;
+  int _waveformGeneration = 0;
+  Timer? _waveformDebounce;
+
+  @override
+  void dispose() {
+    _waveformDebounce?.cancel();
+    _waveformDebounce = null;
+    super.dispose();
+  }
+
+  /// Debounces the decode so rapid browsing does not start a decode per track,
+  /// and drops any late result whose song has since been replaced.
+  Future<List<double>> _requestWaveform(
+      int songId, String? filePath, int generation) {
+    final completer = Completer<List<double>>();
+    _waveformDebounce?.cancel();
+    _waveformDebounce = Timer(_waveformDebounceDelay, () async {
+      _waveformDebounce = null;
+      if (generation != _waveformGeneration) {
+        completer.complete(const <double>[]);
+        return;
+      }
+      try {
+        final loader = PlayerSeekBar.waveformLoaderOverride;
+        final samples = loader != null
+            ? await loader(songId, filePath)
+            : await WaveformService.instance
+                .getWaveform(songId: songId, filePath: filePath);
+        completer.complete(
+            generation == _waveformGeneration ? samples : const <double>[]);
+      } catch (error, stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
+      }
+    });
+    return completer.future;
+  }
 
   @override
   void didUpdateWidget(PlayerSeekBar oldWidget) {
@@ -82,6 +130,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         context.select<PlayerCubit, String?>((c) => c.state.currentSong?.path);
     final waveformEnabled = context
         .select<SettingsCubit, bool>((c) => c.state.waveformSeekBarEnabled);
+    final isBuffering =
+        context.select<PlayerCubit, bool>((c) => c.state.isBuffering);
 
     final effectiveSongId = widget.songId ?? songId;
     final effectiveFilePath = widget.filePath ?? songPath;
@@ -105,6 +155,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       _tapSeekPending = false;
       _tapSeekRatio = null;
       _cachedWaveformFuture = null;
+      _waveformGeneration++;
+      _waveformDebounce?.cancel();
+      _waveformDebounce = null;
     }
 
     final Widget seekWidget;
@@ -115,10 +168,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         filePath: effectiveFilePath,
       );
 
-      _cachedWaveformFuture ??= WaveformService.instance.getWaveform(
-        songId: effectiveSongId,
-        filePath: effectiveFilePath,
-      );
+      _cachedWaveformFuture ??= _requestWaveform(
+          effectiveSongId, effectiveFilePath, _waveformGeneration);
 
       seekWidget = FutureBuilder<List<double>>(
         key: ValueKey(effectiveSongId),
@@ -135,6 +186,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   duration: widget.duration,
                   onSeek: widget.onSeek,
                   samples: samples,
+                  enabled: !isBuffering,
                   activeColor: widget.activeColor,
                   semanticLabel: widget.semanticLabel,
                   loopPointA: widget.loopPointA,
@@ -153,11 +205,11 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
             );
           }
           // Accurate fallback while waveform is computing or on failure
-          return _buildStandardSeekBar(context, crossfadeSec);
+          return _buildStandardSeekBar(context, crossfadeSec, !isBuffering);
         },
       );
     } else {
-      seekWidget = _buildStandardSeekBar(context, crossfadeSec);
+      seekWidget = _buildStandardSeekBar(context, crossfadeSec, !isBuffering);
     }
 
     return _withUpNext(seekWidget);
@@ -264,7 +316,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   }
 
   Widget _buildStandardSeekBar(BuildContext context,
-      [double crossfadeSec = 0.0]) {
+      [double crossfadeSec = 0.0, bool enabled = true]) {
     bool isPlaying = false;
     try {
       isPlaying = context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
@@ -310,10 +362,14 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                 value: valueLabel,
                 increasedValue: increasedLabel,
                 decreasedValue: decreasedLabel,
-                onIncrease: () => widget.onSeek(clampDuration(
-                    currentDuration + const Duration(seconds: 10))),
-                onDecrease: () => widget.onSeek(clampDuration(
-                    currentDuration - const Duration(seconds: 10))),
+                onIncrease: enabled
+                    ? () => widget.onSeek(clampDuration(
+                        currentDuration + const Duration(seconds: 10)))
+                    : null,
+                onDecrease: enabled
+                    ? () => widget.onSeek(clampDuration(
+                        currentDuration - const Duration(seconds: 10)))
+                    : null,
                 child: RepaintBoundary(
                   child: PulsrSlider(
                     value: effectiveValue,
@@ -327,38 +383,51 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                             ? AppColors.specularStrong
                             : context.palette.hairline.withValues(alpha: 0.8),
                     isWavy: true,
-                    animateWave: isPlaying,
-                    onChangeStart: (val) {
-                      _tapSeekPending = true;
-                      _tapSeekRatio = val.clamp(0.0, maxDuration.toDouble());
-                      setState(() => _dragValue = _tapSeekRatio);
-                    },
-                    onChanged: (val) {
-                      final clampedVal = val.clamp(0.0, maxDuration.toDouble());
-                      if (_tapSeekRatio != null &&
-                          (clampedVal - _tapSeekRatio!).abs() > 200) {
-                        _tapSeekPending = false;
-                      }
-                      setState(() => _dragValue = clampedVal);
-                    },
-                    onChangeEnd: (val) {
-                      final target = (_tapSeekPending && _tapSeekRatio != null)
-                          ? _tapSeekRatio!.clamp(0.0, maxDuration.toDouble())
-                          : val.clamp(0.0, maxDuration.toDouble());
-                      widget.onSeek(Duration(milliseconds: target.round()));
-                      setState(() {
-                        _dragValue = null;
-                        _tapSeekPending = false;
-                        _tapSeekRatio = null;
-                      });
-                    },
-                    onChangeCancel: () {
-                      setState(() {
-                        _dragValue = null;
-                        _tapSeekPending = false;
-                        _tapSeekRatio = null;
-                      });
-                    },
+                    animateWave: isPlaying && enabled,
+                    onChangeStart: enabled
+                        ? (val) {
+                            _tapSeekPending = true;
+                            _tapSeekRatio =
+                                val.clamp(0.0, maxDuration.toDouble());
+                            setState(() => _dragValue = _tapSeekRatio);
+                          }
+                        : null,
+                    onChanged: enabled
+                        ? (val) {
+                            final clampedVal =
+                                val.clamp(0.0, maxDuration.toDouble());
+                            if (_tapSeekRatio != null &&
+                                (clampedVal - _tapSeekRatio!).abs() > 200) {
+                              _tapSeekPending = false;
+                            }
+                            setState(() => _dragValue = clampedVal);
+                          }
+                        : (_) {},
+                    onChangeEnd: enabled
+                        ? (val) {
+                            final target =
+                                (_tapSeekPending && _tapSeekRatio != null)
+                                    ? _tapSeekRatio!
+                                        .clamp(0.0, maxDuration.toDouble())
+                                    : val.clamp(0.0, maxDuration.toDouble());
+                            widget
+                                .onSeek(Duration(milliseconds: target.round()));
+                            setState(() {
+                              _dragValue = null;
+                              _tapSeekPending = false;
+                              _tapSeekRatio = null;
+                            });
+                          }
+                        : null,
+                    onChangeCancel: enabled
+                        ? () {
+                            setState(() {
+                              _dragValue = null;
+                              _tapSeekPending = false;
+                              _tapSeekRatio = null;
+                            });
+                          }
+                        : null,
                   ),
                 ),
               ),

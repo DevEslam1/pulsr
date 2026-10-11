@@ -110,7 +110,8 @@ void main() {
   });
 
   testWidgets('the sign-up toggle switches the form mode', (tester) async {
-    when(() => auth.signUpWithEmail(any(), any())).thenAnswer((_) async => null);
+    when(() => auth.signUpWithEmail(any(), any()))
+        .thenAnswer((_) async => null);
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
 
@@ -170,6 +171,59 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('No account found with this email.'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+      'a cancelled Google sign-in shows an informational (non-error) snackbar',
+      (tester) async {
+    when(() => auth.signInWithGoogle()).thenAnswer((_) async => null);
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign-in was cancelled.'), findsOneWidget);
+    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+    expect(snackBar.backgroundColor, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+      'an email sign-in failure with unauthenticated status still reaches the user',
+      (tester) async {
+    when(() => auth.signInWithEmail(any(), any()))
+        .thenAnswer((_) async => null);
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, 'a@b.com');
+    await tester.enterText(find.byType(TextFormField).last, 'secret1');
+    await tester.tap(find.text('Sign In'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign in failed. Please try again.'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('the sheet pads for the bottom system inset (gesture bar)',
+      (tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    addTearDown(() {
+      tester.view.resetPadding();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    final container = tester
+        .widgetList<Container>(find.descendant(
+          of: find.byType(AuthSheet),
+          matching: find.byType(Container),
+        ))
+        .first;
+    final padding = container.padding as EdgeInsetsDirectional;
+    expect(padding.bottom, greaterThanOrEqualTo(34 + 24));
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

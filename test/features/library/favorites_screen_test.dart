@@ -92,7 +92,8 @@ void main() {
     verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);
   });
 
-  testWidgets('the inline favorite button toggles the favorite', (tester) async {
+  testWidgets('the inline favorite button toggles the favorite',
+      (tester) async {
     final cubit = stubLibraryCubit(LibraryState(favorites: [
       testSong(id: 1, title: 'First Love', isFavorite: true),
     ]));
@@ -148,5 +149,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No songs match'), findsOneWidget);
+  });
+
+  testWidgets('search keystrokes are debounced into one filter pass',
+      (tester) async {
+    await pumpFavorites(
+      tester,
+      LibraryState(favorites: [
+        testSong(id: 1, title: 'Alpha', isFavorite: true),
+        testSong(id: 2, title: 'Beta', isFavorite: true),
+      ]),
+    );
+
+    await tester.tap(find.byIcon(Icons.search_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'alpha');
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.enterText(find.byType(TextField), 'alphax');
+    await tester.pump(const Duration(milliseconds: 150));
+
+    // The first timer was cancelled before firing, so no filter ran yet.
+    expect(find.text('Beta'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No songs match'), findsOneWidget);
+    expect(find.text('Beta'), findsNothing);
   });
 }

@@ -135,6 +135,13 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   bool _cacheSaveRunning = false;
   bool _isSeedingChecked = false;
 
+  /// Coalesces overlapping auto-fetch triggers (tab switch, sync button,
+  /// post-frame timer) into a single in-flight run.
+  Future<void>? _autoFetchInFlight;
+
+  /// Coalesces identical custom-playlist fetches submitted in quick succession.
+  final Map<String, Future<void>> _customFetchInFlight = {};
+
   /// Reactive online-playlist state. Widgets use [ValueListenableBuilder]
   /// to rebuild only when this changes, without touching the freezed state.
   final ytmOnline = ValueNotifier<YtmOnlineState>(const YtmOnlineState());
@@ -634,17 +641,39 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
   /// Automatically triggers fetching liked songs and account playlists if
   /// logged in and not already fetched.
-  Future<void> autoFetchOnlineLibrary({bool force = false}) async {
-    if (!AppConfig.ytmEnabled) return;
+  Future<void> autoFetchOnlineLibrary({bool force = false}) {
+    if (!AppConfig.ytmEnabled) return Future.value();
+    return _autoFetchOnlineLibrary(force: force);
+  }
+
+  @visibleForTesting
+  Future<void> autoFetchOnlineLibraryForTesting({bool force = false}) =>
+      _autoFetchOnlineLibrary(force: force);
+
+  Future<void> _autoFetchOnlineLibrary({required bool force}) {
     final account = getIt<YtmAccountService>();
-    if (!account.isLoggedIn) return;
+    if (!account.isLoggedIn) return Future.value();
+
+    final inFlight = _autoFetchInFlight;
+    if (inFlight != null) return inFlight;
 
     if (!force &&
         onlineState.likedStatus == YtmFetchStatus.done &&
         onlineState.accountStatus == YtmFetchStatus.done) {
-      return;
+      return Future.value();
     }
 
+    final future = _runAutoFetchOnlineLibrary();
+    _autoFetchInFlight = future;
+    future.whenComplete(() {
+      if (identical(_autoFetchInFlight, future)) {
+        _autoFetchInFlight = null;
+      }
+    });
+    return future;
+  }
+
+  Future<void> _runAutoFetchOnlineLibrary() async {
     if (!await ConnectivityGuard.hasConnection()) {
       ErrorLogger.log(
           'Skipping autoFetchOnlineLibrary: no network connectivity',
@@ -656,7 +685,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     try {
       // M-12: Run both independently so one throwing does not cancel or discard the other
       await Future.wait([
-        fetchLikedSongsPlaylist().catchError((e, st) {
+        _fetchLikedSongsPlaylist().catchError((e, st) {
           ErrorLogger.log('fetchLikedSongsPlaylist failed during autoFetch',
               error: e, stackTrace: st, category: 'PlaylistCubit');
         }),
@@ -665,6 +694,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
               error: e, stackTrace: st, category: 'PlaylistCubit');
         }),
       ]);
+    } catch (e, st) {
+      ErrorLogger.log('autoFetchOnlineLibrary failed',
+          error: e, stackTrace: st, category: 'PlaylistCubit');
     } finally {
       _setOnlineState((s) => s.copyWith(isAutoFetching: false));
     }
@@ -673,6 +705,14 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// Fetches the authenticated user's Liked Music from YouTube Music.
   Future<void> fetchLikedSongsPlaylist() async {
     if (!AppConfig.ytmEnabled) return;
+    await _fetchLikedSongsPlaylist();
+  }
+
+  @visibleForTesting
+  Future<void> fetchLikedSongsPlaylistForTesting() =>
+      _fetchLikedSongsPlaylist();
+
+  Future<void> _fetchLikedSongsPlaylist() async {
     final account = getIt<YtmAccountService>();
     if (!account.isLoggedIn) {
       _setOnlineState((s) => s.copyWith(
@@ -690,14 +730,13 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     try {
       final tracks = await account.fetchLikedSongs();
       if (_disposed || isClosed) return;
+      // An empty result is a valid "nothing liked" state, not a failure:
+      // reserve the error state for auth/network problems so the card does
+      // not demand a re-login for an empty library.
       _setOnlineState((s) => s.copyWith(
-            likedStatus:
-                tracks.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.error,
+            likedStatus: YtmFetchStatus.done,
             likedTracks: tracks,
-            likedError: tracks.isEmpty
-                ? 'No liked songs found. Try re-logging into YouTube Music.'
-                : null,
-            clearLikedError: tracks.isNotEmpty,
+            clearLikedError: true,
           ));
       if (tracks.isNotEmpty) {
         await _saveOnlineCache();
@@ -772,15 +811,39 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
   /// Fetches a YouTube / YouTube Music playlist by URL or ID and appends it
   /// to the custom online playlists list.
-  Future<void> fetchOnlinePlaylistByUrl(String urlOrId) async {
-    if (!AppConfig.ytmEnabled) return;
+  Future<void> fetchOnlinePlaylistByUrl(String urlOrId) {
+    if (!AppConfig.ytmEnabled) return Future.value();
+    return _fetchOnlinePlaylistByUrl(urlOrId);
+  }
+
+  @visibleForTesting
+  Future<void> fetchOnlinePlaylistByUrlForTesting(String urlOrId) =>
+      _fetchOnlinePlaylistByUrl(urlOrId);
+
+  Future<void> _fetchOnlinePlaylistByUrl(String urlOrId) {
     final input = urlOrId.trim();
-    if (input.isEmpty) return;
+    if (input.isEmpty) return Future.value();
 
-    // Prevent duplicate fetches
-    final existing = onlineState.customPlaylists.any((p) => p.id == input);
-    if (existing) return;
+    // Prevent duplicate fetches (already saved).
+    if (onlineState.customPlaylists.any((p) => p.id == input)) {
+      return Future.value();
+    }
+    // Two rapid submits both pass the check above before the first await, so
+    // identical requests join the in-flight future instead of fetching twice.
+    final inFlight = _customFetchInFlight[input];
+    if (inFlight != null) return inFlight;
 
+    final future = _runFetchOnlinePlaylistByUrl(input);
+    _customFetchInFlight[input] = future;
+    future.whenComplete(() {
+      if (identical(_customFetchInFlight[input], future)) {
+        _customFetchInFlight.remove(input);
+      }
+    });
+    return future;
+  }
+
+  Future<void> _runFetchOnlinePlaylistByUrl(String input) async {
     _setOnlineState((s) => s.copyWith(
           customStatus: YtmFetchStatus.loading,
           clearCustomError: true,
@@ -833,9 +896,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         tracks: tracks,
       );
 
-      final updated =
-          List<OnlinePlaylistEntry>.from(onlineState.customPlaylists)
-            ..add(entry);
+      // Re-dedupe after the awaits: a concurrent path may have landed the same
+      // entry while this fetch was running.
+      final updated = List<OnlinePlaylistEntry>.from(
+          onlineState.customPlaylists.where((p) => p.id != input))
+        ..add(entry);
       _setOnlineState((s) => s.copyWith(
             customStatus: YtmFetchStatus.done,
             customPlaylists: updated,
@@ -886,6 +951,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       } catch (_) {}
     }
     _cacheSaveQueue.clear();
+    _autoFetchInFlight = null;
+    _customFetchInFlight.clear();
     _playlistsSub?.cancel();
     _playlistSongsSub?.cancel();
     for (final sub in _smartSubscriptions.values) {

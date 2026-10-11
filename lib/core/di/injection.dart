@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
+import 'package:pulsr/core/config/app_config.dart';
 import 'package:pulsr/core/services/file_intent_handler.dart';
 import 'package:pulsr/core/utils/error_logger.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
@@ -102,6 +103,57 @@ void validateDependencies(GetIt getIt) {
   require<PlayerCubit>();
   require<DownloadsCubit>();
   require<YtmDownloadCubit>();
+}
+
+bool _isSingletonReady<T extends Object>() {
+  if (!getIt.isRegistered<T>()) return false;
+  try {
+    return getIt.isReadySync<T>();
+  } on ArgumentError {
+    // Sync singletons and factories are ready by definition.
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<void> _awaitDependency<T extends Object>() async {
+  // Sync-registered types (and factories) must not go through getAsync: it
+  // rejects non-async registrations with a StateError.
+  if (_isSingletonReady<T>()) return;
+  if (!getIt.isRegistered<T>()) {
+    throw StateError('${T.toString()} is not registered in DI');
+  }
+  await getIt.getAsync<T>();
+}
+
+/// Whether every async singleton the root widget resolves synchronously during
+/// its first build is ready. A pending/failed warm-up returns false so the UI
+/// can show a recoverable boot screen instead of throwing a StateError.
+bool get appDependenciesReady =>
+    _isSingletonReady<PulsrAudioHandler>() &&
+    _isSingletonReady<PlayerCubit>() &&
+    (!AppConfig.ytmEnabled || _isSingletonReady<YtmDownloadCubit>());
+
+/// Awaits the app-shell singletons that [PulsrApp] looks up synchronously.
+/// Warm-up failures in [configureDependencies] are swallowed, so this gives a
+/// slow or partially failed cold start a second, awaitable chance. Never
+/// throws; returns whether the app can render.
+Future<bool> ensureAppDependenciesReady({
+  Duration timeout = const Duration(seconds: 30),
+}) async {
+  try {
+    await Future.wait<void>([
+      _awaitDependency<PulsrAudioHandler>(),
+      _awaitDependency<PlayerCubit>(),
+      if (AppConfig.ytmEnabled) _awaitDependency<YtmDownloadCubit>(),
+    ]).timeout(timeout);
+    return true;
+  } catch (e, st) {
+    ErrorLogger.log('App-shell DI warm-up incomplete',
+        error: e, stackTrace: st, category: 'DI');
+    return false;
+  }
 }
 
 FutureOr<void> disposeHttpClient(HttpClient client) {

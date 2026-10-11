@@ -56,8 +56,7 @@ void main() {
     playlists = StreamController<Result<List<PlaylistsTableData>>>.broadcast();
     smartSongs = StreamController<List<SongsTableData>>.broadcast();
 
-    when(() => useCases.watchPlaylists())
-        .thenAnswer((_) => playlists.stream);
+    when(() => useCases.watchPlaylists()).thenAnswer((_) => playlists.stream);
     when(() => useCases.watchSmartPlaylistSongs(any()))
         .thenAnswer((_) => smartSongs.stream);
     when(() => useCases.createPlaylist(any(),
@@ -278,9 +277,12 @@ void main() {
   group('online cache', () {
     test('restores a valid cache', () async {
       final track = const YtmTrack(
-          videoId: 'v1', title: 'T', artist: 'A', duration: Duration(seconds: 3));
-      final account = const YtmAccountPlaylist(
-          playlistId: 'p1', title: 'P', subtitle: 's');
+          videoId: 'v1',
+          title: 'T',
+          artist: 'A',
+          duration: Duration(seconds: 3));
+      final account =
+          const YtmAccountPlaylist(playlistId: 'p1', title: 'P', subtitle: 's');
       final custom = OnlinePlaylistEntry(
           id: 'c1', title: 'C', uploader: 'u', tracks: [track]);
       SharedPreferences.setMockInitialValues({
@@ -302,7 +304,8 @@ void main() {
     test('truncates more than ten custom playlists', () async {
       final customs = [
         for (var i = 0; i < 12; i++)
-          OnlinePlaylistEntry(id: 'c$i', title: 'C$i', uploader: '', tracks: const []).toJson(),
+          OnlinePlaylistEntry(
+              id: 'c$i', title: 'C$i', uploader: '', tracks: const []).toJson(),
       ];
       SharedPreferences.setMockInitialValues({
         PlaylistCubit.onlineCacheKey: jsonEncode({
@@ -366,17 +369,14 @@ void main() {
 
     test('custom playlist removal, restore and clear persist the cache',
         () async {
-      final entry = OnlinePlaylistEntry(
-          id: 'c1',
-          title: 'C',
-          uploader: 'u',
-          tracks: [
-            const YtmTrack(
-                videoId: 'v',
-                title: 'T',
-                artist: 'A',
-                duration: Duration(seconds: 1))
-          ]);
+      final entry =
+          OnlinePlaylistEntry(id: 'c1', title: 'C', uploader: 'u', tracks: [
+        const YtmTrack(
+            videoId: 'v',
+            title: 'T',
+            artist: 'A',
+            duration: Duration(seconds: 1))
+      ]);
       final cubit = create();
       cubit.restoreCustomPlaylist(entry);
       expect(cubit.onlineState.customPlaylists.length, 1);

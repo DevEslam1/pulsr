@@ -4454,5 +4454,8 @@
   "upNext": "التالي",
   "proBadge": "PRO",
   "nowPlayingPreview": "▶ قيد التشغيل الآن",
-  "compactView": "العرض المصغر"
+  "compactView": "العرض المصغر",
+  "bootConfigurationError": "لا يمكن تشغيل Pulsr بهذا الإعداد",
+  "bootStartupFailed": "تعذّر إكمال تشغيل Pulsr",
+  "bootStartupFailedMessage": "لم تصبح مكوّنات التشغيل جاهزة في الوقت المحدد. إعادة المحاولة تحلّ عادةً مشكلة بدء التشغيل البطيء."
 }

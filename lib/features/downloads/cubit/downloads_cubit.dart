@@ -135,6 +135,23 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     }
   }
 
+  /// Replaces [task] in the createdAt-descending [current] list without
+  /// re-sorting every task on each progress tick. A task's createdAt never
+  /// changes, so its slot is stable; a new task is inserted in order.
+  static List<DownloadTask> _replaceTaskInOrderedList(
+      List<DownloadTask> current, DownloadTask task) {
+    final next = List<DownloadTask>.of(current);
+    final index = next.indexWhere((t) => t.videoId == task.videoId);
+    if (index == -1) {
+      final insertAt =
+          next.indexWhere((t) => t.createdAt.isBefore(task.createdAt));
+      next.insert(insertAt == -1 ? next.length : insertAt, task);
+      return next;
+    }
+    next[index] = task;
+    return next;
+  }
+
   void _subscribeToDownloadUpdates() {
     _downloadSub?.cancel();
     removeFromComposite(_downloadSub);
@@ -216,7 +233,10 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       task.videoId: task,
     });
 
-    safeEmit(state.copyWith(tasks: updatedTasks));
+    safeEmit(state.copyWith(
+      tasks: updatedTasks,
+      cachedTaskList: _replaceTaskInOrderedList(state.taskList, task),
+    ));
 
     await _deleteMutex.protect(() async {
       // Prune throttle bookkeeping: tasks that never reach a terminal state
@@ -331,19 +351,28 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
         .where((t) => t.status == DownloadStatus.failed)
         .map((t) => t.videoId)
         .toList();
+    return retryDownloads(failedIds, delayMs: delayMs);
+  }
+
+  /// Re-queues [videoIds] with the same pacing as [retryAllFailed], so a bulk
+  /// selection retry cannot fire every request at once and trip YouTube's
+  /// 429/bot throttling. Returns the number re-queued.
+  Future<int> retryDownloads(Iterable<String> videoIds,
+      {int delayMs = 500}) async {
+    final ids = videoIds.toList();
     var queued = 0;
-    for (var i = 0; i < failedIds.length; i++) {
+    for (var i = 0; i < ids.length; i++) {
       if (isClosed) break;
       if (i > 0 && delayMs > 0) {
         await Future.delayed(Duration(milliseconds: delayMs));
       }
       if (isClosed) break;
-      final result = await _retryDownloadUseCase(failedIds[i]);
+      final result = await _retryDownloadUseCase(ids[i]);
       // FIX-M07: Check isClosed immediately after async retry use-case
       if (isClosed) break;
       if (result.isRight()) queued++;
     }
-    if (!isClosed && failedIds.isNotEmpty && queued == 0) {
+    if (!isClosed && ids.isNotEmpty && queued == 0) {
       safeEmit(
           state.copyWith(errorMessage: 'Could not retry failed downloads'));
     }

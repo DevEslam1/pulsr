@@ -74,7 +74,16 @@ class LyricsOffsetStore {
         await prefs.remove('$legKey$_pathSuffix');
         return val;
       }
-      if (owner != null && owner != path) return 0;
+      if (owner == null) {
+        // Missing owner marker: the value cannot be attributed to this path
+        // (the hash may belong to a colliding path). Treat as a miss and drop
+        // the orphan so it cannot be served to a future collision either.
+        if (prefs.containsKey(key)) {
+          await prefs.remove(key);
+        }
+        return 0;
+      }
+      if (owner != path) return 0;
       return prefs.getInt(key) ?? 0;
     } catch (e, st) {
       ErrorLogger.log('Lyrics offset read failed',

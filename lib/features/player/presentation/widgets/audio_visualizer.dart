@@ -124,6 +124,9 @@ class AudioVisualizerState extends State<AudioVisualizer>
   static const int _numBands = 32;
   final List<double> _currentData = List.filled(_numBands, 0.0);
   final List<double> _targetData = List.filled(_numBands, 0.0);
+  // Snapshot recycled for the next notification: emitting the previously
+  // dropped snapshot avoids a `List.from` allocation on every tick.
+  List<double> _spareDataSnapshot = List.filled(_numBands, 0.0);
   late final ValueNotifier<List<double>> _dataNotifier;
   DateTime _lastNativeDataTime = DateTime.fromMillisecondsSinceEpoch(0);
   // Monotonic phase clock for the simulated visualizer. A wall-clock jump
@@ -401,6 +404,9 @@ class AudioVisualizerState extends State<AudioVisualizer>
   List<double> get currentDataForTesting => List.unmodifiable(_currentData);
 
   @visibleForTesting
+  ValueListenable<List<double>> get dataListenableForTesting => _dataNotifier;
+
+  @visibleForTesting
   void setBarDataForTesting(int index, double val) {
     _currentData[index] = val;
     _dataNotifier.value = List.from(_currentData);
@@ -488,7 +494,15 @@ class AudioVisualizerState extends State<AudioVisualizer>
     }
 
     if (hasChanged) {
-      _dataNotifier.value = List.from(_currentData);
+      // Two alternating preallocated snapshots: the one the listeners currently
+      // hold becomes the spare as soon as it is replaced, so no per-tick
+      // allocation is needed and every emission still has a fresh identity.
+      final emit = _spareDataSnapshot;
+      for (int i = 0; i < _numBands; i++) {
+        emit[i] = _currentData[i];
+      }
+      _spareDataSnapshot = _dataNotifier.value;
+      _dataNotifier.value = emit;
     }
 
     if (!widget.isPlaying && _isDecayedToBaseline()) {
@@ -659,10 +673,31 @@ class AudioVisualizerState extends State<AudioVisualizer>
 
 // --- PAINTER 1: BAR VISUALIZER ---
 class _BarVisualizerPainter extends CustomPainter {
+  static const int _maxCachedPaints = 24;
+  static final Map<int, Paint> _paintCache = <int, Paint>{};
+
   final List<double> data;
   final Color color;
 
   _BarVisualizerPainter({required this.data, required this.color});
+
+  static Paint _paintFor(Color color, Size size) {
+    final key = Object.hash(color, size.width, size.height);
+    if (_paintCache.length > _maxCachedPaints) _paintCache.clear();
+    return _paintCache.putIfAbsent(
+      key,
+      () => Paint()
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.95),
+            color.withValues(alpha: 0.35),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -675,16 +710,7 @@ class _BarVisualizerPainter extends CustomPainter {
     final totalWidth = count * barWidth + totalGap;
     final startX = (size.width - totalWidth) / 2;
 
-    final paint = Paint()
-      ..style = PaintingStyle.fill
-      ..shader = LinearGradient(
-        colors: [
-          color.withValues(alpha: 0.95),
-          color.withValues(alpha: 0.35),
-        ],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    final paint = _paintFor(color, size);
 
     for (int i = 0; i < count; i++) {
       final x = startX + i * (barWidth + gap);
@@ -706,10 +732,43 @@ class _BarVisualizerPainter extends CustomPainter {
 
 // --- PAINTER 2: WAVE VISUALIZER ---
 class _WaveVisualizerPainter extends CustomPainter {
+  static const int _maxCachedPaints = 24;
+  static final Map<int, ({Paint fill, Paint line})> _paintCache =
+      <int, ({Paint fill, Paint line})>{};
+  // Paint calls are synchronous on the UI thread, so reusing the path buffers
+  // across frames avoids a per-frame allocation without observable aliasing.
+  static final Path _path = Path();
+  static final Path _fillPath = Path();
+
   final List<double> data;
   final Color color;
 
   _WaveVisualizerPainter({required this.data, required this.color});
+
+  static ({Paint fill, Paint line}) _paintsFor(Color color, Size size) {
+    final key = Object.hash(color, size.width, size.height);
+    if (_paintCache.length > _maxCachedPaints) _paintCache.clear();
+    return _paintCache.putIfAbsent(
+      key,
+      () => (
+        fill: Paint()
+          ..style = PaintingStyle.fill
+          ..shader = LinearGradient(
+            colors: [
+              color.withValues(alpha: 0.35),
+              color.withValues(alpha: 0.0),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
+        line: Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.0
+          ..strokeCap = StrokeCap.round
+          ..color = color,
+      ),
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -718,8 +777,8 @@ class _WaveVisualizerPainter extends CustomPainter {
     final count = data.length;
     final stepX = size.width / (count - 1);
 
-    final path = Path();
-    final fillPath = Path();
+    final path = _path..reset();
+    final fillPath = _fillPath..reset();
 
     final points = <Offset>[];
     final midY = size.height / 2;
@@ -746,25 +805,9 @@ class _WaveVisualizerPainter extends CustomPainter {
     fillPath.lineTo(size.width, size.height);
     fillPath.close();
 
-    final fillPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..shader = LinearGradient(
-        colors: [
-          color.withValues(alpha: 0.35),
-          color.withValues(alpha: 0.0),
-        ],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    final linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round
-      ..color = color;
-
-    canvas.drawPath(fillPath, fillPaint);
-    canvas.drawPath(path, linePaint);
+    final paints = _paintsFor(color, size);
+    canvas.drawPath(fillPath, paints.fill);
+    canvas.drawPath(path, paints.line);
   }
 
   @override

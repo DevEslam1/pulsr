@@ -36,27 +36,30 @@ void main() {
     when(() => repo.getAllSongs())
         .thenAnswer((_) async => const Right(<SongsTableData>[]));
     when(() => repo.syncScannedMusic(
-        songs: any(named: 'songs'),
-        albums: any(named: 'albums'),
-        artists: any(named: 'artists'))).thenAnswer((_) async => const Right(null));
+            songs: any(named: 'songs'),
+            albums: any(named: 'albums'),
+            artists: any(named: 'artists')))
+        .thenAnswer((_) async => const Right(null));
     when(() => repo.cleanupOrphanedSongs(any()))
         .thenAnswer((_) async => const Right(0));
     when(() => repo.expandCueSheets()).thenAnswer((_) async => const Right(0));
     when(() => repo.updateAudioQuality(
-        songId: any(named: 'songId'),
-        sampleRate: any(named: 'sampleRate'),
-        bitDepth: any(named: 'bitDepth'),
-        bitrateKbps: any(named: 'bitrateKbps'),
-        codec: any(named: 'codec'),
-        loudnessRange: any(named: 'loudnessRange'))).thenAnswer((_) async => const Right(null));
+            songId: any(named: 'songId'),
+            sampleRate: any(named: 'sampleRate'),
+            bitDepth: any(named: 'bitDepth'),
+            bitrateKbps: any(named: 'bitrateKbps'),
+            codec: any(named: 'codec'),
+            loudnessRange: any(named: 'loudnessRange')))
+        .thenAnswer((_) async => const Right(null));
     when(() => repo.updateSongTags(
-        path: any(named: 'path'),
-        title: any(named: 'title'),
-        artist: any(named: 'artist'),
-        album: any(named: 'album'),
-        genre: any(named: 'genre'),
-        year: any(named: 'year'),
-        trackNumber: any(named: 'trackNumber'))).thenAnswer((_) async => const Right(null));
+            path: any(named: 'path'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
+            album: any(named: 'album'),
+            genre: any(named: 'genre'),
+            year: any(named: 'year'),
+            trackNumber: any(named: 'trackNumber')))
+        .thenAnswer((_) async => const Right(null));
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(queryChannel, (call) async {
@@ -111,9 +114,9 @@ void main() {
       });
       final album = Directory('${temp.path}${Platform.pathSeparator}album')
         ..createSync();
-      File('${album.path}${Platform.pathSeparator}.nomedia').writeAsStringSync('');
-      final song =
-          '${album.path}${Platform.pathSeparator}song.mp3';
+      File('${album.path}${Platform.pathSeparator}.nomedia')
+          .writeAsStringSync('');
+      final song = '${album.path}${Platform.pathSeparator}song.mp3';
 
       expect(MediaScannerService.isInNomediaDirectory(song), isTrue);
       // cached second call
@@ -139,8 +142,7 @@ void main() {
       expect(scanner.lastScanEpochSec, 1234);
       expect(scanner.lastScanAt, isNotNull);
       expect(scanner.shouldRescanOnResume(), isFalse);
-      expect(
-          scanner.shouldRescanOnResume(threshold: Duration.zero), isTrue);
+      expect(scanner.shouldRescanOnResume(threshold: Duration.zero), isTrue);
     });
 
     test('checkPermission and requestPermission succeed off Android', () async {

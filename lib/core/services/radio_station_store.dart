@@ -44,6 +44,45 @@ class RadioStationStore {
     await persist();
   }
 
+  /// True when a station other than [exceptId] already uses [url]. Callers use
+  /// this to refuse an edit that would silently delete another station.
+  bool hasUrlCollision(String url, {String? exceptId}) {
+    final normalized = url.trim();
+    return _stations.any((s) => s.id != exceptId && s.url == normalized);
+  }
+
+  /// Atomically replaces [previous] with [updated] in a single persist pass,
+  /// so a rejected update can never leave the list missing the old entry.
+  /// Returns false (touching nothing) when [updated] is not a valid URL.
+  Future<bool> replace(RadioStation previous, RadioStation updated) async {
+    if (!RadioStation.isHttpUrl(updated.url)) return false;
+    _stations.removeWhere((s) => s.id == previous.id);
+    _stations.removeWhere((s) => s.id == updated.id || s.url == updated.url);
+    _stations.insert(0, updated);
+    if (_stations.length > maxEntries) {
+      _stations.removeRange(maxEntries, _stations.length);
+    }
+    await persist();
+    return true;
+  }
+
+  /// Adds many stations with a single persist pass. Returns the number of
+  /// accepted (valid `http(s)`) stations.
+  Future<int> addAll(Iterable<RadioStation> stations) async {
+    var accepted = 0;
+    for (final station in stations) {
+      if (!RadioStation.isHttpUrl(station.url)) continue;
+      _stations.removeWhere((s) => s.id == station.id || s.url == station.url);
+      _stations.insert(0, station);
+      if (_stations.length > maxEntries) {
+        _stations.removeRange(maxEntries, _stations.length);
+      }
+      accepted++;
+    }
+    if (accepted > 0) await persist();
+    return accepted;
+  }
+
   Future<void> remove(String id) async {
     final before = _stations.length;
     _stations.removeWhere((s) => s.id == id);

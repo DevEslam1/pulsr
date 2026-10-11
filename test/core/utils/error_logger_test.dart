@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/utils/error_logger.dart';
 
@@ -65,6 +67,34 @@ void main() {
       final scrubbedAuth = ErrorLogger.redactPii(authHeaderFixture);
       expect(scrubbedAuth, contains('Authorization: [REDACTED_TOKEN]'));
       expect(scrubbedAuth, isNot(contains('my_secret_jwt_token_here')));
+    });
+
+    test('reports each error to onCrashReported exactly once (single sink)',
+        () {
+      var calls = 0;
+      ErrorLogger.onCrashReported = (_, __, ___) => calls++;
+
+      ErrorLogger.log('Single sink',
+          error: Exception('boom'), category: 'UnitTests');
+      ErrorLogger.log('No error means no crash report', category: 'UnitTests');
+
+      expect(calls, 1);
+      ErrorLogger.onCrashReported = null;
+    });
+
+    test('main.dart does not capture Sentry a second time from onCrashReported',
+        () {
+      final source = File('lib/main.dart').readAsStringSync();
+      final callbackStart = source.indexOf('ErrorLogger.onCrashReported =');
+      expect(callbackStart, isNot(-1),
+          reason: 'main() must install the crash-report hook');
+      final callbackEnd = source.indexOf('};', callbackStart);
+      expect(callbackEnd, greaterThan(callbackStart));
+
+      final callbackBody = source.substring(callbackStart, callbackEnd);
+      expect(callbackBody.contains('Sentry.captureException'), isFalse,
+          reason: 'ErrorLogger.log already captures; capturing in the hook '
+              'would report every crash to Sentry twice');
     });
   });
 }

@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pulsr/core/widgets/song_tile.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';
@@ -15,6 +14,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_state.dart';
 import 'package:pulsr/features/search/presentation/search_screen.dart';
+import 'package:pulsr/features/search/presentation/widgets/highlighted_song_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../helpers/screen_harness.dart';
@@ -31,6 +31,7 @@ void main() {
   late _LibraryCubit libraryCubit;
   late StreamController<SearchState> states;
   late ValueNotifier<List<String>> savedSearches;
+  late ValueNotifier<bool> hasMoreResults;
   late PlayerCubit player;
 
   setUpAll(() {
@@ -57,6 +58,7 @@ void main() {
     libraryCubit = _LibraryCubit();
     states = StreamController<SearchState>.broadcast();
     savedSearches = ValueNotifier<List<String>>(const []);
+    hasMoreResults = ValueNotifier<bool>(false);
     player = stubPlayerCubit();
     when(() => player.playSong(any(), queue: any(named: 'queue')))
         .thenAnswer((_) async {});
@@ -64,6 +66,8 @@ void main() {
     when(() => searchCubit.state).thenReturn(const SearchState());
     when(() => searchCubit.stream).thenAnswer((_) => states.stream);
     when(() => searchCubit.savedSearches).thenReturn(savedSearches);
+    when(() => searchCubit.hasMoreResults).thenReturn(hasMoreResults);
+    when(() => searchCubit.isDebouncing).thenReturn(false);
     when(() => searchCubit.isSaved(any(), any())).thenReturn(false);
     when(() => searchCubit.onQueryChanged(any(),
         immediate: any(named: 'immediate'))).thenReturn(null);
@@ -88,6 +92,7 @@ void main() {
     addTearDown(() async {
       await states.close();
       savedSearches.dispose();
+      hasMoreResults.dispose();
     });
   });
 
@@ -212,7 +217,8 @@ void main() {
     ignoreOverflow();
     when(() => libraryCubit.state).thenReturn(const LibraryState(
       albums: [
-        AlbumsTableData(id: 1, title: 'Good Girl Gone Bad', artist: 'R', songCount: 2),
+        AlbumsTableData(
+            id: 1, title: 'Good Girl Gone Bad', artist: 'R', songCount: 2),
       ],
     ));
     await pumpScreen(tester);
@@ -224,10 +230,7 @@ void main() {
         query: 'beat',
         results: [
           createTestSong(
-              id: 1,
-              title: 'Beat',
-              artist: 'R',
-              album: 'Good Girl Gone Bad'),
+              id: 1, title: 'Beat', artist: 'R', album: 'Good Girl Gone Bad'),
         ],
       ),
     );
@@ -237,8 +240,7 @@ void main() {
     expect(find.text('album-route'), findsOneWidget);
   });
 
-  testWidgets('local results list every match and play on tap',
-      (tester) async {
+  testWidgets('local results list every match and play on tap', (tester) async {
     ignoreOverflow();
     await pumpScreen(tester, size: const Size(800, 3000));
     await tester.enterText(find.byType(TextField).first, 'beat');
@@ -254,9 +256,9 @@ void main() {
       ),
     );
 
-    expect(find.byType(SongTile), findsNWidgets(8));
+    expect(find.byType(HighlightedSongTile), findsNWidgets(8));
 
-    await tester.tap(find.byType(SongTile).first);
+    await tester.tap(find.byType(HighlightedSongTile).first);
     await tester.pump();
     verify(() => searchCubit.commitQuery()).called(1);
     verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);

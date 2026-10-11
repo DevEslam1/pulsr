@@ -69,15 +69,51 @@ class SearchAlgorithmUtils {
     }
   }
 
+  static final RegExp _whitespace = RegExp(r'\s+');
+
   // LRU bounded cache to prevent unbounded retention. Keyed by raw metadata so
   // a retagged song is not served stale normalized text; the superseded entry
-  // ages out through LRU eviction.
-  static final LinkedHashMap<String,
-          ({String title, String artist, String album})> _normCache =
-      LinkedHashMap();
+  // ages out through LRU eviction. Word splits are cached alongside the
+  // normalized fields so the fuzzy word pass never re-splits per query.
+  static final LinkedHashMap<String, _NormMeta> _normCache = LinkedHashMap();
 
   /// Test-only: drops every cached normalized metadata entry.
   static void clearCache() => _normCache.clear();
+
+  static _NormMeta _normalizeMeta(String title, String artist, String album) {
+    final t = normalize(title);
+    final a = normalize(artist);
+    final b = normalize(album);
+    return (
+      title: t,
+      artist: a,
+      album: b,
+      titleWords: t.split(_whitespace),
+      artistWords: a.split(_whitespace),
+      albumWords: b.split(_whitespace),
+    );
+  }
+
+  static int _trigramHashAt(String s, int i) =>
+      (s.codeUnitAt(i) << 32) |
+      (s.codeUnitAt(i + 1) << 16) |
+      s.codeUnitAt(i + 2);
+
+  /// Hash set of every 3-code-unit window in [s], computed once per query.
+  static Set<int> _trigramHashes(String s) {
+    final out = <int>{};
+    for (var i = 0; i + 3 <= s.length; i++) {
+      out.add(_trigramHashAt(s, i));
+    }
+    return out;
+  }
+
+  static bool _sharesTrigram(String text, Set<int> trigrams) {
+    for (var i = 0; i + 3 <= text.length; i++) {
+      if (trigrams.contains(_trigramHashAt(text, i))) return true;
+    }
+    return false;
+  }
 
   /// Normalizes Unicode, Arabic diacritics / letter variants, and Latin
   /// accents for fuzzy search.
@@ -147,8 +183,7 @@ class SearchAlgorithmUtils {
     return prevRow[s2.length];
   }
 
-  static ({String title, String artist, String album}) _normalizedMetadata(
-      SongsTableData song) {
+  static _NormMeta _normalizedMetadata(SongsTableData song) {
     final key = '${song.id}|${song.title}|${song.artist}|${song.album}';
     final cached = _normCache.remove(key);
     if (cached != null) {
@@ -156,11 +191,7 @@ class SearchAlgorithmUtils {
       _normCache[key] = cached;
       return cached;
     }
-    final norm = (
-      title: normalize(song.title),
-      artist: normalize(song.artist),
-      album: normalize(song.album),
-    );
+    final norm = _normalizeMeta(song.title, song.artist, song.album);
     if (_normCache.length >= _normCacheMax) {
       _normCache.remove(_normCache.keys.first);
     }
@@ -169,42 +200,62 @@ class SearchAlgorithmUtils {
   }
 
   /// Filters [songs] against [rawQuery] (already server-side pre-filtered) and
-  /// returns relevance-ranked matches capped at [maxResultCount].
+  /// returns relevance-ranked matches capped at [maxResults] (defaults to
+  /// [maxResultCount]). The query is normalized once and its trigrams are
+  /// precomputed once so the per-song matching pass never re-normalizes or
+  /// re-splits.
   static List<SongsTableData> filterWithFuzzy(
     List<SongsTableData> songs,
     String rawQuery,
-    String filter,
-  ) {
-    final q = rawQuery.length > maxQueryLength
+    String filter, {
+    int? maxResults,
+  }) {
+    final bounded = rawQuery.length > maxQueryLength
         ? rawQuery.substring(0, maxQueryLength)
         : rawQuery;
-    final results = <SongsTableData>[];
+    final q = normalize(bounded);
+    final limit = maxResults ?? maxResultCount;
+    if (limit <= 0) return const [];
+    final qTrigrams = q.length >= 3 ? _trigramHashes(q) : const <int>{};
+    final matches = <({SongsTableData song, int score})>[];
+
+    bool matchesField(String text, List<String> words) {
+      if (text.contains(q)) return true;
+      // Skip Levenshtein distance check for queries < 3 chars.
+      if (q.length < 3) return false;
+      final diff = (text.length - q.length).abs();
+      // Edit distance <= 2 implies a length gap <= 2. For long fields a
+      // missing shared trigram is a sound reject: with only two edits the
+      // longest unbroken run is >= (length - 2) / 3 > 2 at length >= 9.
+      if (diff <= 2 &&
+          (text.length < 9 || _sharesTrigram(text, qTrigrams)) &&
+          levenshtein(text, q) <= 2) {
+        return true;
+      }
+      // Word-level fuzzy match; words outside the distance window cannot
+      // match, so they never reach the DP.
+      for (final word in words) {
+        if (word.length < 3) continue;
+        final lenDiff = word.length - q.length;
+        if (lenDiff > 2 || lenDiff < -2) continue;
+        if (word.length >= 9 && !_sharesTrigram(word, qTrigrams)) continue;
+        if (levenshtein(word, q) <= 2) return true;
+      }
+      return false;
+    }
 
     for (final song in songs) {
-      if (results.length >= maxResultCount) break;
+      if (matches.length >= limit) break;
 
       final norm = _normalizedMetadata(song);
-      final title = norm.title;
-      final artist = norm.artist;
-      final album = norm.album;
 
-      bool matchesField(String text) {
-        if (text.contains(q)) return true;
-        // Skip Levenshtein distance check for queries < 3 chars
-        if (q.length < 3) return false;
-        if (levenshtein(text, q) <= 2) return true;
-        // Word-level fuzzy match
-        for (final word in text.split(RegExp(r'\s+'))) {
-          if (word.length >= 3 && levenshtein(word, q) <= 2) return true;
-        }
-        return false;
-      }
-
-      final matches = switch (filter) {
-        'Songs' => matchesField(title),
-        'Artists' => matchesField(artist),
-        'Albums' => matchesField(album),
-        _ => matchesField(title) || matchesField(artist) || matchesField(album),
+      final matched = switch (filter) {
+        'Songs' => matchesField(norm.title, norm.titleWords),
+        'Artists' => matchesField(norm.artist, norm.artistWords),
+        'Albums' => matchesField(norm.album, norm.albumWords),
+        _ => matchesField(norm.title, norm.titleWords) ||
+            matchesField(norm.artist, norm.artistWords) ||
+            matchesField(norm.album, norm.albumWords),
       };
 
       // C-04: format chips additionally constrain by codec while still
@@ -212,34 +263,39 @@ class SearchAlgorithmUtils {
       final formatOk =
           _isFormatFilter(filter) ? _formatMatches(song, filter) : true;
 
-      if (matches && formatOk) {
-        results.add(song);
+      if (matched && formatOk) {
+        matches.add((song: song, score: _relevanceScore(norm, q)));
       }
     }
 
     // Relevance ranking: exact title first, then prefix, then exact
     // artist/album, then title word, then contains; stable by title otherwise.
-    results.sort((a, b) {
-      int score(SongsTableData s) {
-        final t = normalize(s.title);
-        final ar = normalize(s.artist);
-        final al = normalize(s.album);
-        if (t == q) return 0;
-        if (t.startsWith(q)) return 1;
-        if (ar == q || al == q) return 2;
-        final titleWord =
-            t.split(RegExp(r'\s+')).any((w) => w == q || w.startsWith(q));
-        if (titleWord) return 3;
-        if (t.contains(q)) return 4;
-        if (ar.contains(q) || al.contains(q)) return 5;
-        return 6;
-      }
-
-      final sa = score(a);
-      final sb = score(b);
-      if (sa != sb) return sa.compareTo(sb);
-      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    matches.sort((a, b) {
+      if (a.score != b.score) return a.score.compareTo(b.score);
+      return a.song.title.toLowerCase().compareTo(b.song.title.toLowerCase());
     });
-    return results;
+    return [for (final m in matches) m.song];
+  }
+
+  static int _relevanceScore(_NormMeta norm, String q) {
+    final t = norm.title;
+    final ar = norm.artist;
+    final al = norm.album;
+    if (t == q) return 0;
+    if (t.startsWith(q)) return 1;
+    if (ar == q || al == q) return 2;
+    if (norm.titleWords.any((w) => w == q || w.startsWith(q))) return 3;
+    if (t.contains(q)) return 4;
+    if (ar.contains(q) || al.contains(q)) return 5;
+    return 6;
   }
 }
+
+typedef _NormMeta = ({
+  String title,
+  String artist,
+  String album,
+  List<String> titleWords,
+  List<String> artistWords,
+  List<String> albumWords,
+});

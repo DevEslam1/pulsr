@@ -94,10 +94,12 @@ void main() {
 
   testWidgets('lists recent tracks and plays the tapped one', (tester) async {
     await pump(tester);
-    await emit(tester, Right([
-      createTestSong(id: 1, title: 'Alpha'),
-      createTestSong(id: 2, title: 'Beta'),
-    ]));
+    await emit(
+        tester,
+        Right([
+          createTestSong(id: 1, title: 'Alpha'),
+          createTestSong(id: 2, title: 'Beta'),
+        ]));
 
     expect(find.text('Alpha'), findsOneWidget);
     expect(find.text('Beta'), findsOneWidget);
@@ -111,10 +113,12 @@ void main() {
   testWidgets('the search field filters the list after the debounce',
       (tester) async {
     await pump(tester);
-    await emit(tester, Right([
-      createTestSong(id: 1, title: 'Alpha'),
-      createTestSong(id: 2, title: 'Beta'),
-    ]));
+    await emit(
+        tester,
+        Right([
+          createTestSong(id: 1, title: 'Alpha'),
+          createTestSong(id: 2, title: 'Beta'),
+        ]));
 
     await tester.enterText(find.byType(TextField).first, 'Alpha');
     await tester.pump(const Duration(milliseconds: 350));

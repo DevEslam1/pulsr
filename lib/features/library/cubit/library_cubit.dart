@@ -9,6 +9,7 @@ import '../../../core/errors/failures.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/library_cache_manager.dart';
 import '../../../core/services/ytm_account_service.dart';
+import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/song_rating_store.dart';
 import '../../../data/db/app_database.dart';
@@ -192,6 +193,18 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           },
           (songs) async {
             if (isClosed || t != _songsToken) return;
+            // Same optimistic-favorite overlay as the favorites watch: a live
+            // DB emission can still carry the pre-toggle truth while a
+            // toggleFavorite write is in flight, which would flip the row back
+            // in the songs list even though the user just favorited it.
+            if (_pendingFavoriteTargets.isNotEmpty) {
+              songs = <SongsTableData>[
+                for (final s in songs)
+                  _pendingFavoriteTargets.containsKey(s.id)
+                      ? s.copyWith(isFavorite: _pendingFavoriteTargets[s.id])
+                      : s,
+              ];
+            }
             if (isRatingSort) {
               _hasMoreSongs = false;
               _isLoadingMoreSongs = false;
@@ -709,23 +722,21 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   /// Synchronizes private Liked Music from the authenticated YouTube Music web account.
+  ///
+  /// Success returns the imported count. Failures set [LibraryState.errorMessage]
+  /// and rethrow (auth failures as [YtmException] with `isAuth == true`) so the
+  /// caller can present session-expired recovery instead of "Synced 0".
   Future<int> syncYtmAccountLikes() async {
+    final accountService = getIt<YtmAccountService>();
+    if (!accountService.isLoggedIn) {
+      safeEmit(state.copyWith(errorMessage: 'Not signed in to YouTube Music'));
+      throw const YtmException(
+          'SIGN_IN_REQUIRED', 'Not signed in to YouTube Music');
+    }
+
+    final List<YtmTrack> tracks;
     try {
-      final accountService = getIt<YtmAccountService>();
-      if (!accountService.isLoggedIn) {
-        safeEmit(
-            state.copyWith(errorMessage: 'Not signed in to YouTube Music'));
-        return 0;
-      }
-      final tracks = await accountService.fetchLikedSongs();
-      final count = await importYtmTracksAsFavorites(tracks);
-      // M-3: -1 means the repository threw — surface the failure.
-      if (count < 0 && !isClosed) {
-        safeEmit(state.copyWith(
-            errorMessage: 'Failed to import YouTube Music liked songs'));
-        return 0;
-      }
-      return count < 0 ? 0 : count;
+      tracks = await accountService.fetchLikedSongs();
     } catch (e, st) {
       ErrorLogger.log('Failed to sync YTM account likes',
           error: e, stackTrace: st, category: 'LibraryCubit');
@@ -733,8 +744,19 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         safeEmit(
             state.copyWith(errorMessage: 'Failed to sync YouTube Music likes'));
       }
-      return 0;
+      rethrow;
     }
+
+    final count = await importYtmTracksAsFavorites(tracks);
+    if (count < 0) {
+      if (!isClosed) {
+        safeEmit(state.copyWith(
+            errorMessage: 'Failed to import YouTube Music liked songs'));
+      }
+      throw const YtmException(
+          'YTM_IMPORT_FAILED', 'Failed to import liked songs');
+    }
+    return count;
   }
 
   @override

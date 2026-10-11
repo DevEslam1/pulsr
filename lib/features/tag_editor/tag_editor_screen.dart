@@ -61,23 +61,124 @@ class _TagEditorViewState extends State<_TagEditorView> {
       final prefs = await SharedPreferences.getInstance();
       final checkpoint = prefs.getStringList(TagEditorCubit.batchCheckpointKey);
       if (checkpoint != null && checkpoint.isNotEmpty && mounted) {
-        await prefs.remove(TagEditorCubit.batchCheckpointKey);
+        final remaining = await _loadCheckpointSongs(checkpoint);
         if (!mounted) return;
+        final l10n = context.l10n;
         PulsrDialogHelper.showPulsrDialog<void>(
           context,
-          title: Text(context.l10n.partialBatchDetected),
+          title: Text(l10n.partialBatchDetected),
           content: Text(
             '${checkpoint.length} file(s) were not updated due to an interrupted batch.',
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(context.l10n.ok),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _dismissInterruptedBatch();
+              },
+              child: Text(l10n.ok),
             ),
+            if (remaining.isNotEmpty)
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _retryInterruptedBatch(remaining);
+                },
+                child: Text('Retry remaining ${remaining.length} files'),
+              ),
           ],
         );
       }
     } catch (_) {}
+  }
+
+  Future<void> _dismissInterruptedBatch() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(TagEditorCubit.batchCheckpointKey);
+    } catch (_) {}
+  }
+
+  /// Resolves checkpoint paths back to library rows, preserving their order.
+  /// Returns empty when the database is unavailable or a path is gone, in
+  /// which case the dialog stays informational and dismissal drops the
+  /// checkpoint.
+  Future<List<SongsTableData>> _loadCheckpointSongs(List<String> paths) async {
+    try {
+      if (!getIt.isRegistered<AppDatabase>()) return const [];
+      final db = getIt<AppDatabase>();
+      final rows = await (db.select(db.songsTable)
+            ..where((t) => t.path.isIn(paths)))
+          .get();
+      final byPath = {for (final row in rows) row.path: row};
+      return [
+        for (final path in paths)
+          if (byPath[path] != null) byPath[path]!,
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Re-runs the batch for the checkpoint's remaining files. The checkpoint is
+  /// kept until this retry finishes (saveTags rewrites or clears it) or the
+  /// user dismisses the dialog.
+  Future<void> _retryInterruptedBatch(List<SongsTableData> songs) async {
+    if (songs.isEmpty || !mounted) return;
+    if (!getIt.isRegistered<MediaScannerService>() ||
+        !getIt.isRegistered<MetadataSearchService>()) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final errorColor = context.palette.error;
+    final accentColor = context.palette.accent;
+    final l10n = context.l10n;
+    final cubit = TagEditorCubit(
+      song: songs.first,
+      batchSongs: songs,
+      scannerService: getIt<MediaScannerService>(),
+      metadataSearchService: getIt<MetadataSearchService>(),
+    );
+    try {
+      await _awaitInitialLoad(cubit);
+      await cubit.saveTags();
+      if (!mounted) return;
+      final state = cubit.state;
+      final failed = state.batchFailedCount;
+      if (failed > 0) {
+        messenger?.clearSnackBars();
+        messenger?.showSnackBar(SnackBar(
+          content: Text(state.errorMessage ?? l10n.tagsSaveError),
+          backgroundColor: errorColor,
+        ));
+      } else if (state.status == TagEditorStatus.success) {
+        // A full batch clears its own checkpoint; a lone remaining file takes
+        // the single-track path, so clear it here.
+        await _dismissInterruptedBatch();
+        if (!mounted) return;
+        messenger?.clearSnackBars();
+        messenger?.showSnackBar(SnackBar(
+          content: Text(l10n.tagsSavedSuccess),
+          backgroundColor: accentColor,
+        ));
+      }
+    } finally {
+      await cubit.close();
+    }
+  }
+
+  /// Waits for the single-track editor's initial tag read to settle. Saving
+  /// while the read is in flight is ignored by the cubit.
+  Future<void> _awaitInitialLoad(TagEditorCubit cubit) async {
+    for (var i = 0; i < 100; i++) {
+      if (cubit.isClosed) return;
+      final status = cubit.state.status;
+      if (status != TagEditorStatus.loading &&
+          status != TagEditorStatus.initial) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
   }
 
   @override
@@ -88,6 +189,20 @@ class _TagEditorViewState extends State<_TagEditorView> {
         final messenger = ScaffoldMessenger.maybeOf(context);
         if (messenger == null) return;
         if (state.status == TagEditorStatus.success) {
+          if (state.batchFailedCount > 0) {
+            // Partial batch: the written files still make this a success, but
+            // the failure must not be hidden behind a success toast + pop.
+            messenger
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(
+                  content:
+                      Text(state.errorMessage ?? context.l10n.tagsSaveError),
+                  backgroundColor: p.error,
+                ),
+              );
+            return;
+          }
           messenger
             ..clearSnackBars()
             ..showSnackBar(

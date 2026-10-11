@@ -138,7 +138,13 @@ class PlayerTransportController {
 
   Future<void> seek(Duration position) => _seekThrottle.seek(position);
 
+  /// Drops any coalesced trailing seek. Wired into every track-change path
+  /// (skips, queue loads, slot switches) so a pending seek for the old track
+  /// never lands on the new one.
+  void cancelPendingSeek() => _seekThrottle.cancelPending();
+
   Future<void> next() async {
+    _seekThrottle.cancelPending();
     try {
       await _audioHandler.skipToNext();
     } catch (e, st) {
@@ -153,6 +159,7 @@ class PlayerTransportController {
   }
 
   Future<void> previous() async {
+    _seekThrottle.cancelPending();
     try {
       await _audioHandler.skipToPrevious();
     } catch (e, st) {
@@ -169,6 +176,7 @@ class PlayerTransportController {
   Future<void> skipToQueueItem(int index) async {
     final state = _getState();
     if (index < 0 || index >= state.queue.length) return;
+    _seekThrottle.cancelPending();
     try {
       await _audioHandler.skipToQueueItem(index);
     } catch (e, st) {

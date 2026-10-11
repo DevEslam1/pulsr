@@ -3,6 +3,8 @@
 // Exercises tag loading, field editing + undo, artwork handling, online
 // metadata search/apply/auto-fetch and both single-track and batch saves,
 // including the native-bridge result classification paths.
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -169,14 +171,35 @@ void main() {
     test('history is bounded at its maximum', () async {
       final cubit = single();
       await Future<void>.delayed(const Duration(milliseconds: 10));
+      // Alternate fields: consecutive edits to the same field inside the
+      // coalescing window intentionally collapse into one undo step.
       for (var i = 0; i < 40; i++) {
-        cubit.updateTitle('v$i');
+        if (i.isEven) {
+          cubit.updateTitle('v$i');
+        } else {
+          cubit.updateLyrics('l$i');
+        }
       }
       // Undo 15 times (the cap) and then it must report empty.
       for (var i = 0; i < 15; i++) {
         expect(cubit.undo(), isTrue);
       }
       expect(cubit.undo(), isFalse);
+      await cubit.close();
+    });
+
+    test('rapid same-field edits coalesce into one undo step', () async {
+      final cubit = single(s: song(title: 'orig'));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      cubit.updateTitle('o');
+      cubit.updateTitle('or');
+      cubit.updateTitle('ori');
+      expect(cubit.canUndo, isTrue);
+
+      expect(cubit.undo(), isTrue);
+      expect(cubit.state.title, 'orig');
+      expect(cubit.canUndo, isFalse);
       await cubit.close();
     });
 
@@ -270,6 +293,36 @@ void main() {
       final ok = await cubit.autoFetchOnlineTags();
       expect(ok, isTrue);
       expect(cubit.state.title, 'Hit');
+      await cubit.close();
+    });
+
+    test('applied metadata survives a slow loadTags that lands afterwards',
+        () async {
+      final readCompleter = Completer<Map<dynamic, dynamic>>();
+      handler = (call) async {
+        if (call.method == 'readTags') return readCompleter.future;
+        return true;
+      };
+      final cubit = single(s: song(title: 'orig'));
+      // loadTags is in flight, blocked on the completer.
+      final ok = await cubit.applyMetadataResult(const OnlineTrackMetadata(
+        title: 'Applied',
+        artist: 'Meta Artist',
+        album: 'Meta Album',
+      ));
+      expect(ok, isTrue);
+
+      readCompleter.complete(<dynamic, dynamic>{
+        'title': 'From File',
+        'artist': 'File Artist',
+        'album': 'File Album',
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(cubit.state.status, TagEditorStatus.loaded);
+      expect(cubit.state.title, 'Applied');
+      expect(cubit.state.artist, 'Meta Artist');
+      expect(cubit.state.album, 'Meta Album');
       await cubit.close();
     });
   });
@@ -451,8 +504,7 @@ void main() {
       handler = (call) async {
         if (call.method == 'readTags') return <String, dynamic>{};
         throw PlatformException(
-            code: 'WRITE_TAGS_ERROR',
-            message: 'Permission denied for write');
+            code: 'WRITE_TAGS_ERROR', message: 'Permission denied for write');
       };
       final cubit = single();
       await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -471,6 +523,26 @@ void main() {
       await cubit.saveTags();
       expect(cubit.state.status, TagEditorStatus.success);
       expect(cubit.state.errorMessage, contains('truncated'));
+      await cubit.close();
+    });
+
+    test('a save retried after a failure is not a silent no-op', () async {
+      var writeCalls = 0;
+      handler = (call) async {
+        if (call.method == 'readTags') return <String, dynamic>{};
+        writeCalls++;
+        return writeCalls > 1;
+      };
+      final cubit = single();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      await cubit.saveTags();
+      expect(cubit.state.status, TagEditorStatus.failure);
+      expect(writeCalls, 1);
+
+      await cubit.saveTags();
+      expect(cubit.state.status, TagEditorStatus.success);
+      expect(writeCalls, 2);
       await cubit.close();
     });
   });
@@ -500,10 +572,10 @@ void main() {
         final path = (call.arguments as Map)['path'] as String;
         return path.contains('A') ? false : true;
       };
-      final a = createTestSong(
-          id: 1, title: 'A', artist: 'X', path: '/music/A.mp3');
-      final b = createTestSong(
-          id: 2, title: 'B', artist: 'Y', path: '/music/B.mp3');
+      final a =
+          createTestSong(id: 1, title: 'A', artist: 'X', path: '/music/A.mp3');
+      final b =
+          createTestSong(id: 2, title: 'B', artist: 'Y', path: '/music/B.mp3');
       final cubit = TagEditorCubit(
         song: a,
         batchSongs: [a, b],
@@ -513,6 +585,57 @@ void main() {
       await cubit.saveTags();
       expect(cubit.state.status, TagEditorStatus.success);
       expect(cubit.state.errorMessage, contains('Failed to tag 1 file'));
+      await cubit.close();
+    });
+
+    test('a partial batch records the failed count and keeps a checkpoint',
+        () async {
+      handler = (call) async {
+        if (call.method == 'readTags') return <String, dynamic>{};
+        final path = (call.arguments as Map)['path'] as String;
+        return path.contains('A') ? false : true;
+      };
+      final a =
+          createTestSong(id: 1, title: 'A', artist: 'X', path: '/music/A.mp3');
+      final b =
+          createTestSong(id: 2, title: 'B', artist: 'Y', path: '/music/B.mp3');
+      final cubit = TagEditorCubit(
+        song: a,
+        batchSongs: [a, b],
+        scannerService: scanner,
+        metadataSearchService: metadata,
+      );
+      await cubit.saveTags();
+
+      expect(cubit.state.status, TagEditorStatus.success);
+      expect(cubit.state.batchFailedCount, 1);
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getStringList(TagEditorCubit.batchCheckpointKey),
+        ['/music/A.mp3'],
+        reason: 'the still-untagged path must be offered for retry later',
+      );
+      await cubit.close();
+    });
+
+    test('a clean batch clears the checkpoint and the failed count', () async {
+      handler = (call) async =>
+          call.method == 'readTags' ? <String, dynamic>{} : true;
+      final a =
+          createTestSong(id: 1, title: 'A', artist: 'X', path: '/music/A.mp3');
+      final b =
+          createTestSong(id: 2, title: 'B', artist: 'Y', path: '/music/B.mp3');
+      final cubit = TagEditorCubit(
+        song: a,
+        batchSongs: [a, b],
+        scannerService: scanner,
+        metadataSearchService: metadata,
+      );
+      await cubit.saveTags();
+
+      expect(cubit.state.batchFailedCount, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(TagEditorCubit.batchCheckpointKey), isNull);
       await cubit.close();
     });
   });

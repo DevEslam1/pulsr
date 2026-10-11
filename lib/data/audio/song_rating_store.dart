@@ -57,6 +57,20 @@ class SongRatingStore {
     }
   }
 
+  /// Re-reads the persisted map, replacing the in-memory cache. Used after an
+  /// out-of-band write (e.g. backup import) so the live store is not stale
+  /// until the next app launch. Safe to call repeatedly.
+  Future<void> reload() async {
+    await ready;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(prefsKey);
+    if (raw == null || raw.isEmpty) {
+      _ratings.clear();
+      return;
+    }
+    await load();
+  }
+
   Future<void> persist() async {
     try {
       final prefs = await SharedPreferences.getInstance();

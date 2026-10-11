@@ -2,12 +2,14 @@
 //
 // Coverage for the AB-loop / bookmark / lyrics / earbud extension on
 // [PlayerPlaybackOptionsController].
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/earbud_optimization_service.dart';
 import 'package:pulsr/core/services/hires_audio_service.dart';
+import 'package:pulsr/data/audio/ab_loop_manager.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/playback_bookmark_store.dart';
 import 'package:pulsr/data/db/tables.dart';
@@ -66,8 +68,29 @@ void main() {
   }
 
   group('AB loop', () {
-    test('setAbPointA arms the loop only when B already sits later', () {
+    late AbLoopManager manager;
+
+    setUp(() {
+      manager = AbLoopManager();
+    });
+
+    void wireAbLoop(_MockAudioHandler handler, {int? songId}) {
+      when(() => handler.abLoopManager).thenReturn(manager);
+      when(() => handler.setAbPointA(any())).thenAnswer((invocation) {
+        manager.setA(invocation.positionalArguments[0] as Duration,
+            songId: songId);
+      });
+      when(() => handler.setAbPointB(any())).thenAnswer((invocation) {
+        manager.setB(invocation.positionalArguments[0] as Duration,
+            songId: songId);
+      });
+      when(() => handler.toggleAbLoop()).thenAnswer((_) => manager.toggle());
+      when(() => handler.clearAbLoop()).thenAnswer((_) => manager.clear());
+    }
+
+    test('setAbPointA reaches the engine and mirrors manager state', () {
       final handler = _MockAudioHandler();
+      wireAbLoop(handler);
       var state = PlayerState(
         playback: const PlaybackSlice(position: Duration(seconds: 10)),
       );
@@ -75,61 +98,95 @@ void main() {
           make(handler, getState: () => state, emit: (s) => state = s);
 
       controller.setAbPointA();
+      verify(() => handler.setAbPointA(const Duration(seconds: 10))).called(1);
       expect(state.abPointA, const Duration(seconds: 10));
+      expect(state.abPointB, isNull);
       expect(state.abLoopEnabled, isFalse);
-
-      state = state.copyWith(
-          playback: state.playback.copyWith(abPointB: const Duration(seconds: 5)));
-      controller.setAbPointA(); // B before position -> loop stays off
-      expect(state.abLoopEnabled, isFalse);
-
-      state = state.copyWith(
-          playback: state.playback.copyWith(abPointB: const Duration(seconds: 30)));
-      controller.setAbPointA(); // B after position -> loop armed
-      expect(state.abLoopEnabled, isTrue);
     });
 
-    test('setAbPointB arms the loop only when A sits earlier', () {
+    test('setAbPointB arms the loop only when it sits after A', () {
       final handler = _MockAudioHandler();
+      wireAbLoop(handler);
       var state = PlayerState(
         playback: const PlaybackSlice(position: Duration(seconds: 10)),
       );
       final controller =
           make(handler, getState: () => state, emit: (s) => state = s);
 
+      // No A yet: the manager rejects B.
       controller.setAbPointB();
-      expect(state.abPointB, const Duration(seconds: 10));
+      verify(() => handler.setAbPointB(const Duration(seconds: 10))).called(1);
+      expect(state.abPointB, isNull);
       expect(state.abLoopEnabled, isFalse);
 
+      controller.setAbPointA();
       state = state.copyWith(
-          playback: state.playback.copyWith(abPointA: const Duration(seconds: 2)));
-      controller.setAbPointB(); // A earlier -> armed
+          playback: state.playback.copyWith(position: Duration(seconds: 20)));
+      controller.setAbPointB();
+      expect(state.abPointA, const Duration(seconds: 10));
+      expect(state.abPointB, const Duration(seconds: 20));
       expect(state.abLoopEnabled, isTrue);
     });
 
-    test('clear, guard and toggle AB loop', () {
+    test('clear and guarded toggle reach the engine', () {
       final handler = _MockAudioHandler();
+      wireAbLoop(handler);
       var state = const PlayerState();
       final controller =
           make(handler, getState: () => state, emit: (s) => state = s);
 
-      // Missing points: toggle is a no-op.
+      // Missing points: toggle is a no-op and never touches the engine.
       controller.toggleAbLoop();
       expect(state.abLoopEnabled, isFalse);
+      verifyNever(() => handler.toggleAbLoop());
 
       state = state.copyWith(
-          playback: state.playback.copyWith(
-              abPointA: const Duration(seconds: 1),
-              abPointB: const Duration(seconds: 9)));
-      controller.toggleAbLoop();
+          playback: state.playback.copyWith(position: Duration(seconds: 1)));
+      controller.setAbPointA();
+      state = state.copyWith(
+          playback: state.playback.copyWith(position: Duration(seconds: 9)));
+      controller.setAbPointB();
       expect(state.abLoopEnabled, isTrue);
+
       controller.toggleAbLoop();
       expect(state.abLoopEnabled, isFalse);
+      controller.toggleAbLoop();
+      expect(state.abLoopEnabled, isTrue);
+      verify(() => handler.toggleAbLoop()).called(2);
 
       controller.clearAbLoop();
+      verify(() => handler.clearAbLoop()).called(1);
       expect(state.abPointA, isNull);
       expect(state.abPointB, isNull);
       expect(state.abLoopEnabled, isFalse);
+    });
+
+    test('onCurrentSongChanged restores the persisted loop into state',
+        () async {
+      final handler = _MockAudioHandler();
+      SharedPreferences.setMockInitialValues({
+        AbLoopManager.prefsKey: jsonEncode({
+          '7': {'a': 2000, 'b': 8000, 'enabled': true},
+        }),
+      });
+      when(() => handler.abLoopManager).thenReturn(manager);
+      when(() =>
+              handler.restoreAbLoopForCurrentSong(songId: any(named: 'songId')))
+          .thenAnswer((invocation) async {
+        await manager.restoreForSong(invocation.namedArguments[#songId] as int);
+      });
+
+      var state =
+          PlayerState(playback: PlaybackSlice(currentSong: buildSong(7)));
+      final controller =
+          make(handler, getState: () => state, emit: (s) => state = s);
+
+      await controller.onCurrentSongChanged(buildSong(7));
+
+      verify(() => handler.restoreAbLoopForCurrentSong(songId: 7)).called(1);
+      expect(state.abPointA, const Duration(seconds: 2));
+      expect(state.abPointB, const Duration(seconds: 8));
+      expect(state.abLoopEnabled, isTrue);
     });
   });
 
@@ -155,8 +212,7 @@ void main() {
     test('dismissBookmark clears the position', () {
       final handler = _MockAudioHandler();
       var state = PlayerState(
-        playback: const PlaybackSlice(
-            bookmarkPosition: Duration(seconds: 5)),
+        playback: const PlaybackSlice(bookmarkPosition: Duration(seconds: 5)),
       );
       final controller =
           make(handler, getState: () => state, emit: (s) => state = s);
@@ -236,8 +292,7 @@ void main() {
 
       var state = PlayerState(
         playback: PlaybackSlice(
-            currentSong: song,
-            bookmarkPosition: const Duration(seconds: 9)),
+            currentSong: song, bookmarkPosition: const Duration(seconds: 9)),
       );
       final controller =
           make(handler, getState: () => state, emit: (s) => state = s);
@@ -306,8 +361,7 @@ void main() {
         const LyricsLine(timestamp: Duration(seconds: 1), text: 'hello world'),
       ];
       expect(await controller.updateLyrics(lines), isTrue);
-      final sidecar =
-          File('${dir.path}${Platform.pathSeparator}song.lrc');
+      final sidecar = File('${dir.path}${Platform.pathSeparator}song.lrc');
       expect(sidecar.existsSync(), isTrue);
     });
 
@@ -318,8 +372,7 @@ void main() {
       addTearDown(() => dir.deleteSync(recursive: true));
       final blocker = File('${dir.path}${Platform.pathSeparator}blocker')
         ..writeAsStringSync('not a dir');
-      final badPath =
-          '${blocker.path}${Platform.pathSeparator}song.mp3';
+      final badPath = '${blocker.path}${Platform.pathSeparator}song.mp3';
       var state = PlayerState(
         playback: PlaybackSlice(currentSong: buildSong(6, path: badPath)),
       );
@@ -341,7 +394,8 @@ void main() {
 
     test('with callback success flips loading off', () async {
       final handler = _MockAudioHandler();
-      var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(7)));
+      var state =
+          PlayerState(playback: PlaybackSlice(currentSong: buildSong(7)));
       var loaded = 0;
       final controller = make(
         handler,
@@ -358,7 +412,8 @@ void main() {
 
     test('with callback throwing still clears loading', () async {
       final handler = _MockAudioHandler();
-      var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(8)));
+      var state =
+          PlayerState(playback: PlaybackSlice(currentSong: buildSong(8)));
       final controller = make(
         handler,
         getState: () => state,
@@ -372,7 +427,8 @@ void main() {
 
     test('without callback clears loading immediately', () async {
       final handler = _MockAudioHandler();
-      var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(9)));
+      var state =
+          PlayerState(playback: PlaybackSlice(currentSong: buildSong(9)));
       final controller =
           make(handler, getState: () => state, emit: (s) => state = s);
       await controller.refreshLyrics();
@@ -381,7 +437,8 @@ void main() {
 
     test('closed controller leaves loading set', () async {
       final handler = _MockAudioHandler();
-      var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(10)));
+      var state =
+          PlayerState(playback: PlaybackSlice(currentSong: buildSong(10)));
       final controller = make(
         handler,
         getState: () => state,
@@ -390,6 +447,30 @@ void main() {
         onLoadLyrics: (song, {bool isOfflineOnly = false}) async {},
       );
       await controller.refreshLyrics();
+      expect(state.isLoadingLyrics, isTrue);
+    });
+
+    test('a slow fetch does not clear the new track loading flag', () async {
+      final handler = _MockAudioHandler();
+      var state =
+          PlayerState(playback: PlaybackSlice(currentSong: buildSong(11)));
+      final controller = make(
+        handler,
+        getState: () => state,
+        emit: (s) => state = s,
+        onLoadLyrics: (song, {bool isOfflineOnly = false}) async {
+          // The user switches tracks while this fetch is still in flight; the
+          // new track's loader starts.
+          state = state.copyWith(
+            playback: state.playback.copyWith(currentSong: buildSong(12)),
+            lyricsSlice: state.lyricsSlice.copyWith(isLoadingLyrics: true),
+          );
+        },
+      );
+
+      await controller.refreshLyrics();
+
+      expect(state.currentSong?.id, 12);
       expect(state.isLoadingLyrics, isTrue);
     });
   });
@@ -434,16 +515,16 @@ void main() {
       final handler = _MockAudioHandler();
       final hiRes = _MockHiRes();
       when(() => hiRes.currentOutputInfo).thenReturn(null);
-      when(() => hiRes.getAudioOutputInfo()).thenAnswer((_) async =>
-          const AudioOutputInfo(
-            deviceName: 'BT Buds',
-            isUsbDac: false,
-            sampleRate: 48000,
-            bitDepth: 16,
-            isBitPerfectActive: false,
-            isBluetooth: true,
-            btCodecName: 'SBC',
-          ));
+      when(() => hiRes.getAudioOutputInfo())
+          .thenAnswer((_) async => const AudioOutputInfo(
+                deviceName: 'BT Buds',
+                isUsbDac: false,
+                sampleRate: 48000,
+                bitDepth: 16,
+                isBitPerfectActive: false,
+                isBluetooth: true,
+                btCodecName: 'SBC',
+              ));
       final caps = await make(
         handler,
         earbudService: EarbudOptimizationService(),

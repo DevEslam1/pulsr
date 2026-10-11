@@ -118,17 +118,15 @@ void main() {
       await insertSong(
           id: 2, title: 'Needle', path: r'\music\private\needle.mp3');
 
-      final res = await repo
-          .watchAllSongs(
-              searchQuery: '!!!', excludedFolders: [r'\music\private'])
-          .first;
+      final res = await repo.watchAllSongs(
+          searchQuery: '!!!', excludedFolders: [r'\music\private']).first;
       expect(res.isRight(), isTrue);
     });
 
     test('FTS search honours excluded folders and offset', () async {
       await insertSong(id: 1, title: 'Sunshine', path: r'\music\a\sun.mp3');
-      await insertSong(id: 2, title: 'Sunshine Two',
-          path: r'\music\private\sun.mp3');
+      await insertSong(
+          id: 2, title: 'Sunshine Two', path: r'\music\private\sun.mp3');
 
       final res = await repo
           .watchAllSongs(
@@ -156,10 +154,7 @@ void main() {
     test('watchFavorites includes youtube rows and excludes missing local',
         () async {
       await insertSong(
-          id: 1,
-          title: 'LocalFav',
-          isFavorite: true,
-          path: '/music/f.mp3');
+          id: 1, title: 'LocalFav', isFavorite: true, path: '/music/f.mp3');
       await insertSong(
           id: 2,
           title: 'YtFav',
@@ -218,7 +213,8 @@ void main() {
         duration: Duration(minutes: 2),
       );
       // A local row already owns the deterministic online id.
-      await insertSong(id: track.songId, title: 'Occupied', path: '/music/o.mp3');
+      await insertSong(
+          id: track.songId, title: 'Occupied', path: '/music/o.mp3');
 
       await repo.importOnlineTracksAsFavorites(const [track]);
 
@@ -275,6 +271,116 @@ void main() {
       final res = await repo.syncScannedMusic(
           songs: const [], albums: const [], artists: const []);
       expect(res.isRight(), isTrue);
+    });
+
+    test('case-variant duplicate paths fold onto one row and keep children',
+        () async {
+      await insertSong(id: 10, title: 'Winner', path: '/music/song.mp3');
+      await insertSong(id: 20, title: 'Loser', path: '/Music/Song.mp3');
+
+      final plId = (await repo.createPlaylist('List')).getOrElse((_) => -1);
+      await repo.addSongToPlaylist(plId, 10);
+      await repo.addSongToPlaylist(plId, 20);
+      await repo.saveQueue([20], 0, 500);
+      await db
+          .into(db.playHistoryTable)
+          .insert(PlayHistoryTableCompanion.insert(songId: 20));
+
+      final res = await repo.syncScannedMusic(
+        songs: [
+          const SongsTableCompanion(
+            id: Value(999),
+            title: Value('Scanned'),
+            path: Value('/music/song.mp3'),
+            source: Value(SongSource.local),
+          ),
+        ],
+        albums: const [],
+        artists: const [],
+      );
+      res.fold((failure) => fail('sync failed: ${failure.cause}'), (_) {});
+
+      final rows = await db.select(db.songsTable).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.id, 10,
+          reason: 'lowest id survives so play history is preserved');
+
+      final playlistSongs =
+          (await repo.getPlaylistSongs(plId)).getOrElse((_) => []);
+      expect(playlistSongs.map((s) => s.id), [10],
+          reason: 'the loser membership must not be cascade-deleted');
+      final queue = (await repo.getSavedQueue()).getOrElse((_) => []);
+      expect(queue.single.songId, 10);
+      final history = await db.select(db.playHistoryTable).get();
+      expect(history.single.songId, 10);
+    });
+
+    test('FTS search excludes non-local and ytmusic rows', () async {
+      await insertSong(id: 1, title: 'Sunshine', path: '/music/sun.mp3');
+      await insertSong(
+          id: 2,
+          title: 'Sunshine',
+          path: 'ytmusic://vidSun',
+          source: SongSource.youtube,
+          remoteId: 'vidSun');
+      await insertSong(
+          id: 3,
+          title: 'Sunshine',
+          path: 'https://stream.example/sun',
+          source: SongSource.radio);
+
+      final res = await repo.watchAllSongs(searchQuery: 'sunshine').first;
+      final songs = res.getOrElse((_) => []);
+      expect(songs.map((s) => s.id), [1]);
+    });
+  });
+
+  group('case-insensitive path lookups', () {
+    test('getSongByPath finds a row whose stored casing differs', () async {
+      await insertSong(id: 1, title: 'Case', path: '/Music/Song.mp3');
+      final res = await repo.getSongByPath('/music/song.mp3');
+      expect(res.getOrElse((_) => null)?.id, 1);
+    });
+
+    test('updateSongTags applies to a row whose stored casing differs',
+        () async {
+      await insertSong(id: 1, title: 'Old', path: '/Music/Song.mp3');
+      final res = await repo.updateSongTags(
+        path: '/music/song.mp3',
+        title: 'New',
+        artist: 'A',
+        album: 'B',
+      );
+      expect(res.isRight(), isTrue);
+      final row = (await repo.getSongById(1)).getOrElse((_) => null);
+      expect(row!.title, 'New');
+    });
+  });
+
+  group('cleanup re-verification', () {
+    test('marks a large unscanned set missing without quadratic lookups',
+        () async {
+      await db.batch((batch) {
+        batch.insertAll(
+          db.songsTable,
+          List.generate(
+            600,
+            (i) => SongsTableCompanion.insert(
+              id: Value(i + 1),
+              title: 'Gone $i',
+              path: '/missing/gone_$i.mp3',
+            ),
+          ),
+        );
+      });
+
+      final marked =
+          (await repo.cleanupOrphanedSongs({99999})).getOrElse((_) => -1);
+      expect(marked, 600);
+      final missing = await (db.select(db.songsTable)
+            ..where((t) => t.isMissing.equals(true)))
+          .get();
+      expect(missing, hasLength(600));
     });
   });
 
@@ -381,8 +487,8 @@ void main() {
           'FILE "album.flac" WAVE\n  TRACK 01 AUDIO\n    TITLE "One"\n    INDEX 01 00:00:00\n'
           'FILE "other.flac" WAVE\n  TRACK 02 AUDIO\n    TITLE "Two"\n    INDEX 01 00:00:00\n');
 
-      await insertSong(id: 1, title: 'Container', path: flac.path,
-          durationMs: 600000);
+      await insertSong(
+          id: 1, title: 'Container', path: flac.path, durationMs: 600000);
       expect((await repo.expandCueSheets()).getOrElse((_) => -1), 0);
     });
 
@@ -394,8 +500,8 @@ void main() {
       File('${temp.path}${Platform.pathSeparator}album.cue').writeAsStringSync(
           'FILE "different.flac" WAVE\n  TRACK 01 AUDIO\n    TITLE "One"\n    INDEX 01 00:00:00\n');
 
-      await insertSong(id: 1, title: 'Container', path: flac.path,
-          durationMs: 600000);
+      await insertSong(
+          id: 1, title: 'Container', path: flac.path, durationMs: 600000);
       expect((await repo.expandCueSheets()).getOrElse((_) => -1), 0);
     });
   });
@@ -431,8 +537,8 @@ void main() {
       await repo.addSongToPlaylist(plId, 1);
       await repo.addSongToPlaylist(plId, 2); // duplicate target entry
 
-      final res = await repo.reconcileDownloadedSong(
-          oldId: 1, newPath: file.path);
+      final res =
+          await repo.reconcileDownloadedSong(oldId: 1, newPath: file.path);
       final surviving = res.getOrElse((_) => null);
       expect(surviving, 2);
 
@@ -451,7 +557,8 @@ void main() {
       expect(playlistSongs.single.id, 2);
     });
 
-    test('promotes an existing YTM row when the file appears with no scanner row',
+    test(
+        'promotes an existing YTM row when the file appears with no scanner row',
         () async {
       final temp = Directory.systemTemp.createTempSync('repo_reconcile2');
       addTearDown(() => temp.deleteSync(recursive: true));
@@ -474,7 +581,8 @@ void main() {
       expect(row.isDownloaded, isTrue);
     });
 
-    test('inserts a fallback row when neither the old row nor a scanner row exists',
+    test(
+        'inserts a fallback row when neither the old row nor a scanner row exists',
         () async {
       final temp = Directory.systemTemp.createTempSync('repo_reconcile3');
       addTearDown(() => temp.deleteSync(recursive: true));

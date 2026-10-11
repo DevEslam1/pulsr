@@ -83,12 +83,19 @@ void main() {
       final cubit = makeCubit();
       addTearDown(cubit.close);
 
+      await cubit.setDownloadQuality(YtmAudioQuality.high);
       await cubit.setStreamingQuality(YtmAudioQuality.low);
       expect(cubit.state.streamingQuality, YtmAudioQuality.low);
-      expect(cubit.state.downloadQuality, YtmAudioQuality.low);
+      // Changing streaming quality must not clobber the dedicated download
+      // quality row.
+      expect(cubit.state.downloadQuality, YtmAudioQuality.high);
 
       await cubit.setDownloadQuality(YtmAudioQuality.medium);
       expect(cubit.state.downloadQuality, YtmAudioQuality.medium);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('setting_streaming_quality'), 'low');
+      expect(prefs.getString('setting_download_quality'), 'medium');
 
       await cubit.setWifiOnlyMode(true);
       await cubit.setOfflineOnlyMode(true);
@@ -338,7 +345,8 @@ void main() {
       addTearDown(cubit.close);
 
       await cubit.setSincResamplerQuality(2);
-      expect(cubit.state.sincResamplerQuality, cubit.state.sincResamplerQuality);
+      expect(
+          cubit.state.sincResamplerQuality, cubit.state.sincResamplerQuality);
     });
 
     test('bluetooth permission request and developer options do not throw',

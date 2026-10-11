@@ -95,19 +95,32 @@ void main() {
     expect(find.byType(SongTile), findsNothing);
   });
 
-  testWidgets('shows the error view and retries when the stream fails',
+  testWidgets('shows the error view and retry recreates the stream',
       (tester) async {
-    final controller = StreamController<Result<List<SongsTableData>>>();
-    await tester.pumpWidget(build(controller.stream));
+    // Broadcast: the retry swaps the StreamBuilder to a new stream, which
+    // cancels this subscription; closing a single-subscription controller
+    // after that leaves the test binding hanging.
+    final first = StreamController<Result<List<SongsTableData>>>.broadcast();
+    var calls = 0;
+    when(() => useCase.watchAlbumSongs(any())).thenAnswer((_) {
+      calls++;
+      if (calls == 1) return first.stream;
+      return Stream.value(Right([_song(1, 'Recovered', track: 1)]));
+    });
+    await tester.pumpWidget(detailHarness(
+      child: AlbumDetailScreen(album: _album, getAlbumsUseCase: useCase),
+    ));
     await tester.pump();
-    controller.add(Left(const DatabaseFailure('boom')));
+    first.add(Left(const DatabaseFailure('boom')));
     await tester.pumpAndSettle();
 
     expect(find.text('Retry'), findsOneWidget);
     await tester.tap(find.text('Retry'));
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    await controller.close();
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.text('Recovered'), findsOneWidget);
+    await first.close();
   });
 
   testWidgets('sorts by track number by default', (tester) async {
@@ -182,6 +195,30 @@ void main() {
     expect(find.textContaining('Disc'), findsWidgets);
   });
 
+  testWidgets('omits disc headers under the title sort', (tester) async {
+    await tester.pumpWidget(build(Stream.value(Right([
+      _song(1, 'Bravo', disc: 1, track: 1),
+      _song(2, 'Alpha', disc: 2, track: 1),
+    ]))));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Disc'), findsWidgets);
+
+    final dropdown = find.byWidgetPredicate((w) => w is DropdownButton);
+    await tester.ensureVisible(dropdown.first);
+    await tester.pumpAndSettle();
+    await tester.tap(dropdown.first, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Name (A-Z)').last);
+    await tester.pumpAndSettle();
+
+    final titles = tester
+        .widgetList<SongTile>(find.byType(SongTile))
+        .map((t) => t.song.title)
+        .toList();
+    expect(titles, ['Alpha', 'Bravo']);
+    expect(find.textContaining('Disc'), findsNothing);
+  });
+
   testWidgets('long-press selects a track for batch queue actions',
       (tester) async {
     await tester.pumpWidget(build(Stream.value(Right([
@@ -201,8 +238,8 @@ void main() {
       (tester) async {
     await tester.pumpWidget(build(Stream.value(const Right([]))));
     await tester.pumpAndSettle();
-    final emptyButton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Play All'));
+    final emptyButton = tester
+        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Play All'));
     expect(emptyButton.onPressed, isNull);
   });
 }

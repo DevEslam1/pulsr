@@ -44,8 +44,7 @@ void registerLibraryFallbacks() {
 MockPlayerCubit stubPlayerCubit([PlayerState? state]) {
   final cubit = MockPlayerCubit();
   when(() => cubit.state).thenReturn(state ?? const PlayerState());
-  when(() => cubit.stream)
-      .thenAnswer((_) => const Stream<PlayerState>.empty());
+  when(() => cubit.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
   when(() => cubit.playSong(any(), queue: any(named: 'queue')))
       .thenAnswer((_) async {});
   when(() => cubit.playNext(any())).thenAnswer((_) async {});
@@ -69,6 +68,7 @@ MockLibraryCubit stubLibraryCubit(
   when(() => cubit.loadMoreSongs()).thenAnswer((_) {});
   when(() => cubit.toggleViewMode()).thenAnswer((_) {});
   when(() => cubit.clearSelection()).thenAnswer((_) {});
+  when(() => cubit.clearError()).thenAnswer((_) {});
   when(() => cubit.toggleSongSelection(any())).thenAnswer((_) {});
   when(() => cubit.toggleFavorite(any())).thenAnswer((_) async {});
   when(() => cubit.selectAllSongs()).thenAnswer((_) async {});

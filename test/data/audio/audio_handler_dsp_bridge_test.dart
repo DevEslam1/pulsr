@@ -185,8 +185,8 @@ void main() {
     await handler!.setStereoWidth(true,
         width: 1.4, multiband: true, lowWidth: 1.1, midWidth: 1.3);
     await handler!.setLoudnessContour(true, intensity: 0.5);
-    await handler!.setSubCrossover(true,
-        cornerHz: 90, slopeDbPerOct: 24, gain: 0.7);
+    await handler!
+        .setSubCrossover(true, cornerHz: 90, slopeDbPerOct: 24, gain: 0.7);
     await handler!.setDynamicEq(true);
     await handler!.addDynamicEqBand();
     await handler!.removeDynamicEqBand(0);

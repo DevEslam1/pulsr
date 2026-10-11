@@ -135,7 +135,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
           ? await _useCases.addSongToPlaylist(playlist.id, widget.song.id)
           : await _useCases.addSongsToPlaylist(
               playlist.id, _allSongs.map((s) => s.id).toList());
-      if (!context.mounted || !_isMutating) return;
+      if (!context.mounted) return;
       final insertFailure =
           insertResult.fold<String?>((f) => f.message, (_) => null);
       if (insertFailure != null) {
@@ -144,7 +144,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
         );
         return;
       }
-      if (context.mounted && _isMutating) {
+      if (context.mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -372,42 +372,17 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
             Positioned.fill(
               child: Container(
                 color: AppColors.scrimAt(0.25),
+                // No cancel affordance: the playlist write cannot be aborted
+                // once started, so offering "Cancel" only produced a silent
+                // success. The sheet reports the real outcome and closes.
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: p.accent,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.xs,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () {
-                          if (mounted) {
-                            setState(() => _isMutating = false);
-                          }
-                        },
-                        child: Text(
-                          context.l10n.cancel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: p.accent,
+                    ),
                   ),
                 ),
               ),

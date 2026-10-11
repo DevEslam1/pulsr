@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/constants/app_radii.dart';
@@ -131,53 +132,72 @@ class SettingsScreenState extends State<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SettingsCubit, SettingsState>(
-      buildWhen: SettingsScreenController._settingsBuildWhen,
-      builder: (context, state) {
-        final cubit = context.read<SettingsCubit>();
-
-        final isLandscapePhone =
-            context.isLandscape && MediaQuery.sizeOf(context).height < 500;
-        final isTabletView = !isLandscapePhone &&
-            ((context.breakpoint >= PulsrBreakpoint.medium &&
-                    (context.isLandscape ||
-                        Adaptive.widthOf(context) >= 700)) ||
-                context.isTwoPane);
-        // H6/M3: A selected category can disappear when Professional mode is
-        // turned off (e.g. `profiles`). Normalise the persisted selection in the
-        // same frame so the master rail highlight and the detail pane can never
-        // disagree, then reset the stale id so it doesn't resurface when
-        // Professional mode is re-enabled.
-        final categories = _getCategories(context, pro: state.isProfessional);
-        var selectedCategoryId = _selectedCategoryId;
-        if (selectedCategoryId != 'all' &&
-            !categories.any((c) => c.id == selectedCategoryId)) {
-          selectedCategoryId = categories.first.id;
-          final corrected = selectedCategoryId;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _selectedCategoryId != corrected) {
-              setState(() => _selectedCategoryId = corrected);
-            }
-          });
-        }
-        final effectiveCategoryId =
-            (isTabletView && selectedCategoryId == 'all')
-                ? 'sound'
-                : selectedCategoryId;
-
-        return Scaffold(
-          body: SafeArea(
-            bottom: false,
-            child: FocusTraversalGroup(
-              policy: ReadingOrderTraversalPolicy(),
-              child: isTabletView
-                  ? _buildTabletLayout(
-                      context, state, cubit, effectiveCategoryId)
-                  : _buildPhoneLayout(context, state, cubit),
+    return BlocListener<SettingsCubit, SettingsState>(
+      listenWhen: (previous, current) =>
+          current.errorMessage != null &&
+          current.errorMessage != previous.errorMessage,
+      listener: (context, state) {
+        final message = state.errorMessage;
+        if (message == null) return;
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(resolveUiErrorMessage(context, message)),
+              backgroundColor: context.palette.error,
+              behavior: SnackBarBehavior.floating,
             ),
-          ),
-        );
+          );
+        context.read<SettingsCubit>().clearError();
       },
+      child: BlocBuilder<SettingsCubit, SettingsState>(
+        buildWhen: SettingsScreenController._settingsBuildWhen,
+        builder: (context, state) {
+          final cubit = context.read<SettingsCubit>();
+
+          final isLandscapePhone =
+              context.isLandscape && MediaQuery.sizeOf(context).height < 500;
+          final isTabletView = !isLandscapePhone &&
+              ((context.breakpoint >= PulsrBreakpoint.medium &&
+                      (context.isLandscape ||
+                          Adaptive.widthOf(context) >= 700)) ||
+                  context.isTwoPane);
+          // H6/M3: A selected category can disappear when Professional mode is
+          // turned off (e.g. `profiles`). Normalise the persisted selection in the
+          // same frame so the master rail highlight and the detail pane can never
+          // disagree, then reset the stale id so it doesn't resurface when
+          // Professional mode is re-enabled.
+          final categories = _getCategories(context, pro: state.isProfessional);
+          var selectedCategoryId = _selectedCategoryId;
+          if (selectedCategoryId != 'all' &&
+              !categories.any((c) => c.id == selectedCategoryId)) {
+            selectedCategoryId = categories.first.id;
+            final corrected = selectedCategoryId;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _selectedCategoryId != corrected) {
+                setState(() => _selectedCategoryId = corrected);
+              }
+            });
+          }
+          final effectiveCategoryId =
+              (isTabletView && selectedCategoryId == 'all')
+                  ? 'sound'
+                  : selectedCategoryId;
+
+          return Scaffold(
+            body: SafeArea(
+              bottom: false,
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: isTabletView
+                    ? _buildTabletLayout(
+                        context, state, cubit, effectiveCategoryId)
+                    : _buildPhoneLayout(context, state, cubit),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

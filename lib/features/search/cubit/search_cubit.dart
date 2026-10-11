@@ -71,9 +71,24 @@ class SearchCubit extends PulsrCubit<SearchState> {
       ValueNotifier<List<String>>(const []);
   late final Future<void> savedSearchesReady;
 
+  /// True while the latest query has not been executed yet (debounce window).
+  /// The UI uses this to keep the skeleton up instead of flashing "no results".
+  bool get isDebouncing => _debounceTimer?.isActive ?? false;
+
+  /// True when more matches exist beyond the results currently emitted.
+  final ValueNotifier<bool> hasMoreResults = ValueNotifier<bool>(false);
+
   // ── Pipeline bookkeeping ────────────────────────────────────────────
   /// Bumped for every new query/filter/clear. Invalidates in-flight work.
   int _generation = 0;
+
+  /// Current fuzzy cap for this query; raised by [showMoreResults].
+  int _resultLimit = SearchAlgorithmUtils.maxResultCount;
+
+  /// Source pool of the last emission, retained so "show more" can re-filter
+  /// with a higher cap without another network/DB round-trip.
+  List<SongsTableData>? _lastPool;
+  String? _lastPoolFilter;
 
   /// Bumped for every emission of the DB stream. A slow emission (fuzzy
   /// fallback awaits a second query) must not overwrite a newer one.
@@ -156,9 +171,17 @@ class SearchCubit extends PulsrCubit<SearchState> {
     if (filter == state.selectedFilter) return;
     _debounceTimer?.cancel();
     _debounceTimer = null;
+    _resetResultWindow();
     safeEmit(state.copyWith(selectedFilter: filter));
     unawaited(_persistFilter(filter));
     _executeSearch(state.query, filterOverride: filter);
+  }
+
+  void _resetResultWindow() {
+    _resultLimit = SearchAlgorithmUtils.maxResultCount;
+    _lastPool = null;
+    _lastPoolFilter = null;
+    if (hasMoreResults.value) hasMoreResults.value = false;
   }
 
   /// [immediate] skips the debounce (chip taps, suggestions, deep links).
@@ -166,6 +189,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
   /// (previously stale results lingered for 300 ms after deleting the text).
   void onQueryChanged(String query, {bool immediate = false}) {
     _generation++;
+    _resetResultWindow();
     _cancelSearch();
     safeEmit(state.copyWith(query: query));
     if (immediate || query.trim().isEmpty) {
@@ -208,6 +232,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
   void clearQuery() {
     _generation++;
     _cancelSearch();
+    _resetResultWindow();
     safeEmit(state.copyWith(
         query: '', results: [], isLoading: false, errorMessage: null));
   }
@@ -435,7 +460,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
             (allResults) async {
               final q = normalize(boundedQuery);
               final filter = filterOverride ?? state.selectedFilter;
-              var filtered = _filterWithFuzzy(allResults, q, filter);
+              var pool = allResults;
+              var filtered = _filterWithFuzzy(pool, q, filter);
 
               if (filtered.isEmpty && boundedQuery.length >= 2) {
                 try {
@@ -450,8 +476,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
                   if (stale()) return;
                   final candidates =
                       prefixRes.fold((l) => <SongsTableData>[], (r) => r);
-                  filtered = _filterWithFuzzy(
-                      candidates.take(_searchLimit).toList(), q, filter);
+                  pool = candidates.take(_searchLimit).toList();
+                  filtered = _filterWithFuzzy(pool, q, filter);
                 } catch (e, st) {
                   ErrorLogger.log('Fuzzy fallback search failed',
                       error: e, stackTrace: st, category: 'SearchCubit');
@@ -459,6 +485,9 @@ class SearchCubit extends PulsrCubit<SearchState> {
               }
 
               if (stale()) return;
+              _lastPool = pool;
+              _lastPoolFilter = filter;
+              _updateHasMore(filtered, pool);
               safeEmit(state.copyWith(
                   results: filtered, isLoading: false, errorMessage: null));
             },
@@ -485,7 +514,32 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
   List<SongsTableData> _filterWithFuzzy(
           List<SongsTableData> songs, String rawQ, String filter) =>
-      SearchAlgorithmUtils.filterWithFuzzy(songs, rawQ, filter);
+      SearchAlgorithmUtils.filterWithFuzzy(songs, rawQ, filter,
+          maxResults: _resultLimit);
+
+  void _updateHasMore(
+      List<SongsTableData> filtered, List<SongsTableData> pool) {
+    final more =
+        filtered.length >= _resultLimit && pool.length > filtered.length;
+    if (hasMoreResults.value != more) hasMoreResults.value = more;
+  }
+
+  /// Raises the fuzzy cap by [SearchAlgorithmUtils.maxResultCount] and
+  /// re-filters the cached pool, so a capped result set is never silently
+  /// truncated.
+  Future<void> showMoreResults() async {
+    final pool = _lastPool;
+    if (isClosed || pool == null || !hasMoreResults.value) return;
+    final generation = _generation;
+    final raised = _resultLimit + SearchAlgorithmUtils.maxResultCount;
+    _resultLimit = raised > _searchLimit ? _searchLimit : raised;
+    final q = normalize(state.query.trim());
+    final filtered =
+        _filterWithFuzzy(pool, q, _lastPoolFilter ?? state.selectedFilter);
+    if (isClosed || generation != _generation) return;
+    _updateHasMore(filtered, pool);
+    safeEmit(state.copyWith(results: filtered));
+  }
 
   @override
   Future<void> close() async {
@@ -494,5 +548,6 @@ class SearchCubit extends PulsrCubit<SearchState> {
     await super.close();
     savedSearches.value = const [];
     savedSearches.dispose();
+    hasMoreResults.dispose();
   }
 }

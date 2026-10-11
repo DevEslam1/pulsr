@@ -60,6 +60,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   PlaylistsTableData? _selectedPlaylist;
   List<PlaylistSuggestion> _suggestions = const [];
   bool _isCreatingPlaylist = false;
+  final Set<String> _creatingSuggestions = {};
 
   @override
   void initState() {
@@ -91,6 +92,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   Future<void> _createPlaylistFromSuggestion(
       PlaylistSuggestion suggestion) async {
+    // The card is only removed after several awaits; without this latch a
+    // double-tap creates two playlists from the same suggestion.
+    if (!_creatingSuggestions.add(suggestion.title)) return;
     // Capture localized strings before async gaps (no context-across-gap).
     final createFailedText = context.l10n.suggestCreateFailed;
     final loc = context.l10n;
@@ -128,6 +132,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       if (mounted) {
         PulsrToast.show(context, message: createFailedText, isError: true);
       }
+    } finally {
+      _creatingSuggestions.remove(suggestion.title);
     }
   }
 

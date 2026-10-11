@@ -192,8 +192,8 @@ void main() {
 
   testWidgets('opens the overflow menu with export/share/delete actions',
       (tester) async {
-    await tester.pumpWidget(
-        build(() => Stream.value(Right([_song(1, 'Alpha')]))));
+    await tester
+        .pumpWidget(build(() => Stream.value(Right([_song(1, 'Alpha')]))));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded));
@@ -203,6 +203,25 @@ void main() {
     expect(find.text('Export as M3U'), findsOneWidget);
     expect(find.text('Share Playlist'), findsOneWidget);
     expect(find.text('Delete Playlist'), findsOneWidget);
+  });
+
+  testWidgets('the in-playlist search filters the local tracks',
+      (tester) async {
+    await tester.pumpWidget(build(() => Stream.value(Right([
+          _song(1, 'Alpha'),
+          _song(2, 'Beta'),
+        ]))));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Beta');
+    await tester.pump();
+
+    expect(find.byType(SongTile), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(SongTile), matching: find.text('Beta')),
+      findsOneWidget,
+    );
+    expect(find.text('Alpha'), findsNothing);
   });
 
   testWidgets('smart playlist uses the smart engine and hides remove actions',

@@ -133,10 +133,11 @@ void main() {
   group('reason codes', () {
     test('reflect the dominant decision', () {
       expect(run(hires: false).reason, 'bt-hires-off');
-      expect(run(codec: 'LDAC', codecRate: 44100).reason,
-          'bt-hires-high-codec');
+      expect(
+          run(codec: 'LDAC', codecRate: 44100).reason, 'bt-hires-high-codec');
       expect(run(leAudio: true, codecRate: 44100).reason, 'bt-hires-le-audio');
-      expect(run(codec: 'SBC', codecRate: 44100).reason, 'bt-hires-lossy-codec');
+      expect(
+          run(codec: 'SBC', codecRate: 44100).reason, 'bt-hires-lossy-codec');
       expect(
         run(trackRate: 44100, codecRate: 48000).reason,
         'bt-hires-align-rate',

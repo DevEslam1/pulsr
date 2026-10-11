@@ -93,7 +93,11 @@ void main() {
     gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     filters: [
       EqFilter(frequency: 100, gain: 3, q: 1.0),
-      EqFilter(frequency: 5000, gain: -2, q: 2.0, filterType: EqFilterType.highShelf),
+      EqFilter(
+          frequency: 5000,
+          gain: -2,
+          q: 2.0,
+          filterType: EqFilterType.highShelf),
     ],
   );
 
@@ -292,7 +296,8 @@ void main() {
     final manager = await newManager();
     await manager.setDynamicEq(true);
     expect(manager.isDynamicEqEnabled, isTrue);
-    await manager.setDynamicEqBand(0, const DynamicEqBandConfig(frequency: 120));
+    await manager.setDynamicEqBand(
+        0, const DynamicEqBandConfig(frequency: 120));
     await manager.addDynamicEqBand();
     expect(manager.dynamicEqBands.length, greaterThan(1));
     await manager.setDynamicEqBand(99, const DynamicEqBandConfig());
@@ -319,7 +324,8 @@ void main() {
         makeupGainDb: 0,
       ),
     );
-    await manager.setMultibandCompressorBand(99,
+    await manager.setMultibandCompressorBand(
+        99,
         const MultibandCompressorBandConfig(
             thresholdDb: -20,
             ratio: 2,

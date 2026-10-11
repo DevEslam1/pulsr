@@ -34,7 +34,8 @@ class WavFileInfo {
     final riff = String.fromCharCodes(bytes.sublist(0, 4));
     final wave = String.fromCharCodes(bytes.sublist(8, 12));
     if (riff != 'RIFF' || wave != 'WAVE') {
-      throw FormatException('Not a valid RIFF WAVE file: riff=$riff, wave=$wave');
+      throw FormatException(
+          'Not a valid RIFF WAVE file: riff=$riff, wave=$wave');
     }
 
     int offset = 12;
@@ -84,19 +85,22 @@ class WavFileInfo {
 
 void main() {
   group('Real Audio File Bit-Perfect Null & Transparency Verification', () {
-    const realWavPath = r'D:\Courses\Projectss\pulsr\build\playback-startup-test.wav';
+    const realWavPath =
+        r'D:\Courses\Projectss\pulsr\build\playback-startup-test.wav';
     late File wavFile;
     late Uint8List wavFileRawBytes;
     late WavFileInfo wavInfo;
 
     setUpAll(() async {
       wavFile = File(realWavPath);
-      expect(await wavFile.exists(), isTrue, reason: 'Real WAV test audio file must exist');
+      expect(await wavFile.exists(), isTrue,
+          reason: 'Real WAV test audio file must exist');
       wavFileRawBytes = await wavFile.readAsBytes();
       wavInfo = WavFileInfo.parse(wavFileRawBytes);
     });
 
-    test('Real audio file format verification (RIFF stereo PCM 44.1kHz 16-bit)', () {
+    test('Real audio file format verification (RIFF stereo PCM 44.1kHz 16-bit)',
+        () {
       expect(wavInfo.audioFormat, equals(1)); // Standard uncompressed PCM
       expect(wavInfo.channels, equals(2));
       expect(wavInfo.sampleRate, equals(44100));
@@ -113,7 +117,8 @@ void main() {
       final outputDigest = sha256.convert(outputPcm).toString();
 
       expect(outputDigest, equals(inputDigest),
-          reason: 'Cryptographic SHA-256 hash must be identical under Bit-Perfect pass-through');
+          reason:
+              'Cryptographic SHA-256 hash must be identical under Bit-Perfect pass-through');
 
       // Byte-by-byte bitwise XOR null test
       int bitErrors = 0;
@@ -122,10 +127,13 @@ void main() {
           bitErrors++;
         }
       }
-      expect(bitErrors, equals(0), reason: 'Bit Error Rate across real audio data must be 0.000%');
+      expect(bitErrors, equals(0),
+          reason: 'Bit Error Rate across real audio data must be 0.000%');
     });
 
-    test('2. Negative Control: Software Volume Attenuation (Even -0.01 dB) Alters Real Data', () {
+    test(
+        '2. Negative Control: Software Volume Attenuation (Even -0.01 dB) Alters Real Data',
+        () {
       // Demonstrates why non-bit-perfect mode alters raw audio data
       final originalSamples = ByteData.sublistView(wavInfo.pcmData);
       final alteredPcm = Uint8List.fromList(wavInfo.pcmData);
@@ -147,12 +155,15 @@ void main() {
       final alteredDigest = sha256.convert(alteredPcm).toString();
 
       expect(alteredDigest, isNot(equals(originalDigest)),
-          reason: 'Even 0.01 dB software volume breaks byte-exact bit perfection');
+          reason:
+              'Even 0.01 dB software volume breaks byte-exact bit perfection');
       expect(alteredCount, greaterThan(1000),
           reason: 'Subtle software volume touches thousands of audio samples');
     });
 
-    test('3. Rate Invariance Decision on Real Audio (44.1 kHz Preserved Without 48k SRC)', () {
+    test(
+        '3. Rate Invariance Decision on Real Audio (44.1 kHz Preserved Without 48k SRC)',
+        () {
       final decision = negotiateOutputFormat(
         request: OutputFormatRequest(
           trackSampleRate: wavInfo.sampleRate, // 44100
@@ -206,9 +217,11 @@ void main() {
         final lMarker = dopOutput[s * 6 + 2];
         final rMarker = dopOutput[s * 6 + 5];
         expect(lMarker, equals(expectedMarker),
-            reason: 'DoP Left marker must strictly follow 0x05/0xFA alternation');
+            reason:
+                'DoP Left marker must strictly follow 0x05/0xFA alternation');
         expect(rMarker, equals(expectedMarker),
-            reason: 'DoP Right marker must strictly follow 0x05/0xFA alternation');
+            reason:
+                'DoP Right marker must strictly follow 0x05/0xFA alternation');
       }
     });
   });

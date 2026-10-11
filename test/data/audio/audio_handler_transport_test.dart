@@ -148,16 +148,16 @@ void main() {
     test('setRepeatMode maps every audio-service mode', () async {
       handler = await ready();
       await handler!.setRepeatMode(AudioServiceRepeatMode.all);
-      expect(handler!.playbackState.value.repeatMode,
-          AudioServiceRepeatMode.all);
+      expect(
+          handler!.playbackState.value.repeatMode, AudioServiceRepeatMode.all);
 
       await handler!.setRepeatMode(AudioServiceRepeatMode.one);
-      expect(handler!.playbackState.value.repeatMode,
-          AudioServiceRepeatMode.one);
+      expect(
+          handler!.playbackState.value.repeatMode, AudioServiceRepeatMode.one);
 
       await handler!.setRepeatMode(AudioServiceRepeatMode.none);
-      expect(handler!.playbackState.value.repeatMode,
-          AudioServiceRepeatMode.none);
+      expect(
+          handler!.playbackState.value.repeatMode, AudioServiceRepeatMode.none);
     });
   });
 

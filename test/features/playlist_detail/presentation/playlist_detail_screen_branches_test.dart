@@ -205,14 +205,15 @@ void main() {
   testWidgets('the smart edit button opens the builder', (tester) async {
     when(() => useCases.watchSmartPlaylistSongs(any()))
         .thenAnswer((_) => Stream.value([createTestSong(id: 1)]));
-    await pump(tester, playlist: PlaylistsTableData(
-      id: 3,
-      name: 'Smart OK',
-      createdAt: DateTime(2024),
-      updatedAt: DateTime(2024),
-      isSmart: true,
-      smartCriteria: '{"rules":[],"matchAll":true}',
-    ));
+    await pump(tester,
+        playlist: PlaylistsTableData(
+          id: 3,
+          name: 'Smart OK',
+          createdAt: DateTime(2024),
+          updatedAt: DateTime(2024),
+          isSmart: true,
+          smartCriteria: '{"rules":[],"matchAll":true}',
+        ));
     await tester.tap(find.byTooltip('Edit'));
     await tester.pumpAndSettle();
 
@@ -245,5 +246,46 @@ void main() {
   testWidgets('the empty-state still renders without tracks', (tester) async {
     await pump(tester, playlist: _localPlaylist);
     expect(find.byType(PulsrEmptyState), findsOneWidget);
+  });
+
+  testWidgets('corrupt smart criteria surface the retryable error',
+      (tester) async {
+    await pump(
+      tester,
+      playlist: PlaylistsTableData(
+        id: 4,
+        name: 'Broken Smart',
+        createdAt: DateTime(2024),
+        updatedAt: DateTime(2024),
+        isSmart: true,
+        smartCriteria: '{not valid json',
+      ),
+    );
+
+    expect(find.text('Failed to load playlist.'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    verifyNever(() => useCases.watchSmartPlaylistSongs(any()));
+  });
+
+  testWidgets('embedded delete does not pop the enclosing route',
+      (tester) async {
+    when(() => useCases.watchPlaylistSongs(any()))
+        .thenAnswer((_) => Stream.value(Right([createTestSong(id: 1)])));
+    useScreenSize(tester, const Size(800, 1600));
+    await tester.pumpWidget(harness(PlaylistDetailScreen(
+      playlist: _localPlaylist,
+      playlistUseCases: useCases,
+      isEmbedded: true,
+    )));
+    await tester.pumpAndSettle();
+
+    await openMenu(tester);
+    await tester.tap(find.text('Delete Playlist'));
+    await tester.pumpAndSettle();
+
+    verify(() => useCases.deletePlaylist(1)).called(1);
+    // The embedded detail has no route of its own; it must stay mounted.
+    expect(find.byType(PlaylistDetailScreen), findsOneWidget);
+    expect(find.textContaining('Deleted'), findsWidgets);
   });
 }

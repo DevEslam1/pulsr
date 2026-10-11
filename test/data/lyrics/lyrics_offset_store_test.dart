@@ -75,8 +75,7 @@ void main() {
           reason: 'new key now serves the value');
     });
 
-    test('a hash owned by another path reads zero (collision guard)',
-        () async {
+    test('a hash owned by another path reads zero (collision guard)', () async {
       const path = '/music/collide.flac';
       final store = LyricsOffsetStore();
       await store.setOffsetMs(path, 77);
@@ -102,7 +101,8 @@ void main() {
       expect(await store.getOffsetMs('/music/evict_0.flac'), 0,
           reason: 'the oldest offset was evicted');
       expect(
-        await store.getOffsetMs('/music/evict_${LyricsOffsetStore.maxEntries}.flac'),
+        await store
+            .getOffsetMs('/music/evict_${LyricsOffsetStore.maxEntries}.flac'),
         LyricsOffsetStore.maxEntries,
       );
     });

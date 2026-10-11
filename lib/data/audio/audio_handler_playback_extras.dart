@@ -14,11 +14,14 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   void clearAbLoop() => abLoopManager.clear();
 
   /// Re-restores the persisted AB loop for the current song. Used by the
-  /// PlayerCubit to sync loop UI after a track change completes.
-  Future<void> restoreAbLoopForCurrentSong() async {
-    final song = currentSong;
-    if (song == null) return;
-    await abLoopManager.restoreForSong(song.id);
+  /// PlayerCubit to sync loop UI after a track change completes. Clears a
+  /// stale loop scoped to the previous track first, so its points never leak
+  /// into the new track's UI state.
+  Future<void> restoreAbLoopForCurrentSong({int? songId}) async {
+    final id = songId ?? currentSong?.id;
+    if (id == null) return;
+    abLoopManager.onSongChanged(id);
+    await abLoopManager.restoreForSong(id);
   }
 
   // F2: per-track delay

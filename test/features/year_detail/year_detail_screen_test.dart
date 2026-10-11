@@ -68,8 +68,7 @@ void main() {
     expect(find.text('2 tracks'), findsOneWidget);
   });
 
-  testWidgets('renders every track for the year as a SongTile',
-      (tester) async {
+  testWidgets('renders every track for the year as a SongTile', (tester) async {
     await tester.pumpWidget(build(Stream.value(Right([
       _song(1, 'Alpha'),
       _song(2, 'Beta'),
@@ -100,12 +99,23 @@ void main() {
     expect(find.byType(SongTile), findsNothing);
   });
 
-  testWidgets('shows the error view and retries when the stream fails',
+  testWidgets('shows the error view and retry recreates the stream',
       (tester) async {
-    final controller = StreamController<Result<List<SongsTableData>>>();
-    await tester.pumpWidget(build(controller.stream));
+    // Broadcast: the retry swaps the StreamBuilder to a new stream, which
+    // cancels this subscription; closing a single-subscription controller
+    // after that leaves the test binding hanging.
+    final first = StreamController<Result<List<SongsTableData>>>.broadcast();
+    var calls = 0;
+    when(() => useCase.watchYearSongs(any())).thenAnswer((_) {
+      calls++;
+      if (calls == 1) return first.stream;
+      return Stream.value(Right([_song(1, 'Recovered')]));
+    });
+    await tester.pumpWidget(detailHarness(
+      child: YearDetailScreen(yearItem: _year, getYearsUseCase: useCase),
+    ));
     await tester.pump();
-    controller.add(Left(const DatabaseFailure('boom')));
+    first.add(Left(const DatabaseFailure('boom')));
     await tester.pumpAndSettle();
 
     expect(find.text('Could not load songs for this year'), findsOneWidget);
@@ -114,17 +124,19 @@ void main() {
     expect(find.text('Retry'), findsOneWidget);
 
     await tester.tap(find.text('Retry'));
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    await controller.close();
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.text('Recovered'), findsOneWidget);
+    await first.close();
   });
 
   testWidgets('play-all is disabled without tracks and enabled with tracks',
       (tester) async {
     await tester.pumpWidget(build(Stream.value(const Right([]))));
     await tester.pumpAndSettle();
-    final emptyButton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Play All'));
+    final emptyButton = tester
+        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Play All'));
     expect(emptyButton.onPressed, isNull);
   });
 

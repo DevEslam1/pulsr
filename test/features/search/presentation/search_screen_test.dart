@@ -9,12 +9,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/widgets/highlighted_text.dart';
 import 'package:pulsr/core/widgets/pulsr_empty_state.dart';
-import 'package:pulsr/core/widgets/song_tile.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_state.dart';
 import 'package:pulsr/features/search/presentation/search_screen.dart';
+import 'package:pulsr/features/search/presentation/widgets/highlighted_song_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../helpers/screen_harness.dart';
@@ -28,6 +29,7 @@ void main() {
   late _SearchCubit searchCubit;
   late StreamController<SearchState> states;
   late ValueNotifier<List<String>> savedSearches;
+  late ValueNotifier<bool> hasMoreResults;
 
   setUpAll(() {
     registerFallbackValue('');
@@ -39,10 +41,13 @@ void main() {
     searchCubit = _SearchCubit();
     states = StreamController<SearchState>.broadcast();
     savedSearches = ValueNotifier<List<String>>(const []);
+    hasMoreResults = ValueNotifier<bool>(false);
 
     when(() => searchCubit.state).thenReturn(const SearchState());
     when(() => searchCubit.stream).thenAnswer((_) => states.stream);
     when(() => searchCubit.savedSearches).thenReturn(savedSearches);
+    when(() => searchCubit.hasMoreResults).thenReturn(hasMoreResults);
+    when(() => searchCubit.isDebouncing).thenReturn(false);
     when(() => searchCubit.isSaved(any(), any())).thenReturn(false);
     when(() => searchCubit.onQueryChanged(any(),
         immediate: any(named: 'immediate'))).thenReturn(null);
@@ -55,6 +60,7 @@ void main() {
     addTearDown(() async {
       await states.close();
       savedSearches.dispose();
+      hasMoreResults.dispose();
     });
   });
 
@@ -100,12 +106,20 @@ void main() {
       tester,
       SearchState(
         query: 'Beat',
-        results: [createTestSong(id: 1, title: 'Beat Flow', artist: 'A', album: 'B')],
+        results: [
+          createTestSong(id: 1, title: 'Beat Flow', artist: 'A', album: 'B')
+        ],
       ),
     );
 
-    expect(find.byType(SongTile), findsWidgets);
+    expect(find.byType(HighlightedSongTile), findsWidgets);
     expect(find.text('Beat Flow'), findsWidgets);
+
+    final highlighted = tester.widgetList<PulsrHighlightedText>(find.descendant(
+        of: find.byType(HighlightedSongTile),
+        matching: find.byType(PulsrHighlightedText)));
+    expect(highlighted, isNotEmpty);
+    expect(highlighted.every((w) => w.query == 'Beat'), isTrue);
   });
 
   testWidgets('clearing the query returns to the start page', (tester) async {
@@ -117,17 +131,19 @@ void main() {
       tester,
       SearchState(
         query: 'Beat',
-        results: [createTestSong(id: 1, title: 'Beat Flow', artist: 'A', album: 'B')],
+        results: [
+          createTestSong(id: 1, title: 'Beat Flow', artist: 'A', album: 'B')
+        ],
       ),
     );
-    expect(find.byType(SongTile), findsWidgets);
+    expect(find.byType(HighlightedSongTile), findsWidgets);
 
     await tester.tap(find.byIcon(Icons.clear_rounded));
     await tester.pump();
     verify(() => searchCubit.clearQuery()).called(1);
 
     await emit(tester, const SearchState());
-    expect(find.byType(SongTile), findsNothing);
+    expect(find.byType(HighlightedSongTile), findsNothing);
     expect(find.text('Rock'), findsWidgets);
   });
 
@@ -139,8 +155,8 @@ void main() {
     verify(() => searchCubit.setFilter('Songs')).called(1);
 
     await emit(tester, const SearchState(selectedFilter: 'Songs'));
-    final chip = tester.widget<ChoiceChip>(
-        find.widgetWithText(ChoiceChip, 'Songs'));
+    final chip =
+        tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Songs'));
     expect(chip.selected, isTrue);
   });
 

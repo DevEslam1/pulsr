@@ -54,24 +54,24 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   }
 
   void updateName(String name) {
-    safeEmit(state.copyWith(name: name));
+    safeEmit(state.copyWith(name: name, errorMessage: null));
   }
 
   /// Replaces the current rule set with a preset template.
   void applyTemplate(SmartCriteria template) {
-    safeEmit(state.copyWith(criteria: template));
+    safeEmit(state.copyWith(criteria: template, errorMessage: null));
     _updatePreview();
   }
 
   void toggleMatchAll(bool matchAll) {
     final newCriteria = state.criteria.copyWith(matchAll: matchAll);
-    safeEmit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria, errorMessage: null));
     _updatePreview();
   }
 
   void setLimit(int? limit) {
     final newCriteria = state.criteria.copyWith(limit: limit);
-    safeEmit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria, errorMessage: null));
     _updatePreview();
   }
 
@@ -80,13 +80,14 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       sortBy: sortBy,
       sortAscending: sortAscending ?? state.criteria.sortAscending,
     );
-    safeEmit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria, errorMessage: null));
     _updatePreview();
   }
 
   void addRule(SmartRule rule) {
     final rules = List<SmartRule>.from(state.criteria.rules)..add(rule);
-    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(
+        criteria: state.criteria.copyWith(rules: rules), errorMessage: null));
     _updatePreview();
   }
 
@@ -94,14 +95,16 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     if (index < 0 || index >= state.criteria.rules.length) return;
     final rules = List<SmartRule>.from(state.criteria.rules);
     rules[index] = rule;
-    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(
+        criteria: state.criteria.copyWith(rules: rules), errorMessage: null));
     _updatePreview();
   }
 
   void removeRule(int index) {
     if (index < 0 || index >= state.criteria.rules.length) return;
     final rules = List<SmartRule>.from(state.criteria.rules)..removeAt(index);
-    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(
+        criteria: state.criteria.copyWith(rules: rules), errorMessage: null));
     _updatePreview();
   }
 
@@ -196,6 +199,18 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       normalizedRules.add(rule);
     }
     final criteria = state.criteria.copyWith(rules: normalizedRules);
+
+    // A rule the engine cannot evaluate must block the save: saving it would
+    // silently widen the playlist (unbuildable rules previously failed open).
+    final invalidRules = _engine.validateRules(criteria);
+    if (invalidRules.isNotEmpty) {
+      final index = criteria.rules.indexWhere(invalidRules.contains);
+      safeEmit(state.copyWith(
+        errorMessage:
+            'Please enter a valid value for rule #${index >= 0 ? index + 1 : 1}',
+      ));
+      return false;
+    }
 
     safeEmit(state.copyWith(isSubmitting: true, errorMessage: null));
 

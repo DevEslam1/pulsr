@@ -195,11 +195,9 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                         p: p,
                                         isTablet: isTablet,
                                         iconOnly: widget.iconOnly,
-                                        onTap: () {
-                                          if (widget.currentIndex != i) {
-                                            widget.onTap(i);
-                                          }
-                                        },
+                                        // Forward same-tab taps too: AppShell
+                                        // resets the branch (scroll to top).
+                                        onTap: () => widget.onTap(i),
                                       ),
                                     ),
                                 ],

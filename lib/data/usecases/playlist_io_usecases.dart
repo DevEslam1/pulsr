@@ -37,6 +37,20 @@ String _decodeXmlEntities(String input) {
       .replaceAll('&amp;', '&');
 }
 
+/// Decodes UTF-16 code units (BOM skipped via [start]) without a dependency.
+/// Surrogate pairs pass through as raw code units, which `String.fromCharCodes`
+/// accepts.
+String _decodeUtf16(List<int> bytes,
+    {required bool littleEndian, int start = 2}) {
+  final codeUnits = <int>[];
+  for (var i = start; i + 1 < bytes.length; i += 2) {
+    codeUnits.add(littleEndian
+        ? bytes[i] | (bytes[i + 1] << 8)
+        : (bytes[i] << 8) | bytes[i + 1]);
+  }
+  return String.fromCharCodes(codeUnits);
+}
+
 @singleton
 class PlaylistExportUseCase {
   /// Generates #EXTM3U formatted string for a list of songs.
@@ -237,18 +251,26 @@ class PlaylistImportUseCase {
       }
 
       final bytes = await file.readAsBytes();
-      if (bytes.contains(0)) {
-        return Left(DatabaseFailure('Binary or malformed playlist file'));
-      }
 
+      // BOM sniffing first: Windows Media Player writes UTF-16LE WPL/M3U files
+      // whose NUL bytes would otherwise trip the binary heuristic below.
       String content;
-      try {
-        content = utf8.decode(bytes);
-      } catch (_) {
-        content = latin1.decode(bytes);
+      if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+        content = _decodeUtf16(bytes, littleEndian: true);
+      } else if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+        content = _decodeUtf16(bytes, littleEndian: false);
+      } else {
+        if (bytes.contains(0)) {
+          return Left(DatabaseFailure('Binary or malformed playlist file'));
+        }
+        try {
+          content = utf8.decode(bytes);
+        } catch (_) {
+          content = latin1.decode(bytes);
+        }
       }
 
-      // Strip UTF-8 BOM if present
+      // Strip UTF-8 BOM if present (UTF-16 BOMs were consumed above)
       if (content.startsWith('\uFEFF')) {
         content = content.substring(1);
       }

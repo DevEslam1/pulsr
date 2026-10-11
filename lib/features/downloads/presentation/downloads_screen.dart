@@ -38,6 +38,36 @@ Set<String> pruneSelectedVideoIds(
   return selected.where(valid.contains).toSet();
 }
 
+/// The tasks [filter] currently shows, in list order. Extracted to the top
+/// level so the "what is visible" rule is testable without the screen.
+@visibleForTesting
+List<DownloadTask> filterDownloadTasks(
+    List<DownloadTask> tasks, DownloadFilter filter) {
+  return switch (filter) {
+    DownloadFilter.all => tasks,
+    DownloadFilter.downloading =>
+      tasks.where((t) => t.status.isActive).toList(),
+    DownloadFilter.completed =>
+      tasks.where((t) => t.status == DownloadStatus.complete).toList(),
+    DownloadFilter.failed =>
+      tasks.where((t) => t.status == DownloadStatus.failed).toList(),
+  };
+}
+
+/// Whether two task lists show the same tiles in the same order with the same
+/// statuses. Progress/ETA/speed ticks do not change the shape, so the screen
+/// can skip its outer rebuild and let each tile selector update itself.
+@visibleForTesting
+bool sameTaskListShape(List<DownloadTask> a, List<DownloadTask> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].videoId != b[i].videoId || a[i].status != b[i].status) {
+      return false;
+    }
+  }
+  return true;
+}
+
 class DownloadsScreen extends StatefulWidget {
   final AppDatabase? db;
 
@@ -51,6 +81,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   DownloadFilter _filter = DownloadFilter.all;
   late final AppDatabase? _db;
   final Set<String> _selectedVideoIds = <String>{};
+  bool _retryingBatch = false;
 
   bool get _isSelectionMode => _selectedVideoIds.isNotEmpty;
 
@@ -95,11 +126,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       onSelected: (_) {
         setState(() {
           _filter = filter;
-          // Prune selections that reference tasks which no longer exist so the
-          // screen can never remain stuck in selection mode after the list or
-          // filter shrinks (deleted/completed tasks are dropped from the map).
-          final validIds = context.read<DownloadsCubit>().state.tasks.keys;
-          final pruned = pruneSelectedVideoIds(_selectedVideoIds, validIds);
+          // Prune selections that are not part of the newly filtered list, so
+          // bulk Delete/Add-to-playlist can never act on tasks the filter has
+          // hidden (they would otherwise stay selected but invisible).
+          final cubit = context.read<DownloadsCubit>();
+          final visible = filterDownloadTasks(cubit.state.taskList, filter);
+          final pruned = pruneSelectedVideoIds(
+              _selectedVideoIds, visible.map((t) => t.videoId));
           _selectedVideoIds
             ..clear()
             ..addAll(pruned);
@@ -120,6 +153,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             }
           : null,
       child: BlocBuilder<DownloadsCubit, DownloadsState>(
+        // Progress-only emits recreate the task map but not the visible list
+        // shape; each tile subscribes to its own task, so skipping the outer
+        // rebuild stops a ~100ms progress tick from rebuilding every tile.
+        buildWhen: (prev, curr) =>
+            prev.isLoading != curr.isLoading ||
+            prev.errorMessage != curr.errorMessage ||
+            prev.storageStats != curr.storageStats ||
+            !sameTaskListShape(prev.taskList, curr.taskList),
         builder: (context, state) {
           final allTasks = state.taskList;
           final activeTasks = allTasks.where((t) => t.status.isActive).toList();
@@ -129,24 +170,21 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           final failedTasks =
               allTasks.where((t) => t.status == DownloadStatus.failed).toList();
 
-          final filteredTasks = switch (_filter) {
-            DownloadFilter.all => allTasks,
-            DownloadFilter.downloading => activeTasks,
-            DownloadFilter.completed => completedTasks,
-            DownloadFilter.failed => failedTasks,
-          };
+          final filteredTasks = filterDownloadTasks(allTasks, _filter);
 
           return BlocListener<DownloadsCubit, DownloadsState>(
-            // Prune selected ids when the underlying task map changes so a
-            // removed/completed task cannot leave the screen stuck in
+            // Prune selected ids when the visible list changes so a removed,
+            // completed or filtered-out task cannot leave the screen stuck in
             // selection mode with stale "N selected" state.
             listenWhen: (prev, curr) =>
                 _selectedVideoIds.isNotEmpty && curr.tasks != prev.tasks,
             listener: (context, state) {
-              if (_selectedVideoIds.any((id) => !state.tasks.containsKey(id))) {
+              final visible = filterDownloadTasks(state.taskList, _filter);
+              final visibleIds = {for (final t in visible) t.videoId};
+              if (_selectedVideoIds.any((id) => !visibleIds.contains(id))) {
                 setState(() {
-                  final pruned = pruneSelectedVideoIds(
-                      _selectedVideoIds, state.tasks.keys);
+                  final pruned =
+                      pruneSelectedVideoIds(_selectedVideoIds, visibleIds);
                   _selectedVideoIds
                     ..clear()
                     ..addAll(pruned);
@@ -238,9 +276,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                               return const SizedBox.shrink();
                             }
                             return TextButton.icon(
-                              onPressed: () => context
-                                  .read<DownloadsCubit>()
-                                  .retryAllFailed(),
+                              onPressed:
+                                  _retryingBatch ? null : _retryAllFailed,
                               icon: Icon(Icons.refresh_rounded,
                                   size: 18, color: p.accent),
                               label: Text(
@@ -432,9 +469,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                       : Icons.explore_rounded,
                               onPrimaryAction: () {
                                 if (_filter == DownloadFilter.failed) {
-                                  context
-                                      .read<DownloadsCubit>()
-                                      .retryAllFailed();
+                                  _retryAllFailed();
                                 } else {
                                   context.go('/browse');
                                 }
@@ -508,7 +543,15 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                     ),
                                     const SizedBox(width: AppSpacing.xxs),
                                   ],
-                                  Expanded(child: DownloadTile(task: task)),
+                                  Expanded(
+                                    child: BlocSelector<DownloadsCubit,
+                                        DownloadsState, DownloadTask>(
+                                      selector: (state) =>
+                                          state.tasks[task.videoId] ?? task,
+                                      builder: (context, latest) =>
+                                          DownloadTile(task: latest),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -651,15 +694,45 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
   }
 
-  void _retrySelectedFailed(
-      BuildContext context, List<DownloadTask> selectedTasks) {
+  Future<void> _retrySelectedFailed(
+      BuildContext context, List<DownloadTask> selectedTasks) async {
+    if (_retryingBatch) return;
+    final failedIds = selectedTasks
+        .where((t) => t.status == DownloadStatus.failed)
+        .map((t) => t.videoId)
+        .toList();
+    if (failedIds.isEmpty) return;
     final cubit = context.read<DownloadsCubit>();
-    final failed =
-        selectedTasks.where((t) => t.status == DownloadStatus.failed);
-    for (final t in failed) {
-      cubit.retryDownload(t.videoId);
-    }
-    if (mounted) setState(() => _selectedVideoIds.clear());
+    setState(() {
+      _retryingBatch = true;
+      _selectedVideoIds.clear();
+    });
+    // Paced inside the cubit: a raw concurrent loop here fired every retry at
+    // once and tripped YouTube's 429/bot throttling.
+    final queued = await cubit.retryDownloads(failedIds);
+    if (!mounted) return;
+    setState(() => _retryingBatch = false);
+    _showRequeued(queued);
+  }
+
+  /// Re-queues every failed task with the cubit's pacing and reports the count.
+  Future<void> _retryAllFailed() async {
+    if (_retryingBatch) return;
+    final cubit = context.read<DownloadsCubit>();
+    setState(() => _retryingBatch = true);
+    final queued = await cubit.retryAllFailed();
+    if (!mounted) return;
+    setState(() => _retryingBatch = false);
+    _showRequeued(queued);
+  }
+
+  void _showRequeued(int count) {
+    if (count <= 0) return;
+    PulsrToast.show(
+      context,
+      message: '$count re-queued',
+      icon: Icons.schedule_rounded,
+    );
   }
 
   Future<void> _addSelectedToPlaylist(

@@ -126,8 +126,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 20));
   });
 
-  test('smart prefetch runs when playback approaches the track end',
-      () async {
+  test('smart prefetch runs when playback approaches the track end', () async {
     handler = await buildTestHandler(repository: repo, ytmService: ytm);
     await handler!.loadQueue(
       [localSong(1, durationMs: 200000), localSong(2, durationMs: 200000)],

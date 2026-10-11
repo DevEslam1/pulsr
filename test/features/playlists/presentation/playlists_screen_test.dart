@@ -143,6 +143,7 @@ void main() {
     await tester.tap(find.text('Online'));
     await tester.pumpAndSettle();
 
-    verify(() => cubit.autoFetchOnlineLibrary()).called(greaterThanOrEqualTo(1));
+    verify(() => cubit.autoFetchOnlineLibrary())
+        .called(greaterThanOrEqualTo(1));
   });
 }

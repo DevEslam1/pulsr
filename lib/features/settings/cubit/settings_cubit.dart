@@ -1438,7 +1438,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     return AppHttpOverrides.instance.testConnection(configToTest: configToTest);
   }
 
-  Future<int> rescanLibrary() async {
+  Future<int> rescanLibrary() async => (await rescanLibraryWithResult()).count;
+
+  /// Like [rescanLibrary], but also reports whether the scan failed. A failed
+  /// scan returns 0 just like an empty library, so callers that display a
+  /// success message must use this result instead of the raw count.
+  Future<({int count, String? error})> rescanLibraryWithResult() async {
     MediaScannerService.clearNomediaCache();
     safeEmit(
       state.copyWith(
@@ -1458,7 +1463,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       );
       SoundFeedbackService.playSuccess(mirrorHaptics: true);
       safeEmit(state.copyWith(isScanning: false, scanResultCount: count));
-      return count;
+      return (count: count, error: null);
     } catch (e, st) {
       SoundFeedbackService.playError(mirrorHaptics: true);
       final error = classifyFailure(e, st);
@@ -1466,7 +1471,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           error: e, stackTrace: st, category: 'SettingsCubit');
       safeEmit(
           state.copyWith(isScanning: false, errorMessage: error.userMessage));
-      return 0;
+      return (count: 0, error: error.userMessage);
     }
   }
 

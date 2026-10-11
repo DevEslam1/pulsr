@@ -48,6 +48,7 @@ class ResponsivePlayerLayout extends StatefulWidget {
 class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _wasSplitView = false;
 
   @override
   void initState() {
@@ -66,8 +67,11 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
         if (!widget.state.isLyricsVisible) cubit.toggleLyricsVisibility();
       case 1:
         if (!widget.state.isQueueVisible) cubit.toggleQueueVisibility();
-      default:
-        break;
+      case 2:
+        // The DSP tab is not represented by an overlay flag: leaving both set
+        // would surface a stale lyrics/queue overlay once the phone layout
+        // reads the flags again after rotation.
+        cubit.resetOverlayViews();
     }
   }
 
@@ -102,6 +106,18 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     return null;
   }
 
+  /// The overlay flags only describe the split-view tabs; once the split layout
+  /// is gone they must not leak into the single-pane theme (which would render
+  /// the stale lyrics/queue overlay instead of the track view).
+  void _clearStaleOverlaysWhenLeavingSplit() {
+    if (!_wasSplitView) return;
+    _wasSplitView = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.cubit.resetOverlayViews();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
@@ -112,6 +128,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     // A zero-height hinge (degenerate/zero-width report) must not produce a
     // tabletop layout with no usable halves — fall through to split/single pane.
     if (hinge != null && hinge.bounds.height > 0) {
+      _clearStaleOverlaysWhenLeavingSplit();
       final topHeight = hinge.bounds.top;
       final bottomHeight = mediaQuery.size.height - hinge.bounds.bottom;
 
@@ -150,6 +167,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                   const SizedBox(height: AppSpacing.md),
                   PlayerControls(
                     isPlaying: widget.state.isPlaying,
+                    isBuffering: widget.state.isBuffering,
                     isShuffle: widget.state.isShuffle,
                     repeatMode: widget.state.repeatMode,
                     primaryColor: widget.activeColor,
@@ -191,6 +209,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                     mediaQuery.size.height >= 500)) &&
             isLandscapeOrientation;
     if (isTabletLandscape) {
+      _wasSplitView = true;
       final p = context.palette;
       return Stack(
         children: [
@@ -427,6 +446,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     }
 
     // 3. Single-Pane Layout (Phone / Standard)
+    _clearStaleOverlaysWhenLeavingSplit();
     return widget.themeWidget;
   }
 }

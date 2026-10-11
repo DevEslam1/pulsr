@@ -26,6 +26,7 @@ void main() {
   late _SearchCubit searchCubit;
   late StreamController<SearchState> states;
   late ValueNotifier<List<String>> savedSearches;
+  late ValueNotifier<bool> hasMoreResults;
 
   setUpAll(() {
     registerFallbackValue('');
@@ -37,10 +38,13 @@ void main() {
     searchCubit = _SearchCubit();
     states = StreamController<SearchState>.broadcast();
     savedSearches = ValueNotifier<List<String>>(const []);
+    hasMoreResults = ValueNotifier<bool>(false);
 
     when(() => searchCubit.state).thenReturn(const SearchState());
     when(() => searchCubit.stream).thenAnswer((_) => states.stream);
     when(() => searchCubit.savedSearches).thenReturn(savedSearches);
+    when(() => searchCubit.hasMoreResults).thenReturn(hasMoreResults);
+    when(() => searchCubit.isDebouncing).thenReturn(false);
     when(() => searchCubit.isSaved(any(), any())).thenReturn(false);
     when(() => searchCubit.onQueryChanged(any(),
         immediate: any(named: 'immediate'))).thenReturn(null);
@@ -60,6 +64,7 @@ void main() {
     addTearDown(() async {
       await states.close();
       savedSearches.dispose();
+      hasMoreResults.dispose();
     });
   });
 
@@ -136,6 +141,24 @@ void main() {
     await tester.tap(find.text('Clear search'));
     await tester.pump();
     verify(() => searchCubit.clearQuery()).called(1);
+  });
+
+  testWidgets('keeps the skeleton while the debounce is pending',
+      (tester) async {
+    await pumpScreen(tester);
+    await tester.enterText(find.byType(TextField), 'Beat');
+    await tester.pump();
+
+    when(() => searchCubit.isDebouncing).thenReturn(true);
+    await emit(tester, const SearchState(query: 'Beat'));
+
+    expect(find.byType(SkeletonList), findsWidgets);
+    expect(find.text('No music found'), findsNothing);
+
+    when(() => searchCubit.isDebouncing).thenReturn(false);
+    await emit(tester, const SearchState(query: 'Beat'));
+
+    expect(find.text('No music found'), findsOneWidget);
   });
 
   testWidgets('the save-search chip adds then removes the current search',

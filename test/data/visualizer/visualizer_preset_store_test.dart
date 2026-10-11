@@ -70,8 +70,7 @@ void main() {
 
   group('VisualizerPresetStore.importFromFile', () {
     test('returns null when the picker is cancelled', () async {
-      FilePickerPlatform.instance =
-          FakeFilePickerPlatform(result: () => null);
+      FilePickerPlatform.instance = FakeFilePickerPlatform(result: () => null);
       expect(await VisualizerPresetStore().importFromFile(), isNull);
     });
 
@@ -83,8 +82,7 @@ void main() {
     });
 
     test('rejects a file larger than maxImportBytes', () async {
-      final file = File(
-          '${tempDir.path}${Platform.pathSeparator}huge.json');
+      final file = File('${tempDir.path}${Platform.pathSeparator}huge.json');
       file.writeAsBytesSync(
           List<int>.filled(VisualizerPresetStore.maxImportBytes + 1, 0));
       FilePickerPlatform.instance =
@@ -93,8 +91,8 @@ void main() {
     });
 
     test('parses and persists a valid preset file', () async {
-      final file = writeFile('custom.json',
-          '{"name":"Imported","shape":"wave","barCount":48}');
+      final file = writeFile(
+          'custom.json', '{"name":"Imported","shape":"wave","barCount":48}');
       FilePickerPlatform.instance =
           FakeFilePickerPlatform(result: () => FakePlatformFile(file.path));
 
@@ -110,8 +108,8 @@ void main() {
     });
 
     test('swallows picker errors and returns null', () async {
-      FilePickerPlatform.instance = FakeFilePickerPlatform(
-          error: StateError('picker exploded'));
+      FilePickerPlatform.instance =
+          FakeFilePickerPlatform(error: StateError('picker exploded'));
       expect(await VisualizerPresetStore().importFromFile(), isNull);
     });
   });

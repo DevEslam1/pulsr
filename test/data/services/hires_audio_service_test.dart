@@ -98,7 +98,8 @@ void main() {
 
   test('getUsbDacCapabilities returns the map or null', () async {
     responder = (call) => <String, Object?>{'uacVersion': 2, 'label': 'UAC2'};
-    expect(await service.getUsbDacCapabilities(), {'uacVersion': 2, 'label': 'UAC2'});
+    expect(await service.getUsbDacCapabilities(),
+        {'uacVersion': 2, 'label': 'UAC2'});
   });
 
   test('isBitPerfectSupported reflects the native boolean', () async {
@@ -152,13 +153,13 @@ void main() {
     expect(result.requiresSystemPicker, isTrue);
     expect(result.error, 'permission_denied');
 
-    _messenger.setMockMethodCallHandler(
-        _method, (call) async => call.method == 'setOutputDevice' ? true : _output());
+    _messenger.setMockMethodCallHandler(_method,
+        (call) async => call.method == 'setOutputDevice' ? true : _output());
     result = await service.selectOutputDevice(5);
     expect(result.success, isTrue);
 
-    _messenger.setMockMethodCallHandler(
-        _method, (call) async => call.method == 'setOutputDevice' ? null : _output());
+    _messenger.setMockMethodCallHandler(_method,
+        (call) async => call.method == 'setOutputDevice' ? null : _output());
     result = await service.selectOutputDevice(5);
     expect(result.error, 'unknown_response');
 
@@ -204,7 +205,8 @@ void main() {
   test('setTargetOutputFormat succeeds for a supported format', () async {
     _messenger.setMockMethodCallHandler(
         _method,
-        (call) async => call.method == 'setTargetOutputFormat' ? true : _output());
+        (call) async =>
+            call.method == 'setTargetOutputFormat' ? true : _output());
     expect(await service.setTargetOutputFormat(sampleRate: 48000, bitDepth: 24),
         isTrue);
   });

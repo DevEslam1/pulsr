@@ -15,6 +15,9 @@ class AuthCubit extends PulsrCubit<AuthState> {
   final AuthService _authService;
   final CloudSyncService _cloudSyncService;
   bool _syncing = false;
+  // Set when a sync arrives while one is already in flight; the in-flight pass
+  // re-runs once it finishes so an account switch mid-sync is never dropped.
+  bool _syncQueued = false;
   // FIX-C11: Monotonic Stopwatch for sync deduplication
   final Stopwatch _syncStopwatch = Stopwatch();
   static const Duration _syncDedupeWindow = Duration(seconds: 2);
@@ -62,8 +65,12 @@ class AuthCubit extends PulsrCubit<AuthState> {
         ));
         await syncNow();
       } else {
-        SoundFeedbackService.playError(mirrorHaptics: true);
-        safeEmit(state.copyWith(status: AuthStatus.unauthenticated));
+        // A null result means the user dismissed the Google account picker.
+        // That is not a failure: no error sound, just an informational message.
+        safeEmit(state.copyWith(
+          status: AuthStatus.unauthenticated,
+          errorMessage: 'Sign-in was cancelled.',
+        ));
       }
     } catch (e) {
       if (isClosed) return;
@@ -239,7 +246,13 @@ class AuthCubit extends PulsrCubit<AuthState> {
   }
 
   Future<void> syncNow() async {
-    if (state.user == null || _syncing) return;
+    if (state.user == null) return;
+    if (_syncing) {
+      // A sign-out -> sign-in during an in-flight sync must not be dropped:
+      // queue one re-run that starts as soon as the current pass finishes.
+      _syncQueued = true;
+      return;
+    }
     // FIX-C11: Monotonic clock prevents system wall-clock jumps from disrupting sync deduplication
     if (_syncStopwatch.isRunning &&
         _syncStopwatch.elapsed < _syncDedupeWindow) {
@@ -249,6 +262,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       ..reset()
       ..start();
     _syncing = true;
+    _syncQueued = false;
     safeEmit(state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
     try {
       final success = await _cloudSyncService.syncAll();
@@ -273,6 +287,15 @@ class AuthCubit extends PulsrCubit<AuthState> {
       ));
     } finally {
       _syncing = false;
+    }
+    if (_syncQueued) {
+      _syncQueued = false;
+      // Bypass the dedupe window: the queued run is the account that must
+      // actually sync, not a duplicate of the pass that just finished.
+      _syncStopwatch
+        ..stop()
+        ..reset();
+      await syncNow();
     }
   }
 

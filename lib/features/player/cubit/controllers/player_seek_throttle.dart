@@ -120,13 +120,19 @@ class PlayerSeekThrottle {
     });
   }
 
-  void dispose() {
+  /// Drops a scheduled trailing seek without executing it. Called on every
+  /// track-change path so a scrub release immediately before next()/previous()/
+  /// skipToQueueItem()/playSong() cannot seek the new track to the old position.
+  void cancelPending() {
     _throttleTimer?.cancel();
     _throttleTimer = null;
     _pendingSeek = null;
-    if (_pendingCompleter != null && !_pendingCompleter!.isCompleted) {
-      _pendingCompleter!.complete();
-    }
+    final completer = _pendingCompleter;
     _pendingCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
   }
+
+  void dispose() => cancelPending();
 }

@@ -53,5 +53,25 @@ void main() {
       expect(Formatters.formatSongCount(1), '1 song');
       expect(Formatters.formatSongCount(42), '42 songs');
     });
+
+    test('formatBytes promotes when rounding reaches a full unit', () {
+      // 1,048,575 B divides to 1023.999 KB, which toStringAsFixed(1) rounds to
+      // "1024.0" — the formatter must promote to the next suffix instead.
+      expect(Formatters.formatBytes(1048575), '1.0 MB');
+      expect(Formatters.formatBytes(1073741823), '1.0 GB');
+      expect(Formatters.formatBytes(1099511627775), '1.0 TB');
+    });
+
+    test('formatBytes boundaries stay stable', () {
+      expect(Formatters.formatBytes(0), '0 B');
+      expect(Formatters.formatBytes(1023), '1023 B');
+      expect(Formatters.formatBytes(1024), '1.0 KB');
+      expect(Formatters.formatBytes(524288), '512.0 KB');
+      expect(Formatters.formatBytes(1048576), '1.0 MB');
+      // Rounds up to 1024.0 KB -> promotes; just below the rounding threshold
+      // stays in KB.
+      expect(Formatters.formatBytes(1048574), '1.0 MB');
+      expect(Formatters.formatBytes(1048524), '1023.9 KB');
+    });
   });
 }

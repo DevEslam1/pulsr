@@ -197,5 +197,68 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 2500));
     });
+
+    testWidgets('hide() is safe to call repeatedly and clears the toast',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AuraTheme.darkTheme,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  PulsrSnackBar.show(context, message: 'Hide me twice');
+                },
+                child: const Text('Show SnackBar'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show SnackBar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Hide me twice'), findsOneWidget);
+
+      // The old hide() could call OverlayEntry.remove() on an already-detached
+      // entry; it must never throw and must clear both statics.
+      PulsrToast.hide();
+      PulsrToast.hide();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('Hide me twice'), findsNothing);
+    });
+
+    testWidgets('toast content is announced as an accessibility live region',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AuraTheme.darkTheme,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  PulsrSnackBar.show(context, message: 'Announced message');
+                },
+                child: const Text('Show SnackBar'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show SnackBar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final liveRegion = find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.liveRegion == true,
+      );
+      expect(liveRegion, findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 2500));
+    });
   });
 }

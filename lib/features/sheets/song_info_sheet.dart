@@ -136,6 +136,13 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.ringtoneSet)),
         );
+      } else {
+        // The native side can refuse without throwing (e.g. no write
+        // permission): report that instead of staying silent.
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.ringtoneFailed)),
+        );
       }
     } on PlatformException catch (e) {
       if (!context.mounted) return;

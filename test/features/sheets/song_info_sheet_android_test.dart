@@ -138,7 +138,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('setRingtone returning false shows no success snackbar',
+  testWidgets('setRingtone returning false reports the failure',
       (tester) async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
@@ -151,6 +151,8 @@ void main() {
     await tester.tap(find.text('Phone Ringtone'));
     await tester.pumpAndSettle();
     expect(find.text('Ringtone set successfully'), findsNothing);
+    expect(find.text('Failed to set ringtone.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
     debugDefaultTargetPlatformOverride = null;
   });
 

@@ -55,10 +55,7 @@ void main() {
         case 'castLocalFile':
         case 'castUrl':
         case 'castQueue':
-          return <Object?, Object?>{
-            'success': true,
-            'message': 'casting'
-          };
+          return <Object?, Object?>{'success': true, 'message': 'casting'};
         default:
           return null;
       }

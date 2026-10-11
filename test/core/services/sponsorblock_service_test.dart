@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
+import 'package:pulsr/core/di/injection.dart' show getIt;
 import 'package:pulsr/core/services/sponsorblock_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('SponsorBlockService', () {
@@ -202,6 +205,63 @@ void main() {
       expect(merged[1].start, const Duration(seconds: 100));
       expect(merged[1].end, const Duration(seconds: 110));
       expect(merged[1].category, 'outro');
+    });
+  });
+
+  group('SponsorBlockService preference persistence', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('setSkipEnabled persists the explicit value on a cold service',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.sponsorBlockEnabled: false,
+      });
+      final service = SponsorBlockService();
+
+      await service.setSkipEnabled(true);
+
+      expect(service.isEnabled, isTrue);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(PrefsKeys.sponsorBlockEnabled), isTrue);
+    });
+
+    test('setEnabledCategories keeps the explicit set on a cold service',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.sponsorBlockCategories: <String>['sponsor'],
+      });
+      final service = SponsorBlockService();
+
+      await service.setEnabledCategories({'intro'});
+
+      expect(service.enabledCategories, {'intro'});
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(PrefsKeys.sponsorBlockCategories), ['intro']);
+    });
+
+    test('loading persisted prefs still wins when nothing is set explicitly',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.sponsorBlockEnabled: false,
+        PrefsKeys.sponsorBlockCategories: <String>['outro'],
+      });
+      final service = SponsorBlockService();
+
+      await service.loadPreferences();
+
+      expect(service.isEnabled, isFalse);
+      expect(service.enabledCategories, {'outro'});
+    });
+
+    test('instance prefers the DI-registered singleton', () async {
+      await getIt.reset();
+      addTearDown(getIt.reset);
+      final di = SponsorBlockService();
+      getIt.registerSingleton<SponsorBlockService>(di);
+
+      expect(identical(SponsorBlockService.instance, di), isTrue);
     });
   });
 }

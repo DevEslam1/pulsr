@@ -47,7 +47,8 @@ void main() {
     });
   });
 
-  Future<void> pumpTab(WidgetTester tester, LibraryState state, String tab) async {
+  Future<void> pumpTab(
+      WidgetTester tester, LibraryState state, String tab) async {
     disableAnimations(tester);
     setSurface(tester);
     await tester.pumpWidget(libraryHarness(

@@ -64,6 +64,20 @@ class PerSongVolumeStore {
     }
   }
 
+  /// Re-reads the persisted map, replacing the in-memory cache, so an
+  /// out-of-band write (backup import) is visible without a restart. Safe to
+  /// call repeatedly.
+  Future<void> reload() async {
+    await ready;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(prefsKey);
+    if (raw == null || raw.isEmpty) {
+      _overrides.clear();
+      return;
+    }
+    await load();
+  }
+
   Future<void> persist() async {
     try {
       final prefs = await SharedPreferences.getInstance();

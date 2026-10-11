@@ -86,6 +86,10 @@ class _PulsrPressableState extends State<PulsrPressable>
   }
 
   void _activate() {
+    // Release the pressed scale before the early return: a pressable that only
+    // exposes onLongPress never calls _release() from the tap path, so without
+    // this the widget stayed visually stuck at pressedScale after a long press.
+    _release();
     if (widget.onTap == null) return;
     if (widget.enableHaptics) {
       switch (widget.hapticStyle) {
@@ -103,7 +107,6 @@ class _PulsrPressableState extends State<PulsrPressable>
           break;
       }
     }
-    _release();
     widget.onTap?.call();
   }
 

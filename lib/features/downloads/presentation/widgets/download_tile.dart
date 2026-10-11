@@ -246,12 +246,18 @@ class DownloadTile extends StatelessWidget {
                           break;
                         case 'delete':
                           cubit.deleteDownload(task.videoId);
+                          // For a completed entry the file is already gone, so
+                          // the action cannot undo the delete — it starts a
+                          // fresh download. Label it honestly instead of
+                          // offering an "Undo" that silently re-downloads.
+                          final isComplete =
+                              task.status == DownloadStatus.complete;
                           PulsrToast.show(
                             context,
                             message:
                                 '${task.title.isNotEmpty ? task.title : task.videoId} ${l10n.delete.toLowerCase()}',
                             icon: Icons.delete_outline_rounded,
-                            actionLabel: l10n.undo,
+                            actionLabel: isComplete ? l10n.retry : l10n.undo,
                             onActionPressed: () => cubit.queueDownload(task),
                           );
                           break;

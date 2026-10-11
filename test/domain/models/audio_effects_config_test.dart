@@ -323,8 +323,7 @@ void main() {
       expect(a, isNot(const MultibandCompressorBandConfig(attackMs: 5)));
       expect(a, isNot(const MultibandCompressorBandConfig(releaseMs: 200)));
       expect(a, isNot(const MultibandCompressorBandConfig(kneeDb: 3)));
-      expect(
-          a, isNot(const MultibandCompressorBandConfig(makeupGainDb: 2)));
+      expect(a, isNot(const MultibandCompressorBandConfig(makeupGainDb: 2)));
       expect(a, isNot(const MultibandCompressorBandConfig(enabled: false)));
     });
 
@@ -445,6 +444,93 @@ void main() {
         expect(p.sideGainLow, inInclusiveRange(0.0, 1.0));
         expect(p.sideGainHigh, inInclusiveRange(0.0, 1.0));
       }
+    });
+  });
+
+  group('AudioEffectsConfig value equality', () {
+    test('structurally equal configs are equal with equal hashCodes', () {
+      final a = const AudioEffectsConfig().copyWith(
+        isVirtualizerEnabled: true,
+        virtualizerStrength: 0.5,
+        dynamicEqBands: const [DynamicEqBandConfig(frequency: 120)],
+        multibandCompressorBands: const [MultibandCompressorBandConfig()],
+      );
+      final b = const AudioEffectsConfig().copyWith(
+        isVirtualizerEnabled: true,
+        virtualizerStrength: 0.5,
+        dynamicEqBands: const [DynamicEqBandConfig(frequency: 120)],
+        multibandCompressorBands: const [MultibandCompressorBandConfig()],
+      );
+
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('scalar and list differences break equality', () {
+      const base = AudioEffectsConfig();
+
+      expect(base,
+          isNot(equals(const AudioEffectsConfig(isDynamicsEnabled: true))));
+      expect(
+        base,
+        isNot(equals(
+            const AudioEffectsConfig(dynamicEqBands: [DynamicEqBandConfig()]))),
+      );
+      expect(
+        const AudioEffectsConfig(dynamicEqBands: [DynamicEqBandConfig()]),
+        isNot(equals(const AudioEffectsConfig(
+            dynamicEqBands: [DynamicEqBandConfig(frequency: 200)]))),
+      );
+      expect(
+        const AudioEffectsConfig(
+            multibandCompressorBands: [MultibandCompressorBandConfig()]),
+        isNot(equals(const AudioEffectsConfig(multibandCompressorBands: [
+          MultibandCompressorBandConfig(ratio: 4)
+        ]))),
+      );
+    });
+
+    test('copyWith() of identical values is equal to the original', () {
+      const config = AudioEffectsConfig(
+        isSaturationEnabled: true,
+        saturationDrive: 0.8,
+        dynamicBassPreset: 3,
+      );
+      expect(config.copyWith(), equals(config));
+    });
+  });
+
+  group('DynamicBassConfig value equality', () {
+    test('structurally equal configs are equal with equal hashCodes', () {
+      const a = DynamicBassConfig(
+        enabled: true,
+        strength: 2.0,
+        xLow: 140,
+        preset: 1,
+      );
+      const b = DynamicBassConfig(
+        enabled: true,
+        strength: 2.0,
+        xLow: 140,
+        preset: 1,
+      );
+
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('every field affects equality', () {
+      const base = DynamicBassConfig();
+
+      expect(base, isNot(equals(const DynamicBassConfig(enabled: true))));
+      expect(base, isNot(equals(const DynamicBassConfig(strength: 3))));
+      expect(base, isNot(equals(const DynamicBassConfig(xLow: 200))));
+      expect(base, isNot(equals(const DynamicBassConfig(xHigh: 5000))));
+      expect(base, isNot(equals(const DynamicBassConfig(yLow: 50))));
+      expect(base, isNot(equals(const DynamicBassConfig(yHigh: 90))));
+      expect(base, isNot(equals(const DynamicBassConfig(sideGainLow: 0.3))));
+      expect(base, isNot(equals(const DynamicBassConfig(sideGainHigh: 0.6))));
+      expect(base, isNot(equals(const DynamicBassConfig(preset: 2))));
     });
   });
 }

@@ -55,8 +55,7 @@ void main() {
       expect(row.year, isNull);
     });
 
-    test('artists keep nullable columns null and default the counts',
-        () async {
+    test('artists keep nullable columns null and default the counts', () async {
       await db.into(db.artistsTable).insert(
             ArtistsTableCompanion.insert(id: const Value(1), name: 'Ar'),
           );

@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../core/di/injection.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/search_algorithm_utils.dart';
 import '../audio/audio_handler.dart';
 import '../audio/song_rating_store.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
@@ -67,17 +68,22 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     if (criteria.rules.isNotEmpty) {
       query.where((t) {
         Expression<bool>? combined;
+        var ignoredRule = false;
         for (final rule in criteria.rules) {
-          // Rating and BPM live outside Drift (SharedPreferences): skipped
-          // here without noise and applied as a Dart post-filter below.
-          if (_isDartRule(rule.field)) continue;
+          // Rating/BPM and Unicode text rules live outside Drift's SQL
+          // capabilities: skipped here and applied as Dart post-filters below.
+          if (_isDartPostRule(rule)) continue;
           final expr = _buildRuleExpression(t, rule);
           if (expr == null) {
+            ignoredRule = true;
             ErrorLogger.log(
               'Smart playlist: ignoring unsupported rule '
               '${rule.field.name} ${rule.operator.name} "${rule.value}"',
               category: 'SmartPlaylist',
             );
+            // Fail closed: a rule that cannot be built must never widen the
+            // result to the whole library under AND.
+            if (criteria.matchAll) return const Constant(false);
             continue;
           }
           if (combined == null) {
@@ -87,7 +93,12 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
                 criteria.matchAll ? (combined & expr) : (combined | expr);
           }
         }
-        return combined ?? const Constant(true);
+        if (combined == null) {
+          // matchAny where every rule was unbuildable matches nothing; with
+          // only Dart-backed rules the Dart post-step still filters.
+          return ignoredRule ? const Constant(false) : const Constant(true);
+        }
+        return combined;
       });
     }
 
@@ -129,8 +140,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     // When rating rules exist (or rating sort is requested) the limit is
     // applied in Dart AFTER the prefs-backed filter/sort; a SQL limit first
     // would truncate candidates before ratings are even considered.
-    final needsDartPost = criteria.rules.any((r) => _isDartRule(r.field)) ||
-        criteria.sortBy == 'rating';
+    final needsDartPost =
+        criteria.rules.any(_isDartPostRule) || criteria.sortBy == 'rating';
     if (!needsDartPost && criteria.limit != null && criteria.limit! > 0) {
       query.limit(criteria.limit!);
     }
@@ -142,6 +153,35 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   /// they are excluded from the SQL shape and applied as Dart post-filters.
   bool _isDartRule(SmartRuleField field) =>
       field == SmartRuleField.rating || field == SmartRuleField.bpm;
+
+  bool _isTextRule(SmartRuleField field) =>
+      field == SmartRuleField.artist ||
+      field == SmartRuleField.album ||
+      field == SmartRuleField.title ||
+      field == SmartRuleField.genre;
+
+  bool _isAscii(String value) {
+    for (final unit in value.codeUnits) {
+      if (unit > 0x7F) return false;
+    }
+    return true;
+  }
+
+  /// Text rules whose value is non-ASCII cannot rely on SQLite's lower(), which
+  /// folds ASCII only: they are fetched as candidates and compared with the
+  /// app-wide [SearchAlgorithmUtils.normalize]. ASCII-valued rules keep the SQL
+  /// fast path.
+  bool _needsDartTextRule(SmartRule rule) {
+    if (!_isTextRule(rule.field)) return false;
+    if (rule.operator != SmartOperator.equals &&
+        rule.operator != SmartOperator.contains) {
+      return false;
+    }
+    return !_isAscii(rule.value);
+  }
+
+  bool _isDartPostRule(SmartRule rule) =>
+      _isDartRule(rule.field) || _needsDartTextRule(rule);
 
   Expression<bool>? _buildRuleExpression($SongsTableTable t, SmartRule rule) {
     final valStr = rule.value.trim();
@@ -414,12 +454,14 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   (int, int)? _parseIntBetween(String valStr) {
-    // Fix: previously `RegExp(r'[,.\s-]+|to|\.\.')` had `to` inside char class matching single t/o; now correctly handles "100 to 200" and "100..200"
+    // Split only on separators (",", ";", whitespace, "..", "to") so a leading
+    // minus survives per operand: "-12, -6" must parse as (-12, -6) rather
+    // than losing the signs.
     final normalized = valStr
         .replaceAll(RegExp(r'\bto\b', caseSensitive: false), ' ')
         .replaceAll('..', ' ');
     final parts = normalized
-        .split(RegExp(r'[,;\s-]+'))
+        .split(RegExp(r'[,;\s]+'))
         .map((e) => int.tryParse(e.trim()))
         .whereType<int>()
         .toList();
@@ -436,7 +478,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         .replaceAll(RegExp(r'\bto\b', caseSensitive: false), ' ')
         .replaceAll('..', ' ');
     final parts = normalized
-        .split(RegExp(r'[,;\s-]+'))
+        .split(RegExp(r'[,;\s]+'))
         .map((e) => double.tryParse(e.trim()))
         .whereType<double>()
         .toList();
@@ -450,8 +492,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   @override
   Future<List<SongsTableData>> evaluateCriteria(SmartCriteria criteria) async {
-    final dartRules =
-        criteria.rules.where((r) => _isDartRule(r.field)).toList();
+    final dartRules = criteria.rules.where(_isDartPostRule).toList();
     if (dartRules.isEmpty) {
       final list = await _buildQuery(criteria).get();
       return _postProcess(list, criteria, const []);
@@ -461,8 +502,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       return _postProcess(base, criteria, dartRules);
     }
     // matchAny: union of SQL matches and prefs-backed matches.
-    final sqlRules =
-        criteria.rules.where((r) => !_isDartRule(r.field)).toList();
+    final sqlRules = criteria.rules.where((r) => !_isDartPostRule(r)).toList();
     final base = sqlRules.isEmpty
         ? <SongsTableData>[]
         : await _buildQuery(_withoutDartRules(criteria)).get();
@@ -475,8 +515,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   @override
   Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) {
-    final dartRules =
-        criteria.rules.where((r) => _isDartRule(r.field)).toList();
+    final dartRules = criteria.rules.where(_isDartPostRule).toList();
     if (dartRules.isEmpty) {
       final stream = _buildQuery(criteria)
           .watch()
@@ -492,8 +531,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           .debounceTime(const Duration(milliseconds: 500))
           .map((list) => _postProcess(list, criteria, dartRules));
     }
-    final sqlRules =
-        criteria.rules.where((r) => !_isDartRule(r.field)).toList();
+    final sqlRules = criteria.rules.where((r) => !_isDartPostRule(r)).toList();
     final baseStream = sqlRules.isEmpty
         ? Stream.value(<SongsTableData>[])
         : _buildQuery(_withoutDartRules(criteria)).watch();
@@ -510,10 +548,13 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         (parts) => _postProcessAny(parts.$1, parts.$2, criteria, dartRules));
   }
 
-  /// [criteria] with prefs-backed rules removed (SQL shape only).
+  /// [criteria] with Dart-backed rules removed (SQL shape only). The sort
+  /// survives because matchAny still needs the base half ordered before the
+  /// union; the limit does not, because it must apply after the union.
   SmartCriteria _withoutDartRules(SmartCriteria criteria) => SmartCriteria(
-        rules: criteria.rules.where((r) => !_isDartRule(r.field)).toList(),
+        rules: criteria.rules.where((r) => !_isDartPostRule(r)).toList(),
         matchAll: criteria.matchAll,
+        sortBy: criteria.sortBy,
         sortAscending: criteria.sortAscending,
       );
 
@@ -593,12 +634,11 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
                   audioHandler: audioHandler,
                 )))
         .toList();
-    if (criteria.sortBy == 'rating') {
-      list = _sortByRating(
-        list,
-        ascending: criteria.sortAscending,
-        ratingStore: ratingStore,
-      );
+    // The union appends Dart-side matches after the SQL half, so every sort
+    // key needs a final Dart pass: 'rating' because it is prefs-backed, the
+    // rest because the SQL order no longer covers the whole union.
+    if (criteria.sortBy != null) {
+      list = _sortSongs(list, criteria, ratingStore);
     }
     if (criteria.limit != null && criteria.limit! > 0) {
       list = list.take(criteria.limit!).toList();
@@ -645,7 +685,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     }
   }
 
-  /// Dispatches a prefs-backed rule to its concrete evaluator.
+  /// Dispatches a Dart-evaluated rule (prefs-backed or non-ASCII text) to its
+  /// concrete evaluator.
   bool _matchesDartRule(
     SongsTableData song,
     SmartRule rule, {
@@ -657,8 +698,21 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           _matchesRating(song, rule, ratingStore: ratingStore),
         SmartRuleField.bpm =>
           _matchesBpm(song, rule, audioHandler: audioHandler),
+        SmartRuleField.artist => _matchesText(song.artist, rule),
+        SmartRuleField.album => _matchesText(song.album, rule),
+        SmartRuleField.title => _matchesText(song.title, rule),
+        SmartRuleField.genre => _matchesText(song.genre ?? '', rule),
         _ => false,
       };
+
+  /// Unicode-aware text match used when SQL lower() cannot fold the value.
+  bool _matchesText(String value, SmartRule rule) {
+    final target = SearchAlgorithmUtils.normalize(rule.value);
+    final haystack = SearchAlgorithmUtils.normalize(value);
+    return rule.operator == SmartOperator.equals
+        ? haystack == target
+        : haystack.contains(target);
+  }
 
   /// Manual BPM override (40–240, prefs-backed) for [song], or null.
   double? _bpmOf(SongsTableData song, [PulsrAudioHandler? handler]) {
@@ -715,6 +769,41 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     final sorted = List<SongsTableData>.from(songs);
     sorted.sort((a, b) {
       final cmp = ratingFor(a).compareTo(ratingFor(b));
+      if (cmp != 0) return ascending ? cmp : -cmp;
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+    return sorted;
+  }
+
+  /// Applies [criteria.sortBy]/[criteria.sortAscending] in Dart, used where
+  /// the SQL ordering cannot cover the whole candidate set (matchAny unions)
+  /// or the key is prefs-backed (rating). Unknown keys fall back to title.
+  List<SongsTableData> _sortSongs(
+    List<SongsTableData> songs,
+    SmartCriteria criteria,
+    SongRatingStore? ratingStore,
+  ) {
+    final sortBy = criteria.sortBy;
+    if (sortBy == null) return songs;
+    if (sortBy == 'rating') {
+      return _sortByRating(
+        songs,
+        ascending: criteria.sortAscending,
+        ratingStore: ratingStore,
+      );
+    }
+    final ascending = criteria.sortAscending;
+    int compare(SongsTableData a, SongsTableData b) => switch (sortBy) {
+          'dateAdded' => (a.dateAdded ?? 0).compareTo(b.dateAdded ?? 0),
+          'playCount' => a.playCount.compareTo(b.playCount),
+          'lastPlayed' => (a.lastPlayed ?? 0).compareTo(b.lastPlayed ?? 0),
+          'durationMs' => a.durationMs.compareTo(b.durationMs),
+          'year' => (a.year ?? 0).compareTo(b.year ?? 0),
+          _ => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        };
+    final sorted = List<SongsTableData>.from(songs);
+    sorted.sort((a, b) {
+      final cmp = compare(a, b);
       if (cmp != 0) return ascending ? cmp : -cmp;
       return a.title.toLowerCase().compareTo(b.title.toLowerCase());
     });

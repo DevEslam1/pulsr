@@ -27,8 +27,9 @@ void main() {
     when(() => player.volume).thenReturn(1.0);
     when(() => player.playing).thenReturn(true);
     when(() => player.setVolume(any())).thenAnswer((_) async {});
-    when(() => player.dspSetGainCurve(any(),
-        segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => false);
+    when(() =>
+            player.dspSetGainCurve(any(), segmentMs: any(named: 'segmentMs')))
+        .thenAnswer((_) async => false);
     when(() => player.dspClearGainCurve()).thenAnswer((_) async => false);
   });
 
@@ -140,7 +141,8 @@ void main() {
   });
 
   group('end-of-track / after-N / end-of-queue expiry', () {
-    test('endOfTrack fires the callback on the first track completion', () async {
+    test('endOfTrack fires the callback on the first track completion',
+        () async {
       var fired = 0;
       manager.startEndOfTrackTimer(
         fadeOut: false,
@@ -153,7 +155,8 @@ void main() {
       expect(manager.isArmed, isFalse);
     });
 
-    test('afterNTracks decrements and only expires on the last track', () async {
+    test('afterNTracks decrements and only expires on the last track',
+        () async {
       var fired = 0;
       manager.startAfterNTracksTimer(
         2,
@@ -296,8 +299,11 @@ void main() {
 
     test('an already-expired target is refused and cleared', () async {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(PrefsKeys.sleepTimerTarget,
-          DateTime.now().subtract(const Duration(minutes: 1)).millisecondsSinceEpoch);
+      await prefs.setInt(
+          PrefsKeys.sleepTimerTarget,
+          DateTime.now()
+              .subtract(const Duration(minutes: 1))
+              .millisecondsSinceEpoch);
       expect(
         await manager.restorePersistedState(
           onTimerExpired: () async {},

@@ -123,8 +123,8 @@ void main() {
   group('IR resampling', () {
     test('matching rates return the input unchanged', () {
       final input = [0.1, 0.2, 0.3, 0.4];
-      expect(identical(IrFileParser.resample(input, 48000, 48000), input),
-          isTrue);
+      expect(
+          identical(IrFileParser.resample(input, 48000, 48000), input), isTrue);
     });
 
     test('tiny inputs are returned unchanged', () {

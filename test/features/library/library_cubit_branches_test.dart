@@ -11,6 +11,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
+import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
@@ -253,8 +254,8 @@ void main() {
     final cubit = create(repo: repo);
     await settle();
 
-    final count = await cubit.syncYtmAccountLikes();
-    expect(count, 0);
+    await expectLater(
+        cubit.syncYtmAccountLikes(), throwsA(isA<YtmException>()));
     expect(cubit.state.errorMessage, isNotNull);
     await cubit.close();
   });

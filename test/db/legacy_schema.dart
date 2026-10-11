@@ -110,7 +110,10 @@ CREATE TABLE excluded_folders (
 ///
 /// Seeds one song plus a playlist containing it, so a migration that drops or
 /// recreates `songs` is caught as data loss rather than passing silently.
-AppDatabase openLegacyDatabase(int version) {
+/// [extraSql] runs after the seed, before the version pragma, so a test can
+/// install triggers or legacy duplicates that make a migration step fail.
+AppDatabase openLegacyDatabase(int version,
+    {List<String> extraSql = const []}) {
   return AppDatabase.forTesting(
     NativeDatabase.memory(
       setup: (raw) {
@@ -131,6 +134,10 @@ AppDatabase openLegacyDatabase(int version) {
         raw.execute(
           'INSERT INTO playlist_entries (playlist_id, song_id, order_index, added_at) VALUES (1, 77, 0, 0);',
         );
+
+        for (final sql in extraSql) {
+          raw.execute(sql);
+        }
 
         raw.execute('PRAGMA user_version = $version;');
       },

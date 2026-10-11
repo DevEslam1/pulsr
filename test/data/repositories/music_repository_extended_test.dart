@@ -124,14 +124,13 @@ void main() {
           path: 'ytmusic://vid',
           source: SongSource.youtube,
           remoteId: 'vid');
-      await insertSong(id: 4, title: 'Missing', path: '/music/m.mp3',
-          isMissing: true);
+      await insertSong(
+          id: 4, title: 'Missing', path: '/music/m.mp3', isMissing: true);
 
       final paths = (await repo.getLocalSongPaths()).getOrElse((_) => []);
       expect(paths, ['/music/a.mp3']);
 
-      final entries =
-          (await repo.getLocalSongEntries()).getOrElse((_) => []);
+      final entries = (await repo.getLocalSongEntries()).getOrElse((_) => []);
       expect(entries.length, 1);
       expect(entries.first.id, 1);
     });
@@ -140,31 +139,37 @@ void main() {
       await insertSong(id: 1, title: 'Direct', path: '/music/album/one.mp3');
       await insertSong(id: 2, title: 'Deep', path: '/music/album/sub/two.mp3');
 
-      final result =
-          await repo.watchSongsInFolder('/music/album').first;
+      final result = await repo.watchSongsInFolder('/music/album').first;
       final songs = result.getOrElse((_) => []);
       expect(songs.map((s) => s.id), [1]);
     });
 
     test('getSongById / by path / by uri / by remoteId', () async {
       await insertSong(
-          id: 5, title: 'Lookup', path: '/music/look.mp3', uri: 'content://x/5',
+          id: 5,
+          title: 'Lookup',
+          path: '/music/look.mp3',
+          uri: 'content://x/5',
           remoteId: 'remote5');
 
       expect(
           (await repo.getSongById(5)).getOrElse((_) => null)?.title, 'Lookup');
       expect(
-          (await repo.getSongByPath('/music/look.mp3')).getOrElse((_) => null)?.id,
+          (await repo.getSongByPath('/music/look.mp3'))
+              .getOrElse((_) => null)
+              ?.id,
           5);
       expect(
           (await repo.getSongByUri('content://x/5')).getOrElse((_) => null)?.id,
           5);
-      expect((await repo.getSongByRemoteId('remote5')).getOrElse((_) => null)?.id,
+      expect(
+          (await repo.getSongByRemoteId('remote5')).getOrElse((_) => null)?.id,
           5);
       expect((await repo.getSongByRemoteId('')).getOrElse((_) => null), isNull);
     });
 
-    test('findMatchingLocalSong matches by remoteId, then title/artist', () async {
+    test('findMatchingLocalSong matches by remoteId, then title/artist',
+        () async {
       await insertSong(
           id: 10,
           title: 'Match Me',
@@ -175,8 +180,8 @@ void main() {
       final byId = await repo.findMatchingLocalSong(remoteId: 'r10');
       expect(byId.getOrElse((_) => null)?.id, 10);
 
-      final byMeta = await repo
-          .findMatchingLocalSong(title: 'match me', artist: 'the artist');
+      final byMeta = await repo.findMatchingLocalSong(
+          title: 'match me', artist: 'the artist');
       expect(byMeta.getOrElse((_) => null)?.id, 10);
 
       final none = await repo.findMatchingLocalSong(title: 'nope');
@@ -184,7 +189,9 @@ void main() {
     });
 
     test('getSongsByIds handles empty and populated lists', () async {
-      expect((await repo.getSongsByIds(const [])).getOrElse((_) => <SongsTableData>[]),
+      expect(
+          (await repo.getSongsByIds(const []))
+              .getOrElse((_) => <SongsTableData>[]),
           isEmpty);
       await insertSong(id: 20, title: 'Twenty');
       final res = await repo.getSongsByIds([20, 999]);
@@ -249,10 +256,16 @@ void main() {
     });
 
     test('favorites / recently added / top played streams emit', () async {
-      await insertSong(id: 1, title: 'Fav', isFavorite: true, playCount: 5,
-          lastPlayed: 1000, dateAdded: 500);
+      await insertSong(
+          id: 1,
+          title: 'Fav',
+          isFavorite: true,
+          playCount: 5,
+          lastPlayed: 1000,
+          dateAdded: 500);
       expect((await repo.watchFavorites().first).isRight(), isTrue);
-      expect((await repo.watchRecentlyAdded(limit: null).first).isRight(), isTrue);
+      expect(
+          (await repo.watchRecentlyAdded(limit: null).first).isRight(), isTrue);
       expect((await repo.watchRecentlyAdded().first).isRight(), isTrue);
       expect((await repo.watchTopPlayed().first).isRight(), isTrue);
       expect((await repo.watchRecentlyPlayed().first).isRight(), isTrue);
@@ -296,7 +309,8 @@ void main() {
       expect((await repo.getAlbumById(100)).getOrElse((_) => null)?.title,
           'Album A');
       expect((await repo.getAlbumSongs(100)).getOrElse((_) => []).length, 1);
-      expect((await repo.watchAlbumSongs(100).first).getOrElse((_) => []).length,
+      expect(
+          (await repo.watchAlbumSongs(100).first).getOrElse((_) => []).length,
           1);
       expect((await repo.watchAlbums().first).getOrElse((_) => []).length, 1);
 
@@ -327,7 +341,9 @@ void main() {
       expect((await repo.watchGenres().first).getOrElse((_) => []).length, 2);
       expect((await repo.getGenreSongs('Rock')).getOrElse((_) => []).length, 2);
       expect(
-          (await repo.watchGenreSongs('Jazz').first).getOrElse((_) => []).length,
+          (await repo.watchGenreSongs('Jazz').first)
+              .getOrElse((_) => [])
+              .length,
           1);
 
       final years = (await repo.watchYears().first).getOrElse((_) => []);
@@ -349,7 +365,8 @@ void main() {
       expect((await repo.getPlaylistById(plId)).getOrElse((_) => null)?.name,
           'My List');
       expect((await repo.getPlaylists()).getOrElse((_) => []).length, 1);
-      expect((await repo.watchPlaylists().first).getOrElse((_) => []).length, 1);
+      expect(
+          (await repo.watchPlaylists().first).getOrElse((_) => []).length, 1);
 
       await repo.addSongToPlaylist(plId, 1);
       await repo.addSongToPlaylist(plId, 1); // duplicate ignored
@@ -357,7 +374,9 @@ void main() {
       var songs = (await repo.getPlaylistSongs(plId)).getOrElse((_) => []);
       expect(songs.length, 2);
       expect(
-          (await repo.watchPlaylistSongs(plId).first).getOrElse((_) => []).length,
+          (await repo.watchPlaylistSongs(plId).first)
+              .getOrElse((_) => [])
+              .length,
           2);
 
       await repo.removeSongFromPlaylist(plId, 1);
@@ -397,15 +416,15 @@ void main() {
           1);
 
       await repo.toggleFolderExclusion('/music/private');
-      expect((await repo.getExcludedFolderPaths()).getOrElse((_) => []),
-          isEmpty);
+      expect(
+          (await repo.getExcludedFolderPaths()).getOrElse((_) => []), isEmpty);
     });
   });
 
   group('tag / audio quality updates', () {
     test('updateSongTags updates denormalised album and artist rows', () async {
-      await db.into(db.albumsTable).insert(AlbumsTableCompanion.insert(
-          id: const Value(7), title: 'Old Album'));
+      await db.into(db.albumsTable).insert(
+          AlbumsTableCompanion.insert(id: const Value(7), title: 'Old Album'));
       await db.into(db.artistsTable).insert(
           ArtistsTableCompanion.insert(id: const Value(8), name: 'Old Artist'));
       await insertSong(
@@ -437,10 +456,10 @@ void main() {
     });
 
     test('updateAudioQuality spreads across rows sharing a path', () async {
-      await insertSong(id: 1, title: 'C1', path: '/music/disc.flac',
-          cueStartMs: 0);
-      await insertSong(id: 2, title: 'C2', path: '/music/disc.flac',
-          cueStartMs: 30000);
+      await insertSong(
+          id: 1, title: 'C1', path: '/music/disc.flac', cueStartMs: 0);
+      await insertSong(
+          id: 2, title: 'C2', path: '/music/disc.flac', cueStartMs: 30000);
 
       await repo.updateAudioQuality(
           songId: 1,
@@ -483,8 +502,8 @@ void main() {
 
     test('hardDeleteMissingSongs removes missing local rows', () async {
       await insertSong(id: 1, title: 'Keep', path: '/music/keep.mp3');
-      await insertSong(id: 2, title: 'Missing', path: '/music/gone.mp3',
-          isMissing: true);
+      await insertSong(
+          id: 2, title: 'Missing', path: '/music/gone.mp3', isMissing: true);
       await insertSong(
           id: 3,
           title: 'MissingYt',
@@ -492,7 +511,8 @@ void main() {
           source: SongSource.youtube,
           isMissing: true);
 
-      final deleted = (await repo.hardDeleteMissingSongs()).getOrElse((_) => -1);
+      final deleted =
+          (await repo.hardDeleteMissingSongs()).getOrElse((_) => -1);
       expect(deleted, 1);
       final survivors = await db.select(db.songsTable).get();
       expect(survivors.map((s) => s.id), containsAll([1, 3]));
@@ -504,8 +524,8 @@ void main() {
       final plId = (await repo.createPlaylist('List')).getOrElse((_) => -1);
       await repo.addSongsToPlaylist(plId, [1, 2]);
 
-      final affected = (await repo.deleteSongsWithReport([1]))
-          .getOrElse((_) => <int>[]);
+      final affected =
+          (await repo.deleteSongsWithReport([1])).getOrElse((_) => <int>[]);
       expect(affected, [plId]);
       expect((await repo.getSongById(1)).getOrElse((_) => null), isNull);
 
@@ -513,7 +533,9 @@ void main() {
       final res = await repo.deleteSongs([2]);
       expect(res.isRight(), isTrue);
       expect((await repo.getSongById(2)).getOrElse((_) => null), isNull);
-      expect((await repo.deleteSongsWithReport(const [])).getOrElse((_) => <int>[]),
+      expect(
+          (await repo.deleteSongsWithReport(const []))
+              .getOrElse((_) => <int>[]),
           isEmpty);
     });
   });
@@ -529,14 +551,22 @@ void main() {
     });
 
     test('buildCueExpansion maps chapters to virtual companions', () async {
-      await insertSong(id: 1, title: 'Container', path: '/music/album.flac',
-          durationMs: 600000, artist: 'Band', album: 'Disc');
+      await insertSong(
+          id: 1,
+          title: 'Container',
+          path: '/music/album.flac',
+          durationMs: 600000,
+          artist: 'Band',
+          album: 'Disc');
       final container = (await repo.getSongById(1)).getOrElse((_) => null)!;
 
       final companions = MusicRepository.buildCueExpansion(
         container: container,
         chapters: const [
-          ChapterInfo(index: 1, title: 'One', start: Duration.zero,
+          ChapterInfo(
+              index: 1,
+              title: 'One',
+              start: Duration.zero,
               end: Duration(minutes: 3)),
           ChapterInfo(index: 2, title: 'Two', start: Duration(minutes: 3)),
         ],
@@ -562,8 +592,8 @@ void main() {
             '  TRACK 01 AUDIO\n    TITLE "One"\n    INDEX 01 00:00:00\n'
             '  TRACK 02 AUDIO\n    TITLE "Two"\n    INDEX 01 03:00:00\n');
 
-      await insertSong(id: 1, title: 'Container', path: flac.path,
-          durationMs: 600000);
+      await insertSong(
+          id: 1, title: 'Container', path: flac.path, durationMs: 600000);
 
       final expanded = (await repo.expandCueSheets()).getOrElse((_) => -1);
       expect(expanded, 2);

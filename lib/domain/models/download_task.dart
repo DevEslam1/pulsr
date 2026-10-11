@@ -93,6 +93,8 @@ class DownloadTask {
     int? localSongId,
     int? fileSize,
     bool clearError = false, // FIX-A09: support clearing error via copyWith
+    bool clearSpeedKbps = false,
+    bool clearEtaSeconds = false,
   }) {
     return DownloadTask(
       id: id ?? this.id,
@@ -101,8 +103,8 @@ class DownloadTask {
       artist: artist ?? this.artist,
       status: status ?? this.status,
       progress: progress ?? this.progress,
-      speedKbps: speedKbps ?? this.speedKbps,
-      etaSeconds: etaSeconds ?? this.etaSeconds,
+      speedKbps: clearSpeedKbps ? null : (speedKbps ?? this.speedKbps),
+      etaSeconds: clearEtaSeconds ? null : (etaSeconds ?? this.etaSeconds),
       filePath: filePath ?? this.filePath,
       format: format ?? this.format,
       bitrate: bitrate ?? this.bitrate,

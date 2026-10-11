@@ -492,8 +492,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   @override
   void _scrollToLetter(String letter, List<SongsTableData> songs) {
-    final index =
-        songs.indexWhere((s) => s.title.toUpperCase().startsWith(letter));
+    final index = libraryRailLetterIndex(letter, songs);
     if (index == -1 || !_songsScrollController.hasClients) return;
     // BUG-05: use the same column count as the actual list grid, and include the
     // list's top padding so the target row is not hidden under it.
@@ -524,8 +523,37 @@ class _LibraryScreenState extends State<LibraryScreen>
   Widget build(BuildContext context) {
     return BlocConsumer<LibraryCubit, LibraryState>(
       listenWhen: (prev, curr) =>
-          curr.infoMessage != null && prev.infoMessage != curr.infoMessage,
+          (curr.infoMessage != null && prev.infoMessage != curr.infoMessage) ||
+          (curr.errorMessage != null && prev.errorMessage != curr.errorMessage),
       listener: (context, state) {
+        // Surface failures emitted by any stream (songs/albums/artists/
+        // folders) instead of silently rendering the "No songs found" empty
+        // state, then consume the message so it is not replayed.
+        final error = state.errorMessage;
+        if (error != null && error.isNotEmpty) {
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        size: 16, color: Colors.white70),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(error,
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                ),
+                backgroundColor: context.palette.error,
+                duration: const Duration(seconds: 4),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          context.read<LibraryCubit>().clearError();
+          return;
+        }
         // M-6: Surface infoMessage (e.g. song-cap notifications) as a SnackBar.
         final msg = state.infoMessage;
         if (msg == null || msg.isEmpty) return;
@@ -642,9 +670,10 @@ class _LibraryScreenState extends State<LibraryScreen>
           body: Center(
             child: ConstrainedBox(
               constraints: Adaptive.contentConstraints(context),
+              // Children are keyed by tab name in _buildTabView, so reordering
+              // the active tabs moves elements instead of destroying their
+              // state. The view itself must NOT carry an order-dependent key.
               child: TabBarView(
-                key: ValueKey(
-                    'library_tab_view_${_activeTabs.map((t) => t.name).join('_')}'),
                 controller: _tabController,
                 children: _activeTabs
                     .map((tab) =>
@@ -1303,27 +1332,34 @@ class _LayoutToggleButton extends StatelessWidget {
       child: InkWell(
         borderRadius: AppRadii.r12All,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: selected ? p.onAccent : p.textSecondary,
-              ),
-              const SizedBox(width: AppSpacing.s6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w700,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
                   color: selected ? p.onAccent : p.textSecondary,
                 ),
-              ),
-            ],
+                const SizedBox(width: AppSpacing.s6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? p.onAccent : p.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

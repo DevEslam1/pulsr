@@ -1,7 +1,6 @@
 // lib/core/services/yt_download_service.dart
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -10,6 +9,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:pulsr/domain/models/ytm_audio_quality.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -26,6 +26,9 @@ import '../errors/ytm_error_classifier.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 import '../widgets/cached_artwork.dart';
+import 'yt_download_file_naming.dart';
+import 'yt_download_quality_policy.dart';
+import 'yt_download_transfer_math.dart';
 import 'ytm_service.dart';
 import 'ytm_url_cache.dart';
 
@@ -57,12 +60,17 @@ class _QueuedDownload {
   final SongsTableData song;
   final void Function(YtDownloadProgress)? onProgress;
   final Completer<Result<int>> completer;
+
+  /// Per-download quality requested by the caller (the long-press picker), or
+  /// null to fall back to the persisted download-quality default.
+  final YtmAudioQuality? quality;
   bool isCanceled = false;
 
   _QueuedDownload({
     required this.song,
     required this.onProgress,
     required this.completer,
+    this.quality,
   });
 }
 
@@ -111,6 +119,14 @@ class YtDownloadService {
   final Map<String, _QueuedDownload> _activeDownloads = {};
   static const int _maxCanceledIds = 200;
   final Set<String> _canceledVideoIds = <String>{};
+
+  /// Per-download quality overrides requested from the search row's picker.
+  final YtDownloadQualityPolicy _qualityPolicy = YtDownloadQualityPolicy();
+
+  /// Records the quality the user picked for the next download of [videoId].
+  void setPendingDownloadQuality(String videoId, YtmAudioQuality quality) {
+    _qualityPolicy.setPending(videoId, quality);
+  }
 
   /// True while the native download foreground service is running. Reference
   /// counted by [_activeDownloads] + [_queue] rather than by call site: the
@@ -177,61 +193,49 @@ class YtDownloadService {
   YtDownloadService(
       this._http, this._ytmService, this._scanner, this._repository);
 
-  /// No connection sustains less than this for long; used to turn a byte count
-  /// into a pessimistic transfer time so a URL that cannot outlive the download
-  /// is replaced before the first byte rather than mid-transfer.
-  static const int _pessimisticBytesPerSecond = 48 * 1024; // ~384 kbps
-
-  /// Gap between two received chunks after which the transfer is treated as
-  /// dead. Without it a silently half-open socket held a download — and one of
-  /// the three concurrency slots — until the OS eventually gave up, which on
-  /// mobile can be many minutes.
-  static const Duration _stallTimeout = Duration(seconds: 45);
+  static const Duration _stallTimeout = YtDownloadTransferMath.stallTimeout;
 
   /// Bytes [stream] is expected to occupy on disk, from its own metadata.
-  static int estimateBytes(YtmStream stream) {
-    final bitrate = stream.bitrateKbps > 0 ? stream.bitrateKbps : 160;
-    final seconds =
-        stream.duration.inSeconds > 0 ? stream.duration.inSeconds : 240;
-    return seconds * bitrate * 1000 ~/ 8;
-  }
+  static int estimateBytes(YtmStream stream) =>
+      YtDownloadTransferMath.estimateBytes(stream);
+
+  /// Quality a transfer should request. An explicit per-download [override]
+  /// wins; otherwise the persisted download-quality default, then the
+  /// streaming-quality fallback, then `high`. The download setting is checked
+  /// first so the separate Download Quality row actually governs downloads.
+  @visibleForTesting
+  static String resolveDownloadQuality({
+    YtmAudioQuality? override,
+    String? downloadQuality,
+    String? streamingQuality,
+  }) =>
+      YtDownloadQualityPolicy.resolve(
+        override: override,
+        downloadQuality: downloadQuality,
+        streamingQuality: streamingQuality,
+      );
 
   /// Disk space this service insists on before starting a download of
   /// [stream], including the scratch the parallel path needs (F3).
-  ///
-  /// The true peak is two copies of the body: all four `.partN` chunks exist
-  /// while `.part` is being merged, which is the same 2x bar that
-  /// [_downloadParallel] checks against. The old `_concurrentChunks + 1` (= 5x)
-  /// pre-flight refused downloads that would have completed — a 40-minute
-  /// 256kbps track asked for ~394MB free when ~154MB is enough.
   @visibleForTesting
   static int requiredPreflightBytes(YtmStream stream) =>
-      estimateBytes(stream) * 2 + (10 * 1024 * 1024);
+      YtDownloadTransferMath.requiredPreflightBytes(stream);
 
   /// Stamp value written beside a sequential `.part` so a resume can tell
   /// whether those bytes came from the URL it is about to re-request (F6).
   @visibleForTesting
-  static String resumeStampFor(Uri uri) => uri.toString().hashCode.toString();
+  static String resumeStampFor(Uri uri) =>
+      YtDownloadTransferMath.resumeStampFor(uri);
 
   /// Whether a `.part` carrying [stampContents] may be resumed against
-  /// [urlStamp]. Anything else — a different URL, a missing stamp, or a stamp
-  /// written by a build that did not write one — means the bytes on disk are
-  /// not known to line up with the body about to be requested.
+  /// [urlStamp].
   @visibleForTesting
   static bool resumeStampMatches(String? stampContents, String urlStamp) =>
-      stampContents != null && stampContents.trim() == urlStamp;
+      YtDownloadTransferMath.resumeStampMatches(stampContents, urlStamp);
 
   /// How much life a URL needs left for this download to finish on it.
-  ///
-  /// A download is not a seek: it has to survive from the first byte to the
-  /// last, so [YtmStream.isExpiringSoon]'s 5-minute playback default is the
-  /// wrong bar — a 40-minute mix on a slow link outlives it and dies at 403
-  /// with the bytes already on disk.
-  static Duration requiredLifetime(YtmStream stream) {
-    final seconds = (estimateBytes(stream) / _pessimisticBytesPerSecond).ceil();
-    return Duration(seconds: seconds.clamp(60, 1800)) +
-        const Duration(minutes: 2);
-  }
+  static Duration requiredLifetime(YtmStream stream) =>
+      YtDownloadTransferMath.requiredLifetime(stream);
 
   /// Cancels an active or queued download.
   void cancel(String videoId) {
@@ -239,6 +243,7 @@ class YtDownloadService {
       _canceledVideoIds.remove(_canceledVideoIds.first);
     }
     _canceledVideoIds.add(videoId);
+    _qualityPolicy.discardPending(videoId);
     final active = _activeDownloads[videoId];
     if (active != null) {
       active.isCanceled = true;
@@ -249,9 +254,14 @@ class YtDownloadService {
 
   /// Downloads [song] (which must be a `source == youtube` row) and returns the
   /// surviving positive song id once it is a local library track.
+  ///
+  /// [quality] is the per-download picker override; when null the pending
+  /// picker request for this video id (if any) is used, then the persisted
+  /// `setting_download_quality`, then the streaming quality, then `high`.
   Future<Result<int>> download(
     SongsTableData song, {
     void Function(YtDownloadProgress)? onProgress,
+    YtmAudioQuality? quality,
   }) async {
     if (song.source != SongSource.youtube) {
       return const Left(
@@ -263,6 +273,7 @@ class YtDownloadService {
     }
 
     _canceledVideoIds.remove(videoId);
+    final requestedQuality = quality ?? _qualityPolicy.takePending(videoId);
 
     final completer = Completer<Result<int>>();
     // Chain onto an existing job for the same video rather than starting a
@@ -285,6 +296,7 @@ class YtDownloadService {
       song: song,
       onProgress: onProgress,
       completer: completer,
+      quality: requestedQuality,
     );
 
     _queue.add(task);
@@ -450,10 +462,11 @@ class YtDownloadService {
       await _ytmService.ensurePoTokenReady();
 
       final prefs = await SharedPreferences.getInstance();
-      // Use the sound quality the user chose to stream (fallback to setting_download_quality or 'high')
-      final quality = prefs.getString('setting_streaming_quality') ??
-          prefs.getString('setting_download_quality') ??
-          'high';
+      final quality = resolveDownloadQuality(
+        override: task.quality,
+        downloadQuality: prefs.getString('setting_download_quality'),
+        streamingQuality: prefs.getString('setting_streaming_quality'),
+      );
       final dir = await getTemporaryDirectory();
       // Download high-res master artwork in parallel with stream resolution
       final rawArtUrl = song.remoteArtworkUrl;
@@ -1321,7 +1334,27 @@ class YtDownloadService {
         }
       }
     } on _RangeIgnored {
-      // Inner finally already cleaned up tempParts and stamp since keepParts is false.
+      // A server that ignores Range mid-transfer leaves `.part0..3` full-body
+      // duplicates and a `.parts` stamp that do not describe the sequential
+      // retry's output. Sweep them before it runs so the committed file is the
+      // only artifact left behind (deleting an already-removed file is a
+      // no-op, and this stays correct even if the inner finally changes).
+      for (final part in tempParts) {
+        try {
+          if (await part.exists()) {
+            await part.delete();
+          }
+        } catch (_) {
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
+      }
+      try {
+        if (await stamp.exists()) {
+          await stamp.delete();
+        }
+      } catch (_) {
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
       debugPrint(
           '[YtDownloadService] Server ignored Range mid-transfer; retrying as a single request');
       await _downloadSequential(uri, dest, task, onProgress,
@@ -1337,6 +1370,9 @@ class YtDownloadService {
   /// integrity mismatch means the bytes themselves are suspect, and a full disk
   /// is only made worse by holding on to them.
   static bool _partsWorthKeeping(Object e) {
+    // Range-ignored means the `.partN` files hold whole-body duplicates, not
+    // the ranged chunks; nothing in them can be resumed or merged.
+    if (e is _RangeIgnored) return false;
     if (e is StorageFailure) return false;
     if (e is DownloadFailure) {
       final m = e.message.toLowerCase();
@@ -1726,146 +1762,24 @@ class YtDownloadService {
         category: 'YTM');
   }
 
-  /// Audio container extensions this service is willing to name a file after.
-  static const Set<String> _allowedExtensions = {
-    'm4a',
-    'webm',
-    'opus',
-    'mp4',
-    'ogg',
-    'oga',
-    'mp3',
-    'flac',
-    'aac',
-  };
-
   /// F11: [ext] arrives from the resolver and from byte sniffing and is then
   /// interpolated straight into a file name, so it has to be a bare container
   /// extension and nothing that could carry a path separator or a traversal
   /// segment.
-  static String safeExtension(String? ext) {
-    final e = (ext ?? '').trim().toLowerCase();
-    if (e.isEmpty || e.contains('.') || e.contains('/') || e.contains('\\')) {
-      return 'm4a';
-    }
-    return _allowedExtensions.contains(e) ? e : 'm4a';
-  }
+  static String safeExtension(String? ext) =>
+      YtDownloadFileNaming.safeExtension(ext);
 
-  static String sanitizeFilename(String artist, String title, String ext) {
-    ext = safeExtension(ext);
-    var rawArtist = artist.trim();
-    var rawTitle = title.trim();
-    if (rawArtist.isEmpty) rawArtist = 'Unknown Artist';
-    if (rawTitle.isEmpty) rawTitle = 'Unknown Title';
-
-    // 1. Strip reserved characters and control characters (BUG-015)
-    final cleanedArtist =
-        rawArtist.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim();
-    final cleanedTitle =
-        rawTitle.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim();
-
-    var base = '$cleanedArtist - $cleanedTitle';
-    // 2. Check Windows reserved device names
-    final baseUpper = base.toUpperCase().split('.').first;
-    const reservedNames = {
-      'CON',
-      'PRN',
-      'AUX',
-      'NUL',
-      'COM1',
-      'COM2',
-      'COM3',
-      'COM4',
-      'COM5',
-      'COM6',
-      'COM7',
-      'COM8',
-      'COM9',
-      'LPT1',
-      'LPT2',
-      'LPT3',
-      'LPT4',
-      'LPT5',
-      'LPT6',
-      'LPT7',
-      'LPT8',
-      'LPT9'
-    };
-    if (reservedNames.contains(baseUpper)) {
-      base = '${base}_track';
-    }
-
-    // 3. Limit UTF-8 byte length to 180 bytes (BUG-015)
-    var encoded = utf8.encode(base);
-    if (encoded.length > 180) {
-      while (encoded.length > 180 && base.isNotEmpty) {
-        base = base.substring(0, base.length - 1);
-        encoded = utf8.encode(base);
-      }
-    }
-    // F11: strip trailing dots/spaces — not a valid file-name tail on every
-    // target, and the shape a traversal attempt takes once separators are gone.
-    base = base.replaceAll(RegExp(r'[. ]+$'), '').trim();
-    if (base.isEmpty) base = 'Track';
-
-    return '$base.$ext';
-  }
+  static String sanitizeFilename(String artist, String title, String ext) =>
+      YtDownloadFileNaming.sanitizeFilename(artist, title, ext);
 
   /// The container the bytes on disk actually are, or null for a header nothing
-  /// recognises.
-  ///
-  /// The URL is not a trustworthy source for this. Entries the playback path
-  /// wrote into `YtmUrlCache` carry no [YtmStream], so the container and MIME
-  /// that come back with them are *guessed* — and a WebM/Opus body was being
-  /// saved as `.m4a`, handed to the MP4 tagger (which fails), and published to
-  /// MediaStore as `audio/mp4`, leaving an untagged file with a lying extension
-  /// that the scanner then refuses to index.
+  /// recognises. The URL is not a trustworthy source; the bytes are.
   @visibleForTesting
-  static ({String ext, String mime})? sniffContainerBytes(List<int> header) {
-    bool at(int offset, List<int> magic) {
-      if (header.length < offset + magic.length) return false;
-      for (var i = 0; i < magic.length; i++) {
-        if (header[offset + i] != magic[i]) return false;
-      }
-      return true;
-    }
+  static ({String ext, String mime})? sniffContainerBytes(List<int> header) =>
+      YtDownloadFileNaming.sniffContainerBytes(header);
 
-    // ISO-BMFF: 4-byte box length, then 'ftyp'. Covers m4a/mp4/3gp.
-    if (at(4, const [0x66, 0x74, 0x79, 0x70])) {
-      return (ext: 'm4a', mime: 'audio/mp4');
-    }
-    // EBML header → Matroska/WebM.
-    if (at(0, const [0x1A, 0x45, 0xDF, 0xA3])) {
-      return (ext: 'webm', mime: 'audio/webm');
-    }
-    if (at(0, const [0x4F, 0x67, 0x67, 0x53])) {
-      return (ext: 'ogg', mime: 'audio/ogg');
-    }
-    if (at(0, const [0x66, 0x4C, 0x61, 0x43])) {
-      return (ext: 'flac', mime: 'audio/flac');
-    }
-    if (at(0, const [0x49, 0x44, 0x33])) {
-      return (ext: 'mp3', mime: 'audio/mpeg');
-    }
-    // MPEG audio frame sync: eleven set bits.
-    if (header.length >= 2 && header[0] == 0xFF && (header[1] & 0xE0) == 0xE0) {
-      return (ext: 'mp3', mime: 'audio/mpeg');
-    }
-    return null;
-  }
-
-  static Future<({String ext, String mime})?> _sniffContainer(File file) async {
-    try {
-      final raf = await file.open();
-      try {
-        return sniffContainerBytes(await raf.read(32));
-      } finally {
-        await raf.close();
-      }
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<({String ext, String mime})?> _sniffContainer(File file) =>
+      YtDownloadFileNaming.sniffContainer(file);
 
   void _sampleThroughput(int bytes, Duration elapsed) {
     try {

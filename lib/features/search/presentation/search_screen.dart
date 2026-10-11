@@ -14,7 +14,6 @@ import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
-import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../library/cubit/library_cubit.dart';
@@ -26,6 +25,7 @@ import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../../../data/db/app_database.dart';
 import '../cubit/search_cubit.dart';
 import '../cubit/search_state.dart';
+import 'widgets/highlighted_song_tile.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -907,8 +907,9 @@ class _LocalResults extends StatelessWidget {
     final p = context.palette;
     final cubit = context.read<SearchCubit>();
     final player = context.read<PlayerCubit>();
+    final pending = cubit.isDebouncing;
 
-    if (state.isLoading && state.results.isEmpty) {
+    if ((state.isLoading || pending) && state.results.isEmpty) {
       return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
     }
     final error = state.errorMessage;
@@ -1007,8 +1008,9 @@ class _LocalResults extends StatelessWidget {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final song = state.results[index];
-                return SongTile(
+                return HighlightedSongTile(
                   song: song,
+                  query: state.query,
                   subtitleOverride: '${song.artist} • ${song.album}',
                   onTap: () {
                     cubit.commitQuery();
@@ -1018,6 +1020,31 @@ class _LocalResults extends StatelessWidget {
                 );
               },
               childCount: state.results.length,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: cubit.hasMoreResults,
+              builder: (context, hasMore, _) => hasMore
+                  ? Center(
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                        child: TextButton.icon(
+                          onPressed: cubit.showMoreResults,
+                          icon: Icon(Icons.expand_more_rounded,
+                              size: 18, color: p.accent),
+                          label: Text(
+                            context.l10n.showMore,
+                            style: TextStyle(
+                                color: p.accent,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
           SliverToBoxAdapter(
@@ -1154,10 +1181,12 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
       builder: (context, local) {
         return BlocBuilder<YtmSearchCubit, YtmSearchState>(
           builder: (context, ytm) {
-            final localDone = !local.isLoading;
-            final onlineDone = isOffline || !ytm.isLoading;
-            final onlineEmpty =
-                isOffline || (ytm.results.isEmpty && ytm.hasSearched);
+            final localPending = context.read<SearchCubit>().isDebouncing;
+            final onlinePending = context.read<YtmSearchCubit>().isDebouncing;
+            final localDone = !local.isLoading && !localPending;
+            final onlineDone = isOffline || (!ytm.isLoading && !onlinePending);
+            final onlineEmpty = isOffline ||
+                (ytm.results.isEmpty && ytm.hasSearched && !onlinePending);
 
             if (localDone &&
                 onlineDone &&
@@ -1222,12 +1251,13 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                       onRetry: context.read<SearchCubit>().retry,
                       p: p,
                     )
-                  else if (local.isLoading && localSongs.isEmpty)
+                  else if ((local.isLoading || localPending) &&
+                      localSongs.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
                       child: SkeletonList(itemCount: 3),
                     )
-                  else if (localSongs.isEmpty)
+                  else if (localSongs.isEmpty && !localPending)
                     _buildEmptySectionCard(
                       context: context,
                       icon: Icons.library_music_outlined,
@@ -1236,8 +1266,9 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     )
                   else ...[
                     for (final song in localShown)
-                      SongTile(
+                      HighlightedSongTile(
                         song: song,
+                        query: widget.query,
                         subtitleOverride: '${song.artist} • ${song.album}',
                         onTap: () {
                           widget.onCommit();
@@ -1251,6 +1282,27 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                         expanded: _expandLocal,
                         onPressed: () =>
                             setState(() => _expandLocal = !_expandLocal),
+                      ),
+                    if (_expandLocal)
+                      ValueListenableBuilder<bool>(
+                        valueListenable:
+                            context.read<SearchCubit>().hasMoreResults,
+                        builder: (context, hasMore, _) => hasMore
+                            ? TextButton.icon(
+                                onPressed: () => context
+                                    .read<SearchCubit>()
+                                    .showMoreResults(),
+                                icon: Icon(Icons.expand_more_rounded,
+                                    size: 18, color: p.accent),
+                                label: Text(
+                                  context.l10n.showMore,
+                                  style: TextStyle(
+                                      color: p.accent,
+                                      fontSize: AppFontSize.caption,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
                   ],
                   Padding(
@@ -1274,7 +1326,8 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                       message: context.l10n.offlineOnlyMode,
                       p: p,
                     )
-                  else if (ytm.isLoading && onlineTracks.isEmpty)
+                  else if ((ytm.isLoading || onlinePending) &&
+                      onlineTracks.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
                       child: SkeletonList(itemCount: 4),
@@ -1287,7 +1340,9 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                       onRetry: context.read<YtmSearchCubit>().retry,
                       p: p,
                     )
-                  else if (onlineTracks.isEmpty && ytm.hasSearched)
+                  else if (onlineTracks.isEmpty &&
+                      ytm.hasSearched &&
+                      !onlinePending)
                     _buildEmptySectionCard(
                       context: context,
                       icon: Icons.search_off_rounded,
@@ -1296,8 +1351,9 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     )
                   else ...[
                     for (var i = 0; i < onlineShown; i++)
-                      SongTile(
+                      HighlightedSongTile(
                         song: onlineSongs[i],
+                        query: widget.query,
                         subtitleOverride: onlineTracks[i].artist,
                         onTap: () =>
                             player.playSong(onlineSongs[i], queue: onlineSongs),
@@ -1572,7 +1628,9 @@ class _OnlineResults extends StatelessWidget {
           );
         }
 
-        if (state.isLoading) {
+        final pending = context.read<YtmSearchCubit>().isDebouncing;
+
+        if ((state.isLoading || pending) && state.results.isEmpty) {
           return const SkeletonList(
               padding: EdgeInsets.only(top: AppSpacing.xs));
         }
@@ -1589,7 +1647,7 @@ class _OnlineResults extends StatelessWidget {
         }
 
         if (state.results.isEmpty) {
-          if (state.hasSearched) {
+          if (state.hasSearched && !pending) {
             return PulsrEmptyState(
               icon: Icons.search_off_rounded,
               title: context.l10n.browseNoResultsFound,
@@ -1669,8 +1727,9 @@ class _OnlineResults extends StatelessWidget {
             itemCount: songs.length,
             itemBuilder: (context, index) {
               final song = songs[index];
-              return SongTile(
+              return HighlightedSongTile(
                 song: song,
+                query: state.query,
                 subtitleOverride: state.results[index].artist,
                 onTap: () => playerCubit.playSong(song, queue: songs),
                 trailing: YtmDownloadButton(song: song),

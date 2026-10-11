@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/utils/adaptive.dart';
+import 'package:pulsr/features/player/cubit/player_cubit.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
+import 'package:pulsr/features/player/presentation/responsive_player_layout.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme_scaffold.dart';
+import 'package:pulsr/l10n/generated/app_localizations.dart';
+
+class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {
   group('Adaptive responsive metrics across screen sizes', () {
@@ -102,6 +111,72 @@ void main() {
         isTablet: false,
       );
       expect(safeArtNegative, equals(0.0));
+    });
+  });
+
+  group('ResponsivePlayerLayout split-view overlay flags', () {
+    late MockPlayerCubit cubit;
+
+    setUp(() {
+      cubit = MockPlayerCubit();
+      when(() => cubit.state).thenReturn(const PlayerState(
+        lyricsSlice: LyricsSlice(isLyricsVisible: true),
+      ));
+      when(() => cubit.stream).thenAnswer((_) => const Stream.empty());
+      when(() => cubit.resetOverlayViews()).thenAnswer((_) {});
+    });
+
+    Widget host(Size size) => MaterialApp(
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: MediaQueryData(size: size),
+            child: Scaffold(
+              body: SizedBox(
+                width: size.width,
+                height: size.height,
+                child: BlocProvider<PlayerCubit>.value(
+                  value: cubit,
+                  child: ResponsivePlayerLayout(
+                    state: cubit.state,
+                    cubit: cubit,
+                    themeWidget: const Center(child: Text('THEME')),
+                    activeColor: Colors.deepPurple,
+                    bgColor: Colors.black,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('selecting the DSP tab clears the stale overlay flags',
+        (tester) async {
+      await tester.pumpWidget(host(const Size(1024, 768)));
+      await tester.pumpAndSettle();
+      expect(find.byType(TabBar), findsOneWidget);
+
+      await tester.tap(find.text('DSP'));
+      await tester.pumpAndSettle();
+
+      verify(() => cubit.resetOverlayViews()).called(greaterThanOrEqualTo(1));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('leaving the split layout clears the stale overlay flags',
+        (tester) async {
+      await tester.pumpWidget(host(const Size(1024, 768)));
+      await tester.pumpAndSettle();
+      verifyNever(() => cubit.resetOverlayViews());
+
+      await tester.pumpWidget(host(const Size(390, 844)));
+      await tester.pump();
+      await tester.pump();
+
+      verify(() => cubit.resetOverlayViews()).called(1);
+      expect(find.text('THEME'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

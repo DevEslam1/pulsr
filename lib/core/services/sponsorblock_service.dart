@@ -7,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../constants/prefs_keys.dart';
+import '../di/injection.dart';
 
 class SponsorBlockSegment {
   final String category;
@@ -28,7 +29,21 @@ class SponsorBlockSegment {
 
 @singleton
 class SponsorBlockService {
-  static final SponsorBlockService instance = SponsorBlockService();
+  /// Process-wide fallback for call sites that cannot receive the DI instance
+  /// (e.g. PlayerCubit wiring). Prefers the DI singleton once registered so
+  /// the whole app observes one set of preferences.
+  static SponsorBlockService? _fallbackInstance;
+
+  static SponsorBlockService get instance {
+    try {
+      if (getIt.isRegistered<SponsorBlockService>()) {
+        return getIt<SponsorBlockService>();
+      }
+    } catch (_) {
+      // DI unavailable (early startup / tests without a graph) — fall through.
+    }
+    return _fallbackInstance ??= SponsorBlockService();
+  }
 
   final http.Client _client;
   final LinkedHashMap<String, List<SponsorBlockSegment>> _cache =
@@ -78,16 +93,19 @@ class SponsorBlockService {
   }
 
   Future<void> setSkipEnabled(bool enabled) async {
-    _enabled = enabled;
+    // Load persisted values BEFORE mutating the in-memory state: on a cold
+    // first call, loadPreferences() would otherwise overwrite the explicit
+    // value with the persisted (old) one before we write the new value.
     await loadPreferences();
+    _enabled = enabled;
     try {
       await _prefs?.setBool(PrefsKeys.sponsorBlockEnabled, enabled);
     } catch (_) {}
   }
 
   Future<void> setEnabledCategories(Set<String> categories) async {
-    _enabledCategories = categories.where(supportedCategories.contains).toSet();
     await loadPreferences();
+    _enabledCategories = categories.where(supportedCategories.contains).toSet();
     try {
       await _prefs?.setStringList(
           PrefsKeys.sponsorBlockCategories, _enabledCategories.toList());

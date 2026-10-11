@@ -44,7 +44,8 @@ void main() {
     when(() => settings.rescanLibrary()).thenAnswer((_) async => 0);
   });
 
-  Future<void> pumpGrid(WidgetTester tester, List<AlbumsTableData> albums) async {
+  Future<void> pumpGrid(
+      WidgetTester tester, List<AlbumsTableData> albums) async {
     tester.view.physicalSize = const Size(1200, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -135,8 +136,8 @@ void main() {
   });
 
   testWidgets('scrolling near the end reveals more albums', (tester) async {
-    await pumpGrid(tester,
-        [for (var i = 0; i < 60; i++) _album(i + 1, 'Album $i')]);
+    await pumpGrid(
+        tester, [for (var i = 0; i < 60; i++) _album(i + 1, 'Album $i')]);
 
     int itemCount() {
       final grid = tester.widget<GridView>(find.byType(GridView));

@@ -99,7 +99,10 @@ void main() {
   });
 
   testWidgets('batch add-to-queue reaches the player', (tester) async {
-    final songs = [testSong(id: 1, title: 'Alpha'), testSong(id: 2, title: 'Beta')];
+    final songs = [
+      testSong(id: 1, title: 'Alpha'),
+      testSong(id: 2, title: 'Beta')
+    ];
     final cubit = stubLibraryCubit(LibraryState(
       isMultiSelectMode: true,
       selectedSongIds: const {1, 2},
@@ -122,7 +125,10 @@ void main() {
 
   testWidgets('batch delete confirms and reports the removed count',
       (tester) async {
-    final songs = [testSong(id: 1, title: 'Alpha'), testSong(id: 2, title: 'Beta')];
+    final songs = [
+      testSong(id: 1, title: 'Alpha'),
+      testSong(id: 2, title: 'Beta')
+    ];
     final cubit = stubLibraryCubit(LibraryState(
       isMultiSelectMode: true,
       selectedSongIds: const {1, 2},
@@ -149,8 +155,8 @@ void main() {
     final cubit = stubLibraryCubit(const LibraryState());
     await pump(tester, cubit: cubit, settings: settings);
 
-    final indicator = tester.widget<RefreshIndicator>(
-        find.byType(RefreshIndicator).first);
+    final indicator =
+        tester.widget<RefreshIndicator>(find.byType(RefreshIndicator).first);
     await indicator.onRefresh();
     await tester.pumpAndSettle();
 

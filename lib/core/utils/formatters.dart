@@ -33,6 +33,12 @@ class Formatters {
       d /= 1024.0;
       i++;
     }
+    // Promote when rounding reaches a full unit (1,048,575 B is 1023.999 KB,
+    // which toStringAsFixed(1) would print as the impossible "1024.0 KB").
+    if (i > 0 && i < suffixes.length - 1 && d.toStringAsFixed(1) == '1024.0') {
+      d /= 1024.0;
+      i++;
+    }
     return '${d.toStringAsFixed(i == 0 ? 0 : 1)} ${suffixes[i]}';
   }
 }

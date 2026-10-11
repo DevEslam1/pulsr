@@ -9,6 +9,12 @@ class PrefsRepository {
   Timer? _batchTimer;
   final Map<String, dynamic> _pendingWrites = {};
 
+  /// Keys removed while a [flush] was in flight. The flush snapshot may still
+  /// carry their old value; without this tombstone the stale write landed
+  /// after `remove()` and resurrected the key.
+  final Set<String> _removedKeys = {};
+  int _activeFlushes = 0;
+
   PrefsRepository(this._prefs) {
     // Populate in-memory cache with all existing keys
     for (final key in _prefs.getKeys()) {
@@ -86,6 +92,9 @@ class PrefsRepository {
   Future<void> remove(String key) async {
     _memoryCache.remove(key);
     _pendingWrites.remove(key);
+    // Tombstone before the await while a flush may still hold a snapshot with
+    // this key, so the stale value cannot land after the removal.
+    if (_activeFlushes > 0) _removedKeys.add(key);
     await _prefs.remove(key);
   }
 
@@ -98,15 +107,24 @@ class PrefsRepository {
     _pendingWrites.clear();
     Object? firstError;
     StackTrace? firstStack;
-    for (final entry in writes.entries) {
-      try {
-        await _writeToDisk(entry.key, entry.value);
-      } catch (e, st) {
-        // `_writeToDisk` already logged the rejection; keep flushing the rest
-        // so one unsupported value cannot drop unrelated queued writes.
-        firstError ??= e;
-        firstStack ??= st;
+    _activeFlushes++;
+    try {
+      for (final entry in writes.entries) {
+        // A remove() that landed after the snapshot is authoritative; its
+        // removal already reached (or is queued ahead of) the disk.
+        if (_removedKeys.contains(entry.key)) continue;
+        try {
+          await _writeToDisk(entry.key, entry.value);
+        } catch (e, st) {
+          // `_writeToDisk` already logged the rejection; keep flushing the rest
+          // so one unsupported value cannot drop unrelated queued writes.
+          firstError ??= e;
+          firstStack ??= st;
+        }
       }
+    } finally {
+      _activeFlushes--;
+      if (_activeFlushes == 0) _removedKeys.clear();
     }
     if (firstError != null) {
       Error.throwWithStackTrace(firstError, firstStack ?? StackTrace.current);

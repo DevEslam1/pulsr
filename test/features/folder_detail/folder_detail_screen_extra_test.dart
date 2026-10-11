@@ -36,9 +36,13 @@ const _folder = FolderItem(
   isExcluded: false,
 );
 
-_Library _library({List<SongsTableData> favorites = const []}) {
+_Library _library({
+  List<SongsTableData> favorites = const [],
+  List<FolderItem> folders = const [],
+}) {
   final cubit = _Library();
-  when(() => cubit.state).thenReturn(LibraryState(favorites: favorites));
+  when(() => cubit.state)
+      .thenReturn(LibraryState(favorites: favorites, folders: folders));
   when(() => cubit.stream).thenAnswer((_) => const Stream.empty());
   when(() => cubit.toggleFavorite(any())).thenAnswer((_) async {});
   return cubit;
@@ -61,8 +65,18 @@ void main() {
     useCase = _FolderUseCases();
   });
 
-  SongsTableData song(int id, String title, {int durationMs = 20000}) =>
-      createTestSong(id: id, title: title, durationMs: durationMs);
+  SongsTableData song(
+    int id,
+    String title, {
+    int durationMs = 20000,
+    bool isFavorite = false,
+  }) =>
+      createTestSong(
+        id: id,
+        title: title,
+        durationMs: durationMs,
+        isFavorite: isFavorite,
+      );
 
   Widget build(
     Stream<Result<List<SongsTableData>>> stream, {
@@ -108,7 +122,10 @@ void main() {
 
   testWidgets('the favorite button removes already-favorited tracks',
       (tester) async {
-    final songs = [song(1, 'Alpha'), song(2, 'Beta')];
+    final songs = [
+      song(1, 'Alpha', isFavorite: true),
+      song(2, 'Beta', isFavorite: true),
+    ];
     final lib = _library(favorites: songs);
     await tester.pumpWidget(build(
       Stream.value(Right(songs)),
@@ -127,6 +144,57 @@ void main() {
     await drain(tester);
   });
 
+  testWidgets('favorite-all follows the listed songs when favorites are stale',
+      (tester) async {
+    // Regression: the direction must come from the listed songs' isFavorite
+    // flags, not from a stale/not-yet-loaded library favorites list.
+    final songs = [
+      song(1, 'Alpha', isFavorite: true),
+      song(2, 'Beta', isFavorite: true),
+    ];
+    final lib = _library();
+    await tester.pumpWidget(build(
+      Stream.value(Right(songs)),
+      libraryCubit: lib,
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.favorite_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    verify(() => lib.toggleFavorite(any())).called(2);
+    expect(find.text(l10n.removeFromFavorites), findsOneWidget);
+
+    await drain(tester);
+  });
+
+  testWidgets('favorite-all ignores extra taps while the batch is in flight',
+      (tester) async {
+    final lib = _library();
+    final gate = Completer<void>();
+    when(() => lib.toggleFavorite(any())).thenAnswer((_) async {
+      await gate.future;
+    });
+    await tester.pumpWidget(build(
+      Stream.value(Right([song(1, 'Alpha'), song(2, 'Beta')])),
+      libraryCubit: lib,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+    await tester.pump();
+
+    gate.complete();
+    await drain(tester);
+
+    verify(() => lib.toggleFavorite(1)).called(1);
+    verify(() => lib.toggleFavorite(2)).called(1);
+  });
+
   testWidgets('long folder durations format with hours', (tester) async {
     await tester.pumpWidget(build(
       Stream.value(Right([song(1, 'Long', durationMs: 3700000)])),
@@ -137,8 +205,7 @@ void main() {
     expect(find.textContaining('min'), findsWidgets);
   });
 
-  testWidgets('breadcrumb taps navigate to the parent folder',
-      (tester) async {
+  testWidgets('breadcrumb taps navigate to the parent folder', (tester) async {
     when(() => useCase.watchFolderSongs(any())).thenAnswer(
       (_) => Stream.value(Right([song(1, 'Alpha')])),
     );
@@ -151,9 +218,8 @@ void main() {
         GoRoute(
           path: '/folder',
           builder: (context, state) {
-            final folder = state.extra is FolderItem
-                ? state.extra as FolderItem
-                : _folder;
+            final folder =
+                state.extra is FolderItem ? state.extra as FolderItem : _folder;
             return BlocProvider<LibraryCubit>.value(
               value: lib,
               child: FolderDetailScreen(
@@ -191,6 +257,70 @@ void main() {
     await tester.tap(find.text('music').first);
     await tester.pumpAndSettle();
 
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('breadcrumb navigation preserves the folder exclusion state',
+      (tester) async {
+    when(() => useCase.watchFolderSongs(any())).thenAnswer(
+      (_) => Stream.value(Right([song(1, 'Alpha')])),
+    );
+    final lib = _library(folders: const [
+      FolderItem(
+        path: '/music',
+        name: 'music',
+        songCount: 5,
+        isExcluded: true,
+      ),
+    ]);
+    final player = stubPlayerCubit();
+
+    final router = GoRouter(
+      initialLocation: '/folder',
+      routes: [
+        GoRoute(
+          path: '/folder',
+          builder: (context, state) {
+            final folder =
+                state.extra is FolderItem ? state.extra as FolderItem : _folder;
+            return BlocProvider<LibraryCubit>.value(
+              value: lib,
+              child: FolderDetailScreen(
+                folder: folder,
+                folderUseCases: useCase,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      BlocProvider<PlayerCubit>.value(
+        value: player,
+        child: MaterialApp.router(
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Excluded from scan'), findsNothing);
+
+    await tester.tap(find.text('music').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Excluded from scan'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

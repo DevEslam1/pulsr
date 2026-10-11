@@ -33,8 +33,7 @@ void main() {
             ),
           );
 
-      final row = await (db.select(db.songsTable)
-            ..where((t) => t.id.equals(1)))
+      final row = await (db.select(db.songsTable)..where((t) => t.id.equals(1)))
           .getSingle();
 
       expect(row.title, 'Minimal');
@@ -312,8 +311,7 @@ void main() {
             PlayHistoryTableCompanion.insert(songId: 1),
           );
       await db.into(db.queueItemsTable).insert(
-            QueueItemsTableCompanion.insert(
-                songId: 1, orderIndex: 0),
+            QueueItemsTableCompanion.insert(songId: 1, orderIndex: 0),
           );
 
       await (db.delete(db.songsTable)..where((t) => t.id.equals(1))).go();

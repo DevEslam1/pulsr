@@ -84,6 +84,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   void setStateForTesting(PlayerState state) => emit(state);
 
   bool _userPausedIntentionally = false;
+  // Auto-skip-on-error bookkeeping: the id of the track that last failed and
+  // how many consecutive failures it has produced. A different track (or a
+  // successful track change) resets the count.
+  int? _lastFailedSongId;
+  int _consecutiveErrorCount = 0;
   // Monotonic counter bumped whenever the queue is mutated; used to invalidate
   // the home-widget "up next" title cache on reorder.
   int _queueVersion = 0;
@@ -220,6 +225,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       onResumePerSongMemory: (song) =>
           unawaited(playbackOptionsController.applyPerSongPlaybackMemory(song)),
       invalidateQueueSyncResolution: invalidateQueueSyncResolution,
+      cancelPendingSeek: () => transportController.cancelPendingSeek(),
     );
     transportController = PlayerTransportController(
       audioHandler: _audioHandler,
@@ -510,8 +516,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         ),
       ));
       if (!isSameSong) {
+        _lastFailedSongId = null;
+        _consecutiveErrorCount = 0;
         unawaited(metadataController.enrichTrackParallel(song));
         unawaited(dspController.maybeFollowTrackSampleRate(song));
+        unawaited(playbackOptionsController.onCurrentSongChanged(song));
         widgetBridge.updateWidgetThrottled(state, force: true);
       }
       _maybeScrobble(song, state.position, state.isPlaying);
@@ -527,6 +536,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
               playback: state.playback.copyWith(
                 currentSong: null,
                 isPlaying: false,
+                isBuffering: false,
                 position: Duration.zero,
                 duration: Duration.zero,
               ),
@@ -612,8 +622,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         ));
 
         if (!isSameSong) {
+          _lastFailedSongId = null;
+          _consecutiveErrorCount = 0;
           unawaited(metadataController.enrichTrackParallel(song));
           unawaited(dspController.maybeFollowTrackSampleRate(song));
+          unawaited(playbackOptionsController.onCurrentSongChanged(song));
         }
         if (songChanged) {
           widgetBridge.updateWidgetThrottled(state, force: true);
@@ -629,6 +642,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             playback: state.playback.copyWith(
               currentSong: null,
               isPlaying: false,
+              isBuffering: false,
               position: Duration.zero,
               duration: Duration.zero,
               errorMessage: null,
@@ -749,6 +763,9 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         resolvedPlaying = true;
       }
 
+      final isBuffering = ps.processingState == AudioProcessingState.loading ||
+          ps.processingState == AudioProcessingState.buffering;
+
       final resolvedIndex = ps.queueIndex != null &&
               ps.queueIndex! >= 0 &&
               ps.queueIndex! < state.queue.length
@@ -758,6 +775,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       final effectivePos = isCompleted ? Duration.zero : ps.position;
       final resolvedShuffle = ps.shuffleMode == AudioServiceShuffleMode.all;
       final nonPositionStateChanged = resolvedPlaying != state.isPlaying ||
+          isBuffering != state.isBuffering ||
           resolvedShuffle != state.isShuffle ||
           repeat != state.repeatMode ||
           resolvedIndex != state.currentIndex ||
@@ -771,6 +789,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       safeEmit(state.copyWith(
         playback: state.playback.copyWith(
           isPlaying: resolvedPlaying,
+          isBuffering: isBuffering,
           position: isCompleted
               ? Duration.zero
               : (effectivePos > Duration.zero ? effectivePos : state.position),
@@ -822,8 +841,34 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
     autoSub(_audioHandler.errorStream, (err) {
       widgetBridge.onPlaybackError(err);
-      safeEmit(
-          state.copyWith(playback: state.playback.copyWith(errorMessage: err)));
+      final failed = state.currentSong;
+      if (failed == null) {
+        safeEmit(state.copyWith(
+            playback: state.playback
+                .copyWith(errorMessage: err, isBuffering: false)));
+        return;
+      }
+      if (failed.id == _lastFailedSongId) {
+        _consecutiveErrorCount++;
+      } else {
+        _lastFailedSongId = failed.id;
+        _consecutiveErrorCount = 1;
+      }
+      if (_consecutiveErrorCount >= 2 && _canAutoSkipUnplayable()) {
+        _lastFailedSongId = null;
+        _consecutiveErrorCount = 0;
+        safeEmit(state.copyWith(
+          playback: state.playback.copyWith(
+            errorMessage: 'Skipped ${failed.title} (unplayable)',
+            isBuffering: false,
+          ),
+        ));
+        unawaited(next());
+        return;
+      }
+      safeEmit(state.copyWith(
+          playback:
+              state.playback.copyWith(errorMessage: err, isBuffering: false)));
     });
 
     autoSub(_audioHandler.sleepTimerRemainingStream, (rem) {
@@ -843,6 +888,15 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       safeEmit(state.copyWith(
           playback: state.playback.copyWith(audioSessionId: id)));
     });
+  }
+
+  /// Whether a twice-failed track can be abandoned for the next queue item.
+  /// Repeat-one would replay the same broken track, a single-item queue has
+  /// nowhere to go, and repeat-off at the last item must not wrap around.
+  bool _canAutoSkipUnplayable() {
+    if (state.repeatMode == PlayerRepeatMode.one) return false;
+    if (state.queue.length <= 1) return false;
+    return state.hasNextNeighbour;
   }
 
   bool _isSameTrack(SongsTableData? a, SongsTableData? b) {

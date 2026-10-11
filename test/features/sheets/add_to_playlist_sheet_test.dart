@@ -44,7 +44,7 @@ void main() {
   });
 
   testWidgets(
-      '[M-11] IgnorePointer does not block cancel button during mutation overlay',
+      '[M-11] the mutation overlay offers no fake cancel and always reports the outcome',
       (tester) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1.0;
@@ -59,19 +59,23 @@ void main() {
       (_) => mutationCompleter.future,
     );
 
+    final navKey = GlobalKey<NavigatorState>();
     await tester.pumpWidget(
       MaterialApp(
+        navigatorKey: navKey,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: AddToPlaylistSheet(
-            song: dummySong,
-            playlistUseCases: mockPlaylistUseCases,
-          ),
-        ),
+        home: const Scaffold(body: Text('HOME')),
       ),
     );
-
+    navKey.currentState!.push(MaterialPageRoute<void>(
+      builder: (_) => Scaffold(
+        body: AddToPlaylistSheet(
+          song: dummySong,
+          playlistUseCases: mockPlaylistUseCases,
+        ),
+      ),
+    ));
     await tester.pumpAndSettle();
 
     // Verify playlist name is rendered
@@ -83,20 +87,14 @@ void main() {
 
     // The mutation overlay is visible with progress indicators (trailing header + overlay)
     expect(find.byType(CircularProgressIndicator), findsNWidgets(2));
+    // A playlist write cannot be aborted, so no misleading Cancel affordance.
+    expect(find.text('Cancel'), findsNothing);
 
-    // Find the Cancel button in the mutation overlay
-    final cancelButton = find.text('Cancel');
-    expect(cancelButton, findsOneWidget);
-
-    // Tap the Cancel button while mutation is in flight - should succeed because IgnorePointer does not wrap it
-    await tester.tap(cancelButton);
-    await tester.pump();
-
-    // Overlay is dismissed and mutation is cancelled
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-
-    // Complete the pending future safely
+    // Complete the write: the sheet must close and confirm the real outcome.
     mutationCompleter.complete(const Right(null));
-    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('My Favorites'), findsNothing);
+    expect(find.textContaining('Added'), findsOneWidget);
   });
 }

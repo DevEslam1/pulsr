@@ -28,7 +28,8 @@ void main() {
     l10n = await AppLocalizations.delegate.load(const Locale('en'));
     cubit = MockPlayerCubit();
     settings = MockSettingsCubit();
-    when(() => cubit.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
+    when(() => cubit.stream)
+        .thenAnswer((_) => const Stream<PlayerState>.empty());
     when(() => settings.stream)
         .thenAnswer((_) => const Stream<SettingsState>.empty());
     when(() => cubit.toggleQueueVisibility()).thenAnswer((_) {});
@@ -77,12 +78,14 @@ void main() {
     int? currentId,
     List<int> queueIds = const [],
     int currentIndex = 0,
+    bool isBuffering = false,
   }) {
     final queue = queueIds.map(buildSong).toList();
     return PlayerState(
       playback: PlaybackSlice(
         currentSong: currentId == null ? null : buildSong(currentId),
         isPlaying: true,
+        isBuffering: isBuffering,
         duration: const Duration(minutes: 3),
         position: const Duration(seconds: 30),
       ),
@@ -141,6 +144,46 @@ void main() {
     expect(seeked, isNotNull);
   });
 
+  testWidgets('a buffering standard bar ignores taps and drags',
+      (tester) async {
+    Duration? seeked;
+    await tester.pumpWidget(host(
+      playerState: stateWith(currentId: 1, isBuffering: true),
+      settingsState: const SettingsState(waveformSeekBarEnabled: false),
+      position: const Duration(seconds: 30),
+      onSeek: (d) => seeked = d,
+    ));
+    await tester.pump();
+
+    await tester.tapAt(tester.getCenter(find.byType(PulsrSlider)));
+    await tester.pump();
+    await tester.drag(find.byType(PulsrSlider), const Offset(120, 0));
+    await tester.pump();
+
+    expect(seeked, isNull);
+  });
+
+  testWidgets('a buffering waveform bar ignores taps', (tester) async {
+    Duration? seeked;
+    await tester.pumpWidget(host(
+      playerState: stateWith(currentId: 1, isBuffering: true),
+      settingsState: const SettingsState(waveformSeekBarEnabled: true),
+      position: const Duration(seconds: 30),
+      onSeek: (d) => seeked = d,
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byType(WaveformSeekBar), findsOneWidget);
+    final widget = tester.widget<WaveformSeekBar>(find.byType(WaveformSeekBar));
+    expect(widget.enabled, isFalse);
+
+    await tester.tapAt(tester.getCenter(find.byType(WaveformSeekBar)));
+    await tester.pump(const Duration(milliseconds: 30));
+
+    expect(seeked, isNull);
+  });
+
   testWidgets('renders the up-next strip and toggles the queue on tap',
       (tester) async {
     await tester.pumpWidget(host(
@@ -169,8 +212,7 @@ void main() {
     expect(find.text(l10n.upNext), findsNothing);
   });
 
-  testWidgets('hides the up-next strip on the last queue item',
-      (tester) async {
+  testWidgets('hides the up-next strip on the last queue item', (tester) async {
     await tester.pumpWidget(host(
       playerState: stateWith(currentId: 2, queueIds: [1, 2], currentIndex: 1),
       settingsState: const SettingsState(waveformSeekBarEnabled: false),
@@ -210,8 +252,8 @@ void main() {
       (tester) async {
     await tester.pumpWidget(host(
       playerState: stateWith(currentId: 1),
-      settingsState:
-          const SettingsState(waveformSeekBarEnabled: false, crossfadeSeconds: 5),
+      settingsState: const SettingsState(
+          waveformSeekBarEnabled: false, crossfadeSeconds: 5),
       position: const Duration(seconds: 30),
       duration: const Duration(minutes: 3),
     ));

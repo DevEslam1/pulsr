@@ -31,8 +31,7 @@ void main() {
         .setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       if (throwMethods.contains(call.method)) {
-        throw PlatformException(
-            code: 'ERR', message: 'forced ${call.method}');
+        throw PlatformException(code: 'ERR', message: 'forced ${call.method}');
       }
       if (overrides.containsKey(call.method)) return overrides[call.method];
       switch (call.method) {
@@ -130,7 +129,8 @@ void main() {
     expect(hasCall('setNativeEqBand'), isTrue);
   });
 
-  test('volume boost is clamped by the headphone preamp headroom and reports '
+  test(
+      'volume boost is clamped by the headphone preamp headroom and reports '
       'native rejection', () async {
     final manager = await newManager();
     manager.selectedHeadphoneProfile = const HeadphoneProfile(
@@ -152,7 +152,8 @@ void main() {
 
     overrides['setVolumeBoost'] = true;
     await manager.setVolumeBoost(0.5);
-    expect(manager.effectStatusNotifier.value.containsKey('volumeBoost'), isFalse);
+    expect(
+        manager.effectStatusNotifier.value.containsKey('volumeBoost'), isFalse);
 
     // A zero boost is treated as applied even when native rejects.
     overrides['setVolumeBoost'] = false;
@@ -279,7 +280,8 @@ void main() {
     await manager.setCompressorParams(ratio: 4.0);
     await manager.setReverb(true,
         preset: ReverbPreset.custom.wireValue, wetDry: 0.3);
-    expect(await manager.loadCustomImpulseResponse(const [0.1, 0.2, 0.3]), isTrue);
+    expect(
+        await manager.loadCustomImpulseResponse(const [0.1, 0.2, 0.3]), isTrue);
     await manager.setStereoBalance(0.3);
     await manager.setMonoMix(true);
     await manager.setSaturation(true);
@@ -476,8 +478,7 @@ void main() {
   test('multiband compressor repairs inverted crossovers on both passes',
       () async {
     final manager = await newManager();
-    await manager.setMultibandCompressor(true,
-        f0: 5000.0, f1: 100.0, f2: 50.0);
+    await manager.setMultibandCompressor(true, f0: 5000.0, f1: 100.0, f2: 50.0);
     expect(manager.multibandCompressorF1,
         greaterThan(manager.multibandCompressorF0));
     expect(manager.multibandCompressorF2,
@@ -500,7 +501,8 @@ void main() {
     expect(manager.isDitherEnabled, isTrue);
   });
 
-  test('saturation and stereo width optional parameters are honoured', () async {
+  test('saturation and stereo width optional parameters are honoured',
+      () async {
     final manager = await newManager();
     await manager.setSaturation(true,
         drive: 0.6, mix: 0.4, tilt: 0.2, mode: 2, multiband: true);
@@ -526,7 +528,10 @@ void main() {
   test('sub crossover optional knobs and slope selection', () async {
     final manager = await newManager();
     await manager.setSubCrossover(true,
-        cornerHz: 120.0, slopeDbPerOct: 6.0, gain: 0.5, bassMono: true,
+        cornerHz: 120.0,
+        slopeDbPerOct: 6.0,
+        gain: 0.5,
+        bassMono: true,
         antiPop: false);
     expect(manager.subCrossoverSlopeDbPerOct, 12.0);
     expect(manager.subCrossoverBassMono, isTrue);

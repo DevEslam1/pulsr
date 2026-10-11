@@ -255,7 +255,9 @@ class MiniPlayerState extends State<MiniPlayer> {
       ErrorLogger.log('MiniPlayer swipe failed',
           error: e, stackTrace: st, category: 'MiniPlayer');
     } finally {
-      _isInteracting.value = false;
+      if (!_controllerDisposed) {
+        _isInteracting.value = false;
+      }
       if (mounted) {
         setState(() {
           _swipeInFlight = false;
@@ -323,6 +325,8 @@ class MiniPlayerState extends State<MiniPlayer> {
           a.currentSong?.artist != b.currentSong?.artist ||
           a.currentSong?.remoteArtworkUrl != b.currentSong?.remoteArtworkUrl ||
           a.isPlaying != b.isPlaying ||
+          a.isBuffering != b.isBuffering ||
+          a.errorMessage != b.errorMessage ||
           a.duration != b.duration ||
           a.currentIndex != b.currentIndex ||
           listContentDiffers(a.queue, b.queue),
@@ -767,16 +771,30 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                         ScaleTransition(
                                                             scale: anim,
                                                             child: child),
-                                                child: Icon(
-                                                  state.isPlaying
-                                                      ? Icons.pause_rounded
-                                                      : Icons
-                                                          .play_arrow_rounded,
-                                                  key: ValueKey<bool>(
-                                                      state.isPlaying),
-                                                  color: activeAccent,
-                                                  size: 32,
-                                                ),
+                                                child: state.isBuffering
+                                                    ? SizedBox(
+                                                        key: const ValueKey<
+                                                                String>(
+                                                            'buffering'),
+                                                        width: 26,
+                                                        height: 26,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                          strokeWidth: 2.5,
+                                                          color: activeAccent,
+                                                        ),
+                                                      )
+                                                    : Icon(
+                                                        state.isPlaying
+                                                            ? Icons
+                                                                .pause_rounded
+                                                            : Icons
+                                                                .play_arrow_rounded,
+                                                        key: ValueKey<bool>(
+                                                            state.isPlaying),
+                                                        color: activeAccent,
+                                                        size: 32,
+                                                      ),
                                               ),
                                               onPressed: () {
                                                 HapticFeedback.lightImpact();
@@ -809,6 +827,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                           activeAccent: activeAccent,
                                           hairlineColor: p.hairline,
                                           isPlaying: state.isPlaying,
+                                          isBuffering: state.isBuffering,
                                           onSeek: (pos) => cubit.seek(pos),
                                         ),
                                       ),
@@ -830,6 +849,25 @@ class MiniPlayerState extends State<MiniPlayer> {
                                       ),
                                     ),
                                   ),
+                                  if (state.errorMessage != null)
+                                    PositionedDirectional(
+                                      top: 6,
+                                      start: 10,
+                                      end: 10,
+                                      child: _MiniPlayerErrorPill(
+                                        message: state.errorMessage!,
+                                        accentColor: activeAccent,
+                                        onRetry: () {
+                                          HapticFeedback.lightImpact();
+                                          cubit.playSong(
+                                            song,
+                                            queue: queue,
+                                            initialPosition: state.position,
+                                          );
+                                        },
+                                        onDismiss: cubit.clearError,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -886,6 +924,7 @@ class _MiniPlayerProgressBar extends StatefulWidget {
   final Color activeAccent;
   final Color hairlineColor;
   final bool isPlaying;
+  final bool isBuffering;
   final void Function(Duration) onSeek;
 
   const _MiniPlayerProgressBar({
@@ -893,6 +932,7 @@ class _MiniPlayerProgressBar extends StatefulWidget {
     required this.activeAccent,
     required this.hairlineColor,
     required this.isPlaying,
+    this.isBuffering = false,
     required this.onSeek,
   });
 
@@ -938,8 +978,11 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
   void _syncWave() {
     final isTest = const bool.fromEnvironment('FLUTTER_TEST') ||
         WidgetsBinding.instance.runtimeType.toString().contains('Test');
-    final shouldAnimate =
-        _isAppActive && widget.isPlaying && context.motionEnabled && !isTest;
+    final shouldAnimate = _isAppActive &&
+        widget.isPlaying &&
+        !widget.isBuffering &&
+        context.motionEnabled &&
+        !isTest;
     if (shouldAnimate) {
       if (!_waveController.isAnimating) _waveController.repeat();
     } else if (_waveController.isAnimating) {
@@ -950,7 +993,10 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
   @override
   void didUpdateWidget(covariant _MiniPlayerProgressBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.isPlaying != widget.isPlaying) _syncWave();
+    if (oldWidget.isPlaying != widget.isPlaying ||
+        oldWidget.isBuffering != widget.isBuffering) {
+      _syncWave();
+    }
   }
 
   @override
@@ -1026,54 +1072,72 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                   value: valueLabel,
                   increasedValue: increasedLabel,
                   decreasedValue: decreasedLabel,
-                  onIncrease: () => _recordSeek(clampDuration(
-                      currentDuration + const Duration(seconds: 10))),
-                  onDecrease: () => _recordSeek(clampDuration(
-                      currentDuration - const Duration(seconds: 10))),
+                  onIncrease: widget.isBuffering
+                      ? null
+                      : () => _recordSeek(clampDuration(
+                          currentDuration + const Duration(seconds: 10))),
+                  onDecrease: widget.isBuffering
+                      ? null
+                      : () => _recordSeek(clampDuration(
+                          currentDuration - const Duration(seconds: 10))),
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTapUp: (details) {
-                      if (trackWidth > 0 &&
-                          widget.duration.inMilliseconds > 0) {
-                        HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
-                        setState(() => _dragProgress = null);
-                        final seekMs =
-                            (widget.duration.inMilliseconds * ratio).round();
-                        _recordSeek(Duration(milliseconds: seekMs));
-                      }
-                    },
-                    onHorizontalDragStart: (details) {
-                      if (trackWidth > 0 &&
-                          widget.duration.inMilliseconds > 0) {
-                        HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
-                        setState(() => _dragProgress = ratio);
-                      }
-                    },
-                    onHorizontalDragUpdate: (details) {
-                      if (trackWidth > 0 &&
-                          widget.duration.inMilliseconds > 0) {
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
-                        setState(() => _dragProgress = ratio);
-                      }
-                    },
-                    onHorizontalDragEnd: (_) {
-                      if (_dragProgress != null &&
-                          widget.duration.inMilliseconds > 0) {
-                        final seekMs =
-                            (widget.duration.inMilliseconds * _dragProgress!)
-                                .round();
-                        _recordSeek(Duration(milliseconds: seekMs));
-                        setState(() => _dragProgress = null);
-                      }
-                    },
-                    onHorizontalDragCancel: () {
-                      setState(() => _dragProgress = null);
-                    },
+                    onTapUp: widget.isBuffering
+                        ? null
+                        : (details) {
+                            if (trackWidth > 0 &&
+                                widget.duration.inMilliseconds > 0) {
+                              HapticFeedback.selectionClick();
+                              final ratio =
+                                  (details.localPosition.dx / trackWidth)
+                                      .clamp(0.0, 1.0);
+                              setState(() => _dragProgress = null);
+                              final seekMs =
+                                  (widget.duration.inMilliseconds * ratio)
+                                      .round();
+                              _recordSeek(Duration(milliseconds: seekMs));
+                            }
+                          },
+                    onHorizontalDragStart: widget.isBuffering
+                        ? null
+                        : (details) {
+                            if (trackWidth > 0 &&
+                                widget.duration.inMilliseconds > 0) {
+                              HapticFeedback.selectionClick();
+                              final ratio =
+                                  (details.localPosition.dx / trackWidth)
+                                      .clamp(0.0, 1.0);
+                              setState(() => _dragProgress = ratio);
+                            }
+                          },
+                    onHorizontalDragUpdate: widget.isBuffering
+                        ? null
+                        : (details) {
+                            if (trackWidth > 0 &&
+                                widget.duration.inMilliseconds > 0) {
+                              final ratio =
+                                  (details.localPosition.dx / trackWidth)
+                                      .clamp(0.0, 1.0);
+                              setState(() => _dragProgress = ratio);
+                            }
+                          },
+                    onHorizontalDragEnd: widget.isBuffering
+                        ? null
+                        : (_) {
+                            if (_dragProgress != null &&
+                                widget.duration.inMilliseconds > 0) {
+                              final seekMs = (widget.duration.inMilliseconds *
+                                      _dragProgress!)
+                                  .round();
+                              _recordSeek(Duration(milliseconds: seekMs));
+                              setState(() => _dragProgress = null);
+                            }
+                          },
+                    onHorizontalDragCancel: widget.isBuffering
+                        ? null
+                        : () {
+                            setState(() => _dragProgress = null);
+                          },
                     // Generous hit area so the thin wavy bar is easy to grab; the
                     // wave amplitude stays small so the card never grows.
                     child: SizedBox(
@@ -1129,6 +1193,80 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
               },
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact error overlay for the mini player: shows the active playback
+/// error, retries the current track from its position, and can be dismissed.
+class _MiniPlayerErrorPill extends StatelessWidget {
+  final String message;
+  final Color accentColor;
+  final VoidCallback onRetry;
+  final VoidCallback onDismiss;
+
+  const _MiniPlayerErrorPill({
+    required this.message,
+    required this.accentColor,
+    required this.onRetry,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onRetry,
+        borderRadius: AppRadii.r10All,
+        child: Container(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s6, AppSpacing.xxs, AppSpacing.xxs, AppSpacing.xxs),
+          decoration: BoxDecoration(
+            color: p.error.withValues(alpha: p.isDark ? 0.24 : 0.14),
+            borderRadius: AppRadii.r10All,
+            border: Border.all(color: p.error.withValues(alpha: 0.55)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline_rounded, size: 13, color: p.error),
+              const SizedBox(width: AppSpacing.s6),
+              Expanded(
+                child: Text(
+                  message,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: AppFontSize.tiny,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s6),
+              Tooltip(
+                message: context.l10n.retry,
+                excludeFromSemantics: true,
+                child: InkWell(
+                  onTap: onRetry,
+                  borderRadius: AppRadii.r8All,
+                  child:
+                      Icon(Icons.refresh_rounded, size: 15, color: accentColor),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s2),
+              InkWell(
+                onTap: onDismiss,
+                borderRadius: AppRadii.r8All,
+                child:
+                    Icon(Icons.close_rounded, size: 15, color: p.textSecondary),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1234,7 +1372,8 @@ class MiniPlayerHorizontal extends StatelessWidget {
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (prev, curr) =>
           prev.currentSong != curr.currentSong ||
-          prev.isPlaying != curr.isPlaying,
+          prev.isPlaying != curr.isPlaying ||
+          prev.isBuffering != curr.isBuffering,
       builder: (context, state) {
         final song = state.currentSong;
         if (song == null) return const SizedBox.shrink();
@@ -1299,12 +1438,21 @@ class MiniPlayerHorizontal extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                     constraints:
                         const BoxConstraints(minWidth: 48, minHeight: 48),
-                    icon: Icon(
-                      state.isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      color: activeAccent,
-                    ),
+                    icon: state.isBuffering
+                        ? SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: activeAccent,
+                            ),
+                          )
+                        : Icon(
+                            state.isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            color: activeAccent,
+                          ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       cubit.togglePlayPause();

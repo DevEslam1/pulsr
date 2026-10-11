@@ -282,6 +282,20 @@ void main() {
       }
     });
 
+    testWidgets('a SettingsCubit error is surfaced and cleared (fix P2)',
+        (tester) async {
+      await pumpScreen(tester);
+
+      settingsCubit.safeEmit(settingsCubit.state.copyWith(
+        errorMessage: 'output device could not disable Bit-Perfect',
+      ));
+      await settleAnims(tester);
+
+      expect(find.text('output device could not disable Bit-Perfect'),
+          findsOneWidget);
+      expect(settingsCubit.state.errorMessage, isNull);
+    });
+
     testWidgets('maps legacy category to consolidated category on load',
         (tester) async {
       SharedPreferences.setMockInitialValues({

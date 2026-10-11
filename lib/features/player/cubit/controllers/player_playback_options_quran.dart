@@ -141,8 +141,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setBool(PrefsKeys.playbackShuffle, false);
           } catch (e, st) {
-            ErrorLogger.log(
-                'Failed to persist shuffle state for Quran Mode',
+            ErrorLogger.log('Failed to persist shuffle state for Quran Mode',
                 error: e,
                 stackTrace: st,
                 category: 'PlayerPlaybackOptionsQuran');
@@ -169,7 +168,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         if (isClosed || gen != _quranToggleGen) return;
 
         if (snapshot != null) {
-          final restored = await _restoreFromSnapshot(snapshot, expectedGen: gen);
+          final restored =
+              await _restoreFromSnapshot(snapshot, expectedGen: gen);
           if (!restored && !isClosed && gen == _quranToggleGen) {
             final st = _getState();
             _emit(st.copyWith(
@@ -182,8 +182,14 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           await _restoreSafeDefaults(expectedGen: gen);
         }
 
-        _quranManager.setRestoreSnapshot(null);
-        await _clearQuranSnapshot();
+        // A re-enable that landed while this disable was in flight already
+        // captured a fresh snapshot; the stale disable must not null it or
+        // delete the persisted copy (the early returns above only cover the
+        // pre-restore window).
+        if (gen == _quranToggleGen) {
+          _quranManager.setRestoreSnapshot(null);
+          await _clearQuranSnapshot();
+        }
       }
     } finally {
       if (gen == _quranToggleGen) {
@@ -218,7 +224,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     final s = _getState();
     final prevDsp = s.dsp;
     final profile = QuranModeProfile.forStyle(s.quranReciterStyle);
-    final drive = profile.saturationDrive > 0.0 ? profile.saturationDrive : 0.20;
+    final drive =
+        profile.saturationDrive > 0.0 ? profile.saturationDrive : 0.20;
     final tilt = profile.saturationTilt > 0.0 ? profile.saturationTilt : 0.30;
     _emit(s.copyWith(
       dsp: s.dsp.copyWith(
@@ -232,9 +239,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     try {
       if (!_getState().isQuranModeEnabled) return;
       await _audioHandler.setSaturation(enable,
-          drive: drive,
-          mix: mix,
-          tilt: tilt);
+          drive: drive, mix: mix, tilt: tilt);
     } catch (e, st) {
       ErrorLogger.log('Failed to set Quran vocal warmth',
           error: e, stackTrace: st, category: 'PlayerPlaybackOptionsQuran');

@@ -84,12 +84,15 @@ class PulsrSheetHelper {
     }
 
     // Modal counting is handled exclusively by the root [PulsrModalObserver]
-    // (see pulsr_modal_tracker.dart). Sheets opened here use the root navigator,
-    // so the observer's didPush/didPop already registers them — counting again
-    // here would double-count and could strand the dock hidden on any asymmetry.
+    // (see pulsr_modal_tracker.dart) for sheets pushed on the root navigator.
+    // A non-root navigator is invisible to that observer, so track it manually
+    // (mirrors PulsrDialogHelper.showCustomDialog) to keep the mini-player dock
+    // hidden while the sheet is open — and never double-count.
+    final trackManually = !useRootNavigator;
+    if (trackManually) PulsrModalTracker.push();
     final p = context.palette;
 
-    return showModalBottomSheet<T>(
+    final future = showModalBottomSheet<T>(
       context: context,
       useRootNavigator: useRootNavigator,
       isScrollControlled: isScrollControlled,
@@ -108,6 +111,7 @@ class PulsrSheetHelper {
         );
       },
     );
+    return trackManually ? future.whenComplete(PulsrModalTracker.pop) : future;
   }
 }
 

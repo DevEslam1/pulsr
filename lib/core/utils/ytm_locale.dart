@@ -29,9 +29,23 @@ class YtmLocale {
   /// Returns [url] with `gl`/`hl` ensured (respects existing query params and
   /// never duplicates them).
   static String withLocaleParams(String url) {
-    if (url.contains('gl=')) return url;
-    final sep = url.contains('?') ? '&' : '?';
-    return '$url${sep}gl=${gl()}&hl=${hl()}';
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    // Key by query parameter, not by substring: `hl=` present with `gl=`
+    // missing used to append `hl` a second time, and a path containing `gl=`
+    // made the whole URL look already-parametrized.
+    final params = Map<String, String>.from(uri.queryParameters);
+    var changed = false;
+    if (!params.containsKey('gl')) {
+      params['gl'] = gl();
+      changed = true;
+    }
+    if (!params.containsKey('hl')) {
+      params['hl'] = hl();
+      changed = true;
+    }
+    if (!changed) return url;
+    return uri.replace(queryParameters: params).toString();
   }
 
   static String homeUrl() => withLocaleParams('https://music.youtube.com/');

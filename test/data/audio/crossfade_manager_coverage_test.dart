@@ -26,10 +26,12 @@ void main() {
     when(() => playerB.setVolume(any())).thenAnswer((_) async {});
     when(() => playerA.stop()).thenAnswer((_) async {});
     when(() => playerB.stop()).thenAnswer((_) async {});
-    when(() => playerA.dspSetGainCurve(any(),
-        segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => false);
-    when(() => playerB.dspSetGainCurve(any(),
-        segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => false);
+    when(() =>
+            playerA.dspSetGainCurve(any(), segmentMs: any(named: 'segmentMs')))
+        .thenAnswer((_) async => false);
+    when(() =>
+            playerB.dspSetGainCurve(any(), segmentMs: any(named: 'segmentMs')))
+        .thenAnswer((_) async => false);
     when(() => playerA.dspClearGainCurve()).thenAnswer((_) async => false);
     when(() => playerB.dspClearGainCurve()).thenAnswer((_) async => false);
   });
@@ -87,16 +89,16 @@ void main() {
 
     test('a valid BPM snaps to the nearest beat multiple', () {
       // 120 BPM -> 0.5s per beat; base 8s is exactly 16 beats.
-      final aligned =
-          CrossfadeManager.calculateBpmAlignedDuration(const Duration(seconds: 8), 120.0);
+      final aligned = CrossfadeManager.calculateBpmAlignedDuration(
+          const Duration(seconds: 8), 120.0);
       expect(aligned, const Duration(seconds: 8));
     });
 
     test('getEffectiveDuration honours an optional BPM', () {
       manager.duration = const Duration(seconds: 8);
       expect(manager.getEffectiveDuration(), const Duration(seconds: 8));
-      expect(manager.getEffectiveDuration(bpm: 120.0),
-          const Duration(seconds: 8));
+      expect(
+          manager.getEffectiveDuration(bpm: 120.0), const Duration(seconds: 8));
     });
 
     test('effectiveFadeDuration requires sync enabled, a track id and override',
@@ -153,7 +155,8 @@ void main() {
       fakeAsync((async) {
         final events = <(double, double)>[];
         final sub = manager
-            .auditionCurveProgress(duration: const Duration(seconds: 3), steps: 3)
+            .auditionCurveProgress(
+                duration: const Duration(seconds: 3), steps: 3)
             .listen(events.add);
         async.elapse(const Duration(seconds: 4));
         expect(events, hasLength(4));
@@ -215,19 +218,21 @@ void main() {
         isSameDecoderConfig: true,
         isRepeatOne: true,
       );
-      expect(shortRemaining.effectiveDuration, const Duration(milliseconds: 500));
+      expect(
+          shortRemaining.effectiveDuration, const Duration(milliseconds: 500));
       expect(shortRemaining.reason, contains('linear'));
     });
   });
 
   group('fadeVolume', () {
     test('zero/negative duration jumps straight to the endpoint', () async {
-      await manager.fadeVolume(playerA, 0.5, 0.9, Duration.zero,
-          manager.nextFadeId());
+      await manager.fadeVolume(
+          playerA, 0.5, 0.9, Duration.zero, manager.nextFadeId());
       verify(() => playerA.setVolume(0.9)).called(1);
     });
 
-    test('stepped fallback runs when the native curve is unavailable', () async {
+    test('stepped fallback runs when the native curve is unavailable',
+        () async {
       final volumes = <double>[];
       when(() => playerA.setVolume(any())).thenAnswer((inv) async {
         volumes.add(inv.positionalArguments[0] as double);
@@ -244,8 +249,7 @@ void main() {
       fakeAsync((async) {
         var armed = false;
         when(() => playerA.dspSetGainCurve(any(),
-                segmentMs: any(named: 'segmentMs')))
-            .thenAnswer((_) async {
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async {
           armed = true;
           return true;
         });
@@ -366,7 +370,8 @@ void main() {
         ));
         async.elapse(const Duration(milliseconds: 20));
         manager.dispose();
-        verify(() => playerA.dspClearGainCurve()).called(greaterThanOrEqualTo(1));
+        verify(() => playerA.dspClearGainCurve())
+            .called(greaterThanOrEqualTo(1));
         async.elapse(const Duration(milliseconds: 300));
       });
     });

@@ -37,8 +37,7 @@ void main() {
     expect(taps, 1);
   });
 
-  testWidgets('QuickCard uses the compact styling below 380dp',
-      (tester) async {
+  testWidgets('QuickCard uses the compact styling below 380dp', (tester) async {
     await tester.pumpWidget(_wrap(
       QuickCard(
         title: 'Chill',

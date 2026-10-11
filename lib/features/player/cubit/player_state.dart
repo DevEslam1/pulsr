@@ -22,6 +22,7 @@ abstract class PlaybackSlice with _$PlaybackSlice {
   const factory PlaybackSlice({
     SongsTableData? currentSong,
     @Default(false) bool isPlaying,
+    @Default(false) bool isBuffering,
     @Default(Duration.zero) Duration position,
     @Default(Duration.zero) Duration duration,
     @Default(false) bool isShuffle,
@@ -49,6 +50,7 @@ abstract class PlaybackSlice with _$PlaybackSlice {
   bool differsBeyondPosition(PlaybackSlice other) {
     return currentSong != other.currentSong ||
         isPlaying != other.isPlaying ||
+        isBuffering != other.isBuffering ||
         duration != other.duration ||
         isShuffle != other.isShuffle ||
         repeatMode != other.repeatMode ||
@@ -273,6 +275,7 @@ abstract class PlayerState with _$PlayerState {
   // ──────────────────────────────────────────────
   SongsTableData? get currentSong => playback.currentSong;
   bool get isPlaying => playback.isPlaying;
+  bool get isBuffering => playback.isBuffering;
   Duration get position => playback.position;
   Duration get duration => playback.duration;
   bool get isShuffle => playback.isShuffle;

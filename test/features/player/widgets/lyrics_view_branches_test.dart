@@ -211,7 +211,8 @@ void main() {
       await tester.pump();
 
       playerState = playerState.copyWith(
-        playback: playerState.playback.copyWith(position: const Duration(seconds: 6)),
+        playback:
+            playerState.playback.copyWith(position: const Duration(seconds: 6)),
       );
       playerStates.add(playerState);
       await tester.pump();
@@ -267,9 +268,11 @@ void main() {
 
       expect(find.text(l10n.settingsSyncOffset), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, l10n.offsetPlus50Ms));
+      await tester
+          .tap(find.widgetWithText(OutlinedButton, l10n.offsetPlus50Ms));
       await tester.pump();
-      await tester.tap(find.widgetWithText(OutlinedButton, l10n.offsetPlus50Ms));
+      await tester
+          .tap(find.widgetWithText(OutlinedButton, l10n.offsetPlus50Ms));
       await tester.pump();
 
       await tester.tap(find.text(l10n.done));
@@ -293,7 +296,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      await tester.tap(find.widgetWithText(OutlinedButton, l10n.offsetMinus50Ms));
+      await tester
+          .tap(find.widgetWithText(OutlinedButton, l10n.offsetMinus50Ms));
       await tester.pump();
       await tester.tap(find.widgetWithText(TextButton, l10n.reset));
       await tester.pump();
@@ -352,6 +356,59 @@ void main() {
       await tester.pump();
 
       expect(tapped, isNotNull);
+    });
+  });
+
+  group('long-press offset nudge', () {
+    const synced = [
+      LyricsLine(timestamp: Duration(seconds: 2), text: 'First'),
+      LyricsLine(timestamp: Duration(seconds: 4), text: 'Second'),
+      LyricsLine(timestamp: Duration(seconds: 8), text: 'Third'),
+    ];
+
+    Future<void> pumpSynced(WidgetTester tester) async {
+      await tester.pumpWidget(host(
+        lyrics: synced,
+        currentPosition: const Duration(seconds: 4),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    testWidgets('long-press on the right half nudges the offset +0.1s',
+        (tester) async {
+      await pumpSynced(tester);
+
+      final rect = tester.getRect(find.byType(LyricView));
+      await tester.longPressAt(Offset(rect.right - 24, rect.center.dy));
+      await tester.pumpAndSettle();
+
+      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), 100);
+    });
+
+    testWidgets('long-press on the left half nudges the offset -0.1s',
+        (tester) async {
+      await pumpSynced(tester);
+
+      final rect = tester.getRect(find.byType(LyricView));
+      await tester.longPressAt(Offset(rect.left + 24, rect.center.dy));
+      await tester.pumpAndSettle();
+
+      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), -100);
+    });
+
+    testWidgets('consecutive long-presses accumulate the nudge',
+        (tester) async {
+      await pumpSynced(tester);
+
+      final rect = tester.getRect(find.byType(LyricView));
+      final target = Offset(rect.right - 24, rect.center.dy);
+      await tester.longPressAt(target);
+      await tester.pumpAndSettle();
+      await tester.longPressAt(target);
+      await tester.pumpAndSettle();
+
+      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), 200);
     });
   });
 

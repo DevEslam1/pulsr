@@ -109,7 +109,8 @@ void main() {
     verifyNever(() => handler.setSpeed(any()));
   });
 
-  test('setPlaybackSpeed rolls back and reports an error when the engine throws',
+  test(
+      'setPlaybackSpeed rolls back and reports an error when the engine throws',
       () async {
     final handler = _MockAudioHandler();
     when(() => handler.minPlaybackSpeed).thenReturn(0.5);
@@ -119,7 +120,8 @@ void main() {
     var state = PlayerState(
       playback: const PlaybackSlice(playbackSpeed: 1.25),
     );
-    final controller = make(handler, getState: () => state, emit: (s) => state = s);
+    final controller =
+        make(handler, getState: () => state, emit: (s) => state = s);
 
     await controller.setPlaybackSpeed(1.5);
     expect(state.playbackSpeed, 1.25);
@@ -132,8 +134,8 @@ void main() {
 
     final store = PerSongPlaybackStore();
     var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(2)));
-    final controller =
-        make(handler, getState: () => state, emit: (s) => state = s, playbackStore: store);
+    final controller = make(handler,
+        getState: () => state, emit: (s) => state = s, playbackStore: store);
 
     await controller.setPlaybackPitch(1.4);
     expect(state.playbackPitch, 1.4);
@@ -161,8 +163,8 @@ void main() {
     expect(ratingStore.getRating('3'), 5);
 
     // A rating for a different song persists but does not touch state.
-    state = state.copyWith(
-        playback: state.playback.copyWith(currentSongRating: 5));
+    state =
+        state.copyWith(playback: state.playback.copyWith(currentSongRating: 5));
     await controller.setSongRating(99, 2);
     expect(state.currentSongRating, 5);
     expect(ratingStore.getRating('99'), 2);
@@ -186,7 +188,8 @@ void main() {
     await noSong.setRating(4); // no current song -> no throw
   });
 
-  test('checkDspGuard defaults true and delegates when a guard is provided', () {
+  test('checkDspGuard defaults true and delegates when a guard is provided',
+      () {
     final handler = _MockAudioHandler();
     expect(make(handler).checkDspGuard('feature'), isTrue);
 
@@ -202,8 +205,10 @@ void main() {
   test('importEqPreset honours the DSP guard, success and closed states',
       () async {
     final handler = _MockAudioHandler();
-    when(() => handler.importPresetFromJson(any())).thenAnswer((_) async => true);
-    const preset = EqPreset(name: 'Imported', gains: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    when(() => handler.importPresetFromJson(any()))
+        .thenAnswer((_) async => true);
+    const preset =
+        EqPreset(name: 'Imported', gains: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     when(() => handler.currentPreset).thenReturn(preset);
 
     var state = const PlayerState();
@@ -216,7 +221,8 @@ void main() {
     expect(await guarded.importEqPreset('{}'), isFalse);
     verifyNever(() => handler.importPresetFromJson(any()));
 
-    final controller = make(handler, getState: () => state, emit: (s) => state = s);
+    final controller =
+        make(handler, getState: () => state, emit: (s) => state = s);
     expect(await controller.importEqPreset('{}'), isTrue);
     expect(state.eqPreset, preset);
 
@@ -243,8 +249,8 @@ void main() {
     final handler = _MockAudioHandler();
     final eqStore = PerSongEqStore();
     var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(5)));
-    final controller =
-        make(handler, getState: () => state, emit: (s) => state = s, eqStore: eqStore);
+    final controller = make(handler,
+        getState: () => state, emit: (s) => state = s, eqStore: eqStore);
 
     await controller.setSongEqOverride(5, 'Bass'); // int branch
     expect(state.currentSongEqOverride, 'Bass');
@@ -268,8 +274,8 @@ void main() {
     final handler = _MockAudioHandler();
     final eqStore = PerSongEqStore();
     var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(6)));
-    final controller =
-        make(handler, getState: () => state, emit: (s) => state = s, eqStore: eqStore);
+    final controller = make(handler,
+        getState: () => state, emit: (s) => state = s, eqStore: eqStore);
 
     await controller.setSongEqOverrideById(6, 'Vocal');
     expect(state.currentSongEqOverride, 'Vocal');
@@ -377,7 +383,8 @@ void main() {
     expect(state.playbackSpeed, 1.0);
   });
 
-  test('applyPerSongPlaybackMemory swallows engine failures and keeps old values',
+  test(
+      'applyPerSongPlaybackMemory swallows engine failures and keeps old values',
       () async {
     final handler = _MockAudioHandler();
     when(() => handler.setSpeed(any())).thenThrow(Exception('boom'));
@@ -387,7 +394,8 @@ void main() {
     await playbackStore.setSpeed('10', 1.5);
     await playbackStore.setPitch('10', 0.75);
 
-    var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(10)));
+    var state =
+        PlayerState(playback: PlaybackSlice(currentSong: buildSong(10)));
     final controller = make(
       handler,
       getState: () => state,
@@ -402,6 +410,7 @@ void main() {
 
   test('overlay toggles, reset and playback option setters emit', () {
     final handler = _MockAudioHandler();
+    when(() => handler.setCurrentTrackDelay(any())).thenAnswer((_) async {});
     var state = const PlayerState();
     final controller =
         make(handler, getState: () => state, emit: (s) => state = s);
@@ -431,6 +440,39 @@ void main() {
     final song = buildSong(11);
     when(() => handler.setTrackBpm(song, 128.0)).thenAnswer((_) async => true);
     controller.setTrackBpm(song, 128.0);
+  });
+
+  test('setTrackDelayMs pushes to the engine and clamps to the manager range',
+      () async {
+    final handler = _MockAudioHandler();
+    when(() => handler.setCurrentTrackDelay(any())).thenAnswer((_) async {});
+    var state = const PlayerState();
+    final controller =
+        make(handler, getState: () => state, emit: (s) => state = s);
+
+    await controller.setTrackDelayMs(250);
+    expect(state.trackDelayMs, 250);
+    verify(() => handler.setCurrentTrackDelay(250)).called(1);
+
+    await controller.setTrackDelayMs(999999);
+    expect(state.trackDelayMs, 2000);
+    verify(() => handler.setCurrentTrackDelay(2000)).called(1);
+  });
+
+  test('onCurrentSongChanged seeds trackDelayMs from the engine', () async {
+    final handler = _MockAudioHandler();
+    when(() => handler.currentTrackDelayMs).thenReturn(150);
+    when(() =>
+            handler.restoreAbLoopForCurrentSong(songId: any(named: 'songId')))
+        .thenAnswer((_) async {});
+    var state = PlayerState(
+      playback: PlaybackSlice(currentSong: buildSong(12), trackDelayMs: 400),
+    );
+    final controller =
+        make(handler, getState: () => state, emit: (s) => state = s);
+
+    await controller.onCurrentSongChanged(buildSong(13));
+    expect(state.trackDelayMs, 150);
   });
 
   test('sleep timer delegation arms and cancels', () {

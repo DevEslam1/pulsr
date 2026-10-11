@@ -8196,4 +8196,14 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get compactView => 'العرض المصغر';
+
+  @override
+  String get bootConfigurationError => 'لا يمكن تشغيل Pulsr بهذا الإعداد';
+
+  @override
+  String get bootStartupFailed => 'تعذّر إكمال تشغيل Pulsr';
+
+  @override
+  String get bootStartupFailedMessage =>
+      'لم تصبح مكوّنات التشغيل جاهزة في الوقت المحدد. إعادة المحاولة تحلّ عادةً مشكلة بدء التشغيل البطيء.';
 }

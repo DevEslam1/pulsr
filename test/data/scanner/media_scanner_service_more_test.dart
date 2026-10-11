@@ -1,11 +1,14 @@
 // test/data/scanner/media_scanner_service_more_test.dart
 import 'dart:io';
 
+import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/data/repositories/music_repository.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 
@@ -73,27 +76,28 @@ void main() {
           as List<SongsTableCompanion>;
       return const Right(null);
     });
-    when(() => repo.cleanupOrphanedSongs(any()))
-        .thenAnswer((invocation) async {
+    when(() => repo.cleanupOrphanedSongs(any())).thenAnswer((invocation) async {
       capturedValidIds = invocation.positionalArguments.first as Set<int>;
       return const Right(0);
     });
     when(() => repo.expandCueSheets()).thenAnswer((_) async => const Right(0));
     when(() => repo.updateAudioQuality(
-        songId: any(named: 'songId'),
-        sampleRate: any(named: 'sampleRate'),
-        bitDepth: any(named: 'bitDepth'),
-        bitrateKbps: any(named: 'bitrateKbps'),
-        codec: any(named: 'codec'),
-        loudnessRange: any(named: 'loudnessRange'))).thenAnswer((_) async => const Right(null));
+            songId: any(named: 'songId'),
+            sampleRate: any(named: 'sampleRate'),
+            bitDepth: any(named: 'bitDepth'),
+            bitrateKbps: any(named: 'bitrateKbps'),
+            codec: any(named: 'codec'),
+            loudnessRange: any(named: 'loudnessRange')))
+        .thenAnswer((_) async => const Right(null));
     when(() => repo.updateSongTags(
-        path: any(named: 'path'),
-        title: any(named: 'title'),
-        artist: any(named: 'artist'),
-        album: any(named: 'album'),
-        genre: any(named: 'genre'),
-        year: any(named: 'year'),
-        trackNumber: any(named: 'trackNumber'))).thenAnswer((_) async => const Right(null));
+            path: any(named: 'path'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
+            album: any(named: 'album'),
+            genre: any(named: 'genre'),
+            year: any(named: 'year'),
+            trackNumber: any(named: 'trackNumber')))
+        .thenAnswer((_) async => const Right(null));
 
     scanner = MediaScannerService(repo);
   });
@@ -108,15 +112,13 @@ void main() {
 
   group('isSystemIgnoredPath extra branches', () {
     test('ptt- and aud- only match inside messenger folders', () {
-      expect(
-          MediaScannerService.isSystemIgnoredPath('/music/ptt-1234.ogg'),
+      expect(MediaScannerService.isSystemIgnoredPath('/music/ptt-1234.ogg'),
           isFalse);
       expect(
           MediaScannerService.isSystemIgnoredPath(
               '/whatsapp/aud-1234567890123456789012.opus'),
           isTrue);
-      expect(
-          MediaScannerService.isSystemIgnoredPath('/music/aud-1234.opus'),
+      expect(MediaScannerService.isSystemIgnoredPath('/music/aud-1234.opus'),
           isFalse);
     });
 
@@ -156,15 +158,13 @@ void main() {
       final deep = Directory(
           '${temp.path}${Platform.pathSeparator}a${Platform.pathSeparator}b')
         ..createSync(recursive: true);
-      final file =
-          File('${deep.path}${Platform.pathSeparator}song.mp3');
+      final file = File('${deep.path}${Platform.pathSeparator}song.mp3');
       expect(MediaScannerService.isInNomediaDirectory(file.path), isTrue);
     });
 
     test('evicts the cache when it grows past its cap', () {
       for (var i = 0; i < 1300; i++) {
-        expect(
-            MediaScannerService.isInNomediaDirectory('/unique$i/a/song.mp3'),
+        expect(MediaScannerService.isInNomediaDirectory('/unique$i/a/song.mp3'),
             isFalse);
       }
       expect(MediaScannerService.isInNomediaDirectory('bare.mp3'), isFalse);
@@ -255,8 +255,8 @@ void main() {
     });
 
     test('honours minSizeKb and excluded folders', () async {
-      when(() => repo.getExcludedFolderPaths()).thenAnswer(
-          (_) async => const Right(<String>[r'C:\Music\Excluded']));
+      when(() => repo.getExcludedFolderPaths())
+          .thenAnswer((_) async => const Right(<String>[r'C:\Music\Excluded']));
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(queryChannel, (call) async {
@@ -285,8 +285,7 @@ void main() {
           .setMockMethodCallHandler(queryChannel, (call) async {
         if (call.method == 'querySongs') {
           return <Map<String, dynamic>>[
-            song(1, '/storage/emulated/0/Music/old.mp3',
-                dateModified: 1000),
+            song(1, '/storage/emulated/0/Music/old.mp3', dateModified: 1000),
           ];
         }
         return <dynamic>[];
@@ -312,8 +311,7 @@ void main() {
           .setMockMethodCallHandler(queryChannel, (call) async {
         if (call.method == 'querySongs') {
           return <Map<String, dynamic>>[
-            song(1, '/storage/emulated/0/Music/new.mp3',
-                dateModified: 3000),
+            song(1, '/storage/emulated/0/Music/new.mp3', dateModified: 3000),
           ];
         }
         return <dynamic>[];
@@ -336,6 +334,139 @@ void main() {
         return <dynamic>[];
       });
       expect(await scanner.scanDeviceLibrary(), 1);
+    });
+
+    test('persists the scan-start epoch, not the scan-end epoch', () async {
+      var endOfQueryEpoch = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(queryChannel, (call) async {
+        if (call.method == 'querySongs') {
+          await Future<void>.delayed(const Duration(milliseconds: 1100));
+          endOfQueryEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+          return <Map<String, dynamic>>[
+            song(1, '/storage/emulated/0/Music/a.mp3'),
+          ];
+        }
+        return <dynamic>[];
+      });
+
+      await scanner.scanDeviceLibrary();
+
+      expect(endOfQueryEpoch, greaterThan(0));
+      expect(scanner.lastScanEpochSec, lessThan(endOfQueryEpoch),
+          reason: 'a file modified while the scan runs must survive the next '
+              'incremental modSec >= lastEpoch filter');
+    });
+
+    test('labels the isolate parse phase between preview and sync ticks',
+        () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(queryChannel, (call) async {
+        if (call.method == 'querySongs') {
+          return <Map<String, dynamic>>[
+            song(1, '/storage/emulated/0/Music/a.mp3', displayWOExt: 'a'),
+            song(2, '/storage/emulated/0/Music/b.mp3', displayWOExt: 'b'),
+          ];
+        }
+        return <dynamic>[];
+      });
+
+      final updates = <ScanProgressUpdate>[];
+      final sub = scanner.detailedProgress.listen(updates.add);
+      await scanner.scanDeviceLibrary();
+      await Future<void>.delayed(Duration.zero);
+      await sub.cancel();
+
+      final previewIndex =
+          updates.indexWhere((u) => u.progress == 0.25 && u.currentFile == 'a');
+      final parseIndex = updates.indexWhere(
+          (u) => u.currentFile?.contains('Parsing metadata') ?? false);
+      final syncIndex = updates.indexWhere(
+          (u) => u.currentFile?.contains('Syncing catalog') ?? false);
+
+      expect(previewIndex, greaterThanOrEqualTo(0),
+          reason: 'the preview loop must yield so the tick is delivered');
+      expect(parseIndex, greaterThan(previewIndex));
+      expect(updates[parseIndex].progress, 0.7);
+      expect(syncIndex, greaterThan(parseIndex));
+      expect(updates[syncIndex].progress, 0.75);
+    });
+  });
+
+  group('artwork preservation', () {
+    test('scanner companions leave every artwork column absent', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(queryChannel, (call) async {
+        if (call.method == 'querySongs') {
+          return <Map<String, dynamic>>[
+            song(1, '/storage/emulated/0/Music/a.mp3',
+                artistId: 11, albumId: 21),
+          ];
+        }
+        return <dynamic>[];
+      });
+
+      await scanner.scanDeviceLibrary();
+
+      final captured = verify(() => repo.syncScannedMusic(
+            songs: captureAny(named: 'songs'),
+            albums: captureAny(named: 'albums'),
+            artists: captureAny(named: 'artists'),
+          )).captured;
+      final songs = captured[0] as List<SongsTableCompanion>;
+      final albums = captured[1] as List<AlbumsTableCompanion>;
+      final artists = captured[2] as List<ArtistsTableCompanion>;
+      expect(songs.single.artworkUri.present, isFalse);
+      expect(albums.single.artworkUri.present, isFalse);
+      expect(artists.single.artworkUri.present, isFalse);
+    });
+
+    test('a rescan keeps artwork written by updateAlbumArtwork', () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final realRepo = MusicRepository(db);
+
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+            id: const Value(1),
+            title: 'Old Title',
+            path: '/storage/emulated/0/Music/a.mp3',
+            artistId: const Value(11),
+            albumId: const Value(21),
+            artworkUri: const Value('art://song-cover'),
+          ));
+      await db.into(db.albumsTable).insert(AlbumsTableCompanion.insert(
+            id: const Value(21),
+            title: 'Album',
+            artworkUri: const Value('art://album-cover'),
+          ));
+      await db.into(db.artistsTable).insert(ArtistsTableCompanion.insert(
+            id: const Value(11),
+            name: 'Artist',
+            artworkUri: const Value('art://artist-cover'),
+          ));
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(queryChannel, (call) async {
+        if (call.method == 'querySongs') {
+          return <Map<String, dynamic>>[
+            song(1, '/storage/emulated/0/Music/a.mp3',
+                title: 'New Title', artistId: 11, albumId: 21),
+          ];
+        }
+        return <dynamic>[];
+      });
+
+      final realScanner = MediaScannerService(realRepo);
+      addTearDown(realScanner.dispose);
+      expect(await realScanner.scanDeviceLibrary(), 1);
+
+      final songRow = (await realRepo.getSongById(1)).getOrElse((_) => null);
+      expect(songRow!.title, 'New Title');
+      expect(songRow.artworkUri, 'art://song-cover');
+      final album = (await realRepo.getAlbumById(21)).getOrElse((_) => null);
+      expect(album!.artworkUri, 'art://album-cover');
+      final artist = (await realRepo.getArtistById(11)).getOrElse((_) => null);
+      expect(artist!.artworkUri, 'art://artist-cover');
     });
   });
 

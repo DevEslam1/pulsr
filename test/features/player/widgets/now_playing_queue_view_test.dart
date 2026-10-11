@@ -40,6 +40,8 @@ void main() {
     when(() => cubit.reorderQueue(any(), any())).thenAnswer((_) async {});
     when(() => cubit.removeQueueItem(any())).thenAnswer((_) async {});
     when(() => cubit.restoreQueue(any(), any())).thenAnswer((_) async {});
+    when(() => cubit.playNext(any())).thenAnswer((_) async {});
+    when(() => cubit.addToQueue(any())).thenAnswer((_) async {});
     when(() => cubit.playSong(any(),
         queue: any(named: 'queue'),
         initialPosition: any(named: 'initialPosition'),
@@ -129,7 +131,7 @@ void main() {
     )));
     await tester.pump();
 
-    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -140,6 +142,63 @@ void main() {
     await tester.pump();
 
     verify(() => cubit.restoreQueue(any(), any())).called(1);
+  });
+
+  testWidgets('the currently playing row exposes a remove affordance',
+      (tester) async {
+    final songs = [buildSong(1), buildSong(2)];
+    await tester.pumpWidget(host(PlayerState(
+      queueSlice: QueueSlice(queue: songs, currentIndex: 0),
+    )));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.close_rounded), findsNWidgets(2));
+
+    await tester.tap(find.byIcon(Icons.close_rounded).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    verify(() => cubit.removeQueueItem(0)).called(1);
+  });
+
+  testWidgets('long-press opens row actions and play next forwards the song',
+      (tester) async {
+    final songs = [buildSong(1), buildSong(2)];
+    await tester.pumpWidget(host(PlayerState(
+      queueSlice: QueueSlice(queue: songs, currentIndex: 0),
+    )));
+    await tester.pump();
+
+    await tester.longPress(find.text('Song 2'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text(l10n.playNext), findsOneWidget);
+    expect(find.text(l10n.addToQueue), findsOneWidget);
+
+    await tester.tap(find.text(l10n.playNext));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    verify(() => cubit.playNext(any())).called(1);
+  });
+
+  testWidgets('long-press add to queue forwards the song', (tester) async {
+    final songs = [buildSong(1), buildSong(2)];
+    await tester.pumpWidget(host(PlayerState(
+      queueSlice: QueueSlice(queue: songs, currentIndex: 0),
+    )));
+    await tester.pump();
+
+    await tester.longPress(find.text('Song 2'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.text(l10n.addToQueue));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    verify(() => cubit.addToQueue(any())).called(1);
   });
 
   testWidgets('swiping a row away removes it and offers undo', (tester) async {

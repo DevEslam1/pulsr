@@ -77,9 +77,10 @@ void main() {
       expect((await handler!.getMediaItem('root_playlists'))?.id, 'playlists');
       expect((await handler!.getMediaItem('root_genres'))?.id, 'genres');
       expect((await handler!.getMediaItem('root_favorites'))?.id, 'favorites');
-      expect((await handler!.getMediaItem('root_downloaded'))?.id, 'downloaded');
-      expect((await handler!.getMediaItem('root_browse_mood'))?.id,
-          'browse_mood');
+      expect(
+          (await handler!.getMediaItem('root_downloaded'))?.id, 'downloaded');
+      expect(
+          (await handler!.getMediaItem('root_browse_mood'))?.id, 'browse_mood');
       expect((await handler!.getMediaItem('root_recent'))?.id, 'recent');
       expect((await handler!.getMediaItem('root_sound_settings'))?.id,
           'sound_settings');
@@ -127,9 +128,10 @@ void main() {
       expect((await handler!.getChildren('root_favorites')).length, 1);
       expect((await handler!.getChildren('root_albums')).first.id, 'album_1');
       expect((await handler!.getChildren('root_artists')).first.id, 'artist_1');
+      expect((await handler!.getChildren('root_playlists')).first.id,
+          'playlist_1');
       expect(
-          (await handler!.getChildren('root_playlists')).first.id, 'playlist_1');
-      expect((await handler!.getChildren('root_genres')).first.id, 'genre_Rock');
+          (await handler!.getChildren('root_genres')).first.id, 'genre_Rock');
       expect((await handler!.getChildren('root_recent')).length, 1);
       expect((await handler!.getChildren('root_browse_mood')).length, 4);
       expect((await handler!.getChildren('root_sound_settings')).length, 3);
@@ -145,12 +147,12 @@ void main() {
       );
       final withAlbum = localSong(3).copyWith(albumId: const Value(9));
       when(() => repo.getAllSongs(
-            sortBy: any(named: 'sortBy'),
-            ascending: any(named: 'ascending'),
-            limit: any(named: 'limit'),
-            offset: any(named: 'offset'),
-          )).thenAnswer(
-          (_) async => Right([withArtwork, withRemote, withAlbum]));
+                sortBy: any(named: 'sortBy'),
+                ascending: any(named: 'ascending'),
+                limit: any(named: 'limit'),
+                offset: any(named: 'offset'),
+              ))
+          .thenAnswer((_) async => Right([withArtwork, withRemote, withAlbum]));
 
       final children = await handler!.getChildren('songs');
       expect(children.length, 3);
@@ -414,8 +416,8 @@ void main() {
 
     test('removeQueueItem ignores an unknown media id', () async {
       handler = await ready(load: true);
-      await handler!.removeQueueItem(
-          MediaItem(id: 'does-not-exist', title: 'Ghost'));
+      await handler!
+          .removeQueueItem(MediaItem(id: 'does-not-exist', title: 'Ghost'));
       expect(handler!.queue.value.length, 3);
     });
 
@@ -483,7 +485,8 @@ void main() {
     test('addQueueItem appends a resolved song and rejects a duplicate',
         () async {
       handler = await ready();
-      when(() => repo.getSongById(7)).thenAnswer((_) async => Right(localSong(7)));
+      when(() => repo.getSongById(7))
+          .thenAnswer((_) async => Right(localSong(7)));
       await handler!.addQueueItem(MediaItem(id: '7', title: 'Track 7'));
       expect(handler!.queue.value.map((m) => m.id), <String>['7']);
       await handler!.addQueueItem(MediaItem(id: '7', title: 'Track 7'));
@@ -492,8 +495,7 @@ void main() {
 
     test('addQueueItem ignores a non-numeric id', () async {
       handler = await ready();
-      await handler!.addQueueItem(
-          MediaItem(id: 'not-a-number', title: 'Nope'));
+      await handler!.addQueueItem(MediaItem(id: 'not-a-number', title: 'Nope'));
       expect(handler!.queue.value, isEmpty);
     });
 
@@ -578,8 +580,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 30));
     });
 
-    test('headset single click maps to seekForward when configured',
-        () async {
+    test('headset single click maps to seekForward when configured', () async {
       handler = await ready(load: true);
       handler!.cachedHeadsetConfig = const HeadsetControlConfig(
         singleClick: HeadsetClickAction.seekForward,
@@ -663,8 +664,8 @@ void main() {
       final on = await handler!.customAction(
           'virtualizer', <String, dynamic>{'enable': true, 'strength': 0.8});
       expect(on, isTrue);
-      final off = await handler!
-          .customAction('action_virtualizer', <String, dynamic>{'enable': false});
+      final off = await handler!.customAction(
+          'action_virtualizer', <String, dynamic>{'enable': false});
       expect(off, isFalse);
     });
 
@@ -684,14 +685,14 @@ void main() {
     test('customAction cycles through every repeat state', () async {
       handler = await ready(load: true);
       await handler!.customAction('cycleRepeat');
-      expect(handler!.playbackState.value.repeatMode,
-          AudioServiceRepeatMode.all);
+      expect(
+          handler!.playbackState.value.repeatMode, AudioServiceRepeatMode.all);
       await handler!.customAction('toggleRepeat');
-      expect(handler!.playbackState.value.repeatMode,
-          AudioServiceRepeatMode.one);
+      expect(
+          handler!.playbackState.value.repeatMode, AudioServiceRepeatMode.one);
       await handler!.customAction('cycleRepeat');
-      expect(handler!.playbackState.value.repeatMode,
-          AudioServiceRepeatMode.none);
+      expect(
+          handler!.playbackState.value.repeatMode, AudioServiceRepeatMode.none);
     });
 
     test('customAction cycleSpeed walks the speed ladder', () async {
@@ -722,7 +723,8 @@ void main() {
 
     test('setRating ignores non-heart ratings', () async {
       handler = await ready(load: true);
-      await handler!.setRating(Rating.newStarRating(RatingStyle.range5stars, 5));
+      await handler!
+          .setRating(Rating.newStarRating(RatingStyle.range5stars, 5));
       expect(handler!.currentSong?.isFavorite, isFalse);
       await handler!.setRating(Rating.newHeartRating(false));
       expect(handler!.currentSong?.isFavorite, isFalse);
@@ -761,8 +763,8 @@ void main() {
       handler!.setGaplessEnabled(false);
       handler!.setCrossfadeDuration(Duration.zero);
       await Future<void>.delayed(const Duration(milliseconds: 30));
-      await handler!.loadQueue([ytSong(1, remoteId: 'dQw4w9WgXcQ')],
-          autoPlay: false);
+      await handler!
+          .loadQueue([ytSong(1, remoteId: 'dQw4w9WgXcQ')], autoPlay: false);
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       await handler!.pause();
@@ -785,8 +787,8 @@ void main() {
 
     test('native gapless index advance reconciles the current song', () async {
       handler = await ready();
-      await handler!.loadQueue(
-          [localSong(1), localSong(2), localSong(3)], autoPlay: true);
+      await handler!.loadQueue([localSong(1), localSong(2), localSong(3)],
+          autoPlay: true);
       await Future<void>.delayed(const Duration(milliseconds: 40));
       for (final p in platform.players.values) {
         p.emitPlayback(
@@ -883,8 +885,8 @@ void main() {
         () async {
       handler = await ready();
       handler!.adaptiveQualityManager.enabled = false;
-      await handler!.loadQueue([ytSong(1, remoteId: 'dQw4w9WgXcQ')],
-          autoPlay: false);
+      await handler!
+          .loadQueue([ytSong(1, remoteId: 'dQw4w9WgXcQ')], autoPlay: false);
       expect(handler!.mediaItem.value, isNotNull);
     });
   });

@@ -17,6 +17,7 @@ T _$identity<T>(T value) => value;
 mixin _$PlaybackSlice {
   SongsTableData? get currentSong;
   bool get isPlaying;
+  bool get isBuffering;
   Duration get position;
   Duration get duration;
   bool get isShuffle;
@@ -57,6 +58,8 @@ mixin _$PlaybackSlice {
                 other.currentSong == _this.currentSong) &&
             (identical(other.isPlaying, _this.isPlaying) ||
                 other.isPlaying == _this.isPlaying) &&
+            (identical(other.isBuffering, _this.isBuffering) ||
+                other.isBuffering == _this.isBuffering) &&
             (identical(other.position, _this.position) ||
                 other.position == _this.position) &&
             (identical(other.duration, _this.duration) ||
@@ -114,6 +117,7 @@ mixin _$PlaybackSlice {
       runtimeType,
       _this.currentSong,
       _this.isPlaying,
+      _this.isBuffering,
       _this.position,
       _this.duration,
       _this.isShuffle,
@@ -141,7 +145,7 @@ mixin _$PlaybackSlice {
   @override
   String toString() {
     final _this = this as PlaybackSlice;
-    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, sleepTimerRemainingTracks: ${_this.sleepTimerRemainingTracks}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb})';
+    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, isBuffering: ${_this.isBuffering}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, sleepTimerRemainingTracks: ${_this.sleepTimerRemainingTracks}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb})';
   }
 }
 
@@ -154,6 +158,7 @@ abstract mixin class $PlaybackSliceCopyWith<$Res> {
   $Res call(
       {SongsTableData? currentSong,
       bool isPlaying,
+      bool isBuffering,
       Duration position,
       Duration duration,
       bool isShuffle,
@@ -192,6 +197,7 @@ class _$PlaybackSliceCopyWithImpl<$Res>
   $Res call({
     Object? currentSong = freezed,
     Object? isPlaying = null,
+    Object? isBuffering = null,
     Object? position = null,
     Object? duration = null,
     Object? isShuffle = null,
@@ -222,6 +228,10 @@ class _$PlaybackSliceCopyWithImpl<$Res>
       isPlaying: null == isPlaying
           ? _self.isPlaying
           : isPlaying // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isBuffering: null == isBuffering
+          ? _self.isBuffering
+          : isBuffering // ignore: cast_nullable_to_non_nullable
               as bool,
       position: null == position
           ? _self.position
@@ -407,6 +417,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
     TResult Function(
             SongsTableData? currentSong,
             bool isPlaying,
+            bool isBuffering,
             Duration position,
             Duration duration,
             bool isShuffle,
@@ -437,6 +448,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
         return $default(
             _that.currentSong,
             _that.isPlaying,
+            _that.isBuffering,
             _that.position,
             _that.duration,
             _that.isShuffle,
@@ -481,6 +493,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
     TResult Function(
             SongsTableData? currentSong,
             bool isPlaying,
+            bool isBuffering,
             Duration position,
             Duration duration,
             bool isShuffle,
@@ -510,6 +523,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
         return $default(
             _that.currentSong,
             _that.isPlaying,
+            _that.isBuffering,
             _that.position,
             _that.duration,
             _that.isShuffle,
@@ -553,6 +567,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
     TResult? Function(
             SongsTableData? currentSong,
             bool isPlaying,
+            bool isBuffering,
             Duration position,
             Duration duration,
             bool isShuffle,
@@ -582,6 +597,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
         return $default(
             _that.currentSong,
             _that.isPlaying,
+            _that.isBuffering,
             _that.position,
             _that.duration,
             _that.isShuffle,
@@ -615,6 +631,7 @@ class _PlaybackSlice extends PlaybackSlice {
   const _PlaybackSlice(
       {this.currentSong,
       this.isPlaying = false,
+      this.isBuffering = false,
       this.position = Duration.zero,
       this.duration = Duration.zero,
       this.isShuffle = false,
@@ -643,6 +660,9 @@ class _PlaybackSlice extends PlaybackSlice {
   @override
   @JsonKey()
   final bool isPlaying;
+  @override
+  @JsonKey()
+  final bool isBuffering;
   @override
   @JsonKey()
   final Duration position;
@@ -715,6 +735,8 @@ class _PlaybackSlice extends PlaybackSlice {
                 other.currentSong == currentSong) &&
             (identical(other.isPlaying, isPlaying) ||
                 other.isPlaying == isPlaying) &&
+            (identical(other.isBuffering, isBuffering) ||
+                other.isBuffering == isBuffering) &&
             (identical(other.position, position) ||
                 other.position == position) &&
             (identical(other.duration, duration) ||
@@ -768,6 +790,7 @@ class _PlaybackSlice extends PlaybackSlice {
       runtimeType,
       currentSong,
       isPlaying,
+      isBuffering,
       position,
       duration,
       isShuffle,
@@ -794,7 +817,7 @@ class _PlaybackSlice extends PlaybackSlice {
 
   @override
   String toString() {
-    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, sleepTimerRemainingTracks: $sleepTimerRemainingTracks, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb)';
+    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, isBuffering: $isBuffering, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, sleepTimerRemainingTracks: $sleepTimerRemainingTracks, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb)';
   }
 }
 
@@ -809,6 +832,7 @@ abstract mixin class _$PlaybackSliceCopyWith<$Res>
   $Res call(
       {SongsTableData? currentSong,
       bool isPlaying,
+      bool isBuffering,
       Duration position,
       Duration duration,
       bool isShuffle,
@@ -847,6 +871,7 @@ class __$PlaybackSliceCopyWithImpl<$Res>
   $Res call({
     Object? currentSong = freezed,
     Object? isPlaying = null,
+    Object? isBuffering = null,
     Object? position = null,
     Object? duration = null,
     Object? isShuffle = null,
@@ -877,6 +902,10 @@ class __$PlaybackSliceCopyWithImpl<$Res>
       isPlaying: null == isPlaying
           ? _self.isPlaying
           : isPlaying // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isBuffering: null == isBuffering
+          ? _self.isBuffering
+          : isBuffering // ignore: cast_nullable_to_non_nullable
               as bool,
       position: null == position
           ? _self.position

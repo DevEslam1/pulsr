@@ -181,10 +181,12 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           PulsrToast.show(context,
               message: l10n.themeApplied, icon: Icons.palette_rounded);
         } else {
+          if (!mounted) return;
           PulsrToast.show(context,
               message: l10n.invalidThemeJson, isError: true);
         }
       } catch (_) {
+        if (!mounted) return;
         PulsrToast.show(context,
             message: l10n.themeImportFailed, isError: true);
       }

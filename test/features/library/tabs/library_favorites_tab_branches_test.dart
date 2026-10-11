@@ -50,8 +50,8 @@ void main() {
     final settings = stubSettingsCubit();
     await pumpFavorites(tester, cubit: cubit, settings: settings);
 
-    final indicator = tester.widget<RefreshIndicator>(
-        find.byType(RefreshIndicator).first);
+    final indicator =
+        tester.widget<RefreshIndicator>(find.byType(RefreshIndicator).first);
     await indicator.onRefresh();
     await tester.pumpAndSettle();
 
@@ -59,8 +59,7 @@ void main() {
     verify(() => cubit.init()).called(1);
   });
 
-  testWidgets('the quick-play shuffle starts a shuffled queue',
-      (tester) async {
+  testWidgets('the quick-play shuffle starts a shuffled queue', (tester) async {
     final cubit = stubLibraryCubit(LibraryState(favorites: [
       testSong(id: 1, title: 'Loved', isFavorite: true),
       testSong(id: 2, title: 'Also', isFavorite: true),
@@ -148,5 +147,35 @@ void main() {
     await tester.pump();
 
     verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);
+  });
+
+  testWidgets('tapping a grid card in multi-select toggles selection',
+      (tester) async {
+    final cubit = stubLibraryCubit(LibraryState(
+      viewMode: LibraryViewMode.grid,
+      isMultiSelectMode: true,
+      selectedSongIds: const {5},
+      favorites: [testSong(id: 5, title: 'Loved', isFavorite: true)],
+    ));
+    final player = await pumpFavorites(tester, cubit: cubit);
+
+    await tester.tap(find.text('Loved').first);
+    await tester.pump();
+
+    verify(() => cubit.toggleSongSelection(5)).called(1);
+    verifyNever(() => player.playSong(any(), queue: any(named: 'queue')));
+  });
+
+  testWidgets('long-pressing a grid card toggles selection', (tester) async {
+    final cubit = stubLibraryCubit(LibraryState(
+      viewMode: LibraryViewMode.grid,
+      favorites: [testSong(id: 8, title: 'Loved', isFavorite: true)],
+    ));
+    await pumpFavorites(tester, cubit: cubit);
+
+    await tester.longPress(find.text('Loved').first);
+    await tester.pump();
+
+    verify(() => cubit.toggleSongSelection(8)).called(1);
   });
 }

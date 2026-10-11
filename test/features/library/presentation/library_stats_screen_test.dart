@@ -37,6 +37,8 @@ void main() {
     int lastPlayed = 0,
     String? codec,
     int? fileSize,
+    int? bitDepth,
+    String? path,
   }) {
     return SongsTableData(
       id: id,
@@ -44,7 +46,7 @@ void main() {
       artist: artist,
       album: 'Album',
       durationMs: 3600000,
-      path: '/music/$id.mp3',
+      path: path ?? '/music/$id.mp3',
       source: SongSource.local,
       isFavorite: false,
       isMissing: false,
@@ -54,6 +56,7 @@ void main() {
       lastPositionMs: 0,
       codec: codec,
       fileSize: fileSize,
+      bitDepth: bitDepth,
     );
   }
 
@@ -71,8 +74,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('renders populated metrics, leaders and artists',
-      (tester) async {
+  testWidgets('renders populated metrics, leaders and artists', (tester) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     when(() => repo.getAllSongs()).thenAnswer((_) async => Right([
           song(
@@ -115,6 +117,21 @@ void main() {
         findsOneWidget);
   });
 
+  testWidgets('lossless stats agree with the shared quality predicate',
+      (tester) async {
+    when(() => repo.getAllSongs()).thenAnswer((_) async => Right([
+          song(id: 1, codec: 'wav', bitDepth: 16),
+          song(id: 2, path: '/music/album.flac'),
+          song(id: 3, bitDepth: 24),
+          song(id: 4, codec: 'mp3', bitDepth: 16),
+        ]));
+
+    await pump(tester, state: const LibraryState());
+
+    expect(find.text('Lossless / Hi-Res: 3 tracks'), findsOneWidget);
+    expect(find.text('Standard Lossy: 1 tracks'), findsOneWidget);
+  });
+
   testWidgets('surfaces a failed full-library load with a retry',
       (tester) async {
     when(() => repo.getAllSongs())
@@ -145,7 +162,11 @@ void main() {
   testWidgets('changing the time range persists the preference',
       (tester) async {
     when(() => repo.getAllSongs()).thenAnswer((_) async => Right([
-          song(id: 1, title: 'Recent', artist: 'A', playCount: 2,
+          song(
+              id: 1,
+              title: 'Recent',
+              artist: 'A',
+              playCount: 2,
               lastPlayed: DateTime.now().millisecondsSinceEpoch),
         ]));
 
@@ -159,8 +180,7 @@ void main() {
   });
 
   testWidgets('the refresh action re-queries the library', (tester) async {
-    when(() => repo.getAllSongs())
-        .thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs()).thenAnswer((_) async => const Right([]));
 
     await pump(tester, state: const LibraryState());
 

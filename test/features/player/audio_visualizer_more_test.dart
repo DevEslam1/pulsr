@@ -82,6 +82,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('tick snapshots alternate without aliasing the live buffer',
+      (tester) async {
+    await tester.pumpWidget(visualizer(trackSeed: 5));
+    await tester.pump();
+
+    final state = stateOf(tester);
+    final seen = <List<double>>[];
+    void listener() => seen.add(state.dataListenableForTesting.value);
+    state.dataListenableForTesting.addListener(listener);
+    addTearDown(() => state.dataListenableForTesting.removeListener(listener));
+
+    for (int i = 0; i < 6; i++) {
+      state.onTickForTesting();
+    }
+    expect(seen, isNotEmpty);
+    // ValueNotifier compares by identity, so consecutive emissions must be
+    // distinct objects for listeners to fire at all.
+    for (int i = 1; i < seen.length; i++) {
+      expect(identical(seen[i], seen[i - 1]), isFalse);
+    }
+
+    // An emitted snapshot must never be the live working buffer that later
+    // ticks mutate in place.
+    final first = seen.first;
+    state.setBarDataForTesting(0, 0.9);
+    expect(first[0], isNot(0.9));
+    expect(seen.last[0], 0.9);
+  });
+
   testWidgets('pausing decays the bars to baseline', (tester) async {
     await tester.pumpWidget(visualizer(isPlaying: false, trackSeed: 2));
     await tester.pump();
@@ -125,8 +154,8 @@ void main() {
       isPlaying: false,
     ));
     await tester.pump();
-    expect(stateOf(tester).currentDataForTesting.every((v) => v == 0.0),
-        isTrue);
+    expect(
+        stateOf(tester).currentDataForTesting.every((v) => v == 0.0), isTrue);
     expect(tester.takeException(), isNull);
   });
 

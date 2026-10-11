@@ -116,7 +116,9 @@ void main() {
       expect(d.isBelowTrackRate, isTrue);
     });
 
-    test('requested rate below every device supported rate selects device floor', () {
+    test(
+        'requested rate below every device supported rate selects device floor',
+        () {
       final d = run(
         trackRate: 22050,
         rates: const [44100, 48000, 96000],

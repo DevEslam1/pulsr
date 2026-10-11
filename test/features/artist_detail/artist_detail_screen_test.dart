@@ -168,39 +168,68 @@ void main() {
     expect(find.byType(SongTile), findsNothing);
   });
 
-  testWidgets('shows the album error section and retries', (tester) async {
-    final controller = StreamController<Result<List<AlbumsTableData>>>();
-    await tester.pumpWidget(build(
-      albums: controller.stream,
-      songs: Stream.value(const Right([])),
+  testWidgets('recreates the albums stream when the album retry is tapped',
+      (tester) async {
+    // Broadcast: the retry swaps the StreamBuilder to a new stream, which
+    // cancels this subscription; closing a single-subscription controller
+    // after that leaves the test binding hanging.
+    final first = StreamController<Result<List<AlbumsTableData>>>.broadcast();
+    var calls = 0;
+    when(() => useCase.watchArtistAlbums(any())).thenAnswer((_) {
+      calls++;
+      if (calls == 1) return first.stream;
+      return Stream.value(const Right([_albumB]));
+    });
+    when(() => useCase.watchArtistSongs(any()))
+        .thenAnswer((_) => Stream.value(const Right([])));
+
+    await tester.pumpWidget(_wrap(
+      child: ArtistDetailScreen(artist: _artist, getArtistsUseCase: useCase),
     ));
     await tester.pump();
-    controller.add(Left(const DatabaseFailure('boom')));
+    first.add(Left(const DatabaseFailure('boom')));
     await tester.pumpAndSettle();
 
     expect(find.text('Could not load albums.'), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
     await tester.tap(find.text('Retry'));
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    await controller.close();
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.text('Could not load albums.'), findsNothing);
+    expect(find.text('Second Album'), findsOneWidget);
+    await first.close();
   });
 
-  testWidgets('shows the top-tracks error section and retries', (tester) async {
-    final controller = StreamController<Result<List<SongsTableData>>>();
-    await tester.pumpWidget(build(
-      albums: Stream.value(const Right([_albumA])),
-      songs: controller.stream,
+  testWidgets('recreates the songs stream when the top-tracks retry is tapped',
+      (tester) async {
+    // Broadcast: the retry swaps the StreamBuilder to a new stream, which
+    // cancels this subscription; closing a single-subscription controller
+    // after that leaves the test binding hanging.
+    final first = StreamController<Result<List<SongsTableData>>>.broadcast();
+    var calls = 0;
+    when(() => useCase.watchArtistSongs(any())).thenAnswer((_) {
+      calls++;
+      if (calls == 1) return first.stream;
+      return Stream.value(Right([_song(1, 'Recovered')]));
+    });
+    when(() => useCase.watchArtistAlbums(any()))
+        .thenAnswer((_) => Stream.value(const Right([_albumA])));
+
+    await tester.pumpWidget(_wrap(
+      child: ArtistDetailScreen(artist: _artist, getArtistsUseCase: useCase),
     ));
     await tester.pump();
-    controller.add(Left(const DatabaseFailure('boom')));
+    first.add(Left(const DatabaseFailure('boom')));
     await tester.pumpAndSettle();
 
     expect(find.text('Could not load top tracks.'), findsOneWidget);
     await tester.tap(find.text('Retry'));
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    await controller.close();
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.text('Could not load top tracks.'), findsNothing);
+    expect(find.text('Recovered'), findsOneWidget);
+    await first.close();
   });
 
   testWidgets('reports the track count from the artist row', (tester) async {
@@ -232,8 +261,7 @@ void main() {
     verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);
   });
 
-  testWidgets('tapping an album navigates to the album route',
-      (tester) async {
+  testWidgets('tapping an album navigates to the album route', (tester) async {
     await tester.pumpWidget(build(
       albums: Stream.value(const Right([_albumA])),
       songs: Stream.value(const Right([])),

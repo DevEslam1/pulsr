@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,6 +9,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_static_grid.dart';
+import 'package:pulsr/core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
@@ -163,6 +166,27 @@ void main() {
 
       expect(find.byType(EmptyLibrary), findsOneWidget);
       expect(find.byType(SongTile), findsNothing);
+    });
+
+    testWidgets('renders a skeleton before the first emission', (tester) async {
+      final controller = StreamController<Result<List<SongsTableData>>>();
+      addTearDown(controller.close);
+      when(() => getSongs.watchRecentlyAdded(limit: any(named: 'limit')))
+          .thenAnswer((_) => controller.stream);
+
+      await tester.pumpWidget(
+        wrap(RecentlyAddedSection(getSongsUseCase: getSongs)),
+      );
+      await tester.pump();
+
+      expect(find.byType(SkeletonList), findsOneWidget);
+      expect(find.byType(EmptyLibrary), findsNothing);
+
+      controller.add(const Right<AppFailure, List<SongsTableData>>([]));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmptyLibrary), findsOneWidget);
+      expect(find.byType(SkeletonList), findsNothing);
     });
 
     testWidgets('renders SectionError for a failed stream', (tester) async {

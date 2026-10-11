@@ -1,6 +1,5 @@
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/library/presentation/favorites_screen.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/config/app_config.dart';
@@ -39,13 +38,11 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  Timer? _searchDebounce;
   bool _isSearchOpen = false;
   int _favTabFilter = 0; // 0: Local, 1: Online
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -104,6 +101,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   controller: _searchController,
                   autofocus: true,
                   hintText: '${l10n.search}...',
+                  // PulsrSearchField already debounces onChanged by 300ms, so
+                  // every keystroke does not rebuild the CustomScrollView.
                   onChanged: (v) {
                     if (mounted) setState(() => _searchQuery = v.trim());
                   },
@@ -126,7 +125,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               ),
               tooltip: _isSearchOpen ? context.l10n.close : context.l10n.search,
               onPressed: () {
-                _searchDebounce?.cancel();
                 setState(() {
                   if (_isSearchOpen) {
                     _searchController.clear();

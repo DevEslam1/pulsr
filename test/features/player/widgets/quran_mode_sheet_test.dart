@@ -57,8 +57,8 @@ MockPlayerCubit quranCubit(
     when(() => cubit.detectEarbudCapabilities())
         .thenAnswer((_) async => throw Exception('no earbuds'));
   } else {
-    when(() => cubit.detectEarbudCapabilities()).thenAnswer(
-        (_) => caps ?? Future<EarbudCapabilities>.value(_btCaps));
+    when(() => cubit.detectEarbudCapabilities())
+        .thenAnswer((_) => caps ?? Future<EarbudCapabilities>.value(_btCaps));
   }
   return cubit;
 }
@@ -105,10 +105,20 @@ void main() {
       expect(sliders, isNotEmpty);
       for (final slider in sliders) {
         expect(slider.onChanged, isNotNull);
+        expect(slider.onChangeEnd, isNotNull);
+        // Dragging updates the live label without hitting the cubit…
         slider.onChanged!(0.25);
       }
       await tester.pump();
-      verify(() => cubit.setQuranAmbience(any())).called(greaterThanOrEqualTo(1));
+      expect(find.text('25%'), findsWidgets);
+      verifyNever(() => cubit.setQuranAmbience(any()));
+      // …and the native call only fires once on release.
+      for (final slider in sliders) {
+        slider.onChangeEnd!(0.25);
+      }
+      await tester.pump();
+      verify(() => cubit.setQuranAmbience(any())).called(1);
+      verify(() => cubit.setQuranWarmth(any())).called(1);
 
       await tester.tap(find.text('0.5x'));
       await tester.pump();

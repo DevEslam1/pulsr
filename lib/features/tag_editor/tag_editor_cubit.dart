@@ -39,20 +39,46 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   // FIX-L08 / B-21: Store diff instead of full state (avoids duplicate batchSongs refs)
   static const int _historyMax = 15;
 
+  /// Consecutive edits to the same field inside this window coalesce into one
+  /// undo step, so undo rewinds a typing burst instead of one character.
+  static const Duration _historyCoalesceWindow = Duration(milliseconds: 500);
+  String? _lastHistoryField;
+  DateTime? _lastHistoryPushAt;
+
   bool get canUndo => _history.isNotEmpty;
 
-  void _pushHistory() {
+  void _pushHistory(String field) {
     if (isClosed) return;
+    final now = DateTime.now();
+    final lastAt = _lastHistoryPushAt;
+    if (field == _lastHistoryField &&
+        lastAt != null &&
+        now.difference(lastAt) < _historyCoalesceWindow) {
+      return;
+    }
+    _lastHistoryField = field;
+    _lastHistoryPushAt = now;
     _history.addLast(_TagEditorDiff.fromState(state));
     while (_history.length > _historyMax) {
       _history.removeFirst();
     }
   }
 
+  void _resetHistoryCoalescing() {
+    _lastHistoryField = null;
+    _lastHistoryPushAt = null;
+  }
+
+  void _clearHistory() {
+    _history.clear();
+    _resetHistoryCoalescing();
+  }
+
   /// Restores the state before the last user edit. Returns false when empty.
   bool undo() {
     if (isClosed || _history.isEmpty) return false;
     final prevDiff = _history.removeLast();
+    _resetHistoryCoalescing();
     safeEmit(prevDiff.applyTo(state));
     return true;
   }
@@ -169,14 +195,14 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void updateTitle(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('title');
     _userEditedFields.add('title');
     safeEmit(state.copyWith(title: val));
   }
 
   void updateArtist(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('artist');
     _userEditedFields.add('artist');
     if (state.isBatchMode) _batchArtistEdited = true;
     safeEmit(state.copyWith(artist: val));
@@ -184,7 +210,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void updateAlbum(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('album');
     _userEditedFields.add('album');
     if (state.isBatchMode) _batchAlbumEdited = true;
     safeEmit(state.copyWith(album: val));
@@ -192,7 +218,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void updateGenre(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('genre');
     _userEditedFields.add('genre');
     if (state.isBatchMode) _batchGenreEdited = true;
     safeEmit(state.copyWith(genre: val));
@@ -200,7 +226,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void updateYear(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('year');
     _userEditedFields.add('year');
     if (state.isBatchMode) _batchYearEdited = true;
     safeEmit(state.copyWith(year: val));
@@ -208,7 +234,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void updateTrackNumber(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('trackNumber');
     _userEditedFields.add('trackNumber');
     if (state.isBatchMode) _batchTrackEdited = true;
     safeEmit(state.copyWith(trackNumber: val));
@@ -216,7 +242,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void updateDiscNumber(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('discNumber');
     _userEditedFields.add('discNumber');
     if (state.isBatchMode) _batchDiscEdited = true;
     safeEmit(state.copyWith(discNumber: val));
@@ -224,7 +250,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void updateComment(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('comment');
     _userEditedFields.add('comment');
     if (state.isBatchMode) _batchCommentEdited = true;
     safeEmit(state.copyWith(comment: val));
@@ -232,7 +258,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void updateLyrics(String val) {
     if (isClosed) return;
-    _pushHistory();
+    _pushHistory('lyrics');
     _userEditedFields.add('lyrics');
     safeEmit(state.copyWith(lyrics: val));
   }
@@ -275,7 +301,8 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       safeEmit(state.copyWith(errorMessage: msg));
     } catch (e) {
       if (isClosed) return;
-      safeEmit(state.copyWith(errorMessage: 'Failed to pick artwork image: $e'));
+      safeEmit(
+          state.copyWith(errorMessage: 'Failed to pick artwork image: $e'));
     }
   }
 
@@ -312,6 +339,22 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             .downloadArtworkToTemp(match.artworkUrl!);
       }
       if (isClosed) return false;
+
+      // Applied metadata is a deliberate user edit: a slow loadTags that lands
+      // afterwards must not overwrite it with the file's stale tags.
+      if (match.title.isNotEmpty) _userEditedFields.add('title');
+      if (match.artist.isNotEmpty) _userEditedFields.add('artist');
+      if (match.album.isNotEmpty) _userEditedFields.add('album');
+      if (match.genre != null && match.genre!.isNotEmpty) {
+        _userEditedFields.add('genre');
+      }
+      if (match.releaseYear != null && match.releaseYear!.isNotEmpty) {
+        _userEditedFields.add('year');
+      }
+      if (match.trackNumber != null && match.trackNumber!.isNotEmpty) {
+        _userEditedFields.add('trackNumber');
+      }
+      if (downloadedArtPath != null) _userEditedFields.add('artwork');
 
       safeEmit(state.copyWith(
         isAutoFetching: false,
@@ -456,7 +499,14 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   Future<void> saveTags() async {
     if (isClosed) return;
-    if (state.status != TagEditorStatus.loaded) return;
+    // A failed save leaves status at failure; the user must be able to fix the
+    // offending field and retry, so only in-flight/uninitialised states block
+    // entry. (Previously every retry after any failure was a silent no-op.)
+    if (state.status == TagEditorStatus.saving ||
+        state.status == TagEditorStatus.loading ||
+        state.status == TagEditorStatus.initial) {
+      return;
+    }
     if (!state.isBatchMode && state.title.trim().isEmpty) {
       safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
@@ -492,7 +542,8 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     safeEmit(state.copyWith(
         status: TagEditorStatus.saving,
         clearErrorMessage: true,
-        batchProgress: 0.0));
+        batchProgress: 0.0,
+        batchFailedCount: 0));
     try {
       if (state.isBatchMode) {
         final total = state.batchSongs.length;
@@ -584,7 +635,13 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         }
         if (prefs != null) {
           try {
-            await prefs.remove(batchCheckpointKey);
+            if (failedFiles.isEmpty) {
+              await prefs.remove(batchCheckpointKey);
+            } else {
+              // Keep the paths that still need tagging so the next editor open
+              // can offer to retry the remainder instead of just informing.
+              await prefs.setStringList(batchCheckpointKey, pendingPaths);
+            }
           } catch (_) {}
         }
         // Invalidate only the lyrics caches for the tagged files; a full
@@ -601,10 +658,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
                 : TagEditorStatus.success,
             errorMessage:
                 'Failed to tag ${failedFiles.length} file${failedFiles.length > 1 ? "s" : ""}: ${failedFiles.take(3).join(", ")}${failedFiles.length > 3 ? "…" : ""}',
+            batchFailedCount: failedFiles.length,
             clearBatchProgress: true,
           ));
         } else {
-          _history.clear();
+          _clearHistory();
           _userEditedFields.clear();
           // FIX-C08: Inform user that lyrics are not editable in batch mode
           final batchLyricsNote = state.lyrics.isNotEmpty
@@ -613,6 +671,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
           safeEmit(state.copyWith(
             status: TagEditorStatus.success,
             errorMessage: batchLyricsNote,
+            batchFailedCount: 0,
             clearBatchProgress: true,
           ));
         }
@@ -678,15 +737,19 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
       _userEditedFields.clear();
       if (lyricsTruncated && !isClosed) {
-        _history.clear();
+        _clearHistory();
         safeEmit(state.copyWith(
           status: TagEditorStatus.success,
           errorMessage:
               'Note: lyrics truncated to 8192 chars (device tag limit).',
+          batchFailedCount: 0,
         ));
       } else {
-        _history.clear();
-        safeEmit(state.copyWith(status: TagEditorStatus.success));
+        _clearHistory();
+        safeEmit(state.copyWith(
+          status: TagEditorStatus.success,
+          batchFailedCount: 0,
+        ));
       }
     } on _TagWriteRejectedException {
       if (isClosed) return;

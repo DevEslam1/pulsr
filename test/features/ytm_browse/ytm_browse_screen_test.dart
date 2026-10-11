@@ -16,6 +16,10 @@ void main() {
 
   late MockYtmBrowseService mockBrowse;
 
+  setUpAll(() {
+    registerFallbackValue(false);
+  });
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     mockBrowse = MockYtmBrowseService();
@@ -35,7 +39,7 @@ void main() {
 
   testWidgets('renders loading skeleton while the feed is in flight',
       (tester) async {
-    when(() => mockBrowse.getHomeFeed())
+    when(() => mockBrowse.getHomeFeed(force: any(named: 'force')))
         .thenAnswer((_) => Future<List<YtmBrowseSection>>.delayed(
               const Duration(seconds: 5),
               () => const [],
@@ -54,7 +58,8 @@ void main() {
 
   testWidgets('renders the empty state when the feed has no items',
       (tester) async {
-    when(() => mockBrowse.getHomeFeed()).thenAnswer((_) async => const []);
+    when(() => mockBrowse.getHomeFeed(force: any(named: 'force')))
+        .thenAnswer((_) async => const []);
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
@@ -66,17 +71,18 @@ void main() {
 
   testWidgets('drops empty sections and renders only populated ones',
       (tester) async {
-    when(() => mockBrowse.getHomeFeed()).thenAnswer((_) async => const [
-          YtmBrowseSection(title: 'Empty Section', items: []),
-          YtmBrowseSection(title: 'Top Charts & Trending', items: [
-            YtmBrowseItem(
-              id: 'dQw4w9WgXcQ',
-              title: 'Never Gonna Give You Up',
-              subtitle: 'Rick Astley',
-              type: 'song',
-            ),
-          ]),
-        ]);
+    when(() => mockBrowse.getHomeFeed(force: any(named: 'force')))
+        .thenAnswer((_) async => const [
+              YtmBrowseSection(title: 'Empty Section', items: []),
+              YtmBrowseSection(title: 'Top Charts & Trending', items: [
+                YtmBrowseItem(
+                  id: 'dQw4w9WgXcQ',
+                  title: 'Never Gonna Give You Up',
+                  subtitle: 'Rick Astley',
+                  type: 'song',
+                ),
+              ]),
+            ]);
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
@@ -86,9 +92,10 @@ void main() {
     expect(find.text('Empty Section'), findsNothing);
   });
 
-  testWidgets('renders the error state with a retry action when the feed throws',
+  testWidgets(
+      'renders the error state with a retry action when the feed throws',
       (tester) async {
-    when(() => mockBrowse.getHomeFeed())
+    when(() => mockBrowse.getHomeFeed(force: any(named: 'force')))
         .thenAnswer((_) async => throw Exception('network down'));
 
     await tester.pumpWidget(host());
@@ -98,9 +105,11 @@ void main() {
     expect(find.text('Retry'), findsWidgets);
   });
 
-  testWidgets('the refresh action re-invokes the feed', (tester) async {
+  testWidgets('the refresh action forces a re-fetch past the cache',
+      (tester) async {
     var calls = 0;
-    when(() => mockBrowse.getHomeFeed()).thenAnswer((_) async {
+    when(() => mockBrowse.getHomeFeed(force: any(named: 'force')))
+        .thenAnswer((_) async {
       calls++;
       return const [];
     });
@@ -109,8 +118,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(calls, 1);
 
-    await tester.tap(find.byIcon(Icons.refresh_rounded).first);
+    await tester.tap(find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byIcon(Icons.refresh_rounded),
+    ));
     await tester.pumpAndSettle();
     expect(calls, 2);
+    verify(() => mockBrowse.getHomeFeed(force: true)).called(1);
+    // The error/empty retry actions keep using the non-forced load.
+    verify(() => mockBrowse.getHomeFeed(force: false)).called(1);
   });
 }

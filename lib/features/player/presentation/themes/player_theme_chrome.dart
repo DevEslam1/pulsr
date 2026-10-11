@@ -47,6 +47,17 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
+/// Human-readable remaining sleep-timer time: seconds below a minute, whole
+/// minutes below an hour, then `h`/`m` so a 90-minute timer never reads "90m".
+String formatSleepTimerRemaining(Duration remaining) {
+  final r = remaining.isNegative ? Duration.zero : remaining;
+  if (r.inSeconds < 60) return '${r.inSeconds}s';
+  if (r.inMinutes < 60) return '${r.inMinutes}m';
+  final hours = r.inHours;
+  final minutes = r.inMinutes.remainder(60);
+  return minutes == 0 ? '${hours}h' : '${hours}h ${minutes}m';
+}
+
 /// Visual tokens that differ between the copies of the dock icon button.
 ///
 /// All eight themes build the same button; classic is the one that had already
@@ -742,7 +753,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                             : (remainingTracks != null
                                 ? 'Sleep Timer: $remainingTracks tracks remaining'
                                 : (props.state.sleepTimerRemaining != null
-                                    ? 'Sleep Timer: ${props.state.sleepTimerRemaining!.inMinutes}m remaining'
+                                    ? 'Sleep Timer: ${formatSleepTimerRemaining(props.state.sleepTimerRemaining!)} remaining'
                                     : l10n.sleepTimer)),
                         badgeText: hasTimer
                             ? (remainingTracks != null
@@ -750,7 +761,8 @@ class PlayerBottomActionDock extends StatelessWidget {
                                 : (isEndQ
                                     ? 'End'
                                     : (props.state.sleepTimerRemaining != null
-                                        ? '${props.state.sleepTimerRemaining!.inMinutes}m'
+                                        ? formatSleepTimerRemaining(
+                                            props.state.sleepTimerRemaining!)
                                         : '')))
                             : null,
                         isActive: hasTimer,
@@ -1230,8 +1242,8 @@ class PlayerControlsColumn extends StatelessWidget {
 
     ExperienceMode mode = ExperienceMode.normal;
     try {
-      mode = context.select<SettingsCubit, ExperienceMode>(
-          (c) => c.state.experienceMode);
+      mode = context
+          .select<SettingsCubit, ExperienceMode>((c) => c.state.experienceMode);
     } catch (_) {}
     final hasAdvancedContent = showAdvancedBar &&
         (state.bookmarkPosition != null || mode == ExperienceMode.professional);
@@ -1244,14 +1256,10 @@ class PlayerControlsColumn extends StatelessWidget {
             ? (classicSizing ? 22.0 : 18.0)
             : (isLandscape ? 6.0 : (classicSizing ? 18.0 : 16.0))) *
         heightRatio;
-    final double spacingSeekToAdvanced = (isTablet
-            ? 12.0
-            : (isLandscape ? 4.0 : 10.0)) *
-        heightRatio;
-    final double spacingAdvancedToControls = (isTablet
-            ? 14.0
-            : (isLandscape ? 4.0 : 12.0)) *
-        heightRatio;
+    final double spacingSeekToAdvanced =
+        (isTablet ? 12.0 : (isLandscape ? 4.0 : 10.0)) * heightRatio;
+    final double spacingAdvancedToControls =
+        (isTablet ? 14.0 : (isLandscape ? 4.0 : 12.0)) * heightRatio;
     final double spacingControlsToDock = (isTablet
             ? (classicSizing ? 20.0 : 16.0)
             : (isLandscape ? 6.0 : (classicSizing ? 16.0 : 14.0))) *
@@ -1293,6 +1301,7 @@ class PlayerControlsColumn extends StatelessWidget {
         ],
         PlayerControls(
           isPlaying: state.isPlaying,
+          isBuffering: state.isBuffering,
           isShuffle: state.isShuffle,
           repeatMode: state.repeatMode,
           hasPrevious: state.hasPreviousNeighbour,

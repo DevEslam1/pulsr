@@ -27,7 +27,6 @@ import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
-import '../../library/cubit/library_state.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../sheets/song_info_sheet.dart';
@@ -52,19 +51,24 @@ class FolderDetailScreen extends StatefulWidget {
 class _FolderDetailScreenState extends State<FolderDetailScreen> {
   late final FolderUseCases _useCase;
   late final ScrollController _scrollController;
-  late final Stream<Result<List<SongsTableData>>> _songsStream;
+  late Stream<Result<List<SongsTableData>>> _songsStream;
   late bool _isExcluded;
   bool _showCollapsedTitle = false;
+  bool _favoriteAllBusy = false;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.folderUseCases ?? getIt<FolderUseCases>();
-    // Memoized so rebuilds (scroll-collapse, exclusion toggle) do not
-    // resubscribe to the folder's DB watch stream.
-    _songsStream = _useCase.watchFolderSongs(widget.folder.path).distinct();
+    // Recreated only on retry so rebuilds (scroll-collapse, exclusion toggle)
+    // do not resubscribe to the folder's DB watch stream.
+    _updateStream();
     _isExcluded = widget.folder.isExcluded;
     _scrollController = ScrollController()..addListener(_onScroll);
+  }
+
+  void _updateStream() {
+    _songsStream = _useCase.watchFolderSongs(widget.folder.path).distinct();
   }
 
   @override
@@ -151,44 +155,53 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     return '$minutes min';
   }
 
+  bool _isAllFavorited(List<SongsTableData> songs) =>
+      songs.isNotEmpty && songs.every((s) => s.isFavorite);
+
   Future<void> _toggleFavoriteFolder(List<SongsTableData> songs) async {
-    if (songs.isEmpty) return;
+    // The listed songs are the DB truth for this folder; the possibly stale or
+    // not-yet-loaded library favorites list must not drive the direction.
+    if (songs.isEmpty || _favoriteAllBusy) return;
+    _favoriteAllBusy = true;
     HapticFeedback.lightImpact();
-    LibraryCubit? libraryCubit;
     try {
-      libraryCubit = context.read<LibraryCubit>();
-    } catch (_) {}
-    if (libraryCubit == null) return;
+      LibraryCubit? libraryCubit;
+      try {
+        libraryCubit = context.read<LibraryCubit>();
+      } catch (_) {}
+      if (libraryCubit == null) return;
 
-    final currentFavIds = libraryCubit.state.favorites.map((s) => s.id).toSet();
-    final allFavorited = songs.every((s) => currentFavIds.contains(s.id));
+      final allFavorited = _isAllFavorited(songs);
 
-    if (allFavorited) {
-      for (final s in songs) {
-        if (currentFavIds.contains(s.id)) {
-          await libraryCubit.toggleFavorite(s.id);
+      if (allFavorited) {
+        for (final s in songs) {
+          if (s.isFavorite) {
+            await libraryCubit.toggleFavorite(s.id);
+          }
+        }
+        if (mounted) {
+          PulsrToast.show(
+            context,
+            message: context.l10n.removeFromFavorites,
+            icon: Icons.favorite_border_rounded,
+          );
+        }
+      } else {
+        for (final s in songs) {
+          if (!s.isFavorite) {
+            await libraryCubit.toggleFavorite(s.id);
+          }
+        }
+        if (mounted) {
+          PulsrToast.show(
+            context,
+            message: context.l10n.favorite,
+            icon: Icons.favorite_rounded,
+          );
         }
       }
-      if (mounted) {
-        PulsrToast.show(
-          context,
-          message: context.l10n.removeFromFavorites,
-          icon: Icons.favorite_border_rounded,
-        );
-      }
-    } else {
-      for (final s in songs) {
-        if (!currentFavIds.contains(s.id)) {
-          await libraryCubit.toggleFavorite(s.id);
-        }
-      }
-      if (mounted) {
-        PulsrToast.show(
-          context,
-          message: context.l10n.favorite,
-          icon: Icons.favorite_rounded,
-        );
-      }
+    } finally {
+      _favoriteAllBusy = false;
     }
   }
 
@@ -759,6 +772,21 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     );
   }
 
+  bool _isPathExcluded(String path) {
+    // Reconstructed breadcrumb folders must carry the real exclusion state,
+    // otherwise excluding/including from the opened folder flips the wrong way.
+    try {
+      final folders = context.read<LibraryCubit>().state.folders;
+      final normalized = path.replaceAll('\\', '/');
+      for (final folder in folders) {
+        if (folder.path.replaceAll('\\', '/') == normalized) {
+          return folder.isExcluded;
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
   Widget _buildBreadcrumbs(
     BuildContext context,
     PulsrPalette p,
@@ -819,7 +847,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                             path: subPath,
                             name: name,
                             songCount: 0,
-                            isExcluded: false,
+                            isExcluded: _isPathExcluded(subPath),
                           ),
                         );
                       },
@@ -971,6 +999,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   ) {
     final screenHeight = MediaQuery.sizeOf(context).height;
     final isShort = screenHeight < 480;
+    final allFavorited = _isAllFavorited(songs);
     final coverSize = isShort
         ? (screenHeight * 0.28).clamp(96.0, 130.0)
         : (screenHeight * 0.28).clamp(130.0, 240.0);
@@ -1025,26 +1054,18 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               iconSize: isShort ? 26 : 30,
             ),
             const SizedBox(width: AppSpacing.md),
-            BlocBuilder<LibraryCubit, LibraryState>(
-              buildWhen: (prev, curr) => prev.favorites != curr.favorites,
-              builder: (context, libState) {
-                final allFavorited = songs.isNotEmpty &&
-                    songs.every(
-                        (s) => libState.favorites.any((fav) => fav.id == s.id));
-                return _buildGlassCircleButton(
-                  icon: allFavorited
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  iconColor: allFavorited ? p.favorite : Colors.white,
-                  size: isShort ? 36 : 40,
-                  iconSize: isShort ? 18 : 20,
-                  p: p,
-                  tooltip: allFavorited
-                      ? context.l10n.removeFromFavorites
-                      : context.l10n.favorite,
-                  onTap: () => _toggleFavoriteFolder(songs),
-                );
-              },
+            _buildGlassCircleButton(
+              icon: allFavorited
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              iconColor: allFavorited ? p.favorite : Colors.white,
+              size: isShort ? 36 : 40,
+              iconSize: isShort ? 18 : 20,
+              p: p,
+              tooltip: allFavorited
+                  ? context.l10n.removeFromFavorites
+                  : context.l10n.favorite,
+              onTap: () => _toggleFavoriteFolder(songs),
             ),
           ],
         ),
@@ -1161,6 +1182,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             Widget buildContent(List<SongsTableData> songs) {
               final totalDurationMs =
                   songs.fold<int>(0, (sum, s) => sum + s.durationMs);
+              final allFavorited = _isAllFavorited(songs);
 
               // Responsive Layout: Tablet / Landscape Master-Detail Split
               if (shouldSplit) {
@@ -1305,38 +1327,22 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                                 ? AppSpacing.md
                                                 : AppSpacing.xl,
                                           ),
-                                          BlocBuilder<LibraryCubit,
-                                              LibraryState>(
-                                            buildWhen: (prev, curr) =>
-                                                prev.favorites !=
-                                                curr.favorites,
-                                            builder: (context, libState) {
-                                              final allFavorited = songs
-                                                      .isNotEmpty &&
-                                                  songs.every((s) => libState
-                                                      .favorites
-                                                      .any((fav) =>
-                                                          fav.id == s.id));
-                                              return _buildGlassCircleButton(
-                                                icon: allFavorited
-                                                    ? Icons.favorite_rounded
-                                                    : Icons
-                                                        .favorite_border_rounded,
-                                                iconColor: allFavorited
-                                                    ? p.favorite
-                                                    : Colors.white,
-                                                size: 40,
-                                                iconSize: 22,
-                                                p: p,
-                                                tooltip: allFavorited
-                                                    ? context.l10n
-                                                        .removeFromFavorites
-                                                    : context.l10n.favorite,
-                                                onTap: () =>
-                                                    _toggleFavoriteFolder(
-                                                        songs),
-                                              );
-                                            },
+                                          _buildGlassCircleButton(
+                                            icon: allFavorited
+                                                ? Icons.favorite_rounded
+                                                : Icons.favorite_border_rounded,
+                                            iconColor: allFavorited
+                                                ? p.favorite
+                                                : Colors.white,
+                                            size: 40,
+                                            iconSize: 22,
+                                            p: p,
+                                            tooltip: allFavorited
+                                                ? context
+                                                    .l10n.removeFromFavorites
+                                                : context.l10n.favorite,
+                                            onTap: () =>
+                                                _toggleFavoriteFolder(songs),
                                           ),
                                         ],
                                       ),
@@ -1466,7 +1472,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               subtitle: context.l10n.libraryReadError,
               primaryActionLabel: context.l10n.retry,
               primaryActionIcon: Icons.refresh_rounded,
-              onPrimaryAction: () => setState(() {}),
+              onPrimaryAction: () => setState(_updateStream),
             );
 
             return AsyncStateBuilder<Result<List<SongsTableData>>>(

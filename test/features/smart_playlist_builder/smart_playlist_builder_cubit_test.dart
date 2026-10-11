@@ -38,14 +38,14 @@ void main() {
     engine = _Engine();
     useCases = PlaylistUseCases(_Repository(), engine);
     emittedCriteria.clear();
-    when(() => engine.watchCriteria(any()))
-        .thenAnswer((invocation) {
+    when(() => engine.watchCriteria(any())).thenAnswer((invocation) {
       emittedCriteria
           .add(invocation.positionalArguments.first as SmartCriteria);
       return const Stream<List<SongsTableData>>.empty();
     });
     when(() => engine.evaluateCriteria(any()))
         .thenAnswer((_) async => const []);
+    when(() => engine.validateRules(any())).thenReturn(const []);
   });
 
   group('initial state', () {
@@ -53,8 +53,8 @@ void main() {
       final cubit = SmartPlaylistBuilderCubit(engine, useCases);
       expect(cubit.state.criteria.rules, hasLength(1));
       expect(cubit.state.criteria.rules.first.field, SmartRuleField.playCount);
-      expect(cubit.state.criteria.rules.first.operator,
-          SmartOperator.greaterThan);
+      expect(
+          cubit.state.criteria.rules.first.operator, SmartOperator.greaterThan);
       expect(cubit.state.criteria.rules.first.value, '0');
       expect(cubit.state.criteria.matchAll, isTrue);
       expect(cubit.state.isEditing, isFalse);
@@ -187,8 +187,8 @@ void main() {
       final cubit = SmartPlaylistBuilderCubit(engine, useCases);
       cubit.setLimit(100000);
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      expect(emittedCriteria.last.limit,
-          SmartPlaylistBuilderCubit.previewCap + 1);
+      expect(
+          emittedCriteria.last.limit, SmartPlaylistBuilderCubit.previewCap + 1);
       await cubit.close();
       await controller.close();
     });
@@ -262,7 +262,8 @@ void main() {
       await cubit.close();
     });
 
-    test('initWithPlaylist with null criteria uses an empty rule set', () async {
+    test('initWithPlaylist with null criteria uses an empty rule set',
+        () async {
       final cubit = SmartPlaylistBuilderCubit(engine, useCases);
       final playlist = PlaylistsTableData(
         id: 7,
@@ -279,22 +280,27 @@ void main() {
   });
 
   group('save', () {
+    _Engine engineMock() {
+      final e = _Engine();
+      when(() => e.validateRules(any())).thenReturn(const []);
+      return e;
+    }
+
     _Repository repo(bool ok) {
       final r = _Repository();
       when(() => r.createPlaylist(any(),
               isSmart: any(named: 'isSmart'),
               smartCriteria: any(named: 'smartCriteria')))
-          .thenAnswer((_) async => ok
-              ? const Right(1)
-              : Left(const DatabaseFailure('nope')));
-      when(() => r.updateSmartPlaylist(any(), any(), any()))
           .thenAnswer((_) async =>
+              ok ? const Right(1) : Left(const DatabaseFailure('nope')));
+      when(() => r.updateSmartPlaylist(any(), any(), any())).thenAnswer(
+          (_) async =>
               ok ? const Right(null) : Left(const DatabaseFailure('nope')));
       return r;
     }
 
     test('rejects an empty name', () async {
-      final cubit = SmartPlaylistBuilderCubit(_Engine(), useCases);
+      final cubit = SmartPlaylistBuilderCubit(engineMock(), useCases);
       final saved = await cubit.savePlaylist();
       expect(saved, isFalse);
       expect(cubit.state.errorMessage, isNotNull);
@@ -302,7 +308,7 @@ void main() {
     });
 
     test('rejects a rule set with no rules', () async {
-      final cubit = SmartPlaylistBuilderCubit(_Engine(), useCases);
+      final cubit = SmartPlaylistBuilderCubit(engineMock(), useCases);
       cubit.updateName('Valid');
       cubit.removeRule(0);
       final saved = await cubit.savePlaylist();
@@ -312,7 +318,7 @@ void main() {
     });
 
     test('rejects a non-boolean rule with an empty value', () async {
-      final cubit = SmartPlaylistBuilderCubit(_Engine(), useCases);
+      final cubit = SmartPlaylistBuilderCubit(engineMock(), useCases);
       cubit.updateName('Valid');
       cubit.addRule(const SmartRule(
           field: SmartRuleField.artist,
@@ -327,7 +333,8 @@ void main() {
     test('normalises an empty boolean rule to false instead of rejecting',
         () async {
       final r = repo(true);
-      final cubit = SmartPlaylistBuilderCubit(_Engine(), PlaylistUseCases(r, engine));
+      final cubit =
+          SmartPlaylistBuilderCubit(engineMock(), PlaylistUseCases(r, engine));
       cubit.updateName('Favorites only');
       cubit
         ..removeRule(0)
@@ -348,7 +355,7 @@ void main() {
     test('creates a new playlist on success', () async {
       final r = repo(true);
       final cubit =
-          SmartPlaylistBuilderCubit(_Engine(), PlaylistUseCases(r, engine));
+          SmartPlaylistBuilderCubit(engineMock(), PlaylistUseCases(r, engine));
       cubit.updateName('New');
       final saved = await cubit.savePlaylist();
       expect(saved, isTrue);
@@ -360,7 +367,7 @@ void main() {
     test('surfaces a failure message when the repository rejects', () async {
       final r = repo(false);
       final cubit =
-          SmartPlaylistBuilderCubit(_Engine(), PlaylistUseCases(r, engine));
+          SmartPlaylistBuilderCubit(engineMock(), PlaylistUseCases(r, engine));
       cubit.updateName('New');
       final saved = await cubit.savePlaylist();
       expect(saved, isFalse);
@@ -371,7 +378,7 @@ void main() {
     test('updates the existing playlist when editing', () async {
       final r = repo(true);
       final cubit =
-          SmartPlaylistBuilderCubit(_Engine(), PlaylistUseCases(r, engine));
+          SmartPlaylistBuilderCubit(engineMock(), PlaylistUseCases(r, engine));
       cubit.initWithPlaylist(PlaylistsTableData(
           id: 5,
           name: 'Edit me',
@@ -383,6 +390,67 @@ void main() {
       final saved = await cubit.savePlaylist();
       expect(saved, isTrue);
       verify(() => r.updateSmartPlaylist(5, 'Edit me', any())).called(1);
+      await cubit.close();
+    });
+
+    test('blocks the save when validateRules flags a rule', () async {
+      final r = repo(true);
+      final flagging = _Engine();
+      when(() => flagging.validateRules(any())).thenAnswer((invocation) =>
+          (invocation.positionalArguments.first as SmartCriteria)
+              .rules
+              .take(1)
+              .toList());
+      final cubit =
+          SmartPlaylistBuilderCubit(flagging, PlaylistUseCases(r, engine));
+      cubit.updateName('Invalid rule');
+      final saved = await cubit.savePlaylist();
+      expect(saved, isFalse);
+      expect(cubit.state.errorMessage, contains('rule #1'));
+      verifyNever(() => r.createPlaylist(any(),
+          isSmart: any(named: 'isSmart'),
+          smartCriteria: any(named: 'smartCriteria')));
+      await cubit.close();
+    });
+
+    test('mutations clear a previous error message', () async {
+      final cubit = SmartPlaylistBuilderCubit(engineMock(), useCases);
+      Future<void> triggerError() async {
+        cubit.updateName('');
+        expect(await cubit.savePlaylist(), isFalse);
+        expect(cubit.state.errorMessage, isNotNull);
+      }
+
+      await triggerError();
+      cubit.updateName('Named');
+      expect(cubit.state.errorMessage, isNull);
+
+      await triggerError();
+      cubit.addRule(const SmartRule(
+          field: SmartRuleField.genre,
+          operator: SmartOperator.equals,
+          value: 'Rock'));
+      expect(cubit.state.errorMessage, isNull);
+
+      await triggerError();
+      cubit.removeRule(0);
+      expect(cubit.state.errorMessage, isNull);
+
+      await triggerError();
+      cubit.setLimit(10);
+      expect(cubit.state.errorMessage, isNull);
+
+      await triggerError();
+      cubit.setSortBy('title', sortAscending: false);
+      expect(cubit.state.errorMessage, isNull);
+
+      await triggerError();
+      cubit.toggleMatchAll(false);
+      expect(cubit.state.errorMessage, isNull);
+
+      await triggerError();
+      cubit.applyTemplate(const SmartCriteria());
+      expect(cubit.state.errorMessage, isNull);
       await cubit.close();
     });
   });

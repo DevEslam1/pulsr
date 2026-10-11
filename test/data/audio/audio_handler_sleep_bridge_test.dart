@@ -31,8 +31,8 @@ void main() {
 
   Future<PulsrAudioHandler> ready() async {
     final h = await buildTestHandler(repository: repo, ytmService: ytm);
-    await h.loadQueue([localSong(1), localSong(2), localSong(3)],
-        autoPlay: false);
+    await h
+        .loadQueue([localSong(1), localSong(2), localSong(3)], autoPlay: false);
     return h;
   }
 

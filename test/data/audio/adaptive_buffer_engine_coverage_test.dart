@@ -9,19 +9,19 @@ import 'package:pulsr/data/audio/adaptive_buffer_engine.dart';
 void main() {
   group('BufferBucket profiles', () {
     test('each bucket exposes min/max/rebuffer durations', () {
-      expect(BufferBucket.minimal.minBufferDuration,
-          const Duration(seconds: 10));
-      expect(BufferBucket.standard.minBufferDuration,
-          const Duration(seconds: 30));
-      expect(BufferBucket.generous.minBufferDuration,
-          const Duration(seconds: 50));
+      expect(
+          BufferBucket.minimal.minBufferDuration, const Duration(seconds: 10));
+      expect(
+          BufferBucket.standard.minBufferDuration, const Duration(seconds: 30));
+      expect(
+          BufferBucket.generous.minBufferDuration, const Duration(seconds: 50));
 
-      expect(BufferBucket.minimal.maxBufferDuration,
-          const Duration(seconds: 20));
-      expect(BufferBucket.standard.maxBufferDuration,
-          const Duration(seconds: 60));
-      expect(BufferBucket.generous.maxBufferDuration,
-          const Duration(seconds: 90));
+      expect(
+          BufferBucket.minimal.maxBufferDuration, const Duration(seconds: 20));
+      expect(
+          BufferBucket.standard.maxBufferDuration, const Duration(seconds: 60));
+      expect(
+          BufferBucket.generous.maxBufferDuration, const Duration(seconds: 90));
 
       expect(BufferBucket.minimal.bufferForPlaybackAfterRebufferDuration,
           const Duration(milliseconds: 500));
@@ -93,8 +93,8 @@ void main() {
   group('environment bucketing', () {
     test('local storage is minimal, slow links are generous', () {
       final engine = AdaptiveBufferEngine();
-      expect(engine.bucketFor(isWifi: false, isLocal: true),
-          BufferBucket.minimal);
+      expect(
+          engine.bucketFor(isWifi: false, isLocal: true), BufferBucket.minimal);
 
       engine.updateNetworkSpeed(1.0); // < 2.0
       expect(engine.bucketFor(isWifi: false, isLocal: false),
@@ -102,12 +102,13 @@ void main() {
 
       engine.reset();
       engine.updateNetworkSpeed(10.0);
-      expect(
-          engine.bucketFor(isWifi: true, isLocal: false), BufferBucket.standard);
+      expect(engine.bucketFor(isWifi: true, isLocal: false),
+          BufferBucket.standard);
       engine.dispose();
     });
 
-    test('evaluateBucket emits only when the bucket actually changes', () async {
+    test('evaluateBucket emits only when the bucket actually changes',
+        () async {
       final engine = AdaptiveBufferEngine();
       final events = <BufferBucket>[];
       final sub = engine.onBucketChanged.listen(events.add);

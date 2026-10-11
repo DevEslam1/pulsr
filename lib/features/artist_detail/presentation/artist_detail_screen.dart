@@ -61,7 +61,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   }
 
   void _rebuildStreams() {
+    _updateAlbumsStream();
+    _updateSongsStream();
+  }
+
+  void _updateAlbumsStream() {
     _albumsStream = _useCase.watchArtistAlbums(widget.artist.id).distinct();
+  }
+
+  void _updateSongsStream() {
     _songsStream = _useCase.watchArtistSongs(widget.artist.id).distinct();
   }
 
@@ -246,7 +254,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
               Widget buildErrorSection() => _ErrorSection(
                     title: context.l10n.albums,
                     message: context.l10n.browseCouldNotLoadAlbums,
-                    onRetry: () => setState(() {}),
+                    onRetry: () => setState(_updateAlbumsStream),
                   );
 
               return AsyncStateBuilder<Result<List<AlbumsTableData>>>(
@@ -330,7 +338,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
               Widget buildErrorSection() => _ErrorSection(
                     title: context.l10n.browseTopTracks,
                     message: context.l10n.browseCouldNotLoadTopTracks,
-                    onRetry: () => setState(() {}),
+                    onRetry: () => setState(_updateSongsStream),
                   );
 
               return AsyncStateBuilder<Result<List<SongsTableData>>>(

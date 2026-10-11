@@ -136,8 +136,7 @@ void main() {
   });
 
   group('_mapTask status mapping', () {
-    Future<YtmDownloadCubit> cubitShowing(String videoId,
-        DownloadStatus status,
+    Future<YtmDownloadCubit> cubitShowing(String videoId, DownloadStatus status,
         {double progress = 0.5, int? localSongId}) async {
       final cubit = build();
       controller.add(DownloadsState(tasks: {
@@ -167,18 +166,17 @@ void main() {
     });
 
     test('paused -> paused without progress', () async {
-      final cubit =
-          await cubitShowing('vid00000003', DownloadStatus.paused);
-      expect(cubit.state.itemFor('vid00000003').status,
-          YtDownloadStatus.paused);
+      final cubit = await cubitShowing('vid00000003', DownloadStatus.paused);
+      expect(
+          cubit.state.itemFor('vid00000003').status, YtDownloadStatus.paused);
       await cubit.close();
     });
 
     test('failed carries the error string', () async {
       final cubit = build();
       controller.add(DownloadsState(tasks: {
-        'vid00000004': taskWith('vid00000004', DownloadStatus.failed,
-            error: 'disk full'),
+        'vid00000004':
+            taskWith('vid00000004', DownloadStatus.failed, error: 'disk full'),
       }));
       await Future.delayed(Duration.zero);
       final item = cubit.state.itemFor('vid00000004');
@@ -260,9 +258,9 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 700));
       // No new call was added by the cancelled staggered start. The single
       // already-verified call above is the only interaction.
-      verifyNever(() => mockDownloads.queueDownload(
-          any(that: isA<DownloadTask>().having(
-              (t) => t.videoId, 'videoId', 'b0000000002'))));
+      verifyNever(() => mockDownloads.queueDownload(any(
+          that: isA<DownloadTask>()
+              .having((t) => t.videoId, 'videoId', 'b0000000002'))));
       await cubit.close();
     });
   });
@@ -271,8 +269,8 @@ void main() {
     test('resets a failed row and re-submits the task', () async {
       final cubit = build();
       controller.add(DownloadsState(tasks: {
-        'retry000001': taskWith('retry000001', DownloadStatus.failed,
-            error: 'boom'),
+        'retry000001':
+            taskWith('retry000001', DownloadStatus.failed, error: 'boom'),
       }));
       await Future.delayed(Duration.zero);
       expect(
@@ -328,41 +326,41 @@ void main() {
     test('canceled rows survive subsequent stream emits', () async {
       final cubit = build();
       cubit.cancelDownload('cancel00001');
-      expect(cubit.state.itemFor('cancel00001').status,
-          YtDownloadStatus.canceled);
+      expect(
+          cubit.state.itemFor('cancel00001').status, YtDownloadStatus.canceled);
 
       // A later stream state with no tasks must not drop the canceled row.
       controller.add(const DownloadsState(tasks: {}));
       await Future.delayed(Duration.zero);
-      expect(cubit.state.itemFor('cancel00001').status,
-          YtDownloadStatus.canceled);
+      expect(
+          cubit.state.itemFor('cancel00001').status, YtDownloadStatus.canceled);
       await cubit.close();
     });
 
     test('throttles rapid running-progress emits', () async {
       final cubit = build();
       controller.add(DownloadsState(tasks: {
-        'throt000001': taskWith('throt000001', DownloadStatus.downloading,
-            progress: 0.2),
+        'throt000001':
+            taskWith('throt000001', DownloadStatus.downloading, progress: 0.2),
       }));
       await Future.delayed(Duration.zero);
       final baseline = cubit.state.itemFor('throt000001').progress;
 
       // Two rapid intermediate-progress updates inside the 200ms window.
       controller.add(DownloadsState(tasks: {
-        'throt000001': taskWith('throt000001', DownloadStatus.downloading,
-            progress: 0.3),
+        'throt000001':
+            taskWith('throt000001', DownloadStatus.downloading, progress: 0.3),
       }));
       controller.add(DownloadsState(tasks: {
-        'throt000001': taskWith('throt000001', DownloadStatus.downloading,
-            progress: 0.4),
+        'throt000001':
+            taskWith('throt000001', DownloadStatus.downloading, progress: 0.4),
       }));
       await Future.delayed(Duration.zero);
 
       // Either the first or second landed, but the throttled one did not
       // produce a third distinct state in the same window.
-      expect(cubit.state.itemFor('throt000001').progress,
-          isNot(equals(baseline)));
+      expect(
+          cubit.state.itemFor('throt000001').progress, isNot(equals(baseline)));
       await cubit.close();
     });
 

@@ -10,6 +10,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_empty_state.dart';
+import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/folder_usecases.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/library_cubit.dart';
@@ -85,6 +86,18 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
           sortedFolders.sort((a, b) => _ascending
               ? a.songCount.compareTo(b.songCount)
               : b.songCount.compareTo(a.songCount));
+        }
+
+        // Precompute a parent-directory -> representative song map once per
+        // build so every row's artwork fallback is an O(1) lookup instead of a
+        // full scan of the loaded songs.
+        final representativeByDir = <String, SongsTableData>{};
+        for (final s in state.songs) {
+          final normalized = p_path.posix
+              .normalize(s.path.replaceAll('\\', '/'))
+              .toLowerCase();
+          representativeByDir.putIfAbsent(
+              p_path.posix.dirname(normalized), () => s);
         }
 
         return Center(
@@ -203,7 +216,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                         ),
                         leading: _buildFolderLeading(
                           folder: folder,
-                          state: state,
+                          representativeByDir: representativeByDir,
                           p: p,
                           isDownloads: isDownloads,
                         ),
@@ -290,7 +303,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
 
   Widget _buildFolderLeading({
     required FolderItem folder,
-    required LibraryState state,
+    required Map<String, SongsTableData> representativeByDir,
     required PulsrPalette p,
     required bool isDownloads,
   }) {
@@ -305,16 +318,12 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
       final normFolder = p_path.posix
           .normalize(folder.path.replaceAll('\\', '/'))
           .toLowerCase();
-      for (final s in state.songs) {
-        final parent = p_path.posix
-            .dirname(p_path.posix.normalize(s.path.replaceAll('\\', '/')))
-            .toLowerCase();
-        if (parent == normFolder) {
-          songId = s.id;
-          albumId = s.albumId;
-          remoteUrl = s.remoteArtworkUrl ?? s.artworkUri;
-          break;
-        }
+      final representative = representativeByDir[normFolder];
+      if (representative != null) {
+        songId = representative.id;
+        albumId = representative.albumId;
+        remoteUrl =
+            representative.remoteArtworkUrl ?? representative.artworkUri;
       }
     }
 

@@ -1,4 +1,7 @@
 // test/features/ytm_search/ytm_search_cubit_test.dart
+import 'dart:async';
+
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -49,7 +52,8 @@ void main() {
       expect(cubit.state.hasSearched, isFalse);
     });
 
-    test('loads persisted history into historyNotifier (capped at 10)', () async {
+    test('loads persisted history into historyNotifier (capped at 10)',
+        () async {
       SharedPreferences.setMockInitialValues({
         'ytm_search_history': List.generate(15, (i) => 'query$i'),
       });
@@ -66,8 +70,7 @@ void main() {
       expect(withError.phase, SearchPhase.error);
       expect(const YtmSearchState(query: 'x', isLoading: true).phase,
           SearchPhase.fetching);
-      expect(
-          YtmSearchState(query: 'x', results: [_track('aaaaaaaaaaa')]).phase,
+      expect(YtmSearchState(query: 'x', results: [_track('aaaaaaaaaaa')]).phase,
           SearchPhase.displaying);
       expect(const YtmSearchState(query: 'x').phase, SearchPhase.debouncing);
       expect(const YtmSearchState().phase, SearchPhase.idle);
@@ -184,8 +187,8 @@ void main() {
       await pumpEventQueue();
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getStringList('ytm_search_history'),
-          contains('Rick Astley'));
+      expect(
+          prefs.getStringList('ytm_search_history'), contains('Rick Astley'));
       expect(cubit.historyNotifier.value, contains('Rick Astley'));
     });
 
@@ -335,17 +338,17 @@ void main() {
   group('URL / video-id resolution', () {
     test('a direct YouTube URL resolves a single track without text search',
         () async {
-      when(() => service.resolveStream(any())).thenAnswer((_) async =>
-          const YtmStream(
-            videoId: 'dQw4w9WgXcQ',
-            url: 'https://example.com/a.m4a',
-            mimeType: 'audio/mp4',
-            container: 'm4a',
-            bitrateKbps: 128,
-            duration: Duration(minutes: 3),
-            title: 'Resolved Title',
-            artist: 'Resolved Artist',
-          ));
+      when(() => service.resolveStream(any()))
+          .thenAnswer((_) async => const YtmStream(
+                videoId: 'dQw4w9WgXcQ',
+                url: 'https://example.com/a.m4a',
+                mimeType: 'audio/mp4',
+                container: 'm4a',
+                bitrateKbps: 128,
+                duration: Duration(minutes: 3),
+                title: 'Resolved Title',
+                artist: 'Resolved Artist',
+              ));
 
       final cubit = build();
       cubit.onQueryChanged('https://youtu.be/dQw4w9WgXcQ');
@@ -383,6 +386,185 @@ void main() {
       when(() => service.isBotCoolingDown).thenReturn(true);
       final cubit = build();
       expect(cubit.statusMessage, contains('cooling down'));
+    });
+  });
+
+  group('generation guard', () {
+    test('an in-flight search for the old query cannot emit after a change',
+        () async {
+      final stale = Completer<List<YtmTrack>>();
+      when(() => service.searchWithFallback('abc'))
+          .thenAnswer((_) => stale.future);
+      when(() => service.searchWithFallback('xyz'))
+          .thenAnswer((_) async => [_track('xyz1', 'Fresh')]);
+
+      final cubit = build();
+      cubit.onQueryChanged('abc');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      expect(cubit.isDebouncing, isFalse);
+
+      cubit.onQueryChanged('xyz');
+      expect(cubit.isDebouncing, isTrue);
+      stale.complete([_track('abc1', 'Stale')]);
+      await pumpEventQueue();
+
+      expect(cubit.state.query, 'xyz');
+      expect(cubit.state.results, isEmpty);
+
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+      expect(cubit.state.results.single.videoId, 'xyz1');
+    });
+
+    test('an empty query clears immediately and ignores in-flight results',
+        () async {
+      final stale = Completer<List<YtmTrack>>();
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) => stale.future);
+
+      final cubit = build();
+      cubit.onQueryChanged('abc');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+
+      cubit.onQueryChanged('');
+      expect(cubit.state.query, isEmpty);
+      expect(cubit.state.results, isEmpty);
+      expect(cubit.state.isLoading, isFalse);
+      expect(cubit.isDebouncing, isFalse);
+
+      stale.complete([_track('abc1', 'Stale')]);
+      await pumpEventQueue();
+      expect(cubit.state.results, isEmpty);
+    });
+  });
+
+  group('retryAfterCooldown', () {
+    test('awaits the cooldown signal instead of polling every 500ms', () {
+      fakeAsync((async) {
+        final cooldown = ValueNotifier<bool>(true);
+        when(() => service.isBotCoolingDown).thenReturn(true);
+        when(() => service.botCooldownNotifier).thenReturn(cooldown);
+        when(() => service.searchWithFallback(any()))
+            .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
+
+        final cubit = build();
+        cubit.onQueryChanged('abc');
+        async.elapse(const Duration(milliseconds: 350));
+        async.flushMicrotasks();
+        clearInteractions(service);
+
+        cubit.retryAfterCooldown();
+        async.flushMicrotasks();
+        expect(cubit.state.errorMessage, contains('rate-limiting'));
+        verifyNever(() => service.searchWithFallback(any()));
+
+        cooldown.value = false;
+        async.flushMicrotasks();
+        async.flushMicrotasks();
+        verify(() => service.searchWithFallback('abc')).called(1);
+        expect(cubit.state.results.single.title, 'Hit');
+
+        // A busy-poll implementation would still be sleeping in 500ms steps;
+        // here nothing further fires as time passes.
+        clearInteractions(service);
+        async.elapse(const Duration(seconds: 30));
+        verifyNever(() => service.searchWithFallback(any()));
+      });
+    });
+
+    test('a new query aborts the cooldown wait', () {
+      fakeAsync((async) {
+        final cooldown = ValueNotifier<bool>(true);
+        when(() => service.isBotCoolingDown).thenReturn(true);
+        when(() => service.botCooldownNotifier).thenReturn(cooldown);
+        when(() => service.searchWithFallback(any()))
+            .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
+
+        final cubit = build();
+        cubit.onQueryChanged('abc');
+        async.flushMicrotasks();
+
+        cubit.retryAfterCooldown();
+        async.flushMicrotasks();
+        cubit.onQueryChanged('other');
+        async.flushMicrotasks();
+
+        // Old cooldown never resolves; the retry must still not fire for "abc".
+        async.elapse(const Duration(seconds: 30));
+        verifyNever(() => service.searchWithFallback('abc'));
+        cooldown.value = false;
+        async.flushMicrotasks();
+        verifyNever(() => service.searchWithFallback('abc'));
+      });
+    });
+  });
+
+  group('loadMore', () {
+    test('appends the next page, de-dupes by videoId and stops when exhausted',
+        () async {
+      final first = [for (var i = 0; i < 30; i++) _track('v$i')];
+      final second = [for (var i = 25; i < 55; i++) _track('v$i')];
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => first);
+      // The initial page uses the default limit; load-more raises it.
+      when(() => service.searchWithFallback(any(), limit: 60))
+          .thenAnswer((_) async => second);
+
+      final cubit = build();
+      cubit.onQueryChanged('abc');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      expect(cubit.state.results.length, 30);
+      expect(cubit.hasMore, isTrue);
+
+      await cubit.loadMore();
+      expect(cubit.state.results.length, 55);
+      expect(cubit.state.results.map((t) => t.videoId).toSet().length, 55);
+      expect(cubit.hasMore, isFalse);
+
+      // Exhausted: no further fetch.
+      await cubit.loadMore();
+      verifyNever(() => service.searchWithFallback('abc', limit: 90));
+    });
+
+    test('a load-more result from an older query cannot append', () async {
+      final first = [for (var i = 0; i < 30; i++) _track('v$i')];
+      final slow = Completer<List<YtmTrack>>();
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => first);
+      when(() => service.searchWithFallback(any(), limit: 60))
+          .thenAnswer((_) => slow.future);
+
+      final cubit = build();
+      cubit.onQueryChanged('abc');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      final pending = cubit.loadMore();
+      await pumpEventQueue();
+      expect(cubit.state.isLoading, isTrue);
+
+      cubit.onQueryChanged('different');
+      slow.complete([for (var i = 30; i < 60; i++) _track('w$i')]);
+      await pending;
+
+      expect(cubit.state.query, 'different');
+      expect(
+          cubit.state.results.where((t) => t.videoId.startsWith('w')), isEmpty);
+    });
+
+    test('a search returning fewer than the page size disables load-more',
+        () async {
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => [_track('only1', 'One')]);
+
+      final cubit = build();
+      cubit.onQueryChanged('abc');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      expect(cubit.hasMore, isFalse);
     });
   });
 }

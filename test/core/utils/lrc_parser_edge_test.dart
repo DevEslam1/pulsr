@@ -188,13 +188,37 @@ void main() {
       expect(line.words[1].endMs, 10850);
     });
 
-    test('word timestamps without minute part fall back to the line start', () {
-      const lrc = '[00:10.00]<10>Hi<20>There';
+    test('word timestamps without a minute part are parsed as seconds', () {
+      const lrc = '[00:05.00]<10>Hi<20>There';
       final line = LrcParser.parse(lrc).single;
       expect(line.words, hasLength(2));
       expect(line.words[0].startMs, 10000);
-      expect(line.words[0].endMs, 10050);
-      expect(line.words[1].startMs, 10000);
+      expect(line.words[0].endMs, 20000);
+      expect(line.words[1].startMs, 20000);
+      expect(line.words[1].endMs, 20350);
+    });
+
+    test('seconds-only word tags with decimals keep their own timings', () {
+      // The regex explicitly allows the minutes-less form; previously every
+      // such word collapsed onto the line start.
+      const lrc = '[01:00.00]<12.34>Hello <12.80>world';
+      final line = LrcParser.parse(lrc).single;
+      expect(line.text, 'Hello world');
+      expect(line.words, hasLength(2));
+      expect(line.words[0].word, 'Hello');
+      expect(line.words[0].startMs, 12340);
+      expect(line.words[0].endMs, 12800);
+      expect(line.words[1].word, 'world');
+      expect(line.words[1].startMs, 12800);
+      expect(line.words[1].endMs, 13150);
+    });
+
+    test('seconds-only word tags still honour the offset tag', () {
+      const lrc = '[offset:1000]\n[00:10.00]<05.5>Hi<06>There';
+      final line = LrcParser.parse(lrc).single;
+      expect(line.words[0].startMs, 6500);
+      expect(line.words[0].endMs, 7000);
+      expect(line.words[1].startMs, 7000);
     });
 
     test('word timestamps honour sub-second fractions and offsets', () {

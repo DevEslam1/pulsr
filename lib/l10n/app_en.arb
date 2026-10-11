@@ -5328,5 +5328,11 @@
   "@proBadge": {"description":"Badge marking a professional-mode-only setting"},
   "nowPlayingPreview": "▶ Now Playing",
   "@nowPlayingPreview": {"description":"Mock mini-player pill label inside the dock style preview"},
-  "compactView": "Compact view"
+  "compactView": "Compact view",
+  "bootConfigurationError": "Pulsr cannot start with this configuration",
+  "@bootConfigurationError": {"description":"Terminal boot screen title when the app configuration is invalid"},
+  "bootStartupFailed": "Pulsr could not finish starting up",
+  "@bootStartupFailed": {"description":"Recoverable boot screen title after a warm-up failure"},
+  "bootStartupFailedMessage": "Playback components did not become ready in time. Retrying usually fixes a slow cold start.",
+  "@bootStartupFailedMessage": {"description":"Recoverable boot screen body explaining the retry"}
 }

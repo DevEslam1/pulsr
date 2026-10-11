@@ -162,18 +162,26 @@ void main() {
       expect(await titles(SmartOperator.equals, '5'), ['Five']);
       expect(await titles(SmartOperator.greaterThan, '5'), ['Ten']);
       expect(await titles(SmartOperator.lessThan, '5'), ['None']);
-      expect(await titles(SmartOperator.greaterThanOrEqual, '5'),
-          ['Five', 'Ten']);
-      expect(await titles(SmartOperator.lessThanOrEqual, '5'),
-          ['Five', 'None']);
+      expect(
+          await titles(SmartOperator.greaterThanOrEqual, '5'), ['Five', 'Ten']);
+      expect(
+          await titles(SmartOperator.lessThanOrEqual, '5'), ['Five', 'None']);
       expect(await titles(SmartOperator.between, '5..10'), ['Five', 'Ten']);
     });
 
     test('text fields equals and contains', () async {
-      await insertSong(id: 1, title: 'Blue Sky', artist: 'The Band',
-          album: 'Skies', genre: 'Rock');
-      await insertSong(id: 2, title: 'Red River', artist: 'Solo',
-          album: 'Rivers', genre: 'Jazz');
+      await insertSong(
+          id: 1,
+          title: 'Blue Sky',
+          artist: 'The Band',
+          album: 'Skies',
+          genre: 'Rock');
+      await insertSong(
+          id: 2,
+          title: 'Red River',
+          artist: 'Solo',
+          album: 'Rivers',
+          genre: 'Jazz');
 
       expect(
           (await engine.evaluateCriteria(const SmartCriteria(rules: [
@@ -181,7 +189,8 @@ void main() {
                 field: SmartRuleField.artist,
                 operator: SmartOperator.equals,
                 value: 'the band'),
-          ]))).map((s) => s.id),
+          ])))
+              .map((s) => s.id),
           [1]);
       expect(
           (await engine.evaluateCriteria(const SmartCriteria(rules: [
@@ -189,7 +198,8 @@ void main() {
                 field: SmartRuleField.album,
                 operator: SmartOperator.contains,
                 value: 'riv'),
-          ]))).map((s) => s.id),
+          ])))
+              .map((s) => s.id),
           [2]);
       expect(
           (await engine.evaluateCriteria(const SmartCriteria(rules: [
@@ -197,7 +207,8 @@ void main() {
                 field: SmartRuleField.title,
                 operator: SmartOperator.contains,
                 value: 'sky'),
-          ]))).map((s) => s.id),
+          ])))
+              .map((s) => s.id),
           [1]);
       expect(
           (await engine.evaluateCriteria(const SmartCriteria(rules: [
@@ -205,7 +216,8 @@ void main() {
                 field: SmartRuleField.genre,
                 operator: SmartOperator.equals,
                 value: 'rock'),
-          ]))).map((s) => s.id),
+          ])))
+              .map((s) => s.id),
           [1]);
     });
 
@@ -215,39 +227,52 @@ void main() {
       await insertSong(id: 3, title: 'Y90', year: 1995);
 
       Future<Iterable<int>> ids(SmartRule rule) async {
-        final res = await engine
-            .evaluateCriteria(SmartCriteria(rules: [rule]));
+        final res = await engine.evaluateCriteria(SmartCriteria(rules: [rule]));
         return res.map((s) => s.id);
       }
 
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.year,
-          operator: SmartOperator.equals,
-          value: '1985')), [2]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.year,
-          operator: SmartOperator.greaterThan,
-          value: '1985')), [3]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.year,
-          operator: SmartOperator.lessThan,
-          value: '1985')), [1]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.year,
-          operator: SmartOperator.greaterThanOrEqual,
-          value: '1985')), [2, 3]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.year,
-          operator: SmartOperator.lessThanOrEqual,
-          value: '1985')), [1, 2]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.year,
-          operator: SmartOperator.between,
-          value: '1970, 1990')), [1, 2]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.decade,
-          operator: SmartOperator.equals,
-          value: '1980')), [2]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.equals,
+              value: '1985')),
+          [2]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.greaterThan,
+              value: '1985')),
+          [3]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.lessThan,
+              value: '1985')),
+          [1]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.greaterThanOrEqual,
+              value: '1985')),
+          [2, 3]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.lessThanOrEqual,
+              value: '1985')),
+          [1, 2]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.between,
+              value: '1970, 1990')),
+          [1, 2]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.decade,
+              operator: SmartOperator.equals,
+              value: '1980')),
+          [2]);
     });
 
     test('duration operators', () async {
@@ -258,24 +283,30 @@ void main() {
           (await engine.evaluateCriteria(SmartCriteria(rules: [rule])))
               .map((s) => s.id);
 
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.durationMs,
-          operator: SmartOperator.greaterThan,
-          value: '300000')), [2]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.durationMs,
-          operator: SmartOperator.lessThan,
-          value: '300000')), [1]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.durationMs,
-          operator: SmartOperator.between,
-          value: '50000..300000')), [1]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.durationMs,
+              operator: SmartOperator.greaterThan,
+              value: '300000')),
+          [2]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.durationMs,
+              operator: SmartOperator.lessThan,
+              value: '300000')),
+          [1]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.durationMs,
+              operator: SmartOperator.between,
+              value: '50000..300000')),
+          [1]);
     });
 
     test('isFavorite and isLossless rules', () async {
       await insertSong(id: 1, title: 'Fav', isFavorite: true, codec: 'FLAC');
-      await insertSong(id: 2, title: 'Plain', codec: 'MP3',
-          path: '/music/plain.mp3');
+      await insertSong(
+          id: 2, title: 'Plain', codec: 'MP3', path: '/music/plain.mp3');
 
       expect(
           (await engine.evaluateCriteria(const SmartCriteria(rules: [
@@ -283,7 +314,8 @@ void main() {
                 field: SmartRuleField.isFavorite,
                 operator: SmartOperator.equals,
                 value: 'true'),
-          ]))).map((s) => s.id),
+          ])))
+              .map((s) => s.id),
           [1]);
 
       expect(
@@ -292,36 +324,45 @@ void main() {
                 field: SmartRuleField.isLossless,
                 operator: SmartOperator.equals,
                 value: 'false'),
-          ]))).map((s) => s.id),
+          ])))
+              .map((s) => s.id),
           [2]);
     });
 
     test('loudnessRange and bitrate rules', () async {
-      await insertSong(id: 1, title: 'Dynamic', loudnessRange: 12.5,
-          bitrateKbps: 900);
-      await insertSong(id: 2, title: 'Flat', loudnessRange: 4.0,
-          bitrateKbps: 320);
+      await insertSong(
+          id: 1, title: 'Dynamic', loudnessRange: 12.5, bitrateKbps: 900);
+      await insertSong(
+          id: 2, title: 'Flat', loudnessRange: 4.0, bitrateKbps: 320);
 
       Future<Iterable<int>> ids(SmartRule rule) async =>
           (await engine.evaluateCriteria(SmartCriteria(rules: [rule])))
               .map((s) => s.id);
 
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.loudnessRange,
-          operator: SmartOperator.between,
-          value: '10..15')), [1]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.loudnessRange,
-          operator: SmartOperator.greaterThan,
-          value: '10')), [1]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.bitrate,
-          operator: SmartOperator.greaterThanOrEqual,
-          value: '900')), [1]);
-      expect(await ids(const SmartRule(
-          field: SmartRuleField.bitrate,
-          operator: SmartOperator.lessThan,
-          value: '500')), [2]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.loudnessRange,
+              operator: SmartOperator.between,
+              value: '10..15')),
+          [1]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.loudnessRange,
+              operator: SmartOperator.greaterThan,
+              value: '10')),
+          [1]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.bitrate,
+              operator: SmartOperator.greaterThanOrEqual,
+              value: '900')),
+          [1]);
+      expect(
+          await ids(const SmartRule(
+              field: SmartRuleField.bitrate,
+              operator: SmartOperator.lessThan,
+              value: '500')),
+          [2]);
     });
 
     test('lastPlayed operators', () async {
@@ -333,26 +374,32 @@ void main() {
           (await engine.evaluateCriteria(SmartCriteria(rules: [rule])))
               .map((s) => s.id);
 
-      expect(await ids(SmartRule(
-          field: SmartRuleField.lastPlayed,
-          operator: SmartOperator.greaterThan,
-          value: '${nowMs - 5000}')), [1]);
-      expect(await ids(SmartRule(
-          field: SmartRuleField.lastPlayed,
-          operator: SmartOperator.withinDays,
-          value: '1')), [1]);
-      expect(await ids(SmartRule(
-          field: SmartRuleField.lastPlayed,
-          operator: SmartOperator.between,
-          value: '${nowMs - 5000}..$nowMs')), [1]);
+      expect(
+          await ids(SmartRule(
+              field: SmartRuleField.lastPlayed,
+              operator: SmartOperator.greaterThan,
+              value: '${nowMs - 5000}')),
+          [1]);
+      expect(
+          await ids(SmartRule(
+              field: SmartRuleField.lastPlayed,
+              operator: SmartOperator.withinDays,
+              value: '1')),
+          [1]);
+      expect(
+          await ids(SmartRule(
+              field: SmartRuleField.lastPlayed,
+              operator: SmartOperator.between,
+              value: '${nowMs - 5000}..$nowMs')),
+          [1]);
     });
 
     test('dateAdded operators and matchAll OR', () async {
       final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      await insertSong(id: 1, title: 'Fresh', dateAdded: nowSec - 3600,
-          playCount: 0);
-      await insertSong(id: 2, title: 'Heavy', dateAdded: nowSec - 9 * 86400,
-          playCount: 50);
+      await insertSong(
+          id: 1, title: 'Fresh', dateAdded: nowSec - 3600, playCount: 0);
+      await insertSong(
+          id: 2, title: 'Heavy', dateAdded: nowSec - 9 * 86400, playCount: 50);
 
       final any = await engine.evaluateCriteria(SmartCriteria(
         matchAll: false,
@@ -389,11 +436,25 @@ void main() {
 
   group('sorting and limits', () {
     test('sortBy branches produce stable orderings', () async {
-      await insertSong(id: 1, title: 'B', artist: 'Z', album: 'M',
-          playCount: 1, year: 2000, lastPlayed: 100, dateAdded: 100,
+      await insertSong(
+          id: 1,
+          title: 'B',
+          artist: 'Z',
+          album: 'M',
+          playCount: 1,
+          year: 2000,
+          lastPlayed: 100,
+          dateAdded: 100,
           durationMs: 1000);
-      await insertSong(id: 2, title: 'A', artist: 'A', album: 'Z',
-          playCount: 9, year: 1990, lastPlayed: 900, dateAdded: 900,
+      await insertSong(
+          id: 2,
+          title: 'A',
+          artist: 'A',
+          album: 'Z',
+          playCount: 9,
+          year: 1990,
+          lastPlayed: 900,
+          dateAdded: 900,
           durationMs: 9000);
 
       for (final sort in [
@@ -417,8 +478,8 @@ void main() {
       await insertSong(id: 2, title: 'Two');
       await insertSong(id: 3, title: 'Three');
 
-      final res = await engine.evaluateCriteria(
-          const SmartCriteria(limit: 2, sortBy: 'rating'));
+      final res = await engine
+          .evaluateCriteria(const SmartCriteria(limit: 2, sortBy: 'rating'));
       expect(res.length, 2);
     });
   });
@@ -491,6 +552,184 @@ void main() {
       ));
       // No store, but rating 0 == default, so both match via prefs-backed path.
       expect(res.length, 2);
+    });
+  });
+
+  group('matchAny sorting and fail-closed rules', () {
+    test('matchAny applies sortBy title across the SQL/Dart union', () async {
+      await insertSong(id: 1, title: 'Zeta', playCount: 5);
+      await insertSong(id: 2, title: 'Alpha', playCount: 0);
+
+      SmartCriteria criteria(bool ascending) => SmartCriteria(
+            matchAll: false,
+            sortBy: 'title',
+            sortAscending: ascending,
+            rules: const [
+              SmartRule(
+                  field: SmartRuleField.playCount,
+                  operator: SmartOperator.greaterThan,
+                  value: '1'),
+              SmartRule(
+                  field: SmartRuleField.rating,
+                  operator: SmartOperator.equals,
+                  value: '0'),
+            ],
+          );
+
+      final asc = await engine.evaluateCriteria(criteria(true));
+      expect(asc.map((s) => s.title), ['Alpha', 'Zeta']);
+
+      final desc = await engine.evaluateCriteria(criteria(false));
+      expect(desc.map((s) => s.title), ['Zeta', 'Alpha']);
+    });
+
+    test('matchAny applies sortBy playCount descending', () async {
+      await insertSong(id: 1, title: 'FewPlays', playCount: 3);
+      await insertSong(id: 2, title: 'ManyPlays', playCount: 9);
+
+      final res = await engine.evaluateCriteria(SmartCriteria(
+        matchAll: false,
+        sortBy: 'playCount',
+        sortAscending: false,
+        rules: const [
+          SmartRule(
+              field: SmartRuleField.playCount,
+              operator: SmartOperator.greaterThan,
+              value: '100'),
+          SmartRule(
+              field: SmartRuleField.rating,
+              operator: SmartOperator.equals,
+              value: '0'),
+        ],
+      ));
+      expect(res.map((s) => s.title), ['ManyPlays', 'FewPlays']);
+    });
+
+    test('matchAll with an unbuildable rule matches nothing', () async {
+      await insertSong(id: 1, title: 'Any');
+
+      final res = await engine.evaluateCriteria(const SmartCriteria(
+        matchAll: true,
+        rules: [
+          SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.greaterThan,
+              value: 'not-a-year'),
+        ],
+      ));
+      expect(res, isEmpty);
+    });
+
+    test('matchAny with only unbuildable rules matches nothing', () async {
+      await insertSong(id: 1, title: 'Any');
+
+      final res = await engine.evaluateCriteria(const SmartCriteria(
+        matchAll: false,
+        rules: [
+          SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.greaterThan,
+              value: 'x'),
+        ],
+      ));
+      expect(res, isEmpty);
+    });
+
+    test('matchAny ignores an unbuildable rule when another one matches',
+        () async {
+      await insertSong(id: 1, title: 'Played', playCount: 5);
+      await insertSong(id: 2, title: 'Unplayed', playCount: 0);
+
+      final res = await engine.evaluateCriteria(SmartCriteria(
+        matchAll: false,
+        rules: const [
+          SmartRule(
+              field: SmartRuleField.year,
+              operator: SmartOperator.greaterThan,
+              value: 'x'),
+          SmartRule(
+              field: SmartRuleField.playCount,
+              operator: SmartOperator.greaterThan,
+              value: '1'),
+        ],
+      ));
+      expect(res.map((s) => s.title), ['Played']);
+    });
+
+    test('between keeps negative operand signs', () async {
+      await insertSong(
+          id: 1, title: 'Negative', playCount: -3, loudnessRange: -9);
+      await insertSong(
+          id: 2, title: 'Positive', playCount: 3, loudnessRange: 9);
+
+      final plays = await engine.evaluateCriteria(const SmartCriteria(
+        rules: [
+          SmartRule(
+              field: SmartRuleField.playCount,
+              operator: SmartOperator.between,
+              value: '-5..-1'),
+        ],
+      ));
+      expect(plays.map((s) => s.title), ['Negative']);
+
+      final lra = await engine.evaluateCriteria(const SmartCriteria(
+        rules: [
+          SmartRule(
+              field: SmartRuleField.loudnessRange,
+              operator: SmartOperator.between,
+              value: '-12, -6'),
+        ],
+      ));
+      expect(lra.map((s) => s.title), ['Negative']);
+    });
+  });
+
+  group('Unicode text rules', () {
+    test('non-ASCII values match with accent normalization', () async {
+      await insertSong(id: 1, title: 'Chanson', artist: 'Édith Piaf');
+      await insertSong(id: 2, title: 'Other', artist: 'Queen');
+
+      final res = await engine.evaluateCriteria(const SmartCriteria(
+        rules: [
+          SmartRule(
+              field: SmartRuleField.artist,
+              operator: SmartOperator.contains,
+              value: 'Édith'),
+        ],
+      ));
+      expect(res.map((s) => s.title), ['Chanson']);
+    });
+
+    test('Arabic letter variants are folded', () async {
+      await insertSong(id: 1, title: 'أغنية', artist: 'فنان');
+      await insertSong(id: 2, title: 'Other', artist: 'Queen');
+
+      final res = await engine.evaluateCriteria(const SmartCriteria(
+        rules: [
+          SmartRule(
+              field: SmartRuleField.title,
+              operator: SmartOperator.contains,
+              value: 'اغنيه'),
+        ],
+      ));
+      expect(res.map((s) => s.title), ['أغنية']);
+    });
+
+    test('matchAny uses the normalized path for non-ASCII text rules',
+        () async {
+      await insertSong(id: 1, title: 'Café', artist: 'Édith');
+      await insertSong(id: 2, title: 'Other', artist: 'Queen');
+
+      final res = await engine.evaluateCriteria(SmartCriteria(
+        matchAll: false,
+        rules: const [
+          SmartRule(
+              field: SmartRuleField.title,
+              operator: SmartOperator.contains,
+              value: 'Café'),
+        ],
+      ));
+      expect(res.map((s) => s.title), ['Café']);
     });
   });
 

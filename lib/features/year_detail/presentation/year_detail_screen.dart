@@ -37,13 +37,18 @@ class YearDetailScreen extends StatefulWidget {
 
 class _YearDetailScreenState extends State<YearDetailScreen> {
   late GetYearsUseCase _useCase;
-  late final Stream<Result<List<SongsTableData>>> _songsStream;
+  late Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getYearsUseCase ?? getIt<GetYearsUseCase>();
-    // Memoized so rebuilds do not resubscribe to the DB watch stream.
+    // Recreated only on retry so rebuilds do not resubscribe to the DB watch
+    // stream.
+    _updateStream();
+  }
+
+  void _updateStream() {
     _songsStream = _useCase.watchYearSongs(widget.yearItem.year).distinct();
   }
 
@@ -210,7 +215,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                     ),
                     const SizedBox(height: AppSpacing.s20),
                     FilledButton.icon(
-                      onPressed: () => setState(() {}),
+                      onPressed: () => setState(_updateStream),
                       icon: const Icon(Icons.refresh_rounded),
                       label: Text(context.l10n.retry),
                     ),

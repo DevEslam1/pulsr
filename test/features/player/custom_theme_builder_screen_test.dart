@@ -3,6 +3,8 @@
 // Branch coverage for [CustomThemeBuilderScreen]: settings hydration, live
 // preview toggle (with and without a PlayerCubit), palette/radius/glow edits,
 // theme JSON import (valid, missing-colour, malformed) and export.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -95,8 +97,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // The palette circles are the only GestureDetectors with a 48x48 box.
-    final palette = find.byWidgetPredicate((w) =>
-        w is GestureDetector && w.child is Container);
+    final palette = find
+        .byWidgetPredicate((w) => w is GestureDetector && w.child is Container);
     expect(palette, findsWidgets);
     await tester.tap(palette.at(1));
     await tester.pump();
@@ -162,6 +164,39 @@ void main() {
     await tester.pumpAndSettle();
 
     verifyNever(() => settings.setCustomAccentColor(any()));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'a pending import completing after dispose never uses the dead context',
+      (tester) async {
+    final radiusCompleter = Completer<void>();
+    when(() => settings.setCustomThemeRadius(any()))
+        .thenAnswer((_) => radiusCompleter.future);
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.file_upload_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField),
+      '{"accentColor": 4288388853, "cornerRadius": 30}',
+    );
+    await tester.tap(find.byType(FilledButton));
+    // Let the dialog fully close; the handler is now awaiting the settings
+    // write, which stays pending.
+    await tester.pumpAndSettle();
+
+    // Dispose the screen while the awaited settings write is still pending.
+    await tester.pumpWidget(sheetHost(
+      settingsCubit: settings,
+      child: const SizedBox.shrink(),
+    ));
+    await tester.pump();
+
+    radiusCompleter.completeError(StateError('late settings failure'));
+    await tester.pump();
     expect(tester.takeException(), isNull);
   });
 

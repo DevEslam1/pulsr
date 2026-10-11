@@ -368,13 +368,15 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       ErrorLogger.log('Failed to remove queue item in audio handler',
           error: e, stackTrace: st, category: 'PlayerQueueController');
       if (!_isClosed()) {
+        // Merge only the failed mutation's slice into the fresh state: a track
+        // change that landed during the await must not be rolled back to the
+        // stale pre-await playback snapshot.
         final s = _getState();
         _emit(s.copyWith(
           queueSlice: s.queueSlice.copyWith(
             queue: state.queue,
             currentIndex: state.currentIndex,
           ),
-          playback: state.playback,
         ));
       }
     }
@@ -389,6 +391,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     try {
       final state = _getState();
       if (slot == state.activeQueueSlot) return;
+      _cancelPendingSeek();
       final wasPlaying = state.isPlaying;
 
       setQueueSlot(
@@ -678,14 +681,16 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       ));
       return;
     }
-    final seen = <int>{...state.queue.map((q) => q.id)};
+    // Dedupe with the same identity as single add (id/remoteId/path), not id
+    // alone: a batch entry whose remoteId or path matches an existing queue
+    // song would otherwise slip in as a duplicate.
+    final seen = <SongsTableData>[...state.queue];
     final toAdd = <SongsTableData>[];
     for (final s in songs) {
-      if (!seen.contains(s.id)) {
-        seen.add(s.id);
-        toAdd.add(s);
-        if (toAdd.length == room) break;
-      }
+      if (seen.any((q) => _isSameTrack(q, s))) continue;
+      seen.add(s);
+      toAdd.add(s);
+      if (toAdd.length == room) break;
     }
     if (toAdd.isEmpty) {
       if (state.queue.length >= PlayerQueueController.maxQueueSize) {

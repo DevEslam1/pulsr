@@ -6,9 +6,14 @@ import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
+import '../../core/di/injection.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/music_repository_interface.dart';
+import '../audio/audio_handler.dart';
+import '../audio/per_song_eq_store.dart';
+import '../audio/per_song_volume_store.dart';
+import '../audio/song_rating_store.dart';
 
 class ImportResult {
   final int restoredFavoritesCount;
@@ -471,9 +476,14 @@ class ImportBackupUseCase {
       for (final item in playlistsList) {
         if (item is Map<String, dynamic> && item.containsKey('name')) {
           await _db.transaction(() async {
-            final name = item['name'] as String? ?? 'Restored Playlist';
-            final isSmart = item['isSmart'] as bool? ?? false;
-            final smartCriteria = item['smartCriteria'] as String?;
+            final rawName = item['name'];
+            final name = rawName is String && rawName.trim().isNotEmpty
+                ? rawName
+                : 'Restored Playlist';
+            final rawIsSmart = item['isSmart'];
+            final isSmart = rawIsSmart is bool ? rawIsSmart : false;
+            final rawCriteria = item['smartCriteria'];
+            final smartCriteria = rawCriteria is String ? rawCriteria : null;
             final songPaths = (item['songPaths'] is List)
                 ? (item['songPaths'] as List).whereType<String>().toList()
                 : <String>[];
@@ -568,22 +578,24 @@ class ImportBackupUseCase {
             settings['resumeAfterInterruption'] == true);
       }
       if (settings.containsKey('themeMode')) {
-        await prefs.setString(
-            'setting_theme_mode', (settings['themeMode'] as String?) ?? 'dark');
+        final rawThemeMode = settings['themeMode'];
+        await prefs.setString('setting_theme_mode',
+            rawThemeMode is String ? rawThemeMode : 'dark');
       }
       if (settings.containsKey('customAccentColorValue')) {
-        await prefs.setInt(
-            'setting_custom_accent',
-            ((settings['customAccentColorValue'] as num?) ?? 0xFF9B9EF5)
-                .toInt());
+        final rawAccent = settings['customAccentColorValue'];
+        await prefs.setInt('setting_custom_accent',
+            rawAccent is num ? rawAccent.toInt() : 0xFF9B9EF5);
       }
       if (settings.containsKey('playerThemeMode')) {
+        final rawPlayerTheme = settings['playerThemeMode'];
         await prefs.setString('setting_player_theme_mode',
-            (settings['playerThemeMode'] as String?) ?? 'classic');
+            rawPlayerTheme is String ? rawPlayerTheme : 'classic');
       }
       if (settings.containsKey('visualizerStyle')) {
+        final rawVisualizer = settings['visualizerStyle'];
         await prefs.setString('setting_visualizer_style',
-            (settings['visualizerStyle'] as String?) ?? 'bar');
+            rawVisualizer is String ? rawVisualizer : 'bar');
       }
       // Restore extended settings with validation
       if (settings['replayGainMode'] is String) {
@@ -669,9 +681,13 @@ class ImportBackupUseCase {
         await _db.transaction(() async {
           for (final item in batch) {
             if (item is Map<String, dynamic>) {
-              final path = item['path'] as String?;
-              final playCount = (item['playCount'] as num?)?.toInt() ?? 0;
-              final lastPlayed = (item['lastPlayed'] as num?)?.toInt();
+              final rawPath = item['path'];
+              final path = rawPath is String ? rawPath : null;
+              final rawPlayCount = item['playCount'];
+              final playCount = rawPlayCount is num ? rawPlayCount.toInt() : 0;
+              final rawLastPlayed = item['lastPlayed'];
+              final lastPlayed =
+                  rawLastPlayed is num ? rawLastPlayed.toInt() : null;
 
               if (path != null && path.isNotEmpty) {
                 final matched = matchPath(path);
@@ -759,8 +775,10 @@ class ImportBackupUseCase {
       await _db.transaction(() async {
         for (final item in dlList) {
           if (item is Map<String, dynamic>) {
-            final path = item['path'] as String?;
-            final remoteId = item['remoteId'] as String?;
+            final rawPath = item['path'];
+            final path = rawPath is String ? rawPath : null;
+            final rawRemoteId = item['remoteId'];
+            final remoteId = rawRemoteId is String ? rawRemoteId : null;
             final matched = matchPath(path ?? '') ??
                 (remoteId != null ? remoteIdMap[remoteId] : null);
             if (matched != null && !matched.isDownloaded) {
@@ -851,8 +869,10 @@ class ImportBackupUseCase {
       final paths = (q['paths'] is List)
           ? (q['paths'] as List).whereType<String>().toList()
           : <String>[];
-      final idx = (q['currentIndex'] as num?)?.toInt() ?? 0;
-      final posMs = (q['positionMs'] as num?)?.toInt() ?? 0;
+      final rawIdx = q['currentIndex'];
+      final idx = rawIdx is num ? rawIdx.toInt() : 0;
+      final rawPosMs = q['positionMs'];
+      final posMs = rawPosMs is num ? rawPosMs.toInt() : 0;
       if (paths.isNotEmpty) {
         try {
           await _db.transaction(() async {
@@ -883,6 +903,11 @@ class ImportBackupUseCase {
       }
     }
 
+    // 11. Live store refresh: ratings/BPM/EQ/volume/bookmarks/DSP snapshots
+    // are cached in memory by their stores, so without this a restore stayed
+    // invisible until the next app launch.
+    await _reloadLiveStoresAfterImport();
+
     return ImportResult(
       restoredFavoritesCount: restoredFavoritesCount,
       restoredPlaylistsCount: restoredPlaylistsCount,
@@ -897,6 +922,37 @@ class ImportBackupUseCase {
   }
 
   void _validateSchema(Map<String, dynamic> data) => validateSchema(data);
+
+  /// Re-reads the stores that cache restored prefs maps in memory. Missing
+  /// registrations (e.g. unit tests constructing the use case directly) are
+  /// skipped; the handler owns BPM/bookmark/DSP snapshot instances.
+  Future<void> _reloadLiveStoresAfterImport() async {
+    await _reloadStore<SongRatingStore>((s) => s.reload());
+    await _reloadStore<PerSongEqStore>((s) => s.reload());
+    await _reloadStore<PerSongVolumeStore>((s) => s.reload());
+    await _reloadStore<PulsrAudioHandler>((handler) async {
+      await Future.wait<void>([
+        handler.bpmOverrideStore.reload(),
+        handler.bookmarkStore.reload(),
+        handler.dspSnapshotStore.reload(),
+      ]);
+    });
+  }
+
+  Future<void> _reloadStore<T extends Object>(
+      Future<void> Function(T store) action) async {
+    try {
+      if (!getIt.isRegistered<T>()) return;
+      // `getIt<T>()` throws for an async singleton that is not ready yet;
+      // skipping then is correct, the store's own load() will pick the
+      // restored prefs up on construction.
+      final store = getIt<T>();
+      await action(store);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reload live store after backup import',
+          error: e, stackTrace: st, category: 'Backup');
+    }
+  }
 
   // FIX-E02: Check unsupported future backup versions
   @visibleForTesting

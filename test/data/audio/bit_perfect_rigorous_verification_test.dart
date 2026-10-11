@@ -24,7 +24,8 @@ void main() {
     // TEST 1: BIT-FOR-BIT NULL TEST (Zero Bit Error Rate Invariant)
     // =========================================================================
     group('1. Bit-for-Bit Byte Identity & Cryptographic Hash Null Test', () {
-      test('16-bit PCM pass-through preserves every bit across dynamic range', () {
+      test('16-bit PCM pass-through preserves every bit across dynamic range',
+          () {
         // Construct a 16-bit stereo frame buffer containing:
         // - Edge boundaries: full positive (+32767), full negative (-32768)
         // - LSB sensitivity: +1, -1, +2, -2
@@ -51,7 +52,9 @@ void main() {
             sample = 0; // DC zero
           } else {
             // Dynamic waveform
-            sample = (sin(i * 0.05) * 20000 + (rng.nextInt(5) - 2)).round().clamp(-32768, 32767);
+            sample = (sin(i * 0.05) * 20000 + (rng.nextInt(5) - 2))
+                .round()
+                .clamp(-32768, 32767);
           }
           byteData.setInt16(i * 2, sample, Endian.little);
         }
@@ -67,7 +70,8 @@ void main() {
 
         // 1. Exact cryptographic identity
         expect(outputDigest, equals(inputDigest),
-            reason: 'SHA-256 hash must be identical down to the least significant bit.');
+            reason:
+                'SHA-256 hash must be identical down to the least significant bit.');
 
         // 2. Exact byte-by-byte null test: Input XOR Output must equal 0 across all bytes
         int bitErrors = 0;
@@ -75,7 +79,8 @@ void main() {
           final diff = rawInput[b] ^ rawOutput[b];
           if (diff != 0) bitErrors++;
         }
-        expect(bitErrors, equals(0), reason: 'Bit Error Rate must be exactly 0.0000%');
+        expect(bitErrors, equals(0),
+            reason: 'Bit Error Rate must be exactly 0.0000%');
       });
 
       test('24-bit PCM Hi-Res pass-through preserves subtle 1-LSB nuances', () {
@@ -104,7 +109,9 @@ void main() {
         expect(outputDigest, equals(inputDigest));
       });
 
-      test('NEGATIVE CONTROL: Modifying even 1 LSB fails the null test immediately', () {
+      test(
+          'NEGATIVE CONTROL: Modifying even 1 LSB fails the null test immediately',
+          () {
         // Falsifiability proof: proves our test is sensitive enough to detect any DSP tampering
         final rawInput = Uint8List(2048);
         for (int i = 0; i < rawInput.length; i++) {
@@ -119,10 +126,12 @@ void main() {
         final alteredDigest = sha256.convert(alteredOutput).toString();
 
         expect(alteredDigest, isNot(equals(inputDigest)),
-            reason: 'Even a 1-bit deviation must cause a total hash null-test failure.');
+            reason:
+                'Even a 1-bit deviation must cause a total hash null-test failure.');
       });
 
-      test('NEGATIVE CONTROL: 0.001 dB software gain attenuation is caught', () {
+      test('NEGATIVE CONTROL: 0.001 dB software gain attenuation is caught',
+          () {
         // Attenuating by 0.001 dB corresponds to gain = 0.9998848
         final samples = 1000;
         final original = Int16List(samples);
@@ -140,7 +149,8 @@ void main() {
 
         // Must catch altered samples: this proves digital volume CANNOT be active during Bit-Perfect
         expect(alteredSamples, greaterThan(0),
-            reason: 'Software volume attenuation destroys bit-perfect bitstream identity.');
+            reason:
+                'Software volume attenuation destroys bit-perfect bitstream identity.');
       });
     });
 
@@ -150,7 +160,9 @@ void main() {
     group('2. Sample Rate Invariance (Strict Track Following)', () {
       final supportedLadder = [44100, 48000, 88200, 96000, 176400, 192000];
 
-      test('44.1 kHz Redbook CD track outputs strictly at 44.1 kHz (no 48k resampling)', () {
+      test(
+          '44.1 kHz Redbook CD track outputs strictly at 44.1 kHz (no 48k resampling)',
+          () {
         final decision = negotiateOutputFormat(
           request: const OutputFormatRequest(
             trackSampleRate: 44100,
@@ -217,7 +229,8 @@ void main() {
         );
 
         // Bluetooth route is lossy transcoded (LDAC/aptX/AAC/SBC), never bit-perfect exclusive
-        expect(decision.reason, isNot(equals(OutputFormatReason.bitPerfectExclusive)));
+        expect(decision.reason,
+            isNot(equals(OutputFormatReason.bitPerfectExclusive)));
       });
     });
 
@@ -225,7 +238,9 @@ void main() {
     // TEST 3: BITSTREAM INTEGRITY GUARDS (Speed, Pitch & DSP Lockout)
     // =========================================================================
     group('3. Bitstream Integrity Guards (Speed/Pitch & DSP Lockout)', () {
-      test('Speed and Pitch adjustments are blocked when Bit-Perfect guard is active', () async {
+      test(
+          'Speed and Pitch adjustments are blocked when Bit-Perfect guard is active',
+          () async {
         final handler = _MockPulsrAudioHandler();
         when(() => handler.minPlaybackSpeed).thenReturn(0.5);
         when(() => handler.maxPlaybackSpeed).thenReturn(2.0);
@@ -243,8 +258,10 @@ void main() {
         // Attempt to alter playback speed to 1.25x
         await controller.setPlaybackSpeed(1.25);
         expect(currentState.playbackSpeed, equals(1.0),
-            reason: 'Playback speed must remain locked at 1.0x to avoid resampling.');
-        expect(currentState.playback.errorMessage, contains('Bit-Perfect bypass active'));
+            reason:
+                'Playback speed must remain locked at 1.0x to avoid resampling.');
+        expect(currentState.playback.errorMessage,
+            contains('Bit-Perfect bypass active'));
 
         // Attempt to alter playback pitch
         await controller.setPlaybackPitch(1.10);

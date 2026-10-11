@@ -113,7 +113,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   content: Text(
                       '$msg Notifications are needed for playback controls.'),
                   behavior: SnackBarBehavior.floating,
-                  action: SnackBarAction(label: 'OK', onPressed: () {}),
+                  action: SnackBarAction(
+                    label: context.l10n.openSettings,
+                    onPressed: _openNotificationSettings,
+                  ),
                 ),
               );
           }
@@ -133,13 +136,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               SnackBar(
                 content: Text(msg),
                 behavior: SnackBarBehavior.floating,
-                action: SnackBarAction(label: 'OK', onPressed: () {}),
+                action: SnackBarAction(
+                  label: context.l10n.openSettings,
+                  onPressed: _openNotificationSettings,
+                ),
               ),
             );
         }
       }
     } else {
       await _setNotificationDeniedPref(true);
+    }
+  }
+
+  /// Opens the system notification settings and refreshes the persisted
+  /// denial flag from the real OS state when the user returns, so the home
+  /// banner is not shown for a permission that was just granted.
+  Future<void> _openNotificationSettings() async {
+    await openAppSettings();
+    try {
+      final status = await Permission.notification.status;
+      await _setNotificationDeniedPref(
+          status.isDenied || status.isPermanentlyDenied);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to re-check notification permission',
+          error: e, stackTrace: st, category: 'Onboarding');
     }
   }
 
@@ -192,12 +213,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
 
-    if (action == 'settings') {
+    if (action == 'limited') {
+      await _completeOnboarding();
+    } else if (action == 'settings') {
       await openAppSettings();
-      return;
     }
-
-    await _completeOnboarding();
+    // A null result (barrier tap / back) means the user dismissed the dialog
+    // without choosing: keep onboarding open and leave the CTA tappable.
   }
 
   Future<void> _completeOnboarding() async {

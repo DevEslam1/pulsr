@@ -15,8 +15,6 @@ void main() {
 
   setUpAll(registerLibraryFallbacks);
 
-
-
   testWidgets('shows the empty library message when no songs exist',
       (tester) async {
     setSurface(tester);
@@ -31,8 +29,7 @@ void main() {
     expect(find.text('No music files indexed'), findsOneWidget);
   });
 
-  testWidgets('derives folders from song paths and lists them',
-      (tester) async {
+  testWidgets('derives folders from song paths and lists them', (tester) async {
     setSurface(tester);
     final player = stubPlayerCubit();
     final cubit = stubLibraryCubit(LibraryState(

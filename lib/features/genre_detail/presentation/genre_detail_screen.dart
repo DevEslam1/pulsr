@@ -37,14 +37,18 @@ class GenreDetailScreen extends StatefulWidget {
 
 class _GenreDetailScreenState extends State<GenreDetailScreen> {
   late GetGenresUseCase _useCase;
-  late final Stream<Result<List<SongsTableData>>> _songsStream;
+  late Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getGenresUseCase ?? getIt<GetGenresUseCase>();
-    // Memoize the watch stream: recreating it in build() resubscribed to the DB
-    // on every rebuild (scroll/theme) and reset snapshot state.
+    // Recreated only on retry so rebuilds (scroll/theme) do not resubscribe to
+    // the DB watch stream.
+    _updateStream();
+  }
+
+  void _updateStream() {
     _songsStream = _useCase.watchGenreSongs(widget.genreItem.name).distinct();
   }
 
@@ -228,7 +232,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                     ),
                     const SizedBox(height: AppSpacing.s20),
                     FilledButton.icon(
-                      onPressed: () => setState(() {}),
+                      onPressed: () => setState(_updateStream),
                       icon: const Icon(Icons.refresh_rounded),
                       label: Text(context.l10n.retry),
                     ),

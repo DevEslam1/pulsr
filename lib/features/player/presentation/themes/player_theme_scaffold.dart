@@ -315,6 +315,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                         children: [
                           PlayerControls(
                             isPlaying: state.isPlaying,
+                            isBuffering: state.isBuffering,
                             isShuffle: state.isShuffle,
                             repeatMode: state.repeatMode,
                             hasPrevious: state.hasPreviousNeighbour,

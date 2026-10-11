@@ -100,6 +100,27 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
     }
   }
 
+  /// Rescans the library and reports the real outcome: a thrown scan also
+  /// returns 0 tracks, so the result (not the count) decides success vs error.
+  Future<void> _rescanAndReport(SettingsCubit cubit) async {
+    final result = await cubit.rescanLibraryWithResult();
+    if (!mounted) return;
+    if (result.error != null) {
+      cubit.clearError();
+    }
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            result.error ?? context.l10n.settingsLibraryUpdated(result.count),
+          ),
+          backgroundColor: result.error != null ? context.palette.error : null,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
   Future<void> _showAddCustomFolderDialog(
       BuildContext context, PulsrPalette p) async {
     final path = await PulsrDialogHelper.showInputDialog(
@@ -177,18 +198,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                         fontWeight: FontWeight.w700,
                         fontSize: AppFontSize.body),
                   ),
-                  onPressed: state.isScanning
-                      ? null
-                      : () async {
-                          final count = await cubit.rescanLibrary();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(context.l10n
-                                      .settingsLibraryUpdated(count))),
-                            );
-                          }
-                        },
+                  onPressed:
+                      state.isScanning ? null : () => _rescanAndReport(cubit),
                 ),
               ),
             ),
@@ -217,10 +228,12 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             value: state.autoHideSystemMedia,
                             activeTrackColor: p.accent,
                             activeThumbColor: Colors.white,
-                            onChanged: (val) async {
-                              await cubit.setAutoHideSystemMedia(val);
-                              await cubit.rescanLibrary();
-                            },
+                            onChanged: state.isScanning
+                                ? null
+                                : (val) async {
+                                    await cubit.setAutoHideSystemMedia(val);
+                                    await _rescanAndReport(cubit);
+                                  },
                             secondary: Container(
                               width: 38,
                               height: 38,

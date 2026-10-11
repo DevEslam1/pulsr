@@ -8,33 +8,19 @@ extension PlayerPlaybackOptionsLyricsExtension
   // ──────────────────────────────────────────────
   void setAbPointA() {
     final s = _getState();
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        abPointA: s.position,
-        abLoopEnabled: s.abPointB != null && s.position < s.abPointB!,
-      ),
-    ));
+    _audioHandler.setAbPointA(s.position);
+    _syncAbLoopFromHandler();
   }
 
   void setAbPointB() {
     final s = _getState();
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        abPointB: s.position,
-        abLoopEnabled: s.abPointA != null && s.abPointA! < s.position,
-      ),
-    ));
+    _audioHandler.setAbPointB(s.position);
+    _syncAbLoopFromHandler();
   }
 
   void clearAbLoop() {
-    final s = _getState();
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        abLoopEnabled: false,
-        abPointA: null,
-        abPointB: null,
-      ),
-    ));
+    _audioHandler.clearAbLoop();
+    _syncAbLoopFromHandler();
   }
 
   void toggleAbLoop() {
@@ -42,8 +28,8 @@ extension PlayerPlaybackOptionsLyricsExtension
     if (!s.abLoopEnabled && (s.abPointA == null || s.abPointB == null)) {
       return;
     }
-    _emit(s.copyWith(
-        playback: s.playback.copyWith(abLoopEnabled: !s.abLoopEnabled)));
+    _audioHandler.toggleAbLoop();
+    _syncAbLoopFromHandler();
   }
 
   void seekToBookmark() {
@@ -159,6 +145,7 @@ extension PlayerPlaybackOptionsLyricsExtension
     final s = _getState();
     final song = s.currentSong;
     if (song == null) return;
+    final songId = song.id;
 
     LrcParser.invalidateSong(songId: song.id, path: song.path);
     _emit(s.copyWith(
@@ -178,7 +165,9 @@ extension PlayerPlaybackOptionsLyricsExtension
       } finally {
         if (!_isClosed()) {
           final cur = _getState();
-          if (cur.isLoadingLyrics) {
+          // Only clear the spinner if the refreshed track is still current: a
+          // track switch during the fetch already started the new track's load.
+          if (cur.isLoadingLyrics && cur.currentSong?.id == songId) {
             _emit(cur.copyWith(
               lyricsSlice: cur.lyricsSlice.copyWith(isLoadingLyrics: false),
             ));

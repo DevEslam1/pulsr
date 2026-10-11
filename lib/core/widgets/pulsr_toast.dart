@@ -44,12 +44,21 @@ class PulsrToast {
 
   /// Hides any currently visible toast / snackbar immediately with animation.
   static void hide() {
-    if (_activeWidgetState != null && _activeWidgetState!.mounted) {
-      _activeWidgetState!.dismiss();
-    } else {
-      _activeEntry?.remove();
-      _activeEntry = null;
+    final state = _activeWidgetState;
+    if (state != null && state.mounted) {
+      state.dismiss();
+      return;
     }
+    // The entry can already be detached (its overlay disposed, or a concurrent
+    // dismiss completed); remove() throws in that state, so never call it
+    // unguarded — and always clear both statics.
+    try {
+      _activeEntry?.remove();
+    } catch (_) {
+      // Already detached: nothing to remove.
+    }
+    _activeEntry = null;
+    _activeWidgetState = null;
   }
 
   /// Displays a floating SnackBar positioned above the mini player or top/center.
@@ -415,175 +424,182 @@ class _ToastWidgetState extends State<_ToastWidget>
                           borderRadius: snackbarRadius,
                           child: Builder(
                             builder: (context) {
-                              final toastContainer = Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: snackbarRadius,
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      GpuBudget.isGpuSaverActive
-                                          ? p.surface
-                                          : p.surface.withValues(
-                                              alpha: p.isDark ? 0.82 : 0.90),
-                                      GpuBudget.isGpuSaverActive
-                                          ? p.surfaceContainer
-                                          : p.surfaceContainer.withValues(
-                                              alpha: p.isDark ? 0.76 : 0.86),
-                                    ],
+                              final toastContainer = Semantics(
+                                liveRegion: true,
+                                container: true,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: snackbarRadius,
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        GpuBudget.isGpuSaverActive
+                                            ? p.surface
+                                            : p.surface.withValues(
+                                                alpha: p.isDark ? 0.82 : 0.90),
+                                        GpuBudget.isGpuSaverActive
+                                            ? p.surfaceContainer
+                                            : p.surfaceContainer.withValues(
+                                                alpha: p.isDark ? 0.76 : 0.86),
+                                      ],
+                                    ),
+                                    border: Border.all(
+                                      color: widget.isError
+                                          ? p.error.withValues(alpha: 0.45)
+                                          : (widget.isSuccess
+                                              ? p.success
+                                                  .withValues(alpha: 0.45)
+                                              : (p.isDark
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.14)
+                                                  : Colors.black.withValues(
+                                                      alpha: 0.08))),
+                                      width: 1.2,
+                                    ),
                                   ),
-                                  border: Border.all(
-                                    color: widget.isError
-                                        ? p.error.withValues(alpha: 0.45)
-                                        : (widget.isSuccess
-                                            ? p.success.withValues(alpha: 0.45)
-                                            : (p.isDark
-                                                ? Colors.white
-                                                    .withValues(alpha: 0.14)
-                                                : Colors.black
-                                                    .withValues(alpha: 0.08))),
-                                    width: 1.2,
+                                  padding: const EdgeInsetsDirectional.fromSTEB(
+                                    14,
+                                    11,
+                                    12,
+                                    11,
                                   ),
-                                ),
-                                padding: const EdgeInsetsDirectional.fromSTEB(
-                                  14,
-                                  11,
-                                  12,
-                                  11,
-                                ),
-                                child: Row(
-                                  children: [
-                                    // Leading Status Badge
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(
-                                            alpha: p.isDark ? 0.18 : 0.12),
-                                        borderRadius: AppRadii.r12All,
-                                        border: Border.all(
+                                  child: Row(
+                                    children: [
+                                      // Leading Status Badge
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
                                           color: statusColor.withValues(
-                                              alpha: 0.24),
-                                          width: 1.0,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Icon(
-                                          effectiveIcon,
-                                          color: statusColor,
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-
-                                    // Text Content
-                                    Expanded(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (widget.title != null) ...[
-                                            Text(
-                                              widget.title!,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: p.textPrimary,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: AppFontSize.bodySmall,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                          ],
-                                          Text(
-                                            widget.message,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: widget.title != null
-                                                  ? p.textSecondary
-                                                  : p.textPrimary,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: AppFontSize.bodySmall,
-                                              height: 1.25,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    // Optional Action Button
-                                    if (widget.action != null) ...[
-                                      const SizedBox(width: 8),
-                                      GestureDetector(
-                                        behavior: HitTestBehavior.opaque,
-                                        onTap: () {
-                                          HapticFeedback.lightImpact();
-                                          widget.action!.onPressed();
-                                          dismiss();
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
+                                              alpha: p.isDark ? 0.18 : 0.12),
+                                          borderRadius: AppRadii.r12All,
+                                          border: Border.all(
                                             color: statusColor.withValues(
-                                                alpha: p.isDark ? 0.20 : 0.14),
-                                            borderRadius: AppRadii.r10All,
-                                            border: Border.all(
-                                              color: statusColor.withValues(
-                                                  alpha: 0.32),
-                                              width: 1.0,
-                                            ),
+                                                alpha: 0.24),
+                                            width: 1.0,
                                           ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              if (widget.action!.icon !=
-                                                  null) ...[
-                                                Icon(
-                                                  widget.action!.icon,
-                                                  size: 14,
-                                                  color: statusColor,
-                                                ),
-                                                const SizedBox(width: 4),
-                                              ],
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            effectiveIcon,
+                                            color: statusColor,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+
+                                      // Text Content
+                                      Expanded(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (widget.title != null) ...[
                                               Text(
-                                                widget.action!.label,
+                                                widget.title!,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
-                                                  color: statusColor,
+                                                  color: p.textPrimary,
                                                   fontWeight: FontWeight.w700,
                                                   fontSize:
                                                       AppFontSize.bodySmall,
                                                 ),
                                               ),
+                                              const SizedBox(height: 2),
                                             ],
+                                            Text(
+                                              widget.message,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: widget.title != null
+                                                    ? p.textSecondary
+                                                    : p.textPrimary,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: AppFontSize.bodySmall,
+                                                height: 1.25,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // Optional Action Button
+                                      if (widget.action != null) ...[
+                                        const SizedBox(width: 8),
+                                        GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            widget.action!.onPressed();
+                                            dismiss();
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withValues(
+                                                  alpha:
+                                                      p.isDark ? 0.20 : 0.14),
+                                              borderRadius: AppRadii.r10All,
+                                              border: Border.all(
+                                                color: statusColor.withValues(
+                                                    alpha: 0.32),
+                                                width: 1.0,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (widget.action!.icon !=
+                                                    null) ...[
+                                                  Icon(
+                                                    widget.action!.icon,
+                                                    size: 14,
+                                                    color: statusColor,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                ],
+                                                Text(
+                                                  widget.action!.label,
+                                                  style: TextStyle(
+                                                    color: statusColor,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize:
+                                                        AppFontSize.bodySmall,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+
+                                      // Close Button
+                                      const SizedBox(width: 6),
+                                      GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: () {
+                                          HapticFeedback.lightImpact();
+                                          dismiss();
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: Icon(
+                                            Icons.close_rounded,
+                                            size: 18,
+                                            color: p.textTertiary,
                                           ),
                                         ),
                                       ),
                                     ],
-
-                                    // Close Button
-                                    const SizedBox(width: 6),
-                                    GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: () {
-                                        HapticFeedback.lightImpact();
-                                        dismiss();
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(4),
-                                        child: Icon(
-                                          Icons.close_rounded,
-                                          size: 18,
-                                          color: p.textTertiary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               );
 

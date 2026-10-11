@@ -9,6 +9,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
+import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/audio/song_rating_store.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
@@ -282,6 +283,32 @@ void main() {
       await cubit.close();
     });
 
+    test('songs watch keeps the pending favorite overlay in flight', () async {
+      final completer = Completer<Result<bool>>();
+      when(() => toggleFavorite(1)).thenAnswer((_) => completer.future);
+      final cubit = create();
+      await settle();
+      songs.add(Right([createTestSong(id: 1, title: 'A')]));
+      await settle();
+      favorites.add(const Right(<SongsTableData>[]));
+      await settle();
+
+      final future = cubit.toggleFavorite(1);
+      await settle();
+      expect(cubit.state.songs.single.isFavorite, isTrue);
+
+      // A live songs emission carrying the pre-toggle DB truth must not flip
+      // the row back while the toggle write is still in flight.
+      songs.add(Right([createTestSong(id: 1, title: 'A')]));
+      await settle();
+      expect(cubit.state.songs.single.isFavorite, isTrue);
+
+      completer.complete(const Right(true));
+      await future;
+      expect(cubit.state.songs.single.isFavorite, isTrue);
+      await cubit.close();
+    });
+
     test('a failed promotion rolls back and reports the error', () async {
       when(() => toggleFavorite(1))
           .thenAnswer((_) async => const Left(DatabaseFailure('nope')));
@@ -299,23 +326,21 @@ void main() {
     });
 
     test('demotion removes the favorite on success', () async {
-      when(() => toggleFavorite(1))
-          .thenAnswer((_) async => const Right(true));
+      when(() => toggleFavorite(1)).thenAnswer((_) async => const Right(true));
       final cubit = create();
       await settle();
-      favorites.add(Right([createTestSong(id: 1, title: 'A', isFavorite: true)]));
+      favorites
+          .add(Right([createTestSong(id: 1, title: 'A', isFavorite: true)]));
       await settle();
       await cubit.toggleFavorite(1);
       expect(cubit.state.favorites.any((s) => s.id == 1), isFalse);
       await cubit.close();
     });
 
-    test('falls back to the repository when the song is not loaded',
-        () async {
+    test('falls back to the repository when the song is not loaded', () async {
       when(() => repo.getSongsByIds(any())).thenAnswer(
           (_) async => Right([createTestSong(id: 7, title: 'Hidden')]));
-      when(() => toggleFavorite(7))
-          .thenAnswer((_) async => const Right(true));
+      when(() => toggleFavorite(7)).thenAnswer((_) async => const Right(true));
       final cubit = create();
       await settle();
       await cubit.toggleFavorite(7);
@@ -330,7 +355,8 @@ void main() {
       await settle();
       final res = await cubit.toggleFolderExclusion('/music/hidden');
       expect(res.isRight(), isTrue);
-      verify(() => folders.getFolderHierarchy()).called(greaterThanOrEqualTo(2));
+      verify(() => folders.getFolderHierarchy())
+          .called(greaterThanOrEqualTo(2));
       await cubit.close();
     });
 
@@ -471,8 +497,10 @@ void main() {
       when(() => account.isLoggedIn).thenReturn(false);
       getIt.registerSingleton<YtmAccountService>(account);
       final cubit = create();
-      final count = await cubit.syncYtmAccountLikes();
-      expect(count, 0);
+      await expectLater(
+        cubit.syncYtmAccountLikes(),
+        throwsA(isA<YtmException>().having((e) => e.isAuth, 'isAuth', isTrue)),
+      );
       expect(cubit.state.errorMessage, contains('Not signed in'));
       await cubit.close();
     });
@@ -481,12 +509,12 @@ void main() {
       final account = _Account();
       when(() => account.isLoggedIn).thenReturn(true);
       when(() => account.fetchLikedSongs()).thenAnswer((_) async => const [
-        YtmTrack(
-            videoId: 'v',
-            title: 'T',
-            artist: 'A',
-            duration: Duration(seconds: 1)),
-      ]);
+            YtmTrack(
+                videoId: 'v',
+                title: 'T',
+                artist: 'A',
+                duration: Duration(seconds: 1)),
+          ]);
       when(() => repo.importOnlineTracksAsFavorites(any()))
           .thenAnswer((_) async => const Right(1));
       getIt.registerSingleton<YtmAccountService>(account);
@@ -496,16 +524,50 @@ void main() {
       await cubit.close();
     });
 
-    test('syncYtmAccountLikes handles a thrown error', () async {
+    test('syncYtmAccountLikes rethrows thrown errors for the UI', () async {
+      final account = _Account();
+      when(() => account.isLoggedIn).thenReturn(true);
+      when(() => account.fetchLikedSongs()).thenThrow(Exception('network'));
+      getIt.registerSingleton<YtmAccountService>(account);
+      final cubit = create();
+      await expectLater(cubit.syncYtmAccountLikes(), throwsA(isA<Exception>()));
+      expect(cubit.state.errorMessage, contains('Failed to sync'));
+      await cubit.close();
+    });
+
+    test('syncYtmAccountLikes rethrows auth failures for session recovery',
+        () async {
       final account = _Account();
       when(() => account.isLoggedIn).thenReturn(true);
       when(() => account.fetchLikedSongs())
-          .thenThrow(Exception('network'));
+          .thenThrow(const YtmException('LOGIN_REQUIRED'));
       getIt.registerSingleton<YtmAccountService>(account);
       final cubit = create();
-      final count = await cubit.syncYtmAccountLikes();
-      expect(count, 0);
-      expect(cubit.state.errorMessage, contains('Failed to sync'));
+      await expectLater(
+        cubit.syncYtmAccountLikes(),
+        throwsA(isA<YtmException>().having((e) => e.isAuth, 'isAuth', isTrue)),
+      );
+      await cubit.close();
+    });
+
+    test('syncYtmAccountLikes throws when the import repository fails',
+        () async {
+      final account = _Account();
+      when(() => account.isLoggedIn).thenReturn(true);
+      when(() => account.fetchLikedSongs()).thenAnswer((_) async => const [
+            YtmTrack(
+                videoId: 'v',
+                title: 'T',
+                artist: 'A',
+                duration: Duration(seconds: 1)),
+          ]);
+      when(() => repo.importOnlineTracksAsFavorites(any()))
+          .thenAnswer((_) async => const Left(DatabaseFailure('no')));
+      getIt.registerSingleton<YtmAccountService>(account);
+      final cubit = create();
+      await expectLater(
+          cubit.syncYtmAccountLikes(), throwsA(isA<YtmException>()));
+      expect(cubit.state.errorMessage, contains('Failed to import'));
       await cubit.close();
     });
   });

@@ -14,6 +14,7 @@ import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
+import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/playlist_usecases.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';
@@ -34,6 +35,8 @@ class _Download extends Mock implements YtmDownloadCubit {}
 class _Playlists extends Mock implements PlaylistUseCases {}
 
 class _Library extends Mock implements LibraryCubit {}
+
+class _Repo extends Mock implements IMusicRepository {}
 
 const _tracks = [
   YtmTrack(
@@ -78,8 +81,10 @@ void main() {
         .thenAnswer((_) async => const Right(9));
     when(() => playlists.addSongsToPlaylist(any(), any()))
         .thenAnswer((_) async => const Right<AppFailure, void>(null));
-    when(() => download.downloadAllDetailed(any())).thenReturn(
-        (queued: 1, skippedLocal: 1, alreadyActive: 0, capped: 1));
+    when(() => playlists.deletePlaylist(any()))
+        .thenAnswer((_) async => const Right<AppFailure, void>(null));
+    when(() => download.downloadAllDetailed(any()))
+        .thenReturn((queued: 1, skippedLocal: 1, alreadyActive: 0, capped: 1));
   });
 
   tearDown(() async {
@@ -217,13 +222,117 @@ void main() {
     expect(find.text('First Track'), findsOneWidget);
   });
 
-  testWidgets('a search with no matches shows the empty hint',
-      (tester) async {
+  testWidgets('a search with no matches shows the empty hint', (tester) async {
     await pump(tester, title: 'Mix', initialTracks: _tracks);
 
     await tester.enterText(find.byType(TextField), 'zzzznomatch');
     await tester.pump();
 
     expect(find.textContaining('No songs match'), findsOneWidget);
+  });
+
+  testWidgets('save-to-pulsr reports an import failure without creating',
+      (tester) async {
+    when(() => library.importYtmTracksAsFavorites(any()))
+        .thenAnswer((_) async => -1);
+    getIt.registerSingleton<PlaylistUseCases>(playlists);
+    await pump(tester, title: 'Bad Mix', initialTracks: _tracks);
+
+    await tester.tap(find.text('Save to Pulsr'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Save failed'), findsWidgets);
+    verifyNever(() => playlists.createPlaylist(any()));
+  });
+
+  testWidgets('save-to-pulsr resolves already-downloaded row ids',
+      (tester) async {
+    final repo = _Repo();
+    when(() => repo.getFavorites()).thenAnswer((_) async => Right([
+          SongsTableData(
+            id: 555,
+            title: 'Downloaded',
+            artist: 'Artist One',
+            album: '',
+            durationMs: 1000,
+            path: '/music/downloaded.mp3',
+            isFavorite: true,
+            isMissing: false,
+            playCount: 0,
+            lastPositionMs: 0,
+            source: 'local',
+            isDownloaded: true,
+            remoteId: 'v1',
+          ),
+        ]));
+    getIt.registerSingleton<IMusicRepository>(repo);
+    getIt.registerSingleton<PlaylistUseCases>(playlists);
+    await pump(tester, title: 'Saved Mix', initialTracks: _tracks);
+
+    await tester.tap(find.text('Save to Pulsr'));
+    await tester.pumpAndSettle();
+
+    verify(() => playlists.addSongsToPlaylist(9, [555])).called(1);
+  });
+
+  testWidgets('save-to-pulsr reports an add failure and cleans up',
+      (tester) async {
+    when(() => playlists.addSongsToPlaylist(any(), any()))
+        .thenAnswer((_) async => const Left(DatabaseFailure('fk')));
+    getIt.registerSingleton<PlaylistUseCases>(playlists);
+    await pump(tester, title: 'Saved Mix', initialTracks: _tracks);
+
+    await tester.tap(find.text('Save to Pulsr'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Save failed'), findsWidgets);
+    verify(() => playlists.deletePlaylist(9)).called(1);
+  });
+
+  testWidgets('a superseded background fetch cannot overwrite newer tracks',
+      (tester) async {
+    final slow = Completer<YtmPlaylistDetails?>();
+    var calls = 0;
+    when(() => account.fetchPlaylistDetails(any(),
+        maxTracks: any(named: 'maxTracks'))).thenAnswer((_) {
+      calls++;
+      if (calls == 1) return slow.future;
+      return Future.value(const YtmPlaylistDetails(
+        id: 'PL1',
+        title: 'Mix',
+        author: 'A',
+        tracks: [
+          YtmTrack(
+              videoId: 'new',
+              title: 'New Track',
+              artist: 'A',
+              duration: Duration(minutes: 1)),
+        ],
+      ));
+    });
+    getIt.registerSingleton<YtmAccountService>(account);
+    getIt.registerSingleton<YtmService>(ytm);
+
+    await pump(tester, title: 'Mix', initialTracks: _tracks);
+    await tester.tap(find.byIcon(Icons.refresh_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('New Track'), findsOneWidget);
+
+    slow.complete(const YtmPlaylistDetails(
+      id: 'PL1',
+      title: 'Old Title',
+      author: 'A',
+      tracks: [
+        YtmTrack(
+            videoId: 'old',
+            title: 'Old Track',
+            artist: 'A',
+            duration: Duration(minutes: 1)),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Old Track'), findsNothing);
+    expect(find.text('New Track'), findsOneWidget);
   });
 }

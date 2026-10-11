@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+
 class EqBand {
   final int index;
   final double centerFrequency; // in Hz
@@ -17,6 +19,22 @@ class EqBand {
     this.filterType = 0,
     this.enabled = true,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EqBand &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          centerFrequency == other.centerFrequency &&
+          gain == other.gain &&
+          q == other.q &&
+          filterType == other.filterType &&
+          enabled == other.enabled;
+
+  @override
+  int get hashCode =>
+      Object.hash(index, centerFrequency, gain, q, filterType, enabled);
 
   EqBand copyWith({
     double? gain,
@@ -71,6 +89,46 @@ class EqPreset {
     this.qFactors,
     this.bandsMap = const {},
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EqPreset &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          bassBoost == other.bassBoost &&
+          listEquals(gains, other.gains) &&
+          listEquals(customFrequencies, other.customFrequencies) &&
+          listEquals(qFactors, other.qFactors) &&
+          _bandsMapEquals(bandsMap, other.bandsMap);
+
+  @override
+  int get hashCode => Object.hash(
+        name,
+        bassBoost,
+        Object.hashAll(gains),
+        customFrequencies == null ? null : Object.hashAll(customFrequencies!),
+        qFactors == null ? null : Object.hashAll(qFactors!),
+        _bandsMapHash(bandsMap),
+      );
+
+  static bool _bandsMapEquals(
+      Map<int, List<double>> a, Map<int, List<double>> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      final other = b[entry.key];
+      if (other == null || !listEquals(entry.value, other)) return false;
+    }
+    return true;
+  }
+
+  static int _bandsMapHash(Map<int, List<double>> map) {
+    final keys = map.keys.toList()..sort();
+    return Object.hashAll([
+      for (final key in keys) Object.hash(key, Object.hashAll(map[key]!)),
+    ]);
+  }
 
   EqPreset copyWith({
     String? name,
@@ -145,7 +203,7 @@ class EqPreset {
   ];
 
   /// ISO 31-band 1/3-octave studio parametric EQ centers (Hz).
-  static const List<double> iso32Frequencies = [
+  static const List<double> iso31Frequencies = [
     20,
     25,
     31.5,
@@ -179,6 +237,11 @@ class EqPreset {
     20000,
   ];
 
+  /// Legacy alias for [iso31Frequencies]. This list has 31 entries (it is the
+  /// ISO 1/3-octave series), not the app's 32-band plan
+  /// ([iso32BandFrequencies]).
+  static const List<double> iso32Frequencies = iso31Frequencies;
+
   /// Default centers for the UI's "32-band" mode. The ISO 1/3-octave series
   /// ([iso32Frequencies]) is 31 bands, which made the 10/32/64 toggle unable
   /// to ever highlight 32 and silently rejected the custom editor. This is a
@@ -211,13 +274,18 @@ class EqPreset {
     if (source.isEmpty) return List<double>.filled(n, 0.0);
     if (source.length == 1) return List<double>.filled(n, source.first);
 
+    // Key the source centers off the exact band count: the app's 32-band plan
+    // (iso32BandFrequencies, 20 Hz–20 kHz) is distinct from the 31-entry ISO
+    // 1/3-octave list, so a 32-band curve converted to 10 bands stays aligned.
     final srcFreqs = source.length == centerFrequencies.length
         ? centerFrequencies
-        : (source.length == iso32Frequencies.length
-            ? iso32Frequencies
-            : (source.length == iso64Frequencies.length
-                ? iso64Frequencies
-                : _logSpread(source.length, targetFrequencies)));
+        : (source.length == iso32BandFrequencies.length
+            ? iso32BandFrequencies
+            : (source.length == iso31Frequencies.length
+                ? iso31Frequencies
+                : (source.length == iso64Frequencies.length
+                    ? iso64Frequencies
+                    : _logSpread(source.length, targetFrequencies))));
 
     return [
       for (final f in targetFrequencies) _interpAtLogFreq(f, srcFreqs, source)

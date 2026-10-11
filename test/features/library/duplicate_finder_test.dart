@@ -84,6 +84,7 @@ void main() {
     String path = '/storage/music/song.mp3',
     int? bitrateKbps,
     int? fileSize,
+    int? cueStartMs,
   }) =>
       createTestSong(
         id: id,
@@ -93,7 +94,7 @@ void main() {
         durationMs: durationMs,
         path: path,
         bitrateKbps: bitrateKbps,
-      ).copyWith(fileSize: Value(fileSize));
+      ).copyWith(fileSize: Value(fileSize), cueStartMs: Value(cueStartMs));
 
   testWidgets(
       'detects duplicates, auto-selects the best quality and deletes the copy',
@@ -166,5 +167,65 @@ void main() {
     ]);
 
     expect(find.text('Identical Title & Artist (2 copies)'), findsOneWidget);
+  });
+
+  testWidgets('CUE chapter rows from one container are not duplicates',
+      (tester) async {
+    await pumpScreen(tester, [
+      song(
+          id: 1,
+          title: 'Track',
+          artist: 'Narrator',
+          durationMs: 300000,
+          path: '/a/book.flac',
+          fileSize: 60000000,
+          cueStartMs: 0),
+      song(
+          id: 2,
+          title: 'Track',
+          artist: 'Narrator',
+          durationMs: 300000,
+          path: '/a/book.flac',
+          fileSize: 60000000,
+          cueStartMs: 300000),
+      song(
+          id: 3,
+          title: 'Track',
+          artist: 'Narrator',
+          durationMs: 300000,
+          path: '/a/book.flac',
+          fileSize: 60000000,
+          cueStartMs: 600000),
+    ]);
+
+    expect(find.text('No Duplicates Found!'), findsOneWidget);
+    expect(find.textContaining('Identical'), findsNothing);
+  });
+
+  testWidgets('real duplicates are still found alongside CUE chapters',
+      (tester) async {
+    await pumpScreen(tester, [
+      song(
+          id: 1,
+          title: 'Track',
+          artist: 'Narrator',
+          durationMs: 300000,
+          path: '/a/book.flac',
+          fileSize: 60000000,
+          cueStartMs: 0),
+      song(
+          id: 2,
+          title: 'Track',
+          artist: 'Narrator',
+          durationMs: 300000,
+          path: '/a/book.flac',
+          fileSize: 60000000,
+          cueStartMs: 300000),
+      song(id: 3, title: 'Real', path: '/a/real.mp3', bitrateKbps: 320),
+      song(id: 4, title: 'Real', path: '/b/real.mp3', bitrateKbps: 320),
+    ]);
+
+    expect(find.text('Identical Title & Artist (2 copies)'), findsOneWidget);
+    expect(find.text('2 tracks'), findsOneWidget);
   });
 }

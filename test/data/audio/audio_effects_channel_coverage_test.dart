@@ -100,15 +100,15 @@ void main() {
       expect(await effects.setBassBoost(100), isFalse);
       expect(await effects.setVirtualizerEnabled(true), isFalse);
       expect(await effects.setVirtualizerStrength(0.5), isFalse);
-      expect(await effects.setDynamicsPreset(DynamicsPreset.off, true), isFalse);
+      expect(
+          await effects.setDynamicsPreset(DynamicsPreset.off, true), isFalse);
       expect(await effects.setSpatializerEnabled(true), isFalse);
       expect(await effects.setEqBands([1.0]), isFalse);
       expect(await effects.setEqBandGain(0, 1.0), isFalse);
       expect(await effects.setEqBandGains([1.0]), isFalse);
       expect(await effects.setNativeEqBand(0, 100, 1.0, 1.0), isFalse);
       expect(
-        await effects.setNativeEqBandsBulk(
-            frequencies: [100.0], gains: [1.0]),
+        await effects.setNativeEqBandsBulk(frequencies: [100.0], gains: [1.0]),
         isFalse,
       );
       expect(await effects.setNativeEqBandCount(1), isFalse);
@@ -140,7 +140,8 @@ void main() {
       expect(await effects.sendWarmupBuffer(), isFalse);
     });
 
-    test('setDvcGain rejects a non-finite gain without a channel call', () async {
+    test('setDvcGain rejects a non-finite gain without a channel call',
+        () async {
       expect(await AudioEffectsChannel().setDvcGain(double.infinity), isFalse);
       expect(await AudioEffectsChannel().setDvcGain(double.nan), isFalse);
       expect(calls.where((c) => c.method == 'setDvcGain'), isEmpty);
@@ -163,8 +164,8 @@ void main() {
       expect(await effects.getDspBatteryDrainEstimate(), isEmpty);
       expect(await effects.getChainOfCustodyReport(), isEmpty);
       expect(await effects.verifyState(), isNull);
-      expect(await effects.detectOemAudio(),
-          containsPair('hasOemAudio', false));
+      expect(
+          await effects.detectOemAudio(), containsPair('hasOemAudio', false));
       expect(await effects.detectSystemEffects(),
           containsPair('status', 'unknown'));
       expect(await effects.getSystemEffectsStatus(),
@@ -186,7 +187,8 @@ void main() {
     });
 
     test('loadLiveProgCode returns the error string on failure', () async {
-      stub((_) async => throw PlatformException(code: 'COMPILE', message: 'bad'));
+      stub((_) async =>
+          throw PlatformException(code: 'COMPILE', message: 'bad'));
       final result = await AudioEffectsChannel().loadLiveProgCode('@init');
       expect(result, contains('PlatformException'));
     });
@@ -297,9 +299,8 @@ void main() {
 
   group('telemetry', () {
     test('a list payload parses and a non-list throws', () async {
-      stub((call) async => call.method == 'getTelemetry'
-          ? List<dynamic>.filled(17, 0.0)
-          : null);
+      stub((call) async =>
+          call.method == 'getTelemetry' ? List<dynamic>.filled(17, 0.0) : null);
       final telemetry = await AudioEffectsChannel().getTelemetry();
       expect(telemetry, isA<DspTelemetry>());
       expect(telemetry.autoDegradedStages, 0);

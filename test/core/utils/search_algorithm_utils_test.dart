@@ -87,6 +87,31 @@ void main() {
           SearchAlgorithmUtils.filterWithFuzzy(big, 'song', 'Songs');
       expect(results.length, SearchAlgorithmUtils.maxResultCount);
     });
+
+    test('a raised maxResults surfaces the matches beyond the default cap', () {
+      final big = List.generate(
+        SearchAlgorithmUtils.maxResultCount + 60,
+        (i) => _song(id: i + 1, title: 'Song $i', artist: 'Artist'),
+      );
+      final raised = SearchAlgorithmUtils.filterWithFuzzy(big, 'song', 'Songs',
+          maxResults: SearchAlgorithmUtils.maxResultCount + 100);
+      expect(raised.length, big.length);
+    });
+
+    test('normalizes the incoming query (mixed case and padding match)', () {
+      final results =
+          SearchAlgorithmUtils.filterWithFuzzy(songs, '  COLDPLAY ', 'Artists');
+      expect(results.map((s) => s.artist), contains('Coldplay'));
+    });
+
+    test('long-word typos still match through the trigram pre-filter', () {
+      final pool = [
+        _song(id: 9, title: 'Extraordinary Machine', artist: 'Fiona'),
+      ];
+      final results =
+          SearchAlgorithmUtils.filterWithFuzzy(pool, 'extraordinery', 'Songs');
+      expect(results.map((s) => s.id), [9]);
+    });
   });
 
   // C-04: format filter chips.

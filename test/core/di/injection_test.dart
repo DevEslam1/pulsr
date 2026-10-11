@@ -1,4 +1,5 @@
 // test/core/di/injection_test.dart
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -46,15 +47,15 @@ void main() {
 
       expect(
         () => validateDependencies(getIt),
-        throwsA(isA<StateError>().having(
-            (e) => e.message, 'message', contains('AppDatabase'))),
+        throwsA(isA<StateError>()
+            .having((e) => e.message, 'message', contains('AppDatabase'))),
       );
 
       getIt.registerSingleton<AppDatabase>(_MockAppDatabase());
       expect(
         () => validateDependencies(getIt),
-        throwsA(isA<StateError>()
-            .having((e) => e.message, 'message', contains('PulsrAudioHandler'))),
+        throwsA(isA<StateError>().having(
+            (e) => e.message, 'message', contains('PulsrAudioHandler'))),
       );
     });
   });
@@ -94,5 +95,62 @@ void main() {
 
   test('initializationReady is a future signal', () {
     expect(initializationReady, isA<Future<void>>());
+  });
+
+  group('app dependency readiness gate', () {
+    setUp(() async {
+      await getIt.reset();
+    });
+
+    tearDown(() async {
+      await getIt.reset();
+    });
+
+    test('ready when the required singletons resolve synchronously', () {
+      getIt.registerSingleton<PulsrAudioHandler>(_MockAudioHandler());
+      getIt.registerSingleton<PlayerCubit>(_MockPlayerCubit());
+
+      expect(appDependenciesReady, isTrue);
+    });
+
+    test('not ready when a required singleton is missing', () {
+      getIt.registerSingleton<PulsrAudioHandler>(_MockAudioHandler());
+
+      expect(appDependenciesReady, isFalse);
+    });
+
+    test('not ready while an async singleton is still warming up', () async {
+      final completer = Completer<PulsrAudioHandler>();
+      getIt.registerSingletonAsync<PulsrAudioHandler>(() => completer.future);
+      getIt.registerSingleton<PlayerCubit>(_MockPlayerCubit());
+
+      expect(appDependenciesReady, isFalse);
+
+      completer.complete(_MockAudioHandler());
+      await getIt.getAsync<PulsrAudioHandler>();
+
+      expect(appDependenciesReady, isTrue);
+    });
+
+    test('ensureAppDependenciesReady awaits pending singletons', () async {
+      final completer = Completer<PulsrAudioHandler>();
+      getIt.registerSingletonAsync<PulsrAudioHandler>(() => completer.future);
+      getIt.registerSingleton<PlayerCubit>(_MockPlayerCubit());
+
+      final pending = ensureAppDependenciesReady();
+      completer.complete(_MockAudioHandler());
+
+      expect(await pending, isTrue);
+    });
+
+    test('ensureAppDependenciesReady returns false instead of throwing',
+        () async {
+      // Empty graph: the lookup throws, but the gate must stay recoverable.
+      expect(
+        await ensureAppDependenciesReady(
+            timeout: const Duration(milliseconds: 50)),
+        isFalse,
+      );
+    });
   });
 }

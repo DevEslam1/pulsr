@@ -164,11 +164,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final queuedTask = task.copyWith(
       status: DownloadStatus.queued,
       progress: 0.0,
-      error: null,
+      clearError: true,
+      clearSpeedKbps: true,
+      clearEtaSeconds: true,
     );
 
     _pausedVideoIds.remove(videoId);
-    _updateTask(queuedTask);
+    _updateTask(queuedTask, allowInsert: true);
 
     if (!_activeVideoIds.contains(videoId) && !_queue.contains(videoId)) {
       _queue.add(videoId);
@@ -231,8 +233,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     _pausedVideoIds.remove(videoId);
     _ytDownloadService.clearPaused(videoId);
     _notifyNativePaused(videoId, false);
-    final queuedTask =
-        task.copyWith(status: DownloadStatus.queued, error: null);
+    final queuedTask = task.copyWith(
+      status: DownloadStatus.queued,
+      clearError: true,
+      clearSpeedKbps: true,
+      clearEtaSeconds: true,
+    );
     _updateTask(queuedTask);
 
     if (!_activeVideoIds.contains(videoId) && !_queue.contains(videoId)) {
@@ -255,7 +261,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     return (await queueDownload(task.copyWith(
       status: DownloadStatus.queued,
       progress: 0.0,
-      error: null,
+      clearError: true,
+      clearSpeedKbps: true,
+      clearEtaSeconds: true,
     )))
         .fold(
       (f) => Left(f),
@@ -605,8 +613,11 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   final Map<String, DownloadTask> _pendingThrottledTasks = {};
   static const _throttleMs = 100;
 
-  void _updateTask(DownloadTask task) {
+  void _updateTask(DownloadTask task, {bool allowInsert = false}) {
     if (_streamController.isClosed) return;
+    // A task removed by deleteDownload must never be resurrected by a late
+    // progress/completion/failure update. Only admission may insert a new key.
+    if (!allowInsert && !_tasks.containsKey(task.videoId)) return;
     _tasks[task.videoId] = task;
 
     final videoId = task.videoId;
@@ -762,16 +773,22 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               !_tasks.containsKey(videoId)) {
             break;
           }
-          final current = _tasks[videoId] ?? task;
+          final current = _tasks[videoId];
+          if (current == null) break;
           _updateTask(current.copyWith(
             status: DownloadStatus.downloading,
-            error: null,
+            clearError: true,
+            clearSpeedKbps: true,
+            clearEtaSeconds: true,
           ));
         }
         result = await _ytDownloadService.download(
           songRow,
           onProgress: (p) {
             if (_pausedVideoIds.contains(videoId)) return;
+            // A deleted task must not be resurrected by a late progress tick.
+            final progressTask = _tasks[videoId];
+            if (progressTask == null) return;
 
             final mappedStatus = switch (p.stage) {
               YtDownloadStage.queued => DownloadStatus.queued,
@@ -786,7 +803,6 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               YtDownloadStage.canceled => DownloadStatus.downloading,
             };
 
-            final progressTask = _tasks[videoId] ?? task;
             _updateTask(progressTask.copyWith(
               status: mappedStatus,
               progress: p.fraction ?? progressTask.progress,
@@ -819,21 +835,26 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         return;
       }
 
-      result.fold(
-        (failure) {
+      // Await the completion branch: a discarded future let `finally` free the
+      // slot and deleters run between the DB read and `_updateTask(complete)`,
+      // resurrecting a task the user had already removed.
+      await result.fold(
+        (failure) async {
           // Classify via YtmErrorClassifier for localized message, but repository keeps raw for UI to map
-          final current = _tasks[videoId] ?? task;
+          final current = _tasks[videoId];
+          if (current == null) return;
           _updateTask(current.copyWith(
             status: DownloadStatus.failed,
             error: failure.message,
-            speedKbps: null,
-            etaSeconds: null,
+            clearSpeedKbps: true,
+            clearEtaSeconds: true,
           ));
         },
         (newId) async {
           _cachedStorageStats =
               null; // Invalidate storage stats cache on completion
-          final current = _tasks[videoId] ?? task;
+          final current = _tasks[videoId];
+          if (current == null) return;
           String? resolvedPath =
               current.filePath ?? _ytDownloadService.getDownloadedPath(videoId);
           int? resolvedSize = current.fileSize;
@@ -868,12 +889,15 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             }
           }
 
-          _updateTask(current.copyWith(
+          // Re-read after the async DB read: a delete may have landed meanwhile.
+          final latest = _tasks[videoId];
+          if (latest == null) return;
+          _updateTask(latest.copyWith(
             status: DownloadStatus.complete,
             progress: 1.0,
-            error: null,
-            speedKbps: null,
-            etaSeconds: null,
+            clearError: true,
+            clearSpeedKbps: true,
+            clearEtaSeconds: true,
             localSongId: newId,
             filePath: resolvedPath,
             fileSize: resolvedSize,
@@ -888,8 +912,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         _updateTask(current.copyWith(
           status: DownloadStatus.failed,
           error: e.toString(),
-          speedKbps: null,
-          etaSeconds: null,
+          clearSpeedKbps: true,
+          clearEtaSeconds: true,
         ));
       }
     } finally {

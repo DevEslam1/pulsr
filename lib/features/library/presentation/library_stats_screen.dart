@@ -23,6 +23,7 @@ import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../sheets/song_info_sheet.dart';
+import 'library_quality_utils.dart';
 
 class LibraryStatsScreen extends StatefulWidget {
   final IMusicRepository? musicRepository;
@@ -81,6 +82,72 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
     final days = _timeRangeIndex == 0 ? 7 : 30;
     final cutoffMs = nowMs - (days * 24 * 60 * 60 * 1000);
     return songs.where((s) => (s.lastPlayed ?? 0) >= cutoffMs).toList();
+  }
+
+  List<SongsTableData>? _statsSongsRef;
+  int? _statsTimeRangeRef;
+  _LibraryStats? _statsCache;
+
+  /// Memoized on the songs list identity plus the time-range filter so a
+  /// rebuild (e.g. a LibraryState emission) does not re-sort the whole
+  /// library and re-aggregate artist plays.
+  _LibraryStats _computeStats(List<SongsTableData> songs) {
+    if (_statsCache != null &&
+        identical(_statsSongsRef, songs) &&
+        _statsTimeRangeRef == _timeRangeIndex) {
+      return _statsCache!;
+    }
+
+    final totalDurationMs = songs.fold<int>(0, (sum, s) => sum + s.durationMs);
+    final totalSizeBytes =
+        songs.fold<int>(0, (sum, s) => sum + (s.fileSize ?? 0));
+    final totalPlays = songs.fold<int>(0, (sum, s) => sum + s.playCount);
+    final losslessCount = songs.where(isLosslessSong).length;
+    final lossyCount = songs.length - losslessCount;
+
+    // Most played songs
+    final statsSongs = _filterSongsByTimeRange(songs);
+    final topPlayed = List<SongsTableData>.from(statsSongs)
+      ..sort((a, b) => b.playCount.compareTo(a.playCount));
+    final topSongs = topPlayed.where((s) => s.playCount > 0).take(10).toList();
+
+    // Top artists by total song plays
+    final Map<String, int> artistPlayCounts = {};
+    final Map<String, int> artistTrackCounts = {};
+    for (final s in songs) {
+      final artistName = s.artist.trim();
+      if (artistName.isEmpty || artistName == 'Unknown Artist') {
+        continue;
+      }
+      artistPlayCounts[artistName] =
+          (artistPlayCounts[artistName] ?? 0) + s.playCount;
+      artistTrackCounts[artistName] = (artistTrackCounts[artistName] ?? 0) + 1;
+    }
+    final sortedArtists = artistPlayCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topArtists = sortedArtists.take(5).toList();
+
+    // Recently played
+    final recentSongs = List<SongsTableData>.from(songs)
+      ..sort((a, b) => (b.lastPlayed ?? 0).compareTo(a.lastPlayed ?? 0));
+    final recentlyPlayed =
+        recentSongs.where((s) => (s.lastPlayed ?? 0) > 0).take(5).toList();
+
+    final stats = _LibraryStats(
+      totalDurationMs: totalDurationMs,
+      totalSizeBytes: totalSizeBytes,
+      totalPlays: totalPlays,
+      losslessCount: losslessCount,
+      lossyCount: lossyCount,
+      topSongs: topSongs,
+      topArtists: topArtists,
+      artistTrackCounts: artistTrackCounts,
+      recentlyPlayed: recentlyPlayed,
+    );
+    _statsSongsRef = songs;
+    _statsTimeRangeRef = _timeRangeIndex;
+    _statsCache = stats;
+    return stats;
   }
 
   DateTime? _lastLoadedAt;
@@ -198,58 +265,18 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
             final artists = state.artists;
             final albums = state.albums;
 
-            final totalDurationMs =
-                songs.fold<int>(0, (sum, s) => sum + s.durationMs);
-            final totalSizeBytes =
-                songs.fold<int>(0, (sum, s) => sum + (s.fileSize ?? 0));
-            final totalPlays =
-                songs.fold<int>(0, (sum, s) => sum + s.playCount);
-
-            final losslessCount = songs
-                .where((s) =>
-                    s.codec == 'FLAC' ||
-                    s.codec == 'ALAC' ||
-                    (s.bitDepth != null && s.bitDepth! > 16))
-                .length;
-            final lossyCount = songs.length - losslessCount;
+            final stats = _computeStats(songs);
+            final losslessCount = stats.losslessCount;
+            final lossyCount = stats.lossyCount;
+            final topSongs = stats.topSongs;
+            final topArtists = stats.topArtists;
+            final artistTrackCounts = stats.artistTrackCounts;
+            final recentlyPlayed = stats.recentlyPlayed;
 
             final totalHours =
-                (totalDurationMs / (1000 * 60 * 60)).toStringAsFixed(1);
-            final totalGb =
-                (totalSizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(2);
-
-            // Most played songs
-            final statsSongs = _filterSongsByTimeRange(songs);
-            final topPlayed = List<SongsTableData>.from(statsSongs)
-              ..sort((a, b) => b.playCount.compareTo(a.playCount));
-            final topSongs =
-                topPlayed.where((s) => s.playCount > 0).take(10).toList();
-
-            // Top artists by total song plays
-            final Map<String, int> artistPlayCounts = {};
-            final Map<String, int> artistTrackCounts = {};
-            for (final s in songs) {
-              final artistName = s.artist.trim();
-              if (artistName.isEmpty || artistName == 'Unknown Artist') {
-                continue;
-              }
-              artistPlayCounts[artistName] =
-                  (artistPlayCounts[artistName] ?? 0) + s.playCount;
-              artistTrackCounts[artistName] =
-                  (artistTrackCounts[artistName] ?? 0) + 1;
-            }
-            final sortedArtists = artistPlayCounts.entries.toList()
-              ..sort((a, b) => b.value.compareTo(a.value));
-            final topArtists = sortedArtists.take(5).toList();
-
-            // Recently played
-            final recentSongs = List<SongsTableData>.from(songs)
-              ..sort(
-                  (a, b) => (b.lastPlayed ?? 0).compareTo(a.lastPlayed ?? 0));
-            final recentlyPlayed = recentSongs
-                .where((s) => (s.lastPlayed ?? 0) > 0)
-                .take(5)
-                .toList();
+                (stats.totalDurationMs / (1000 * 60 * 60)).toStringAsFixed(1);
+            final totalGb = (stats.totalSizeBytes / (1024 * 1024 * 1024))
+                .toStringAsFixed(2);
 
             return Center(
               child: ConstrainedBox(
@@ -322,7 +349,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                   context,
                                   icon: Icons.play_circle_filled_rounded,
                                   title: context.l10n.browseTotalPlays,
-                                  value: totalPlays.toString(),
+                                  value: stats.totalPlays.toString(),
                                   color: p.accent,
                                   p: p,
                                 )),
@@ -816,4 +843,28 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
       ),
     );
   }
+}
+
+class _LibraryStats {
+  final int totalDurationMs;
+  final int totalSizeBytes;
+  final int totalPlays;
+  final int losslessCount;
+  final int lossyCount;
+  final List<SongsTableData> topSongs;
+  final List<MapEntry<String, int>> topArtists;
+  final Map<String, int> artistTrackCounts;
+  final List<SongsTableData> recentlyPlayed;
+
+  const _LibraryStats({
+    required this.totalDurationMs,
+    required this.totalSizeBytes,
+    required this.totalPlays,
+    required this.losslessCount,
+    required this.lossyCount,
+    required this.topSongs,
+    required this.topArtists,
+    required this.artistTrackCounts,
+    required this.recentlyPlayed,
+  });
 }

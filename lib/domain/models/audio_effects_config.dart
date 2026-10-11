@@ -1,4 +1,5 @@
 // lib/domain/models/audio_effects_config.dart
+import 'package:flutter/foundation.dart';
 
 enum DynamicsPreset {
   off('Direct', 'No compression or dynamics processing applied'),
@@ -109,6 +110,95 @@ class AudioEffectsConfig {
     this.dynamicBassSideGainHigh = 0.50,
     this.dynamicBassPreset = 0,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AudioEffectsConfig &&
+          runtimeType == other.runtimeType &&
+          isVirtualizerEnabled == other.isVirtualizerEnabled &&
+          virtualizerStrength == other.virtualizerStrength &&
+          isDynamicsEnabled == other.isDynamicsEnabled &&
+          dynamicsPreset == other.dynamicsPreset &&
+          isDynamicsBypassed == other.isDynamicsBypassed &&
+          isSaturationEnabled == other.isSaturationEnabled &&
+          saturationDrive == other.saturationDrive &&
+          saturationMix == other.saturationMix &&
+          saturationTilt == other.saturationTilt &&
+          saturationMode == other.saturationMode &&
+          isStereoWidthEnabled == other.isStereoWidthEnabled &&
+          stereoWidth == other.stereoWidth &&
+          stereoWidthMultiband == other.stereoWidthMultiband &&
+          stereoWidthLow == other.stereoWidthLow &&
+          stereoWidthMid == other.stereoWidthMid &&
+          stereoWidthHigh == other.stereoWidthHigh &&
+          stereoWidthLowCrossoverHz == other.stereoWidthLowCrossoverHz &&
+          stereoWidthHighCrossoverHz == other.stereoWidthHighCrossoverHz &&
+          isLoudnessContourEnabled == other.isLoudnessContourEnabled &&
+          loudnessContourIntensity == other.loudnessContourIntensity &&
+          isSubCrossoverEnabled == other.isSubCrossoverEnabled &&
+          subCrossoverCornerHz == other.subCrossoverCornerHz &&
+          subCrossoverSlopeDbPerOct == other.subCrossoverSlopeDbPerOct &&
+          subCrossoverGain == other.subCrossoverGain &&
+          subCrossoverBassMono == other.subCrossoverBassMono &&
+          subCrossoverAntiPop == other.subCrossoverAntiPop &&
+          isDynamicEqEnabled == other.isDynamicEqEnabled &&
+          listEquals(dynamicEqBands, other.dynamicEqBands) &&
+          isMultibandCompressorEnabled == other.isMultibandCompressorEnabled &&
+          listEquals(
+              multibandCompressorBands, other.multibandCompressorBands) &&
+          isDynamicBassEnabled == other.isDynamicBassEnabled &&
+          dynamicBassStrength == other.dynamicBassStrength &&
+          dynamicBassXLow == other.dynamicBassXLow &&
+          dynamicBassXHigh == other.dynamicBassXHigh &&
+          dynamicBassYLow == other.dynamicBassYLow &&
+          dynamicBassYHigh == other.dynamicBassYHigh &&
+          dynamicBassSideGainLow == other.dynamicBassSideGainLow &&
+          dynamicBassSideGainHigh == other.dynamicBassSideGainHigh &&
+          dynamicBassPreset == other.dynamicBassPreset;
+
+  @override
+  int get hashCode => Object.hashAll([
+        isVirtualizerEnabled,
+        virtualizerStrength,
+        isDynamicsEnabled,
+        dynamicsPreset,
+        isDynamicsBypassed,
+        isSaturationEnabled,
+        saturationDrive,
+        saturationMix,
+        saturationTilt,
+        saturationMode,
+        isStereoWidthEnabled,
+        stereoWidth,
+        stereoWidthMultiband,
+        stereoWidthLow,
+        stereoWidthMid,
+        stereoWidthHigh,
+        stereoWidthLowCrossoverHz,
+        stereoWidthHighCrossoverHz,
+        isLoudnessContourEnabled,
+        loudnessContourIntensity,
+        isSubCrossoverEnabled,
+        subCrossoverCornerHz,
+        subCrossoverSlopeDbPerOct,
+        subCrossoverGain,
+        subCrossoverBassMono,
+        subCrossoverAntiPop,
+        isDynamicEqEnabled,
+        Object.hashAll(dynamicEqBands),
+        isMultibandCompressorEnabled,
+        Object.hashAll(multibandCompressorBands),
+        isDynamicBassEnabled,
+        dynamicBassStrength,
+        dynamicBassXLow,
+        dynamicBassXHigh,
+        dynamicBassYLow,
+        dynamicBassYHigh,
+        dynamicBassSideGainLow,
+        dynamicBassSideGainHigh,
+        dynamicBassPreset,
+      ]);
 
   AudioEffectsConfig copyWith({
     bool? isVirtualizerEnabled,
@@ -438,6 +528,25 @@ class DynamicBassConfig {
     this.sideGainHigh = 0.50,
     this.preset = 0,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DynamicBassConfig &&
+          runtimeType == other.runtimeType &&
+          enabled == other.enabled &&
+          strength == other.strength &&
+          xLow == other.xLow &&
+          xHigh == other.xHigh &&
+          yLow == other.yLow &&
+          yHigh == other.yHigh &&
+          sideGainLow == other.sideGainLow &&
+          sideGainHigh == other.sideGainHigh &&
+          preset == other.preset;
+
+  @override
+  int get hashCode => Object.hash(enabled, strength, xLow, xHigh, yLow, yHigh,
+      sideGainLow, sideGainHigh, preset);
 
   DynamicBassConfig copyWith({
     bool? enabled,

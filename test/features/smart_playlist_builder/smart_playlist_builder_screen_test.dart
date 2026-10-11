@@ -41,6 +41,7 @@ void main() {
         .thenAnswer((_) => const Stream<List<SongsTableData>>.empty());
     when(() => engine.evaluateCriteria(any()))
         .thenAnswer((_) async => const []);
+    when(() => engine.validateRules(any())).thenReturn(const []);
     cubit = SmartPlaylistBuilderCubit(engine, PlaylistUseCases(repo, engine));
     getIt.registerSingleton<SmartPlaylistBuilderCubit>(cubit);
     addTearDown(() async {
@@ -82,8 +83,8 @@ void main() {
     await tester.tap(find.text('Add Rule'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(DropdownButtonFormField<SmartRuleField>),
-        findsNWidgets(2));
+    expect(
+        find.byType(DropdownButtonFormField<SmartRuleField>), findsNWidgets(2));
   });
 
   testWidgets('rejects a non-positive track limit and clears on a valid one',
@@ -113,8 +114,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // The selected template's name lands in the (previously empty) name field.
-    final nameField = tester.widget<TextField>(
-        find.widgetWithText(TextField, 'e.g. 80s Rock Hits, Heavy Rotation...'));
+    final nameField = tester.widget<TextField>(find.widgetWithText(
+        TextField, 'e.g. 80s Rock Hits, Heavy Rotation...'));
     expect(nameField.controller!.text, isNotEmpty);
   });
 
@@ -168,8 +169,41 @@ void main() {
     await pumpBuilder(tester, initial: existing);
 
     expect(find.text('Edit Playlist'), findsOneWidget);
-    final nameField = tester.widget<TextField>(
-        find.widgetWithText(TextField, 'e.g. 80s Rock Hits, Heavy Rotation...'));
+    final nameField = tester.widget<TextField>(find.widgetWithText(
+        TextField, 'e.g. 80s Rock Hits, Heavy Rotation...'));
     expect(nameField.controller!.text, 'My Smart');
+  });
+
+  testWidgets('a stale error is not re-shown after a later edit',
+      (tester) async {
+    await pumpBuilder(tester);
+
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+    expect(find.text('Please enter a playlist name'), findsOneWidget);
+
+    // Let the snackbar finish entering, then auto-dismiss.
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+        find.widgetWithText(TextField, 'e.g. 80s Rock Hits, Heavy Rotation...'),
+        'Now Named');
+    await tester.pump();
+
+    expect(find.text('Please enter a playlist name'), findsNothing);
+  });
+
+  testWidgets('the sort direction toggle flips sortAscending', (tester) async {
+    await pumpBuilder(tester);
+
+    expect(cubit.state.criteria.sortAscending, isTrue);
+    await tester.tap(find.byTooltip('Descending'));
+    await tester.pump();
+
+    expect(cubit.state.criteria.sortAscending, isFalse);
+    expect(cubit.state.criteria.sortBy, 'title');
+    expect(find.byTooltip('Ascending'), findsOneWidget);
   });
 }

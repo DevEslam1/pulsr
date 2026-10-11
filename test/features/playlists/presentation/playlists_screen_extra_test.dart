@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/services/playlist_suggestions_service.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
@@ -94,24 +95,22 @@ void main() {
     loginState = ValueNotifier<bool>(false);
     settings = _Settings();
 
-    when(() => cubit.state)
-        .thenReturn(const PlaylistState(isLoading: false));
+    when(() => cubit.state).thenReturn(const PlaylistState(isLoading: false));
     when(() => cubit.stream).thenAnswer((_) => states.stream);
     when(() => cubit.ytmOnline).thenReturn(online);
     when(() => cubit.createPlaylist(any())).thenAnswer((_) async {});
     when(() => cubit.renamePlaylist(any(), any())).thenAnswer((_) async {});
     when(() => cubit.deletePlaylist(any())).thenAnswer((_) async {});
     when(() => cubit.restorePlaylist(any(),
-            isSmart: any(named: 'isSmart'),
-            criteria: any(named: 'criteria'),
-            songIds: any(named: 'songIds'))).thenAnswer((_) async => 1);
+        isSmart: any(named: 'isSmart'),
+        criteria: any(named: 'criteria'),
+        songIds: any(named: 'songIds'))).thenAnswer((_) async => 1);
     when(() => cubit.autoFetchOnlineLibrary()).thenAnswer((_) async {});
     when(() => cubit.autoFetchOnlineLibrary(force: true))
         .thenAnswer((_) async {});
     when(() => cubit.fetchLikedSongsPlaylist()).thenAnswer((_) async {});
     when(() => cubit.fetchAccountPlaylists()).thenAnswer((_) async {});
-    when(() => cubit.fetchOnlinePlaylistByUrl(any()))
-        .thenAnswer((_) async {});
+    when(() => cubit.fetchOnlinePlaylistByUrl(any())).thenAnswer((_) async {});
     when(() => cubit.removeCustomPlaylist(any())).thenReturn(null);
     when(() => cubit.restoreCustomPlaylist(any())).thenReturn(null);
 
@@ -135,10 +134,9 @@ void main() {
     when(() => useCases.addSongsToPlaylist(any(), any()))
         .thenAnswer((_) async => const Right(null));
     final export = _Export();
-    when(() => export.exportToFile(any(), any(),
-            format: any(named: 'format')))
-        .thenAnswer((_) async =>
-            File('${Directory.systemTemp.path}/pulsr_export.m3u'));
+    when(() => export.exportToFile(any(), any(), format: any(named: 'format')))
+        .thenAnswer(
+            (_) async => File('${Directory.systemTemp.path}/pulsr_export.m3u'));
     final account = _Account();
     when(() => account.loginState).thenReturn(loginState);
     when(() => account.isLoggedIn).thenReturn(false);
@@ -193,13 +191,15 @@ void main() {
     testWidgets('renders a suggestion and creates a playlist from it',
         (tester) async {
       final suggestions = getIt<PlaylistSuggestionsService>() as _Suggestions;
-      when(() => suggestions.generateSuggestionsAsync(any(),
-          forceRefresh: any(named: 'forceRefresh'))).thenAnswer((_) async => [
-            PlaylistSuggestion(
-                title: 'Heavy Rotation Mix',
-                description: 'your top tracks',
-                songs: [createTestSong(id: 1)]),
-          ]);
+      when(() =>
+              suggestions.generateSuggestionsAsync(any(),
+                  forceRefresh: any(named: 'forceRefresh')))
+          .thenAnswer((_) async => [
+                PlaylistSuggestion(
+                    title: 'Heavy Rotation Mix',
+                    description: 'your top tracks',
+                    songs: [createTestSong(id: 1)]),
+              ]);
 
       await pumpScreen(tester);
       await emit(tester, PlaylistState(playlists: [userPlaylist]));
@@ -212,11 +212,43 @@ void main() {
       verify(() => useCases.createPlaylist('Heavy Rotation Mix')).called(1);
       verify(() => useCases.addSongsToPlaylist(9, [1])).called(1);
     });
+
+    testWidgets('a double-tap creates a single playlist', (tester) async {
+      final suggestions = getIt<PlaylistSuggestionsService>() as _Suggestions;
+      when(() =>
+              suggestions.generateSuggestionsAsync(any(),
+                  forceRefresh: any(named: 'forceRefresh')))
+          .thenAnswer((_) async => [
+                PlaylistSuggestion(
+                    title: 'Double Tap Mix',
+                    description: 'x',
+                    songs: [createTestSong(id: 1)]),
+              ]);
+
+      await pumpScreen(tester);
+      await emit(tester, PlaylistState(playlists: [userPlaylist]));
+      expect(find.text('Double Tap Mix'), findsOneWidget);
+
+      // Hold the first create open so the second tap lands mid-flight.
+      final completer = Completer<Result<int>>();
+      final useCases = getIt<PlaylistUseCases>() as _PlaylistUseCases;
+      when(() => useCases.createPlaylist(any()))
+          .thenAnswer((_) => completer.future);
+
+      await tester.tap(find.text('Double Tap Mix'));
+      await tester.pump();
+      await tester.tap(find.text('Double Tap Mix'));
+      await tester.pump();
+
+      completer.complete(const Right(9));
+      await tester.pumpAndSettle();
+
+      verify(() => useCases.createPlaylist('Double Tap Mix')).called(1);
+    });
   });
 
   group('local playlist menus', () {
-    testWidgets('rename flow pushes the new name to the cubit',
-        (tester) async {
+    testWidgets('rename flow pushes the new name to the cubit', (tester) async {
       await pumpScreen(tester);
       await emit(tester, PlaylistState(playlists: [userPlaylist]));
 
@@ -250,12 +282,10 @@ void main() {
           criteria: any(named: 'criteria'),
           songIds: any(named: 'songIds'))).called(1);
     });
-
   });
 
   group('smart playlist menu', () {
-    testWidgets('edit smart rules navigates to the builder',
-        (tester) async {
+    testWidgets('edit smart rules navigates to the builder', (tester) async {
       await pumpScreen(tester);
       await emit(tester, PlaylistState(playlists: [smartPlaylist]));
 

@@ -111,13 +111,18 @@ class RadioStation {
     return !_isUnsafeHost(host);
   }
 
-  /// Rejects loopback, link-local, unique-local and RFC 1918 hosts.
+  /// Rejects loopback, link-local, unique-local, unspecified, CGNAT and
+  /// RFC 1918 hosts, including IPv4 addresses embedded in IPv6 mapped
+  /// (`::ffff:192.168.1.1`, `::ffff:7f00:1`) or compatible forms.
   static bool _isUnsafeHost(String host) {
     final lower = host.toLowerCase();
     if (lower == 'localhost' || lower.endsWith('.local')) return true;
 
     if (lower.contains(':')) {
-      if (lower == '::1') return true;
+      const loopbacks = {'::', '::1', '0:0:0:0:0:0:0:0', '0:0:0:0:0:0:0:1'};
+      if (loopbacks.contains(lower)) return true;
+      final embedded = _embeddedIpv4(lower);
+      if (embedded != null) return _isUnsafeIpv4(embedded);
       final firstGroup = lower.split(':').first;
       final value = int.tryParse(firstGroup, radix: 16);
       if (value != null) {
@@ -128,7 +133,41 @@ class RadioStation {
       return false;
     }
 
-    final parts = lower.split('.');
+    return _isUnsafeIpv4(lower);
+  }
+
+  /// Extracts the embedded IPv4 address from an IPv6 mapped/compatible host
+  /// (`::ffff:a.b.c.d`, `::ffff:hhhh:hhhh`, `::a.b.c.d`) or returns null when
+  /// the host is a genuine IPv6 address.
+  static String? _embeddedIpv4(String lower) {
+    final groups = lower.split(':');
+    var marker = -1;
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i] == 'ffff') {
+        marker = i;
+        break;
+      }
+    }
+    final prefixEnd = marker == -1 ? groups.length - 1 : marker;
+    for (var i = 0; i < prefixEnd; i++) {
+      final group = groups[i];
+      if (group.isNotEmpty && int.tryParse(group, radix: 16) != 0) return null;
+    }
+    final rest = groups.sublist(marker == -1 ? groups.length - 1 : marker + 1);
+    if (rest.length == 1) {
+      return rest.first.contains('.') ? rest.first : null;
+    }
+    if (rest.length != 2) return null;
+    final high = int.tryParse(rest[0].padLeft(4, '0'), radix: 16);
+    final low = int.tryParse(rest[1].padLeft(4, '0'), radix: 16);
+    if (high == null || low == null || high > 0xffff || low > 0xffff) {
+      return null;
+    }
+    return '${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}';
+  }
+
+  static bool _isUnsafeIpv4(String host) {
+    final parts = host.split('.');
     if (parts.length != 4) return false;
     final octets = <int>[];
     for (final part in parts) {
@@ -138,11 +177,13 @@ class RadioStation {
     }
     final a = octets[0];
     final b = octets[1];
+    if (a == 0) return true; // 0.0.0.0/8 (unspecified)
     if (a == 127) return true; // 127.0.0.0/8
     if (a == 10) return true; // 10.0.0.0/8
     if (a == 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
     if (a == 192 && b == 168) return true; // 192.168.0.0/16
     if (a == 169 && b == 254) return true; // 169.254.0.0/16
+    if (a == 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 (CGNAT)
     return false;
   }
 

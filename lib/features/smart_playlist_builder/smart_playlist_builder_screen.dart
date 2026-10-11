@@ -51,6 +51,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
   late final TextEditingController _nameController;
   late final TextEditingController _limitController;
   String? _limitError;
+  String? _lastShownError;
 
   @override
   void initState() {
@@ -73,14 +74,22 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
     final p = context.palette;
     return BlocConsumer<SmartPlaylistBuilderCubit, SmartPlaylistBuilderState>(
       listener: (context, state) {
-        if (state.errorMessage != null) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            SnackBar(
-              content: Text(state.errorMessage!),
-              backgroundColor: p.error,
-            ),
-          );
+        final error = state.errorMessage;
+        if (error == null) {
+          _lastShownError = null;
+          return;
         }
+        // Only surface a new error once; the cubit preserves errorMessage
+        // across mutations and re-emitting the same SnackBar on every state
+        // change spams the user.
+        if (error == _lastShownError) return;
+        _lastShownError = error;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: p.error,
+          ),
+        );
       },
       builder: (context, state) {
         final cubit = context.read<SmartPlaylistBuilderCubit>();
@@ -345,60 +354,93 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                             fontSize: AppFontSize.label,
                                             color: p.textSecondary)),
                                     const SizedBox(height: AppSpacing.xxs),
-                                    DropdownButtonFormField<String>(
-                                      initialValue: const {
-                                        'title',
-                                        'dateAdded',
-                                        'playCount',
-                                        'lastPlayed',
-                                        'durationMs',
-                                        'year',
-                                        'rating',
-                                      }.contains(state.criteria.sortBy)
-                                          ? state.criteria.sortBy!
-                                          : 'title',
-                                      decoration: InputDecoration(
-                                        filled: true,
-                                        fillColor: p.surface,
-                                        contentPadding: EdgeInsets.symmetric(
-                                            horizontal: AppSpacing.sm,
-                                            vertical: AppSpacing.xs),
-                                        border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.all(
-                                                Radius.circular(AppRadii.r10)),
-                                            borderSide: BorderSide.none),
-                                      ),
-                                      items: [
-                                        DropdownMenuItem(
-                                            value: 'title',
-                                            child:
-                                                Text(context.l10n.titleLabel)),
-                                        DropdownMenuItem(
-                                            value: 'dateAdded',
-                                            child: Text(
-                                                context.l10n.sortDateAdded)),
-                                        DropdownMenuItem(
-                                            value: 'playCount',
-                                            child: Text(
-                                                context.l10n.playCountLabel)),
-                                        DropdownMenuItem(
-                                            value: 'lastPlayed',
-                                            child: Text(
-                                                context.l10n.lastPlayedLabel)),
-                                        DropdownMenuItem(
-                                            value: 'durationMs',
-                                            child: Text(
-                                                context.l10n.sortDuration)),
-                                        DropdownMenuItem(
-                                            value: 'year',
-                                            child:
-                                                Text(context.l10n.yearLabel)),
-                                        DropdownMenuItem(
-                                            value: 'rating',
-                                            child:
-                                                Text(context.l10n.ruleRating)),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child:
+                                              DropdownButtonFormField<String>(
+                                            initialValue: const {
+                                              'title',
+                                              'dateAdded',
+                                              'playCount',
+                                              'lastPlayed',
+                                              'durationMs',
+                                              'year',
+                                              'rating',
+                                            }.contains(state.criteria.sortBy)
+                                                ? state.criteria.sortBy!
+                                                : 'title',
+                                            decoration: InputDecoration(
+                                              filled: true,
+                                              fillColor: p.surface,
+                                              contentPadding:
+                                                  EdgeInsets.symmetric(
+                                                      horizontal: AppSpacing.sm,
+                                                      vertical: AppSpacing.xs),
+                                              border: OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.all(
+                                                          Radius.circular(
+                                                              AppRadii.r10)),
+                                                  borderSide: BorderSide.none),
+                                            ),
+                                            items: [
+                                              DropdownMenuItem(
+                                                  value: 'title',
+                                                  child: Text(
+                                                      context.l10n.titleLabel)),
+                                              DropdownMenuItem(
+                                                  value: 'dateAdded',
+                                                  child: Text(context
+                                                      .l10n.sortDateAdded)),
+                                              DropdownMenuItem(
+                                                  value: 'playCount',
+                                                  child: Text(context
+                                                      .l10n.playCountLabel)),
+                                              DropdownMenuItem(
+                                                  value: 'lastPlayed',
+                                                  child: Text(context
+                                                      .l10n.lastPlayedLabel)),
+                                              DropdownMenuItem(
+                                                  value: 'durationMs',
+                                                  child: Text(context
+                                                      .l10n.sortDuration)),
+                                              DropdownMenuItem(
+                                                  value: 'year',
+                                                  child: Text(
+                                                      context.l10n.yearLabel)),
+                                              DropdownMenuItem(
+                                                  value: 'rating',
+                                                  child: Text(
+                                                      context.l10n.ruleRating)),
+                                            ],
+                                            onChanged: (val) =>
+                                                cubit.setSortBy(val),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          constraints: const BoxConstraints(
+                                              minWidth:
+                                                  AppSpacing.minTouchTarget,
+                                              minHeight:
+                                                  AppSpacing.minTouchTarget),
+                                          tooltip: state.criteria.sortAscending
+                                              ? context.l10n.sortDescending
+                                              : context.l10n.sortAscending,
+                                          icon: Icon(
+                                            state.criteria.sortAscending
+                                                ? Icons.arrow_upward_rounded
+                                                : Icons.arrow_downward_rounded,
+                                            size: 18,
+                                            color: p.accent,
+                                          ),
+                                          onPressed: () => cubit.setSortBy(
+                                            state.criteria.sortBy ?? 'title',
+                                            sortAscending:
+                                                !state.criteria.sortAscending,
+                                          ),
+                                        ),
                                       ],
-                                      onChanged: (val) => cubit.setSortBy(val),
                                     ),
                                   ],
                                 ),

@@ -28,10 +28,19 @@ class GenreCategory {
     if (_regexCache.length >= _maxCacheSize) {
       _regexCache.remove(_regexCache.keys.first);
     }
-    final regex = RegExp('\\b${RegExp.escape(kw)}\\b', caseSensitive: false);
+    // ECMAScript `\b` only treats [A-Za-z0-9_] as word characters, so a
+    // boundary-anchored keyword like روك can never match Arabic text. Keep
+    // boundaries for ASCII words ("rock" must not match "rockabilly") and fall
+    // back to case-insensitive substring matching for non-ASCII keywords.
+    final regex = _hasNonAsciiChars(kw)
+        ? RegExp(RegExp.escape(kw), caseSensitive: false)
+        : RegExp('\\b${RegExp.escape(kw)}\\b', caseSensitive: false);
     _regexCache[kw] = regex;
     return regex;
   }
+
+  static bool _hasNonAsciiChars(String value) =>
+      RegExp(r'[^\x00-\x7F]').hasMatch(value);
 
   // FIX-H15: Static method to clear regex cache for memory cleanup and tests
   static void clearCache() {

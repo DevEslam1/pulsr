@@ -112,10 +112,10 @@ void main() {
     final tracks = [
       for (var i = 0; i < 60; i++)
         YtmTrack(
-                videoId: 'v$i',
-                title: 'T$i',
-                artist: 'A',
-                duration: const Duration(seconds: 1)),
+            videoId: 'v$i',
+            title: 'T$i',
+            artist: 'A',
+            duration: const Duration(seconds: 1)),
     ];
     cubit.restoreCustomPlaylist(entry('big', tracks: tracks));
     await settle();
@@ -145,7 +145,8 @@ void main() {
 
   test('restorePlaylist for a smart playlist skips song insertion', () async {
     final cubit = create();
-    final id = await cubit.restorePlaylist('Smart', isSmart: true, songIds: [1]);
+    final id =
+        await cubit.restorePlaylist('Smart', isSmart: true, songIds: [1]);
     expect(id, 1);
     verifyNever(() => useCases.addSongsToPlaylist(any(), any()));
     await cubit.close();

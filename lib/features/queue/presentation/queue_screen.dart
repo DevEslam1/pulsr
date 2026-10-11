@@ -310,19 +310,20 @@ class QueueScreen extends StatelessWidget {
                   },
                   onReorderItem: (oldIdx, newIdx) {
                     if (oldIdx == newIdx) return;
-                    context.read<PlayerCubit>().reorderQueue(oldIdx, newIdx);
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    // Capture the cubit and messenger before the snackbar is
+                    // shown: the snackbar outlives this screen on the root
+                    // messenger, so its undo action must not touch `context`.
+                    final cubit = context.read<PlayerCubit>();
+                    final messenger = ScaffoldMessenger.of(context);
+                    cubit.reorderQueue(oldIdx, newIdx);
+                    messenger.clearSnackBars();
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text(context.l10n.queue),
                         duration: const Duration(seconds: 4),
                         action: SnackBarAction(
                           label: context.l10n.undo,
-                          onPressed: () {
-                            context
-                                .read<PlayerCubit>()
-                                .reorderQueue(newIdx, oldIdx);
-                          },
+                          onPressed: () => cubit.reorderQueue(newIdx, oldIdx),
                         ),
                       ),
                     );

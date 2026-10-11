@@ -70,8 +70,13 @@ void main() {
     when(() => account.loginState).thenReturn(loginState);
     when(() => account.isLoggedIn).thenReturn(false);
 
-    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
-        .thenAnswer((_) async => const Right(<SongsTableData>[]));
+    when(() => getSongs.getAllSongs(
+          sortBy: any(named: 'sortBy'),
+          ascending: any(named: 'ascending'),
+          limit: any(named: 'limit'),
+        )).thenAnswer((_) async => const Right(<SongsTableData>[]));
+    when(() => getSongs.watchTopPlayed(limit: any(named: 'limit')))
+        .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyAdded(limit: any(named: 'limit')))
@@ -112,15 +117,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('a failed quick-action fetch plays nothing', (tester) async {
-    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
-        .thenAnswer((_) async => const Left(DatabaseFailure('offline')));
+  testWidgets('a failed quick-action fetch plays nothing and reports the error',
+      (tester) async {
+    when(() => getSongs.getAllSongs(
+          sortBy: any(named: 'sortBy'),
+          ascending: any(named: 'ascending'),
+          limit: any(named: 'limit'),
+        )).thenAnswer((_) async => const Left(DatabaseFailure('offline')));
 
     await pumpScreen(tester);
     await tester.tap(find.text('Daily Drive'));
     await tester.pumpAndSettle();
 
     verifyNever(() => player.playSong(any(), queue: any(named: 'queue')));
+    // The failure is surfaced instead of silently doing nothing.
+    expect(find.text('Failed to fetch'), findsOneWidget);
   });
 
   testWidgets('a library stream change invalidates the quick-action cache',
@@ -148,8 +159,8 @@ void main() {
   testWidgets('local pull-to-refresh rescans the library', (tester) async {
     await pumpScreen(tester);
 
-    final indicator = tester.widget<RefreshIndicator>(
-        find.byType(RefreshIndicator).first);
+    final indicator =
+        tester.widget<RefreshIndicator>(find.byType(RefreshIndicator).first);
     await indicator.onRefresh();
     await tester.pumpAndSettle();
 

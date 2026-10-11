@@ -13,8 +13,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/core/widgets/highlighted_text.dart';
 import 'package:pulsr/core/widgets/shimmer_skeleton.dart';
-import 'package:pulsr/core/widgets/song_tile.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
@@ -22,6 +22,7 @@ import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
+import 'package:pulsr/features/search/presentation/widgets/highlighted_song_tile.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
 import 'package:pulsr/features/ytm_search/presentation/ytm_search_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
@@ -89,8 +90,8 @@ void main() {
     when(() => service.isBotCoolingDown).thenReturn(false);
     when(() => service.botCooldownNotifier)
         .thenReturn(ValueNotifier<bool>(false));
-    when(() => service.resolveStream(any()))
-        .thenAnswer((inv) async => _stream(inv.positionalArguments.first as String));
+    when(() => service.resolveStream(any())).thenAnswer(
+        (inv) async => _stream(inv.positionalArguments.first as String));
 
     downloadsCubit = MockDownloadsCubit();
     downloadsController = StreamController<DownloadsState>.broadcast();
@@ -165,7 +166,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => service.searchWithFallback('Queen')).called(1);
-    expect(find.byType(SongTile), findsOneWidget);
+    expect(find.byType(HighlightedSongTile), findsOneWidget);
   });
 
   testWidgets('shows the skeleton while a search is in flight', (tester) async {
@@ -196,10 +197,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SongTile), findsOneWidget);
+    expect(find.byType(HighlightedSongTile), findsOneWidget);
     expect(find.text('Never Gonna'), findsOneWidget);
 
-    await tester.tap(find.byType(SongTile));
+    await tester.tap(find.byType(HighlightedSongTile));
     await tester.pump();
     verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);
   });
@@ -216,6 +217,60 @@ void main() {
 
     expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
     expect(find.text(l10n.browseNoResultsFound), findsOneWidget);
+  });
+
+  testWidgets(
+      'keeps the skeleton during the debounce instead of flashing no-results',
+      (tester) async {
+    final completer = Completer<List<YtmTrack>>();
+    when(() => service.searchWithFallback(any()))
+        .thenAnswer((_) => completer.future);
+
+    await pumpScreen(tester);
+    searchCubit.onQueryChanged('nothing here');
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(SkeletonList), findsOneWidget);
+    expect(find.byIcon(Icons.search_off_rounded), findsNothing);
+
+    completer.complete(const []);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
+  });
+
+  testWidgets('highlights the query in rendered result rows', (tester) async {
+    when(() => service.searchWithFallback(any()))
+        .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Never Gonna')]);
+
+    await pumpScreen(tester);
+    searchCubit.onQueryChanged('rick');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    final highlighted = tester
+        .widgetList<PulsrHighlightedText>(find.byType(PulsrHighlightedText));
+    expect(highlighted, isNotEmpty);
+    expect(highlighted.every((w) => w.query == 'rick'), isTrue);
+  });
+
+  testWidgets('long-press opens the download + add-to-playlist actions',
+      (tester) async {
+    when(() => service.searchWithFallback(any()))
+        .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Never Gonna')]);
+
+    await pumpScreen(tester);
+    searchCubit.onQueryChanged('rick');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byType(HighlightedSongTile));
+    await tester.pumpAndSettle();
+
+    expect(find.text(l10n.browseDownloadOffline), findsOneWidget);
+    expect(find.text(l10n.addToPlaylist), findsOneWidget);
   });
 
   testWidgets('shows the error state and retries after a failure',
@@ -238,7 +293,7 @@ void main() {
     await tester.tap(find.text(l10n.tryAgain));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SongTile), findsOneWidget);
+    expect(find.byType(HighlightedSongTile), findsOneWidget);
     expect(find.text('Recovered'), findsOneWidget);
   });
 

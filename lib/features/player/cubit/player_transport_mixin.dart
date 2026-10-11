@@ -2,15 +2,29 @@ part of 'player_cubit.dart';
 
 mixin PlayerTransportControls on PulsrCubit<PlayerState> {
   PlayerTransportController get transportController;
+  PlayerQueueController get queueController;
 
   /// Cancels any in-flight mediaItem resolution from a previous selection.
   void invalidateMediaItemResolution();
 
-  Future<void> play() => transportController.play();
+  Future<void> play() {
+    if (queueController.isLiveRadio) return queueController.resumeLiveRadio();
+    return transportController.play();
+  }
 
-  Future<void> pause() => transportController.pause();
+  Future<void> pause() {
+    if (queueController.isLiveRadio) return queueController.pauseLiveRadio();
+    return transportController.pause();
+  }
 
-  Future<void> togglePlayPause() => transportController.togglePlayPause();
+  Future<void> togglePlayPause() {
+    if (queueController.isLiveRadio) {
+      return state.isPlaying
+          ? queueController.pauseLiveRadio()
+          : queueController.resumeLiveRadio();
+    }
+    return transportController.togglePlayPause();
+  }
 
   Future<void> seek(Duration position) => transportController.seek(position);
 

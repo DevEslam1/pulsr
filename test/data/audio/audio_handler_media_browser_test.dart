@@ -136,7 +136,8 @@ void main() {
   group('getMediaItem', () {
     test('resolves a numeric song id', () async {
       handler = await buildTestHandler(repository: repo, ytmService: ytm);
-      when(() => repo.getSongById(1)).thenAnswer((_) async => Right(localSong(1)));
+      when(() => repo.getSongById(1))
+          .thenAnswer((_) async => Right(localSong(1)));
       final item = await handler!.getMediaItem('1');
       expect(item?.title, 'Track 1');
     });

@@ -51,6 +51,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
 
   List<SongsTableData>? _cachedSongsRef;
   Set<String>? _cachedFolders;
+  List<SongsTableData>? _cachedRepSongsRef;
+  Map<String, SongsTableData>? _cachedRepByDir;
 
   Set<String> _getFolders(List<SongsTableData> songs) {
     if (identical(_cachedSongsRef, songs) && _cachedFolders != null) {
@@ -59,6 +61,31 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
     _cachedSongsRef = songs;
     _cachedFolders = _extractFolders(songs);
     return _cachedFolders!;
+  }
+
+  /// Maps every ancestor directory of every song to a representative song, so
+  /// the subfolder artwork fallback is a map lookup rather than a prefix scan
+  /// over all songs for each visible row.
+  Map<String, SongsTableData> _getRepresentativeByDir(
+      List<SongsTableData> songs) {
+    if (identical(_cachedRepSongsRef, songs) && _cachedRepByDir != null) {
+      return _cachedRepByDir!;
+    }
+    final map = <String, SongsTableData>{};
+    for (final s in songs) {
+      final normPath =
+          p_path.posix.normalize(s.path.replaceAll('\\', '/')).toLowerCase();
+      var dir = p_path.posix.dirname(normPath);
+      while (dir.isNotEmpty && dir != '.' && dir != '/') {
+        map.putIfAbsent(dir, () => s);
+        final parent = p_path.posix.dirname(dir);
+        if (parent == dir) break;
+        dir = parent;
+      }
+    }
+    _cachedRepSongsRef = songs;
+    _cachedRepByDir = map;
+    return map;
   }
 
   Set<String> _extractFolders(List<SongsTableData> songs) {
@@ -125,6 +152,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         }
 
         final folders = _getFolders(songs);
+        final representativeByDir = _getRepresentativeByDir(songs);
         final effectivePath = _currentPath ?? _findRootFolder(folders) ?? '';
         final currentDir =
             p_path.posix.normalize(effectivePath.replaceAll('\\', '/'));
@@ -238,19 +266,12 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                           final normSub = p_path.posix
                               .normalize(sub.replaceAll('\\', '/'))
                               .toLowerCase();
-                          final dirPrefixSub =
-                              normSub.endsWith('/') ? normSub : '$normSub/';
-                          for (final s in songs) {
-                            final normPath = p_path.posix
-                                .normalize(s.path.replaceAll('\\', '/'))
-                                .toLowerCase();
-                            if (normPath.startsWith(dirPrefixSub) ||
-                                p_path.posix.dirname(normPath) == normSub) {
-                              songId = s.id;
-                              albumId = s.albumId;
-                              remoteUrl = s.remoteArtworkUrl ?? s.artworkUri;
-                              break;
-                            }
+                          final representative = representativeByDir[normSub];
+                          if (representative != null) {
+                            songId = representative.id;
+                            albumId = representative.albumId;
+                            remoteUrl = representative.remoteArtworkUrl ??
+                                representative.artworkUri;
                           }
                         }
 

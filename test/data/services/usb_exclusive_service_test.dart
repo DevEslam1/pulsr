@@ -220,9 +220,8 @@ void main() {
     test('returns claimFailed when the device is not permitted', () async {
       _messenger.setMockMethodCallHandler(
           _method,
-          (call) async => call.method == 'getStatus'
-              ? _statusMap(permitted: false)
-              : null);
+          (call) async =>
+              call.method == 'getStatus' ? _statusMap(permitted: false) : null);
       await service.getStatus();
       expect(await service.startStreaming(), UsbStreamResult.claimFailed);
     });
@@ -252,8 +251,8 @@ void main() {
       expect(await withError('claim_failed'), UsbStreamResult.claimFailed);
       expect(await withError('alt_setting_failed'),
           UsbStreamResult.altSettingFailed);
-      expect(await withError('rate_unsupported'),
-          UsbStreamResult.rateUnsupported);
+      expect(
+          await withError('rate_unsupported'), UsbStreamResult.rateUnsupported);
       expect(await withError('submit_failed'), UsbStreamResult.submitFailed);
       expect(await withError('invalid_args'), UsbStreamResult.invalidArgs);
       expect(await withError('mystery'), UsbStreamResult.unknown);

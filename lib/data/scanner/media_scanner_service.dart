@@ -290,6 +290,10 @@ class MediaScannerService {
       return 0;
     }
     _isScanning = true;
+    // Persist the scan-START epoch: a file modified between the MediaStore
+    // query and completion has modSec >= this value, so the next incremental
+    // scan re-examines it instead of skipping it forever.
+    final scanStartEpochSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     _emitProgress(0.0,
         currentFile: 'Initializing scanner...', isIncremental: incremental);
     try {
@@ -337,7 +341,7 @@ class MediaScannerService {
               scannedCount: 0,
               totalCount: songs.length,
               isIncremental: true);
-          markScanComplete();
+          markScanComplete(epochSec: scanStartEpochSec);
           return 0;
         }
       }
@@ -400,7 +404,9 @@ class MediaScannerService {
           'Scanner started with ${songsToProcess.length} raw MediaStore songs (incremental: $incremental)',
           category: 'scanner');
 
-      // Stream progress preview with sample filenames
+      // Stream progress preview with sample filenames. Yielding periodically
+      // lets the UI paint the intermediate ticks instead of only the last one
+      // before the opaque isolate parse starts.
       for (int i = 0; i < songsToProcess.length; i += 30) {
         final song = songsToProcess[i];
         final frac = 0.25 +
@@ -414,7 +420,20 @@ class MediaScannerService {
           totalCount: songsToProcess.length,
           isIncremental: incremental,
         );
+        if (i % 300 == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
       }
+
+      // The isolate parse is one opaque phase; label it explicitly so the UI
+      // shows "parsing" rather than appearing stuck on the last preview tick.
+      _emitProgress(
+        0.7,
+        currentFile: 'Parsing metadata for ${songsToProcess.length} tracks...',
+        scannedCount: songsToProcess.length,
+        totalCount: songsToProcess.length,
+        isIncremental: incremental,
+      );
 
       // Offload CPU-heavy metadata parsing and aggregation to background isolate
       final parseInput = _ScanMediaInput(
@@ -476,7 +495,7 @@ class MediaScannerService {
           '${parseResult.nativeDecoderRequiredCount > 0 ? ', ${parseResult.nativeDecoderRequiredCount} file(s) need a native decoder (not indexed)' : ''}',
           category: 'scanner');
 
-      markScanComplete();
+      markScanComplete(epochSec: scanStartEpochSec);
       scheduleAudioQualityEnrichment();
       return parseResult.songs.length;
     } catch (e, st) {
@@ -776,7 +795,6 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
             ? (dateAdded < 10000000000 ? dateAdded * 1000 : dateAdded)
             : null),
         fileSize: Value(size),
-        artworkUri: const Value(null),
         genre: Value(genre),
         year: Value(year),
       ),
@@ -791,7 +809,6 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
           title: Value(album),
           artist: Value(artist),
           artistId: Value(artistId),
-          artworkUri: const Value(null),
         );
       }
     }
@@ -803,7 +820,6 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
         artistMap[artistId] = ArtistsTableCompanion(
           id: Value(artistId),
           name: Value(artist),
-          artworkUri: const Value(null),
         );
       }
     }

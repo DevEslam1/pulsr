@@ -21,7 +21,8 @@ void main() {
       routes: [
         GoRoute(
           path: '/',
-          builder: (_, __) => Scaffold(body: GenreHierarchyView(genres: genres)),
+          builder: (_, __) =>
+              Scaffold(body: GenreHierarchyView(genres: genres)),
         ),
         GoRoute(
           path: '/genre',
@@ -59,7 +60,8 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('renders the summary, matching categories and uncategorized group',
+  testWidgets(
+      'renders the summary, matching categories and uncategorized group',
       (tester) async {
     await tester.pumpWidget(build(const [
       GenreItem(name: 'Rock', songCount: 5),
@@ -138,12 +140,48 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('Arabic genre names land in their categories, not "Other"',
+      (tester) async {
+    await tester.pumpWidget(build(const [
+      GenreItem(name: 'روك', songCount: 5),
+      GenreItem(name: 'طرب', songCount: 2),
+    ]));
+    await tester.pumpAndSettle();
+
+    // Both genres are categorized, so no "Other Genres" bucket is rendered.
+    expect(find.text(l10n.otherGenres), findsNothing);
+
+    await tester.tap(find.text(l10n.browseGenreRockMetal));
+    await tester.pumpAndSettle();
+    expect(find.text('روك (5)'), findsOneWidget);
+    expect(find.text('طرب (2)'), findsNothing);
+
+    await unmount(tester);
+  });
+
   group('GenreCategory.matches', () {
     test('matches keywords with word boundaries and is case-insensitive', () {
-      const category = GenreCategory('Rock', Icons.music_note, ['rock', 'metal']);
+      const category =
+          GenreCategory('Rock', Icons.music_note, ['rock', 'metal']);
       expect(category.matches('Hard Rock 90s'), isTrue);
       expect(category.matches('METAL'), isTrue);
       expect(category.matches('Pop'), isFalse);
+    });
+
+    test('ASCII keywords still respect word boundaries', () {
+      const category = GenreCategory('Rock', Icons.music_note, ['rock']);
+      expect(category.matches('rock'), isTrue);
+      expect(category.matches('rockabilly'), isFalse);
+    });
+
+    test('non-ASCII (Arabic) keywords match by case-insensitive substring', () {
+      const category = GenreCategory(
+          'Arabic', Icons.music_note, ['روك', 'ميتال', 'هيب هوب', 'طرب']);
+      expect(category.matches('روك'), isTrue);
+      expect(category.matches('ميتال مصري'), isTrue);
+      expect(category.matches('هيب هوب'), isTrue);
+      expect(category.matches('طرب'), isTrue);
+      expect(category.matches('بوب'), isFalse);
     });
 
     test('evicts the oldest cached regex past the cache cap', () {

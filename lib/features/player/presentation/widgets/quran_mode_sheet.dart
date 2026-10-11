@@ -209,7 +209,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ? '${(state.reverbWetDry * 100).round()}%'
                   : '0%',
               onChanged: cubit.setQuranAmbience,
-              applyOnRelease: false,
+              applyOnRelease: true,
             ),
             _QuranSliderTile(
               icon: Icons.local_fire_department_rounded,
@@ -224,7 +224,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ? '${(state.saturationMix * 100).round()}%'
                   : '0%',
               onChanged: cubit.setQuranWarmth,
-              applyOnRelease: false,
+              applyOnRelease: true,
             ),
 
             // Learning speed

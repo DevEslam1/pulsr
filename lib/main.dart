@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'core/errors/error_message_resolver.dart';
 import 'core/utils/l10n_extensions.dart';
 import 'core/utils/l10n_holder.dart';
+import 'core/utils/startup_gates.dart';
 import 'package:flutter/services.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -73,21 +74,22 @@ Future<void> main() async {
   // RAM under heavy scrolling (80 MB ceiling).
   PaintingBinding.instance.imageCache.maximumSizeBytes = 80 << 20;
   HttpOverrides.global = AppHttpOverrides.instance;
+  // A production build with dev flags cannot be patched at runtime: surface a
+  // blocking configuration screen instead of logging and continuing with
+  // illegal flags (Play Store compliance).
+  Object? fatalConfigError;
   try {
     AppConfig.validateConfiguration();
   } catch (e, st) {
+    fatalConfigError = e;
     ErrorLogger.log('AppConfig.validateConfiguration error',
         error: e, stackTrace: st, category: 'Startup');
   }
 
   ErrorLogger.onCrashReported = (error, stackTrace, category) {
-    // Crashlytics is not a dependency — Sentry is the crash backend.
-    // Route every crash report there (when telemetry is allowed) plus logcat.
-    try {
-      if (AppConfig.isTelemetryAllowed) {
-        Sentry.captureException(error, stackTrace: stackTrace);
-      }
-    } catch (_) {}
+    // Single-sink rule: the Sentry capture (with scope tags) is owned by
+    // ErrorLogger.log. This hook only mirrors the report to logcat so the
+    // crash is not reported twice.
     debugPrint('[Pulsr.CrashReport][$category] $error\n$stackTrace');
   };
   ErrorLogger.initialize();
@@ -111,6 +113,14 @@ Future<void> main() async {
       ),
     );
   };
+
+  if (fatalConfigError != null) {
+    runApp(PulsrConfigurationErrorApp(
+      title: AppConfig.appTitle,
+      message: fatalConfigError.toString(),
+    ));
+    return;
+  }
 
   // Initialize in-memory SettingsCache and ArtworkCacheManager
   try {
@@ -181,18 +191,21 @@ Future<void> main() async {
   // Previously awaited 3x8s before first frame -> Skipped 121 frames. Now fire-and-forget.
   void firePostStartupTasks() {
     // Run after first frame renders on screen so startup paints without jank
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Respect the user's offline-only setting at cold start: it must disable
       // every online initializer, not just the UI surfaces (mirrors
-      // CloudSyncService's runtime gate).
-      var offlineOnly = false;
+      // CloudSyncService's runtime gate). SharedPreferences MUST be awaited
+      // before computing the gates; resolving it in a later microtask let the
+      // synchronous onlineAllowed computation ignore offline-only mode.
+      SharedPreferences? prefs;
       try {
-        final prefs = SharedPreferences.getInstance();
-        prefs.then((p) {
-          offlineOnly = p.getBool('setting_offline_only_mode') ?? false;
-        }).catchError((_) {});
-      } catch (_) {}
-      final onlineAllowed = AppConfig.ytmEnabled && !offlineOnly;
+        prefs = await SharedPreferences.getInstance();
+      } catch (e, st) {
+        ErrorLogger.log('Failed to read startup preferences',
+            error: e, stackTrace: st, category: 'Startup');
+      }
+      final onlineAllowed = StartupGates.onlineAllowed(prefs);
+      final cloudSyncAllowed = StartupGates.cloudSyncAllowed(prefs);
       try {
         Future.wait([
           // Pure builds have no INTERNET permission: skip every online
@@ -205,7 +218,7 @@ Future<void> main() async {
               ErrorLogger.log('YtmRateLimiter restore failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
-          if (AppConfig.isCloudSyncAllowed && !offlineOnly)
+          if (cloudSyncAllowed)
             getIt<AuthService>()
                 .initialize()
                 .timeout(const Duration(seconds: 4))
@@ -260,9 +273,7 @@ Future<void> main() async {
         // death, and proactively move leftover plaintext credentials into
         // secure storage. Local-first; safe to run whenever cloud sync is on.
         try {
-          if (AppConfig.isCloudSyncAllowed &&
-              !offlineOnly &&
-              getIt.isRegistered<ScrobblerService>()) {
+          if (cloudSyncAllowed && getIt.isRegistered<ScrobblerService>()) {
             final scrobbler = getIt<ScrobblerService>();
             unawaited(scrobbler
                 .migrateAllCredentialsToSecureStorage()
@@ -284,21 +295,31 @@ Future<void> main() async {
     });
   }
 
+  var appStarted = false;
   if (AppConfig.isTelemetryAllowed) {
-    await SentryFlutter.init(
-      (options) {
-        options.dsn = AppConfig.sentryDsn;
-        options.environment = AppConfig.envName;
-        options.tracesSampleRate = AppConfig.isProd ? 0.2 : 1.0;
-        options.sendDefaultPii = false;
-        options.enableAutoPerformanceTracing = true;
-      },
-      appRunner: () {
-        runApp(const PulsrApp());
-        firePostStartupTasks();
-      },
-    );
-  } else {
+    try {
+      await SentryFlutter.init(
+        (options) {
+          options.dsn = AppConfig.sentryDsn;
+          options.environment = AppConfig.envName;
+          options.tracesSampleRate = AppConfig.isProd ? 0.2 : 1.0;
+          options.sendDefaultPii = false;
+          options.enableAutoPerformanceTracing = true;
+        },
+        appRunner: () {
+          appStarted = true;
+          runApp(const PulsrApp());
+          firePostStartupTasks();
+        },
+      );
+    } catch (e, st) {
+      // A telemetry init failure must never black-screen the app: fall through
+      // to the un-instrumented startup path below.
+      ErrorLogger.log('SentryFlutter.init failed — starting without telemetry',
+          error: e, stackTrace: st, category: 'Startup');
+    }
+  }
+  if (!appStarted) {
     runApp(const PulsrApp());
     firePostStartupTasks();
   }
@@ -312,19 +333,26 @@ class PulsrApp extends StatefulWidget {
 }
 
 class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
-  late final GoRouter _router;
+  GoRouter? _router;
   StreamSubscription<void>? _authExpiredSub;
   StreamSubscription<void>? _networkChangeSub;
   NetworkChangeMonitor? _networkMonitor;
   AutomationTriggerService? _automationTriggerService;
   VoidCallback? _platformBridgeDegradedListener;
   DateTime? _lastAuthExpiredPrompt;
+  bool _dependenciesReady = false;
+  bool _bootstrapFailed = false;
+  bool _bootstrapInFlight = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _router = createRouter(getIt<MediaScannerService>());
+    _router = _createRouterSafely();
+    _dependenciesReady = appDependenciesReady;
+    if (!_dependenciesReady) {
+      unawaited(_resolveDependencies());
+    }
     _autoScanOnStartup();
     _checkInitialAudioIntent();
     if (AppConfig.ytmEnabled) _listenForYtmSessionExpiry();
@@ -332,6 +360,42 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _startAutomationTriggers();
     _watchPlatformBridgeHealth();
     _verifyPureMode();
+  }
+
+  GoRouter? _createRouterSafely() {
+    try {
+      return createRouter(getIt<MediaScannerService>());
+    } catch (e, st) {
+      ErrorLogger.log('Router creation failed — bootstrap will retry',
+          error: e, stackTrace: st, category: 'Startup');
+      return null;
+    }
+  }
+
+  /// Awaits the async singletons the UI resolves synchronously. A slow or
+  /// partially failed warm-up paints a retry screen instead of crashing in
+  /// build with an un-ready StateError.
+  Future<void> _resolveDependencies() async {
+    if (_bootstrapInFlight) return;
+    _bootstrapInFlight = true;
+    final ready = await ensureAppDependenciesReady();
+    _bootstrapInFlight = false;
+    if (!mounted) return;
+    setState(() {
+      _dependenciesReady = ready;
+      _bootstrapFailed = !ready;
+    });
+  }
+
+  void _retryBootstrap() {
+    if (!mounted) return;
+    setState(() {
+      _bootstrapFailed = false;
+      _router ??= _createRouterSafely();
+    });
+    if (!_dependenciesReady || _router == null) {
+      unawaited(_resolveDependencies());
+    }
   }
 
   /// Runtime "Pulsr Pure" guarantee: a Pure build must not carry the INTERNET
@@ -585,6 +649,13 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final router = _router;
+    if (!_dependenciesReady || router == null) {
+      return _DependencyBootstrapScreen(
+        failed: _bootstrapFailed || (router == null && _dependenciesReady),
+        onRetry: _retryBootstrap,
+      );
+    }
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AppDatabase>.value(value: getIt<AppDatabase>()),
@@ -862,7 +933,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                             GlobalCupertinoLocalizations.delegate,
                           ],
                           supportedLocales: AppLocalizations.supportedLocales,
-                          routerConfig: _router,
+                          routerConfig: router,
                         ),
                       );
                     },
@@ -942,4 +1013,115 @@ class _AppOrientationSystemUiObserverState
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// Blocking screen shown when the build's flavor/environment configuration is
+/// invalid (e.g. a Play Store build shipping YTM flags). The app must not
+/// start with an illegal configuration, so this is terminal — not recoverable.
+class PulsrConfigurationErrorApp extends StatelessWidget {
+  final String title;
+  final String message;
+
+  const PulsrConfigurationErrorApp({
+    super.key,
+    required this.title,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: title,
+      debugShowCheckedModeBanner: false,
+      theme: AuraTheme.darkTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    size: 52, color: Colors.redAccent),
+                const SizedBox(height: 18),
+                Text(
+                  context.l10n.bootConfigurationError,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Recoverable boot/retry screen rendered while the async DI singletons the
+/// shell needs are still warming up (or after a warm-up failure). Prevents the
+/// un-ready-StateError crash that previously black-screened slow cold starts.
+class _DependencyBootstrapScreen extends StatelessWidget {
+  final bool failed;
+  final VoidCallback onRetry;
+
+  const _DependencyBootstrapScreen({
+    required this.failed,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AuraTheme.darkTheme,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!failed)
+                  const CircularProgressIndicator()
+                else ...[
+                  const Icon(Icons.refresh_rounded,
+                      size: 48, color: Colors.white70),
+                  const SizedBox(height: 16),
+                  Text(
+                    context.l10n.bootStartupFailed,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    context.l10n.bootStartupFailedMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13.5, height: 1.4),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: onRetry,
+                    child: Text(context.l10n.retry),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

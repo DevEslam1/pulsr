@@ -1,4 +1,5 @@
 // lib/features/player/cubit/controllers/player_playback_options_controller.dart
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
@@ -9,6 +10,7 @@ import '../../../../core/services/earbud_optimization_service.dart';
 import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/lrc_parser.dart';
+import '../../../../data/audio/ab_loop_manager.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/audio/per_song_eq_store.dart';
 import '../../../../data/audio/per_song_playback_store.dart';
@@ -16,6 +18,7 @@ import '../../../../data/audio/per_song_volume_store.dart';
 import '../../../../data/audio/playback_bookmark_store.dart';
 import '../../../../data/audio/sleep_timer_manager.dart';
 import '../../../../data/audio/song_rating_store.dart';
+import '../../../../data/audio/track_delay_manager.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../../../domain/models/eq_preset.dart';
@@ -29,6 +32,7 @@ import 'playback_volume_mute.dart';
 part 'player_playback_options_lyrics.dart';
 part 'player_playback_options_quran.dart';
 part 'player_playback_options_rate_guard.dart';
+part 'player_playback_options_track_state.dart';
 
 /// Owns playback options: sleep timer, speed, pitch, ratings, per-track overrides, AB loop, and overlays.
 class PlayerPlaybackOptionsController {
@@ -56,6 +60,7 @@ class PlayerPlaybackOptionsController {
   int _quranToggleGen = 0;
   bool? _targetQuranModeEnabled;
   int _reciterStyleGen = 0;
+  StreamSubscription<bool>? _abLoopSub;
 
   bool get isClosed => _isClosed();
 
@@ -88,7 +93,9 @@ class PlayerPlaybackOptionsController {
         _perSongVolumeStore = perSongVolumeStore ?? PerSongVolumeStore(),
         _perSongEqStore = perSongEqStore ?? PerSongEqStore(),
         _quranManager = quranManager ?? PlayerQuranManager(),
-        _songRatingStore = songRatingStore ?? SongRatingStore();
+        _songRatingStore = songRatingStore ?? SongRatingStore() {
+    _watchAbLoopChanges();
+  }
 
   bool checkDspGuard(String feature, {bool showError = true}) =>
       _guardDsp?.call(feature, showError: showError) ?? true;
@@ -384,12 +391,7 @@ class PlayerPlaybackOptionsController {
 
   void setExpanded(bool expanded) => _emit(_getState()
       .copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
-  Future<void> setTrackBpm(SongsTableData song, double? bpm) =>
-      _audioHandler.setTrackBpm(song, bpm);
-  void setTrackDelayMs(int delayMs) => _emit(_getState().copyWith(
-      playback: _getState().playback.copyWith(trackDelayMs: delayMs)));
   void setSilenceSkipSensitivity(int sensitivity) => _emit(_getState().copyWith(
       playback:
           _getState().playback.copyWith(silenceSkipSensitivity: sensitivity)));
-  void dispose() {}
 }

@@ -147,6 +147,10 @@ class PulsrViewport {
 
   /// Optimal navigation paradigm.
   PulsrNavMode get navMode {
+    // Short landscape viewports (e.g. an 844x390 phone) resolve to
+    // bottomNavWide in [PulsrLayoutDelegate.resolveMode] — a side rail is
+    // unusable there. Keep this token in agreement with the shell delegate.
+    if (isShortHeight) return PulsrNavMode.bottomBar;
     if (deviceClass == PulsrDeviceClass.desktop ||
         sizeClass == PulsrBreakpoint.large) {
       return PulsrNavMode.sideRailExtended;

@@ -66,8 +66,8 @@ void main() {
     when(() => service.cancel(any())).thenReturn(null);
     when(() => service.deleteArtifactsFor(any())).thenAnswer((_) async {});
     when(() => service.cleanOrphanPartFiles(
-        protectedVideoIds: any(named: 'protectedVideoIds'))).thenAnswer(
-        (_) async {});
+            protectedVideoIds: any(named: 'protectedVideoIds')))
+        .thenAnswer((_) async {});
     when(() => service.getDownloadedPath(any())).thenReturn(null);
     repo = DownloadRepositoryImpl(service);
   });
@@ -122,8 +122,7 @@ void main() {
           contains(true));
     });
 
-    test('deleteDownload removes the task and clears its artifacts',
-        () async {
+    test('deleteDownload removes the task and clears its artifacts', () async {
       final temp = Directory.systemTemp.createTempSync('dl_delete');
       addTearDown(() => temp.deleteSync(recursive: true));
       final file = File('${temp.path}${Platform.pathSeparator}done.m4a')
@@ -131,8 +130,9 @@ void main() {
 
       SharedPreferences.setMockInitialValues({
         'pulsr_download_tasks_v2': jsonEncode([
-          task('abcdefghijk').copyWith(
-              status: DownloadStatus.complete, filePath: file.path).toJson(),
+          task('abcdefghijk')
+              .copyWith(status: DownloadStatus.complete, filePath: file.path)
+              .toJson(),
         ]),
       });
       when(() => service.getDownloadedPath(any())).thenReturn(file.path);
@@ -279,8 +279,8 @@ void main() {
       await repo.queueDownload(task('abcdefghijk'));
       await Future<void>.delayed(const Duration(milliseconds: 60));
 
-      final stats = (await repo.getStorageStats()).getOrElse(
-          (_) => throw StateError('failed'));
+      final stats = (await repo.getStorageStats())
+          .getOrElse((_) => throw StateError('failed'));
       expect(stats.downloadedSongsCount, 1);
       expect(stats.usedBytes, 10);
       expect(stats.freeBytes, 100 * 1024 * 1024);
@@ -298,25 +298,21 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'pulsr_download_tasks_v2': jsonEncode([
           task('queuedtask1').toJson(),
-          task('completetask').copyWith(
-              status: DownloadStatus.complete, filePath: file.path).toJson(),
-          task('failedtask')
-              .copyWith(status: DownloadStatus.failed)
+          task('completetask')
+              .copyWith(status: DownloadStatus.complete, filePath: file.path)
               .toJson(),
+          task('failedtask').copyWith(status: DownloadStatus.failed).toJson(),
         ]),
       });
 
       await repo.reconcileOnBoot();
       final tasks = await repo.getAllDownloads();
       expect(tasks.length, 3);
-      expect(
-          tasks.firstWhere((t) => t.videoId == 'queuedtask1').status,
+      expect(tasks.firstWhere((t) => t.videoId == 'queuedtask1').status,
           DownloadStatus.paused);
-      expect(
-          tasks.firstWhere((t) => t.videoId == 'completetask').status,
+      expect(tasks.firstWhere((t) => t.videoId == 'completetask').status,
           DownloadStatus.complete);
-      expect(
-          tasks.firstWhere((t) => t.videoId == 'failedtask').status,
+      expect(tasks.firstWhere((t) => t.videoId == 'failedtask').status,
           DownloadStatus.failed);
       verify(() => service.cleanOrphanPartFiles(
           protectedVideoIds: any(named: 'protectedVideoIds'))).called(1);
@@ -325,9 +321,11 @@ void main() {
     test('marks a complete task as failed when the file is gone', () async {
       SharedPreferences.setMockInitialValues({
         'pulsr_download_tasks_v2': jsonEncode([
-          task('gonetask').copyWith(
-              status: DownloadStatus.complete,
-              filePath: '/definitely/not/here.m4a').toJson(),
+          task('gonetask')
+              .copyWith(
+                  status: DownloadStatus.complete,
+                  filePath: '/definitely/not/here.m4a')
+              .toJson(),
         ]),
       });
       await repo.reconcileOnBoot();

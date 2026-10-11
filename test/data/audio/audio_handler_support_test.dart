@@ -38,8 +38,7 @@ void main() {
       final changes = <MultiOutputMode>[];
       final sub = router.changes.listen(changes.add);
 
-      expect(
-          await router.setMode(MultiOutputMode.speakerAndBluetooth), isTrue);
+      expect(await router.setMode(MultiOutputMode.speakerAndBluetooth), isTrue);
       expect(router.isSimultaneous, isTrue);
       await Future<void>.delayed(Duration.zero);
       expect(changes, contains(MultiOutputMode.speakerAndBluetooth));
@@ -189,8 +188,7 @@ void main() {
 
     test('withSmoothDspTransition runs the action', () async {
       handler = await buildTestHandler(repository: repo, ytmService: ytm);
-      final result =
-          await handler!.withSmoothDspTransition(() async => 42);
+      final result = await handler!.withSmoothDspTransition(() async => 42);
       expect(result, 42);
     });
 

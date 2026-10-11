@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/services/radio_station_store.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/domain/models/radio_station.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/radio/presentation/radio_screen.dart';
@@ -31,6 +35,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    RadioStationStore.resetForTesting();
     mockPlayerCubit = MockPlayerCubit();
     when(() => mockPlayerCubit.state).thenReturn(const PlayerState());
     when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
@@ -100,6 +105,63 @@ void main() {
     // Verify new station appears in the list
     expect(find.text('Chill Beats'), findsOneWidget);
     expect(find.text('https://stream.example.com/live.mp3'), findsOneWidget);
+  });
+
+  testWidgets('editing a station onto another station URL is refused',
+      (tester) async {
+    final alpha =
+        RadioStation.create(name: 'Alpha', url: 'https://a.example.com/live');
+    final beta =
+        RadioStation.create(name: 'Beta', url: 'https://b.example.com/live');
+    SharedPreferences.setMockInitialValues({
+      RadioStationStore.prefsKey: jsonEncode([alpha.toJson(), beta.toJson()]),
+    });
+
+    await tester.pumpWidget(_buildTestApp(
+      child: const RadioScreen(),
+      playerCubit: mockPlayerCubit,
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(find.text('Beta'), findsOneWidget);
+
+    // Edit Alpha and point it at Beta's URL.
+    await tester.tap(find.byIcon(Icons.edit_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Stream URL'), beta.url);
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // The collision is surfaced and neither station is silently deleted.
+    expect(
+        find.text('A station with this URL already exists.'), findsOneWidget);
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(find.text('Beta'), findsOneWidget);
+  });
+
+  testWidgets('an uppercase HTTPS scheme is accepted when adding a station',
+      (tester) async {
+    await tester.pumpWidget(_buildTestApp(
+      child: const RadioScreen(),
+      playerCubit: mockPlayerCubit,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.add_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Station name'), 'Caps');
+    await tester.enterText(find.widgetWithText(TextField, 'Stream URL'),
+        'HTTPS://stream.example.com/live');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Caps'), findsOneWidget);
+    expect(find.text('Please enter a URL'), findsNothing);
+    expect(find.text('URL must start with http:// or https://'), findsNothing);
   });
 
   testWidgets('Import dialog opens and cancels cleanly', (tester) async {

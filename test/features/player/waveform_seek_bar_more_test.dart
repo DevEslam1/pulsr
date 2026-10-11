@@ -41,6 +41,7 @@ void main() {
     Duration? loopB,
     Duration? crossfade,
     String? semanticLabel,
+    WaveformVisualizerStyle style = WaveformVisualizerStyle.mirroredBars,
   }) {
     return host(
       Center(
@@ -57,6 +58,7 @@ void main() {
             loopPointB: loopB,
             crossfadeDuration: crossfade,
             semanticLabel: semanticLabel,
+            style: style,
           ),
         ),
       ),
@@ -161,5 +163,52 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
   });
-}
 
+  testWidgets('a held press that becomes a drag does not seek at touch-down',
+      (tester) async {
+    final seeks = <Duration>[];
+    await tester.pumpWidget(build(onSeek: seeks.add));
+    await tester.pumpAndSettle();
+
+    final finder = find.byType(WaveformSeekBar);
+    final gesture = await tester.startGesture(tester.getCenter(finder));
+    // Past the tap recognizer's deadline: onTapDown used to seek right here.
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(seeks, isEmpty);
+
+    await gesture.moveBy(const Offset(80, 0));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // Only the drag release seeks, and it seeks the released position.
+    expect(seeks.length, 1);
+    expect(seeks.single.inSeconds, greaterThan(90));
+  });
+
+  testWidgets('painter repaints when the style or duration changes',
+      (tester) async {
+    CustomPainter painter() => tester
+        .widget<CustomPaint>(find.byWidgetPredicate((w) =>
+            w is CustomPaint &&
+            w.painter.runtimeType.toString() == '_WaveformPainter'))
+        .painter!;
+
+    await tester.pumpWidget(build(style: WaveformVisualizerStyle.mirroredBars));
+    await tester.pump();
+    final bars = painter();
+
+    await tester.pumpWidget(build(style: WaveformVisualizerStyle.neonGlowLine));
+    await tester.pump();
+    final neon = painter();
+    expect(neon.shouldRepaint(bars), isTrue);
+
+    await tester.pumpWidget(build(
+      style: WaveformVisualizerStyle.neonGlowLine,
+      duration: const Duration(minutes: 4),
+    ));
+    await tester.pump();
+    final longer = painter();
+    expect(longer.shouldRepaint(neon), isTrue);
+  });
+}

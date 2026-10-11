@@ -3,6 +3,8 @@
 // Branch coverage for [KaraokeModeScreen]: empty/loading lyrics, active + next
 // line rendering and tap-to-seek, pitch/font/practice controls, the tap-rhythm
 // score, lifecycle chrome and the landscape layout.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -143,6 +145,74 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('practice mode loops the active line when its end is passed',
+      (tester) async {
+    final states = StreamController<PlayerState>.broadcast();
+    addTearDown(states.close);
+    final cubit = stubTransport(stateWith(
+      lines: lyrics,
+      position: const Duration(seconds: 5),
+    ));
+    when(() => cubit.stream).thenAnswer((_) => states.stream);
+    await pumpKaraoke(tester, cubit);
+
+    void pressPractice() {
+      final button = tester.widget<IconButton>(
+          find.widgetWithIcon(IconButton, Icons.repeat_one_rounded));
+      button.onPressed!();
+    }
+
+    void emit(Duration position) {
+      final next = stateWith(lines: lyrics, position: position);
+      when(() => cubit.state).thenReturn(next);
+      states.add(next);
+    }
+
+    pressPractice();
+    await tester.pump();
+    // Still inside the first line (0s..10s): nothing to loop yet.
+    verifyNever(() => cubit.seek(any()));
+
+    // Cross the first line's end while the screen stays mounted.
+    emit(const Duration(seconds: 12));
+    await tester.pump();
+    await tester.pump();
+    verify(() => cubit.seek(Duration.zero)).called(1);
+
+    // A rebuild while the engine catches up must not seek again.
+    tester.element(find.byType(KaraokeModeScreen)).markNeedsBuild();
+    await tester.pump();
+    await tester.pump();
+    verifyNever(() => cubit.seek(Duration.zero));
+
+    // Once the position is back inside the line, the next pass loops again.
+    emit(const Duration(seconds: 1));
+    await tester.pump();
+    await tester.pump();
+    emit(const Duration(seconds: 12));
+    await tester.pump();
+    await tester.pump();
+    verify(() => cubit.seek(Duration.zero)).called(1);
+  });
+
+  testWidgets('practice mode loops the last line with the fallback end',
+      (tester) async {
+    final cubit = stubTransport(stateWith(
+      lines: lyrics,
+      position: const Duration(seconds: 25),
+    ));
+    await pumpKaraoke(tester, cubit);
+
+    final button = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.repeat_one_rounded));
+    button.onPressed!();
+    await tester.pump();
+    await tester.pump();
+
+    // The last line (20s) is looped once past its 4s fallback end (24s).
+    verify(() => cubit.seek(const Duration(seconds: 20))).called(1);
+  });
+
   testWidgets('portrait transport buttons drive the cubit', (tester) async {
     final cubit = stubTransport(stateWith(lines: lyrics));
     await pumpKaraoke(tester, cubit);
@@ -170,8 +240,7 @@ void main() {
     expect(find.byType(KaraokeModeScreen), findsOneWidget);
   });
 
-  testWidgets('app lifecycle resume restores immersive chrome',
-      (tester) async {
+  testWidgets('app lifecycle resume restores immersive chrome', (tester) async {
     final cubit = stubTransport(stateWith(lines: lyrics));
     await pumpKaraoke(tester, cubit);
 
@@ -180,5 +249,3 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
-
-

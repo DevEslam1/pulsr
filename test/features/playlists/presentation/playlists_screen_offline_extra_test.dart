@@ -111,8 +111,7 @@ void main() {
         .thenAnswer((_) async {});
     when(() => cubit.fetchLikedSongsPlaylist()).thenAnswer((_) async {});
     when(() => cubit.fetchAccountPlaylists()).thenAnswer((_) async {});
-    when(() => cubit.fetchOnlinePlaylistByUrl(any()))
-        .thenAnswer((_) async {});
+    when(() => cubit.fetchOnlinePlaylistByUrl(any())).thenAnswer((_) async {});
     when(() => cubit.removeCustomPlaylist(any())).thenReturn(null);
     when(() => cubit.restoreCustomPlaylist(any())).thenReturn(null);
 
@@ -136,10 +135,9 @@ void main() {
     when(() => useCases.addSongsToPlaylist(any(), any()))
         .thenAnswer((_) async => const Right(null));
     export = _Export();
-    when(() => export.exportToFile(any(), any(),
-            format: any(named: 'format')))
-        .thenAnswer((_) async =>
-            File('${Directory.systemTemp.path}/pulsr_export.m3u'));
+    when(() => export.exportToFile(any(), any(), format: any(named: 'format')))
+        .thenAnswer(
+            (_) async => File('${Directory.systemTemp.path}/pulsr_export.m3u'));
     final account = _Account();
     when(() => account.loginState).thenReturn(loginState);
     when(() => account.isLoggedIn).thenReturn(false);
@@ -231,8 +229,9 @@ void main() {
     await tester.tap(find.text('M3U'));
     await tester.pumpAndSettle();
 
-    verify(() => export.exportToFile('Road Trip', any(),
-        format: PlaylistFormat.m3u)).called(1);
+    verify(() =>
+            export.exportToFile('Road Trip', any(), format: PlaylistFormat.m3u))
+        .called(1);
   });
 
   testWidgets('a smart playlist can be renamed and deleted', (tester) async {
@@ -279,7 +278,8 @@ void main() {
       likedStatus: YtmFetchStatus.loading,
       customStatus: YtmFetchStatus.done,
       customPlaylists: [
-        OnlinePlaylistEntry(id: 'c1', title: 'Added Mix', uploader: 'u', tracks: []),
+        OnlinePlaylistEntry(
+            id: 'c1', title: 'Added Mix', uploader: 'u', tracks: []),
       ],
     );
     await pumpScreen(tester);
@@ -336,8 +336,8 @@ void main() {
     await pumpScreen(tester);
     await emit(tester, PlaylistState(playlists: [userPlaylist]));
 
-    final indicator = tester.widget<RefreshIndicator>(
-        find.byType(RefreshIndicator).first);
+    final indicator =
+        tester.widget<RefreshIndicator>(find.byType(RefreshIndicator).first);
     await indicator.onRefresh();
     await tester.pumpAndSettle();
 

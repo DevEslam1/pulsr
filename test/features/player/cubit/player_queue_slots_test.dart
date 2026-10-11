@@ -63,7 +63,9 @@ void main() {
           {int currentIndex = 0, int activeSlot = 0}) =>
       PlayerState(
         queueSlice: QueueSlice(
-            queue: queue, currentIndex: currentIndex, activeQueueSlot: activeSlot),
+            queue: queue,
+            currentIndex: currentIndex,
+            activeQueueSlot: activeSlot),
       );
 
   group('persistQueueSlotsNow', () {
@@ -182,8 +184,7 @@ void main() {
           },
         }),
       });
-      when(() => repo.getSongsByIds([1]))
-          .thenThrow(Exception('DB exploded'));
+      when(() => repo.getSongsByIds([1])).thenThrow(Exception('DB exploded'));
 
       await buildController().restoreQueueSlots();
       expect(slots, isEmpty);
@@ -194,8 +195,8 @@ void main() {
     test('retains the current song', () async {
       final song = buildSong(1);
       state = stateWithQueue([song]);
-      state = state.copyWith(
-          playback: state.playback.copyWith(currentSong: song));
+      state =
+          state.copyWith(playback: state.playback.copyWith(currentSong: song));
       final controller = buildController();
       await controller.clearQueue();
       expect(state.queue.length, 1);
@@ -308,8 +309,7 @@ void main() {
       expect(handler.calls, isNot(contains('loadQueue')));
     });
 
-    test('emits an error when the target slot has no playable songs',
-        () async {
+    test('emits an error when the target slot has no playable songs', () async {
       state = stateWithQueue([buildSong(1)], activeSlot: 0);
       await buildController().switchQueueSlot(2);
       expect(state.errorMessage, 'Queue slot is empty');
@@ -525,13 +525,54 @@ void main() {
       final controller = buildController();
       final many = List.generate(4100, (i) => buildSong(i + 1));
       controller.setQueueSlot(0,
-          songs: many,
-          currentIndex: 0,
-          position: Duration.zero,
-          speed: 1.0);
+          songs: many, currentIndex: 0, position: Duration.zero, speed: 1.0);
       expect(cache.length, lessThanOrEqualTo(4096));
       // The most recently written ids survive.
       expect(cache.containsKey(4100), isTrue);
+    });
+  });
+
+  group('addAllToQueue identity dedupe', () {
+    PlayerQueueController buildIdentityController() => PlayerQueueController(
+          audioHandler: handler,
+          repository: repo,
+          getState: () => state,
+          emit: (s) => state = s,
+          isClosed: () => closed,
+          queueMutex: Mutex(),
+          slotLookupCache: cache,
+          queueSlots: slots,
+          updateWidgetThrottled: ({bool force = false}) {},
+          loadLyrics: (_) {},
+          debouncedPersistQueueSlots: () => debounced++,
+          bumpQueueVersion: () => bumped++,
+          isSameTrack: (a, b) {
+            if (a == null || b == null) return false;
+            if (a.id == b.id) return true;
+            if (a.remoteId != null &&
+                a.remoteId!.isNotEmpty &&
+                a.remoteId == b.remoteId) {
+              return true;
+            }
+            if (a.path.isNotEmpty && a.path == b.path) return true;
+            return false;
+          },
+        );
+
+    test('dedupes batch entries by remoteId and path, not id alone', () async {
+      state = stateWithQueue([
+        buildSong(1, source: SongSource.youtube, remoteId: 'abc'),
+        buildSong(2),
+      ]);
+
+      await buildIdentityController().addAllToQueue([
+        buildSong(99, source: SongSource.youtube, remoteId: 'abc'),
+        buildSong(100, path: '/music/2.mp3'),
+        buildSong(101),
+      ]);
+
+      expect(state.queue.map((s) => s.id), [1, 2, 101]);
+      expect(handler.calls.where((c) => c == 'addToQueueEnd').length, 1);
     });
   });
 }

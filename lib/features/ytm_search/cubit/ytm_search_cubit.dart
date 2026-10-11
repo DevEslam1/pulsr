@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
@@ -21,6 +22,39 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   int _generation = 0;
   // FIX-C7: Latch to prevent concurrent bot-block retries
   bool _botRetryInFlight = false;
+
+  /// Page size for load-more. The native extractor caps a single search at 200
+  /// (YtmExtractorPlugin.MAX_SEARCH_LIMIT); each load-more raises the limit by
+  /// one page and de-dupes the appended tracks by videoId.
+  static const int _searchPageSize = 30;
+  static const int _maxSearchLimit = 200;
+  int _nextLimit = _searchPageSize;
+  bool _hasMore = false;
+
+  /// True while a query change is waiting out the debounce. The UI keeps the
+  /// skeleton (or the previous results) up instead of flashing "no results".
+  bool get isDebouncing => _debounceTimer?.isActive ?? false;
+
+  /// True when more results may exist beyond the emitted page.
+  bool get hasMore => _hasMore;
+
+  /// Wake-up callbacks for [retryAfterCooldown]'s cooldown wait. Bumping the
+  /// generation wakes them too, so a new query aborts the wait immediately
+  /// instead of sleeping until the cooldown ends.
+  final List<void Function()> _wakeCooldownWaiters = [];
+
+  int _bumpGeneration() {
+    _generation++;
+    for (final wake in List<void Function()>.of(_wakeCooldownWaiters)) {
+      wake();
+    }
+    return _generation;
+  }
+
+  void _resetPaging() {
+    _hasMore = false;
+    _nextLimit = _searchPageSize;
+  }
 
   final ValueNotifier<List<String>> historyNotifier =
       ValueNotifier<List<String>>(const []);
@@ -136,8 +170,16 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   }
 
   void onQueryChanged(String query) {
-    safeEmit(state.copyWith(query: query));
+    // Bump synchronously so an in-flight search for the previous text can
+    // never emit after the user typed (or cleared) it.
+    _bumpGeneration();
     _debounceTimer?.cancel();
+    _resetPaging();
+    if (query.trim().isEmpty) {
+      safeEmit(const YtmSearchState());
+      return;
+    }
+    safeEmit(state.copyWith(query: query));
     _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
       _executeSearch(query);
     }));
@@ -145,7 +187,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
   void clearQuery() {
     _debounceTimer?.cancel();
-    _generation++;
+    _bumpGeneration();
+    _resetPaging();
     safeEmit(const YtmSearchState());
   }
 
@@ -155,21 +198,79 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
   Future<void> retry() => _executeSearch(state.query);
 
+  /// Fetches the next page of the current query by raising the search limit,
+  /// appending only tracks whose videoId is not already shown.
+  Future<void> loadMore() async {
+    if (isClosed || state.isLoading || isDebouncing || !_hasMore) return;
+    final query = state.query;
+    if (query.trim().isEmpty ||
+        FileIntentHandler.extractYouTubeVideoId(query) != null) {
+      return;
+    }
+    final nextLimit = math.min(_nextLimit + _searchPageSize, _maxSearchLimit);
+    if (nextLimit <= _nextLimit) {
+      _hasMore = false;
+      return;
+    }
+    final gen = _generation;
+    safeEmit(state.copyWith(isLoading: true));
+    try {
+      final more = await _service.searchWithFallback(query, limit: nextLimit);
+      if (gen != _generation || isClosed) return;
+      final seen = {for (final t in state.results) t.videoId};
+      final appended = <YtmTrack>[...state.results];
+      var added = 0;
+      for (final track in more) {
+        if (track.videoId.isEmpty || !seen.add(track.videoId)) continue;
+        appended.add(track);
+        added++;
+      }
+      _nextLimit = nextLimit;
+      _hasMore =
+          added > 0 && more.length >= nextLimit && nextLimit < _maxSearchLimit;
+      safeEmit(state.copyWith(
+          results: appended, isLoading: false, errorMessage: null));
+    } catch (e, st) {
+      if (gen != _generation || isClosed) return;
+      ErrorLogger.log('Failed to load more YTM search results',
+          error: e, stackTrace: st, category: 'YtmSearchCubit');
+      safeEmit(state.copyWith(isLoading: false));
+    }
+  }
+
   Future<void> retryAfterCooldown() async {
     final gen = _generation;
     final query = state.query;
+    final notifier = _service.botCooldownNotifier;
     if (_service.isBotCoolingDown) {
       safeEmit(state.copyWith(
         errorMessage:
             'YouTube is rate-limiting requests. Please wait a few minutes.',
       ));
-      while (_service.isBotCoolingDown && !isClosed && gen == _generation) {
-        await Future.delayed(const Duration(milliseconds: 500));
+      // Await the service's cooldown signal instead of busy-polling every
+      // 500 ms. A generation bump (new query/clear/close) also wakes this.
+      while (!isClosed && gen == _generation && notifier.value) {
+        await _awaitCooldownSignal(notifier);
       }
       if (isClosed || gen != _generation) return;
     }
     if (query != state.query) return;
     await retry();
+  }
+
+  Future<void> _awaitCooldownSignal(ValueListenable<bool> notifier) {
+    final completer = Completer<void>();
+    late final VoidCallback listener;
+    void wake() {
+      notifier.removeListener(listener);
+      _wakeCooldownWaiters.remove(wake);
+      if (!completer.isCompleted) completer.complete();
+    }
+
+    listener = wake;
+    notifier.addListener(listener);
+    _wakeCooldownWaiters.add(wake);
+    return completer.future;
   }
 
   Future<void> _executeSearch(
@@ -182,11 +283,13 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     final effectiveGeneration = generation ?? ++_generation;
 
     if (query.trim().isEmpty) {
+      _resetPaging();
       safeEmit(
           state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
+    _resetPaging();
     safeEmit(state.copyWith(isLoading: true, errorMessage: null));
     try {
       final videoId = FileIntentHandler.extractYouTubeVideoId(query);
@@ -201,6 +304,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
             duration: stream.duration,
             artworkUrl: stream.artworkUrl,
           );
+          _hasMore = false;
           safeEmit(state.copyWith(
               results: [track], isLoading: false, errorMessage: null));
           return;
@@ -216,6 +320,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
       final results = await _service.searchWithFallback(query);
       if (effectiveGeneration != _generation || isClosed) return;
+      _nextLimit = _searchPageSize;
+      _hasMore = results.length >= _searchPageSize &&
+          _searchPageSize < _maxSearchLimit;
       safeEmit(state.copyWith(
           results: results, isLoading: false, errorMessage: null));
       if (results.isNotEmpty) unawaited(_saveToHistory(query));
@@ -314,7 +421,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     _debounceTimer?.cancel();
     // H-04: Invalidate any in-flight search so its late network completion
     // cannot still be doing work for a dead cubit.
-    _generation++;
+    _bumpGeneration();
     _historyDisposed = true;
     historyNotifier.dispose();
     return super.close();

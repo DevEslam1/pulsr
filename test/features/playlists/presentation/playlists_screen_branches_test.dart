@@ -107,8 +107,7 @@ void main() {
         .thenAnswer((_) async {});
     when(() => cubit.fetchLikedSongsPlaylist()).thenAnswer((_) async {});
     when(() => cubit.fetchAccountPlaylists()).thenAnswer((_) async {});
-    when(() => cubit.fetchOnlinePlaylistByUrl(any()))
-        .thenAnswer((_) async {});
+    when(() => cubit.fetchOnlinePlaylistByUrl(any())).thenAnswer((_) async {});
 
     when(() => settings.state).thenReturn(const SettingsState());
     when(() => settings.stream)
@@ -126,10 +125,9 @@ void main() {
         .thenAnswer((_) async => const Right(9));
     when(() => useCases.addSongsToPlaylist(any(), any()))
         .thenAnswer((_) async => const Right<AppFailure, void>(null));
-    when(() => export.exportToFile(any(), any(),
-            format: any(named: 'format')))
-        .thenAnswer((_) async =>
-            File('${Directory.systemTemp.path}/pulsr_export.m3u'));
+    when(() => export.exportToFile(any(), any(), format: any(named: 'format')))
+        .thenAnswer(
+            (_) async => File('${Directory.systemTemp.path}/pulsr_export.m3u'));
 
     final getSongs = _GetSongs();
     when(() => getSongs.getAllSongs())
@@ -195,8 +193,9 @@ void main() {
 
   testWidgets('creating from a suggestion reports a create failure',
       (tester) async {
-    when(() => suggestions.generateSuggestionsAsync(any(),
-        forceRefresh: any(named: 'forceRefresh'))).thenAnswer((_) async => [
+    when(() =>
+        suggestions.generateSuggestionsAsync(any(),
+            forceRefresh: any(named: 'forceRefresh'))).thenAnswer((_) async => [
           PlaylistSuggestion(
               title: 'Heavy Rotation',
               description: 'top tracks',

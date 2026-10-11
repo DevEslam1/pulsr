@@ -190,9 +190,14 @@ void main() {
     void stubAll({int charts = 1, int releases = 1, int moods = 1}) {
       when(() => ytm.getCharts(limit: 15))
           .thenAnswer((_) async => List.generate(charts, (i) => _track(i)));
+      when(() => ytm.trending(limit: 15)).thenAnswer((_) async => const []);
       when(() => ytm.searchWithFallback('New Music Releases', limit: 15))
           .thenAnswer(
               (_) async => List.generate(releases, (i) => _track(10 + i)));
+      when(() => ytm.searchWithFallback('Top Global Hits', limit: 15))
+          .thenAnswer((_) async => const []);
+      when(() => ytm.searchWithFallback('Popular Hits Playlist', limit: 15))
+          .thenAnswer((_) async => const []);
       when(() => ytm.getMoods(limit: 15))
           .thenAnswer((_) async => List.generate(moods, (i) => _track(20 + i)));
     }
@@ -233,6 +238,59 @@ void main() {
       expect(await browse.getHomeFeed(), isEmpty);
 
       verify(() => ytm.getCharts(limit: 15)).called(2);
+    });
+
+    test('serves the cache inside the TTL and refetches once it expires',
+        () async {
+      var now = DateTime(2026, 1, 1);
+      final clocked = YtmBrowseService(ytm, clock: () => now);
+      stubAll();
+
+      final first = await clocked.getHomeFeed();
+      now = now.add(const Duration(hours: 5));
+      final cached = await clocked.getHomeFeed();
+      expect(identical(cached, first), isTrue);
+
+      now = now.add(const Duration(hours: 2));
+      await clocked.getHomeFeed();
+      // One verify at the end: mocktail only counts unverified interactions.
+      verify(() => ytm.getCharts(limit: 15)).called(2);
+    });
+
+    test('force bypasses a still-valid cache', () async {
+      final clocked = YtmBrowseService(ytm, clock: () => DateTime(2026, 1, 1));
+      stubAll();
+
+      await clocked.getHomeFeed();
+      await clocked.getHomeFeed(force: true);
+      verify(() => ytm.getCharts(limit: 15)).called(2);
+    });
+
+    test('a failing feed with no cache rethrows instead of returning empty',
+        () async {
+      when(() => ytm.getCharts(limit: 15)).thenThrow(StateError('offline'));
+      when(() => ytm.trending(limit: 15)).thenThrow(StateError('offline'));
+      when(() => ytm.getMoods(limit: 15)).thenThrow(StateError('offline'));
+      when(() => ytm.searchWithFallback(any(), limit: any(named: 'limit')))
+          .thenThrow(StateError('offline'));
+
+      await expectLater(browse.getHomeFeed(), throwsA(isA<StateError>()));
+    });
+
+    test('a failed forced refresh serves the stale cache instead of empty',
+        () async {
+      stubAll();
+      final first = await browse.getHomeFeed();
+      expect(first, isNotEmpty);
+
+      when(() => ytm.getCharts(limit: 15)).thenThrow(StateError('offline'));
+      when(() => ytm.trending(limit: 15)).thenThrow(StateError('offline'));
+      when(() => ytm.getMoods(limit: 15)).thenThrow(StateError('offline'));
+      when(() => ytm.searchWithFallback(any(), limit: any(named: 'limit')))
+          .thenThrow(StateError('offline'));
+
+      final fallback = await browse.getHomeFeed(force: true);
+      expect(identical(fallback, first), isTrue);
     });
 
     test('concurrent callers share one in-flight fetch', () async {

@@ -14,6 +14,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/services/playlist_share_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/search_algorithm_utils.dart';
 import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -29,6 +30,8 @@ import '../../sheets/song_info_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Reactively-loaded playlist contents or the failure that prevented loading,
 /// so a DB error surfaces as a retryable state instead of an empty list.
@@ -65,18 +68,22 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   /// Cleared on retry to force a fresh subscription.
   Stream<_PlaylistSongsResult>? _songsStream;
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Stream<_PlaylistSongsResult> _resolveSongsStream(String invalidRulesMessage) {
     final cached = _songsStream;
     if (cached != null) return cached;
     final useCases = _useCases;
     final Stream<_PlaylistSongsResult> stream;
     if (playlist.isSmart && playlist.smartCriteria != null) {
-      SmartCriteria? criteria;
-      try {
-        criteria = SmartCriteria.fromJsonString(playlist.smartCriteria!);
-      } catch (_) {
-        criteria = null;
-      }
+      final criteria = SmartCriteria.tryDecode(playlist.smartCriteria);
       if (criteria != null) {
         stream = useCases
             .watchSmartPlaylistSongs(criteria)
@@ -321,7 +328,11 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                       final deletedMessage =
                           context.l10n.playlistDeleted(plName);
                       await playlistUseCases.deletePlaylist(playlist.id);
-                      if (context.mounted) Navigator.pop(context);
+                      // Embedded two-pane mode has no route of its own: popping
+                      // here would tear down the enclosing /playlists shell.
+                      if (!widget.isEmbedded && context.mounted) {
+                        Navigator.pop(context);
+                      }
                       messenger.showSnackBar(
                         SnackBar(
                           content: Text(deletedMessage),
@@ -419,144 +430,217 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 emptyWidget: noTracksState,
                 onError: (_) => noTracksState,
                 isEmpty: (data) => data.error == null && data.songs.isEmpty,
-                onData: (data) => data.error != null
-                    ? PulsrEmptyState(
-                        icon: Icons.error_outline_rounded,
-                        title: context.l10n.playlistLoadFailed,
-                        subtitle: data.error!,
-                        primaryActionLabel: context.l10n.retry,
-                        onPrimaryAction: _retryLoad,
-                      )
-                    : ListView.builder(
-                        addAutomaticKeepAlives: false,
-                        addRepaintBoundaries: true,
-                        padding: EdgeInsets.only(
-                            bottom: PulsrLayoutMetrics.scrollBottom(context)),
-                        itemCount: songs.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return Padding(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: Adaptive.pagePadding(context),
-                                  vertical: AppSpacing.sm),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: FilledButton.icon(
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: p.accent,
-                                        foregroundColor: p.onAccent,
-                                      ),
-                                      onPressed: () {
-                                        context.read<PlayerCubit>().playSong(
-                                            songs.first,
-                                            queue: songs);
-                                      },
-                                      icon:
-                                          const Icon(Icons.play_arrow_rounded),
-                                      label: Text(context.l10n.playAll),
-                                    ),
+                onData: (data) {
+                  if (data.error != null) {
+                    return PulsrEmptyState(
+                      icon: Icons.error_outline_rounded,
+                      title: context.l10n.playlistLoadFailed,
+                      subtitle: data.error!,
+                      primaryActionLabel: context.l10n.retry,
+                      onPrimaryAction: _retryLoad,
+                    );
+                  }
+                  final normalizedQuery = _searchQuery.trim().isEmpty
+                      ? null
+                      : SearchAlgorithmUtils.normalize(_searchQuery);
+                  final visibleSongs = normalizedQuery == null
+                      ? songs
+                      : songs
+                          .where((s) =>
+                              SearchAlgorithmUtils.normalize(s.title)
+                                  .contains(normalizedQuery) ||
+                              SearchAlgorithmUtils.normalize(s.artist)
+                                  .contains(normalizedQuery))
+                          .toList();
+                  return ListView.builder(
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
+                    padding: EdgeInsets.only(
+                        bottom: PulsrLayoutMetrics.scrollBottom(context)),
+                    itemCount:
+                        visibleSongs.isEmpty ? 3 : visibleSongs.length + 2,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context),
+                              vertical: AppSpacing.sm),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: p.accent,
+                                    foregroundColor: p.onAccent,
                                   ),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () {
-                                        final shuffled =
-                                            List<SongsTableData>.from(songs)
-                                              ..shuffle();
-                                        context.read<PlayerCubit>().playSong(
-                                            shuffled.first,
-                                            queue: shuffled);
-                                      },
-                                      icon: Icon(Icons.shuffle_rounded,
-                                          color: p.accent),
-                                      label: Text(context.l10n.shuffle),
-                                    ),
+                                  onPressed: () {
+                                    context
+                                        .read<PlayerCubit>()
+                                        .playSong(songs.first, queue: songs);
+                                  },
+                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  label: Text(context.l10n.playAll),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    final shuffled =
+                                        List<SongsTableData>.from(songs)
+                                          ..shuffle();
+                                    context.read<PlayerCubit>().playSong(
+                                        shuffled.first,
+                                        queue: shuffled);
+                                  },
+                                  icon: Icon(Icons.shuffle_rounded,
+                                      color: p.accent),
+                                  label: Text(context.l10n.shuffle),
+                                ),
+                              ),
+                              if (AppConfig.ytmEnabled) ...[
+                                const SizedBox(width: AppSpacing.xs),
+                                IconButton.filledTonal(
+                                  constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget),
+                                  onPressed: () =>
+                                      _downloadPlaylist(context, songs),
+                                  icon: const Icon(Icons.download_rounded,
+                                      size: 20),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor:
+                                        p.accent.withValues(alpha: 0.15),
+                                    foregroundColor: p.accent,
                                   ),
-                                  if (AppConfig.ytmEnabled) ...[
-                                    const SizedBox(width: AppSpacing.xs),
-                                    IconButton.filledTonal(
+                                  tooltip: context
+                                      .l10n.browseDownloadAllOfflineActive,
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }
+
+                      if (index == 1) {
+                        return Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                            Adaptive.pagePadding(context),
+                            0,
+                            Adaptive.pagePadding(context),
+                            AppSpacing.xs,
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (val) =>
+                                setState(() => _searchQuery = val),
+                            decoration: InputDecoration(
+                              hintText: context.l10n.browseSearchWithinPlaylist,
+                              prefixIcon:
+                                  const Icon(Icons.search_rounded, size: 20),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
                                       constraints: const BoxConstraints(
                                           minWidth: AppSpacing.minTouchTarget,
                                           minHeight: AppSpacing.minTouchTarget),
-                                      onPressed: () =>
-                                          _downloadPlaylist(context, songs),
-                                      icon: const Icon(Icons.download_rounded,
-                                          size: 20),
-                                      style: IconButton.styleFrom(
-                                        backgroundColor:
-                                            p.accent.withValues(alpha: 0.15),
-                                        foregroundColor: p.accent,
-                                      ),
-                                      tooltip: context
-                                          .l10n.browseDownloadAllOfflineActive,
-                                    ),
-                                  ],
-                                ],
+                                      icon: const Icon(Icons.clear_rounded,
+                                          size: 18),
+                                      tooltip: context.l10n.clear,
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _searchQuery = '');
+                                      },
+                                    )
+                                  : null,
+                              filled: true,
+                              fillColor: p.surfaceContainer,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.s10),
+                              border: OutlineInputBorder(
+                                borderRadius: AppRadii.r14All,
+                                borderSide: BorderSide(color: p.hairline),
                               ),
-                            );
-                          }
-
-                          final i = index - 1;
-                          final song = songs[i];
-                          return SongTile(
-                            song: song,
-                            index: i,
-                            subtitleOverride: '${song.artist} • ${song.album}',
-                            onTap: () => context
-                                .read<PlayerCubit>()
-                                .playSong(song, queue: songs),
-                            onMorePressed: () =>
-                                SongInfoSheet.show(context, song: song),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (AppConfig.ytmEnabled &&
-                                    song.remoteId != null &&
-                                    song.remoteId!.isNotEmpty)
-                                  YtmDownloadButton(song: song),
-                                if (!playlist.isSmart)
-                                  IconButton(
-                                    icon: Icon(
-                                        Icons.remove_circle_outline_rounded,
-                                        size: 20,
-                                        color: p.textTertiary),
-                                    tooltip: context.l10n.remove,
-                                    constraints: const BoxConstraints(
-                                      minWidth: AppSpacing.minTouchTarget,
-                                      minHeight: AppSpacing.minTouchTarget,
-                                    ),
-                                    onPressed: () async {
-                                      await playlistUseCases
-                                          .removeSongFromPlaylist(
-                                              playlist.id, song.id);
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .clearSnackBars();
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(context.l10n
-                                                .songRemovedFromPlaylist(
-                                                    song.title, playlist.name)),
-                                            action: SnackBarAction(
-                                              label: context.l10n.undo,
-                                              onPressed: () {
-                                                playlistUseCases
-                                                    .addSongsToPlaylist(
-                                                        playlist.id, [song.id]);
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                              ],
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadii.r14All,
+                                borderSide: BorderSide(color: p.hairline),
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      }
+
+                      if (visibleSongs.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.s40),
+                          child: Center(
+                            child: Text(
+                              '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
+                              style: TextStyle(
+                                  color: p.textTertiary,
+                                  fontSize: AppFontSize.body),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final i = index - 2;
+                      final song = visibleSongs[i];
+                      return SongTile(
+                        song: song,
+                        index: i,
+                        subtitleOverride: '${song.artist} • ${song.album}',
+                        onTap: () => context
+                            .read<PlayerCubit>()
+                            .playSong(song, queue: visibleSongs),
+                        onMorePressed: () =>
+                            SongInfoSheet.show(context, song: song),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (AppConfig.ytmEnabled &&
+                                song.remoteId != null &&
+                                song.remoteId!.isNotEmpty)
+                              YtmDownloadButton(song: song),
+                            if (!playlist.isSmart)
+                              IconButton(
+                                icon: Icon(Icons.remove_circle_outline_rounded,
+                                    size: 20, color: p.textTertiary),
+                                tooltip: context.l10n.remove,
+                                constraints: const BoxConstraints(
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget,
+                                ),
+                                onPressed: () async {
+                                  await playlistUseCases.removeSongFromPlaylist(
+                                      playlist.id, song.id);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .clearSnackBars();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(context.l10n
+                                            .songRemovedFromPlaylist(
+                                                song.title, playlist.name)),
+                                        action: SnackBarAction(
+                                          label: context.l10n.undo,
+                                          onPressed: () {
+                                            playlistUseCases.addSongsToPlaylist(
+                                                playlist.id, [song.id]);
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ),

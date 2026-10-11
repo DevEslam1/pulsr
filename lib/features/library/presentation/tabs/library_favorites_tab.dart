@@ -272,7 +272,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                                 ? ''
                                 : '${currentFavorites.first.id}-${currentFavorites.length}',
                             child: _buildFavoriteGridCard(context, song,
-                                currentFavorites, p, playerCubit),
+                                currentFavorites, p, playerCubit, state, cubit),
                           );
                         },
                       )
@@ -591,6 +591,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       tooltip: context.l10n.browsePasteFromClipboard,
                       onPressed: () async {
                         final data = await Clipboard.getData('text/plain');
+                        if (!ctx.mounted) return;
                         if (data?.text != null) {
                           setSheetState(
                               () => controller.text = data!.text!.trim());
@@ -640,6 +641,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                             final ytmService = getIt<YtmService>();
                             var tracks =
                                 await ytmService.getPlaylistTracks(text);
+                            if (!ctx.mounted) return;
                             if (tracks.isEmpty &&
                                 (text.contains('list=LM') ||
                                     text.contains('list=LL') ||
@@ -648,6 +650,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                               final ytmAccount = getIt<YtmAccountService>();
                               if (ytmAccount.isLoggedIn) {
                                 tracks = await ytmAccount.fetchLikedSongs();
+                                if (!ctx.mounted) return;
                               }
                             }
 
@@ -662,7 +665,18 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
                             final count = await libraryCubit
                                 .importYtmTracksAsFavorites(tracks);
-                            if (ctx.mounted && Navigator.of(ctx).canPop()) {
+                            if (!ctx.mounted) return;
+                            // A repository failure is reported as -1; keep the
+                            // sheet open with an inline error instead of
+                            // popping and claiming "Imported -1".
+                            if (count < 0) {
+                              setSheetState(() {
+                                isLoading = false;
+                                errorText = context.l10n.importFailed;
+                              });
+                              return;
+                            }
+                            if (Navigator.of(ctx).canPop()) {
                               Navigator.of(ctx).pop();
                             }
                             if (context.mounted) {
@@ -682,6 +696,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                               } catch (_) {}
                             }
                           } catch (e) {
+                            if (!ctx.mounted) return;
                             setSheetState(() {
                               isLoading = false;
                               errorText =
@@ -725,10 +740,20 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
     List<SongsTableData> currentFavorites,
     PulsrPalette p,
     PlayerCubit playerCubit,
+    LibraryState state,
+    LibraryCubit cubit,
   ) {
+    final isSelected = state.selectedSongIds.contains(song.id);
     return InkWell(
       borderRadius: AppRadii.r18All,
-      onTap: () => playerCubit.playSong(song, queue: currentFavorites),
+      onTap: () {
+        if (state.isMultiSelectMode) {
+          cubit.toggleSongSelection(song.id);
+        } else {
+          playerCubit.playSong(song, queue: currentFavorites);
+        }
+      },
+      onLongPress: () => cubit.toggleSongSelection(song.id),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -745,6 +770,19 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     borderRadius: 18,
                   ),
                 ),
+                if (isSelected)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.45),
+                        borderRadius: AppRadii.r18All,
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.check_circle_rounded,
+                            color: Colors.white, size: 36),
+                      ),
+                    ),
+                  ),
                 if (AppConfig.ytmEnabled &&
                     song.remoteId != null &&
                     song.remoteId!.isNotEmpty)
@@ -774,10 +812,13 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       customBorder: const CircleBorder(),
                       onTap: () =>
                           context.read<LibraryCubit>().toggleFavorite(song.id),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.s6),
-                        child: Icon(Icons.favorite_rounded,
-                            color: p.favorite, size: 18),
+                      child: SizedBox(
+                        width: AppSpacing.minTouchTarget,
+                        height: AppSpacing.minTouchTarget,
+                        child: Center(
+                          child: Icon(Icons.favorite_rounded,
+                              color: p.favorite, size: 18),
+                        ),
                       ),
                     ),
                   ),

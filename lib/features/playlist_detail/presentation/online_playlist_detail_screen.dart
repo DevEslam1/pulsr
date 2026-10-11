@@ -11,12 +11,14 @@ import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/search_algorithm_utils.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../domain/models/ytm_track.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -89,6 +91,10 @@ class _OnlinePlaylistDetailScreenState
 
   bool _disposed = false;
 
+  /// Incremented per fetch so a slow older request cannot overwrite the newer
+  /// one's data or stop its spinner early.
+  int _fetchGen = 0;
+
   @override
   void dispose() {
     _disposed = true;
@@ -98,6 +104,7 @@ class _OnlinePlaylistDetailScreenState
 
   Future<void> _fetchTracks({bool isBackgroundRefresh = false}) async {
     if (_disposed || !mounted) return;
+    final gen = ++_fetchGen;
     if (!isBackgroundRefresh) {
       setState(() {
         _isLoading = true;
@@ -127,7 +134,7 @@ class _OnlinePlaylistDetailScreenState
             '[ONLINE_PLAYLIST] fetchPlaylistDetails timed out for ${widget.args.playlistId}');
       }
 
-      if (_disposed || !mounted) return;
+      if (_disposed || !mounted || gen != _fetchGen) return;
 
       List<YtmTrack> fetchedTracks = details?.tracks ?? const [];
 
@@ -148,7 +155,7 @@ class _OnlinePlaylistDetailScreenState
         }
       }
 
-      if (_disposed || !mounted) return;
+      if (_disposed || !mounted || gen != _fetchGen) return;
 
       if (fetchedTracks.isEmpty) {
         if (!isBackgroundRefresh) {
@@ -186,13 +193,13 @@ class _OnlinePlaylistDetailScreenState
       // Speculative warm: pre-resolve the head of the list so a tap near the
       // top starts from the shared YtmUrlCache instead of a cold multi-engine
       // resolve. Staggered and bot-cooldown-aware inside warmStreams.
-      if (!_disposed && mounted) {
+      if (!_disposed && mounted && gen == _fetchGen) {
         context.read<PlayerCubit>().warmStreams(
           [for (final t in fetchedTracks.take(3)) t.toSongData()],
         );
       }
     } catch (e) {
-      if (_disposed || !mounted) return;
+      if (_disposed || !mounted || gen != _fetchGen) return;
       setState(() {
         _isLoading = false;
         _errorMessage = e is TimeoutException
@@ -246,33 +253,52 @@ class _OnlinePlaylistDetailScreenState
     final loc = context.l10n;
     try {
       final playlistUseCases = getIt<PlaylistUseCases>();
-      final songs = _tracks.map((t) => t.toSongData()).toList();
 
-      // First ensure tracks are known in local favorites repository
+      // First ensure tracks are known in local favorites repository.
+      // A negative result means the import failed: creating the playlist now
+      // would leave it empty while reporting success.
       final libraryCubit = context.read<LibraryCubit>();
-      await libraryCubit.importYtmTracksAsFavorites(_tracks);
+      final importedCount =
+          await libraryCubit.importYtmTracksAsFavorites(_tracks);
+      if (importedCount < 0) {
+        if (mounted) {
+          PulsrToast.show(context, message: saveFailedText, isError: true);
+        }
+        return;
+      }
+
+      // Hash-derived ids only exist when the import allocated exactly that id;
+      // already-downloaded tracks keep their positive local id. Resolve the
+      // real row ids by remoteId so the FK-constrained insert cannot fail.
+      final songIds = await _resolveSavedSongIds();
 
       final playlistRes = await playlistUseCases.createPlaylist(_title);
       final createdId = playlistRes.fold((l) => null, (r) => r);
 
-      if (createdId != null) {
-        // Single batch insert: one transaction instead of N round-trips.
-        await playlistUseCases
-            .addSongsToPlaylist(createdId, [for (final s in songs) s.id]);
+      if (createdId == null) {
         if (mounted) {
-          PulsrToast.show(
-            context,
-            message: loc.savedToLocal(_title, songs.length),
-            isSuccess: true,
-          );
+          PulsrToast.show(context, message: saveFailedText, isError: true);
         }
-      } else if (mounted) {
-        // Creating the local playlist failed — surface it instead of silently
-        // reporting success (or nothing at all).
+        return;
+      }
+
+      final addRes =
+          await playlistUseCases.addSongsToPlaylist(createdId, songIds);
+      final addFailure = addRes.fold((f) => f.message, (_) => null);
+      if (addFailure != null) {
+        // Never leave the just-created playlist empty behind a success toast.
+        await playlistUseCases.deletePlaylist(createdId);
+        if (mounted) {
+          PulsrToast.show(context, message: saveFailedText, isError: true);
+        }
+        return;
+      }
+
+      if (mounted) {
         PulsrToast.show(
           context,
-          message: saveFailedText,
-          isError: true,
+          message: loc.savedToLocal(_title, songIds.length),
+          isSuccess: true,
         );
       }
     } catch (_) {
@@ -286,15 +312,40 @@ class _OnlinePlaylistDetailScreenState
     }
   }
 
+  /// Maps every track's videoId to its real persisted row id. Falls back to
+  /// the deterministic hash id when the row cannot be resolved (repository
+  /// absent/failing), so a genuine FK failure still surfaces through the
+  /// insert result instead of being silently swallowed.
+  Future<List<int>> _resolveSavedSongIds() async {
+    final fallback = [for (final t in _tracks) t.songId];
+    if (!getIt.isRegistered<IMusicRepository>()) return fallback;
+    try {
+      final res = await getIt<IMusicRepository>().getFavorites();
+      final byRemoteId = <String, int>{};
+      res.fold((_) {}, (songs) {
+        for (final song in songs) {
+          final remoteId = song.remoteId;
+          if (remoteId != null && remoteId.isNotEmpty) {
+            byRemoteId[remoteId] = song.id;
+          }
+        }
+      });
+      if (byRemoteId.isEmpty) return fallback;
+      return [for (final t in _tracks) byRemoteId[t.videoId] ?? t.songId];
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final filtered = _searchQuery.isEmpty
         ? _tracks
         : _tracks.where((t) {
-            final q = _searchQuery.toLowerCase();
-            return t.title.toLowerCase().contains(q) ||
-                t.artist.toLowerCase().contains(q);
+            final q = SearchAlgorithmUtils.normalize(_searchQuery);
+            return SearchAlgorithmUtils.normalize(t.title).contains(q) ||
+                SearchAlgorithmUtils.normalize(t.artist).contains(q);
           }).toList();
 
     final totalDurationMs =

@@ -378,8 +378,11 @@ class AudioQualityInfo {
       bitrateEstimated: explicitBitrateKbps == null &&
           song.bitrateKbps == null &&
           calculatedBitrate != null,
-      sampleRate:
-          realSampleRate != null && realSampleRate > 0 ? sampleRate : 'Unknown',
+      sampleRate: realSampleRate != null && realSampleRate > 0
+          ? sampleRate
+          // DSD carriers report a computed "2.8 MHz / 5.6 MHz" rate that must
+          // not be masked as Unknown when no PCM header rate exists.
+          : (isDsd ? sampleRate : 'Unknown'),
       bitDepth: isDsd
           ? '1-bit DSD'
           : realBitDepth != null && realBitDepth > 0

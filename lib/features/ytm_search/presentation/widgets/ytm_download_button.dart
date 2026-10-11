@@ -4,12 +4,32 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/errors/error_message_resolver.dart';
+import '../../../../core/services/yt_download_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
+import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../cubit/ytm_download_cubit.dart';
 import '../../../downloads/presentation/widgets/download_quality_picker_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
+
+/// Routes a picker-confirmed [quality] into the service's per-download
+/// override, then queues the download through [cubit]. Extracted to the top
+/// level so the wiring is unit-testable without the YTM UI being compiled in.
+@visibleForTesting
+void routeDownloadQuality(
+  YtmDownloadCubit cubit,
+  SongsTableData song,
+  YtmAudioQuality quality,
+) {
+  final videoId = song.remoteId;
+  if (videoId != null &&
+      videoId.isNotEmpty &&
+      getIt.isRegistered<YtDownloadService>()) {
+    getIt<YtDownloadService>().setPendingDownloadQuality(videoId, quality);
+  }
+  cubit.download(song);
+}
 
 /// Per-result download control: shows an idle download icon, a determinate
 /// progress ring while transferring, a check once it lands in the library, and
@@ -119,7 +139,7 @@ class YtmDownloadButton extends StatelessWidget {
                   context,
                   song: song,
                   onConfirm: (quality) {
-                    cubit.download(song);
+                    routeDownloadQuality(cubit, song, quality);
                   },
                 );
               },

@@ -47,16 +47,20 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   _AlbumSort _sort = _AlbumSort.track;
   final Set<int> _selectedIds = {};
 
-  // Memoized so rebuilds (sort changes, selection, theme) do not resubscribe to
-  // the DB watch stream.
-  late final Stream<Result<List<SongsTableData>>> _songsStream;
+  // Recreated on retry only, so rebuilds (sort changes, selection, theme) do
+  // not resubscribe to the DB watch stream.
+  late Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getAlbumsUseCase ?? getIt<GetAlbumsUseCase>();
-    _songsStream = _useCase.watchAlbumSongs(widget.album.id).distinct();
+    _updateStream();
     _loadSortPreference();
+  }
+
+  void _updateStream() {
+    _songsStream = _useCase.watchAlbumSongs(widget.album.id).distinct();
   }
 
   String _sortPrefsKey(int albumId) => 'album_sort_$albumId';
@@ -272,9 +276,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           snapshot: snapshot,
           loadingWidget: emptyView,
           emptyWidget: emptyView,
-          onError: (_) => _AlbumErrorView(onRetry: () => setState(() {})),
+          onError: (_) =>
+              _AlbumErrorView(onRetry: () => setState(_updateStream)),
           onData: (result) => result.fold(
-            (_) => _AlbumErrorView(onRetry: () => setState(() {})),
+            (_) => _AlbumErrorView(onRetry: () => setState(_updateStream)),
             buildSongsView,
           ),
         );
@@ -392,11 +397,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   Widget _buildSongItem(
       BuildContext context, List<SongsTableData> songs, int index) {
     final p = context.palette;
-    // Disc grouping (gap 07-02): data is already ordered by
-    // discNumber/trackNumber; render a header on change.
+    // Disc grouping (gap 07-02): only meaningful when the list is ordered by
+    // disc/track; title and duration sorts must not interleave disc headers.
     final song = songs[index];
-    final showDiscHeader = index == 0 ||
-        (song.discNumber ?? 1) != (songs[index - 1].discNumber ?? 1);
+    final showDiscHeader = _sort == _AlbumSort.track &&
+        (index == 0 ||
+            (song.discNumber ?? 1) != (songs[index - 1].discNumber ?? 1));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

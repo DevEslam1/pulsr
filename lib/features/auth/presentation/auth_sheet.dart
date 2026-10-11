@@ -83,6 +83,7 @@ class _AuthSheetState extends State<AuthSheet> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final systemBottomInset = MediaQuery.paddingOf(context).bottom;
 
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {
@@ -101,15 +102,18 @@ class _AuthSheetState extends State<AuthSheet> {
           if (context.mounted && Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
           }
-        } else if (state.status == AuthStatus.error &&
-            state.errorMessage != null) {
+        } else if (state.errorMessage != null) {
+          // Non-error statuses (e.g. sign-in cancelled, email result null)
+          // still carry a message that must reach the user; only genuine
+          // failures get the red error styling.
+          final isError = state.status == AuthStatus.error;
           ScaffoldMessenger.of(context)
             ..clearSnackBars()
             ..showSnackBar(
               SnackBar(
                 content:
                     Text(resolveUiErrorMessage(context, state.errorMessage!)),
-                backgroundColor: p.error,
+                backgroundColor: isError ? p.error : null,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -124,8 +128,11 @@ class _AuthSheetState extends State<AuthSheet> {
             constraints: BoxConstraints(
                 maxWidth: Adaptive.sheetConstraints(context).maxWidth),
             child: Container(
-              padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg,
-                  AppSpacing.md, AppSpacing.lg, bottomInset + 24),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                  bottomInset + (bottomInset > 0 ? 0 : systemBottomInset) + 24),
               decoration: BoxDecoration(
                 color: p.surfaceContainer,
                 borderRadius: const BorderRadius.vertical(

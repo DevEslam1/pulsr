@@ -89,8 +89,7 @@ void main() {
     expect(find.text('Loved Local'), findsNothing);
   });
 
-  testWidgets('grid view mode renders the favorite grid cards',
-      (tester) async {
+  testWidgets('grid view mode renders the favorite grid cards', (tester) async {
     disableAnimations(tester);
     setSurface(tester);
     final cubit = stubLibraryCubit(LibraryState(

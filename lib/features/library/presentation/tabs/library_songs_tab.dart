@@ -1,5 +1,21 @@
 part of '../library_screen.dart';
 
+final RegExp _railAsciiLetter = RegExp(r'^[A-Z]$');
+
+/// Resolves the first list index for an alphabet-rail letter. The '#' entry
+/// buckets every title whose initial is not an ASCII letter (digits, symbols,
+/// non-Latin scripts) instead of only titles literally starting with '#'.
+@visibleForTesting
+int libraryRailLetterIndex(String letter, List<SongsTableData> songs) {
+  return songs.indexWhere((song) {
+    final title = song.title.trim();
+    if (title.isEmpty) return letter == '#';
+    final initial = title[0].toUpperCase();
+    if (letter == '#') return !_railAsciiLetter.hasMatch(initial);
+    return initial == letter;
+  });
+}
+
 mixin LibrarySongsTab on State<LibraryScreen> {
   /// Ensures the list head is pre-resolved exactly once per screen, so the
   /// first online taps don't pay the network resolve. Warms the top few online
@@ -130,10 +146,13 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                                 customBorder: const CircleBorder(),
                                 onTap: () =>
                                     SongInfoSheet.show(context, song: song),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(AppSpacing.s6),
-                                  child: Icon(Icons.more_vert_rounded,
-                                      color: Colors.white, size: 18),
+                                child: const SizedBox(
+                                  width: AppSpacing.minTouchTarget,
+                                  height: AppSpacing.minTouchTarget,
+                                  child: Center(
+                                    child: Icon(Icons.more_vert_rounded,
+                                        color: Colors.white, size: 18),
+                                  ),
                                 ),
                               ),
                             ),

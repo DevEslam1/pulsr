@@ -52,6 +52,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         final res = await getIt<IMusicRepository>().getAllSongs();
         songs = res.fold((_) => const <SongsTableData>[], (list) => list);
       }
+      // CUE chapter rows share the container's path/duration/fileSize, so the
+      // checksum pass would hash one file per chapter and report every chapter
+      // as an identical copy of its siblings. Skip them: only real file rows
+      // (cueStartMs == null) are duplicate candidates.
+      songs = songs.where((s) => s.cueStartMs == null).toList();
       final duplicates = await _finder.findDuplicates(songs);
       if (!mounted) return;
       setState(() {

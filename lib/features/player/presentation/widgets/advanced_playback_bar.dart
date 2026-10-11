@@ -12,6 +12,7 @@ import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 /// AB-loop / bookmark labels need a placeholder for an unset point; the
@@ -84,7 +85,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.center,
                   child: Container(
-                    height: 36,
+                    height: 48,
                     padding:
                         const EdgeInsets.symmetric(horizontal: AppSpacing.s6),
                     decoration: BoxDecoration(
@@ -102,10 +103,10 @@ class AdvancedPlaybackBar extends StatelessWidget {
                       children: [
                         // F1: AB loop
                         IconButton(
-                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 32, minHeight: 32),
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
                           tooltip: l10n.setLoopPointA(_fmt(state.abPointA)),
                           color: state.abPointA != null
                               ? context.palette.info
@@ -116,10 +117,10 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                   fontWeight: FontWeight.w800, fontSize: 13)),
                         ),
                         IconButton(
-                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 32, minHeight: 32),
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
                           tooltip: l10n.setLoopPointB(_fmt(state.abPointB)),
                           color: state.abPointB != null
                               ? context.palette.info
@@ -130,10 +131,10 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                   fontWeight: FontWeight.w800, fontSize: 13)),
                         ),
                         IconButton(
-                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 32, minHeight: 32),
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
                           tooltip: state.abLoopEnabled
                               ? l10n.disableAbLoop
                               : l10n.enableAbLoop,
@@ -148,13 +149,32 @@ class AdvancedPlaybackBar extends StatelessWidget {
                         ),
                         if (state.abPointA != null || state.abPointB != null)
                           IconButton(
-                            visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
-                                minWidth: 32, minHeight: 32),
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget),
                             tooltip: l10n.clearAbLoop,
                             onPressed: cubit.clearAbLoop,
                             icon: const Icon(Icons.clear, size: 16),
+                          ),
+                        if (state.abPointA != null || state.abPointB != null)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                                start: AppSpacing.xs, end: AppSpacing.s2),
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                'A ${_fmt(state.abPointA)} · B ${_fmt(state.abPointB)}',
+                                style: TextStyle(
+                                  fontSize: AppFontSize.tiny,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.palette.info,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         Container(
                           width: 1,
@@ -165,10 +185,10 @@ class AdvancedPlaybackBar extends StatelessWidget {
                         ),
                         // F2: per-track delay
                         IconButton(
-                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 32, minHeight: 32),
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
                           tooltip: l10n.audioDelayTooltip(state.trackDelayMs),
                           onPressed: () => _showDelaySheet(
                               context, cubit, state.trackDelayMs),

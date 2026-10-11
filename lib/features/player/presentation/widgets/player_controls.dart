@@ -23,6 +23,10 @@ class PlayerControls extends StatelessWidget {
   final double mainButtonSize;
   final Color primaryColor;
 
+  /// Shows a progress spinner on the main button while the engine is
+  /// loading/buffering. Tapping still toggles play/pause.
+  final bool isBuffering;
+
   /// Whether a neighbouring queue entry exists in each direction. Defaults to
   /// true so standalone usages keep the pre-existing always-enabled behavior.
   final bool hasPrevious;
@@ -41,6 +45,7 @@ class PlayerControls extends StatelessWidget {
     required this.onToggleRepeat,
     this.mainButtonSize = 64.0,
     required this.primaryColor,
+    this.isBuffering = false,
     this.hasPrevious = true,
     this.hasNext = true,
     this.abLoopActive = false,
@@ -207,14 +212,24 @@ class PlayerControls extends StatelessWidget {
                           scale: anim,
                           child: child,
                         ),
-                        child: Icon(
-                          isPlaying
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          key: ValueKey(isPlaying),
-                          color: onPrimaryColor,
-                          size: mainButtonSize * 0.52,
-                        ),
+                        child: isBuffering
+                            ? SizedBox(
+                                key: const ValueKey<String>('buffering'),
+                                width: mainButtonSize * 0.42,
+                                height: mainButtonSize * 0.42,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  color: onPrimaryColor,
+                                ),
+                              )
+                            : Icon(
+                                isPlaying
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                key: ValueKey(isPlaying),
+                                color: onPrimaryColor,
+                                size: mainButtonSize * 0.52,
+                              ),
                       ),
                     ),
                   ).animate(target: isPlaying ? 1 : 0).scale(

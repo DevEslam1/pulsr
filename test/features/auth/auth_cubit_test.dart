@@ -101,7 +101,8 @@ void main() {
       await cubit.close();
     });
 
-    test('a null result emits unauthenticated', () async {
+    test('a null result emits unauthenticated with a cancellation message',
+        () async {
       when(() => auth.signInWithGoogle()).thenAnswer((_) async => null);
 
       final cubit = build();
@@ -109,14 +110,15 @@ void main() {
 
       expect(cubit.state.status, AuthStatus.unauthenticated);
       expect(cubit.state.user, isNull);
+      expect(cubit.state.errorMessage, 'Sign-in was cancelled.');
       verifyNever(() => cloud.syncAll());
       await cubit.close();
     });
 
     test('a thrown error maps to an error state', () async {
       when(() => auth.signInWithGoogle()).thenThrow(
-            FirebaseAuthException(code: 'user-not-found', message: 'nope'),
-          );
+        FirebaseAuthException(code: 'user-not-found', message: 'nope'),
+      );
 
       final cubit = build();
       await cubit.signInWithGoogle();
@@ -155,8 +157,8 @@ void main() {
 
     test('a thrown error maps to an error state', () async {
       when(() => auth.signInWithEmail(any(), any())).thenThrow(
-            FirebaseAuthException(code: 'wrong-password', message: 'bad'),
-          );
+        FirebaseAuthException(code: 'wrong-password', message: 'bad'),
+      );
 
       final cubit = build();
       await cubit.signInWithEmail('a@b.com', 'secret');
@@ -194,9 +196,8 @@ void main() {
 
     test('a thrown error maps to an error state', () async {
       when(() => auth.signUpWithEmail(any(), any())).thenThrow(
-            FirebaseAuthException(
-                code: 'email-already-in-use', message: 'taken'),
-          );
+        FirebaseAuthException(code: 'email-already-in-use', message: 'taken'),
+      );
 
       final cubit = build();
       await cubit.signUpWithEmail('a@b.com', 'secret');
@@ -222,8 +223,8 @@ void main() {
 
     test('returns false and surfaces the mapped error on failure', () async {
       when(() => auth.sendPasswordResetEmail(any())).thenThrow(
-            FirebaseAuthException(code: 'too-many-requests', message: 'x'),
-          );
+        FirebaseAuthException(code: 'too-many-requests', message: 'x'),
+      );
 
       final cubit = build();
       final ok = await cubit.sendPasswordReset('a@b.com');
@@ -277,6 +278,35 @@ void main() {
       expect(cubit.state.syncError, contains('Failed to sync'));
       await cubit.close();
     });
+
+    test('re-runs a sync queued while another sync was in flight', () async {
+      final controller = StreamController<User?>.broadcast();
+      when(() => auth.authStateChanges).thenAnswer((_) => controller.stream);
+      final firstSync = Completer<bool>();
+      var calls = 0;
+      when(() => cloud.syncAll()).thenAnswer((_) {
+        calls++;
+        return calls == 1 ? firstSync.future : Future.value(true);
+      });
+
+      final cubit = build();
+      controller.add(user);
+      await settle();
+      // Sign out then sign back in while the first sync is still running: the
+      // new account's sync must not be dropped.
+      controller.add(null);
+      controller.add(user);
+      await settle();
+
+      firstSync.complete(true);
+      await settle();
+      await settle();
+      await settle();
+
+      expect(calls, 2);
+      await cubit.close();
+      await controller.close();
+    });
   });
 
   group('signOut', () {
@@ -318,7 +348,8 @@ void main() {
 
     test('maps PlatformException fallbacks', () {
       expect(
-        AuthCubit.mapAuthError(PlatformException(code: 'other', message: 'oops')),
+        AuthCubit.mapAuthError(
+            PlatformException(code: 'other', message: 'oops')),
         'oops',
       );
       expect(
@@ -326,8 +357,7 @@ void main() {
         'Sign-in failed. Please try again.',
       );
       expect(
-        AuthCubit.mapAuthError(
-            PlatformException(code: 'sign_in_cancelled')),
+        AuthCubit.mapAuthError(PlatformException(code: 'sign_in_cancelled')),
         'Sign-in was cancelled.',
       );
     });

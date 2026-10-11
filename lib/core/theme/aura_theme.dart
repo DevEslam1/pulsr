@@ -167,21 +167,24 @@ class AuraTheme {
   static ThemeData get amoledTheme => customTheme(AppColors.primary,
       brightness: Brightness.dark, isAmoled: true);
   static ThemeData get highContrastTheme => customTheme(AppColors.accentCyan,
-      brightness: Brightness.dark, isAmoled: true);
+      brightness: Brightness.dark, isAmoled: true, isHighContrast: true);
 
   /// Brightness-aware high-contrast theme. Respects the light/dark mode and
   /// the user's accent seed (custom/system/artwork) instead of forcing
-  /// dark-AMOLED cyan everywhere.
+  /// dark-AMOLED cyan everywhere, while genuinely raising text/outline
+  /// contrast (the palette and component outlines differ from [customTheme]).
   static ThemeData highContrastThemeFor(Brightness brightness,
       {Color seed = AppColors.accentCyan}) {
     final isDark = brightness == Brightness.dark;
     return customTheme(seed,
-        brightness: brightness, isAmoled: isDark ? true : false);
+        brightness: brightness,
+        isAmoled: isDark ? true : false,
+        isHighContrast: true);
   }
 
   static PulsrPalette _palette(
       Color accent, Brightness brightness, bool isAmoled,
-      {bool dimWhitePoint = false}) {
+      {bool dimWhitePoint = false, bool isHighContrast = false}) {
     final isDark = brightness == Brightness.dark;
     // WCAG-correct black/white decision point (~0.179), matching [textOnAccent].
     // The old 0.5 threshold picked white text on mid-luminance accents where
@@ -190,6 +193,29 @@ class AuraTheme {
         accent.computeLuminance() > 0.179 ? AppColors.onBright : Colors.white;
 
     if (!isDark) {
+      if (isHighContrast) {
+        return PulsrPalette(
+          accent: accent,
+          onAccent: onAccent,
+          accentContainer: accent.withValues(alpha: 0.22),
+          glow: accent.withValues(alpha: 0.45),
+          bg: Colors.white,
+          surface: Colors.white,
+          surfaceContainer: const Color(0xFFF1F1F1),
+          surfaceContainerHigh: const Color(0xFFE4E4E4),
+          // Strong outlines: 0.42 vs the normal 0.09 hairline.
+          hairline: Colors.black.withValues(alpha: 0.42),
+          textPrimary: Colors.black,
+          textSecondary: const Color(0xFF33373F),
+          textTertiary: const Color(0xFF444B5A),
+          favorite: AppColors.favorite,
+          success: AppColors.success,
+          error: AppColors.error,
+          isDark: false,
+          playerCard: Colors.white,
+          deepShade: Colors.white,
+        );
+      }
       return PulsrPalette(
         accent: accent,
         onAccent: onAccent,
@@ -210,6 +236,29 @@ class AuraTheme {
         isDark: false,
         playerCard: Colors.white,
         deepShade: const Color(0xFFF4F6FB),
+      );
+    }
+    if (isHighContrast) {
+      return PulsrPalette(
+        accent: accent,
+        onAccent: onAccent,
+        accentContainer: accent.withValues(alpha: 0.26),
+        glow: accent.withValues(alpha: 0.50),
+        bg: Colors.black,
+        surface: const Color(0xFF050506),
+        surfaceContainer: const Color(0xFF111114),
+        surfaceContainerHigh: const Color(0xFF1B1B20),
+        // Strong outlines: 0.42 vs the normal ~0.09 specular hairline.
+        hairline: Colors.white.withValues(alpha: 0.42),
+        textPrimary: Colors.white,
+        textSecondary: const Color(0xFFD3D8E2),
+        textTertiary: const Color(0xFFB9BFCC),
+        favorite: AppColors.favorite,
+        success: AppColors.success,
+        error: AppColors.error,
+        isDark: true,
+        playerCard: const Color(0xFF050506),
+        deepShade: Colors.black,
       );
     }
     if (isAmoled) {
@@ -269,10 +318,13 @@ class AuraTheme {
     bool isAmoled = false,
     bool isBoldText = false,
     bool dimWhitePoint = false,
+    bool isHighContrast = false,
   }) {
-    final p =
-        _palette(accent, brightness, isAmoled, dimWhitePoint: dimWhitePoint);
+    final p = _palette(accent, brightness, isAmoled,
+        dimWhitePoint: dimWhitePoint, isHighContrast: isHighContrast);
     final isDark = p.isDark;
+    final outlineWidth = isHighContrast ? 1.6 : 1.0;
+    final focusRingWidth = isHighContrast ? 2.6 : 1.5;
     const fontFamily = 'Manrope';
     const fontFallbacks = [
       '.SF Pro Text',
@@ -369,7 +421,7 @@ class AuraTheme {
 
     final outlineBorder = OutlineInputBorder(
       borderRadius: AppRadii.r16All,
-      borderSide: BorderSide(color: p.hairline),
+      borderSide: BorderSide(color: p.hairline, width: outlineWidth),
     );
 
     return ThemeData(
@@ -439,7 +491,7 @@ class AuraTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: AppRadii.cardRadius,
-          side: BorderSide(color: p.hairline),
+          side: BorderSide(color: p.hairline, width: outlineWidth),
         ),
         margin: EdgeInsets.zero,
       ),
@@ -559,7 +611,7 @@ class AuraTheme {
           if (states.contains(WidgetState.selected)) return Colors.transparent;
           return p.hairline;
         }),
-        trackOutlineWidth: const WidgetStatePropertyAll(1.0),
+        trackOutlineWidth: WidgetStatePropertyAll(outlineWidth),
       ),
       sliderTheme: SliderThemeData(
         activeTrackColor: p.accent,
@@ -590,7 +642,7 @@ class AuraTheme {
         enabledBorder: outlineBorder,
         focusedBorder: OutlineInputBorder(
           borderRadius: AppRadii.r16All,
-          borderSide: BorderSide(color: p.accent, width: 1.5),
+          borderSide: BorderSide(color: p.accent, width: focusRingWidth),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -621,7 +673,7 @@ class AuraTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: p.textPrimary,
-          side: BorderSide(color: p.hairline),
+          side: BorderSide(color: p.hairline, width: outlineWidth),
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s20, vertical: AppSpacing.s14),
           shape:

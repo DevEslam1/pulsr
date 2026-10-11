@@ -52,6 +52,8 @@ void main() {
         .thenAnswer((_) => const Stream.empty());
     when(() => mockSettingsCubit.getMinFileSizeKb()).thenAnswer((_) async => 0);
     when(() => mockSettingsCubit.rescanLibrary()).thenAnswer((_) async => 0);
+    when(() => mockSettingsCubit.rescanLibraryWithResult())
+        .thenAnswer((_) async => (count: 0, error: null));
 
     when(() => mockLibraryCubit.state).thenReturn(const LibraryState());
     when(() => mockLibraryCubit.stream).thenAnswer((_) => const Stream.empty());
@@ -145,5 +147,50 @@ void main() {
 
     // Timer should be cancelled and null
     expect(state.searchDebounce, isNull);
+  });
+
+  Future<void> pumpScreen(WidgetTester tester) async {
+    when(() => mockFolderUseCases.getFolderHierarchy())
+        .thenAnswer((_) async => Right(initialFolders));
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<SettingsCubit>.value(value: mockSettingsCubit),
+          BlocProvider<LibraryCubit>.value(value: mockLibraryCubit),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HiddenFoldersScreen(folderUseCases: mockFolderUseCases),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('rescan reports the real count on success', (tester) async {
+    when(() => mockSettingsCubit.rescanLibraryWithResult())
+        .thenAnswer((_) async => (count: 7, error: null));
+    await pumpScreen(tester);
+
+    await tester.tap(find.text('Apply & Rescan Library'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Library updated! 7 tracks loaded.'), findsOneWidget);
+    verifyNever(() => mockSettingsCubit.clearError());
+  });
+
+  testWidgets('a failed rescan reports the failure instead of "0 tracks"',
+      (tester) async {
+    when(() => mockSettingsCubit.rescanLibraryWithResult())
+        .thenAnswer((_) async => (count: 0, error: 'Scan failed hard'));
+    await pumpScreen(tester);
+
+    await tester.tap(find.text('Apply & Rescan Library'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Scan failed hard'), findsOneWidget);
+    expect(find.textContaining('Library updated!'), findsNothing);
+    verify(() => mockSettingsCubit.clearError()).called(1);
   });
 }

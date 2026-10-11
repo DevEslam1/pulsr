@@ -166,8 +166,8 @@ void main() {
     progress.add(0.42);
     await tester.pump();
 
-    final bar =
-        tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
+    final bar = tester
+        .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
     expect(bar.value, closeTo(0.42, 0.001));
     expect(find.text(l10n.homeScanProgress(42)), findsOneWidget);
 

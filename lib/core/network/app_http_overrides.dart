@@ -76,11 +76,44 @@ class AppHttpOverrides extends HttpOverrides {
     return client;
   }
 
+  /// Classifies a probe response into the `(success, error)` pair returned by
+  /// [testConnection]. Pure so the auth-failure precedence is unit-testable.
+  @visibleForTesting
+  static ({bool success, String? error}) evaluateResponse(
+    int statusCode,
+    String reasonPhrase,
+    Uri uri,
+  ) {
+    if (statusCode >= 200 && statusCode < 400) {
+      return (success: true, error: null);
+    }
+    // 407 (Proxy Authentication Required) and 401 mean the proxy/server
+    // rejected the credentials. They must fail BEFORE the 4xx-reachability
+    // rule below, otherwise wrong proxy credentials report "working".
+    if (statusCode == 407 || statusCode == 401) {
+      return (
+        success: false,
+        error: 'HTTP $statusCode: '
+            '${reasonPhrase.isEmpty ? 'Authentication failed' : reasonPhrase}',
+      );
+    }
+    if (statusCode >= 400 &&
+        statusCode < 500 &&
+        (uri.host.contains('youtube.com') ||
+            uri.host.contains('googlevideo.com'))) {
+      // YouTube answered (even with 403/404): the proxy path itself works,
+      // the restriction is IP-level. Count the proxy as reachable.
+      return (success: true, error: null);
+    }
+    return (success: false, error: 'HTTP $statusCode: $reasonPhrase');
+  }
+
   /// Probes connectivity through the currently configured proxy.
   /// Defaults to the YouTube Music host: a Google-204 probe can succeed while
   /// the current IP/VPN exit is blocked for YouTube, marking a useless proxy
   /// as "working". Any HTTP response (even 4xx) from music.youtube.com proves
-  /// the path reaches YouTube; only 5xx/network errors mean failure.
+  /// the path reaches YouTube; only 5xx/network errors (and auth failures)
+  /// mean failure.
   /// Returns a record with `(success, latencyMs, errorMessage)`.
   Future<({bool success, int latencyMs, String? error})> testConnection({
     ProxyConfig? configToTest,
@@ -135,30 +168,16 @@ class AppHttpOverrides extends HttpOverrides {
       // Drain response bytes to free connection
       await response.drain<void>();
 
-      if (response.statusCode >= 200 && response.statusCode < 400) {
-        return (
-          success: true,
-          latencyMs: stopwatch.elapsedMilliseconds,
-          error: null,
-        );
-      } else if (response.statusCode >= 400 &&
-          response.statusCode < 500 &&
-          (uri.host.contains('youtube.com') ||
-              uri.host.contains('googlevideo.com'))) {
-        // YouTube answered (even with 403/404): the proxy path itself works,
-        // the restriction is IP-level. Count the proxy as reachable.
-        return (
-          success: true,
-          latencyMs: stopwatch.elapsedMilliseconds,
-          error: null,
-        );
-      } else {
-        return (
-          success: false,
-          latencyMs: stopwatch.elapsedMilliseconds,
-          error: 'HTTP ${response.statusCode}: ${response.reasonPhrase}',
-        );
-      }
+      final verdict = evaluateResponse(
+        response.statusCode,
+        response.reasonPhrase,
+        uri,
+      );
+      return (
+        success: verdict.success,
+        latencyMs: stopwatch.elapsedMilliseconds,
+        error: verdict.error,
+      );
     } catch (e) {
       stopwatch.stop();
       return (

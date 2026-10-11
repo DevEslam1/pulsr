@@ -84,7 +84,8 @@ void main() {
         ),
         GoRoute(
           path: '/onboarding',
-          builder: (context, state) => OnboardingScreen(scannerService: scanner),
+          builder: (context, state) =>
+              OnboardingScreen(scannerService: scanner),
         ),
       ],
     );
@@ -156,6 +157,30 @@ void main() {
     expect(prefs.getBool('onboarding_completed'), isNull);
   });
 
+  testWidgets(
+      'dismissing the denied dialog via the barrier keeps onboarding open',
+      (tester) async {
+    when(() => scanner.requestPermission()).thenAnswer((_) async => false);
+    await goToFinalPage(tester);
+
+    await tester.tap(find.text(l10n.grantAccess));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text(l10n.audioAccessRequired), findsOneWidget);
+
+    // Tap the barrier (outside the dialog) to dismiss without choosing.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text(l10n.audioAccessRequired), findsNothing);
+    expect(find.text('HOME_SCREEN'), findsNothing);
+    expect(find.text(l10n.grantAccess), findsOneWidget);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('onboarding_completed'), isNull);
+    verifyNever(() => scanner.scanDeviceLibrary());
+  });
+
   testWidgets('a library scan failure still completes onboarding',
       (tester) async {
     when(() => scanner.scanDeviceLibrary())
@@ -205,7 +230,9 @@ void main() {
 
     // The accent swatches are rendered on the final page.
     final swatches = find.byWidgetPredicate(
-      (w) => w is Semantics && w.properties.label != null &&
+      (w) =>
+          w is Semantics &&
+          w.properties.label != null &&
           w.properties.label!.startsWith(l10n.customAccentColor),
     );
     expect(swatches, findsWidgets);

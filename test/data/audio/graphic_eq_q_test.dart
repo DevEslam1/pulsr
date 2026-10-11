@@ -7,7 +7,16 @@ void main() {
   group('graphicEqQs', () {
     test('octave spacing (10-band) yields the classic ~1.414', () {
       final octave = <double>[
-        31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000
+        31.25,
+        62.5,
+        125,
+        250,
+        500,
+        1000,
+        2000,
+        4000,
+        8000,
+        16000
       ];
       final qs = graphicEqQs(octave);
       expect(qs.length, octave.length);

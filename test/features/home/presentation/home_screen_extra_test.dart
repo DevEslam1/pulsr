@@ -72,8 +72,13 @@ void main() {
     when(() => account.loginState).thenReturn(loginState);
     when(() => account.isLoggedIn).thenReturn(false);
 
-    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
-        .thenAnswer((_) async => const Right(<SongsTableData>[]));
+    when(() => getSongs.getAllSongs(
+          sortBy: any(named: 'sortBy'),
+          ascending: any(named: 'ascending'),
+          limit: any(named: 'limit'),
+        )).thenAnswer((_) async => const Right(<SongsTableData>[]));
+    when(() => getSongs.watchTopPlayed(limit: any(named: 'limit')))
+        .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyAdded(limit: any(named: 'limit')))
@@ -116,27 +121,39 @@ void main() {
 
   testWidgets('the Focus Flow tile plays the most-played tracks first',
       (tester) async {
-    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
-        .thenAnswer((_) async => Right([
+    when(() => getSongs.watchTopPlayed(limit: any(named: 'limit')))
+        .thenAnswer((_) => Stream.value(Right([
               createTestSong(id: 1, title: 'Low', playCount: 1),
               createTestSong(id: 2, title: 'High', playCount: 9),
               createTestSong(id: 3, title: 'Mid', playCount: 4),
-            ]));
+            ])));
 
     await pumpScreen(tester);
     await tester.tap(find.text('Focus Flow'));
     await tester.pumpAndSettle();
 
-    final captured = verify(
-            () => player.playSong(captureAny(), queue: captureAny(named: 'queue')))
+    final captured = verify(() =>
+            player.playSong(captureAny(), queue: captureAny(named: 'queue')))
         .captured;
     final first = captured[0] as SongsTableData;
     expect(first.title, 'High');
+
+    // Focus Flow reads the top-played source, not the title-ordered page.
+    verify(() => getSongs.watchTopPlayed(limit: 50)).called(1);
+    verifyNever(() => getSongs.getAllSongs(
+          sortBy: any(named: 'sortBy'),
+          ascending: any(named: 'ascending'),
+          limit: any(named: 'limit'),
+        ));
   });
 
   testWidgets('the quick-action song cache is reused within its TTL',
       (tester) async {
-    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
+    when(() => getSongs.getAllSongs(
+              sortBy: any(named: 'sortBy'),
+              ascending: any(named: 'ascending'),
+              limit: any(named: 'limit'),
+            ))
         .thenAnswer((_) async =>
             Right([createTestSong(id: 1, title: 'A', playCount: 1)]));
 
@@ -146,7 +163,11 @@ void main() {
     await tester.tap(find.text('Daily Drive'));
     await tester.pumpAndSettle();
 
-    verify(() => getSongs.getAllSongs(limit: 50)).called(1);
+    verify(() => getSongs.getAllSongs(
+          sortBy: any(named: 'sortBy'),
+          ascending: any(named: 'ascending'),
+          limit: any(named: 'limit'),
+        )).called(1);
   });
 
   testWidgets('the More chip opens the discovery tools sheet', (tester) async {
@@ -161,8 +182,8 @@ void main() {
     await tester.drag(horizontal, const Offset(-800, 0));
     await tester.pumpAndSettle();
 
-    final more = find.text(
-        lookupAppLocalizations(const Locale('en')).browseMoreTools);
+    final more =
+        find.text(lookupAppLocalizations(const Locale('en')).browseMoreTools);
     expect(more, findsOneWidget);
     await tester.tap(more);
     await tester.pumpAndSettle();

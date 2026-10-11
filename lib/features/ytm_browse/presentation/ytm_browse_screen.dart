@@ -41,14 +41,14 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
 
   String? _error;
   bool _loadFailed = false;
-  Future<void> _loadFeed() async {
+  Future<void> _loadFeed({bool force = false}) async {
     setState(() {
       _isLoading = true;
       _error = null;
       _loadFailed = false;
     });
     try {
-      final sections = await _browseService.getHomeFeed();
+      final sections = await _browseService.getHomeFeed(force: force);
       final nonEmptySections =
           sections.where((s) => s.items.isNotEmpty).toList();
       if (mounted) {
@@ -100,7 +100,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                   minHeight: AppSpacing.minTouchTarget),
               icon: Icon(Icons.refresh_rounded, color: p.textPrimary),
               tooltip: context.l10n.refresh,
-              onPressed: _isLoading ? null : _loadFeed,
+              onPressed: _isLoading ? null : () => _loadFeed(force: true),
             ),
           ],
           bottom: _isLoading
@@ -136,7 +136,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                         onPrimaryAction: _loadFeed,
                       )
                     : RefreshIndicator(
-                        onRefresh: _loadFeed,
+                        onRefresh: () => _loadFeed(force: true),
                         color: p.accent,
                         backgroundColor: p.surfaceContainer,
                         child: Align(

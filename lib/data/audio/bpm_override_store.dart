@@ -92,6 +92,41 @@ class BpmOverrideStore {
     }
   }
 
+  /// Re-reads the persisted overrides and replaces the in-memory cache. Unlike
+  /// [load] (which lets pre-load edits win via `putIfAbsent`), this is an
+  /// explicit refresh after an out-of-band write such as a backup import, so
+  /// stored values win. Safe to call repeatedly.
+  Future<void> reload() async {
+    await ready;
+    _clearedBeforeLoad = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(prefsKey);
+      if (raw == null || raw.isEmpty) {
+        _overrides.clear();
+        return;
+      }
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final restored = <String, double>{};
+      decoded.forEach((k, v) {
+        if (k is String && v is num) {
+          final d = v.toDouble();
+          if (d.isFinite && d >= minBpm && d <= maxBpm) {
+            restored[k] = d;
+          }
+        }
+      });
+      _overrides
+        ..clear()
+        ..addAll(restored);
+      _trimToLimit();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reload per-track BPM overrides',
+          error: e, stackTrace: st, category: 'BpmOverrideStore');
+    }
+  }
+
   /// Writes are serialized so an older snapshot can never land after a newer one.
   Future<void> persist() {
     _persistChain = _persistChain.then((_) => _persistNow());

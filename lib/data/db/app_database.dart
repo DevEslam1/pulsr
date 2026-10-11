@@ -93,6 +93,11 @@ class AppDatabase extends _$AppDatabase {
             "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
         ftsRebuildFailed = false;
         _ftsRepairAttempts = 0;
+        // The rebuild bypasses drift's update tracking, so active watchers
+        // (e.g. an FTS search stream that errored) would stay stale until the
+        // next songs write. Announce a songs update to re-run them.
+        notifyUpdates(
+            {TableUpdate.onTable(songsTable, kind: UpdateKind.update)});
         return true;
       } catch (e, st) {
         ErrorLogger.log(
@@ -288,7 +293,9 @@ class AppDatabase extends _$AppDatabase {
         stackTrace: st,
         category: 'Database',
       );
-      rethrow;
+      // Deliberately not rethrown: a legacy duplicate or constraint issue
+      // must not make the database unopenable. The failed step is rolled back
+      // and the open continues; `migrationFailed` surfaces the degradation.
     }
   }
 

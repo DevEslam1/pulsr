@@ -24,6 +24,11 @@ class TagEditorState {
   final double? batchProgress;
   final String? errorMessage;
 
+  /// Files that failed during the latest batch save. A partially failed batch
+  /// still reports [TagEditorStatus.success] (the rest were written), so the
+  /// screen needs this to tell a clean save from a partial one.
+  final int batchFailedCount;
+
   bool get isBatchMode => batchSongs.length > 1;
 
   const TagEditorState({
@@ -45,6 +50,7 @@ class TagEditorState {
     this.isAutoFetching = false,
     this.batchProgress,
     this.errorMessage,
+    this.batchFailedCount = 0,
   });
 
   TagEditorState copyWith({
@@ -70,6 +76,7 @@ class TagEditorState {
     bool clearBatchProgress = false,
     String? errorMessage,
     bool clearErrorMessage = false,
+    int? batchFailedCount,
   }) {
     return TagEditorState(
       song: song ?? this.song,
@@ -94,6 +101,7 @@ class TagEditorState {
           clearBatchProgress ? null : (batchProgress ?? this.batchProgress),
       errorMessage:
           clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      batchFailedCount: batchFailedCount ?? this.batchFailedCount,
     );
   }
 }

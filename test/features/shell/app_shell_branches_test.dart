@@ -171,21 +171,45 @@ void main() {
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final branches = <int>[];
+    final branches = <({int index, bool initialLocation})>[];
     await tester.pumpWidget(buildShell(
       currentIndex: 1,
+      onGoBranch: (i, {initialLocation = false}) =>
+          branches.add((index: i, initialLocation: initialLocation)),
+    ));
+    await tester.pumpAndSettle();
+
+    // A different tab is forwarded normally through the dock bar.
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+    expect(branches.single, (index: 2, initialLocation: false));
+
+    // Retapping the active tab must still reach _onTapNav so AppShell can
+    // reset the branch to its initial location (scroll-to-top).
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 250)));
+    await tester.tap(find.text('Library'));
+    await tester.pumpAndSettle();
+    expect(branches.length, 2);
+    expect(branches.last, (index: 1, initialLocation: true));
+
+    // The active branch is persisted for the next cold start.
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt('setting_last_shell_tab'), 1);
+  });
+
+  testWidgets('cold start restores the persisted shell tab', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SharedPreferences.setMockInitialValues({'setting_last_shell_tab': 3});
+    final branches = <int>[];
+    await tester.pumpWidget(buildShell(
+      currentIndex: 0,
       onGoBranch: (i, {initialLocation = false}) => branches.add(i),
     ));
     await tester.pumpAndSettle();
 
-    final dock =
-        tester.widget<StackedBottomDock>(find.byType(StackedBottomDock));
-    dock.onTapNav(2);
-    await tester.pump(const Duration(milliseconds: 250));
-    dock.onTapNav(2);
-    await tester.pumpAndSettle();
-
-    expect(branches, contains(2));
+    expect(branches, contains(3));
   });
 
   testWidgets('handlePop pops the root navigator when a modal is open',

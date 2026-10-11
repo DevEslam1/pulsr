@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,6 +9,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_section_header.dart';
+import 'package:pulsr/core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
 import 'package:pulsr/features/home/presentation/widgets/recently_played_section.dart';
@@ -123,6 +126,27 @@ void main() {
       expect(find.byType(InkWell), findsNothing);
     });
 
+    testWidgets('renders a skeleton before the first emission', (tester) async {
+      final controller = StreamController<Result<List<SongsTableData>>>();
+      addTearDown(controller.close);
+      when(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
+          .thenAnswer((_) => controller.stream);
+
+      await tester.pumpWidget(
+        wrap(RecentlyPlayedSection(getSongsUseCase: getSongs, isTablet: false)),
+      );
+      await tester.pump();
+
+      expect(find.byType(SkeletonShimmer), findsOneWidget);
+      expect(find.byType(PulsrSectionHeader), findsOneWidget);
+
+      controller.add(const Right<AppFailure, List<SongsTableData>>([]));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SkeletonShimmer), findsNothing);
+      expect(find.byType(PulsrSectionHeader), findsNothing);
+    });
+
     testWidgets('renders history cards on a phone', (tester) async {
       stubRecentlyPlayed(Right<AppFailure, List<SongsTableData>>(_songs(3)));
 
@@ -195,6 +219,35 @@ void main() {
 
       verify(() => getSongs.watchRecentlyPlayed(limit: 100))
           .called(greaterThan(0));
+    });
+
+    testWidgets('does not grow the limit on repeated scrolls at the end',
+        (tester) async {
+      stubRecentlyPlayed(Right<AppFailure, List<SongsTableData>>(_songs(50)));
+
+      await tester.pumpWidget(
+        wrap(RecentlyPlayedSection(getSongsUseCase: getSongs, isTablet: false)),
+      );
+      await tester.pumpAndSettle();
+
+      // Scroll all the way to the end, which requests the next page once.
+      for (var i = 0; i < 20; i++) {
+        await tester.drag(find.byType(ListView), const Offset(-600, 0));
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+
+      // The 100-limit stream only carries 50 rows, so extra scrolls at the end
+      // must not keep growing the window.
+      for (var i = 0; i < 5; i++) {
+        await tester.drag(find.byType(ListView), const Offset(-600, 0));
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+
+      verify(() => getSongs.watchRecentlyPlayed(limit: 100))
+          .called(greaterThan(0));
+      verifyNever(() => getSongs.watchRecentlyPlayed(limit: 150));
     });
   });
 }

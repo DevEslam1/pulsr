@@ -485,6 +485,17 @@ class _LyricsViewState extends State<LyricsView> {
     );
   }
 
+  /// Long-press on the left half nudges the sync offset -0.1s (lyrics appear
+  /// earlier); the right half nudges +0.1s. The header sync-offset sheet
+  /// remains the precise path.
+  void _handleLyricLongPressStart(LongPressStartDetails details) {
+    final width = context.size?.width ?? 0;
+    if (width <= 0) return;
+    HapticFeedback.selectionClick();
+    unawaited(
+        _adjustManualOffset(details.localPosition.dx < width / 2 ? -100 : 100));
+  }
+
   Widget _buildSyncedLyricView(PulsrPalette p) {
     final activeCol =
         widget.activeColor == Colors.white ? p.accent : widget.activeColor;
@@ -519,18 +530,21 @@ class _LyricsViewState extends State<LyricsView> {
       enableSwitchAnimation: true,
     );
 
-    return RepaintBoundary(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SizedBox(
-            width: constraints.maxWidth,
-            height: constraints.maxHeight,
-            child: LyricView(
-              controller: _lyricController,
-              style: style,
-            ),
-          );
-        },
+    return GestureDetector(
+      onLongPressStart: _handleLyricLongPressStart,
+      child: RepaintBoundary(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SizedBox(
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+              child: LyricView(
+                controller: _lyricController,
+                style: style,
+              ),
+            );
+          },
+        ),
       ),
     );
   }

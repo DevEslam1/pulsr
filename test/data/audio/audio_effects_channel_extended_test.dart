@@ -136,9 +136,9 @@ void main() {
 
   test('system-effects queries and policy round-trip', () async {
     final effects = AudioEffectsChannel();
-    expect(await effects.detectSystemEffects(), containsPair('status', 'active'));
-    expect(await effects.setSystemEffectsPolicy('tryDisable'),
-        'applied');
+    expect(
+        await effects.detectSystemEffects(), containsPair('status', 'active'));
+    expect(await effects.setSystemEffectsPolicy('tryDisable'), 'applied');
     expect(await effects.getSystemEffectsStatus(),
         containsPair('status', 'bypassed'));
     expect(await effects.hasActiveEffects(), isTrue);
@@ -197,8 +197,7 @@ void main() {
 
   test('RTF governor and ReplayGain round-trip', () async {
     final effects = AudioEffectsChannel();
-    expect(await effects.getRtfGovernorStatus(),
-        containsPair('enabled', true));
+    expect(await effects.getRtfGovernorStatus(), containsPair('enabled', true));
     await effects.setRtfGovernorEnabled(false);
     expect(
       await effects.setReplayGainParams(
@@ -227,7 +226,8 @@ void main() {
     await effects.setReverbPreset(1);
     await effects.setReverbWetDry(0.3);
     await effects.setReverbCrossChannel(0.2);
-    await effects.setReverbParams(predelayMs: 10.0, damping: 0.4, crossChannel: 0.1);
+    await effects.setReverbParams(
+        predelayMs: 10.0, damping: 0.4, crossChannel: 0.1);
     await effects.setStereoBalance(0.2);
     await effects.setMonoMix(false);
     await effects.setSincResamplerEnabled(true);
@@ -278,11 +278,10 @@ void main() {
       devicePreset: 0,
     );
     await effects.setViperDdcEnabled(true);
-    expect(await effects.loadViperDdc(ddcContent: 'x', profileName: 'p'),
-        isTrue);
+    expect(
+        await effects.loadViperDdc(ddcContent: 'x', profileName: 'p'), isTrue);
     await effects.setArbitraryEqEnabled(true);
-    expect(await effects.loadArbitraryEq(eqString: 'GraphicEq: 20 0'),
-        isTrue);
+    expect(await effects.loadArbitraryEq(eqString: 'GraphicEq: 20 0'), isTrue);
     await effects.setLiveProgEnabled(true);
     expect(await effects.loadLiveProgCode('@init'), 'OK');
     await effects.setLiveProgSlider(1, 0.5);
@@ -436,18 +435,18 @@ void main() {
     expect(await effects.getAppliedSampleRate(), 48000.0);
     expect(await effects.getThermalStatus(), 0);
     expect(await effects.getAutoDegradedStages(), 0);
-    expect(await effects.detectOemAudio(),
-        containsPair('hasOemAudio', false));
+    expect(await effects.detectOemAudio(), containsPair('hasOemAudio', false));
     expect(await effects.detectSystemEffects(),
         containsPair('status', 'unsupportedDevice'));
     expect(await effects.getSystemEffectsStatus(),
         containsPair('status', 'unsupportedDevice'));
     expect(await effects.hasActiveEffects(), isFalse);
-    expect(await effects.setDitherParams(
-        enabled: true, targetBitDepth: 16, isBluetooth: false),
+    expect(
+        await effects.setDitherParams(
+            enabled: true, targetBitDepth: 16, isBluetooth: false),
         isFalse);
-    expect(await effects.loadViperDdc(ddcContent: 'x', profileName: 'p'),
-        isFalse);
+    expect(
+        await effects.loadViperDdc(ddcContent: 'x', profileName: 'p'), isFalse);
     expect(await effects.loadArbitraryEq(eqString: 'x'), isFalse);
     expect(await effects.loadLiveProgCode('x'), 'Unsupported platform');
     expect(await effects.loadImpulseResponse(const [1.0]), isFalse);
@@ -458,8 +457,8 @@ void main() {
     expect(await effects.getDspBatteryDrainEstimate(), isEmpty);
     expect(await effects.getChainOfCustodyReport(), isEmpty);
     expect(await effects.verifyState(), isNull);
-    expect(await effects.getRtfGovernorStatus(),
-        containsPair('enabled', false));
+    expect(
+        await effects.getRtfGovernorStatus(), containsPair('enabled', false));
     // No-op native setters must still complete.
     await effects.setCrossfeedEnabled(true);
     await effects.setReverbEnabled(true);

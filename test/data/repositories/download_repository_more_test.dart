@@ -51,8 +51,8 @@ void main() {
     when(() => service.cancel(any())).thenReturn(null);
     when(() => service.deleteArtifactsFor(any())).thenAnswer((_) async {});
     when(() => service.cleanOrphanPartFiles(
-        protectedVideoIds: any(named: 'protectedVideoIds'))).thenAnswer(
-        (_) async {});
+            protectedVideoIds: any(named: 'protectedVideoIds')))
+        .thenAnswer((_) async {});
     when(() => service.getDownloadedPath(any())).thenReturn(null);
     db = null;
     repo = DownloadRepositoryImpl(service);
@@ -83,7 +83,8 @@ void main() {
 
   Future<void> seed(List<DownloadTask> tasks) async {
     SharedPreferences.setMockInitialValues({
-      'pulsr_download_tasks_v2': jsonEncode(tasks.map((t) => t.toJson()).toList()),
+      'pulsr_download_tasks_v2':
+          jsonEncode(tasks.map((t) => t.toJson()).toList()),
     });
     await repo.reconcileOnBoot();
   }
@@ -157,7 +158,8 @@ void main() {
       final res = await repo.queueDownload(task('abcdefghijk'));
       expect(res.isRight(), isTrue);
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      verify(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      verify(() =>
+              service.download(any(), onProgress: any(named: 'onProgress')))
           .called(1);
     });
 
@@ -173,7 +175,8 @@ void main() {
 
       expect((await repo.queueDownload(task('abcdefghijk'))).isRight(), isTrue);
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      verify(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      verify(() =>
+              service.download(any(), onProgress: any(named: 'onProgress')))
           .called(1);
     });
 
@@ -188,7 +191,8 @@ void main() {
 
       expect(first.isRight(), isTrue);
       expect(second.isRight(), isTrue);
-      verify(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      verify(() =>
+              service.download(any(), onProgress: any(named: 'onProgress')))
           .called(1);
       completer.complete(const Left(DownloadFailure('done')));
       await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -202,7 +206,8 @@ void main() {
       await repo.queueDownload(task('abcdefghijk'));
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      verify(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      verify(() =>
+              service.download(any(), onProgress: any(named: 'onProgress')))
           .called(1);
     });
   });
@@ -250,8 +255,7 @@ void main() {
       repo = DownloadRepositoryImpl(service, db);
 
       await seed([
-        task('abcdefghijk',
-            status: DownloadStatus.complete, localSongId: 42),
+        task('abcdefghijk', status: DownloadStatus.complete, localSongId: 42),
       ]);
 
       final restored = (await repo.getAllDownloads()).single;
@@ -274,8 +278,7 @@ void main() {
       repo = DownloadRepositoryImpl(service, db);
 
       await seed([
-        task('abcdefghijk',
-            status: DownloadStatus.complete, localSongId: 43),
+        task('abcdefghijk', status: DownloadStatus.complete, localSongId: 43),
       ]);
 
       final restored = (await repo.getAllDownloads()).single;
@@ -319,8 +322,8 @@ void main() {
             fileSize: const Value(4096),
           ));
 
-      final stats = (await repo.getStorageStats()).getOrElse(
-          (_) => throw StateError('failed'));
+      final stats = (await repo.getStorageStats())
+          .getOrElse((_) => throw StateError('failed'));
       expect(stats.usedBytes, 4096);
       expect(stats.downloadedSongsCount, 1);
     });
@@ -333,12 +336,13 @@ void main() {
         ..writeAsStringSync('0123456789');
 
       await seed([
-        task('abcdefghijk', status: DownloadStatus.complete, filePath: file.path),
+        task('abcdefghijk',
+            status: DownloadStatus.complete, filePath: file.path),
       ]);
       // reconcileOnBoot keeps fileSize null because there is no localSongId.
 
-      final stats = (await repo.getStorageStats()).getOrElse(
-          (_) => throw StateError('failed'));
+      final stats = (await repo.getStorageStats())
+          .getOrElse((_) => throw StateError('failed'));
       expect(stats.usedBytes, 10);
       final stored = (await repo.getAllDownloads()).single;
       expect(stored.fileSize, 10);
@@ -349,8 +353,8 @@ void main() {
         if (call.method == 'getFreeDiskSpace') return 0;
         return null;
       });
-      final stats = (await repo.getStorageStats()).getOrElse(
-          (_) => throw StateError('failed'));
+      final stats = (await repo.getStorageStats())
+          .getOrElse((_) => throw StateError('failed'));
       expect(stats.totalBytes, 1);
       expect(stats.usedPercentage, 0.0);
     });
