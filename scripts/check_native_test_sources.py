@@ -37,7 +37,15 @@ ANDROID_ONLY = {
 # SincResampler are added to REVERB_SRCS). Collect them from the whole file.
 def main_sources() -> set[str]:
     text = MAIN_CMAKE.read_text(encoding="utf-8")
-    # add_library(pulsr_dsp SHARED ... ) block
+    # Match either set(DSP_CORE_SOURCES ...) or direct add_library(...) block
+    dsp_core = re.search(r"set\(DSP_CORE_SOURCES(.*?)\)", text, re.S)
+    if dsp_core:
+        core_files = set(re.findall(r"([A-Za-z0-9_]+\.cpp)", dsp_core.group(1)))
+        jni_sources = re.search(r"set\(JNI_BRIDGE_SOURCES(.*?)\)", text, re.S)
+        jni_files = set(re.findall(r"([A-Za-z0-9_]+\.cpp)", jni_sources.group(1))) if jni_sources else set()
+        return core_files | jni_files
+
+    # add_library(pulsr_dsp SHARED ... ) block fallback
     block = re.search(r"add_library\(pulsr_dsp SHARED(.*?)\)", text, re.S)
     if not block:
         print("[NATIVE DRIFT] Could not locate add_library(pulsr_dsp ...) block")
