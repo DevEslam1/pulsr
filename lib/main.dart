@@ -332,6 +332,20 @@ Future<void> main() async {
           options.tracesSampleRate = AppConfig.isProd ? 0.2 : 1.0;
           options.sendDefaultPii = false;
           options.enableAutoPerformanceTracing = true;
+          options.beforeSend = (event, hint) {
+            final msg = event.message;
+            final scrubbedMessage = msg != null
+                ? SentryMessage(
+                    ErrorLogger.redactPii(msg.formatted),
+                    template: msg.template != null ? ErrorLogger.redactPii(msg.template!) : null,
+                    params: msg.params?.map((p) => p is String ? ErrorLogger.redactPii(p) : p).toList(),
+                  )
+                : null;
+            return event.copyWith(
+              user: null,
+              message: scrubbedMessage,
+            );
+          };
         },
         appRunner: () {
           appStarted = true;

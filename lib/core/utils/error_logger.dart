@@ -16,8 +16,18 @@ class ErrorLogger {
   static final _authHeaderRegex = RegExp(
       r'\b(Authorization|token|key):\s*(?:Bearer\s+)?([^\s,;]+)|\b(Bearer)\s+([A-Za-z0-9._~+/-]+=*)',
       caseSensitive: false);
+  static final _userPathRegex = RegExp(
+      r'(?:/Users/|/home/|[A-Za-z]:\\Users\\)[^/\\\s\n\r"\)]+',
+      caseSensitive: false);
+  static final _deviceStoragePathRegex = RegExp(
+      r'/(?:data/user/\d+|storage/emulated/\d+)/[^/\s\n\r"\)]+',
+      caseSensitive: false);
+  static final _userIdRegex = RegExp(
+      r'\b(userId|user_id|memberId)\s*[:=]\s*["'']?[A-Za-z0-9_-]+["'']?',
+      caseSensitive: false);
 
-  /// Redacts PII including email addresses, auth tokens, and session cookies (BUG-027).
+  /// Redacts PII including email addresses, auth tokens, session cookies,
+  /// filesystem paths, and user identifiers (P5-2 / BUG-027).
   static String redactPii(String input) {
     var sanitized = input;
     sanitized =
@@ -29,6 +39,12 @@ class ErrorLogger {
         (m) => m.group(1) != null
             ? '${m.group(1)}: [REDACTED_TOKEN]'
             : 'Bearer [REDACTED_TOKEN]');
+    sanitized = sanitized.replaceAllMapped(
+        _userPathRegex, (m) => '[REDACTED_USER_PATH]');
+    sanitized = sanitized.replaceAllMapped(
+        _deviceStoragePathRegex, (m) => '[REDACTED_DEVICE_PATH]');
+    sanitized = sanitized.replaceAllMapped(
+        _userIdRegex, (m) => '${m.group(1)}: [REDACTED_ID]');
     return sanitized;
   }
 
