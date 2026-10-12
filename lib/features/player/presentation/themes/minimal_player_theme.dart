@@ -6,6 +6,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/cached_artwork.dart';
+import '../../../../data/db/app_database.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../widgets/audio_visualizer.dart';

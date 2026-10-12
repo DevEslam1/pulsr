@@ -16,7 +16,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' show Value;
 import '../../data/audio/adaptive_buffer_engine.dart';
 import '../../data/db/app_database.dart';
+import '../../data/repositories/lyrics_repository.dart';
 import '../../data/scanner/media_scanner_service.dart';
+import '../../data/services/download_service.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
@@ -601,13 +603,36 @@ class YtDownloadService {
         }
       }
 
-      // 3. Tagging — artwork embed + tag standardization (TagEditorPlugin)
-      if (ext == 'm4a') {
+      // 3. Tagging — artwork embed + tag standardization (TagEditorPlugin) & lyrics fetch
+      String? lrcText;
+      try {
+        final lyricsRepo = getIt.isRegistered<LyricsRepository>()
+            ? getIt<LyricsRepository>()
+            : null;
+        if (lyricsRepo != null) {
+          lrcText = await lyricsRepo
+              .fetchLyricsLrc(
+                title: song.title,
+                artist: song.artist,
+                album: song.album,
+                durationMs: song.durationMs,
+                videoId: videoId,
+              )
+              .timeout(const Duration(seconds: 8));
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Download lyrics lookup non-critical failure: $videoId',
+            error: e, stackTrace: st, category: 'download');
+      }
+
+      var embeddedLyrics = false;
+      if (DownloadService.carriesTags(ext)) {
         onProgress?.call(const YtDownloadProgress(YtDownloadStage.tagging));
         ErrorLogger.addBreadcrumb('Download tagging: $videoId',
             category: 'download');
         final artPath = artworkFuture != null ? await artworkFuture : null;
-        await _tag(temp.path, song, artworkPath: artPath);
+        embeddedLyrics = await _tag(temp.path, song,
+            artworkPath: artPath, lyrics: lrcText);
       }
 
       if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
@@ -633,6 +658,22 @@ class YtDownloadService {
         return const Left(DownloadFailure('MediaStore did not return a path'));
       }
       _downloadedFilePaths[videoId] = finalPath;
+
+      // If container does not support embedded tags or embedding failed, save sidecar .lrc
+      if ((!embeddedLyrics || !DownloadService.carriesTags(ext)) &&
+          lrcText != null &&
+          lrcText.trim().isNotEmpty) {
+        if (!finalPath.startsWith('content:')) {
+          try {
+            final lrcFile = File('${p.withoutExtension(finalPath)}.lrc');
+            await lrcFile.writeAsString(lrcText, flush: true);
+            ErrorLogger.addBreadcrumb('Saved sidecar .lrc for $videoId',
+                category: 'download');
+          } catch (e) {
+            // Non-critical sidecar failure
+          }
+        }
+      }
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.indexing));
       ErrorLogger.addBreadcrumb('Download indexing: $videoId',
@@ -1730,8 +1771,8 @@ class YtDownloadService {
     }
   }
 
-  Future<void> _tag(String path, SongsTableData song,
-      {String? artworkPath}) async {
+  Future<bool> _tag(String path, SongsTableData song,
+      {String? artworkPath, String? lyrics}) async {
     // Retry once on transient failures — a flaky tag write must not fail
     // the whole download.
     Object? lastError;
@@ -1741,16 +1782,16 @@ class YtDownloadService {
           'path': path,
           'title': song.title,
           'artist': song.artist,
-          'album': song.album,
+          'album': song.album.isNotEmpty ? song.album : 'Unknown Album',
           'genre': song.genre,
           'year': song.year,
-          'trackNumber': song.trackNumber,
+          'trackNumber': song.trackNumber ?? 1,
           'comment': null,
-          'lyrics': null,
+          'lyrics': lyrics,
           'artworkPath': artworkPath,
           'removeArtwork': false,
         });
-        return;
+        return true;
       } on PlatformException catch (e) {
         lastError = e;
         if (attempt == 0) {
@@ -1760,6 +1801,7 @@ class YtDownloadService {
     }
     ErrorLogger.log('Tagging downloaded track failed after retry: $lastError',
         category: 'YTM');
+    return false;
   }
 
   /// F11: [ext] arrives from the resolver and from byte sniffing and is then

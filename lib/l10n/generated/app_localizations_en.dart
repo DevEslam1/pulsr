@@ -5519,6 +5519,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Centered circular artwork with continuous spinning animation';
 
   @override
+  String get settingsThemeCdTurntable => 'CD Turntable';
+
+  @override
+  String get settingsThemeCdTurntableDesc =>
+      'Rotating iridescent CD with central album artwork & animated stylus stick';
+
+  @override
   String get settingsThemeVinylTurntable => 'Vinyl Turntable Studio';
 
   @override

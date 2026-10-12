@@ -89,7 +89,7 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
                 child: Hero(
                   tag: 'now_playing_art_full',
                   child: _CircleArtwork(
-                    song: song,
+                    props: widget.props,
                     activeColor: activeColor,
                     rotationController: _rotationController,
                     isTablet: isTablet,

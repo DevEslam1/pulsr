@@ -5527,6 +5527,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Portada circular centrada con animación de giro continuo';
 
   @override
+  String get settingsThemeCdTurntable => 'Tocadiscos CD';
+
+  @override
+  String get settingsThemeCdTurntableDesc =>
+      'CD iridiscente giratorio con carátula central y aguja animada';
+
+  @override
   String get settingsThemeVinylTurntable => 'Estudio de tocadiscos';
 
   @override

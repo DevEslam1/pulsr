@@ -223,6 +223,19 @@ class YtmService {
   final Map<String, List<DateTime>> _videoFailures = {};
   final Map<String, DateTime> _videoCooldownUntil = {};
 
+  /// Per-video resolved loudness cache (dB) for stream loudness normalization.
+  final Map<String, double> _loudnessByVideoId = {};
+
+  /// Returns the resolved loudness offset in dB for the given [videoId], if known.
+  double? getLoudnessDb(String videoId) => _loudnessByVideoId[videoId];
+
+  /// Records the resolved loudness offset in dB for the given [videoId].
+  void recordLoudness(String videoId, double? loudnessDb) {
+    if (loudnessDb != null) {
+      _loudnessByVideoId[videoId] = loudnessDb;
+    }
+  }
+
   /// Caps the per-video failure/cooldown maps so a long session with many
   /// distinct failing videoIds can't grow them without bound. Entries with no
   /// failure in the last 60s (or an already-expired cooldown) are evicted once
@@ -1018,6 +1031,36 @@ class YtmService {
     return const [];
   }
 
+  /// Fetches radio / autoplay recommendations for [videoId].
+  Future<List<YtmTrack>> getRadioTracks(String videoId, {int limit = 25}) async {
+    final cleanId = videoId.trim();
+    if (cleanId.isEmpty) return const [];
+
+    // 1. Direct Dart InnerTube API via YtmAccountService
+    try {
+      final accountService = getIt.isRegistered<YtmAccountService>()
+          ? getIt<YtmAccountService>()
+          : null;
+      if (accountService != null) {
+        final tracks = await accountService.fetchRadioTracks(cleanId, maxTracks: limit);
+        if (tracks.isNotEmpty) {
+          return tracks;
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] fetchRadioTracks via YtmAccountService error: $e');
+    }
+
+    // 2. Fallback to getPlaylistTracks with RDAMVM$videoId
+    try {
+      final fallbackTracks = await getPlaylistTracks('RDAMVM$cleanId', limit: limit);
+      return fallbackTracks.where((t) => t.videoId != cleanId).toList();
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] getRadioTracks fallback error: $e');
+      return const [];
+    }
+  }
+
   List<YtmTrack> _parseTracks(List<Object?>? raw) {
     if (raw == null) return const [];
     final tracks = <YtmTrack>[];
@@ -1100,7 +1143,9 @@ class YtmService {
           ErrorLogger.log('Non-critical YTM operation failed',
               error: e, stackTrace: st, category: 'YTM');
         }
-        return cachedEntry.toStream(quality: quality);
+        final cachedStream = cachedEntry.toStream(quality: quality);
+        recordLoudness(videoId, cachedStream.loudnessDb);
+        return cachedStream;
       }
     }
 
@@ -1225,6 +1270,7 @@ class YtmService {
               // guessing them from the URL, which wrote Opus bytes into a .m4a.
               urlCache?.putStream(directStream, quality: quality);
               _noteResolveSuccess(videoId: videoId);
+              recordLoudness(videoId, directStream.loudnessDb);
               return directStream;
             }
           }
@@ -1302,6 +1348,7 @@ class YtmService {
           }
           urlCache?.putStream(stream, quality: cacheQuality);
           _noteResolveSuccess(videoId: videoId);
+          recordLoudness(videoId, stream.loudnessDb);
           return stream;
         }
       } catch (e) {
@@ -1418,6 +1465,7 @@ class YtmService {
             }
             urlCache?.putStream(stream, quality: cacheQuality);
             _noteResolveSuccess(videoId: videoId);
+            recordLoudness(videoId, stream.loudnessDb);
             return stream;
           }
         }
@@ -1458,6 +1506,7 @@ class YtmService {
         }
         urlCache?.putStream(dartStream, quality: cacheQuality);
         _noteResolveSuccess(videoId: videoId);
+        recordLoudness(videoId, dartStream.loudnessDb);
         return dartStream;
       }
     } catch (e) {
@@ -1665,6 +1714,10 @@ class YtmService {
               selected.format['approxDurationMs']?.toString() ?? '0') ??
           0;
       final details = data['videoDetails'] as Map<String, dynamic>?;
+      final audioConfig =
+          data['playerConfig']?['audioConfig'] as Map<String, dynamic>?;
+      final loudnessDb = (audioConfig?['loudnessDb'] as num?)?.toDouble() ??
+          (audioConfig?['perVideoLoudnessDb'] as num?)?.toDouble();
 
       return YtmStream(
         videoId: videoId,
@@ -1677,6 +1730,7 @@ class YtmService {
         artist: details?['author'] as String? ?? '',
         artworkUrl: null,
         userAgent: client.ua,
+        loudnessDb: loudnessDb,
       ).withResolvedExpiry();
     }
 

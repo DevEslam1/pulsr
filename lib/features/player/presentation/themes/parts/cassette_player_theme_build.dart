@@ -100,7 +100,7 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
                 child: Hero(
                   tag: 'now_playing_art_full',
                   child: _CassetteBody(
-                    song: song,
+                    props: widget.props,
                     activeColor: activeColor,
                     spoolController: _spoolController,
                     isLandscape: isLandscape,

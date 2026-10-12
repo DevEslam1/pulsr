@@ -385,10 +385,67 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             await playSongAt(nextIndex);
             return;
           }
-          final fadeDuration = decision.effectiveDuration;
-
           final targetNextVolume = _calculateReplayGainVolume(nextSong);
           final isRepeatOne = _activePlayer.loopMode == LoopMode.one;
+
+          // Automix transition planning
+          TransitionPlan? automixPlan;
+          Duration fadeDuration = decision.effectiveDuration;
+
+          if (_crossfadeManager.automixEnabled) {
+            try {
+              final outDurationSec = (outDuration?.inMilliseconds ?? 0) / 1000.0;
+              final inDurationSec = (nextSong.durationMs > 0
+                      ? nextSong.durationMs
+                      : (_inactivePlayer.duration?.inMilliseconds ?? 0)) /
+                  1000.0;
+              final currentSongTrackId = currentSong?.id.toString() ?? '';
+              final nextSongTrackId = nextSong.id.toString();
+
+              final outAnalysis = _crossfadeManager.bpmDetector.estimateTrackAnalysis(
+                trackId: currentSongTrackId,
+                durationSeconds: outDurationSec,
+                explicitBpm: _crossfadeManager.bpmOverrides[currentSongTrackId],
+              );
+              final inAnalysis = _crossfadeManager.bpmDetector.estimateTrackAnalysis(
+                trackId: nextSongTrackId,
+                durationSeconds: inDurationSec,
+                explicitBpm: _crossfadeManager.bpmOverrides[nextSongTrackId],
+              );
+
+              final posSec = _activePlayer.position.inMilliseconds / 1000.0;
+              automixPlan = AutomixTransitionPlanner.planTransition(
+                outgoing: outAnalysis,
+                incoming: inAnalysis,
+                outgoingCurrentTime: posSec,
+                outgoingDuration: outDurationSec,
+                incomingDuration: inDurationSec,
+                fallbackDuration: fadeDuration,
+                advancedAutomix: true,
+              );
+
+              if (!automixPlan.blocked && automixPlan.fadeSeconds > 0) {
+                fadeDuration = automixPlan.fadeDuration;
+                // Cue incoming track if mix-in cue is specified
+                if (automixPlan.incomingCueTime > 0.05) {
+                  await _inactivePlayer.seek(automixPlan.incomingCueDuration);
+                }
+                // Tempo stretch: adjust playback speed on incoming track if sped up
+                if (automixPlan.incomingPlaybackRate > 1.0) {
+                  final targetSpeed = (_activePlayer.speed * automixPlan.incomingPlaybackRate)
+                      .clamp(0.25, 3.0);
+                  await _inactivePlayer.setSpeed(targetSpeed);
+                }
+              }
+            } catch (e, st) {
+              ErrorLogger.log(
+                'Automix transition calculation error, falling back to standard crossfade',
+                error: e,
+                stackTrace: st,
+                category: 'AudioHandler',
+              );
+            }
+          }
 
           // Pre-buffer track N+2 into _prefetchPlayer during crossfade window
           // (gated on depth>=2 so minimal-bucket / critical-battery skips it).
@@ -409,6 +466,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             duration: fadeDuration,
             fadeId: currentFadeId,
             isRepeatOne: isRepeatOne,
+            transitionPlan: automixPlan,
           );
 
           if (_crossfadeManager.currentFadeId != currentFadeId) {

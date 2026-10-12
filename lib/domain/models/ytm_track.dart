@@ -137,6 +137,7 @@ class YtmStream {
   final String? userAgent;
   final String? cookies;
   final int? expiresAt;
+  final double? loudnessDb;
 
   const YtmStream({
     required this.videoId,
@@ -151,6 +152,7 @@ class YtmStream {
     this.userAgent,
     this.cookies,
     this.expiresAt,
+    this.loudnessDb,
   });
 
   YtmStream copyWith({
@@ -166,6 +168,7 @@ class YtmStream {
     String? userAgent,
     String? cookies,
     int? expiresAt,
+    double? loudnessDb,
   }) {
     return YtmStream(
       videoId: videoId ?? this.videoId,
@@ -180,6 +183,7 @@ class YtmStream {
       userAgent: userAgent ?? this.userAgent,
       cookies: cookies ?? this.cookies,
       expiresAt: expiresAt ?? this.expiresAt,
+      loudnessDb: loudnessDb ?? this.loudnessDb,
     );
   }
 
@@ -257,6 +261,7 @@ class YtmStream {
       userAgent: userAgent,
       cookies: cookies,
       expiresAt: stamp,
+      loudnessDb: loudnessDb,
     );
   }
 
@@ -280,6 +285,8 @@ class YtmStream {
       userAgent: map['userAgent'] as String?,
       cookies: map['cookies'] as String?,
       expiresAt: (map['expiresAt'] as num?)?.toInt() ?? expiryFromUrl(url),
+      loudnessDb: (map['loudnessDb'] as num?)?.toDouble() ??
+          (map['perVideoLoudnessDb'] as num?)?.toDouble(),
       // The native side is free to send its stamp in either unit — NewPipe reads
       // `expire` straight off the URL, which is epoch *seconds*. Read as millis
       // that is January 1971, so every stream would be born expired and the URL

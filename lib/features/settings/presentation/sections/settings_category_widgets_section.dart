@@ -215,6 +215,14 @@ mixin SettingsCategoryWidgetsSection
               ),
               _navTile(
                 context,
+                Icons.system_update_alt_rounded,
+                'Check for Updates',
+                'Check GitHub releases for new version',
+                onTap: () => AppUpdateService.instance
+                    .checkForUpdates(context, userInitiated: true),
+              ),
+              _navTile(
+                context,
                 Icons.person_outline_rounded,
                 context.l10n.developer,
                 AppConfig.developerName,

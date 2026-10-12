@@ -13,9 +13,14 @@ import 'package:pulsr/data/audio/per_song_eq_store.dart';
 import 'package:pulsr/data/audio/per_song_volume_store.dart';
 import 'package:pulsr/data/audio/song_rating_store.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/data/repositories/lyrics_repository.dart';
+import 'package:pulsr/data/services/download_service.dart';
+import 'package:pulsr/data/services/spotify_importer_service.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
+import 'package:pulsr/services/discord/discord_rpc_service.dart';
+import 'package:pulsr/services/updater/app_update_service.dart';
 import 'injection.config.dart';
 
 final GetIt getIt = GetIt.instance;
@@ -30,6 +35,24 @@ Future<void> get initializationReady => _initializationReady.future;
 Future<void> configureDependencies() async {
   try {
     getIt.init();
+    if (!getIt.isRegistered<LyricsRepository>()) {
+      getIt.registerLazySingleton<LyricsRepository>(() => LyricsRepository());
+    }
+    if (!getIt.isRegistered<DownloadService>()) {
+      getIt.registerLazySingleton<DownloadService>(() => DownloadService());
+    }
+    if (!getIt.isRegistered<SpotifyImporterService>()) {
+      getIt.registerLazySingleton<SpotifyImporterService>(
+          () => SpotifyImporterService());
+    }
+    if (!getIt.isRegistered<DiscordRpcService>()) {
+      getIt.registerLazySingleton<DiscordRpcService>(
+          () => DiscordRpcService.instance);
+    }
+    if (!getIt.isRegistered<AppUpdateService>()) {
+      getIt.registerLazySingleton<AppUpdateService>(
+          () => AppUpdateService.instance);
+    }
     // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
     // StateError (audio handler -> player cubit -> download cubit -> intents).
     try {

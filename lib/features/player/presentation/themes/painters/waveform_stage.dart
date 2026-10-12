@@ -44,6 +44,16 @@ class _WaveformHeroStage extends StatelessWidget {
         return Stack(
           alignment: Alignment.center,
           children: [
+            // 0. Studio Graphic Spectrum EQ HUD Header
+            PositionedDirectional(
+              top: 4,
+              child: _GraphicSpectrumHud(
+                activeColor: activeColor,
+                isPlaying: isPlaying,
+                waveController: waveController,
+              ),
+            ),
+
             // 0. Live FFT Visualizer Waveform Layer
             Positioned.fill(
               child: Opacity(
@@ -349,5 +359,112 @@ class _FluidAudioWavesPainter extends CustomPainter {
         oldDelegate.isPlaying != isPlaying ||
         oldDelegate.color != color ||
         oldDelegate.baselineY != baselineY;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 10-Band Graphic Spectrum EQ HUD (Studio Monitoring Aesthetics)
+// AUDIT-FIX: Clarify spectrum generation nature
+// Synthetic harmonic simulation; not driven by real FFT data.
+// ---------------------------------------------------------------------------
+class _GraphicSpectrumHud extends StatelessWidget {
+  final Color activeColor;
+  final bool isPlaying;
+  final AnimationController waveController;
+
+  static const List<String> _bandLabels = [
+    '32',
+    '64',
+    '125',
+    '250',
+    '500',
+    '1k',
+    '2k',
+    '4k',
+    '8k',
+    '16k',
+  ];
+
+  const _GraphicSpectrumHud({
+    required this.activeColor,
+    required this.isPlaying,
+    required this.waveController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0C12).withValues(alpha: 0.85),
+        borderRadius: AppRadii.r8All,
+        border: Border.all(
+          color: activeColor.withValues(alpha: 0.28),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: AnimatedBuilder(
+        animation: waveController,
+        builder: (context, _) {
+          final t = waveController.value * 2 * math.pi;
+
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(_bandLabels.length, (index) {
+              // Synthetic harmonic multi-band visualizer simulation based on audio phase
+              final double harmonic = isPlaying
+                  ? (math.sin(t * 1.8 + index * 0.9).abs() * 0.65 +
+                      math.cos(t * 0.9 - index * 0.4).abs() * 0.35)
+                  : 0.12;
+              final int activeSegments = (harmonic * 6).clamp(1, 6).round();
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.2),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Vertical LED segments
+                    for (int seg = 5; seg >= 0; seg--)
+                      Container(
+                        width: 8,
+                        height: 2.2,
+                        margin: const EdgeInsets.symmetric(vertical: 0.6),
+                        decoration: BoxDecoration(
+                          color: seg < activeSegments
+                              ? (seg >= 4
+                                  ? Colors.redAccent
+                                  : (seg >= 3
+                                      ? Colors.amberAccent
+                                      : activeColor))
+                              : Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(0.8),
+                        ),
+                      ),
+                    const SizedBox(height: 2),
+                    // Frequency Label
+                    Text(
+                      _bandLabels[index],
+                      style: const TextStyle(
+                        fontSize: 6.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white54,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          );
+        },
+      ),
+    );
   }
 }

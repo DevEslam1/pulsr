@@ -40,13 +40,18 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
         // 1. Full-bleed Artwork Background
         Positioned.fill(
           child: song != null
-              ? CachedArtwork(
-                  id: song.id,
-                  albumId: song.albumId,
-                  remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                  type: ArtworkType.AUDIO,
-                  size: double.infinity,
-                  highQuality: true,
+              ? CanvasBackdrop(
+                  song: song,
+                  isPlaying: state.isPlaying,
+                  isBackdropMode: true,
+                  fallbackArtwork: CachedArtwork(
+                    id: song.id,
+                    albumId: song.albumId,
+                    remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                    type: ArtworkType.AUDIO,
+                    size: double.infinity,
+                    highQuality: true,
+                  ),
                 )
               : Container(color: p.bg),
         ),

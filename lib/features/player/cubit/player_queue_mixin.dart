@@ -67,4 +67,12 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
 
   Future<void> swapReconciledSong(Object? oldSongOrId, Object? newSongOrId) =>
       queueController.swapReconciledSong(oldSongOrId, newSongOrId);
+
+  Future<void> tieredShuffle() => queueController.tieredShuffle();
+
+  Future<void> setAutoplayEnabled(bool enabled) =>
+      queueController.setAutoplayEnabled(enabled);
+
+  Future<void> checkAndTriggerAutoplay() =>
+      queueController.checkAndTriggerAutoplay();
 }

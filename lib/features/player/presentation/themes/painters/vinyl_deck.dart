@@ -282,59 +282,60 @@ class _VinylTurntableDeck extends StatelessWidget {
                           ),
                         ),
 
-                        // 5. Bottom Plinth RPM Badge (33⅓ RPM / Standby)
+                        // 5. Bottom Plinth RPM Badge (33⅓ RPM / Standby - Interactive)
                         PositionedDirectional(
                           bottom: 12,
                           start: 14,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.xs,
-                                    vertical: AppSpacing.xxs),
-                                decoration: BoxDecoration(
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              SpeedPickerSheet.show(context);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s8,
+                                  vertical: AppSpacing.xxs),
+                              decoration: BoxDecoration(
+                                color: state.isPlaying
+                                    ? activeColor.withValues(alpha: 0.15)
+                                    : const Color(0xFF181A22),
+                                borderRadius: AppRadii.r6All,
+                                border: Border.all(
                                   color: state.isPlaying
-                                      ? activeColor.withValues(alpha: 0.15)
-                                      : const Color(0xFF181A22),
-                                  borderRadius: AppRadii.r6All,
-                                  border: Border.all(
-                                    color: state.isPlaying
-                                        ? activeColor.withValues(alpha: 0.5)
-                                        : const Color(0xFF2B2E3C),
-                                    width: 1,
-                                  ),
+                                      ? activeColor.withValues(alpha: 0.5)
+                                      : const Color(0xFF2B2E3C),
+                                  width: 1,
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      state.isPlaying
-                                          ? Icons.speed_rounded
-                                          : Icons.pause_circle_outline_rounded,
-                                      size: 11,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    state.isPlaying
+                                        ? Icons.speed_rounded
+                                        : Icons.pause_circle_outline_rounded,
+                                    size: 11,
+                                    color: state.isPlaying
+                                        ? activeColor
+                                        : Colors.white38,
+                                  ),
+                                  const SizedBox(width: AppSpacing.xxs),
+                                  Text(
+                                    state.isPlaying
+                                        ? context.l10n.vinylSpeedRpm
+                                        : context.l10n.dspStandby,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.micro,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: AppTracking.overline,
                                       color: state.isPlaying
                                           ? activeColor
                                           : Colors.white38,
                                     ),
-                                    const SizedBox(width: AppSpacing.xxs),
-                                    Text(
-                                      state.isPlaying
-                                          ? context.l10n.vinylSpeedRpm
-                                          : context.l10n.dspStandby,
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.micro,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: AppTracking.overline,
-                                        color: state.isPlaying
-                                            ? activeColor
-                                            : Colors.white38,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ],

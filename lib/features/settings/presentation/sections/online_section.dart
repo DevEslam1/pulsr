@@ -171,6 +171,19 @@ mixin SettingsOnlineSection
           ),
           onTap: () => context.push('/proxy-settings'),
         ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.discord_rounded,
+          'Discord Rich Presence',
+          DiscordRpcService.instance.isEnabled
+              ? 'Active • Showing currently playing track'
+              : (DiscordRpcService.instance.token.isNotEmpty
+                  ? 'Configured • Tap to enable'
+                  : 'Display listening status on your Discord profile'),
+          trailingBadge: DiscordRpcService.instance.isEnabled ? 'ACTIVE' : null,
+          onTap: () => DiscordRpcSheet.show(context),
+        ),
       ],
       key: _catById('network').key,
     );

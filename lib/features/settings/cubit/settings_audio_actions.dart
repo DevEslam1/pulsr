@@ -873,6 +873,21 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
   }
 
+  /// Automix / Smart Transitions toggle. Pushed straight to the crossfade manager.
+  Future<void> setAutomixEnabled(bool enabled) async {
+    markDirty('automixEnabled');
+    safeEmit(state.copyWith(automixEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.automixEnabled, enabled);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setAutomixEnabled(enabled);
+      }
+    } catch (_) {
+      // Player not available yet; boot restore covers it.
+    }
+  }
+
   /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.  /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.
   Future<void> setAaudioPreferExclusive(bool value) async {
     markDirty('aaudioPreferExclusive');

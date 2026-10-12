@@ -262,20 +262,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     return source;
   }
 
-  void _addToStreamCache(
-      String key,
-      ({
-        String url,
-        DateTime expires,
-        String? userAgent,
-        String? cookies
-      }) entry) {
-    if (_streamCache.length >= PulsrAudioHandler._maxStreamCacheEntries) {
-      _streamCache.remove(_streamCache.keys.first);
-    }
-    _streamCache[key] = entry;
-  }
-
   void cancelPrefetches() {
     _prefetchGeneration++;
     _prefetching.clear();
@@ -286,9 +272,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   /// Call on VPN/network-path change: googlevideo URLs carry an IP-bound
   /// `expire`/`ip` signature and return 403 when the egress IP changes.
   void clearNetworkCaches() {
-    _resolveEpoch++;
-    _streamCache.clear();
-    _inFlightResolves.clear();
+    _streamResolutionPipeline.clearNetworkCaches();
     cancelPrefetches(); // also clears _prefetching
   }
 
@@ -336,6 +320,11 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   /// BPM-synced crossfade toggle on the shared crossfade manager.
   Future<void> setBpmSyncCrossfadeEnabled(bool enabled) async {
     _crossfadeManager.bpmSyncEnabled = enabled;
+  }
+
+  /// Automix / Smart Transitions toggle on the shared crossfade manager.
+  Future<void> setAutomixEnabled(bool enabled) async {
+    _crossfadeManager.automixEnabled = enabled;
   }
 
   /// Seeds the crossfade BPM map for [song] from manual overrides.
@@ -521,15 +510,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   FormatAwareDecoder get _formatDecoder;
 
-  Map<
-      String,
-      Future<
-          ({
-            String url,
-            String? userAgent,
-            String? cookies,
-            String quality
-          })>> get _inFlightResolves;
+  StreamResolutionPipeline get _streamResolutionPipeline;
 
   AudioPlayer get _inactivePlayer;
 
@@ -554,17 +535,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   IMusicRepository get _repository;
 
-  int get _resolveEpoch;
-  set _resolveEpoch(int value);
-
   Future<({String url, String? userAgent, String? cookies, String quality})>
       _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
 
   List<SongsTableData> get _songs;
-
-  LinkedHashMap<String,
-          ({String url, DateTime expires, String? userAgent, String? cookies})>
-      get _streamCache;
 
   YtmService get _ytmService;
 

@@ -12,7 +12,16 @@ class CachedStreamUrl {
   final String? userAgent;
   final String? cookies;
   final DateTime expires;
-  CachedStreamUrl(this.url, this.expires, {this.userAgent, this.cookies});
+  final int? bitrateKbps;
+  final String? codec;
+  CachedStreamUrl(
+    this.url,
+    this.expires, {
+    this.userAgent,
+    this.cookies,
+    this.bitrateKbps,
+    this.codec,
+  });
 }
 
 /// BUG-06: an in-flight resolve together with a completion marker, so a
@@ -31,6 +40,9 @@ class _InFlightResolve {
 class StreamResolutionPipeline {
   final YtmService ytmService;
   final PlaybackLatencyTracker? Function()? getLatencyTracker;
+  final String Function()? qualityProvider;
+  final void Function(SongsTableData song, int bitrateKbps, String codec)?
+      onStreamResolved;
 
   /// Retained for call-site compatibility. Hedging now lives entirely in the
   /// native extractor, which races its top two clients and bounds each call;
@@ -42,6 +54,8 @@ class StreamResolutionPipeline {
   final Map<String, _InFlightResolve> _inFlightResolves = {};
   final Map<String, int> _videoIdEpochs = {};
   int _resolveEpoch = 0;
+
+  int get resolveEpoch => _resolveEpoch;
 
   /// Cap on the in-memory URL cache. Without a bound it grew for every distinct
   /// `videoId:quality` seen in a session.
@@ -57,6 +71,8 @@ class StreamResolutionPipeline {
     required this.ytmService,
     this.getLatencyTracker,
     this.hedgedEnabled = true,
+    this.qualityProvider,
+    this.onStreamResolved,
   });
 
   LinkedHashMap<String, CachedStreamUrl> get streamCache => _streamCache;
@@ -95,7 +111,8 @@ class StreamResolutionPipeline {
       resolveStreamUrl(
     SongsTableData song, {
     bool forceRefresh = false,
-    required SharedPreferences prefs,
+    SharedPreferences? prefs,
+    String? quality,
   }) async {
     try {
       getLatencyTracker?.call()?.markStage(PlaybackStage.resolutionRequested);
@@ -109,12 +126,14 @@ class StreamResolutionPipeline {
       throw const YtmException('YTM_UNAVAILABLE', 'Invalid video id');
     }
 
-    final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
+    final effectivePrefs = prefs ?? await SharedPreferences.getInstance();
+    final offlineOnly =
+        effectivePrefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
       throw const YtmException(
           'OFFLINE_ONLY', 'Offline Only Mode is enabled in Settings');
     }
-    final wifiOnly = prefs.getBool('setting_wifi_only_mode') ?? false;
+    final wifiOnly = effectivePrefs.getBool('setting_wifi_only_mode') ?? false;
     if (wifiOnly) {
       final isWifi = await ytmService.isWifiConnected();
       if (!isWifi) {
@@ -122,8 +141,11 @@ class StreamResolutionPipeline {
             'Wi-Fi Only Mode is enabled. Connect to Wi-Fi to stream');
       }
     }
-    final quality = prefs.getString('setting_streaming_quality') ?? 'high';
-    final cacheKey = '$videoId:${quality.toLowerCase()}';
+    final effectiveQuality = quality ??
+        qualityProvider?.call() ??
+        effectivePrefs.getString('setting_streaming_quality') ??
+        'high';
+    final cacheKey = '$videoId:${effectiveQuality.toLowerCase()}';
     final resolveEpoch = _resolveEpoch;
     final videoEpoch = _videoIdEpochs[videoId] ?? 0;
 
@@ -136,11 +158,23 @@ class StreamResolutionPipeline {
           try {
             getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
           } catch (_) {}
+          final defaultKbps = effectiveQuality == 'low'
+              ? 64
+              : effectiveQuality == 'medium'
+                  ? 128
+                  : 160;
+          final defaultCodec =
+              effectiveQuality == 'medium' ? 'AAC' : 'OPUS';
+          onStreamResolved?.call(
+            song,
+            cached.bitrateKbps ?? defaultKbps,
+            cached.codec ?? defaultCodec,
+          );
           return (
             url: cached.url,
             userAgent: cached.userAgent,
             cookies: cached.cookies,
-            quality: quality,
+            quality: effectiveQuality,
           );
         } else {
           // Eagerly evict expired stream cache entry
@@ -162,7 +196,7 @@ class StreamResolutionPipeline {
       } catch (_) {}
 
       Future<YtmStream> doResolve() => ytmService.resolveStream(videoId,
-          quality: quality, forceRefresh: forceRefresh);
+          quality: effectiveQuality, forceRefresh: forceRefresh);
       // The native extractor already hedges its top two clients and bounds each
       // call, so racing a second independent chain here only doubled native
       // load for no tail-latency gain. One chain; the extractor owns the hedge.
@@ -172,23 +206,53 @@ class StreamResolutionPipeline {
             'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
       }
 
+      final realBitrate = stream.bitrateKbps > 0
+          ? stream.bitrateKbps
+          : (effectiveQuality == 'low'
+              ? 64
+              : effectiveQuality == 'medium'
+                  ? 128
+                  : 160);
+      final realCodec = stream.container.toUpperCase() == 'WEBM' ||
+              stream.mimeType.contains('webm') ||
+              stream.mimeType.contains('opus')
+          ? 'OPUS'
+          : (stream.container.toUpperCase() == 'M4A' ||
+                  stream.mimeType.contains('mp4') ||
+                  stream.mimeType.contains('aac')
+              ? 'AAC'
+              : 'OPUS');
+
+      onStreamResolved?.call(song, realBitrate, realCodec);
+
       // F4: one expiry parser, not a second one. `int.parse` on a malformed or
       // out-of-range `expire` threw straight out of the resolver — surfacing as
       // "resolution failed" for a URL that was perfectly fine — and only the
       // `?expire=` query form was read, while `YtmStream.expiryFromUrl` handles
       // both that and the `/expire/<epoch>/` path form without throwing.
-      final stamp = YtmStream.expiryFromUrl(stream.url);
-      final expires = stamp != null
-          ? DateTime.fromMillisecondsSinceEpoch(stamp)
-          : DateTime.now().add(const Duration(hours: 5));
+      final rawExpireStamp =
+          stream.expiresAt ?? YtmStream.expiryFromUrl(stream.url);
+      final expireStamp = (rawExpireStamp != null &&
+              rawExpireStamp > 0 &&
+              rawExpireStamp < 100000000000)
+          ? rawExpireStamp * 1000
+          : rawExpireStamp;
+      final DateTime expireAt;
+      if (expireStamp != null) {
+        expireAt = DateTime.fromMillisecondsSinceEpoch(expireStamp);
+      } else {
+        expireAt = DateTime.now().add(const Duration(hours: 5));
+      }
 
       if (_resolveEpoch == resolveEpoch &&
           (_videoIdEpochs[videoId] ?? 0) == videoEpoch) {
         _streamCache[cacheKey] = CachedStreamUrl(
           stream.url,
-          expires,
+          expireAt,
           userAgent: stream.userAgent,
           cookies: stream.cookies,
+          bitrateKbps: realBitrate,
+          codec: realCodec,
         );
         _pruneCache();
       }
@@ -201,7 +265,7 @@ class StreamResolutionPipeline {
         url: stream.url,
         userAgent: stream.userAgent,
         cookies: stream.cookies,
-        quality: quality,
+        quality: effectiveQuality,
       );
     }();
 

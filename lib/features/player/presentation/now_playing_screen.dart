@@ -16,6 +16,7 @@ import '../cubit/player_state.dart';
 import 'themes/player_theme.dart';
 import 'themes/theme_registry.dart';
 import 'responsive_player_layout.dart';
+import 'widgets/canvas_backdrop.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -123,11 +124,15 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         ({
           bool dynamicThemingEnabled,
           Color customAccentColor,
-          PlayerThemeMode playerThemeMode
+          PlayerThemeMode playerThemeMode,
+          bool canvasEnabled,
+          bool canvasAsBackdrop,
         })>((c) => (
           dynamicThemingEnabled: c.state.dynamicThemingEnabled,
           customAccentColor: c.state.customAccentColor,
           playerThemeMode: c.state.playerThemeMode,
+          canvasEnabled: c.state.canvasEnabled,
+          canvasAsBackdrop: c.state.canvasAsBackdrop,
         ));
 
     return BlocConsumer<PlayerCubit, PlayerState>(
@@ -180,6 +185,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               onDismiss: () => _safePop(context),
               child: Stack(
                 children: [
+                  if (settingsConfig.canvasEnabled &&
+                      settingsConfig.canvasAsBackdrop)
+                    CanvasBackdrop(
+                      song: state.currentSong,
+                      isPlaying: state.isPlaying,
+                      isBackdropMode: true,
+                    ),
                   ResponsivePlayerLayout(
                     state: state,
                     cubit: cubit,
@@ -280,6 +292,9 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
       _dragOffset = _anim.value;
     }
     _animController.stop();
+    // AUDIT-FIX: Neutralise tween endpoints when stopping mid-animation
+    _tween.begin = _dragOffset;
+    _tween.end = _dragOffset;
     _isDragging = true;
   }
 
@@ -295,25 +310,28 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     }
   }
 
-  void _onVerticalDragEnd(DragEndDetails details) {
-    _isDragging = false;
-    final velocity = details.primaryVelocity ?? 0;
-    if (_dragOffset > 100 || velocity > 450) {
-      widget.onDismiss();
-    } else if (_dragOffset > 0) {
+  // AUDIT-FIX: Extract snap-back helper ensuring tween endpoints are reset
+  void _snapBack() {
+    if (_dragOffset > 0) {
       _tween.begin = _dragOffset;
       _tween.end = 0.0;
       _animController.forward(from: 0.0);
     }
   }
 
+  void _onVerticalDragEnd(DragEndDetails details) {
+    _isDragging = false;
+    final velocity = details.primaryVelocity ?? 0;
+    if (_dragOffset > 100 || velocity > 450) {
+      widget.onDismiss();
+    } else {
+      _snapBack();
+    }
+  }
+
   void _onVerticalDragCancel() {
     _isDragging = false;
-    if (_dragOffset > 0) {
-      _tween.begin = _dragOffset;
-      _tween.end = 0.0;
-      _animController.forward(from: 0.0);
-    }
+    _snapBack();
   }
 
   @override

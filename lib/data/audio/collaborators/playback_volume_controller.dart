@@ -2,6 +2,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:just_audio/just_audio.dart';
+import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/utils/error_logger.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/data/audio/replay_gain_math.dart';
@@ -135,11 +137,32 @@ class PlaybackVolumeController {
             preampWithoutRg: _preampWithoutRg,
           );
 
+    var finalVolume = rgVolume;
+
+    // Stream loudness normalization for YouTube Music tracks:
+    // YouTube's reference level is -14 LUFS. loudnessDb expresses offset relative to reference.
+    // Gain to apply: gainDb = -loudnessDb -> multiplier = 10^(-loudnessDb / 20).
+    // Apply peak limiter ceiling (0.985 / -0.13 dBFS) matching BitChord to avoid clipping.
+    if (song.source == SongSource.youtube) {
+      final ytmService =
+          getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null;
+      final videoId = song.remoteId;
+      final loudnessDb =
+          videoId != null ? ytmService?.getLoudnessDb(videoId) : null;
+      if (loudnessDb != null && loudnessDb.isFinite) {
+        final gainMultiplier =
+            math.pow(10.0, -loudnessDb / 20.0).toDouble();
+        final normalized = finalVolume * gainMultiplier;
+        // Peak limiter: ceiling at 0.985
+        finalVolume = math.min(normalized, 0.985);
+      }
+    }
+
     if (perSongOffsetDb.abs() >= 0.01) {
       final multiplier = math.pow(10, perSongOffsetDb / 20.0).toDouble();
-      return (rgVolume * multiplier).clamp(0.0, 1.0);
+      return (finalVolume * multiplier).clamp(0.0, 1.0);
     }
-    return rgVolume;
+    return finalVolume.clamp(0.0, 1.0);
   }
 
   /// Applies calculated volume to [player] with an optional 500ms smooth ramp (P2-1).

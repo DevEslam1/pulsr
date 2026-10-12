@@ -27,7 +27,8 @@ enum PlayerThemeMode {
   vinyl,
   cassette,
   waveform,
-  lyricsFocus
+  lyricsFocus,
+  cd,
 }
 
 enum MiniPlayerSwipeAction { next, prev, volume, none }
@@ -204,6 +205,12 @@ abstract class SettingsState with _$SettingsState {
     @Default(3) int sincResamplerQuality,
     // BPM-synced crossfade (needs a known BPM for the incoming track).
     @Default(false) bool bpmSyncCrossfadeEnabled,
+    // Automix / Smart Transitions (confidence-aware DJ beatmatch, tempo stretch, mix cues).
+    @Default(false) bool automixEnabled,
+    // Spotify Canvas & Motion Artwork looped video backdrop.
+    @Default(true) bool canvasEnabled,
+    // Whether Canvas is rendered as full-screen ambient backdrop (true) or inside album art card (false).
+    @Default(false) bool canvasAsBackdrop,
   }) = _SettingsState;
 
   // FIX-L3: Cache Color object for customAccentColorValue to avoid re-instantiating on every getter call

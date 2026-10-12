@@ -41,6 +41,8 @@ import '../widgets/quran_mode_button.dart';
 import '../widgets/speed_picker_sheet.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../../../domain/models/audio_output_info.dart';
+import '../../../party/presentation/party_sheet.dart';
+import '../widgets/canvas_backdrop.dart';
 import 'player_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -1002,6 +1004,16 @@ class PlayerTopBar extends StatelessWidget {
                   ),
           ),
           circleButton(
+            icon: Icons.group_rounded,
+            semanticLabel: 'Listen Together',
+            iconSize: isTablet ? 24 : 22,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              PartySheet.show(context);
+            },
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          circleButton(
             icon: Icons.more_horiz_rounded,
             semanticLabel: context.l10n.songInfo,
             iconSize: isTablet ? 24 : 22,
@@ -1179,20 +1191,25 @@ class PlayerTrackHeader extends StatelessWidget {
           if (showQualityBadge && qualityBadge != null) ...[
             SizedBox(height: badgeGap),
             Center(
-              child: extraBadge == null
-                  ? qualityBadge
-                  : FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          qualityBadge,
-                          const SizedBox(width: AppSpacing.xs),
-                          extraBadge!,
-                        ],
-                      ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    qualityBadge,
+                    const SizedBox(width: AppSpacing.xs),
+                    CanvasToggleChip(
+                      activeColor: props.activeColor,
+                      compact: true,
                     ),
+                    if (extraBadge != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      extraBadge!,
+                    ],
+                  ],
+                ),
+              ),
             ),
           ],
         ],

@@ -1,6 +1,7 @@
 // F2: Per-track audio delay (sync offset, e.g. video/BT lipsync).
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart';
 
 /// Per-track delay in milliseconds, range -2000..+2000.
 /// Positive = delay audio (audio lags video / BT sink lags).
@@ -54,14 +55,20 @@ class TrackDelayManager {
           _delays.remove(keys[i]);
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load per-track delays',
+          error: e, stackTrace: st, category: 'TrackDelayManager');
+    }
   }
 
   Future<void> persist() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(prefsKey, jsonEncode(_delays));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist per-track delays',
+          error: e, stackTrace: st, category: 'TrackDelayManager');
+    }
   }
 
   static String keyFor({int? songId, String? remoteId, String? path}) {

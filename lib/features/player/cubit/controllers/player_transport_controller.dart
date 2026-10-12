@@ -19,6 +19,7 @@ class PlayerTransportController {
   final Map<int, SongsTableData>? _slotLookupCache;
   final void Function()? _debouncedPersistQueueSlots;
   final void Function({bool force})? _updateWidgetThrottled;
+  final Future<void> Function(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition})? _onPlaySong;
 
   // Monotonic stopwatch for seek throttling. H-05: instance-scoped so separate
   // controller instances (e.g. test + prod) never share throttle state.
@@ -39,6 +40,7 @@ class PlayerTransportController {
     Map<int, SongsTableData>? slotLookupCache,
     void Function()? debouncedPersistQueueSlots,
     void Function({bool force})? updateWidgetThrottled,
+    Future<void> Function(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition})? onPlaySong,
   })  : _audioHandler = audioHandler,
         _getState = getState,
         _emit = emit,
@@ -47,7 +49,8 @@ class PlayerTransportController {
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
         _slotLookupCache = slotLookupCache,
         _debouncedPersistQueueSlots = debouncedPersistQueueSlots,
-        _updateWidgetThrottled = updateWidgetThrottled;
+        _updateWidgetThrottled = updateWidgetThrottled,
+        _onPlaySong = onPlaySong;
 
   Future<void> play() async {
     try {
@@ -160,6 +163,33 @@ class PlayerTransportController {
 
   Future<void> previous() async {
     _seekThrottle.cancelPending();
+    final state = _getState();
+    // If we're at the very beginning of the queue and track position is within 3 seconds,
+    // jump to the most recently played track from queueHistory if available.
+    if (state.currentIndex == 0 && state.position.inSeconds <= 3 && state.queueHistory.isNotEmpty && _onPlaySong != null) {
+      final lastPlayed = state.queueHistory.first;
+      final remainingHistory = state.queueHistory.sublist(1);
+      final updatedQueue = [lastPlayed, ...state.queue.where((s) => s.id != lastPlayed.id)];
+      _emit(state.copyWith(
+        queueSlice: state.queueSlice.copyWith(
+          queueHistory: remainingHistory,
+        ),
+      ));
+      // AUDIT-FIX: Wrap _onPlaySong in try-catch to log errors and report failure state
+      try {
+        await _onPlaySong!(lastPlayed, queue: updatedQueue);
+      } catch (e, st) {
+        ErrorLogger.log('Previous history jump failed',
+            error: e, stackTrace: st, category: 'PlayerTransportController');
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(
+              playback: s.playback.copyWith(errorMessage: 'Skip to previous failed')));
+        }
+      }
+      return;
+    }
+
     try {
       await _audioHandler.skipToPrevious();
     } catch (e, st) {

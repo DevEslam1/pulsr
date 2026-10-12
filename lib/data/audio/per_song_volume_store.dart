@@ -69,13 +69,18 @@ class PerSongVolumeStore {
   /// call repeatedly.
   Future<void> reload() async {
     await ready;
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(prefsKey);
-    if (raw == null || raw.isEmpty) {
-      _overrides.clear();
-      return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(prefsKey);
+      if (raw == null || raw.isEmpty) {
+        _overrides.clear();
+        return;
+      }
+      await load();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reload per-song volume overrides',
+          error: e, stackTrace: st, category: 'PerSongVolumeStore');
     }
-    await load();
   }
 
   Future<void> persist() async {

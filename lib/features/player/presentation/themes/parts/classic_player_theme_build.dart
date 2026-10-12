@@ -13,7 +13,9 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
       :nowPlayingDoubleTap,
       :nowPlayingArtworkSwipe,
       :visualizerStyle,
-      :waveformSeekBarEnabled
+      :waveformSeekBarEnabled,
+      :canvasEnabled,
+      :canvasAsBackdrop
     ) = context.select<
         SettingsCubit,
         ({
@@ -21,11 +23,15 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
           NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
           VisualizerStyle visualizerStyle,
           bool waveformSeekBarEnabled,
+          bool canvasEnabled,
+          bool canvasAsBackdrop,
         })>((c) => (
           nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
           visualizerStyle: c.state.visualizerStyle,
           waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
+          canvasEnabled: c.state.canvasEnabled,
+          canvasAsBackdrop: c.state.canvasAsBackdrop,
         ));
 
     final artRadius = resolveCustomRadius(context, AppRadii.r28);
@@ -221,17 +227,36 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                                   borderRadius:
                                       AppRadii.circular(artRadius),
                                   child: song != null
-                                      ? CachedArtwork(
-                                          id: song.id,
-                                          albumId: song.albumId,
-                                          remoteUrl:
-                                              song.remoteArtworkUrl ??
-                                                  song.artworkUri,
-                                          type: ArtworkType.AUDIO,
-                                          size: double.infinity,
-                                          borderRadius: 26.8,
-                                          highQuality: true,
-                                        )
+                                      ? (!canvasAsBackdrop
+                                          ? CanvasBackdrop(
+                                              song: song,
+                                              isPlaying: state.isPlaying,
+                                              isBackdropMode: false,
+                                              borderRadius:
+                                                  AppRadii.circular(artRadius),
+                                              fallbackArtwork: CachedArtwork(
+                                                id: song.id,
+                                                albumId: song.albumId,
+                                                remoteUrl:
+                                                    song.remoteArtworkUrl ??
+                                                        song.artworkUri,
+                                                type: ArtworkType.AUDIO,
+                                                size: double.infinity,
+                                                borderRadius: 26.8,
+                                                highQuality: true,
+                                              ),
+                                            )
+                                          : CachedArtwork(
+                                              id: song.id,
+                                              albumId: song.albumId,
+                                              remoteUrl:
+                                                  song.remoteArtworkUrl ??
+                                                      song.artworkUri,
+                                              type: ArtworkType.AUDIO,
+                                              size: double.infinity,
+                                              borderRadius: 26.8,
+                                              highQuality: true,
+                                            ))
                                       : const SizedBox.shrink(),
                                 ),
                               ),

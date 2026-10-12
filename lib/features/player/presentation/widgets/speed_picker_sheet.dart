@@ -6,6 +6,8 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
+import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -271,6 +273,42 @@ class SpeedPickerSheet extends StatelessWidget {
                         );
                       }).toList(),
                     ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Divider(color: p.hairline),
+                  const SizedBox(height: AppSpacing.sm),
+                  BlocBuilder<SettingsCubit, SettingsState>(
+                    builder: (context, settingsState) {
+                      final settingsCubit = context.read<SettingsCubit>();
+                      return SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: Icon(
+                          Icons.auto_awesome_rounded,
+                          color: settingsState.automixEnabled ? p.accent : p.textSecondary,
+                        ),
+                        title: Text(
+                          'Automix / Smart Transitions',
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppFontSize.body,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Beatmatch tempo, align cue grids & swap bass',
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.caption,
+                          ),
+                        ),
+                        value: settingsState.automixEnabled,
+                        activeTrackColor: p.accent,
+                        onChanged: (val) {
+                          HapticFeedback.selectionClick();
+                          settingsCubit.setAutomixEnabled(val);
+                        },
+                      );
+                    },
                   ),
                 ],
               ),

@@ -51,6 +51,7 @@ class MainActivity : AudioServiceActivity() {
     private var castDiscoveryPlugin: CastDiscoveryPlugin? = null
     private var castSessionPlugin: CastSessionPlugin? = null
     private var roomCorrectionPlugin: RoomCorrectionPlugin? = null
+    private var updaterChannel: MethodChannel? = null
     private val lyricsExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
  
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -384,6 +385,66 @@ class MainActivity : AudioServiceActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/updater")
+        updaterChannel = channel
+        channel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "installApk" -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath == null) {
+                        result.error("INVALID_ARG", "File path cannot be null", null)
+                        return@setMethodCallHandler
+                    }
+                    val file = File(filePath)
+                    if (!file.exists()) {
+                        result.error("FILE_NOT_FOUND", "APK file does not exist at $filePath", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                            !packageManager.canRequestPackageInstalls()
+                        ) {
+                            val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                data = Uri.parse("package:$packageName")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(settingsIntent)
+                            result.success("REQUESTED_PERMISSION")
+                            return@setMethodCallHandler
+                        }
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            this@MainActivity,
+                            "$packageName.fileprovider",
+                            file
+                        )
+                        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/vnd.android.package-archive")
+                            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+                            addFlags(
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                    Intent.FLAG_ACTIVITY_NEW_TASK
+                            )
+                        }
+                        startActivity(installIntent)
+                        result.success("INSTALLING")
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Failed to install APK: ${e.message}", e)
+                        result.error("INSTALL_ERROR", e.message, null)
+                    }
+                }
+                "canRequestPackageInstalls" -> {
+                    val canInstall = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        packageManager.canRequestPackageInstalls()
+                    } else {
+                        true
+                    }
+                    result.success(canInstall)
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -415,6 +476,8 @@ class MainActivity : AudioServiceActivity() {
         castSessionPlugin = null
         roomCorrectionPlugin?.cleanup()
         roomCorrectionPlugin = null
+        updaterChannel?.setMethodCallHandler(null)
+        updaterChannel = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)

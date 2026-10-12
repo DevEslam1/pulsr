@@ -10,6 +10,7 @@ import '../../../../core/widgets/cached_artwork.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../widgets/audio_visualizer.dart';
+import '../widgets/canvas_backdrop.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import 'player_shape.dart';

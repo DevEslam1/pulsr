@@ -1783,6 +1783,56 @@ class YtmAccountService {
     return details?.tracks ?? const [];
   }
 
+  /// Fetches radio / autoplay tracks for a given videoId via the InnerTube /next endpoint.
+  Future<List<YtmTrack>> fetchRadioTracks(
+    String videoId, {
+    int maxTracks = 25,
+  }) async {
+    if (videoId.isEmpty) return const [];
+    try {
+      final headers = _buildHeaders();
+      final body = jsonEncode({
+        'context': _buildClientContext('WEB_REMIX'),
+        'videoId': videoId,
+        'playlistId': 'RDAMVM$videoId',
+        'isAudioOnly': true,
+        'enablePersistentPlaylistPanel': true,
+      });
+      final response = await _postWithRetry(
+        Uri.parse(
+            'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
+        headers: headers,
+        body: body,
+        baseTimeoutSeconds: 10,
+      );
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final tracks = _parseInnertubePlaylistTracks(json);
+        if (tracks.isNotEmpty) {
+          final seen = <String>{};
+          final unique = <YtmTrack>[];
+          for (final t in tracks) {
+            if (t.videoId != videoId && seen.add(t.videoId)) {
+              unique.add(t);
+              if (unique.length >= maxTracks) break;
+            }
+          }
+          if (unique.isNotEmpty) return unique;
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_ACCOUNT] fetchRadioTracks error for $videoId: $e');
+    }
+
+    // Fallback: try playlist fetch with RDAMVM$videoId
+    try {
+      final fallbackTracks = await fetchPlaylistTracks('RDAMVM$videoId', maxTracks: maxTracks);
+      return fallbackTracks.where((t) => t.videoId != videoId).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Map<String, String?> _extractPlaylistHeaderInfo(Map<String, dynamic> root) {
     String? title;
     String? author;
@@ -2523,6 +2573,10 @@ class YtmAccountService {
                     selected.format['approxDurationMs']?.toString() ?? '0') ??
                 0;
             final details = data['videoDetails'] as Map<String, dynamic>?;
+            final audioConfig =
+                data['playerConfig']?['audioConfig'] as Map<String, dynamic>?;
+            final loudnessDb = (audioConfig?['loudnessDb'] as num?)?.toDouble() ??
+                (audioConfig?['perVideoLoudnessDb'] as num?)?.toDouble();
 
             return YtmStream(
               videoId: videoId,
@@ -2540,6 +2594,7 @@ class YtmAccountService {
               // guest, or playback re-creates the very auth mismatch the chain
               // just worked around.
               cookies: acceptsSessionAuth ? _cookies : null,
+              loudnessDb: loudnessDb,
               // The player response never states an expiry of its own, but the
               // URL it hands back always carries one. Left null, `isExpired` and
               // `isExpiringSoon` answer false for the whole ~6-hour life of the

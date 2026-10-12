@@ -67,6 +67,8 @@ import 'features/widgets/widget_service.dart';
 import 'features/ytm_search/cubit/ytm_download_cubit.dart';
 import 'domain/repositories/download_repository_interface.dart';
 import 'features/downloads/cubit/downloads_cubit.dart';
+import 'services/discord/discord_rpc_service.dart';
+import 'services/updater/app_update_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -288,6 +290,31 @@ Future<void> main() async {
           ErrorLogger.log('Scrobbler startup hook failed',
               error: e, stackTrace: st, category: 'Startup');
         }
+
+        // Initialize Discord RPC if configured and online allowed
+        try {
+          if (onlineAllowed && prefs != null) {
+            unawaited(DiscordRpcService.instance.init(prefs).then((_) {
+              if (getIt.isRegistered<PlayerCubit>()) {
+                DiscordRpcService.instance.bindToPlayerCubit(getIt<PlayerCubit>());
+              }
+            }).catchError((e, st) {
+              ErrorLogger.log('DiscordRpcService init failed',
+                  error: e, stackTrace: st, category: 'Startup');
+            }));
+          }
+        } catch (_) {}
+
+        // Best-effort check for app updates off GitHub releases
+        try {
+          if (onlineAllowed) {
+            unawaited(AppUpdateService.instance.check().catchError((e, st) {
+              ErrorLogger.log('AppUpdateService startup check failed',
+                  error: e, stackTrace: st, category: 'Startup');
+              return null;
+            }));
+          }
+        } catch (_) {}
       } catch (e, st) {
         ErrorLogger.log('Parallel startup init failed',
             error: e, stackTrace: st, category: 'Startup');

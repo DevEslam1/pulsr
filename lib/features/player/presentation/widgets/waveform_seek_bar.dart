@@ -219,6 +219,19 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                 if (_dragFrozenWindow != null) {
                                   _dragFrozenWindow =
                                       _computeWindow(totalCount);
+                                  // AUDIT-FIX: Recompute _dragValue to keep thumb ratio stable under new window
+                                  if (_dragValue != null &&
+                                      widget.duration.inMilliseconds > 0) {
+                                    final ratio = (_dragValue! /
+                                            widget.duration.inMilliseconds)
+                                        .clamp(0.0, 1.0);
+                                    _dragValue = (ratio *
+                                            widget.duration.inMilliseconds)
+                                        .clamp(
+                                            0.0,
+                                            widget.duration.inMilliseconds
+                                                .toDouble());
+                                  }
                                 }
                               });
                             }

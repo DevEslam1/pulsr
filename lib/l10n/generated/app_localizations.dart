@@ -9833,6 +9833,18 @@ abstract class AppLocalizations {
   /// **'Centered circular artwork with continuous spinning animation'**
   String get settingsThemeVinylCircleDesc;
 
+  /// No description provided for @settingsThemeCdTurntable.
+  ///
+  /// In en, this message translates to:
+  /// **'CD Turntable'**
+  String get settingsThemeCdTurntable;
+
+  /// No description provided for @settingsThemeCdTurntableDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotating iridescent CD with central album artwork & animated stylus stick'**
+  String get settingsThemeCdTurntableDesc;
+
   /// No description provided for @settingsThemeVinylTurntable.
   ///
   /// In en, this message translates to:

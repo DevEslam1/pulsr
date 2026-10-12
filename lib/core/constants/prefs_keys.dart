@@ -39,6 +39,7 @@ class PrefsKeys {
   static const String advancedPlaybackSpeed = 'setting_advanced_playback_speed';
   static const String playbackShuffle = 'setting_playback_shuffle';
   static const String playbackRepeatMode = 'setting_playback_repeat_mode';
+  static const String autoplayEnabled = 'setting_autoplay_enabled';
   static const String replayGainMode = 'setting_replay_gain_mode';
   static const String replayGainPreampWithRg =
       'setting_replay_gain_preamp_with_rg';
@@ -276,6 +277,9 @@ class PrefsKeys {
   static const String bpmSyncCrossfadeEnabled =
       'setting_bpm_sync_crossfade_enabled';
 
+  // Automix / Smart Transitions: confidence-aware DJ beatmatching, tempo stretching, and beat alignment.
+  static const String automixEnabled = 'setting_automix_enabled';
+
   // T2: reconfigure the output device to each track's native sample rate
   // (skipped on Bluetooth, where the AVRCP/codec link owns the rate).
   static const String followTrackSampleRate =
@@ -330,4 +334,7 @@ class PrefsKeys {
   static const String offlineOnlyMode = 'setting_offline_only_mode';
   static const String wifiOnlyMode = 'setting_wifi_only_mode';
   static const String settingLanguage = 'setting_language';
+  static const String discordRpcEnabled = 'setting_discord_rpc_enabled';
+  static const String discordRpcToken = 'setting_discord_rpc_token';
+  static const String discordApplicationId = 'setting_discord_application_id';
 }

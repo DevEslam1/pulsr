@@ -344,12 +344,13 @@ class SleepTimerManager {
   }
 
   bool _nativeCurveArmed = false;
+  bool _nativeCurveArming = false;
 
   void _applyFadeOut(AudioPlayer? player, int remainingSeconds) {
     if (player == null || !player.playing) return;
     _preFadeVolume ??= _resolveFadeBaseline(player);
 
-    if (!_nativeCurveArmed && remainingSeconds <= 15 && remainingSeconds > 0) {
+    if (!_nativeCurveArmed && !_nativeCurveArming && remainingSeconds <= 15 && remainingSeconds > 0) {
       final totalMs = remainingSeconds * 1000;
       final points = (totalMs / 20).ceil().clamp(2, 201);
       final segmentMs = (totalMs / (points - 1)).ceil().clamp(1, 1000);
@@ -357,16 +358,22 @@ class SleepTimerManager {
         points,
         (i) => 1.0 - (i / (points - 1)),
       );
+      _nativeCurveArming = true;
       try {
         player.dspSetGainCurve(gains, segmentMs: segmentMs).then((ok) {
+          _nativeCurveArming = false;
           if (ok == true) {
             _nativeCurveArmed = true;
           }
-        }).catchError((_) {});
-      } catch (_) {}
+        }).catchError((_) {
+          _nativeCurveArming = false;
+        });
+      } catch (_) {
+        _nativeCurveArming = false;
+      }
     }
 
-    if (!_nativeCurveArmed) {
+    if (!_nativeCurveArmed && !_nativeCurveArming) {
       _applyFadeOutStep(player, remainingSeconds / 15.0);
     }
   }
@@ -413,11 +420,12 @@ class SleepTimerManager {
     _sleepCountdownTickerCancel();
 
     final player = _lastPlayerGetter?.call();
-    if (_nativeCurveArmed && player != null) {
+    if ((_nativeCurveArmed || _nativeCurveArming) && player != null) {
       try {
         player.dspClearGainCurve().catchError((_) => false);
       } catch (_) {}
       _nativeCurveArmed = false;
+      _nativeCurveArming = false;
     }
     // The track/queue modes (endOfTrack/afterNTracks/endOfQueue) expire at a
     // playback boundary via onTrackCompleted/onQueueCompleted and have no
@@ -486,11 +494,12 @@ class SleepTimerManager {
 
     if (_lastPlayerGetter != null) {
       final player = _lastPlayerGetter!();
-      if (_nativeCurveArmed) {
+      if (_nativeCurveArmed || _nativeCurveArming) {
         try {
           player.dspClearGainCurve().catchError((_) => false);
         } catch (_) {}
         _nativeCurveArmed = false;
+        _nativeCurveArming = false;
       }
       if (onFadeFactor != null) {
         // Coordinated mode: release the fade factor so the handler restores the

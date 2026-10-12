@@ -5475,6 +5475,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'غلاف دائري في الوسط مع حركة دوران مستمرة';
 
   @override
+  String get settingsThemeCdTurntable => 'مشغل أسطوانات CD';
+
+  @override
+  String get settingsThemeCdTurntableDesc =>
+      'قرص CD عاكس يدور مع غلاف الأغنية وإبرة تشغيل متحركة';
+
+  @override
   String get settingsThemeVinylTurntable => 'استوديو أسطوانة دوّارة';
 
   @override

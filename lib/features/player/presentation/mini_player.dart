@@ -64,6 +64,8 @@ class MiniPlayerState extends State<MiniPlayer> {
   Timer? _verticalSwipeTimer;
   double _verticalDragDy = 0.0;
   double _horizontalDragDx = 0.0;
+  // AUDIT-FIX: Throttle retry taps on error pill
+  DateTime? _lastRetryTime;
 
   /// The Hero tag used by the full-screen artwork for the active theme, so the
   /// mini -> full shared-element transition actually runs (tags must match).
@@ -230,6 +232,8 @@ class MiniPlayerState extends State<MiniPlayer> {
               _lastKnownIndex = safeIndex;
             }
           } catch (e, st) {
+            // AUDIT-FIX: Prevent repeated jump retries on jump failure
+            _lastKnownIndex = safeIndex;
             if (e is! FlutterError) {
               ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
                   error: e, stackTrace: st, category: 'MiniPlayer');
@@ -858,6 +862,13 @@ class MiniPlayerState extends State<MiniPlayer> {
                                         message: state.errorMessage!,
                                         accentColor: activeAccent,
                                         onRetry: () {
+                                          // AUDIT-FIX: Cooldown to avoid rapid repeated retries on error pill
+                                          final now = DateTime.now();
+                                          if (_lastRetryTime != null &&
+                                              now.difference(_lastRetryTime!).inMilliseconds < 1000) {
+                                            return;
+                                          }
+                                          _lastRetryTime = now;
                                           HapticFeedback.lightImpact();
                                           cubit.playSong(
                                             song,
@@ -943,8 +954,10 @@ class _MiniPlayerProgressBar extends StatefulWidget {
 class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   double? _dragProgress;
+  // AUDIT-FIX: Monotonic stopwatch clock for optimistic seek timing
+  final Stopwatch _optimisticClock = Stopwatch();
   Duration? _optimisticSeekPosition;
-  DateTime? _optimisticSeekTime;
+  Duration? _optimisticSeekTime;
   bool _isAppActive = true;
   late final AnimationController _waveController = AnimationController(
     vsync: this,
@@ -1003,24 +1016,28 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _waveController.dispose();
+    _optimisticClock.stop();
     super.dispose();
   }
 
   void _recordSeek(Duration target) {
     _optimisticSeekPosition = target;
-    _optimisticSeekTime = DateTime.now();
+    _optimisticClock.reset();
+    _optimisticClock.start();
+    _optimisticSeekTime = _optimisticClock.elapsed;
     widget.onSeek(target);
   }
 
   Duration _resolveEffectivePosition(Duration enginePosition) {
     if (_optimisticSeekPosition != null && _optimisticSeekTime != null) {
-      final elapsed = DateTime.now().difference(_optimisticSeekTime!);
+      final elapsed = _optimisticClock.elapsed;
       final diff = (enginePosition - _optimisticSeekPosition!).abs();
       if (elapsed.inMilliseconds < 350 && diff.inMilliseconds > 400) {
         return _optimisticSeekPosition!;
       } else {
         _optimisticSeekPosition = null;
         _optimisticSeekTime = null;
+        _optimisticClock.stop();
       }
     }
     return enginePosition;

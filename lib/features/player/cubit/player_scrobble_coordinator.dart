@@ -33,10 +33,12 @@ class PlayerScrobbleCoordinator {
   bool? _lastIsPlaying;
   // Track position in milliseconds to avoid precision loss on sub-second seeks.
   int? _lastPosMs;
-  // Wall-clock timestamp of the previous tick and the previous play state, used
+  // AUDIT-FIX: Monotonic timestamp of previous tick and pause timestamp
+  // Monotonic timestamp of the previous tick and the previous play state, used
   // to compute the position advance expected from normal playback so a coarse
   // update cadence is not mistaken for a seek.
-  int? _lastWallMs;
+  int? _lastMonotonicMs;
+  int? _lastPauseMonotonicMs;
   // FIX-G3: Monotonic clock for ordering & throttle timing (instance field per coordinator)
   final Stopwatch _monotonicClock = Stopwatch()..start();
   int? _lastScrobbleElapsedMs;
@@ -64,20 +66,32 @@ class PlayerScrobbleCoordinator {
     final isSongChange = _lastSongId != song.id || isSongRestart;
     final isPlayStateChange = _lastIsPlaying != isPlaying;
 
+    // Track pause duration to subtract from elapsed monotonic time so normal
+    // playback resumption after a pause is not mistaken for a seek.
+    final nowMonotonicMs = _monotonicClock.elapsedMilliseconds;
+    var pauseDurationMs = 0;
+    if (_lastIsPlaying == false && isPlaying) {
+      if (_lastPauseMonotonicMs != null) {
+        pauseDurationMs = nowMonotonicMs - _lastPauseMonotonicMs!;
+        _lastPauseMonotonicMs = null;
+      }
+    } else if (_lastIsPlaying == true && !isPlaying) {
+      _lastPauseMonotonicMs = nowMonotonicMs;
+    }
+
     // Compare the observed position delta with what normal playback would have
     // advanced since the previous tick. A coarse update cadence (e.g. while
     // backgrounded) yields a large raw delta but a matching expected delta, so
     // it is not misclassified as a seek.
-    final nowWallMs = _monotonicClock.elapsedMilliseconds;
     var expectedDeltaMs = 0;
-    if (isPlaying && _lastIsPlaying == true && _lastWallMs != null) {
+    if (isPlaying && _lastIsPlaying == true && _lastMonotonicMs != null) {
       final speed = _playbackSpeed?.call() ?? 1.0;
-      final elapsed = nowWallMs - _lastWallMs!;
+      final elapsed = (nowMonotonicMs - _lastMonotonicMs!) - pauseDurationMs;
       if (elapsed > 0 && speed.isFinite) {
         expectedDeltaMs = (elapsed * speed).round();
       }
     }
-    _lastWallMs = nowWallMs;
+    _lastMonotonicMs = nowMonotonicMs;
     final isMajorSeek = !isSongRestart &&
         _lastPosMs != null &&
         ((posMs - _lastPosMs!) - expectedDeltaMs).abs() >= 5000;
@@ -87,6 +101,7 @@ class PlayerScrobbleCoordinator {
       _debounce?.cancel();
       _debounce = null;
       _pendingSong = null;
+      _lastPauseMonotonicMs = null;
     }
 
     _lastSongId = song.id;

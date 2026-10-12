@@ -41,6 +41,22 @@ class QueueScreen extends StatelessWidget {
           title: Text(context.l10n.queue),
           actions: [
             BlocSelector<PlayerCubit, PlayerState, bool>(
+              selector: (state) => state.isAutoplayEnabled,
+              builder: (context, isAutoplay) {
+                return IconButton(
+                  icon: Icon(
+                    isAutoplay ? Icons.all_inclusive_rounded : Icons.all_inclusive,
+                    color: isAutoplay ? p.accent : p.textTertiary,
+                  ),
+                  tooltip: isAutoplay ? 'Autoplay: ON' : 'Autoplay: OFF',
+                  onPressed: () {
+                    PulsrHaptics.selection();
+                    context.read<PlayerCubit>().setAutoplayEnabled(!isAutoplay);
+                  },
+                );
+              },
+            ),
+            BlocSelector<PlayerCubit, PlayerState, bool>(
                 selector: (state) => state.queue.isEmpty,
                 builder: (context, queueIsEmpty) {
                   if (queueIsEmpty) return const SizedBox.shrink();
@@ -94,13 +110,7 @@ class QueueScreen extends StatelessWidget {
                         case 'shuffle':
                           PulsrHaptics.tap();
                           SoundFeedbackService.playClick();
-                          final shuffled = List.of(playerState.queue)
-                            ..shuffle();
-                          // Rebuild queue with shuffled order centered on current
-                          final current = playerState.currentSong;
-                          if (current != null) {
-                            await cubit.playSong(current, queue: shuffled);
-                          }
+                          await cubit.tieredShuffle();
                           break;
                         case 'autodj':
                           // Auto-DJ: append tracks similar to the current song.
@@ -246,7 +256,8 @@ class QueueScreen extends StatelessWidget {
               prev.queue != curr.queue ||
               prev.currentIndex != curr.currentIndex ||
               prev.currentSong?.id != curr.currentSong?.id ||
-              prev.isPlaying != curr.isPlaying,
+              prev.isPlaying != curr.isPlaying ||
+              prev.queueHistory != curr.queueHistory,
           builder: (context, state) {
             final queue = state.queue;
             final currentSong = state.currentSong;
@@ -278,6 +289,76 @@ class QueueScreen extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: Adaptive.contentConstraints(context),
                 child: ReorderableListView.builder(
+                  header: state.queueHistory.isEmpty
+                      ? null
+                      : Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: ExpansionTile(
+                            tilePadding: EdgeInsets.zero,
+                            leading: Icon(Icons.history_rounded, color: p.accent, size: 20),
+                            title: Text(
+                              'Recently Played (${state.queueHistory.length})',
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: AppFontSize.body,
+                              ),
+                            ),
+                            children: state.queueHistory.take(10).map((histSong) {
+                              return ListTile(
+                                dense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                                leading: CachedArtwork(
+                                  id: histSong.id,
+                                  remoteUrl: histSong.remoteArtworkUrl,
+                                  type: ArtworkType.AUDIO,
+                                  size: 36,
+                                  borderRadius: 8,
+                                ),
+                                title: Text(
+                                  histSong.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.label,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  histSong.artist,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.caption,
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(Icons.playlist_add_rounded, color: p.accent, size: 20),
+                                      tooltip: 'Add to queue',
+                                      onPressed: () {
+                                        PulsrHaptics.confirm();
+                                        context.read<PlayerCubit>().addToQueue(histSong);
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: Icon(Icons.play_arrow_rounded, color: p.accent, size: 22),
+                                      tooltip: 'Play',
+                                      onPressed: () {
+                                        PulsrHaptics.tap();
+                                        context.read<PlayerCubit>().playSong(histSong);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
                   padding: EdgeInsets.symmetric(
                     horizontal: context.pagePadding,
                     vertical: AppSpacing.xs,
@@ -412,6 +493,26 @@ class QueueScreen extends StatelessWidget {
                                     Icons.cloud_outlined,
                                     size: 13,
                                     color: p.accent.withValues(alpha: 0.8),
+                                  ),
+                                  const SizedBox(width: AppSpacing.xxs),
+                                ],
+                                if (song.isAutoplay) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: p.accent.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'AUTOPLAY',
+                                      style: TextStyle(
+                                        color: p.accent,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(width: AppSpacing.xxs),
                                 ],

@@ -213,7 +213,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     super.dispose();
   }
 
-  void _setStateSafe(VoidCallback fn) => setState(fn);
+  // AUDIT-FIX: Guard setState against calls after widget disposal
+  void _setStateSafe(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
 
   @override
   Widget build(BuildContext context) {

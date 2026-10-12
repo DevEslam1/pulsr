@@ -40,6 +40,7 @@ import '../../settings/cubit/settings_cubit.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
+import 'widgets/spotify_import_dialog.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -448,6 +449,16 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     }
   }
 
+  void _showImportSpotifyDialog(
+      BuildContext context, PlaylistCubit cubit) {
+    SpotifyImportDialog.show(
+      context,
+      onImportFinished: () {
+        cubit.reloadPlaylists();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -519,6 +530,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   onPressed: () => _showAddOnlinePlaylistDialog(context, cubit),
                 ),
               ] else ...[
+                IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
+                  icon: const Icon(Icons.playlist_play_rounded),
+                  tooltip: 'Import Spotify Playlist',
+                  onPressed: () => _showImportSpotifyDialog(context, cubit),
+                ),
                 IconButton(
                   constraints: const BoxConstraints(
                       minWidth: AppSpacing.minTouchTarget,

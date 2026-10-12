@@ -1,5 +1,6 @@
 // F10: Silence-skip sensitivity slider.
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart';
 
 /// Sensitivity 0..100. The native ExoPlayer skip-silence stage is boolean, so
 /// the slider maps to: 0 = off, 1..100 = on. The exact threshold/run-length is
@@ -29,7 +30,10 @@ class SilenceSkipController {
         // Legacy installs stored only the bool; default mid sensitivity.
         sensitivity = 50;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load silence skip settings',
+          error: e, stackTrace: st, category: 'SilenceSkipController');
+    }
   }
 
   Future<void> persist() async {
@@ -37,6 +41,9 @@ class SilenceSkipController {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(prefsEnabledKey, enabled);
       await prefs.setInt(prefsSensitivityKey, sensitivity);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist silence skip settings',
+          error: e, stackTrace: st, category: 'SilenceSkipController');
+    }
   }
 }

@@ -18,11 +18,56 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
         ));
     final isTablet = context.isTablet;
 
-    return AnimatedContainer(
-      duration: context.motionMs(400),
-      curve: context.motionCurve(Curves.easeInOut),
-      color: bgColor,
-      child: SafeArea(
+    return Stack(
+      children: [
+        // 1. Dynamic Fluid Ambient Backdrop
+        Positioned.fill(
+          child: AnimatedContainer(
+            duration: context.motionMs(500),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color.lerp(bgColor, Colors.black, 0.45) ?? bgColor,
+                  bgColor,
+                  const Color(0xFF080910),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0.0, 0.45, 1.0],
+              ),
+            ),
+          ),
+        ),
+
+        // 2. Ambient Top Glow Aura
+        PositionedDirectional(
+          top: -70,
+          start: -30,
+          end: -30,
+          height: isTablet ? 520 : 400,
+          child: IgnorePointer(
+            child: AnimatedContainer(
+              duration: context.motionMs(500),
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 0.85,
+                  colors: [
+                    activeColor.withValues(
+                      alpha: state.isPlaying ? 0.30 : 0.16,
+                    ),
+                    activeColor.withValues(alpha: 0.06),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.52, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // 3. Foreground Content
+        SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isInSplitView = PlayerSplitViewScope.of(context);
@@ -299,6 +344,7 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
           },
         ),
       ),
-    );
-  }
+    ],
+  );
+}
 }

@@ -1002,6 +1002,9 @@ mixin _$QueueSlice {
   int get activeQueueSlot;
   List<ChapterInfo> get cueChapters;
   int get currentCueIndex;
+  List<SongsTableData> get queueHistory;
+  bool get isAutoplayEnabled;
+  Map<int, QueueTier> get trackTiers;
 
   /// Create a copy of QueueSlice
   /// with the given fields replaced by the non-null parameter values.
@@ -1024,7 +1027,13 @@ mixin _$QueueSlice {
             const DeepCollectionEquality()
                 .equals(other.cueChapters, _this.cueChapters) &&
             (identical(other.currentCueIndex, _this.currentCueIndex) ||
-                other.currentCueIndex == _this.currentCueIndex));
+                other.currentCueIndex == _this.currentCueIndex) &&
+            const DeepCollectionEquality()
+                .equals(other.queueHistory, _this.queueHistory) &&
+            (identical(other.isAutoplayEnabled, _this.isAutoplayEnabled) ||
+                other.isAutoplayEnabled == _this.isAutoplayEnabled) &&
+            const DeepCollectionEquality()
+                .equals(other.trackTiers, _this.trackTiers));
   }
 
   @override
@@ -1036,13 +1045,16 @@ mixin _$QueueSlice {
         _this.currentIndex,
         _this.activeQueueSlot,
         const DeepCollectionEquality().hash(_this.cueChapters),
-        _this.currentCueIndex);
+        _this.currentCueIndex,
+        const DeepCollectionEquality().hash(_this.queueHistory),
+        _this.isAutoplayEnabled,
+        const DeepCollectionEquality().hash(_this.trackTiers));
   }
 
   @override
   String toString() {
     final _this = this as QueueSlice;
-    return 'QueueSlice(queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, activeQueueSlot: ${_this.activeQueueSlot}, cueChapters: ${_this.cueChapters}, currentCueIndex: ${_this.currentCueIndex})';
+    return 'QueueSlice(queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, activeQueueSlot: ${_this.activeQueueSlot}, cueChapters: ${_this.cueChapters}, currentCueIndex: ${_this.currentCueIndex}, queueHistory: ${_this.queueHistory}, isAutoplayEnabled: ${_this.isAutoplayEnabled}, trackTiers: ${_this.trackTiers})';
   }
 }
 
@@ -1057,7 +1069,10 @@ abstract mixin class $QueueSliceCopyWith<$Res> {
       int currentIndex,
       int activeQueueSlot,
       List<ChapterInfo> cueChapters,
-      int currentCueIndex});
+      int currentCueIndex,
+      List<SongsTableData> queueHistory,
+      bool isAutoplayEnabled,
+      Map<int, QueueTier> trackTiers});
 }
 
 /// @nodoc
@@ -1077,6 +1092,9 @@ class _$QueueSliceCopyWithImpl<$Res> implements $QueueSliceCopyWith<$Res> {
     Object? activeQueueSlot = null,
     Object? cueChapters = null,
     Object? currentCueIndex = null,
+    Object? queueHistory = null,
+    Object? isAutoplayEnabled = null,
+    Object? trackTiers = null,
   }) {
     return _then(QueueSlice(
       queue: null == queue
@@ -1099,6 +1117,18 @@ class _$QueueSliceCopyWithImpl<$Res> implements $QueueSliceCopyWith<$Res> {
           ? _self.currentCueIndex
           : currentCueIndex // ignore: cast_nullable_to_non_nullable
               as int,
+      queueHistory: null == queueHistory
+          ? _self.queueHistory
+          : queueHistory // ignore: cast_nullable_to_non_nullable
+              as List<SongsTableData>,
+      isAutoplayEnabled: null == isAutoplayEnabled
+          ? _self.isAutoplayEnabled
+          : isAutoplayEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      trackTiers: null == trackTiers
+          ? _self.trackTiers
+          : trackTiers // ignore: cast_nullable_to_non_nullable
+              as Map<int, QueueTier>,
     ));
   }
 }
@@ -1201,15 +1231,25 @@ extension QueueSlicePatterns on QueueSlice {
             int currentIndex,
             int activeQueueSlot,
             List<ChapterInfo> cueChapters,
-            int currentCueIndex)?
+            int currentCueIndex,
+            List<SongsTableData> queueHistory,
+            bool isAutoplayEnabled,
+            Map<int, QueueTier> trackTiers)?
         $default, {
     required TResult orElse(),
   }) {
     final _that = this;
     switch (_that) {
       case _QueueSlice() when $default != null:
-        return $default(_that.queue, _that.currentIndex, _that.activeQueueSlot,
-            _that.cueChapters, _that.currentCueIndex);
+        return $default(
+            _that.queue,
+            _that.currentIndex,
+            _that.activeQueueSlot,
+            _that.cueChapters,
+            _that.currentCueIndex,
+            _that.queueHistory,
+            _that.isAutoplayEnabled,
+            _that.trackTiers);
       case _:
         return orElse();
     }
@@ -1235,14 +1275,24 @@ extension QueueSlicePatterns on QueueSlice {
             int currentIndex,
             int activeQueueSlot,
             List<ChapterInfo> cueChapters,
-            int currentCueIndex)
+            int currentCueIndex,
+            List<SongsTableData> queueHistory,
+            bool isAutoplayEnabled,
+            Map<int, QueueTier> trackTiers)
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _QueueSlice():
-        return $default(_that.queue, _that.currentIndex, _that.activeQueueSlot,
-            _that.cueChapters, _that.currentCueIndex);
+        return $default(
+            _that.queue,
+            _that.currentIndex,
+            _that.activeQueueSlot,
+            _that.cueChapters,
+            _that.currentCueIndex,
+            _that.queueHistory,
+            _that.isAutoplayEnabled,
+            _that.trackTiers);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -1267,14 +1317,24 @@ extension QueueSlicePatterns on QueueSlice {
             int currentIndex,
             int activeQueueSlot,
             List<ChapterInfo> cueChapters,
-            int currentCueIndex)?
+            int currentCueIndex,
+            List<SongsTableData> queueHistory,
+            bool isAutoplayEnabled,
+            Map<int, QueueTier> trackTiers)?
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _QueueSlice() when $default != null:
-        return $default(_that.queue, _that.currentIndex, _that.activeQueueSlot,
-            _that.cueChapters, _that.currentCueIndex);
+        return $default(
+            _that.queue,
+            _that.currentIndex,
+            _that.activeQueueSlot,
+            _that.cueChapters,
+            _that.currentCueIndex,
+            _that.queueHistory,
+            _that.isAutoplayEnabled,
+            _that.trackTiers);
       case _:
         return null;
     }
@@ -1289,9 +1349,14 @@ class _QueueSlice extends QueueSlice {
       this.currentIndex = 0,
       this.activeQueueSlot = 0,
       List<ChapterInfo> cueChapters = const [],
-      this.currentCueIndex = 0})
+      this.currentCueIndex = 0,
+      List<SongsTableData> queueHistory = const [],
+      this.isAutoplayEnabled = true,
+      Map<int, QueueTier> trackTiers = const {}})
       : _queue = queue,
         _cueChapters = cueChapters,
+        _queueHistory = queueHistory,
+        _trackTiers = trackTiers,
         super._();
 
   final List<SongsTableData> _queue;
@@ -1321,6 +1386,26 @@ class _QueueSlice extends QueueSlice {
   @override
   @JsonKey()
   final int currentCueIndex;
+  final List<SongsTableData> _queueHistory;
+  @override
+  @JsonKey()
+  List<SongsTableData> get queueHistory {
+    if (_queueHistory is EqualUnmodifiableListView) return _queueHistory;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_queueHistory);
+  }
+
+  @override
+  @JsonKey()
+  final bool isAutoplayEnabled;
+  final Map<int, QueueTier> _trackTiers;
+  @override
+  @JsonKey()
+  Map<int, QueueTier> get trackTiers {
+    if (_trackTiers is EqualUnmodifiableMapView) return _trackTiers;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_trackTiers);
+  }
 
   /// Create a copy of QueueSlice
   /// with the given fields replaced by the non-null parameter values.
@@ -1343,7 +1428,13 @@ class _QueueSlice extends QueueSlice {
             const DeepCollectionEquality()
                 .equals(other.cueChapters, _cueChapters) &&
             (identical(other.currentCueIndex, currentCueIndex) ||
-                other.currentCueIndex == currentCueIndex));
+                other.currentCueIndex == currentCueIndex) &&
+            const DeepCollectionEquality()
+                .equals(other.queueHistory, _queueHistory) &&
+            (identical(other.isAutoplayEnabled, isAutoplayEnabled) ||
+                other.isAutoplayEnabled == isAutoplayEnabled) &&
+            const DeepCollectionEquality()
+                .equals(other.trackTiers, _trackTiers));
   }
 
   @override
@@ -1354,12 +1445,15 @@ class _QueueSlice extends QueueSlice {
         currentIndex,
         activeQueueSlot,
         const DeepCollectionEquality().hash(_cueChapters),
-        currentCueIndex);
+        currentCueIndex,
+        const DeepCollectionEquality().hash(_queueHistory),
+        isAutoplayEnabled,
+        const DeepCollectionEquality().hash(_trackTiers));
   }
 
   @override
   String toString() {
-    return 'QueueSlice(queue: $queue, currentIndex: $currentIndex, activeQueueSlot: $activeQueueSlot, cueChapters: $cueChapters, currentCueIndex: $currentCueIndex)';
+    return 'QueueSlice(queue: $queue, currentIndex: $currentIndex, activeQueueSlot: $activeQueueSlot, cueChapters: $cueChapters, currentCueIndex: $currentCueIndex, queueHistory: $queueHistory, isAutoplayEnabled: $isAutoplayEnabled, trackTiers: $trackTiers)';
   }
 }
 
@@ -1376,7 +1470,10 @@ abstract mixin class _$QueueSliceCopyWith<$Res>
       int currentIndex,
       int activeQueueSlot,
       List<ChapterInfo> cueChapters,
-      int currentCueIndex});
+      int currentCueIndex,
+      List<SongsTableData> queueHistory,
+      bool isAutoplayEnabled,
+      Map<int, QueueTier> trackTiers});
 }
 
 /// @nodoc
@@ -1396,6 +1493,9 @@ class __$QueueSliceCopyWithImpl<$Res> implements _$QueueSliceCopyWith<$Res> {
     Object? activeQueueSlot = null,
     Object? cueChapters = null,
     Object? currentCueIndex = null,
+    Object? queueHistory = null,
+    Object? isAutoplayEnabled = null,
+    Object? trackTiers = null,
   }) {
     return _then(_QueueSlice(
       queue: null == queue
@@ -1418,6 +1518,18 @@ class __$QueueSliceCopyWithImpl<$Res> implements _$QueueSliceCopyWith<$Res> {
           ? _self.currentCueIndex
           : currentCueIndex // ignore: cast_nullable_to_non_nullable
               as int,
+      queueHistory: null == queueHistory
+          ? _self._queueHistory
+          : queueHistory // ignore: cast_nullable_to_non_nullable
+              as List<SongsTableData>,
+      isAutoplayEnabled: null == isAutoplayEnabled
+          ? _self.isAutoplayEnabled
+          : isAutoplayEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      trackTiers: null == trackTiers
+          ? _self._trackTiers
+          : trackTiers // ignore: cast_nullable_to_non_nullable
+              as Map<int, QueueTier>,
     ));
   }
 }

@@ -1,6 +1,7 @@
 // F9: Per-session DSP snapshot (restore EQ per album / artist / genre).
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart';
 
 /// A lightweight snapshot of the DSP chain for one scope key.
 class DspSnapshot {
@@ -64,7 +65,9 @@ class DspSnapshot {
         effects:
             rawEffects is Map ? Map<String, dynamic>.from(rawEffects) : null,
       );
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to parse DspSnapshot from map',
+          error: e, stackTrace: st, category: 'DspSnapshotStore');
       return null;
     }
   }
@@ -170,7 +173,10 @@ class DspSnapshotStore {
       while (_snapshots.length > maxEntries) {
         _snapshots.remove(_snapshots.keys.first);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load DSP snapshots',
+          error: e, stackTrace: st, category: 'DspSnapshotStore');
+    }
   }
 
   /// Re-reads the persisted snapshots, replacing the in-memory cache, so a
@@ -191,6 +197,9 @@ class DspSnapshotStore {
       await prefs.setBool('${prefsKey}_enabled', enabled);
       await prefs.setString(prefsKey,
           jsonEncode(_snapshots.map((k, v) => MapEntry(k, v.toMap()))));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist DSP snapshots',
+          error: e, stackTrace: st, category: 'DspSnapshotStore');
+    }
   }
 }

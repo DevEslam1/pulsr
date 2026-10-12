@@ -3640,6 +3640,8 @@
   "settingsThemeRetroCassetteDesc": "شريط كاسيت قديم ببكرات دوّارة وعدّاد شريط مغناطيسي",
   "settingsThemeVinylCircle": "دائرة أسطوانة (تدور)",
   "settingsThemeVinylCircleDesc": "غلاف دائري في الوسط مع حركة دوران مستمرة",
+  "settingsThemeCdTurntable": "مشغل أسطوانات CD",
+  "settingsThemeCdTurntableDesc": "قرص CD عاكس يدور مع غلاف الأغنية وإبرة تشغيل متحركة",
   "settingsThemeVinylTurntable": "استوديو أسطوانة دوّارة",
   "settingsThemeVinylTurntableDesc": "أسطوانة فينيل حقيقية بأخاديد واقعية وملصق مركزي وذراع",
   "settingsTurnOffGapless": "إيقاف التشغيل المتصل",

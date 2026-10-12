@@ -42,7 +42,6 @@ import 'package:pulsr/core/services/sponsorblock_service.dart' as _i912;
 import 'package:pulsr/core/services/theme_scheduler_service.dart' as _i991;
 import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
 import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
-import 'package:pulsr/core/services/ytm_browse_service.dart' as _i222;
 import 'package:pulsr/core/services/ytm_cache_manager.dart' as _i498;
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart' as _i169;
 import 'package:pulsr/core/services/ytm_service.dart' as _i391;
@@ -55,14 +54,18 @@ import 'package:pulsr/data/audio/per_song_eq_store.dart' as _i1054;
 import 'package:pulsr/data/audio/per_song_volume_store.dart' as _i866;
 import 'package:pulsr/data/audio/song_rating_store.dart' as _i227;
 import 'package:pulsr/data/db/app_database.dart' as _i682;
+import 'package:pulsr/data/party/listen_together_service.dart' as _i58;
 import 'package:pulsr/data/repositories/download_repository_impl.dart' as _i877;
+import 'package:pulsr/data/repositories/lyrics_repository.dart' as _i133;
 import 'package:pulsr/data/repositories/music_repository.dart' as _i627;
 import 'package:pulsr/data/repositories/smart_playlist_engine.dart' as _i399;
 import 'package:pulsr/data/scanner/media_scanner_service.dart' as _i483;
 import 'package:pulsr/data/services/device_profile_service.dart' as _i818;
+import 'package:pulsr/data/services/download_service.dart' as _i593;
 import 'package:pulsr/data/services/hires_audio_service.dart' as _i451;
 import 'package:pulsr/data/services/room_correction_service.dart' as _i855;
 import 'package:pulsr/data/services/settings_profiles_service.dart' as _i775;
+import 'package:pulsr/data/services/spotify_importer_service.dart' as _i636;
 import 'package:pulsr/data/usecases/backup_usecases.dart' as _i1066;
 import 'package:pulsr/data/usecases/playlist_io_usecases.dart' as _i872;
 import 'package:pulsr/domain/repositories/download_repository_interface.dart'
@@ -163,6 +166,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i197.SmartAudioService>(() => _i197.SmartAudioService());
     gh.lazySingleton<_i626.PlaybackLatencyTracker>(
         () => _i626.PlaybackLatencyTracker());
+    gh.lazySingleton<_i58.ListenTogetherService>(
+        () => _i58.ListenTogetherService());
     gh.lazySingleton<_i818.DeviceProfileService>(
         () => _i818.DeviceProfileService());
     gh.lazySingleton<_i451.HiResAudioService>(() => _i451.HiResAudioService());
@@ -189,6 +194,10 @@ extension GetItInjectableX on _i174.GetIt {
           lrclibService: gh<_i621.LrclibService>(),
           ytmAccountService: gh<_i631.YtmAccountService>(),
           mediaScannerService: gh<_i483.MediaScannerService>(),
+        ));
+    gh.lazySingleton<_i133.LyricsRepository>(() => _i133.LyricsRepository(
+          lrclibService: gh<_i621.LrclibService>(),
+          ytmAccountService: gh<_i631.YtmAccountService>(),
         ));
     gh.lazySingleton<_i452.MetadataSearchService>(
         () => _i452.MetadataSearchService(gh<_i519.Client>()));
@@ -233,19 +242,26 @@ extension GetItInjectableX on _i174.GetIt {
         ));
     gh.factory<_i431.PlaylistCubit>(() =>
         _i431.PlaylistCubit(playlistUseCases: gh<_i792.PlaylistUseCases>()));
-    gh.singleton<_i222.YtmBrowseService>(
-        () => _i222.YtmBrowseService(gh<_i391.YtmService>()));
     gh.singleton<_i225.CloudSyncService>(() => _i225.CloudSyncService(
           gh<_i535.AuthService>(),
           gh<_i320.IMusicRepository>(),
           gh<_i682.AppDatabase>(),
         ));
+    gh.lazySingleton<_i636.SpotifyImporterService>(
+        () => _i636.SpotifyImporterService(
+              httpClient: gh<_i519.Client>(),
+              ytmService: gh<_i391.YtmService>(),
+              playlistUseCases: gh<_i792.PlaylistUseCases>(),
+              db: gh<_i682.AppDatabase>(),
+            ));
     gh.singleton<_i968.ArtistBioService>(
         () => _i968.ArtistBioService(gh<_i519.Client>()));
     gh.singleton<_i417.MissingArtworkService>(
         () => _i417.MissingArtworkService(gh<_i519.Client>()));
     gh.singleton<_i912.SponsorBlockService>(
         () => _i912.SponsorBlockService(gh<_i519.Client>()));
+    gh.lazySingleton<_i593.DownloadService>(() =>
+        _i593.DownloadService(lyricsRepository: gh<_i133.LyricsRepository>()));
     gh.singleton<_i631.YtmAccountService>(
       () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()),
       dispose: (i) => i.dispose(),

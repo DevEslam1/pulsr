@@ -1,6 +1,7 @@
 // F11: Playback position bookmarking (per-podcast / per-audiobook).
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart';
 
 class PlaybackBookmark {
   final String trackKey;
@@ -38,7 +39,9 @@ class PlaybackBookmark {
         updatedAt:
             DateTime.fromMillisecondsSinceEpoch((m['at'] as num).toInt()),
       );
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to parse PlaybackBookmark from map',
+          error: e, stackTrace: st, category: 'PlaybackBookmarkStore');
       return null;
     }
   }
@@ -136,7 +139,10 @@ class PlaybackBookmarkStore {
           if (b != null) _bookmarks.putIfAbsent(k, () => b);
         }
       });
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load playback bookmarks',
+          error: e, stackTrace: st, category: 'PlaybackBookmarkStore');
+    }
   }
 
   /// Re-reads the persisted bookmarks, replacing the in-memory cache, so a
@@ -156,6 +162,9 @@ class PlaybackBookmarkStore {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(prefsKey,
           jsonEncode(_bookmarks.map((k, v) => MapEntry(k, v.toMap()))));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist playback bookmarks',
+          error: e, stackTrace: st, category: 'PlaybackBookmarkStore');
+    }
   }
 }

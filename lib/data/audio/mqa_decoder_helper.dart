@@ -306,13 +306,14 @@ class _MqaStreamAudioSource extends StreamAudioSource {
     // payload cannot trigger an out-of-bounds sublist RangeError.
     final from = (start ?? 0).clamp(0, wavBytes.length);
     final to = (end ?? wavBytes.length).clamp(from, wavBytes.length);
+    // sublistView, not sublist: avoid copying up to hundreds of MB on each seek.
     return StreamAudioResponse(
       rangeRequestsSupported: true,
       sourceLength: wavBytes.length,
       contentLength: to - from,
       offset: from,
       contentType: 'audio/wav',
-      stream: Stream.value(wavBytes.sublist(from, to)),
+      stream: Stream.value(Uint8List.sublistView(wavBytes, from, to)),
     );
   }
 }

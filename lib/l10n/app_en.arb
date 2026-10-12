@@ -4082,6 +4082,8 @@
   "settingsThemeRetroCassetteDesc": "Vintage cassette tape with spinning spools & magnetic tape counter",
   "settingsThemeVinylCircle": "Vinyl Circle (Spinning)",
   "settingsThemeVinylCircleDesc": "Centered circular artwork with continuous spinning animation",
+  "settingsThemeCdTurntable": "CD Turntable",
+  "settingsThemeCdTurntableDesc": "Rotating iridescent CD with central album artwork & animated stylus stick",
   "settingsThemeVinylTurntable": "Vinyl Turntable Studio",
   "settingsThemeVinylTurntableDesc": "True vinyl record with realistic grooves, center label & tonearm",
   "settingsTurnOffGapless": "Turn off Gapless",

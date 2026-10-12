@@ -36,6 +36,8 @@ String getThemeModeTitle(PlayerThemeMode mode, AppLocalizations l10n) {
       return l10n.settingsThemeFullBleed;
     case PlayerThemeMode.lyricsFocus:
       return l10n.settingsThemeKaraoke;
+    case PlayerThemeMode.cd:
+      return l10n.settingsThemeCdTurntable;
   }
 }
 
@@ -195,6 +197,8 @@ class _ThemePreviewThumbnail extends StatelessWidget {
         return Icon(Icons.waves_rounded, size: 22, color: tint);
       case PlayerThemeMode.lyricsFocus:
         return Icon(Icons.mic_external_on_rounded, size: 22, color: tint);
+      case PlayerThemeMode.cd:
+        return Icon(Icons.album_outlined, size: 22, color: tint);
     }
   }
 }
@@ -243,6 +247,12 @@ void showThemePickerSheet(
       title: context.l10n.settingsThemeVinylTurntable,
       subtitle: context.l10n.settingsThemeVinylTurntableDesc,
       icon: Icons.album_rounded,
+    ),
+    (
+      mode: PlayerThemeMode.cd,
+      title: context.l10n.settingsThemeCdTurntable,
+      subtitle: context.l10n.settingsThemeCdTurntableDesc,
+      icon: Icons.album_outlined,
     ),
     (
       mode: PlayerThemeMode.cassette,
@@ -569,6 +579,69 @@ class _ThemeMockupCard extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        );
+      case PlayerThemeMode.cd:
+        return SizedBox(
+          width: 72,
+          height: 64,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: SweepGradient(
+                    colors: [
+                      p.surfaceContainerHigh,
+                      primaryColor.withValues(alpha: 0.4),
+                      Colors.cyanAccent.withValues(alpha: 0.35),
+                      Colors.purpleAccent.withValues(alpha: 0.35),
+                      p.surfaceContainerHigh,
+                    ],
+                  ),
+                  border: Border.all(color: p.hairline, width: 1.5),
+                ),
+                child: Center(
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: primaryColor,
+                      border: Border.all(color: Colors.white24, width: 1),
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: p.bg,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 2,
+                top: 4,
+                child: Transform.rotate(
+                  angle: 0.35,
+                  child: Container(
+                    width: 3.5,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: p.textPrimary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       case PlayerThemeMode.cassette:

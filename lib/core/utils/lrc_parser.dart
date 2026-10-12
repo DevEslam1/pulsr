@@ -104,6 +104,8 @@ class LrcParser {
         final totalDuration = Duration(milliseconds: totalMs);
 
         final words = _parseWordTimestamps(rawTextAfterTags, totalMs, offsetMs);
+        final isBackground = (text.startsWith('(') && text.endsWith(')')) ||
+            (text.startsWith('[') && text.endsWith(']'));
 
         result.add(LyricsLine(
           timestamp: totalDuration,
@@ -111,6 +113,7 @@ class LrcParser {
           source: source,
           words: words,
           isVocal: isVocal,
+          isBackground: isBackground,
         ));
       }
     }
@@ -476,7 +479,10 @@ class LrcParser {
                 'text': l.text,
                 'source': l.source.name,
                 'vocal': l.isVocal,
+                'bg': l.isBackground,
+                'align': l.alignment.name,
                 if (l.translation != null) 'translation': l.translation,
+                if (l.romanization != null) 'romanization': l.romanization,
                 if (l.words.isNotEmpty)
                   'words': l.words
                       .map((w) => {
@@ -539,14 +545,24 @@ class LrcParser {
       final rawMs = map['ms'];
       final rawText = map['text'];
       final rawTranslation = map['translation'];
+      final rawRomanization = map['romanization'];
       final rawVocal = map['vocal'];
+      final rawBg = map['bg'];
+      final rawAlign = map['align'];
+      final alignment = rawAlign == 'end'
+          ? LyricAlignment.end
+          : LyricAlignment.start;
+
       lines.add(LyricsLine(
         timestamp: Duration(milliseconds: rawMs is num ? rawMs.toInt() : 0),
         text: rawText is String ? rawText : '',
         source: lineSource,
         words: words,
         translation: rawTranslation is String ? rawTranslation : null,
+        romanization: rawRomanization is String ? rawRomanization : null,
         isVocal: rawVocal is bool ? rawVocal : true,
+        isBackground: rawBg is bool ? rawBg : false,
+        alignment: alignment,
       ));
     }
 

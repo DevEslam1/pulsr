@@ -16,6 +16,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../../data/db/app_database.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../party/presentation/party_sheet.dart';
 
 class NowPlayingQueueView extends StatefulWidget {
   const NowPlayingQueueView({super.key});
@@ -234,6 +235,16 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                         ),
                       );
                     }),
+                    const SizedBox(width: AppSpacing.s6),
+                    IconButton(
+                      icon: const Icon(Icons.group_rounded, size: 20),
+                      tooltip: 'Listen Together',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        PartySheet.show(context);
+                      },
+                    ),
                   ],
                 ),
               ),

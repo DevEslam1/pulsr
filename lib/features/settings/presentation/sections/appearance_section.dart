@@ -293,6 +293,26 @@ mixin SettingsAppearanceSection
           },
         ),
         _divider(p),
+        _switchTile(
+          context,
+          Icons.motion_photos_on_rounded,
+          'Spotify Canvas / Motion Artwork',
+          'Play looping video backdrops for supported tracks (Spotify, Apple Music, Tidal)',
+          value: state.canvasEnabled,
+          onChanged: cubit.toggleCanvasEnabled,
+        ),
+        if (state.canvasEnabled) ...[
+          _divider(p),
+          _switchTile(
+            context,
+            Icons.fullscreen_rounded,
+            'Full-Screen Ambient Backdrop',
+            'Display looping video blurred behind Now Playing controls instead of inside artwork card',
+            value: state.canvasAsBackdrop,
+            onChanged: cubit.setCanvasAsBackdrop,
+          ),
+        ],
+        _divider(p),
         Padding(
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md, vertical: AppSpacing.sm),

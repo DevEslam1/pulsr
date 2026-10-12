@@ -148,6 +148,10 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                           ),
                         ),
                       ),
+                      _MinimalAudiophileTelemetry(
+                        song: song,
+                        activeColor: activeColor,
+                      ),
                       if (showVisualizer) ...[
                         SizedBox(height: math.min(10.0, visualizerSpace)),
                         AudioVisualizer(
@@ -295,6 +299,88 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
           },
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Swiss / Teenage Engineering Audiophile Telemetry HUD
+// ---------------------------------------------------------------------------
+class _MinimalAudiophileTelemetry extends StatelessWidget {
+  final SongsTableData? song;
+  final Color activeColor;
+
+  const _MinimalAudiophileTelemetry({
+    required this.song,
+    required this.activeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (song == null) return const SizedBox.shrink();
+
+    final ext = (song!.codec != null && song!.codec!.isNotEmpty)
+        ? song!.codec!.toUpperCase()
+        : (song!.path.contains('.')
+            ? song!.path.split('.').last.toUpperCase()
+            : 'PCM');
+    final sampleRateStr = song!.sampleRate != null && song!.sampleRate! > 0
+        ? '${(song!.sampleRate! / 1000).toStringAsFixed(1)} kHz'
+        : '44.1 kHz';
+    final bitDepthStr = song!.bitDepth != null && song!.bitDepth! > 0
+        ? '${song!.bitDepth}-BIT'
+        : '16-BIT';
+    final bitrateStr = song!.bitrateKbps != null && song!.bitrateKbps! > 0
+        ? '${song!.bitrateKbps} kbps'
+        : null;
+
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.s10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: AppRadii.r8All,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildChip(ext, isAccent: true),
+          _buildDivider(),
+          _buildChip(sampleRateStr),
+          _buildDivider(),
+          _buildChip(bitDepthStr),
+          if (bitrateStr != null) ...[
+            _buildDivider(),
+            _buildChip(bitrateStr),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(String label, {bool isAccent = false}) {
+    return Text(
+      label,
+      style: TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 9.5,
+        fontWeight: FontWeight.w800,
+        color: isAccent ? activeColor : Colors.white70,
+        letterSpacing: 0.6,
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      width: 1,
+      height: 9,
+      margin: const EdgeInsets.symmetric(horizontal: 7),
+      color: Colors.white24,
     );
   }
 }

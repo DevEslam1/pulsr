@@ -583,6 +583,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     // queue snapshot captured before `addToQueueEnd`.
     final s = _getState();
     final updatedQueue = [...s.queue, song];
+    final updatedTiers = Map<int, QueueTier>.from(s.trackTiers);
+    updatedTiers[song.id] = QueueTier.userQueue;
     setQueueSlot(
       s.activeQueueSlot,
       songs: updatedQueue,
@@ -593,7 +595,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
     _emit(s.copyWith(
-      queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
+      queueSlice: s.queueSlice.copyWith(
+        queue: updatedQueue,
+        trackTiers: updatedTiers,
+      ),
     ));
     _invalidateQueueSyncResolution();
     _updateWidgetThrottled();
@@ -651,6 +656,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final insertAt = (s.currentIndex + 1).clamp(0, s.queue.length);
     final updatedQueue = List<SongsTableData>.from(s.queue);
     updatedQueue.insert(insertAt, song);
+    final updatedTiers = Map<int, QueueTier>.from(s.trackTiers);
+    updatedTiers[song.id] = QueueTier.userQueue;
     setQueueSlot(
       s.activeQueueSlot,
       songs: updatedQueue,
@@ -661,7 +668,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
     _emit(s.copyWith(
-      queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
+      queueSlice: s.queueSlice.copyWith(
+        queue: updatedQueue,
+        trackTiers: updatedTiers,
+      ),
     ));
     _invalidateQueueSyncResolution();
   }
@@ -726,6 +736,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     // Re-fetch state after the awaits so the batch lands on the fresh queue.
     final s = _getState();
     final updatedQueue = [...s.queue, ...added];
+    final updatedTiers = Map<int, QueueTier>.from(s.trackTiers);
+    for (final song in added) {
+      updatedTiers[song.id] = QueueTier.userQueue;
+    }
     setQueueSlot(
       s.activeQueueSlot,
       songs: updatedQueue,
@@ -736,7 +750,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
     _emit(s.copyWith(
-      queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
+      queueSlice: s.queueSlice.copyWith(
+        queue: updatedQueue,
+        trackTiers: updatedTiers,
+      ),
       playback: s.playback.copyWith(
         errorMessage: added.length < toAdd.length
             ? 'Added ${added.length} of ${toAdd.length} songs'
@@ -772,6 +789,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         await swapReconciledSong(nextTrack.id, match);
       }
     }).catchError((Object e, StackTrace st) {
+      // AUDIT-FIX: Guard catchError against controller disposal
+      if (_isClosed()) return;
       ErrorLogger.log('Find next local match failed',
           error: e, stackTrace: st, category: 'PlayerQueueController');
     });

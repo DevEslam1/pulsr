@@ -62,13 +62,18 @@ class SongRatingStore {
   /// until the next app launch. Safe to call repeatedly.
   Future<void> reload() async {
     await ready;
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(prefsKey);
-    if (raw == null || raw.isEmpty) {
-      _ratings.clear();
-      return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(prefsKey);
+      if (raw == null || raw.isEmpty) {
+        _ratings.clear();
+        return;
+      }
+      await load();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reload song ratings',
+          error: e, stackTrace: st, category: 'SongRatingStore');
     }
-    await load();
   }
 
   Future<void> persist() async {

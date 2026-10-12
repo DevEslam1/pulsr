@@ -26,6 +26,7 @@ abstract final class PulsrChannels {
   static const battery = 'com.pulsr.music/battery_optimization';
   static const roomCorrection = 'com.pulsr.music/room_correction';
   static const roomCorrectionPcm = 'com.pulsr.music/room_correction_pcm';
+  static const updater = 'com.pulsr.music/updater';
 }
 
 typedef Channels = PulsrChannels;

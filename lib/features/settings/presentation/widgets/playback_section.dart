@@ -247,6 +247,16 @@ class PlaybackSection extends StatelessWidget {
                 context, cubit, state.crossfadeSeconds),
           ),
         settingsCardDivider(p),
+        // Automix / Smart Transitions
+        _switchTile(
+          context,
+          Icons.auto_awesome_rounded,
+          'Automix / Smart Transitions',
+          'Confidence-aware DJ beatmatching, tempo stretching, and beat alignment',
+          value: state.automixEnabled,
+          onChanged: cubit.setAutomixEnabled,
+        ),
+        settingsCardDivider(p),
         // F3: hedged stream resolution (race 2 clients, take first).
         _switchTile(
           context,

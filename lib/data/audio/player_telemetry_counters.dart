@@ -27,7 +27,7 @@ class PlayerTelemetryCounters {
     positionSaveFailures = 0;
     crossfadeCancels = 0;
     duckStateRecoveries = 0;
-    streamResolveFailures.clear;
+    streamResolveFailures.clear();
     autoResumeDecisions.clear();
   }
 }

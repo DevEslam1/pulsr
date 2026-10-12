@@ -53,6 +53,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
   void initState() {
     super.initState();
     if (_isAndroid) {
+      _volumeLoading = true;
       _init();
     }
   }
@@ -100,10 +101,18 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
       if (supported) await _service.startDiscovery();
     }
 
-    // Reflect the receiver's real volume instead of assuming full scale.
+    // AUDIT-FIX: Reflect the receiver's real volume or mark unknown with loading indicator
     final remoteVolume = await _service.getVolume();
-    if (mounted && remoteVolume != null) {
-      setState(() => _castVolume = remoteVolume);
+    if (mounted) {
+      setState(() {
+        _volumeLoading = false;
+        if (remoteVolume != null) {
+          _castVolume = remoteVolume;
+          _volumeUnknown = false;
+        } else {
+          _volumeUnknown = true;
+        }
+      });
     }
 
     _scanTimeoutTimer?.cancel();
@@ -187,7 +196,10 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
     }
   }
 
+  // AUDIT-FIX: Track volume fetch loading and unknown state
   double _castVolume = 1.0;
+  bool _volumeLoading = false;
+  bool _volumeUnknown = false;
 
   Future<void> _castCurrentQueue() async {
     if (_busy) return;
@@ -546,19 +558,44 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
+                    // AUDIT-FIX: Loading indicator and unknown tooltip on volume slider
                     Row(
                       children: [
                         Icon(Icons.volume_down_rounded,
                             size: 18, color: p.textSecondary),
                         Expanded(
-                          child: Slider(
-                            value: _castVolume,
-                            activeColor: p.accent,
-                            onChanged: (v) {
-                              setState(() => _castVolume = v);
-                              _service.setVolume(v);
-                            },
-                          ),
+                          child: _volumeLoading
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                )
+                              : _volumeUnknown
+                                  ? Tooltip(
+                                      message: 'Receiver volume unknown',
+                                      child: Slider(
+                                        value: _castVolume,
+                                        activeColor:
+                                            p.accent.withValues(alpha: 0.5),
+                                        onChanged: (v) {
+                                          setState(() {
+                                            _castVolume = v;
+                                            _volumeUnknown = false;
+                                          });
+                                          _service.setVolume(v);
+                                        },
+                                      ),
+                                    )
+                                  : Slider(
+                                      value: _castVolume,
+                                      activeColor: p.accent,
+                                      onChanged: (v) {
+                                        setState(() => _castVolume = v);
+                                        _service.setVolume(v);
+                                      },
+                                    ),
                         ),
                         Icon(Icons.volume_up_rounded,
                             size: 18, color: p.textSecondary),

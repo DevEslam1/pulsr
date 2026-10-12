@@ -1,6 +1,5 @@
 // lib/data/audio/audio_handler.dart
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -29,7 +28,6 @@ import '../../domain/models/audio_output_info.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/headphone_profile.dart';
-import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../domain/usecases/toggle_favorite_usecase.dart';
 import 'package:drift/drift.dart' show Value;
@@ -38,6 +36,7 @@ import 'artwork_uri_resolver.dart';
 import 'audio_effects_channel.dart';
 import 'audio_session_id_router.dart';
 import 'crossfade_manager.dart';
+import 'automix/automix_transition_planner.dart';
 import 'interruption_state_machine.dart';
 import 'equalizer_manager.dart';
 import 'sleep_timer_manager.dart';
@@ -363,23 +362,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Duration? _pendingLazyPosition;
   Duration? _preBatteryCriticalCrossfadeDuration;
-  // Memoized stream URLs, keyed by video id. Never persisted — they expire.
-  @override
-  final LinkedHashMap<String,
-          ({String url, DateTime expires, String? userAgent, String? cookies})>
-      _streamCache = LinkedHashMap();
-  // Active stream URL resolutions, keyed by videoId-quality. Deduplicates concurrent
-  // requests (e.g. background pre-warm and YtmResolvingSource.request()).
-  @override
-  final Map<
-      String,
-      Future<
-          ({
-            String url,
-            String? userAgent,
-            String? cookies,
-            String quality
-          })>> _inFlightResolves = {};
   // Video ids with an in-flight prefetch, so we resolve each at most once.
   @override
   final Set<String> _prefetching = {};
@@ -656,6 +638,28 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volumeController = PlaybackVolumeController(
       getActivePlayer: () => _activePlayer,
       getInactivePlayer: () => _inactivePlayer,
+    );
+    _streamResolutionPipeline = StreamResolutionPipeline(
+      ytmService: _ytmService,
+      getLatencyTracker: () => _latencyTracker,
+      qualityProvider: _currentStreamingQuality,
+      onStreamResolved: (song, bitrate, codec) {
+        final songIndex = _songs.indexWhere((s) =>
+            s.id == song.id ||
+            (s.remoteId != null && s.remoteId == song.remoteId));
+        if (songIndex != -1 && songIndex < _songs.length) {
+          final target = _songs[songIndex];
+          if (target.id == song.id ||
+              (target.remoteId != null && target.remoteId == song.remoteId)) {
+            final updated = target.copyWith(
+              bitrateKbps: Value(bitrate),
+              codec: Value(codec),
+              sampleRate: Value(codec == 'OPUS' ? 48000 : 44100),
+            );
+            _songs[songIndex] = updated;
+          }
+        }
+      },
     );
     // Volume coordination: the sleep fade reports its progress as a FACTOR
     // instead of writing the active player's volume itself, so it composes with
@@ -1645,10 +1649,10 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     _memoryManager = AudioMemoryManager(
       onEvictOldestCacheRequested: () {
-        AudioMemoryManager.trimStreamCache(_streamCache);
+        _streamResolutionPipeline.pruneCache();
       },
       onBackgroundReleaseRequested: () {
-        AudioMemoryManager.trimStreamCache(_streamCache);
+        _streamResolutionPipeline.pruneCache();
       },
       onPreloadRejected: (key, sizeBytes) {
         debugPrint(
@@ -1748,11 +1752,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       ErrorLogger.log('Failed to load headset control config',
           error: e, stackTrace: st, category: 'AudioHandler');
     }));
-    _streamResolutionPipeline = StreamResolutionPipeline(
-      ytmService: _ytmService,
-      getLatencyTracker: () => _latencyTracker,
-    );
-
+ 
     _equalizerManager.attachDspPipeline(_dspPipeline);
     unawaited(_equalizerManager.syncNativeLatency(assumedOutputSampleRate));
 
@@ -2014,7 +2014,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                 _smartPrefetch();
               }
               final compensatedPos = _dspPipeline.getCompensatedPosition(pos);
-              if (_crossfadeManager.duration > Duration.zero &&
+              if ((_crossfadeManager.duration > Duration.zero ||
+                      _crossfadeManager.automixEnabled) &&
                   !_crossfadeManager.isCrossfading &&
                   !_gaplessMode) {
                 // Peek the next index (item 10): the mutating _getNextIndex()
@@ -2032,8 +2033,12 @@ class PulsrAudioHandler extends BaseAudioHandler
                   // ramp opens. Firing at `duration - crossfadeDuration` (base)
                   // opened the fade too late, so the outgoing track could reach
                   // ProcessingState.completed mid-fade (one-sided fade).
-                  final effFade = _crossfadeManager.effectiveFadeDuration(
-                      trackId: _songs[nextIdx].id.toString());
+                  final effFade = _crossfadeManager.automixEnabled
+                      ? (_crossfadeManager.duration > Duration.zero
+                          ? _crossfadeManager.duration
+                          : const Duration(seconds: 8))
+                      : _crossfadeManager.effectiveFadeDuration(
+                          trackId: _songs[nextIdx].id.toString());
                   const settleMargin = Duration(milliseconds: 1500);
                   if (duration > effFade + settleMargin &&
                       compensatedPos >= duration - effFade - settleMargin) {
@@ -2515,221 +2520,28 @@ class PulsrAudioHandler extends BaseAudioHandler
   static bool _isStreamUrl(String path) =>
       path.startsWith('http://') || path.startsWith('https://');
 
-  static final RegExp _videoIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
-
   /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized
   /// one until it nears expiry. Throws [YtmException] when nothing usable comes
   /// back, so the caller can tell "network down" from "skip this track".
   ///
+  /// Delegated to [_streamResolutionPipeline] to unify in-memory caching and deduplication.
   /// [quality] is reported back because it is part of every downstream cache key
   /// ([YtmUrlCache], the disk cache slot); the caller cannot assume `high`.
   @override
   Future<({String url, String? userAgent, String? cookies, String quality})>
       _resolveStreamUrl(SongsTableData song,
           {bool forceRefresh = false}) async {
-    try {
-      _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
-    } catch (_) {}
-    final videoId = song.remoteId;
-    if (videoId == null || videoId.isEmpty) {
-      throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
-    }
-    // Guard against placeholder local IDs (e.g. n_1f2cbFnkQ) that would waste
-    // BotGuard + Innertube retries and then loop as VideoGone. Skip quietly.
-    if (!_videoIdPattern.hasMatch(videoId)) {
-      throw const YtmException('YTM_UNAVAILABLE', 'Invalid video id');
-    }
-
-    // Hot path: reuse the cached prefs (loaded once in _init) instead of an
-    // async disk read per resolve — saves ~5-20ms on every tap/prefetch.
     final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
-    final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
-    if (offlineOnly) {
-      throw const YtmException(
-          'OFFLINE_ONLY', 'Offline Only Mode is enabled in Settings');
-    }
-    final wifiOnly = prefs.getBool('setting_wifi_only_mode') ?? false;
-    if (wifiOnly) {
-      final isWifi = await _ytmService.isWifiConnected();
-      if (!isWifi) {
-        throw const YtmException('WIFI_ONLY',
-            'Wi-Fi Only Mode is enabled. Connect to Wi-Fi to stream');
-      }
-    }
-    final quality = _currentStreamingQuality();
-    final cacheKey = '$videoId:${quality.toLowerCase()}';
-
-    // Snapshot the resolve epoch. If a network-path or quality change bumps it
-    // while this resolve is in flight, the result is bound to a now-stale egress
-    // IP / rendition, so we must not write it back into the cache after the
-    // caller already cleared it (that repopulated the cache with a URL that then
-    // 403s on the new path).
-    final resolveEpoch = _resolveEpoch;
-
-    if (!forceRefresh) {
-      final cached = _streamCache[cacheKey];
-      if (cached != null) {
-        if (cached.expires.isAfter(DateTime.now())) {
-          _streamCache.remove(cacheKey);
-          _streamCache[cacheKey] = cached;
-          _memoryManager.touch(cacheKey);
-          try {
-            _latencyTracker?.markStage(PlaybackStage.urlObtained);
-          } catch (_) {}
-          final songIndex = _songs.indexWhere((s) =>
-              s.id == song.id ||
-              (s.remoteId != null && s.remoteId == song.remoteId));
-          if (songIndex != -1 && songIndex < _songs.length) {
-            final target = _songs[songIndex];
-            if (target.id == song.id ||
-                (target.remoteId != null && target.remoteId == song.remoteId)) {
-              if (target.bitrateKbps == null || target.bitrateKbps == 0) {
-                final defaultKbps = quality == 'low'
-                    ? 64
-                    : quality == 'medium'
-                        ? 128
-                        : 160;
-                final defaultCodec = quality == 'medium' ? 'AAC' : 'OPUS';
-                final updated = target.copyWith(
-                  bitrateKbps: Value(defaultKbps),
-                  codec: Value(defaultCodec),
-                  sampleRate: Value(defaultCodec == 'OPUS' ? 48000 : 44100),
-                );
-                _songs[songIndex] = updated;
-              }
-            }
-          }
-          return (
-            url: cached.url,
-            userAgent: cached.userAgent,
-            cookies: cached.cookies,
-            quality: quality
-          );
-        } else {
-          _streamCache.remove(cacheKey);
-        }
-      }
-      final inFlight = _inFlightResolves[cacheKey];
-      if (inFlight != null) {
-        return await inFlight;
-      }
-    }
-
-    Future<YtmStream> doResolve() => _ytmService.resolveStream(videoId,
-        quality: quality, forceRefresh: forceRefresh);
-    final future = () async {
-      try {
-        _latencyTracker?.markStage(PlaybackStage.pluginEntered);
-        _latencyTracker?.markStage(PlaybackStage.clientRequestSent);
-      } catch (_) {}
-      // The native extractor already races its top two clients internally
-      // (InnertubeClient's 350ms hedged race) and bounds each call, so a second,
-      // independent Dart-level chain (coalesce:false) only doubled the native
-      // load — two full multi-client chains contending for a 6-thread pool —
-      // which made cold starts slower, not faster. One chain; the extractor
-      // owns the hedging.
-      final YtmStream stream = await doResolve();
-      if (stream.url.trim().isEmpty) {
-        throw const YtmException(
-            'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
-      }
-
-      final realBitrate = stream.bitrateKbps > 0
-          ? stream.bitrateKbps
-          : (quality == 'low'
-              ? 64
-              : quality == 'medium'
-                  ? 128
-                  : 160);
-      final realCodec = stream.container.toUpperCase() == 'WEBM' ||
-              stream.mimeType.contains('webm') ||
-              stream.mimeType.contains('opus')
-          ? 'OPUS'
-          : (stream.container.toUpperCase() == 'M4A' ||
-                  stream.mimeType.contains('mp4') ||
-                  stream.mimeType.contains('aac')
-              ? 'AAC'
-              : 'OPUS');
-
-      final songIndex = _songs.indexWhere((s) =>
-          s.id == song.id ||
-          (s.remoteId != null && s.remoteId == song.remoteId));
-      if (songIndex != -1 && songIndex < _songs.length) {
-        final target = _songs[songIndex];
-        if (target.id == song.id ||
-            (target.remoteId != null && target.remoteId == song.remoteId)) {
-          final updated = target.copyWith(
-            bitrateKbps: Value(realBitrate),
-            codec: Value(realCodec),
-            sampleRate: Value(realCodec == 'OPUS' ? 48000 : 44100),
-          );
-          _songs[songIndex] = updated;
-        }
-      }
-      // Prefer the resolver-provided expiry, then the URL stamp (which may be a
-      // ?expire= query param or /expire/<s>/ path segment), then a safe default.
-      final rawExpireStamp =
-          stream.expiresAt ?? YtmStream.expiryFromUrl(stream.url);
-      final expireStamp = (rawExpireStamp != null &&
-              rawExpireStamp > 0 &&
-              rawExpireStamp < 100000000000)
-          ? rawExpireStamp * 1000
-          : rawExpireStamp;
-      final DateTime expireAt;
-      if (expireStamp != null) {
-        expireAt = DateTime.fromMillisecondsSinceEpoch(expireStamp);
-      } else {
-        expireAt = DateTime.now().add(const Duration(hours: 5));
-      }
-      final safeExpiry = expireAt.subtract(const Duration(minutes: 5));
-      // Drop the write if a network-path/quality change invalidated caches
-      // while we were resolving — otherwise we'd repopulate with a stale URL.
-      if (_resolveEpoch == resolveEpoch && safeExpiry.isAfter(DateTime.now())) {
-        _addToStreamCache(cacheKey, (
-          url: stream.url,
-          expires: safeExpiry,
-          userAgent: stream.userAgent,
-          cookies: stream.cookies
-        ));
-        AudioMemoryManager.trimStreamCache(_streamCache);
-      }
-      try {
-        _latencyTracker?.markStage(PlaybackStage.urlObtained);
-      } catch (_) {}
-      return (
-        url: stream.url,
-        userAgent: stream.userAgent,
-        cookies: stream.cookies,
-        quality: quality
-      );
-    }();
-
-    // Only non-force resolves participate in dedup, and removal is by identity.
-    // A force-refresh must not overwrite (and then, on completion, evict) an
-    // in-flight normal resolve's entry, which left later callers un-deduped and
-    // firing a redundant native chain.
-    if (!forceRefresh) {
-      _inFlightResolves[cacheKey] = future;
-    }
-    try {
-      return await future;
-    } finally {
-      if (identical(_inFlightResolves[cacheKey], future)) {
-        _inFlightResolves.remove(cacheKey);
-      }
-    }
+    return _streamResolutionPipeline.resolveStreamUrl(
+      song,
+      forceRefresh: forceRefresh,
+      prefs: prefs,
+      quality: _currentStreamingQuality(),
+    );
   }
-
-  static const int _maxStreamCacheEntries = 64;
 
   @override
   int _prefetchGeneration = 0;
-
-  /// Bumped whenever a network-path or streaming-quality change invalidates the
-  /// URL caches, so a resolve already in flight won't write its now-stale result
-  /// back after the caches were cleared. See [_resolveStreamUrl].
-  @override
-  int _resolveEpoch = 0;
 
   /// Track key shared with the per-song stores (id-based).
   static String trackKeyFor(SongsTableData song) => song.id.toString();

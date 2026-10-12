@@ -1,6 +1,7 @@
 // lib/features/player/presentation/themes/vinyl_player_theme.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
@@ -13,6 +14,7 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
+import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';

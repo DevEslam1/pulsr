@@ -112,7 +112,6 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
       if (song != null &&
           song.source == SongSource.youtube &&
           (song.remoteId?.isNotEmpty ?? false)) {
-        _streamCache.removeWhere((k, _) => k.startsWith('${song.remoteId!}:'));
         _streamResolutionPipeline.invalidateCache(song.remoteId!);
         // Hot-swap mid-track: re-resolve at new quality, keep position.
         final pos = _activePlayer.position;
@@ -275,10 +274,6 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
 
   Future<({String url, String? userAgent, String? cookies, String quality})>
       _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
-
-  LinkedHashMap<String,
-          ({String url, DateTime expires, String? userAgent, String? cookies})>
-      get _streamCache;
 
   StreamResolutionPipeline get _streamResolutionPipeline;
 

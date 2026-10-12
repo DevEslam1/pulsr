@@ -20,6 +20,9 @@ import 'lyrics_editor_sheet.dart';
 import '../themes/player_theme.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../data/lyrics/lyrics_translation_service.dart';
+import 'lyrics/advanced_lyrics_view.dart';
+import 'lyrics_share_card.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
@@ -57,6 +60,20 @@ class _LyricsViewState extends State<LyricsView> {
   final LyricsOffsetStore _offsetStore = LyricsOffsetStore();
   int _manualOffsetMs = 0;
   String? _offsetSongPath;
+
+  // Translation and Advanced Lyrics Suite state
+  final LyricsTranslationService _translationService =
+      LyricsTranslationService();
+  bool _isTranslating = false;
+  int _translationMode = 0; // 0: off, 1: translated, 2: romanized
+  List<LyricsLine>? _translatedLyrics;
+
+  bool get _hasWordSync => widget.lyrics.any((l) => l.words.isNotEmpty);
+  bool get _useAdvancedView => _hasWordSync || _translationMode > 0;
+  List<LyricsLine> get _displayLyrics =>
+      (_translationMode > 0 && _translatedLyrics != null)
+          ? _translatedLyrics!
+          : widget.lyrics;
 
   // Cached synced check
   List<LyricsLine>? _syncedCheckSource;
@@ -438,12 +455,85 @@ class _LyricsViewState extends State<LyricsView> {
     );
   }
 
+  Future<void> _toggleTranslation() async {
+    if (_isTranslating || widget.lyrics.isEmpty) return;
+
+    if (_translationMode == 0) {
+      // Off -> Translate to locale
+      setState(() => _isTranslating = true);
+      try {
+        final locale =
+            Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
+        final result = await _translationService.translateLyrics(
+          lines: widget.lyrics,
+          targetLanguage: locale,
+        );
+        if (mounted) {
+          setState(() {
+            _translatedLyrics = result.lines;
+            _translationMode = 1;
+            _isTranslating = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) setState(() => _isTranslating = false);
+      }
+    } else if (_translationMode == 1) {
+      // Translated -> Romanized
+      setState(() => _isTranslating = true);
+      try {
+        final result = await _translationService.romanizeLyrics(
+          lines: widget.lyrics,
+        );
+        if (mounted) {
+          setState(() {
+            _translatedLyrics = result.lines;
+            _translationMode = 2;
+            _isTranslating = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) setState(() => _isTranslating = false);
+      }
+    } else {
+      // Romanized -> Off
+      setState(() {
+        _translationMode = 0;
+        _translatedLyrics = null;
+      });
+    }
+  }
+
+  void _openShareCard({int initialIndex = 0}) {
+    PlayerCubit? cubit;
+    try {
+      cubit = context.read<PlayerCubit>();
+    } catch (_) {}
+    final song = cubit?.state.currentSong;
+    final effective = _displayLyrics;
+    if (effective.isEmpty) return;
+    final activeCol = widget.activeColor == Colors.white
+        ? context.palette.accent
+        : widget.activeColor;
+    unawaited(LyricsShareSheet.show(
+      context: context,
+      lyrics: effective,
+      song: song,
+      activeColor: activeCol,
+      initialLineIndex: initialIndex,
+      showTranslation: _translationMode > 0,
+    ));
+  }
+
   Widget _buildHeaderActions() {
     PlayerCubit? cubit;
     try {
       cubit = context.read<PlayerCubit>();
     } catch (_) {}
     final hasSong = cubit?.state.currentSong != null;
+    final hasLyrics = widget.lyrics.isNotEmpty;
+    final p = context.palette;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -453,6 +543,46 @@ class _LyricsViewState extends State<LyricsView> {
         if (hasSong)
           _headerIconButton(
               Icons.edit_note_rounded, context.l10n.dspEditLyrics, _openEditor),
+        if (hasSong && hasLyrics)
+          IconButton(
+            icon: _isTranslating
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: widget.activeColor,
+                    ),
+                  )
+                : Icon(
+                    _translationMode == 0
+                        ? Icons.translate_rounded
+                        : (_translationMode == 1
+                            ? Icons.g_translate_rounded
+                            : Icons.spellcheck_rounded),
+                    color: _translationMode > 0
+                        ? p.accent
+                        : widget.activeColor,
+                    size: 20,
+                  ),
+            tooltip: _translationMode == 0
+                ? 'Translate lyrics'
+                : (_translationMode == 1
+                    ? 'Romanize lyrics'
+                    : 'Original lyrics'),
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget,
+            ),
+            onPressed: _toggleTranslation,
+          ),
+        if (hasSong && hasLyrics)
+          _headerIconButton(
+            Icons.share_rounded,
+            'Share lyrics card',
+            () => _openShareCard(),
+          ),
         _headerIconButton(Icons.fullscreen_rounded, context.l10n.dspKaraokeMode,
             _openKaraoke),
       ],
@@ -468,16 +598,19 @@ class _LyricsViewState extends State<LyricsView> {
       itemCount: widget.lyrics.length,
       itemBuilder: (context, index) {
         final line = widget.lyrics[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
-          child: Text(
-            line.text,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: AppFontSize.bodyLarge,
-              fontWeight: FontWeight.w500,
-              color: p.textPrimary,
-              height: 1.4,
+        return InkWell(
+          onLongPress: () => _openShareCard(initialIndex: index),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
+            child: Text(
+              line.text,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: AppFontSize.bodyLarge,
+                fontWeight: FontWeight.w500,
+                color: p.textPrimary,
+                height: 1.4,
+              ),
             ),
           ),
         );
@@ -530,22 +663,69 @@ class _LyricsViewState extends State<LyricsView> {
       enableSwitchAnimation: true,
     );
 
-    return GestureDetector(
-      onLongPressStart: _handleLyricLongPressStart,
-      child: RepaintBoundary(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SizedBox(
-              width: constraints.maxWidth,
-              height: constraints.maxHeight,
-              child: LyricView(
-                controller: _lyricController,
-                style: style,
+    final effectiveLyrics = _displayLyrics;
+    final Duration currentPos = widget.currentPosition ??
+        (() {
+          try {
+            return context.read<PlayerCubit>().state.position;
+          } catch (_) {
+            return Duration.zero;
+          }
+        })();
+
+    return Stack(
+      children: [
+        if (!_useAdvancedView)
+          GestureDetector(
+            onLongPressStart: _handleLyricLongPressStart,
+            child: RepaintBoundary(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SizedBox(
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                    child: LyricView(
+                      controller: _lyricController,
+                      style: style,
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
-      ),
+            ),
+          )
+        else
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.0,
+              child: IgnorePointer(
+                child: LyricView(
+                  controller: _lyricController,
+                  style: style,
+                ),
+              ),
+            ),
+          ),
+        if (_useAdvancedView)
+          Positioned.fill(
+            child: AdvancedLyricsView(
+              lyrics: effectiveLyrics,
+              currentPosition: currentPos,
+              activeColor: activeCol,
+              showTranslation: _translationMode > 0,
+              onLineTapped: (seekPos) {
+                if (widget.onLineTapped != null) {
+                  widget.onLineTapped!(seekPos);
+                } else {
+                  try {
+                    context.read<PlayerCubit>().seek(seekPos);
+                  } catch (_) {}
+                }
+                _updateProgress(seekPos);
+              },
+              onLineLongPressed: (idx) => _openShareCard(initialIndex: idx),
+            ),
+          ),
+      ],
     );
   }
 

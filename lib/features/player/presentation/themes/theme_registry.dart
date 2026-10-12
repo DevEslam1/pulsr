@@ -3,6 +3,7 @@ import '../../../settings/cubit/settings_state.dart';
 import 'card_player_theme.dart';
 import 'cassette_player_theme.dart';
 import 'circle_player_theme.dart';
+import 'cd_player_theme.dart';
 import 'classic_player_theme.dart';
 import 'lyrics_player_theme.dart';
 import 'minimal_player_theme.dart';
@@ -22,6 +23,7 @@ class ThemeRegistry {
     PlayerThemeMode.circle: (props) => CirclePlayerTheme(props: props),
     PlayerThemeMode.minimal: (props) => MinimalPlayerTheme(props: props),
     PlayerThemeMode.vinyl: (props) => VinylPlayerTheme(props: props),
+    PlayerThemeMode.cd: (props) => CdPlayerTheme(props: props),
     PlayerThemeMode.cassette: (props) => CassettePlayerTheme(props: props),
     PlayerThemeMode.waveform: (props) => WaveformPlayerTheme(props: props),
     PlayerThemeMode.lyricsFocus: (props) => LyricsPlayerTheme(props: props),

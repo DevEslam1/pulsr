@@ -240,6 +240,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       updateWidgetThrottled: ({bool force = false}) =>
           widgetBridge.updateWidgetThrottled(state,
               queueVersion: _queueVersion, force: force),
+      onPlaySong: (song, {queue, initialPosition}) =>
+          playSong(song, queue: queue, initialPosition: initialPosition),
     );
     widgetBridge.listenToClicks(
       onPlayPause: togglePlayPause,
@@ -338,9 +340,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
                 (settingsCubit.state.crossfadeSeconds * 1000).round()),
       );
       _audioHandler.setGaplessEnabled(settingsCubit.state.gaplessPlayback);
+      _audioHandler.setAutomixEnabled(settingsCubit.state.automixEnabled);
 
       var prevCrossfadeSeconds = settingsCubit.state.crossfadeSeconds;
       var prevGapless = settingsCubit.state.gaplessPlayback;
+      var prevAutomix = settingsCubit.state.automixEnabled;
       var prevReplayGainMode = settingsCubit.state.replayGainMode;
       var prevPreampWithRg = settingsCubit.state.replayGainPreampWithRg;
       var prevPreampWithoutRg = settingsCubit.state.replayGainPreampWithoutRg;
@@ -351,6 +355,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         final crossfadeChanged =
             settingsState.crossfadeSeconds != prevCrossfadeSeconds;
         final gaplessChanged = settingsState.gaplessPlayback != prevGapless;
+        final automixChanged = settingsState.automixEnabled != prevAutomix;
         final volumeRelatedChanged =
             settingsState.replayGainMode != prevReplayGainMode ||
                 settingsState.replayGainPreampWithRg != prevPreampWithRg ||
@@ -361,6 +366,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
         prevCrossfadeSeconds = settingsState.crossfadeSeconds;
         prevGapless = settingsState.gaplessPlayback;
+        prevAutomix = settingsState.automixEnabled;
         prevReplayGainMode = settingsState.replayGainMode;
         prevPreampWithRg = settingsState.replayGainPreampWithRg;
         prevPreampWithoutRg = settingsState.replayGainPreampWithoutRg;
@@ -375,6 +381,9 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         }
         if (gaplessChanged) {
           _audioHandler.setGaplessEnabled(settingsState.gaplessPlayback);
+        }
+        if (automixChanged) {
+          _audioHandler.setAutomixEnabled(settingsState.automixEnabled);
         }
         if (volumeRelatedChanged) {
           // Re-apply composed gain (ReplayGain, loudness equalization, volume boost) for new settings
@@ -604,6 +613,16 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             state.currentSong?.artworkUri != song.artworkUri ||
             state.currentSong?.remoteArtworkUrl != song.remoteArtworkUrl;
 
+        final previousSong = state.currentSong;
+        final updatedHistory = List<SongsTableData>.from(state.queueHistory);
+        if (!isSameSong && previousSong != null) {
+          updatedHistory.removeWhere((s) => s.id == previousSong.id);
+          updatedHistory.insert(0, previousSong);
+          if (updatedHistory.length > 25) {
+            updatedHistory.removeRange(25, updatedHistory.length);
+          }
+        }
+
         safeEmit(state.copyWith(
           playback: state.playback.copyWith(
             currentSong: song,
@@ -613,6 +632,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           ),
           queueSlice: state.queueSlice.copyWith(
             currentIndex: effectiveIndex,
+            queueHistory: updatedHistory,
           ),
           lyricsSlice: state.lyricsSlice.copyWith(
             lyrics: isSameSong ? state.lyrics : const [],
@@ -627,6 +647,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           unawaited(metadataController.enrichTrackParallel(song));
           unawaited(dspController.maybeFollowTrackSampleRate(song));
           unawaited(playbackOptionsController.onCurrentSongChanged(song));
+          unawaited(checkAndTriggerAutoplay());
         }
         if (songChanged) {
           widgetBridge.updateWidgetThrottled(state, force: true);

@@ -1,5 +1,6 @@
 // lib/features/player/cubit/dsp_telemetry_cubit.dart
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/utils/error_logger.dart';
@@ -14,6 +15,8 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   Timer? _retryTimer;
   int _listenerCount = 0;
   int _consecutiveFailures = 0;
+  // AUDIT-FIX: Exponential backoff retry counter
+  int _retryCount = 0;
   bool _didLogFailure = false;
   bool _fetchInFlight = false;
 
@@ -65,6 +68,7 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
     _retryTimer?.cancel();
     _retryTimer = null;
     _consecutiveFailures = 0;
+    _retryCount = 0;
     _didLogFailure = false;
     _pollingTimer = Timer.periodic(pollingInterval, (_) {
       unawaited(_fetchTelemetry());
@@ -82,13 +86,22 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
     _stopTimer();
     _retryTimer?.cancel();
     _retryTimer = null;
+    _retryCount = 0;
     if (!isClosed) emit(const DspTelemetry.zero());
   }
 
   void _scheduleRetry() {
     _retryTimer?.cancel();
     if (isClosed || _listenerCount == 0) return;
-    _retryTimer = Timer(retryInterval, () {
+    // AUDIT-FIX: Exponential backoff (retryInterval * 2^_retryCount, max 30s)
+    final factor = math.pow(2, _retryCount).toDouble();
+    final computedMs = (retryInterval.inMilliseconds * factor).round();
+    final delay = Duration(
+      milliseconds:
+          math.min(computedMs, const Duration(seconds: 30).inMilliseconds),
+    );
+    _retryCount++;
+    _retryTimer = Timer(delay, () {
       if (isClosed || _listenerCount == 0) return;
       unawaited(_fetchTelemetry());
     });
@@ -114,6 +127,7 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
       // close) must not resurrect stale meters.
       if (isClosed || _listenerCount == 0) return;
       _consecutiveFailures = 0;
+      _retryCount = 0;
       _didLogFailure = false;
       _retryTimer?.cancel();
       _retryTimer = null;

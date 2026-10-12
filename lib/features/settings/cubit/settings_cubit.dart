@@ -87,6 +87,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static const String _keyWifiOnlyMode = 'setting_wifi_only_mode';
   static const String _keyOfflineOnlyMode = 'setting_offline_only_mode';
   static const String _keyDspPreference = 'setting_dsp_preference';
+  static const String _keyCanvasEnabled = 'setting_canvas_enabled';
+  static const String _keyCanvasAsBackdrop = 'setting_canvas_as_backdrop';
 
   // Proxy Keys
   static const String _keyProxyEnabled = 'setting_proxy_enabled';
@@ -385,6 +387,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       themeColorSource: themeColorSource,
       waveformSeekBarEnabled:
           prefs.getBool(_keyWaveformSeekBar) ?? current.waveformSeekBarEnabled,
+      canvasEnabled:
+          prefs.getBool(_keyCanvasEnabled) ?? current.canvasEnabled,
+      canvasAsBackdrop:
+          prefs.getBool(_keyCanvasAsBackdrop) ?? current.canvasAsBackdrop,
     );
   }
 
@@ -543,6 +549,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       sincResamplerQuality: prefs.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
       bpmSyncCrossfadeEnabled:
           prefs.getBool(PrefsKeys.bpmSyncCrossfadeEnabled) ?? false,
+      automixEnabled: prefs.getBool(PrefsKeys.automixEnabled) ?? false,
     );
   }
 
@@ -1028,6 +1035,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           loadedState = loadedState.copyWith(
               bpmSyncCrossfadeEnabled: previous.bpmSyncCrossfadeEnabled);
         }
+        if (reconciledDirty.contains('automixEnabled')) {
+          loadedState = loadedState.copyWith(
+              automixEnabled: previous.automixEnabled);
+        }
         if (reconciledDirty.contains('limiterEnabled')) {
           loadedState =
               loadedState.copyWith(limiterEnabled: previous.limiterEnabled);
@@ -1276,6 +1287,21 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     safeEmit(state.copyWith(waveformSeekBarEnabled: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyWaveformSeekBar, value);
+  }
+
+  Future<void> toggleCanvasEnabled([bool? enabled]) async {
+    final next = enabled ?? !state.canvasEnabled;
+    markDirty('canvasEnabled');
+    safeEmit(state.copyWith(canvasEnabled: next));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyCanvasEnabled, next);
+  }
+
+  Future<void> setCanvasAsBackdrop(bool asBackdrop) async {
+    markDirty('canvasAsBackdrop');
+    safeEmit(state.copyWith(canvasAsBackdrop: asBackdrop));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyCanvasAsBackdrop, asBackdrop);
   }
 
   /// Switches between the curated Normal experience and the full Professional

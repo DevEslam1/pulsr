@@ -5,6 +5,8 @@ import 'package:clock/clock.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mutex/mutex.dart';
 import '../../core/utils/error_logger.dart';
+import 'automix/automix_transition_planner.dart';
+import 'automix/bpm_detector.dart';
 
 /// Supported crossfade curves.
 enum CrossfadeCurve {
@@ -53,6 +55,17 @@ class CrossfadeManager {
   /// incoming track, the configured duration is aligned to the nearest
   /// 2/4/8/16/32 beats via [calculateBpmAlignedDuration].
   bool bpmSyncEnabled = false;
+
+  /// Automix / Smart Transitions toggle.
+  /// When true, enables confidence-aware DJ beatmatching, tempo stretching,
+  /// cue alignment, and beat-aligned bass handover.
+  bool automixEnabled = false;
+
+  /// Dedicated BPM detector & track analysis cache.
+  late final BpmDetector bpmDetector = BpmDetector();
+
+  /// Current in-flight or calculated transition plan for Automix.
+  TransitionPlan? activeTransitionPlan;
 
   /// Per-track BPM overrides (track id -> bpm). BPM sources: tag metadata or
   /// manual entry; tracks without an override fall back to the base duration.
@@ -505,7 +518,9 @@ class CrossfadeManager {
     required Duration duration,
     required int fadeId,
     bool isRepeatOne = false,
+    TransitionPlan? transitionPlan,
   }) async {
+    activeTransitionPlan = transitionPlan;
     if (duration == Duration.zero) {
       await active.setVolume(0.0);
       await inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
@@ -642,12 +657,6 @@ class CrossfadeManager {
   /// Whether a native hardware/sink gain curve is currently armed on the outgoing player.
   bool get isNativeCurveArmedOnOutgoing => _nativeCurveArmedOnOutgoing;
 
-  bool _nativeCurveArmedOnIncoming = false;
-  AudioPlayer? _incomingWithArmedCurve;
-
-  /// Whether a native hardware/sink gain curve is currently armed on the incoming player.
-  bool get isNativeCurveArmedOnIncoming => _nativeCurveArmedOnIncoming;
-
   /// Cancels any active crossfade safely and resets player states.
   Future<void> cancel(
     AudioPlayer inactivePlayer,
@@ -664,12 +673,7 @@ class CrossfadeManager {
       _clearNativeCurve(_outgoingWithArmedCurve!);
       _outgoingWithArmedCurve = null;
     }
-    if (_incomingWithArmedCurve != null) {
-      _clearNativeCurve(_incomingWithArmedCurve!);
-      _incomingWithArmedCurve = null;
-    }
     _nativeCurveArmedOnOutgoing = false;
-    _nativeCurveArmedOnIncoming = false;
 
     final hadActiveFade = isCrossfading ||
         _activeTimers.isNotEmpty ||
@@ -692,6 +696,7 @@ class CrossfadeManager {
     _completeActiveFades();
     isCrossfading = false; // Set BEFORE stopping players
     pendingIndex = null;
+    activeTransitionPlan = null;
 
     try {
       await inactivePlayer.stop();
@@ -744,6 +749,7 @@ class CrossfadeManager {
   void finishCrossfade() {
     isCrossfading = false;
     pendingIndex = null;
+    activeTransitionPlan = null;
     // FIX-B04: Guard against completing an already completed crossfade completer
     if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
       _crossfadeCompleter!.complete();
@@ -760,11 +766,6 @@ class CrossfadeManager {
       _outgoingWithArmedCurve = null;
       _nativeCurveArmedOnOutgoing = false;
     }
-    if (_incomingWithArmedCurve != null) {
-      _clearNativeCurve(_incomingWithArmedCurve!);
-      _incomingWithArmedCurve = null;
-      _nativeCurveArmedOnIncoming = false;
-    }
     for (final t in _activeTimers) {
       t.cancel();
     }
@@ -772,6 +773,7 @@ class CrossfadeManager {
     _completeActiveFades();
     isCrossfading = false;
     pendingIndex = null;
+    activeTransitionPlan = null;
     // FIX-B04: Guard against completing an already completed crossfade completer
     if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
       _crossfadeCompleter!.complete();

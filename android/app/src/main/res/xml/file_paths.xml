@@ -11,4 +11,12 @@
     <external-cache-path
         name="widget_external_artwork"
         path="widget_artwork/" />
+
+    <cache-path
+        name="updates"
+        path="updates/" />
+
+    <external-cache-path
+        name="updates_external"
+        path="updates/" />
 </paths>

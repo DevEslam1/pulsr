@@ -14,6 +14,19 @@ part 'player_state.freezed.dart';
 
 enum PlayerRepeatMode { off, all, one }
 
+/// Queue tier for tiered queueing and shuffle:
+/// - context: tracks from the ambient context (album, playlist, artist, library)
+/// - userQueue: manually queued tracks ("Play Next", "Add to Queue")
+/// - autoplay: auto-fetched endless recommendation tracks
+enum QueueTier { context, userQueue, autoplay }
+
+final Expando<bool> _songAutoplayExpando = Expando<bool>('songAutoplayExpando');
+
+extension SongAutoplayExtension on SongsTableData {
+  bool get isAutoplay => _songAutoplayExpando[this] ?? false;
+  set isAutoplay(bool value) => _songAutoplayExpando[this] = value;
+}
+
 /// Focused slice owning playback transport, track identities, positions, and options.
 @freezed
 abstract class PlaybackSlice with _$PlaybackSlice {
@@ -89,14 +102,19 @@ abstract class QueueSlice with _$QueueSlice {
     @Default(0) int activeQueueSlot,
     @Default([]) List<ChapterInfo> cueChapters,
     @Default(0) int currentCueIndex,
+    @Default([]) List<SongsTableData> queueHistory,
+    @Default(true) bool isAutoplayEnabled,
+    @Default({}) Map<int, QueueTier> trackTiers,
   }) = _QueueSlice;
 
   bool differs(QueueSlice other) {
     return currentIndex != other.currentIndex ||
         activeQueueSlot != other.activeQueueSlot ||
         currentCueIndex != other.currentCueIndex ||
+        isAutoplayEnabled != other.isAutoplayEnabled ||
         listContentDiffers(queue, other.queue) ||
-        listContentDiffers(cueChapters, other.cueChapters);
+        listContentDiffers(cueChapters, other.cueChapters) ||
+        listContentDiffers(queueHistory, other.queueHistory);
   }
 }
 
@@ -307,6 +325,9 @@ abstract class PlayerState with _$PlayerState {
   int get activeQueueSlot => queueSlice.activeQueueSlot;
   List<ChapterInfo> get cueChapters => queueSlice.cueChapters;
   int get currentCueIndex => queueSlice.currentCueIndex;
+  List<SongsTableData> get queueHistory => queueSlice.queueHistory;
+  bool get isAutoplayEnabled => queueSlice.isAutoplayEnabled;
+  Map<int, QueueTier> get trackTiers => queueSlice.trackTiers;
 
   // ──────────────────────────────────────────────
   // Forwarded Lyrics Getters

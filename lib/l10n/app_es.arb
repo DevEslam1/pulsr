@@ -3640,6 +3640,8 @@
   "settingsThemeRetroCassetteDesc": "Cinta de casete vintage con carretes giratorios y contador",
   "settingsThemeVinylCircle": "Círculo de vinilo (girando)",
   "settingsThemeVinylCircleDesc": "Portada circular centrada con animación de giro continuo",
+  "settingsThemeCdTurntable": "Tocadiscos CD",
+  "settingsThemeCdTurntableDesc": "CD iridiscente giratorio con carátula central y aguja animada",
   "settingsThemeVinylTurntable": "Estudio de tocadiscos",
   "settingsThemeVinylTurntableDesc": "Disco de vinilo real con surcos realistas, etiqueta central y brazo",
   "settingsTurnOffGapless": "Desactivar sin pausas",

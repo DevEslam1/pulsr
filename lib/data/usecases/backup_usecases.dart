@@ -389,6 +389,13 @@ class ImportBackupUseCase {
 
     Map<String, SongsTableData>? lazyParentFilenameMap;
     Map<String, SongsTableData>? lazyUniqueFilenameMap;
+    List<({SongsTableData song, List<String> segments})>? lazySongSegments;
+
+    List<({SongsTableData song, List<String> segments})> getSongSegments() {
+      return lazySongSegments ??= allSongs.map((s) {
+        return (song: s, segments: s.path.replaceAll('\\', '/').split('/'));
+      }).toList();
+    }
 
     SongsTableData? matchPath(String path) {
       // 1. Exact or normalized path match
@@ -408,12 +415,18 @@ class ImportBackupUseCase {
 
       // 3. Parent + Filename fallback (lazy init)
       if (segments.length >= 2) {
-        lazyParentFilenameMap ??= {
-          for (final s in allSongs)
-            if (s.path.replaceAll('\\', '/').split('/').length >= 2)
-              '${s.path.replaceAll('\\', '/').split('/')[s.path.replaceAll('\\', '/').split('/').length - 2].toLowerCase()}/${s.path.replaceAll('\\', '/').split('/').last.toLowerCase()}':
-                  s
-        };
+        if (lazyParentFilenameMap == null) {
+          final map = <String, SongsTableData>{};
+          for (final item in getSongSegments()) {
+            final segs = item.segments;
+            if (segs.length >= 2) {
+              final key =
+                  '${segs[segs.length - 2].toLowerCase()}/${segs.last.toLowerCase()}';
+              map[key] = item.song;
+            }
+          }
+          lazyParentFilenameMap = map;
+        }
         final parentAndFilename =
             '${segments[segments.length - 2]}/${segments.last}';
         final match = lazyParentFilenameMap![parentAndFilename];
@@ -426,12 +439,12 @@ class ImportBackupUseCase {
         if (lazyUniqueFilenameMap == null) {
           final countMap = <String, int>{};
           final nameMap = <String, SongsTableData>{};
-          for (final s in allSongs) {
-            final fName =
-                s.path.replaceAll('\\', '/').split('/').last.toLowerCase();
+          for (final item in getSongSegments()) {
+            final segs = item.segments;
+            final fName = segs.isNotEmpty ? segs.last.toLowerCase() : '';
             if (fName.isNotEmpty) {
               countMap[fName] = (countMap[fName] ?? 0) + 1;
-              nameMap[fName] = s;
+              nameMap[fName] = item.song;
             }
           }
           lazyUniqueFilenameMap = {
