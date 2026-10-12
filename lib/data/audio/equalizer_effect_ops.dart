@@ -171,38 +171,70 @@ extension EqualizerEffectOps on EqualizerManager {
     double? fcut,
     int? mode,
   }) async {
-    // Finite-guard each knob before clamp (clamp alone passes NaN through).
-    if (delayUs != null) {
-      crossfeedDelayUs = DspParamRanges.crossfeedDelayUs.clamp(delayUs);
+    final prevDelay = crossfeedDelayUs;
+    final prevFeed = crossfeedFeedDb;
+    final prevFcut = crossfeedFcut;
+    final prevMode = crossfeedMode;
+    final prevEnabled = isCrossfeedEnabled;
+
+    final targetDelay = delayUs != null
+        ? DspParamRanges.crossfeedDelayUs.clamp(delayUs)
+        : prevDelay;
+    final targetFeed = feedDb != null
+        ? DspParamRanges.crossfeedFeedDb.clamp(feedDb)
+        : prevFeed;
+    final targetFcut = fcut != null
+        ? DspParamRanges.crossfeedFcut.clamp(fcut)
+        : prevFcut;
+    final targetMode = mode != null
+        ? DspParamRanges.crossfeedMode.clamp(mode)
+        : prevMode;
+
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setCrossfeedParams(
+          targetDelay,
+          targetFeed,
+          fcut: targetFcut,
+        );
+        await _effectsChannel.setCrossfeedMode(targetMode);
+        await _effectsChannel.setCrossfeedEnabled(enabled);
+      }
+      crossfeedDelayUs = targetDelay;
+      crossfeedFeedDb = targetFeed;
+      crossfeedFcut = targetFcut;
+      crossfeedMode = targetMode;
+      isCrossfeedEnabled = enabled;
+      _debouncedSavePreferences();
+      _syncPipeline();
+    } catch (e, st) {
+      crossfeedDelayUs = prevDelay;
+      crossfeedFeedDb = prevFeed;
+      crossfeedFcut = prevFcut;
+      crossfeedMode = prevMode;
+      isCrossfeedEnabled = prevEnabled;
+      ErrorLogger.log('Failed to set crossfeed',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+      rethrow;
     }
-    if (feedDb != null) {
-      crossfeedFeedDb = DspParamRanges.crossfeedFeedDb.clamp(feedDb);
-    }
-    if (fcut != null) {
-      crossfeedFcut = DspParamRanges.crossfeedFcut.clamp(fcut);
-    }
-    if (mode != null) crossfeedMode = DspParamRanges.crossfeedMode.clamp(mode);
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setCrossfeedParams(
-        crossfeedDelayUs,
-        crossfeedFeedDb,
-        fcut: crossfeedFcut,
-      );
-      await _effectsChannel.setCrossfeedMode(crossfeedMode);
-      await _effectsChannel.setCrossfeedEnabled(enabled);
-    }
-    isCrossfeedEnabled = enabled;
-    _debouncedSavePreferences();
-    _syncPipeline();
   }
 
   Future<void> setCrossfeedMode(int mode) async {
-    crossfeedMode = DspParamRanges.crossfeedMode.clamp(mode);
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setCrossfeedMode(crossfeedMode);
+    final prevMode = crossfeedMode;
+    final targetMode = DspParamRanges.crossfeedMode.clamp(mode);
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setCrossfeedMode(targetMode);
+      }
+      crossfeedMode = targetMode;
+      _debouncedSavePreferences();
+      _syncPipeline();
+    } catch (e, st) {
+      crossfeedMode = prevMode;
+      ErrorLogger.log('Failed to set crossfeed mode',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+      rethrow;
     }
-    _debouncedSavePreferences();
-    _syncPipeline();
   }
 
   Future<void> setLookaheadLimiter(

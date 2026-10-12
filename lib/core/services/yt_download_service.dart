@@ -987,8 +987,40 @@ class YtDownloadService {
     }
   }
 
-  static const int _concurrentChunks = 4;
-  static const int _minChunkThreshold = 1024 * 1024; // 1 MB
+  static const int _minChunkThreshold = 512 * 1024; // 512 KB min per chunk
+
+  /// Dynamically computes optimal concurrent chunk count adapted to measured
+  /// throughput from [AdaptiveBufferEngine] and total file size.
+  int _computeOptimalChunks(int totalBytes) {
+    if (totalBytes < _minChunkThreshold * 2) return 1;
+
+    double throughputMbps = 10.0;
+    try {
+      if (getIt.isRegistered<AdaptiveBufferEngine>()) {
+        throughputMbps = getIt<AdaptiveBufferEngine>().averageNetworkSpeedMbps;
+      }
+    } catch (_) {}
+
+    // Adapt chunk count to throughput and file size:
+    // Low bandwidth (<2Mbps) uses 2 chunks.
+    // High bandwidth (>=15Mbps) and larger files (>=8MB) scale up to 8 chunks.
+    // Otherwise standard 4 chunks.
+    int targetChunks;
+    if (throughputMbps < 2.0) {
+      targetChunks = 2;
+    } else if (throughputMbps >= 15.0 && totalBytes >= 8 * 1024 * 1024) {
+      targetChunks = 8;
+    } else {
+      targetChunks = 4;
+    }
+
+    // Ensure each chunk meets the minimum chunk size threshold
+    while (targetChunks > 1 && (totalBytes / targetChunks) < _minChunkThreshold) {
+      targetChunks ~/= 2;
+    }
+
+    return targetChunks.clamp(1, 8);
+  }
 
   Future<void> _downloadFileResilient(
     String url,
@@ -1069,7 +1101,8 @@ class YtDownloadService {
     }
 
     final stopwatch = Stopwatch()..start();
-    final chunkSize = (total / _concurrentChunks).ceil();
+    final concurrentChunks = _computeOptimalChunks(total);
+    final chunkSize = (total / concurrentChunks).ceil();
     final tempParts = <File>[];
     final dir = dest.parent;
     final stamp = File('${dest.path}.parts');
@@ -1080,7 +1113,7 @@ class YtDownloadService {
     // the first attempt got m4a) carries different bytes at the same offsets.
     // Without this stamp, resuming across that switch would merge two formats
     // into one file and the size check would happily pass.
-    final expectedStamp = '$total|${uri.toString().hashCode}';
+    final expectedStamp = '$total|${uri.toString().hashCode}|$concurrentChunks';
     var resumable = false;
     try {
       if (await stamp.exists()) {
@@ -1096,7 +1129,7 @@ class YtDownloadService {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }
 
-    final chunkReceived = List<int>.filled(_concurrentChunks, 0);
+    final chunkReceived = List<int>.filled(concurrentChunks, 0);
     var lastEmitTime = 0;
     var mergeCompleted = false;
     var keepParts = false;
@@ -1120,10 +1153,10 @@ class YtDownloadService {
 
         final futures = <Future<void>>[];
 
-        for (var i = 0; i < _concurrentChunks; i++) {
+        for (var i = 0; i < concurrentChunks; i++) {
           final chunkIndex = i;
           final start = i * chunkSize;
-          final end = (i == _concurrentChunks - 1)
+          final end = (i == concurrentChunks - 1)
               ? total - 1
               : (start + chunkSize - 1);
           if (start >= total) break;

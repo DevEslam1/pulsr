@@ -32,6 +32,9 @@ class AppDatabase extends _$AppDatabase {
   /// statically; the per-instance repair budget below is tracked separately.
   static bool ftsRebuildFailed = false;
 
+  /// Whether the runtime SQLite engine supports the FTS5 trigram tokenizer (SQLite >= 3.34).
+  static bool ftsTrigramSupported = true;
+
   /// True when the v11 constraint migration failed and was rolled back.
   /// Deliberately distinct from [ftsRebuildFailed] so a constraint failure is
   /// not misreported as an FTS rebuild failure (defect 08-04 / 05-01).
@@ -91,6 +94,14 @@ class AppDatabase extends _$AppDatabase {
         await _createFtsTable(customStatement);
         await customStatement(
             "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
+        if (ftsTrigramSupported) {
+          try {
+            await customStatement(
+                "INSERT INTO songs_fts_trigram(songs_fts_trigram) VALUES('rebuild');");
+          } catch (_) {
+            ftsTrigramSupported = false;
+          }
+        }
         ftsRebuildFailed = false;
         _ftsRepairAttempts = 0;
         // The rebuild bypasses drift's update tracking, so active watchers
@@ -134,6 +145,25 @@ class AppDatabase extends _$AppDatabase {
         "CREATE TRIGGER IF NOT EXISTS songs_fts_delete AFTER DELETE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); END;");
     await executeSql(
         "CREATE TRIGGER IF NOT EXISTS songs_fts_update AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
+
+    await _createTrigramFtsTable(executeSql);
+  }
+
+  static Future<void> _createTrigramFtsTable(
+      Future<void> Function(String) executeSql) async {
+    try {
+      await executeSql(
+          "CREATE VIRTUAL TABLE IF NOT EXISTS songs_fts_trigram USING fts5(title, artist, album, content='songs', content_rowid='id', tokenize='trigram');");
+      await executeSql(
+          "CREATE TRIGGER IF NOT EXISTS songs_fts_trigram_insert AFTER INSERT ON songs BEGIN INSERT INTO songs_fts_trigram(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
+      await executeSql(
+          "CREATE TRIGGER IF NOT EXISTS songs_fts_trigram_delete AFTER DELETE ON songs BEGIN INSERT INTO songs_fts_trigram(songs_fts_trigram, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); END;");
+      await executeSql(
+          "CREATE TRIGGER IF NOT EXISTS songs_fts_trigram_update AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts_trigram(songs_fts_trigram, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); INSERT INTO songs_fts_trigram(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
+      ftsTrigramSupported = true;
+    } catch (e) {
+      ftsTrigramSupported = false;
+    }
   }
 
   static Future<void> _createIndexes(

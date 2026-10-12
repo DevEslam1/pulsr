@@ -21,6 +21,9 @@ class SongRatingStore {
   /// Returns rating 0..5 for [trackKey] (defaults to 0 / unrated).
   int getRating(String trackKey) => _ratings[trackKey] ?? 0;
 
+  /// Returns a snapshot of all ratings (trackKey -> star rating).
+  Map<String, int> snapshotRatings() => Map<String, int>.unmodifiable(_ratings);
+
   /// Sets star rating (0 to 5) for [trackKey]. Setting 0 removes rating.
   Future<void> setRating(String trackKey, int rating) async {
     // Wait for the initial load before mutating/persisting: a write that lands

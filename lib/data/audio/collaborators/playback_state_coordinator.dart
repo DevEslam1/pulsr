@@ -9,6 +9,8 @@ import '../../../core/utils/error_logger.dart';
 /// and AudioService PlaybackState updates.
 class PlaybackStateCoordinator {
   final Future<void> Function() onSavePositionRequested;
+  final Duration saveInterval;
+  final int minDeltaMs;
 
   final BehaviorSubject<Duration> _positionSubject =
       BehaviorSubject.seeded(Duration.zero);
@@ -20,7 +22,7 @@ class PlaybackStateCoordinator {
 
   bool _positionDirty = false;
   /// Guards against overlapping persist calls: a slow save (longer than the
-  /// 2s periodic tick, or a manual [triggerSaveIfDirty]) must not start a
+  /// periodic tick, or a manual [triggerSaveIfDirty]) must not start a
   /// second write while the first is still in flight.
   bool _saveInFlight = false;
   Timer? _saveTimer;
@@ -43,14 +45,19 @@ class PlaybackStateCoordinator {
 
   PlaybackStateCoordinator({
     required this.onSavePositionRequested,
+    this.saveInterval = const Duration(seconds: 5),
+    this.minDeltaMs = 500,
   }) {
     _initSaveTimer();
   }
 
   void _initSaveTimer() {
     _saveTimer?.cancel();
-    _saveTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    _saveTimer = Timer.periodic(saveInterval, (_) {
       if (_disposed) return;
+      // Skip periodic write if position delta since last save is under the threshold (I4)
+      final delta = (_lastEmittedPosition - _lastSavedPosition).inMilliseconds.abs();
+      if (delta < minDeltaMs) return;
       _executeSave();
     });
   }

@@ -194,14 +194,12 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     unawaited(_effectController.close().catchError((e, s) {
       ErrorLogger.log('PulsrCubit effect controller close failed',
           error: e, stackTrace: s, category: 'PulsrCubit');
-      addError(e, s);
     }));
     final subsDisposeFuture = _subs.dispose();
     if (subsDisposeFuture != null) {
       unawaited(subsDisposeFuture.catchError((e, s) {
         ErrorLogger.log('PulsrCubit composite dispose failed',
             error: e, stackTrace: s, category: 'PulsrCubit');
-        addError(e, s);
       }));
     }
     // FIX-I01: await super.close() properly so callers awaiting close() have super.close completed

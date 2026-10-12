@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:io';
 import 'package:just_audio/just_audio.dart';
+import 'package:pulsr/core/services/battery_optimization_service.dart';
 import 'package:pulsr/core/utils/error_logger.dart';
 
 /// Item stored in preloaded stream head cache.
@@ -27,10 +28,25 @@ class AudioMemoryManager {
   /// head cache cannot serve indefinitely-old data.
   static const Duration headEntryTtl = Duration(minutes: 5);
 
-  /// Adapts the preload budget using a CPU-core heuristic (16–32MB). Core
-  /// count is only a rough proxy for device class, not a RAM measurement.
-  static void adaptBudgetToSystemRam() {
+  /// Adapts the preload budget from actual system physical RAM tiers
+  /// (<=4GB -> 16MB, <=8GB -> 24MB, >8GB -> 32MB) with fallback to core count.
+  static Future<void> adaptBudgetToSystemRam() async {
+    try {
+      final totalRam = await BatteryOptimizationService.getTotalRamBytes();
+      if (totalRam != null && totalRam > 0) {
+        maxPreloadBudgetBytes = budgetFromRamBytes(totalRam);
+        return;
+      }
+    } catch (_) {}
     maxPreloadBudgetBytes = computeAdaptiveBudget();
+  }
+
+  /// Sizes preload budget from total RAM bytes.
+  static int budgetFromRamBytes(int ramBytes) {
+    final ramGb = ramBytes / (1024 * 1024 * 1024);
+    if (ramGb <= 4.0) return 16 * 1024 * 1024; // 16MB for <= 4GB
+    if (ramGb <= 8.0) return 24 * 1024 * 1024; // 24MB for <= 8GB
+    return 32 * 1024 * 1024; // 32MB for > 8GB
   }
 
   static int computeAdaptiveBudget() {

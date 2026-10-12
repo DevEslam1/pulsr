@@ -51,9 +51,13 @@ class MusicRepository implements IMusicRepository {
             (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-        final ftsQuery = _toFtsQuery(searchQuery);
+        final trimmed = searchQuery.trim();
+        final useTrigram = shouldUseTrigram(trimmed);
+        final ftsQuery = useTrigram
+            ? toTrigramFtsQuery(trimmed)
+            : _toFtsQuery(trimmed);
+
         if (ftsQuery != null && !AppDatabase.ftsRebuildFailed) {
-          // 10/10 path: FTS5 index instead of full-table LIKE scan.
           return _watchSongsFts(
             ftsQuery: ftsQuery,
             sortBy: sortBy,
@@ -61,16 +65,29 @@ class MusicRepository implements IMusicRepository {
             limit: limit ?? 200,
             offset: offset,
             excludedFolders: excludedFolders,
+            useTrigram: useTrigram,
           );
         }
-        // Fallback when FTS tokenization yields no tokens: use indexed prefix search when possible
-        final trimmed = searchQuery.trim();
+
+        // Fallback when FTS tokenization yields no tokens or FTS failed:
+        // Bound the scan (limit to 200 max unless caller provided explicit bound).
         final escaped = _likeEscape(trimmed);
-        final containsPattern = '%$escaped%';
-        query.where((t) =>
-            t.title.like(containsPattern, escapeChar: r'\') |
-            t.artist.like(containsPattern, escapeChar: r'\') |
-            t.album.like(containsPattern, escapeChar: r'\'));
+        if (trimmed.length >= 3) {
+          final prefixPattern = '$escaped%';
+          final containsPattern = '%$escaped%';
+          // Prefer prefix search on title (index-friendly idx_songs_title), falling back to contains
+          query.where((t) =>
+              t.title.like(prefixPattern, escapeChar: r'\') |
+              t.title.like(containsPattern, escapeChar: r'\') |
+              t.artist.like(containsPattern, escapeChar: r'\') |
+              t.album.like(containsPattern, escapeChar: r'\'));
+        } else {
+          final containsPattern = '%$escaped%';
+          query.where((t) =>
+              t.title.like(containsPattern, escapeChar: r'\') |
+              t.artist.like(containsPattern, escapeChar: r'\') |
+              t.album.like(containsPattern, escapeChar: r'\'));
+        }
       }
 
       if (excludedFolders.isNotEmpty) {
@@ -195,6 +212,26 @@ class MusicRepository implements IMusicRepository {
 
   String? _toFtsQuery(String input) => toFtsQuery(input);
 
+  /// Detects if a query contains CJK characters or is a short substring query
+  /// that benefits from the trigram index rather than unicode61 prefix matching.
+  static bool shouldUseTrigram(String query) {
+    if (!AppDatabase.ftsTrigramSupported) return false;
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return false;
+    // Check for CJK Ideographs / Hiragana / Katakana / Hangul
+    final hasCjk = RegExp(r'[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]').hasMatch(trimmed);
+    if (hasCjk) return true;
+    // Or short query (<= 3 chars) or substring search with spaces/fragments
+    return trimmed.length <= 3;
+  }
+
+  /// Formats query for FTS5 trigram virtual table.
+  static String? toTrigramFtsQuery(String input) {
+    final clean = input.replaceAll('"', '""').trim();
+    if (clean.isEmpty) return null;
+    return '"$clean"';
+  }
+
   Stream<Result<List<SongsTableData>>> _watchSongsFts({
     required String ftsQuery,
     required String sortBy,
@@ -202,8 +239,12 @@ class MusicRepository implements IMusicRepository {
     required int limit,
     int? offset,
     List<String> excludedFolders = const [],
+    bool useTrigram = false,
   }) {
     try {
+      final ftsTable = (useTrigram && AppDatabase.ftsTrigramSupported)
+          ? 'songs_fts_trigram'
+          : 'songs_fts';
       // Text sorts are NOCASE so Arabic/diacritic titles order like the
       // indexed watchAllSongs path; numeric sorts stay binary.
       final orderCol = switch (sortBy) {
@@ -221,8 +262,8 @@ class MusicRepository implements IMusicRepository {
       final dir = ascending ? 'ASC' : 'DESC';
       final buffer = StringBuffer(
         'SELECT s.* FROM songs s '
-        'JOIN songs_fts f ON s.id = f.rowid '
-        'WHERE songs_fts MATCH ? AND s.is_missing = 0 '
+        'JOIN $ftsTable f ON s.id = f.rowid '
+        'WHERE $ftsTable MATCH ? AND s.is_missing = 0 '
         'AND s.source = ? '
         "AND s.path NOT LIKE 'ytmusic://%' "
         'AND (s.cue_file IS NULL OR s.cue_start_ms IS NOT NULL) ',
@@ -1627,9 +1668,13 @@ class MusicRepository implements IMusicRepository {
   @visibleForTesting
   static int embeddedCueProbeCount = 0;
 
+  /// Cache of container path -> cue content hash to skip re-parsing unchanged cue sheets.
+  static final Map<String, int> _cueContentHashCache = {};
+
   @visibleForTesting
   static void resetEmbeddedCueProbeState() {
     _embeddedCueMisses.clear();
+    _cueContentHashCache.clear();
     embeddedCueProbeCount = 0;
   }
 
@@ -1718,24 +1763,52 @@ class MusicRepository implements IMusicRepository {
       for (final container in containers) {
         final cuePath = _siblingCuePath(container.path);
         String? effectiveCuePath;
+        String? rawCueContent;
         List<ChapterInfo> chapters = const [];
 
         if (cuePath.isNotEmpty && await File(cuePath).exists()) {
-          chapters = await CueParser.findAndParseCue(container.path);
-          effectiveCuePath = cuePath;
+          try {
+            rawCueContent = await File(cuePath).readAsString();
+            effectiveCuePath = cuePath;
+          } catch (_) {}
         } else if (!_embeddedCueMisses.contains(container.path)) {
           embeddedCueProbeCount++;
           final embedded =
               await CueParser.extractEmbeddedCueSheet(container.path);
           if (embedded != null && embedded.isNotEmpty) {
-            chapters = CueParser.parse(embedded);
+            rawCueContent = embedded;
             effectiveCuePath = 'embedded://${container.path}';
           } else {
             _rememberEmbeddedCueMiss(container.path);
           }
         }
 
-        if (chapters.isEmpty || effectiveCuePath == null) continue;
+        if (rawCueContent == null || rawCueContent.isEmpty || effectiveCuePath == null) {
+          _cueContentHashCache.remove(container.path);
+          continue;
+        }
+
+        final contentHash = rawCueContent.hashCode;
+        final cachedHash = _cueContentHashCache[container.path];
+        // If the cue sheet content hasn't changed, reuse existing virtual tracks without re-parsing
+        if (cachedHash != null && cachedHash == contentHash) {
+          final existingVirtual = await (_db.select(_db.songsTable)
+                ..where((t) =>
+                    t.path.equals(container.path) & t.cueStartMs.isNotNull()))
+              .get();
+          if (existingVirtual.isNotEmpty) {
+            newIdsByPath[container.path] =
+                existingVirtual.map((v) => v.id).toList();
+            coverByContainerId[container.id] = effectiveCuePath;
+            coveredPaths.add(container.path);
+            expanded += existingVirtual.length;
+            continue;
+          }
+        }
+
+        chapters = CueParser.parse(rawCueContent);
+
+        if (chapters.isEmpty) continue;
         // Only whole-file album sheets are expanded. Multi-file sheets map
         // chapters onto several source files; expanding the wrong window on
         // this one file would fabricate playback, so skip them.
@@ -1761,6 +1834,7 @@ class MusicRepository implements IMusicRepository {
           cuePath: effectiveCuePath,
         );
         if (virtual.isEmpty) continue;
+        _cueContentHashCache[container.path] = contentHash;
         companions.addAll(virtual);
         newIdsByPath[container.path] = virtual.map((c) => c.id.value).toList();
         coverByContainerId[container.id] = effectiveCuePath;
@@ -2507,6 +2581,41 @@ class MusicRepository implements IMusicRepository {
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to update song tags', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> updateAudioQualityBatch(
+      List<({int songId, String path, int? sampleRate, int? bitDepth, int? bitrateKbps, String? codec, double? loudnessRange})> updates) async {
+    if (updates.isEmpty) return const Right(null);
+    try {
+      await _db.batch((batch) {
+        for (final u in updates) {
+          final companion = SongsTableCompanion(
+            sampleRate: Value(u.sampleRate),
+            bitDepth: Value(u.bitDepth),
+            bitrateKbps: Value(u.bitrateKbps),
+            codec: Value(u.codec),
+            loudnessRange: Value(u.loudnessRange),
+          );
+          if (u.path.isNotEmpty) {
+            batch.update(
+              _db.songsTable,
+              companion,
+              where: (t) => t.path.equals(u.path),
+            );
+          } else {
+            batch.update(
+              _db.songsTable,
+              companion,
+              where: (t) => t.id.equals(u.songId),
+            );
+          }
+        }
+      });
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to batch update audio quality', e));
     }
   }
 

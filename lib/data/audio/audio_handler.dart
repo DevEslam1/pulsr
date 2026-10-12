@@ -1478,6 +1478,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  int? _lastPersistedSongId;
+  int _lastPersistedPositionMs = 0;
+
   Future<void> _writePositionSnapshot() async {
     final hasPosition = _songs.isNotEmpty &&
         _currentIndex >= 0 &&
@@ -1493,6 +1496,21 @@ class PulsrAudioHandler extends BaseAudioHandler
     final posMs = isIdleWithPending
         ? _pendingLazyPosition!.inMilliseconds
         : _activePlayer.position.inMilliseconds;
+
+    // B5: Guard against writing positionMs < lastPersisted for the same songId
+    // unless actively seeking or at track restart (posMs == 0 with idle/buffering restart).
+    if (_lastPersistedSongId == currentSong.id &&
+        posMs < _lastPersistedPositionMs &&
+        posMs == 0 &&
+        _activePlayer.processingState == ProcessingState.idle) {
+      // Player stopped and reset to 0 — skip overwriting the good resume point
+      _positionDirty = false;
+      return;
+    }
+
+    _lastPersistedSongId = currentSong.id;
+    _lastPersistedPositionMs = posMs;
+
     try {
       await PositionCrashGuard.writeSnapshot(
         songId: currentSong.id,
@@ -1769,13 +1787,17 @@ class PulsrAudioHandler extends BaseAudioHandler
     // Quality step-down decisions are consolidated under AdaptiveQualityManager
     // (via PlaybackAnalytics -> _maybeAdaptiveStepDown) to avoid duplicate drops or thrashing.
 
+    // Event-driven battery state change listener (I2)
     _subscriptions.add(
-      // Battery-aware playback only needs the level while audio is actually
-      // playing. Skip the native platform round-trip when paused/idle, and widen
-      // the tick from 45s to 120s, so this subscription stops waking the CPU and
-      // querying the OS every 45s forever while the app is idle/backgrounded.
-      // The subscription stays registered in _subscriptions, so it is still
-      // cancelled on dispose exactly as before.
+      BatteryOptimizationService.onBatteryChanged.listen((level) {
+        if (!_disposed) {
+          _batteryAwarePlayback.onBatteryLevelChanged(level);
+        }
+      }),
+    );
+
+    _subscriptions.add(
+      // Low-frequency fallback poll only while playing if platform events are delayed
       Stream.periodic(const Duration(seconds: 120)).listen((_) async {
         if (_disposed || !_activePlayer.playing) return;
         try {
@@ -1784,13 +1806,12 @@ class PulsrAudioHandler extends BaseAudioHandler
             _batteryAwarePlayback.onBatteryLevelChanged(level);
           }
         } catch (_) {
-          // Best-effort telemetry; a platform hiccup must not become an
-          // uncaught async error every two minutes.
+          // Best-effort telemetry; platform hiccups must not throw
         }
       }),
     );
     BatteryOptimizationService.getBatteryLevel().then((level) {
-      if (level != null) {
+      if (level != null && !_disposed) {
         _batteryAwarePlayback.onBatteryLevelChanged(level);
       }
     }).catchError((_) {});
@@ -2761,9 +2782,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _sleepFadeFactor = 1.0;
     _interruption.reset();
     _pausedForNoisy = false;
-    // Persist the REAL position before the players are stopped. Previously this
-    // only set a dirty flag; the 2s timer then ran after stop() had reset the
-    // player to 0 and overwrote the saved resume position with 0:00.
+    // Cancel the periodic save timer BEFORE saving and stopping players,
+    // ensuring no trailing ticks run while players report 0.
+    _positionSaveTimer?.cancel();
+    _positionSaveTimer = null;
+    // Persist the REAL position before the players are stopped.
     try {
       await saveCurrentPositionImmediate();
     } catch (_) {}

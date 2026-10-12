@@ -1,4 +1,4 @@
-// lib/core/services/battery_optimization_service.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -41,11 +41,36 @@ class BatteryOptimizationService {
     }
   }
 
+  static final StreamController<int> _batteryController =
+      StreamController<int>.broadcast();
+
+  /// Event-driven stream of battery level percentage updates (0..100).
+  static Stream<int> get onBatteryChanged => _batteryController.stream;
+
+  /// Pushes a battery level reading to active listeners.
+  static void notifyBatteryChanged(int level) {
+    if (!_batteryController.isClosed) {
+      _batteryController.add(level.clamp(0, 100));
+    }
+  }
+
   static Future<int?> getBatteryLevel() async {
     if (kIsWeb || !Platform.isAndroid) return null;
     try {
       final level = await _channel.invokeMethod<int>('getBatteryLevel');
+      if (level != null) notifyBatteryChanged(level);
       return level;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Queries total device physical RAM in bytes via platform channel.
+  static Future<int?> getTotalRamBytes() async {
+    if (kIsWeb || !Platform.isAndroid) return null;
+    try {
+      final ram = await _channel.invokeMethod<int>('getTotalRamBytes');
+      return ram;
     } catch (_) {
       return null;
     }

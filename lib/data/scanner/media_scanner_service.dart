@@ -88,6 +88,14 @@ class MediaScannerService {
   int? get lastScanEpochSec => _lastScanEpochSec;
   bool _isEnrichingQuality = false;
   bool _isScanning = false;
+  bool _cancelScanRequested = false;
+
+  /// Cancels an in-flight scan safely. What has already been processed will be committed.
+  void cancelScan() {
+    if (_isScanning) {
+      _cancelScanRequested = true;
+    }
+  }
 
   /// True when a resume-triggered delta scan is worthwhile (default: 15 min
   /// since last successful scan). Used by app-resume hooks to avoid a full
@@ -283,6 +291,7 @@ class MediaScannerService {
     int minSizeKb = 0,
     bool autoHideSystemMedia = true,
     bool incremental = false,
+    Duration wallClockBudget = const Duration(minutes: 5),
   }) async {
     if (_isScanning) {
       ErrorLogger.log('scanDeviceLibrary ignored: a scan is already running',
@@ -290,6 +299,8 @@ class MediaScannerService {
       return 0;
     }
     _isScanning = true;
+    _cancelScanRequested = false;
+    final stopwatch = Stopwatch()..start();
     // Persist the scan-START epoch: a file modified between the MediaStore
     // query and completion has modSec >= this value, so the next incremental
     // scan re-examines it instead of skipping it forever.
@@ -408,6 +419,11 @@ class MediaScannerService {
       // lets the UI paint the intermediate ticks instead of only the last one
       // before the opaque isolate parse starts.
       for (int i = 0; i < songsToProcess.length; i += 30) {
+        if (_cancelScanRequested || stopwatch.elapsed >= wallClockBudget) {
+          // Bounded scan / cancelled: truncate remaining songsToProcess to what we have previewed so far
+          songsToProcess = songsToProcess.take(i > 0 ? i : 30).toList();
+          break;
+        }
         final song = songsToProcess[i];
         final frac = 0.25 +
             (i / (songsToProcess.isEmpty ? 1 : songsToProcess.length)) * 0.45;
@@ -607,26 +623,75 @@ class MediaScannerService {
 
   /// Schedules a background pass to enrich audio quality metadata (sample rate,
   /// bit depth, bitrate, codec, loudness range) for local songs that do not
-  /// yet have codec information.
+  /// yet have codec information. Batched and committed in single transactions (I6).
   @visibleForTesting
   void scheduleAudioQualityEnrichment() {
     if (!Platform.isAndroid || _isEnrichingQuality) return;
     _isEnrichingQuality = true;
     unawaited(() async {
+      const channel = MethodChannel(PulsrChannels.tagEditor);
       try {
         final res = await _repository.getAllSongs();
         final songs = res.fold((_) => <SongsTableData>[], (s) => s);
-        for (final song in songs) {
-          if (_progressController.isClosed) break;
-          if (song.codec != null && song.codec!.isNotEmpty) continue;
+        final pendingSongs = songs.where((song) {
+          if (song.codec != null && song.codec!.isNotEmpty) return false;
           if (song.path.isEmpty ||
               song.path.startsWith('http') ||
               song.path.startsWith('ytmusic://')) {
-            continue;
+            return false;
           }
-          await enrichAudioQuality(song.id, song.path);
-          // Yield to event loop to avoid starving UI and playback
-          await Future<void>.delayed(const Duration(milliseconds: 20));
+          return true;
+        }).toList();
+
+        final updates = <({
+          int songId,
+          String path,
+          int? sampleRate,
+          int? bitDepth,
+          int? bitrateKbps,
+          String? codec,
+          double? loudnessRange
+        })>[];
+
+        for (int i = 0; i < pendingSongs.length; i++) {
+          if (_progressController.isClosed) break;
+          final song = pendingSongs[i];
+          try {
+            final Map<dynamic, dynamic>? tags =
+                await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
+              'path': song.path,
+              'includeArtwork': false,
+            });
+            if (tags != null) {
+              final sampleRate = _asInt(tags['sampleRate']);
+              final bitDepth = _asInt(tags['bitsPerSample']);
+              final bitrateKbps = _asInt(tags['bitRate']);
+              final codec = (tags['format'] as String?)?.trim();
+              final lraVal = (tags['loudnessRange'] as num?)?.toDouble();
+
+              updates.add((
+                songId: song.id,
+                path: song.path,
+                sampleRate: sampleRate != null && sampleRate > 0 ? sampleRate : null,
+                bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
+                bitrateKbps: bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
+                codec: (codec != null && codec.isNotEmpty) ? codec : null,
+                loudnessRange: lraVal,
+              ));
+            }
+          } catch (_) {}
+
+          // Flush every 50 songs in a single transaction/batch
+          if (updates.length >= 50) {
+            await _repository.updateAudioQualityBatch(List.of(updates));
+            updates.clear();
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+        }
+
+        if (updates.isNotEmpty) {
+          await _repository.updateAudioQualityBatch(updates);
+          updates.clear();
         }
       } catch (e, st) {
         ErrorLogger.log('Background audio quality enrichment failed',

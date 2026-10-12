@@ -582,6 +582,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   /// matchAll post-step: AND-filter by every prefs-backed rule, then rating
   /// sort and limit.
+  /// matchAll post-step: AND-filter by every prefs-backed rule, then rating
+  /// sort and limit.
   List<SongsTableData> _postProcess(
     List<SongsTableData> songs,
     SmartCriteria criteria,
@@ -590,21 +592,24 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     var list = songs;
     final ratingStore = _ratingStore;
     final audioHandler = _audioHandler;
+    final ratingSnapshot = ratingStore?.snapshotRatings() ?? const <String, int>{};
+    final bpmSnapshot = audioHandler?.bpmOverrideStore.snapshot() ?? const <String, double>{};
+
     if (dartRules.isNotEmpty) {
       list = list
           .where((s) => dartRules.every((r) => _matchesDartRule(
                 s,
                 r,
-                ratingStore: ratingStore,
-                audioHandler: audioHandler,
+                ratingSnapshot: ratingSnapshot,
+                bpmSnapshot: bpmSnapshot,
               )))
           .toList();
     }
     if (criteria.sortBy == 'rating') {
-      list = _sortByRating(
+      list = _sortByRatingSnapshot(
         list,
         ascending: criteria.sortAscending,
-        ratingStore: ratingStore,
+        ratingSnapshot: ratingSnapshot,
       );
     }
     if (criteria.limit != null && criteria.limit! > 0) {
@@ -624,21 +629,24 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   ) {
     final ratingStore = _ratingStore;
     final audioHandler = _audioHandler;
+    final ratingSnapshot = ratingStore?.snapshotRatings() ?? const <String, int>{};
+    final bpmSnapshot = audioHandler?.bpmOverrideStore.snapshot() ?? const <String, double>{};
+
     var list = merged
         .where((s) =>
             baseIds.contains(s.id) ||
             dartRules.any((r) => _matchesDartRule(
                   s,
                   r,
-                  ratingStore: ratingStore,
-                  audioHandler: audioHandler,
+                  ratingSnapshot: ratingSnapshot,
+                  bpmSnapshot: bpmSnapshot,
                 )))
         .toList();
     // The union appends Dart-side matches after the SQL half, so every sort
     // key needs a final Dart pass: 'rating' because it is prefs-backed, the
     // rest because the SQL order no longer covers the whole union.
     if (criteria.sortBy != null) {
-      list = _sortSongs(list, criteria, ratingStore);
+      list = _sortSongsWithSnapshot(list, criteria, ratingSnapshot);
     }
     if (criteria.limit != null && criteria.limit! > 0) {
       list = list.take(criteria.limit!).toList();
@@ -658,9 +666,12 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   /// Evaluates one rating rule (numeric operators + between) in Dart.
+  /// Evaluates one rating rule (numeric operators + between) in Dart using a snapshot.
   bool _matchesRating(SongsTableData song, SmartRule rule,
-      {SongRatingStore? ratingStore}) {
-    final rating = _ratingOf(song, ratingStore);
+      {Map<String, int>? ratingSnapshot}) {
+    final rating = ratingSnapshot != null
+        ? (ratingSnapshot[song.id.toString()] ?? 0)
+        : _ratingOf(song);
     final valStr = rule.value.trim();
     if (rule.operator == SmartOperator.between) {
       final b = _parseIntBetween(valStr);
@@ -690,14 +701,14 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   bool _matchesDartRule(
     SongsTableData song,
     SmartRule rule, {
-    SongRatingStore? ratingStore,
-    PulsrAudioHandler? audioHandler,
+    Map<String, int>? ratingSnapshot,
+    Map<String, double>? bpmSnapshot,
   }) =>
       switch (rule.field) {
         SmartRuleField.rating =>
-          _matchesRating(song, rule, ratingStore: ratingStore),
+          _matchesRating(song, rule, ratingSnapshot: ratingSnapshot),
         SmartRuleField.bpm =>
-          _matchesBpm(song, rule, audioHandler: audioHandler),
+          _matchesBpm(song, rule, bpmSnapshot: bpmSnapshot),
         SmartRuleField.artist => _matchesText(song.artist, rule),
         SmartRuleField.album => _matchesText(song.album, rule),
         SmartRuleField.title => _matchesText(song.title, rule),
@@ -728,8 +739,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   /// Evaluates one BPM rule (numeric operators + between) in Dart.
   bool _matchesBpm(SongsTableData song, SmartRule rule,
-      {PulsrAudioHandler? audioHandler}) {
-    final bpm = _bpmOf(song, audioHandler);
+      {Map<String, double>? bpmSnapshot}) {
+    final bpm = bpmSnapshot != null
+        ? bpmSnapshot[PulsrAudioHandler.trackKeyFor(song)]
+        : _bpmOf(song);
     if (bpm == null) return false;
     final valStr = rule.value.trim();
     if (rule.operator == SmartOperator.between) {
@@ -755,16 +768,13 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     }
   }
 
-  /// Sorts by rating (title tiebreak for stability) with memoized ratings (Issue 22).
-  List<SongsTableData> _sortByRating(
+  /// Sorts by rating using snapshot map.
+  List<SongsTableData> _sortByRatingSnapshot(
     List<SongsTableData> songs, {
     bool ascending = false,
-    SongRatingStore? ratingStore,
+    Map<String, int> ratingSnapshot = const {},
   }) {
-    final store = ratingStore ?? _ratingStore;
-    final ratingMap = <int, int>{};
-    int ratingFor(SongsTableData s) =>
-        ratingMap.putIfAbsent(s.id, () => _ratingOf(s, store));
+    int ratingFor(SongsTableData s) => ratingSnapshot[s.id.toString()] ?? 0;
 
     final sorted = List<SongsTableData>.from(songs);
     sorted.sort((a, b) {
@@ -773,6 +783,23 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       return a.title.toLowerCase().compareTo(b.title.toLowerCase());
     });
     return sorted;
+  }
+
+  List<SongsTableData> _sortSongsWithSnapshot(
+    List<SongsTableData> songs,
+    SmartCriteria criteria,
+    Map<String, int> ratingSnapshot,
+  ) {
+    final sortBy = criteria.sortBy;
+    if (sortBy == null) return songs;
+    if (sortBy == 'rating') {
+      return _sortByRatingSnapshot(
+        songs,
+        ascending: criteria.sortAscending,
+        ratingSnapshot: ratingSnapshot,
+      );
+    }
+    return _sortSongs(songs, criteria, null);
   }
 
   /// Applies [criteria.sortBy]/[criteria.sortAscending] in Dart, used where
@@ -786,10 +813,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     final sortBy = criteria.sortBy;
     if (sortBy == null) return songs;
     if (sortBy == 'rating') {
-      return _sortByRating(
+      return _sortByRatingSnapshot(
         songs,
         ascending: criteria.sortAscending,
-        ratingStore: ratingStore,
+        ratingSnapshot: ratingStore?.snapshotRatings() ?? const {},
       );
     }
     final ascending = criteria.sortAscending;

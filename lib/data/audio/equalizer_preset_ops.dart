@@ -198,30 +198,34 @@ extension EqualizerPresetOps on EqualizerManager {
   }) async {
     final prevString = arbitraryEqString;
     final prevPhase = arbitraryEqLinearPhase;
-    if (eqString != null) arbitraryEqString = eqString;
-    if (linearPhase != null) arbitraryEqLinearPhase = linearPhase;
+    final prevEnabled = isArbitraryEqEnabled;
+
+    final targetString = eqString ?? prevString;
+    final targetPhase = linearPhase ?? prevPhase;
+
     try {
       if (PlatformCapabilities.isAndroid) {
         if ((eqString != null && eqString.isNotEmpty) ||
-            (linearPhase != null && arbitraryEqString.isNotEmpty)) {
+            (linearPhase != null && targetString.isNotEmpty)) {
           final loaded = await _effectsChannel.loadArbitraryEq(
-            eqString: arbitraryEqString,
-            linearPhase: arbitraryEqLinearPhase,
+            eqString: targetString,
+            linearPhase: targetPhase,
           );
           if (!loaded) throw StateError('Arbitrary EQ response was rejected');
         }
         await _effectsChannel.setArbitraryEqEnabled(enabled);
       }
+      arbitraryEqString = targetString;
+      arbitraryEqLinearPhase = targetPhase;
+      isArbitraryEqEnabled = enabled;
+      _debouncedSavePreferences();
+      _syncPipeline();
     } catch (_) {
-      // Don't leave a rejected curve in state; it would be re-sent (and
-      // persisted) on every restore/reattach.
       arbitraryEqString = prevString;
       arbitraryEqLinearPhase = prevPhase;
+      isArbitraryEqEnabled = prevEnabled;
       rethrow;
     }
-    isArbitraryEqEnabled = enabled;
-    _debouncedSavePreferences();
-    _syncPipeline();
   }
 
   Future<void> setLiveProg(
@@ -229,7 +233,9 @@ extension EqualizerPresetOps on EqualizerManager {
     String? code,
   }) async {
     final prevCode = liveProgCode;
-    if (code != null) liveProgCode = code;
+    final prevEnabled = isLiveProgEnabled;
+    final targetCode = code ?? prevCode;
+
     try {
       if (PlatformCapabilities.isAndroid) {
         if (code != null && code.isNotEmpty) {
@@ -238,22 +244,36 @@ extension EqualizerPresetOps on EqualizerManager {
         }
         await _effectsChannel.setLiveProgEnabled(enabled);
       }
+      liveProgCode = targetCode;
+      isLiveProgEnabled = enabled;
+      _debouncedSavePreferences();
+      _syncPipeline();
     } catch (_) {
-      liveProgCode = prevCode; // don't keep code the engine rejected
+      liveProgCode = prevCode;
+      isLiveProgEnabled = prevEnabled;
       rethrow;
     }
-    isLiveProgEnabled = enabled;
-    _debouncedSavePreferences();
-    _syncPipeline();
   }
 
   Future<void> setLiveProgSlider(int sliderIndex, double value) async {
     if (!isValidLiveProgSlider(sliderIndex, value)) return;
-    liveProgSliders[sliderIndex] = value;
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setLiveProgSlider(sliderIndex, value);
+    final prevValue = liveProgSliders[sliderIndex];
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setLiveProgSlider(sliderIndex, value);
+      }
+      liveProgSliders[sliderIndex] = value;
+      _debouncedSavePreferences();
+    } catch (e, st) {
+      if (prevValue != null) {
+        liveProgSliders[sliderIndex] = prevValue;
+      } else {
+        liveProgSliders.remove(sliderIndex);
+      }
+      ErrorLogger.log('Failed to set LiveProg slider',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+      rethrow;
     }
-    _debouncedSavePreferences();
   }
 
   Future<void> setStereoWidth(
@@ -266,48 +286,78 @@ extension EqualizerPresetOps on EqualizerManager {
     double? lowCrossoverHz,
     double? highCrossoverHz,
   }) async {
-    // Central contract + finite guard (bare clamp() lets NaN through to native).
-    if (width != null) stereoWidth = DspParamRanges.stereoWidth.clamp(width);
-    if (multiband != null) stereoWidthMultiband = multiband;
-    if (lowWidth != null) {
-      stereoWidthLow = DspParamRanges.stereoWidthBand.clamp(lowWidth);
-    }
-    if (midWidth != null) {
-      stereoWidthMid = DspParamRanges.stereoWidthBand.clamp(midWidth);
-    }
-    if (highWidth != null) {
-      stereoWidthHigh = DspParamRanges.stereoWidthBand.clamp(highWidth);
-    }
-    if (lowCrossoverHz != null) {
-      stereoWidthLowCrossoverHz =
-          DspParamRanges.stereoWidthLowCrossoverHz.clamp(lowCrossoverHz);
-    }
-    if (highCrossoverHz != null) {
-      stereoWidthHighCrossoverHz =
-          DspParamRanges.stereoWidthHighCrossoverHz.clamp(highCrossoverHz);
-    }
-    if (stereoWidthLowCrossoverHz >= stereoWidthHighCrossoverHz) {
-      stereoWidthHighCrossoverHz =
-          (stereoWidthLowCrossoverHz + 200.0).clamp(1000.0, 10000.0);
-      if (stereoWidthHighCrossoverHz <= stereoWidthLowCrossoverHz) {
-        stereoWidthLowCrossoverHz =
-            (stereoWidthHighCrossoverHz - 200.0).clamp(40.0, 1000.0);
+    final prevWidth = stereoWidth;
+    final prevMultiband = stereoWidthMultiband;
+    final prevLowWidth = stereoWidthLow;
+    final prevMidWidth = stereoWidthMid;
+    final prevHighWidth = stereoWidthHigh;
+    final prevLowCrossoverHz = stereoWidthLowCrossoverHz;
+    final prevHighCrossoverHz = stereoWidthHighCrossoverHz;
+    final prevEnabled = isStereoWidthEnabled;
+
+    final targetWidth =
+        width != null ? DspParamRanges.stereoWidth.clamp(width) : prevWidth;
+    final targetMultiband = multiband ?? prevMultiband;
+    final targetLowWidth = lowWidth != null
+        ? DspParamRanges.stereoWidthBand.clamp(lowWidth)
+        : prevLowWidth;
+    final targetMidWidth = midWidth != null
+        ? DspParamRanges.stereoWidthBand.clamp(midWidth)
+        : prevMidWidth;
+    final targetHighWidth = highWidth != null
+        ? DspParamRanges.stereoWidthBand.clamp(highWidth)
+        : prevHighWidth;
+    var targetLowCrossoverHz = lowCrossoverHz != null
+        ? DspParamRanges.stereoWidthLowCrossoverHz.clamp(lowCrossoverHz)
+        : prevLowCrossoverHz;
+    var targetHighCrossoverHz = highCrossoverHz != null
+        ? DspParamRanges.stereoWidthHighCrossoverHz.clamp(highCrossoverHz)
+        : prevHighCrossoverHz;
+
+    if (targetLowCrossoverHz >= targetHighCrossoverHz) {
+      targetHighCrossoverHz =
+          (targetLowCrossoverHz + 200.0).clamp(1000.0, 10000.0);
+      if (targetHighCrossoverHz <= targetLowCrossoverHz) {
+        targetLowCrossoverHz =
+            (targetHighCrossoverHz - 200.0).clamp(40.0, 1000.0);
       }
     }
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setStereoWidthParams(
-        stereoWidth,
-        multiband: stereoWidthMultiband,
-        lowWidth: stereoWidthLow,
-        midWidth: stereoWidthMid,
-        highWidth: stereoWidthHigh,
-        lowCrossoverHz: stereoWidthLowCrossoverHz,
-        highCrossoverHz: stereoWidthHighCrossoverHz,
-      );
-      await _effectsChannel.setStereoWidthEnabled(enabled);
+
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setStereoWidthParams(
+          targetWidth,
+          multiband: targetMultiband,
+          lowWidth: targetLowWidth,
+          midWidth: targetMidWidth,
+          highWidth: targetHighWidth,
+          lowCrossoverHz: targetLowCrossoverHz,
+          highCrossoverHz: targetHighCrossoverHz,
+        );
+        await _effectsChannel.setStereoWidthEnabled(enabled);
+      }
+      stereoWidth = targetWidth;
+      stereoWidthMultiband = targetMultiband;
+      stereoWidthLow = targetLowWidth;
+      stereoWidthMid = targetMidWidth;
+      stereoWidthHigh = targetHighWidth;
+      stereoWidthLowCrossoverHz = targetLowCrossoverHz;
+      stereoWidthHighCrossoverHz = targetHighCrossoverHz;
+      isStereoWidthEnabled = enabled;
+      _debouncedSavePreferences();
+      _syncPipeline();
+    } catch (e, st) {
+      stereoWidth = prevWidth;
+      stereoWidthMultiband = prevMultiband;
+      stereoWidthLow = prevLowWidth;
+      stereoWidthMid = prevMidWidth;
+      stereoWidthHigh = prevHighWidth;
+      stereoWidthLowCrossoverHz = prevLowCrossoverHz;
+      stereoWidthHighCrossoverHz = prevHighCrossoverHz;
+      isStereoWidthEnabled = prevEnabled;
+      ErrorLogger.log('Failed to set stereo width',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+      rethrow;
     }
-    isStereoWidthEnabled = enabled;
-    _debouncedSavePreferences();
-    _syncPipeline();
   }
 }

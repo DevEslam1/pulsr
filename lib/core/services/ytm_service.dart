@@ -1769,12 +1769,8 @@ class YtmService {
         }
         // Back off before retrying a timeout: a tight loop hammers an
         // already-struggling route/VPN exit and hastens an IP block.
-        await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on MissingPluginException {
-        if (attempt == maxRetries) {
-          throw const YtmException('YTM_UNSUPPORTED');
-        }
-        await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
+        throw const YtmException('YTM_UNSUPPORTED');
       } on SocketException catch (e) {
         // Offline/DNS failure — retry with backoff like YTM_TIMEOUT, surface offline
         if (attempt == maxRetries) {

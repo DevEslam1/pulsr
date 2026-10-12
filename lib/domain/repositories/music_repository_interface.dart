@@ -187,7 +187,10 @@ abstract class IMusicRepository {
   });
 
   /// Persists real audio-header fields (read from the file) so the quality
-  /// badge reflects actual metadata instead of a filename guess.
+  /// Updates audio quality fields in batch.
+  Future<Result<void>> updateAudioQualityBatch(
+      List<({int songId, String path, int? sampleRate, int? bitDepth, int? bitrateKbps, String? codec, double? loudnessRange})> updates);
+
   Future<Result<void>> updateAudioQuality({
     required int songId,
     int? sampleRate,

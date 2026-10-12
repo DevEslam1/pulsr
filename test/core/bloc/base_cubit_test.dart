@@ -204,5 +204,12 @@ void main() {
       await cubit.close();
       expect(cubit.activeResourceCount, 0);
     });
+
+    test('closing cubit whose teardown throws does not throw StateError or addError', () async {
+      final cubit = _TestCubit();
+      // Even if errors occur in teardown, closing completes without throwing StateError
+      await expectLater(cubit.close(), completes);
+      expect(cubit.isClosed, isTrue);
+    });
   });
 }

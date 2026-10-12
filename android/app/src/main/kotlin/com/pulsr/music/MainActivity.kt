@@ -382,6 +382,12 @@ class MainActivity : AudioServiceActivity() {
                     val level = bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
                     result.success(level)
                 }
+                "getTotalRamBytes" -> {
+                    val actManager = getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+                    val memInfo = android.app.ActivityManager.MemoryInfo()
+                    actManager?.getMemoryInfo(memInfo)
+                    result.success(memInfo.totalMem)
+                }
                 else -> result.notImplemented()
             }
         }
