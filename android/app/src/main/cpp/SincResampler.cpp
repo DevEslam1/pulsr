@@ -200,13 +200,61 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
                 continue;
             }
             float sum = 0.0f;
-            for (int tap = HALF_TAPS - activeHalfTaps_; tap < HALF_TAPS + activeHalfTaps_; ++tap) {
+            const int startTap = HALF_TAPS - activeHalfTaps_;
+            const int endTap = HALF_TAPS + activeHalfTaps_;
+
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__ARM_NEON)
+            float32x4_t vSum = vdupq_n_f32(0.0f);
+            int tap = startTap;
+            for (; tap <= endTap - 4; tap += 4) {
+                const int ro0 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 0));
+                int ri0 = (writePos_ - ro0) % FIFO_CAPACITY;
+                if (ri0 < 0) ri0 += FIFO_CAPACITY;
+
+                const int ro1 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 1));
+                int ri1 = (writePos_ - ro1) % FIFO_CAPACITY;
+                if (ri1 < 0) ri1 += FIFO_CAPACITY;
+
+                const int ro2 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 2));
+                int ri2 = (writePos_ - ro2) % FIFO_CAPACITY;
+                if (ri2 < 0) ri2 += FIFO_CAPACITY;
+
+                const int ro3 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 3));
+                int ri3 = (writePos_ - ro3) % FIFO_CAPACITY;
+                if (ri3 < 0) ri3 += FIFO_CAPACITY;
+
+                const float samples[4] = {
+                    ringBuf_[ch][ri0],
+                    ringBuf_[ch][ri1],
+                    ringBuf_[ch][ri2],
+                    ringBuf_[ch][ri3]
+                };
+                float32x4_t vSamp = vld1q_f32(samples);
+                float32x4_t vCoeff = vld1q_f32(&coeffs[tap]);
+                vSum = vmlaq_f32(vSum, vSamp, vCoeff);
+#if defined(__aarch64__) || defined(_M_ARM64)
+            sum = vaddvq_f32(vSum);
+#else
+            float32x2_t vSumLow = vget_low_f32(vSum);
+            float32x2_t vSumHigh = vget_high_f32(vSum);
+            float32x2_t vSum2 = vadd_f32(vSumLow, vSumHigh);
+            sum = vget_lane_f32(vpadd_f32(vSum2, vSum2), 0);
+#endif
+            for (; tap < endTap; ++tap) {
+                const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
+                int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
+                if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
+                sum += ringBuf_[ch][ringIndex] * coeffs[tap];
+            }
+#else
+            for (int tap = startTap; tap < endTap; ++tap) {
                 const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
                 if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
 
                 sum += ringBuf_[ch][ringIndex] * coeffs[tap];
             }
+#endif
             // Restore unity DC gain for the truncated (quality<Ultra) window;
             // activeScale_ is 1.0 for Ultra so full-quality output is unchanged.
             out[ch][outFrames] = sum * activeScale_[phaseIdx];
