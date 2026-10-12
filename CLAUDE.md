@@ -2,7 +2,7 @@
 
 > **Target Audience:** AI Models (Claude, Gemini, Cursor, Copilot) & Human Engineers  
 > **Repository:** `pulsr` — Premium Offline-First Audiophile Music Player  
-> **Frameworks & Languages:** Flutter 3.41+ (Dart >=3.0 <4.0), C++17 (Native DSP Engine), Kotlin (Android Platform Channels), Go 1.22+ (Party Sync Server), GLSL (Custom Shaders).
+> **Frameworks & Languages:** Flutter 3.41+ (Dart >=3.0 <4.0), C++20 (Native DSP Engine), Kotlin (Android Platform Channels), Go 1.22+ (Party Sync Server), GLSL (Custom Shaders).
 
 ---
 
@@ -300,6 +300,9 @@ pulsr/
 - **`AAudioSink.cpp / .h`**: High-performance, low-latency audio output stream using the Android AAudio native API with `AAUDIO_PERFORMANCE_MODE_LOW_LATENCY`.
 - **`UsbAudioSink.cpp / .h`**: Direct USB Audio Class 2.0 driver handling bit-perfect output directly to connected external DACs.
 - **`ParametricEQ.cpp / .h` & `ArbitraryResponseEq.cpp / .h`**: Biquad IIR filter arrays providing parametric and arbitrary graphic EQ adjustments.
+- **`Crossfeed.cpp / .h`**: Bauer-style headphone crossfeed filter reducing extreme stereo channel separation fatigue.
+- **`HarmonicSaturation.cpp / .h`**: Soft-clipping even/odd harmonic generator adding analog tape/tube warmth.
+- **`SubCrossover.cpp / .h`**: Linkwitz-Riley low-pass and high-pass frequency split for dedicated subwoofer management.
 - **`ConvolutionReverb.cpp / .h`**: Frequency-domain FFT-based fast convolution engine for realistic acoustic impulse responses (IR).
 - **`LookaheadLimiter.cpp / .h`**: Brickwall peak limiter with lookahead window to prevent digital clipping distortion.
 - **`MultibandCompressor.cpp / .h`**: 4-band audio compressor with independent threshold, ratio, attack, and release parameters.
@@ -329,7 +332,7 @@ pulsr/
 ### 5.1 Code Generation Rules
 1. **Never Bypass Freezed Immutability:** All domain state classes in `cubit/` must use Freezed annotations (`@freezed`). Always generate `.freezed.dart` classes using:
    ```bash
-   flutter pub run build_runner build --delete-conflicting-outputs
+   dart run build_runner build --delete-conflicting-outputs
    ```
 2. **Preserve Audio Pipeline Headroom:** When modifying `AudioDspEngine` or `EqualizerManager`, verify that gain increases are matched with preamp attenuation in `GainStagingBudget` to avoid clipping.
 3. **Keep Audio Handler Methods Non-Blocking:** `PulsrAudioHandler` and its collaborators run on the main platform thread. Never perform heavy file I/O or HTTP requests directly inside playback callbacks (`onPlay`, `onSkipToNext`); delegate them to background isolates or async services.
@@ -346,10 +349,10 @@ pulsr/
 flutter pub get
 
 # Run build_runner for Drift & Freezed code generation
-flutter pub run build_runner build --delete-conflicting-outputs
+dart run build_runner build --delete-conflicting-outputs
 
 # Watch build_runner for active development
-flutter pub run build_runner watch --delete-conflicting-outputs
+dart run build_runner watch --delete-conflicting-outputs
 
 # Run Flutter linter & static analysis
 flutter analyze
