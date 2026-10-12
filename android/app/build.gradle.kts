@@ -30,12 +30,6 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appName"] = "Pulsr Music"
-
-        externalNativeBuild {
-            cmake {
-                cppFlags += listOf("-std=c++20")
-            }
-        }
     }
 
     externalNativeBuild {
