@@ -1,36 +1,87 @@
 package hub
 
 import (
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-// SafeConn wraps *websocket.Conn with a mutex to prevent concurrent write panic.
+const (
+	writeWait = 5 * time.Second
+	queueSize = 64
+)
+
+// SafeConn wraps *websocket.Conn with a bounded send queue and mutex to prevent concurrent writes
+// and avoid unconstrained goroutine creation on broadcasts.
 type SafeConn struct {
-	mu   sync.Mutex
-	conn *websocket.Conn
+	mu        sync.Mutex
+	conn      *websocket.Conn
+	sendQueue chan interface{}
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 func NewSafeConn(conn *websocket.Conn) *SafeConn {
-	return &SafeConn{conn: conn}
+	sc := &SafeConn{
+		conn:      conn,
+		sendQueue: make(chan interface{}, queueSize),
+		done:      make(chan struct{}),
+	}
+	go sc.writePump()
+	return sc
+}
+
+func (s *SafeConn) writePump() {
+	for {
+		select {
+		case msg, ok := <-s.sendQueue:
+			if !ok {
+				return
+			}
+			s.mu.Lock()
+			_ = s.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			err := s.conn.WriteJSON(msg)
+			s.mu.Unlock()
+			if err != nil {
+				_ = s.Close()
+				return
+			}
+		case <-s.done:
+			return
+		}
+	}
 }
 
 func (s *SafeConn) WriteJSON(v interface{}) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	_ = s.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	return s.conn.WriteJSON(v)
+	select {
+	case <-s.done:
+		return errors.New("connection closed")
+	default:
+	}
+
+	select {
+	case s.sendQueue <- v:
+		return nil
+	default:
+		// Queue full: drop frame non-blockingly to protect server from slow client head-of-line blocking
+		return errors.New("send queue full")
+	}
 }
 
 func (s *SafeConn) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.conn.Close()
+	var err error
+	s.closeOnce.Do(func() {
+		close(s.done)
+		s.mu.Lock()
+		err = s.conn.Close()
+		s.mu.Unlock()
+	})
+	return err
 }
 
-// Hub coordinates active WebSocket connections across rooms.
+// Hub coordinates active WebSocket connections across rooms with O(1) room lookups.
 type Hub struct {
 	mu      sync.RWMutex
 	sockets map[string]map[string]*SafeConn // code -> memberId -> SafeConn
@@ -90,6 +141,19 @@ func (h *Hub) DropParty(code string) {
 	}
 }
 
+func (h *Hub) CloseAll() {
+	h.mu.Lock()
+	rooms := h.sockets
+	h.sockets = make(map[string]map[string]*SafeConn)
+	h.mu.Unlock()
+
+	for _, room := range rooms {
+		for _, sc := range room {
+			_ = sc.Close()
+		}
+	}
+}
+
 func (h *Hub) MembersOnline(code string) []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -134,9 +198,13 @@ func (h *Hub) CloseMember(code, memberId string) {
 	h.mu.RLock()
 	room := h.sockets[code]
 	var target *SafeConn
-	if room != nil { target = room[memberId] }
+	if room != nil {
+		target = room[memberId]
+	}
 	h.mu.RUnlock()
-	if target != nil { _ = target.Close() }
+	if target != nil {
+		_ = target.Close()
+	}
 }
 
 func (h *Hub) Broadcast(code string, payload interface{}, skipMemberId string) {
@@ -154,14 +222,8 @@ func (h *Hub) Broadcast(code string, payload interface{}, skipMemberId string) {
 	}
 	h.mu.RUnlock()
 
-	// Concurrently write to all targets so one slow mobile network does not delay others
-	var wg sync.WaitGroup
+	// Enqueue to targets' bounded channels non-blockingly without unbounded goroutine spawning
 	for _, sc := range targets {
-		wg.Add(1)
-		go func(conn *SafeConn) {
-			defer wg.Done()
-			_ = conn.WriteJSON(payload)
-		}(sc)
+		_ = sc.WriteJSON(payload)
 	}
-	wg.Wait()
 }
