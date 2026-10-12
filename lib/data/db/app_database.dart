@@ -290,8 +290,10 @@ class AppDatabase extends _$AppDatabase {
       await executeSql(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_entries_unique ON playlist_entries (playlist_id, song_id);',
       );
-      await executeSql(
-          'CREATE INDEX IF NOT EXISTS idx_songs_uri ON songs (uri);');
+      if (db == null || await db.customSelect("PRAGMA table_info(songs);").get().then((rows) => rows.any((r) => r.data['name'] == 'uri'))) {
+        await executeSql(
+            'CREATE INDEX IF NOT EXISTS idx_songs_uri ON songs (uri);');
+      }
       await executeSql(
           'CREATE INDEX IF NOT EXISTS idx_songs_cue ON songs (cue_file, cue_start_ms);');
       await executeSql(
