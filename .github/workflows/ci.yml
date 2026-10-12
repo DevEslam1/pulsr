@@ -57,6 +57,9 @@ jobs:
       - name: Native DSP Test-Source Drift Guard
         run: python3 scripts/check_native_test_sources.py
 
+      - name: CLAUDE.md §4.6 Documentation Drift Guard
+        run: python3 scripts/check_claude_dsp_docs.py
+
       - name: Run Audio DSP & Bluetooth Suites
         run: bash scripts/run_audio_suites.sh
 
@@ -123,6 +126,26 @@ jobs:
 
       - name: Run Native C++ DSP Suite (parity + sanitizers)
         run: bash scripts/run_native_dsp_tests.sh
+
+  go-party-tests:
+    name: Go Party Server Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: server/pulsr_party/go.sum
+
+      - name: Run Go Vet
+        run: cd server/pulsr_party && go vet ./...
+
+      - name: Run Go Tests with Race Detector
+        run: cd server/pulsr_party && go test -race -v ./...
 
   build-android:
     name: Build Android Release
