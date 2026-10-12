@@ -33,13 +33,14 @@ abstract class AppFontSize {
   static const double bodySmall = 13;
   static const double body = 14;
   static const double callout = 15;
-  static const double bodyLarge = 16;
-  static const double subtitle = 17;
+  static const double subtitle = 16;
+  static const double bodyLarge = 17;
   static const double title = 18;
   static const double titleLarge = 20;
-  static const double headline = 24;
-  static const double display = 28;
-  static const double displayLarge = 32;
+  static const double headline = 22;
+  static const double titleXL = 26;
+  static const double display = 30;
+  static const double displayLarge = 36;
 }
 
 /// Canonical letter-spacing (tracking) scale.

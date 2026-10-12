@@ -45,6 +45,9 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../core/widgets/pulsr_section_header.dart';
+import '../../../core/widgets/pulsr_card.dart';
+import '../../../core/widgets/pulsr_button.dart';
 import '../../../core/widgets/staggered_reveal.dart';
 
 enum _PlaylistTabMode { local, online }
@@ -666,19 +669,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           // Suggested for you (optional; hidden until real library data yields
           // at least one suggestion).
           if (_suggestions.isNotEmpty) ...[
-            Padding(
+            PulsrSectionHeader(
+              title: context.l10n.suggestedForYou,
               padding: EdgeInsetsDirectional.only(
                 start: Adaptive.pagePadding(context),
                 end: Adaptive.pagePadding(context),
-                top: 24,
-                bottom: 10,
-              ),
-              child: Text(
-                context.l10n.suggestedForYou,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: p.textTertiary),
+                top: AppSpacing.sectionGap,
+                bottom: AppSpacing.s10,
               ),
             ),
             SizedBox(
@@ -702,51 +699,20 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           ],
 
           // SMART PLAYLISTS Header
-          Padding(
+          PulsrSectionHeader(
+            title: context.l10n.smartPlaylists,
             padding: EdgeInsetsDirectional.only(
               start: Adaptive.pagePadding(context),
               end: Adaptive.pagePadding(context),
-              top: 24,
-              bottom: 10,
+              top: AppSpacing.sectionGap,
+              bottom: AppSpacing.s10,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  context.l10n.smartPlaylists.toUpperCase(),
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: p.textTertiary),
-                ),
-                if (smartPlaylists.isEmpty)
-                  InkWell(
-                    onTap: () async {
-                      await context.push('/smart-playlist-builder');
-                    },
-                    borderRadius: AppRadii.r8All,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add_rounded, size: 14, color: p.accent),
-                          const SizedBox(width: AppSpacing.xxs),
-                          Text(
-                            context.l10n.createSmartPlaylist,
-                            style: TextStyle(
-                              color: p.accent,
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppFontSize.caption,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            actionLabel: smartPlaylists.isEmpty ? context.l10n.createSmartPlaylist : null,
+            onAction: smartPlaylists.isEmpty
+                ? () async {
+                    await context.push('/smart-playlist-builder');
+                  }
+                : null,
           ),
 
           if (smartPlaylists.isNotEmpty)
@@ -811,23 +777,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             ),
 
           // ── YOUR PLAYLISTS SECTION ──────────────────────────────
-          Padding(
+          PulsrSectionHeader(
+            title: context.l10n.playlists,
             padding: EdgeInsetsDirectional.fromSTEB(
-                Adaptive.pagePadding(context),
-                28,
-                Adaptive.pagePadding(context),
-                12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  context.l10n.playlists.toUpperCase(),
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: p.textTertiary),
-                ),
-              ],
+              Adaptive.pagePadding(context),
+              28,
+              Adaptive.pagePadding(context),
+              12,
             ),
           ),
 
@@ -1121,19 +1077,16 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       horizontal: Adaptive.pagePadding(context),
                       vertical: 12,
                     ),
-                    child: Container(
+                    child: PulsrCard(
+                      variant: PulsrCardVariant.filled,
                       padding: const EdgeInsets.all(AppSpacing.s20),
-                      decoration: BoxDecoration(
-                        color: p.surfaceContainer,
-                        borderRadius: AppRadii.r20All,
-                        border: Border.all(color: p.hairline),
-                      ),
+                      borderRadius: AppRadii.r20,
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(AppSpacing.sm),
                             decoration: BoxDecoration(
-                              color: p.accent.withValues(alpha: 0.12),
+                              color: p.accentSoft,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(Icons.cloud_sync_rounded,
@@ -1164,23 +1117,15 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.xs),
-                          FilledButton(
+                          PulsrButton(
+                            label: context.l10n.signIn,
+                            size: PulsrButtonSize.sm,
                             onPressed: () async {
                               final ok = await YtmWebLoginSheet.show(context);
                               if (ok == true) {
                                 cubit.autoFetchOnlineLibrary(force: true);
                               }
                             },
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s14,
-                                  vertical: AppSpacing.xs),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: AppRadii.r12All),
-                            ),
-                            child: Text(context.l10n.signIn,
-                                style: const TextStyle(
-                                    fontSize: AppFontSize.label)),
                           ),
                         ],
                       ),
@@ -1212,41 +1157,31 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                   ),
 
                   // ── ACCOUNT PLAYLISTS SECTION ─────────────────────────
-                  Padding(
+                  PulsrSectionHeader(
+                    title: context.l10n.accountPlaylists,
                     padding: EdgeInsetsDirectional.fromSTEB(
-                        Adaptive.pagePadding(context),
-                        24,
-                        Adaptive.pagePadding(context),
-                        10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            context.l10n.accountPlaylists,
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(color: p.textTertiary),
-                          ),
-                        ),
-                        if (online.accountStatus == YtmFetchStatus.loading)
-                          SizedBox(
+                      Adaptive.pagePadding(context),
+                      24,
+                      Adaptive.pagePadding(context),
+                      10,
+                    ),
+                    trailing: online.accountStatus == YtmFetchStatus.loading
+                        ? SizedBox(
                             width: AppSpacing.s14,
                             height: 14,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: p.accent),
                           )
-                        else if (online.accountPlaylists.isNotEmpty)
-                          Text(
-                            context.l10n.accountPlaylistCount(
-                                online.accountPlaylists.length),
-                            style: TextStyle(
-                                color: p.textTertiary,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w600),
-                          ),
-                      ],
-                    ),
+                        : (online.accountPlaylists.isNotEmpty
+                            ? Text(
+                                context.l10n.accountPlaylistCount(
+                                    online.accountPlaylists.length),
+                                style: TextStyle(
+                                    color: p.textTertiary,
+                                    fontSize: AppFontSize.caption,
+                                    fontWeight: FontWeight.w600),
+                              )
+                            : null),
                   ),
 
                   if (online.accountStatus == YtmFetchStatus.loading &&

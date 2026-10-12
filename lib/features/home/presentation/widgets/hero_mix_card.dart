@@ -55,6 +55,7 @@ class HeroMixCard extends StatelessWidget {
               ),
               borderRadius: AppRadii.r24All,
               border: Border.all(color: p.accent.withValues(alpha: 0.35)),
+              boxShadow: PulsrElevation.level2(context),
             ),
             child: Stack(
               children: [

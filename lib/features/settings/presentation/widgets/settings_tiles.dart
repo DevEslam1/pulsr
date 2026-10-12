@@ -6,6 +6,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
+import '../../../../core/widgets/pulsr_divider.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -33,7 +34,7 @@ class SettingsIconBox extends StatelessWidget {
 
 /// Hairline divider between rows inside a settings card (was `_divider`).
 Widget settingsCardDivider(PulsrPalette p) =>
-    Divider(height: 1, indent: 72, color: p.hairline);
+    PulsrDivider.inset(indent: 72, color: p.hairline);
 
 /// Navigation-style settings row (was `_navTile`).
 class SettingsNavTile extends StatelessWidget {

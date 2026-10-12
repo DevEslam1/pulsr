@@ -11,6 +11,8 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
+import '../../../core/widgets/pulsr_chip.dart';
+import '../../../core/widgets/pulsr_progress.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -460,8 +462,8 @@ class _SearchViewState extends State<_SearchView> {
           child: SizedBox(
             height: 2,
             child: active
-                ? LinearProgressIndicator(
-                    minHeight: 2,
+                ? PulsrProgressBar.indeterminate(
+                    height: 2,
                     color: p.accent,
                     backgroundColor: Colors.transparent,
                   )
@@ -500,22 +502,13 @@ class _SearchViewState extends State<_SearchView> {
                   builder: (context, _, __) {
                     final saved =
                         cubit.isSaved(state.query, state.selectedFilter);
-                    return ActionChip(
-                      avatar: Icon(
-                        saved
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_add_outlined,
-                        size: 16,
-                        color: p.accent,
-                      ),
-                      label: Text(context.l10n.saveSearch),
-                      backgroundColor: p.surfaceContainer,
-                      side: BorderSide(color: p.hairline),
-                      labelStyle: TextStyle(
-                          color: p.accent,
-                          fontSize: AppFontSize.label,
-                          fontWeight: FontWeight.w700),
-                      onPressed: () {
+                    return PulsrChip(
+                      icon: saved
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_add_outlined,
+                      label: context.l10n.saveSearch,
+                      variant: PulsrChipVariant.action,
+                      onTap: () {
                         HapticFeedback.selectionClick();
                         if (saved) {
                           cubit.removeSavedSearch(SearchCubit.encodeSavedSearch(
@@ -537,15 +530,11 @@ class _SearchViewState extends State<_SearchView> {
   Widget _buildChip(
       BuildContext context, SearchState state, String filter, PulsrPalette p) {
     final selected = state.selectedFilter == filter;
-    return ChoiceChip(
-      label: Text(_filterLabel(context, filter)),
+    return PulsrChip(
+      label: _filterLabel(context, filter),
       selected: selected,
-      showCheckmark: false,
-      labelStyle: TextStyle(
-        color: selected ? p.accent : p.textSecondary,
-        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-      ),
-      onSelected: (_) {
+      variant: PulsrChipVariant.filter,
+      onTap: () {
         HapticFeedback.selectionClick();
         context.read<SearchCubit>().setFilter(filter);
       },

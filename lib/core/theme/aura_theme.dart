@@ -6,6 +6,7 @@ import '../constants/app_radii.dart';
 import 'player_material_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+export 'pulsr_elevation.dart';
 
 /// Semantic tokens consumed by every screen via `context.palette`.
 @immutable
@@ -31,7 +32,30 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     required this.isDark,
     required this.playerCard,
     required this.deepShade,
-  });
+    Color? surfaceElevated,
+    Color? surfaceOverlay,
+    Color? scrimLight,
+    Color? scrimMedium,
+    Color? scrimHeavy,
+    Color? borderSubtle,
+    Color? borderStrong,
+    Color? accentSoft,
+    Color? accentMedium,
+    Color? successSoft,
+    Color? errorSoft,
+    Color? warningSoft,
+  })  : surfaceElevated = surfaceElevated ?? (isDark ? surfaceContainerHigh : surface),
+        surfaceOverlay = surfaceOverlay ?? (isDark ? const Color(0xCC12121A) : const Color(0xE0FFFFFF)),
+        scrimLight = scrimLight ?? (isDark ? const Color(0x26000000) : const Color(0x14000000)),
+        scrimMedium = scrimMedium ?? (isDark ? const Color(0x66000000) : const Color(0x40000000)),
+        scrimHeavy = scrimHeavy ?? (isDark ? const Color(0xB3000000) : const Color(0x80000000)),
+        borderSubtle = borderSubtle ?? hairline,
+        borderStrong = borderStrong ?? (isDark ? const Color(0x2EFFFFFF) : const Color(0x33000000)),
+        accentSoft = accentSoft ?? accentContainer,
+        accentMedium = accentMedium ?? const Color(0x409B9EF5),
+        successSoft = successSoft ?? const Color(0x264CAF50),
+        errorSoft = errorSoft ?? const Color(0x26FF5252),
+        warningSoft = warningSoft ?? const Color(0x26FFB300);
 
   final Color accent;
   final Color onAccent;
@@ -57,6 +81,20 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
 
   /// Deepest immersive-player backdrop below [bg] (circle/classic themes).
   final Color deepShade;
+
+  // ── Extended Semantic Surface & Overlay Tokens ──────────────────────────
+  final Color surfaceElevated;
+  final Color surfaceOverlay;
+  final Color scrimLight;
+  final Color scrimMedium;
+  final Color scrimHeavy;
+  final Color borderSubtle;
+  final Color borderStrong;
+  final Color accentSoft; // 12% alpha
+  final Color accentMedium; // 25% alpha
+  final Color successSoft;
+  final Color errorSoft;
+  final Color warningSoft;
 
   Color get background => bg;
   Color get primary => accent;
@@ -91,6 +129,18 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     bool? isDark,
     Color? playerCard,
     Color? deepShade,
+    Color? surfaceElevated,
+    Color? surfaceOverlay,
+    Color? scrimLight,
+    Color? scrimMedium,
+    Color? scrimHeavy,
+    Color? borderSubtle,
+    Color? borderStrong,
+    Color? accentSoft,
+    Color? accentMedium,
+    Color? successSoft,
+    Color? errorSoft,
+    Color? warningSoft,
   }) {
     return PulsrPalette(
       accent: accent ?? this.accent,
@@ -113,6 +163,18 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       isDark: isDark ?? this.isDark,
       playerCard: playerCard ?? this.playerCard,
       deepShade: deepShade ?? this.deepShade,
+      surfaceElevated: surfaceElevated ?? this.surfaceElevated,
+      surfaceOverlay: surfaceOverlay ?? this.surfaceOverlay,
+      scrimLight: scrimLight ?? this.scrimLight,
+      scrimMedium: scrimMedium ?? this.scrimMedium,
+      scrimHeavy: scrimHeavy ?? this.scrimHeavy,
+      borderSubtle: borderSubtle ?? this.borderSubtle,
+      borderStrong: borderStrong ?? this.borderStrong,
+      accentSoft: accentSoft ?? this.accentSoft,
+      accentMedium: accentMedium ?? this.accentMedium,
+      successSoft: successSoft ?? this.successSoft,
+      errorSoft: errorSoft ?? this.errorSoft,
+      warningSoft: warningSoft ?? this.warningSoft,
     );
   }
 
@@ -147,6 +209,21 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       isDark: t < 0.5 ? isDark : other.isDark,
       playerCard: Color.lerp(playerCard, other.playerCard, t) ?? playerCard,
       deepShade: Color.lerp(deepShade, other.deepShade, t) ?? deepShade,
+      surfaceElevated:
+          Color.lerp(surfaceElevated, other.surfaceElevated, t) ?? surfaceElevated,
+      surfaceOverlay:
+          Color.lerp(surfaceOverlay, other.surfaceOverlay, t) ?? surfaceOverlay,
+      scrimLight: Color.lerp(scrimLight, other.scrimLight, t) ?? scrimLight,
+      scrimMedium: Color.lerp(scrimMedium, other.scrimMedium, t) ?? scrimMedium,
+      scrimHeavy: Color.lerp(scrimHeavy, other.scrimHeavy, t) ?? scrimHeavy,
+      borderSubtle: Color.lerp(borderSubtle, other.borderSubtle, t) ?? borderSubtle,
+      borderStrong: Color.lerp(borderStrong, other.borderStrong, t) ?? borderStrong,
+      accentSoft: Color.lerp(accentSoft, other.accentSoft, t) ?? accentSoft,
+      accentMedium:
+          Color.lerp(accentMedium, other.accentMedium, t) ?? accentMedium,
+      successSoft: Color.lerp(successSoft, other.successSoft, t) ?? successSoft,
+      errorSoft: Color.lerp(errorSoft, other.errorSoft, t) ?? errorSoft,
+      warningSoft: Color.lerp(warningSoft, other.warningSoft, t) ?? warningSoft,
     );
   }
 }
@@ -203,7 +280,18 @@ class AuraTheme {
           surface: Colors.white,
           surfaceContainer: const Color(0xFFF1F1F1),
           surfaceContainerHigh: const Color(0xFFE4E4E4),
-          // Strong outlines: 0.42 vs the normal 0.09 hairline.
+          surfaceElevated: Colors.white,
+          surfaceOverlay: Colors.white.withValues(alpha: 0.95),
+          scrimLight: AppColors.scrimAt(0.12),
+          scrimMedium: AppColors.scrimAt(0.35),
+          scrimHeavy: AppColors.scrimAt(0.65),
+          borderSubtle: Colors.black.withValues(alpha: 0.30),
+          borderStrong: Colors.black.withValues(alpha: 0.60),
+          accentSoft: accent.withValues(alpha: 0.18),
+          accentMedium: accent.withValues(alpha: 0.32),
+          successSoft: AppColors.success.withValues(alpha: 0.22),
+          errorSoft: AppColors.error.withValues(alpha: 0.22),
+          warningSoft: AppColors.warning.withValues(alpha: 0.22),
           hairline: Colors.black.withValues(alpha: 0.42),
           textPrimary: Colors.black,
           textSecondary: const Color(0xFF33373F),
@@ -221,21 +309,32 @@ class AuraTheme {
         onAccent: onAccent,
         accentContainer: accent.withValues(alpha: 0.12),
         glow: accent.withValues(alpha: 0.22),
-        bg: const Color(0xFFF4F6FB),
+        bg: const Color(0xFFFAFAFA),
         surface: Colors.white,
-        surfaceContainer: const Color(0xFFEDF0F7),
-        surfaceContainerHigh: const Color(0xFFE4E9F3),
+        surfaceContainer: const Color(0xFFF5F5F5),
+        surfaceContainerHigh: const Color(0xFFEEEEEE),
+        surfaceElevated: Colors.white,
+        surfaceOverlay: Colors.white.withValues(alpha: 0.88),
+        scrimLight: AppColors.scrimAt(0.08),
+        scrimMedium: AppColors.scrimAt(0.25),
+        scrimHeavy: AppColors.scrimAt(0.50),
+        borderSubtle: const Color(0x14000000),
+        borderStrong: const Color(0x33000000),
+        accentSoft: accent.withValues(alpha: 0.12),
+        accentMedium: accent.withValues(alpha: 0.25),
+        successSoft: AppColors.success.withValues(alpha: 0.15),
+        errorSoft: AppColors.error.withValues(alpha: 0.15),
+        warningSoft: AppColors.warning.withValues(alpha: 0.15),
         hairline: const Color(0xFF0F1724).withValues(alpha: 0.09),
         textPrimary: const Color(0xFF101425),
         textSecondary: const Color(0xFF5D6880),
-        // Small metadata remains readable on every surface, including elevated cards.
         textTertiary: const Color(0xFF59657E),
         favorite: AppColors.favorite,
         success: AppColors.success,
         error: AppColors.error,
         isDark: false,
         playerCard: Colors.white,
-        deepShade: const Color(0xFFF4F6FB),
+        deepShade: const Color(0xFFFAFAFA),
       );
     }
     if (isHighContrast) {
@@ -248,7 +347,18 @@ class AuraTheme {
         surface: const Color(0xFF050506),
         surfaceContainer: const Color(0xFF111114),
         surfaceContainerHigh: const Color(0xFF1B1B20),
-        // Strong outlines: 0.42 vs the normal ~0.09 specular hairline.
+        surfaceElevated: const Color(0xFF1B1B20),
+        surfaceOverlay: Colors.black.withValues(alpha: 0.90),
+        scrimLight: AppColors.scrimAt(0.25),
+        scrimMedium: AppColors.scrimAt(0.55),
+        scrimHeavy: AppColors.scrimAt(0.85),
+        borderSubtle: Colors.white.withValues(alpha: 0.35),
+        borderStrong: Colors.white.withValues(alpha: 0.70),
+        accentSoft: accent.withValues(alpha: 0.20),
+        accentMedium: accent.withValues(alpha: 0.35),
+        successSoft: AppColors.success.withValues(alpha: 0.25),
+        errorSoft: AppColors.error.withValues(alpha: 0.25),
+        warningSoft: AppColors.warning.withValues(alpha: 0.25),
         hairline: Colors.white.withValues(alpha: 0.42),
         textPrimary: Colors.white,
         textSecondary: const Color(0xFFD3D8E2),
@@ -271,9 +381,19 @@ class AuraTheme {
         surface: const Color(0xFF0B0B0E),
         surfaceContainer: const Color(0xFF121216),
         surfaceContainerHigh: const Color(0xFF18181E),
+        surfaceElevated: const Color(0xFF16161D),
+        surfaceOverlay: Colors.black.withValues(alpha: 0.85),
+        scrimLight: AppColors.scrimAt(0.20),
+        scrimMedium: AppColors.scrimAt(0.50),
+        scrimHeavy: AppColors.scrimAt(0.85),
+        borderSubtle: AppColors.specularAt(0.08),
+        borderStrong: AppColors.specularAt(0.20),
+        accentSoft: accent.withValues(alpha: 0.12),
+        accentMedium: accent.withValues(alpha: 0.25),
+        successSoft: AppColors.success.withValues(alpha: 0.15),
+        errorSoft: AppColors.error.withValues(alpha: 0.15),
+        warningSoft: AppColors.warning.withValues(alpha: 0.15),
         hairline: AppColors.specularAt(0.09),
-        // Dim white point softens peak white for night listening (12.8:1,
-        // still well above AA) without touching secondary/tertiary hierarchy.
         textPrimary:
             dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFF5F6FA),
         textSecondary: const Color(0xFF9BA1AE),
@@ -291,14 +411,23 @@ class AuraTheme {
       onAccent: onAccent,
       accentContainer: accent.withValues(alpha: 0.14),
       glow: accent.withValues(alpha: 0.28),
-      // Near-neutral dark base. Was #0A0C12 (blue-tinted); blue is the most
-      // fatiguing wavelength in dark rooms, so this drops the cool cast.
-      bg: const Color(0xFF0B0B0F),
-      surface: const Color(0xFF12141D),
-      surfaceContainer: const Color(0xFF171B28),
-      surfaceContainerHigh: const Color(0xFF1E2235),
+      bg: const Color(0xFF0A0A0F),
+      surface: const Color(0xFF12121A),
+      surfaceContainer: const Color(0xFF1A1A24),
+      surfaceContainerHigh: const Color(0xFF222230),
+      surfaceElevated: const Color(0xFF1E1E2A),
+      surfaceOverlay: const Color(0xFF12121A).withValues(alpha: 0.78),
+      scrimLight: AppColors.scrimAt(0.15),
+      scrimMedium: AppColors.scrimAt(0.40),
+      scrimHeavy: AppColors.scrimAt(0.70),
+      borderSubtle: AppColors.specularAt(0.08),
+      borderStrong: AppColors.specularAt(0.18),
+      accentSoft: accent.withValues(alpha: 0.12),
+      accentMedium: accent.withValues(alpha: 0.25),
+      successSoft: AppColors.success.withValues(alpha: 0.15),
+      errorSoft: AppColors.error.withValues(alpha: 0.15),
+      warningSoft: AppColors.warning.withValues(alpha: 0.15),
       hairline: AppColors.specular,
-      // Dim white point softens peak white for night listening (12.8:1).
       textPrimary:
           dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFEDEFF7),
       textSecondary: const Color(0xFF98A0B3),
@@ -753,34 +882,3 @@ class AuraThemePreset {
       );
 }
 
-/// Standardized elevation shadows across Pulsr.
-class PulsrElevation {
-  const PulsrElevation._();
-
-  /// Subtle elevation for cards and list items.
-  static List<BoxShadow> level1(PulsrPalette p) => [
-        BoxShadow(
-          color: AppColors.scrimAt(p.isDark ? 0.20 : 0.06),
-          blurRadius: 6,
-          offset: const Offset(0, 2),
-        ),
-      ];
-
-  /// Medium elevation for floating action buttons, popovers, and sticky bars.
-  static List<BoxShadow> level2(PulsrPalette p) => [
-        BoxShadow(
-          color: AppColors.scrimAt(p.isDark ? 0.35 : 0.10),
-          blurRadius: 14,
-          offset: const Offset(0, 4),
-        ),
-      ];
-
-  /// High elevation for bottom sheets, modals, and dialogs.
-  static List<BoxShadow> level3(PulsrPalette p) => [
-        BoxShadow(
-          color: AppColors.scrimAt(p.isDark ? 0.50 : 0.16),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-        ),
-      ];
-}

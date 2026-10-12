@@ -1,4 +1,5 @@
-// lib/core/constants/app_spacing.dart
+import 'package:flutter/material.dart';
+import 'package:pulsr/core/utils/adaptive.dart';
 
 /// {@category DesignSystem}
 /// Canonical spacing rhythm for the whole app.
@@ -22,22 +23,44 @@ abstract class AppSpacing {
 
   // ── Half-steps ──────────────────────────────────────────────────────────
   static const double s2 = 2;
+  static const double s4 = 4;
   static const double s6 = 6;
   static const double s8 = 8;
   static const double s10 = 10;
+  static const double s12 = 12;
   static const double s14 = 14;
+  static const double s16 = 16;
   static const double s18 = 18;
   static const double s20 = 20;
+  static const double s24 = 24;
   static const double s28 = 28;
+  static const double s32 = 32;
   static const double s38 = 38;
   static const double s40 = 40;
   static const double s44 = 44;
+  static const double s48 = 48;
   static const double s56 = 56;
   static const double s64 = 64;
+
+  // ── Named semantic layout tokens ────────────────────────────────────────
+  /// Default spacing between major screen sections (24dp).
+  static const double sectionGap = 24;
+
+  /// Default internal padding for cards and container panels (16dp).
+  static const double cardPad = 16;
+
+  /// Vertical padding/gap between list items (8dp).
+  static const double listItemV = 8;
 
   /// Canonical minimum interactive touch target dimension per Material & WCAG guidelines.
   static const double minTouchTarget = 48;
 
+  /// Compact interactive touch target (e.g. dense icon buttons).
+  static const double minTouchTargetCompact = 44;
+
   /// Bottom padding so content clears the mini-player + nav dock.
   static const double scrollBottom = 160;
+
+  /// Adaptive page horizontal padding helper.
+  static double pageH(BuildContext context) => Adaptive.pagePadding(context);
 }

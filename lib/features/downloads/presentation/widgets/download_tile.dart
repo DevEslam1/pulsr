@@ -7,6 +7,8 @@ import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/cached_artwork.dart';
+import '../../../../core/widgets/pulsr_badge.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
@@ -173,21 +175,14 @@ class DownloadTile extends StatelessWidget {
                           ),
                         if (task.status != DownloadStatus.complete) ...[
                           const SizedBox(width: AppSpacing.xxs),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.xs, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.15),
-                              borderRadius: AppRadii.r8All,
-                            ),
-                            child: Text(
-                              statusLabel,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                          PulsrBadge(
+                            label: statusLabel,
+                            color: switch (task.status) {
+                              DownloadStatus.complete => PulsrBadgeColor.success,
+                              DownloadStatus.failed => PulsrBadgeColor.error,
+                              DownloadStatus.paused => PulsrBadgeColor.neutral,
+                              _ => PulsrBadgeColor.accent,
+                            },
                           ),
                         ],
                       ],
@@ -320,33 +315,38 @@ class DownloadTile extends StatelessWidget {
           if (task.status == DownloadStatus.downloading ||
               task.status == DownloadStatus.tagging) ...[
             const SizedBox(height: AppSpacing.sm),
-            ClipRRect(
-              borderRadius: AppRadii.r4All,
-              child: TweenAnimationBuilder<double>(
-                duration: PulsrMotion.standard,
-                curve: Curves.easeOut,
-                tween: Tween<double>(
-                  begin: 0.0,
-                  end: task.progress.clamp(0.0, 1.0),
-                ),
-                builder: (context, animatedProgress, _) {
-                  final progressValue = task.status == DownloadStatus.tagging
-                      ? null
-                      : (animatedProgress > 0 ? animatedProgress : null);
-                  return Semantics(
-                    label: statusLabel,
-                    value: progressValue == null
-                        ? null
-                        : '${(progressValue * 100).toStringAsFixed(0)}%',
-                    child: LinearProgressIndicator(
-                      value: progressValue,
-                      backgroundColor: p.surfaceContainerHigh,
-                      valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-                      minHeight: 6,
-                    ),
-                  );
-                },
+            TweenAnimationBuilder<double>(
+              duration: PulsrMotion.standard,
+              curve: Curves.easeOut,
+              tween: Tween<double>(
+                begin: 0.0,
+                end: task.progress.clamp(0.0, 1.0),
               ),
+              builder: (context, animatedProgress, _) {
+                final progressValue = task.status == DownloadStatus.tagging
+                    ? null
+                    : (animatedProgress > 0 ? animatedProgress : null);
+                return Semantics(
+                  label: statusLabel,
+                  value: progressValue == null
+                      ? null
+                      : '${(progressValue * 100).toStringAsFixed(0)}%',
+                  child: progressValue != null
+                      ? PulsrProgressBar.determinate(
+                          value: progressValue,
+                          height: 6,
+                          color: p.accent,
+                          backgroundColor: p.surfaceContainerHigh,
+                          borderRadius: AppRadii.r4All,
+                        )
+                      : PulsrProgressBar.indeterminate(
+                          height: 6,
+                          color: p.accent,
+                          backgroundColor: p.surfaceContainerHigh,
+                          borderRadius: AppRadii.r4All,
+                        ),
+                );
+              },
             ),
             if (task.status == DownloadStatus.downloading) ...[
               const SizedBox(height: AppSpacing.xs),

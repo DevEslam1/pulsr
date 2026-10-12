@@ -403,31 +403,33 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (_, __) {
-        return SizedBox(
-          width: AppSpacing.s18,
-          height: 16,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(3, (i) {
-              final phase = _c.value * math.pi + i * 0.9;
-              final h =
-                  widget.isPlaying ? 5 + (math.sin(phase).abs() * 11) : 5.0;
-              return Container(
-                width: 3.5,
-                height: h,
-                decoration: BoxDecoration(
-                  color: widget.color,
-                  borderRadius: AppRadii.r2All,
-                ),
-              );
-            }),
-          ),
-        );
-      },
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) {
+          return SizedBox(
+            width: AppSpacing.s18,
+            height: 16,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(3, (i) {
+                final phase = _c.value * math.pi + i * 0.9;
+                final h =
+                    widget.isPlaying ? 5 + (math.sin(phase).abs() * 11) : 5.0;
+                return Container(
+                  width: 3.5,
+                  height: h,
+                  decoration: BoxDecoration(
+                    color: widget.color,
+                    borderRadius: AppRadii.r2All,
+                  ),
+                );
+              }),
+            ),
+          );
+        },
+      ),
     );
   }
 }

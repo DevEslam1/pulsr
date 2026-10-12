@@ -10,6 +10,7 @@ abstract class AppRadii {
   static const double chip = 10.0;
   static const double miniPlayer = 24.0;
   static const double dialog = 26.0;
+  static const double screen = 36.0;
 
   // ── Numeric scale ───────────────────────────────────────────────────────
   // Value-named tokens so every hand-tuned radius in the app can reference a
@@ -31,6 +32,7 @@ abstract class AppRadii {
   static const double r26 = 26.0;
   static const double r28 = 28.0;
   static const double r32 = 32.0;
+  static const double r36 = 36.0;
 
   static const BorderRadius tileRadius =
       BorderRadius.all(Radius.circular(tile));
@@ -48,6 +50,8 @@ abstract class AppRadii {
       BorderRadius.all(Radius.circular(miniPlayer));
   static const BorderRadius dialogRadius =
       BorderRadius.all(Radius.circular(dialog));
+  static const BorderRadius screenRadius =
+      BorderRadius.all(Radius.circular(screen));
   static const BorderRadius full = BorderRadius.all(Radius.circular(999.0));
 
   static const BorderRadius bottomSheetAllRadius =
@@ -71,6 +75,7 @@ abstract class AppRadii {
   static const BorderRadius r26All = BorderRadius.all(Radius.circular(r26));
   static const BorderRadius r28All = BorderRadius.all(Radius.circular(r28));
   static const BorderRadius r32All = BorderRadius.all(Radius.circular(r32));
+  static const BorderRadius r36All = BorderRadius.all(Radius.circular(r36));
 
   /// Builds a circular [BorderRadius] for a computed (non-token) radius.
   static BorderRadius circular(double radius) =>

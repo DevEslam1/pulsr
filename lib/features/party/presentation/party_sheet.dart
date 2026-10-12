@@ -6,6 +6,8 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/widgets/pulsr_badge.dart';
+import '../../../core/widgets/pulsr_button.dart';
 import '../../../data/party/listen_together_service.dart';
 import '../../../data/party/party_models.dart';
 
@@ -367,19 +369,12 @@ class _PartySheetState extends State<PartySheet> {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-              ),
+            PulsrButton(
+              label: 'Join',
+              size: PulsrButtonSize.md,
+              variant: PulsrButtonVariant.primary,
+              loading: _isJoining,
               onPressed: _isCreating || _isJoining ? null : _handleJoin,
-              child: _isJoining
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Join'),
             ),
           ],
         ),
@@ -460,13 +455,9 @@ class _PartySheetState extends State<PartySheet> {
               const SizedBox(height: AppSpacing.xs),
               Row(
                 children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSynced ? Colors.greenAccent : Colors.amberAccent,
-                    ),
+                  PulsrBadge(
+                    dot: true,
+                    color: isSynced ? PulsrBadgeColor.success : PulsrBadgeColor.warning,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -478,20 +469,9 @@ class _PartySheetState extends State<PartySheet> {
                   ),
                   const Spacer(),
                   if (isHost)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: p.accent,
-                        borderRadius: AppRadii.r8All,
-                      ),
-                      child: const Text(
-                        'HOST',
-                        style: TextStyle(
-                          fontSize: AppFontSize.tiny,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
+                    const PulsrBadge(
+                      label: 'HOST',
+                      color: PulsrBadgeColor.accent,
                     ),
                 ],
               ),

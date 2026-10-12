@@ -634,13 +634,13 @@ class _LyricsViewState extends State<LyricsView> {
         widget.activeColor == Colors.white ? p.accent : widget.activeColor;
     final style = LyricStyles.default1.copyWith(
       textStyle: TextStyle(
-        fontSize: AppFontSize.bodyLarge,
+        fontSize: 19.0,
         fontWeight: FontWeight.w500,
         color: p.textSecondary.withValues(alpha: 0.7),
         height: 1.4,
       ),
       activeStyle: TextStyle(
-        fontSize: AppFontSize.titleLarge,
+        fontSize: AppFontSize.headline,
         fontWeight: FontWeight.w800,
         color: activeCol,
         height: 1.3,

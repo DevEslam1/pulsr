@@ -30,24 +30,25 @@ class StaggeredReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!context.motionEnabled || index >= 15) return child;
-    final delay = (index.clamp(0, 14) * 20).ms;
+    if (!context.motionEnabled) return child;
+    // Cap staggering delay to first 8 items (30ms per item) to keep lists responsive.
+    final delay = index < 8 ? (index * 30).ms : 0.ms;
     final anim = child
         .animate(
             key: ValueKey('${groupKey ?? ''}#${horizontal ? 'h' : 'v'}$index'))
-        .fadeIn(duration: 240.ms, delay: delay, curve: Curves.easeOut);
+        .fadeIn(duration: 250.ms, delay: delay, curve: Curves.easeOutCubic);
     final animated = horizontal
         ? anim.slideX(
             begin: beginOffset,
             end: 0,
-            duration: 240.ms,
+            duration: 250.ms,
             delay: delay,
             curve: Curves.easeOutCubic,
           )
         : anim.slideY(
             begin: beginOffset,
             end: 0,
-            duration: 240.ms,
+            duration: 250.ms,
             delay: delay,
             curve: Curves.easeOutCubic,
           );
