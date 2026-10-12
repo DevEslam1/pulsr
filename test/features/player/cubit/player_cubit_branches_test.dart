@@ -167,6 +167,8 @@ void main() {
 
       handler.emitTrackChanged(a);
       await pumpEventQueue();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await pumpEventQueue();
       cubit.setStateForTesting(cubit.state.copyWith(
         lyricsSlice: cubit.state.lyricsSlice.copyWith(
           lyrics: const [

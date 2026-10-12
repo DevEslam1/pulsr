@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/highlighted_text.dart';
 import 'package:pulsr/core/widgets/pulsr_empty_state.dart';
+import 'package:pulsr/core/widgets/pulsr_chip.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_state.dart';
@@ -156,7 +157,7 @@ void main() {
 
     await emit(tester, const SearchState(selectedFilter: 'Songs'));
     final chip =
-        tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Songs'));
+        tester.widget<PulsrChip>(find.widgetWithText(PulsrChip, 'Songs'));
     expect(chip.selected, isTrue);
   });
 

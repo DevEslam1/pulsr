@@ -65,10 +65,10 @@ class _CassetteBody extends StatelessWidget {
                   child: Stack(
                     children: [
                       // 1. Four Corner Screws
-                      const Positioned(top: 4, left: 4, child: _CassetteScrew()),
-                      const Positioned(top: 4, right: 4, child: _CassetteScrew()),
-                      const Positioned(bottom: 4, left: 4, child: _CassetteScrew()),
-                      const Positioned(bottom: 4, right: 4, child: _CassetteScrew()),
+                      const PositionedDirectional(top: 4, start: 4, child: _CassetteScrew()),
+                      const PositionedDirectional(top: 4, end: 4, child: _CassetteScrew()),
+                      const PositionedDirectional(bottom: 4, start: 4, child: _CassetteScrew()),
+                      const PositionedDirectional(bottom: 4, end: 4, child: _CassetteScrew()),
 
                       // 2. Main Cassette Body Layout
                       Padding(
@@ -236,10 +236,10 @@ class _CassetteBody extends StatelessWidget {
           ),
 
           // 3. Horizontal Magnetic Tape Ribbon Path
-          Positioned(
+          PositionedDirectional(
             bottom: 28,
-            left: 54,
-            right: 54,
+            start: 54,
+            end: 54,
             height: 14,
             child: Container(
               decoration: BoxDecoration(

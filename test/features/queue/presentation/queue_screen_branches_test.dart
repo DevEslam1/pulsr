@@ -57,6 +57,12 @@ void main() {
     when(() => player.addAllToQueue(any())).thenAnswer((_) async {});
     when(() => player.playSong(any(), queue: any(named: 'queue')))
         .thenAnswer((_) async {});
+    when(() => player.tieredShuffle()).thenAnswer((_) async {
+      final s = player.state;
+      if (s.currentSong != null) {
+        await player.playSong(s.currentSong!, queue: s.queue);
+      }
+    });
     when(() => player.removeQueueItem(any())).thenAnswer((_) async {});
     return player;
   }

@@ -59,9 +59,9 @@ class PulsrIconButton extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           button,
-          Positioned(
+          PositionedDirectional(
             top: 2,
-            right: 2,
+            end: 2,
             child: badge!,
           ),
         ],

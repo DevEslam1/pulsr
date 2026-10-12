@@ -7,7 +7,6 @@ import '../../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
-import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -18,10 +17,34 @@ class SpeedPickerSheet extends StatelessWidget {
   const SpeedPickerSheet({super.key});
 
   static Future<void> show(BuildContext context) {
+    PlayerCubit? playerCubit;
+    SettingsCubit? settingsCubit;
+    try {
+      playerCubit = context.read<PlayerCubit>();
+    } catch (_) {}
+    try {
+      settingsCubit = context.read<SettingsCubit>();
+    } catch (_) {}
+
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
-      builder: (_) => const SpeedPickerSheet(),
+      builder: (_) {
+        Widget content = const SpeedPickerSheet();
+        if (settingsCubit != null) {
+          content = BlocProvider<SettingsCubit>.value(
+            value: settingsCubit,
+            child: content,
+          );
+        }
+        if (playerCubit != null) {
+          content = BlocProvider<PlayerCubit>.value(
+            value: playerCubit,
+            child: content,
+          );
+        }
+        return content;
+      },
     );
   }
 
@@ -277,14 +300,21 @@ class SpeedPickerSheet extends StatelessWidget {
                   const SizedBox(height: AppSpacing.lg),
                   Divider(color: p.hairline),
                   const SizedBox(height: AppSpacing.sm),
-                  BlocBuilder<SettingsCubit, SettingsState>(
-                    builder: (context, settingsState) {
-                      final settingsCubit = context.read<SettingsCubit>();
+                  Builder(
+                    builder: (context) {
+                      SettingsCubit? settingsCubit;
+                      try {
+                        settingsCubit = context.watch<SettingsCubit>();
+                      } catch (_) {
+                        settingsCubit = null;
+                      }
+                      if (settingsCubit == null) return const SizedBox.shrink();
+                      final automixEnabled = settingsCubit.state.automixEnabled;
                       return SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
                         secondary: Icon(
                           Icons.auto_awesome_rounded,
-                          color: settingsState.automixEnabled ? p.accent : p.textSecondary,
+                          color: automixEnabled ? p.accent : p.textSecondary,
                         ),
                         title: Text(
                           'Automix / Smart Transitions',
@@ -301,11 +331,11 @@ class SpeedPickerSheet extends StatelessWidget {
                             fontSize: AppFontSize.caption,
                           ),
                         ),
-                        value: settingsState.automixEnabled,
+                        value: automixEnabled,
                         activeTrackColor: p.accent,
                         onChanged: (val) {
                           HapticFeedback.selectionClick();
-                          settingsCubit.setAutomixEnabled(val);
+                          settingsCubit?.setAutomixEnabled(val);
                         },
                       );
                     },

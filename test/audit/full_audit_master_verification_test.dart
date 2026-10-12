@@ -68,12 +68,12 @@ void main() {
       final l2Dark = PulsrElevation.level2(darkPalette);
       final l3Dark = PulsrElevation.level3(darkPalette);
 
-      expect(l1Dark.first.blurRadius, equals(6));
-      expect(l2Dark.first.blurRadius, equals(14));
-      expect(l3Dark.first.blurRadius, equals(24));
+      expect(l1Dark.first.blurRadius, equals(4));
+      expect(l2Dark.first.blurRadius, equals(8));
+      expect(l3Dark.first.blurRadius, equals(16));
 
       final l1Light = PulsrElevation.level1(lightPalette);
-      expect(l1Light.first.blurRadius, equals(6));
+      expect(l1Light.first.blurRadius, equals(4));
     });
 
     test('HapticPatterns does not throw when invoked in tests', () {

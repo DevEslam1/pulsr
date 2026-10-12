@@ -181,7 +181,7 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
   }
 
   Widget _buildFullScreenBackdrop(bool showVideo) {
-    return Positioned.fill(
+    return SizedBox.expand(
       child: Stack(
         fit: StackFit.expand,
         children: [

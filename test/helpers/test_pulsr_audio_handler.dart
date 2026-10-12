@@ -548,4 +548,16 @@ class TestPulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {}
+
+  bool automixEnabled = false;
+  @override
+  Future<void> setAutomixEnabled(bool enabled) async {
+    automixEnabled = enabled;
+  }
+
+  bool bpmSyncCrossfadeEnabled = false;
+  @override
+  Future<void> setBpmSyncCrossfadeEnabled(bool enabled) async {
+    bpmSyncCrossfadeEnabled = enabled;
+  }
 }

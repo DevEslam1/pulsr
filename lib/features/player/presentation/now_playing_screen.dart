@@ -187,10 +187,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                 children: [
                   if (settingsConfig.canvasEnabled &&
                       settingsConfig.canvasAsBackdrop)
-                    CanvasBackdrop(
-                      song: state.currentSong,
-                      isPlaying: state.isPlaying,
-                      isBackdropMode: true,
+                    Positioned.fill(
+                      child: CanvasBackdrop(
+                        song: state.currentSong,
+                        isPlaying: state.isPlaying,
+                        isBackdropMode: true,
+                      ),
                     ),
                   ResponsivePlayerLayout(
                     state: state,

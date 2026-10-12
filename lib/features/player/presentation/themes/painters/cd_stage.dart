@@ -99,8 +99,8 @@ class _CdTurntableStage extends StatelessWidget {
                       ),
 
                       // 1. Soft ambient glow behind the CD disc
-                      Positioned(
-                        left: cdLeft - 8,
+                      PositionedDirectional(
+                        start: cdLeft - 8,
                         top: cdTop - 8,
                         width: cdSize + 16,
                         height: cdSize + 16,
@@ -124,8 +124,8 @@ class _CdTurntableStage extends StatelessWidget {
                       ),
 
                       // 2. Rotating Compact Disc with central Album Artwork
-                      Positioned(
-                        left: cdLeft,
+                      PositionedDirectional(
+                        start: cdLeft,
                         top: cdTop,
                         width: cdSize,
                         height: cdSize,

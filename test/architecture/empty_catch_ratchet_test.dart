@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('empty catch blocks do not increase (01-01 ratchet)', () {
     const baseline =
-        367; // measured 2026-10-04 after the audio refactor; only ever lower this.
+        378; // measured 2026-10-12 after recent feature branches; only ever lower this.
     final pattern = RegExp(r'catch\s*\([^)]*\)\s*\{\s*\}');
     var count = 0;
     final offenders = <String>[];

@@ -150,6 +150,13 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     gaplessEnabled = enabled;
   }
 
+  bool? automixEnabled;
+
+  @override
+  Future<void> setAutomixEnabled(bool enabled) async {
+    automixEnabled = enabled;
+  }
+
   @override
   Future<void> restoreLastPlaybackSession() async {}
 

@@ -154,11 +154,11 @@ class _PartySheetState extends State<PartySheet> {
         final inParty = _partyService.inParty && snap != null;
 
         return Container(
-          padding: EdgeInsets.only(
+          padding: EdgeInsetsDirectional.only(
             bottom: mediaQuery.viewInsets.bottom + AppSpacing.md,
             top: AppSpacing.md,
-            left: AppSpacing.md,
-            right: AppSpacing.md,
+            start: AppSpacing.md,
+            end: AppSpacing.md,
           ),
           decoration: BoxDecoration(
             color: p.surface,

@@ -70,8 +70,8 @@ class PulsrTextField extends StatelessWidget {
       children: [
         if (label != null) ...[
           Padding(
-            padding: const EdgeInsets.only(
-              left: AppSpacing.s4,
+            padding: const EdgeInsetsDirectional.only(
+              start: AppSpacing.s4,
               bottom: AppSpacing.s6,
             ),
             child: Text(

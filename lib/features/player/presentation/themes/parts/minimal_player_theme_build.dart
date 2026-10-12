@@ -97,9 +97,11 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                               ? 70.0
                               : 46.0)
                       : 0.0;
+                  final telemetrySpace = (song != null) ? 50.0 : 0.0;
                   final artworkSize = PlayerThemeMetrics.safeArtworkSize(
                     availableWidth: artConstraints.maxWidth,
-                    availableHeight: artConstraints.maxHeight - visualizerSpace,
+                    availableHeight:
+                        math.max(0.0, artConstraints.maxHeight - visualizerSpace - telemetrySpace),
                     isTablet: isTablet,
                     maxAllowedOverride: isLandscape ? 280.0 : null,
                   );
@@ -206,7 +208,11 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                 child: Column(
                   children: [
                     Expanded(child: artworkDisplay),
-                    controlsColumn,
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: controlsColumn,
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -289,11 +295,8 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                   ),
                 ),
                 SizedBox(
-                    height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                  child: controlsColumn,
-                ),
+                    height: (isTablet ? 8.0 : 6.0) * metrics.heightRatio),
+                controlsColumn,
               ],
             );
           },
@@ -334,8 +337,9 @@ class _MinimalAudiophileTelemetry extends StatelessWidget {
         ? '${song!.bitrateKbps} kbps'
         : null;
 
-    return Container(
-      margin: const EdgeInsets.only(top: AppSpacing.s10),
+    return MediaQuery.withNoTextScaling(
+      child: Container(
+        margin: const EdgeInsets.only(top: AppSpacing.s10),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.04),
@@ -345,22 +349,26 @@ class _MinimalAudiophileTelemetry extends StatelessWidget {
           width: 0.8,
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildChip(ext, isAccent: true),
-          _buildDivider(),
-          _buildChip(sampleRateStr),
-          _buildDivider(),
-          _buildChip(bitDepthStr),
-          if (bitrateStr != null) ...[
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildChip(ext, isAccent: true),
             _buildDivider(),
-            _buildChip(bitrateStr),
+            _buildChip(sampleRateStr),
+            _buildDivider(),
+            _buildChip(bitDepthStr),
+            if (bitrateStr != null) ...[
+              _buildDivider(),
+              _buildChip(bitrateStr),
+            ],
           ],
-        ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildChip(String label, {bool isAccent = false}) {
     return Text(

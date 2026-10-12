@@ -626,8 +626,8 @@ class _ThemeMockupCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned(
-                right: 2,
+              PositionedDirectional(
+                end: 2,
                 top: 4,
                 child: Transform.rotate(
                   angle: 0.35,
