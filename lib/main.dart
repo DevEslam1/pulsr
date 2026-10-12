@@ -73,8 +73,9 @@ import 'services/updater/app_update_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Cap the framework's decoded-image cache so artwork bitmaps cannot balloon
-  // RAM under heavy scrolling (80 MB ceiling).
+  // RAM under heavy scrolling (80 MB / 250 image ceiling).
   PaintingBinding.instance.imageCache.maximumSizeBytes = 80 << 20;
+  PaintingBinding.instance.imageCache.maximumSize = 250;
   HttpOverrides.global = AppHttpOverrides.instance;
   // A production build with dev flags cannot be patched at runtime: surface a
   // blocking configuration screen instead of logging and continuing with

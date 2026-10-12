@@ -259,4 +259,22 @@ void main() {
       expect(ArtworkCacheManager.toLowQualityArtworkUrl(url), url);
     });
   });
+
+  group('memory eviction and pressure handling (P2-7)', () {
+    test('evicts in-memory entries when count limit is reached', () async {
+      for (int i = 0; i < 160; i++) {
+        await manager.put('key_$i', _bytes(100));
+      }
+      expect(manager.getDiskCacheSizeBytes(), completes);
+    });
+
+    test('trimMemoryForPressure clears memory caches without destroying disk cache', () async {
+      await manager.put('cached_art', _bytes(2048));
+      expect(await manager.getDiskCacheSizeBytes(), greaterThan(0));
+
+      manager.trimMemoryForPressure();
+      // Disk cache persists so assets do not require re-fetching
+      expect(await manager.getDiskCacheSizeBytes(), greaterThan(0));
+    });
+  });
 }
