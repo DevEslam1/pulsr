@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+// ProtocolVersion indicates the active wire protocol version.
+// Clients send version in frames; servers accept older versions compatibly.
+const ProtocolVersion = 1
+
 // Server -> Client frame types
 const (
 	FrameWelcome = "welcome"

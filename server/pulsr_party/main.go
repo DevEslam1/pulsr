@@ -869,6 +869,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	p.Lock()
 	welcome := map[string]interface{}{
 		"type":     protocol.FrameWelcome,
+		"version":  protocol.ProtocolVersion,
 		"you":      member.ToWire(),
 		"party":    p.ToWire(),
 		"serverMs": clock.NowMs(),
