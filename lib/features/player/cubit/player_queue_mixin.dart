@@ -29,6 +29,7 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     List<SongsTableData>? queue,
     Duration? initialPosition,
     bool openPlayerIfPlaying = true,
+    bool preservePlaybackState = false,
   }) {
     invalidateMediaItemResolution();
     return queueController.playSong(
@@ -36,6 +37,7 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
       queue: queue,
       initialPosition: initialPosition,
       openPlayerIfPlaying: openPlayerIfPlaying,
+      preservePlaybackState: preservePlaybackState,
     );
   }
 

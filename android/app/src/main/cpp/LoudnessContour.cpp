@@ -175,6 +175,130 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
     }
 
     if (channels == 2) {
+#if defined(PULSR_F32_BIQUADS)
+#if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
+        const float32x2_t tb0 = vdup_n_f32(static_cast<float>(treble_[0].b0));
+        const float32x2_t tb1 = vdup_n_f32(static_cast<float>(treble_[0].b1));
+        const float32x2_t tb2 = vdup_n_f32(static_cast<float>(treble_[0].b2));
+        const float32x2_t ta1 = vdup_n_f32(static_cast<float>(treble_[0].a1));
+        const float32x2_t ta2 = vdup_n_f32(static_cast<float>(treble_[0].a2));
+
+        const float32x2_t bb0 = vdup_n_f32(static_cast<float>(bass_[0].b0));
+        const float32x2_t bb1 = vdup_n_f32(static_cast<float>(bass_[0].b1));
+        const float32x2_t bb2 = vdup_n_f32(static_cast<float>(bass_[0].b2));
+        const float32x2_t ba1 = vdup_n_f32(static_cast<float>(bass_[0].a1));
+        const float32x2_t ba2 = vdup_n_f32(static_cast<float>(bass_[0].a2));
+
+        float32x2_t tx1 = { treble_[0].x1, treble_[1].x1 };
+        float32x2_t tx2 = { treble_[0].x2, treble_[1].x2 };
+        float32x2_t ty1 = { treble_[0].y1, treble_[1].y1 };
+        float32x2_t ty2 = { treble_[0].y2, treble_[1].y2 };
+
+        float32x2_t bx1 = { bass_[0].x1, bass_[1].x1 };
+        float32x2_t bx2 = { bass_[0].x2, bass_[1].x2 };
+        float32x2_t by1 = { bass_[0].y1, bass_[1].y1 };
+        float32x2_t by2 = { bass_[0].y2, bass_[1].y2 };
+
+        for (int i = 0; i < frames; ++i) {
+            float l = buffer[i * 2];
+            float r = buffer[i * 2 + 1];
+            if (!std::isfinite(l)) l = 0.0f;
+            if (!std::isfinite(r)) r = 0.0f;
+            float32x2_t vx = { l, r };
+
+            // Treble shelf biquad: y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+            float32x2_t ty = vsub_f32(
+                vadd_f32(vmul_f32(tb0, vx), vadd_f32(vmul_f32(tb1, tx1), vmul_f32(tb2, tx2))),
+                vadd_f32(vmul_f32(ta1, ty1), vmul_f32(ta2, ty2))
+            );
+            tx2 = tx1; tx1 = vx;
+            ty2 = ty1; ty1 = ty;
+
+            // Bass shelf biquad: y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+            float32x2_t by = vsub_f32(
+                vadd_f32(vmul_f32(bb0, ty), vadd_f32(vmul_f32(bb1, bx1), vmul_f32(bb2, bx2))),
+                vadd_f32(vmul_f32(ba1, by1), vmul_f32(ba2, by2))
+            );
+            bx2 = bx1; bx1 = ty;
+            by2 = by1; by1 = by;
+
+            buffer[i * 2] = vget_lane_f32(by, 0);
+            buffer[i * 2 + 1] = vget_lane_f32(by, 1);
+        }
+
+        treble_[0].x1 = vget_lane_f32(tx1, 0); treble_[1].x1 = vget_lane_f32(tx1, 1);
+        treble_[0].x2 = vget_lane_f32(tx2, 0); treble_[1].x2 = vget_lane_f32(tx2, 1);
+        treble_[0].y1 = vget_lane_f32(ty1, 0); treble_[1].y1 = vget_lane_f32(ty1, 1);
+        treble_[0].y2 = vget_lane_f32(ty2, 0); treble_[1].y2 = vget_lane_f32(ty2, 1);
+
+        bass_[0].x1 = vget_lane_f32(bx1, 0); bass_[1].x1 = vget_lane_f32(bx1, 1);
+        bass_[0].x2 = vget_lane_f32(bx2, 0); bass_[1].x2 = vget_lane_f32(bx2, 1);
+        bass_[0].y1 = vget_lane_f32(by1, 0); bass_[1].y1 = vget_lane_f32(by1, 1);
+        bass_[0].y2 = vget_lane_f32(by2, 0); bass_[1].y2 = vget_lane_f32(by2, 1);
+        return;
+#elif defined(PULSR_HAS_SSE2)
+        const __m128 tb0 = _mm_set1_ps(static_cast<float>(treble_[0].b0));
+        const __m128 tb1 = _mm_set1_ps(static_cast<float>(treble_[0].b1));
+        const __m128 tb2 = _mm_set1_ps(static_cast<float>(treble_[0].b2));
+        const __m128 ta1 = _mm_set1_ps(static_cast<float>(treble_[0].a1));
+        const __m128 ta2 = _mm_set1_ps(static_cast<float>(treble_[0].a2));
+
+        const __m128 bb0 = _mm_set1_ps(static_cast<float>(bass_[0].b0));
+        const __m128 bb1 = _mm_set1_ps(static_cast<float>(bass_[0].b1));
+        const __m128 bb2 = _mm_set1_ps(static_cast<float>(bass_[0].b2));
+        const __m128 ba1 = _mm_set1_ps(static_cast<float>(bass_[0].a1));
+        const __m128 ba2 = _mm_set1_ps(static_cast<float>(bass_[0].a2));
+
+        __m128 tx1 = _mm_set_ps(0.0f, 0.0f, treble_[1].x1, treble_[0].x1);
+        __m128 tx2 = _mm_set_ps(0.0f, 0.0f, treble_[1].x2, treble_[0].x2);
+        __m128 ty1 = _mm_set_ps(0.0f, 0.0f, treble_[1].y1, treble_[0].y1);
+        __m128 ty2 = _mm_set_ps(0.0f, 0.0f, treble_[1].y2, treble_[0].y2);
+
+        __m128 bx1 = _mm_set_ps(0.0f, 0.0f, bass_[1].x1, bass_[0].x1);
+        __m128 bx2 = _mm_set_ps(0.0f, 0.0f, bass_[1].x2, bass_[0].x2);
+        __m128 by1 = _mm_set_ps(0.0f, 0.0f, bass_[1].y1, bass_[0].y1);
+        __m128 by2 = _mm_set_ps(0.0f, 0.0f, bass_[1].y2, bass_[0].y2);
+
+        for (int i = 0; i < frames; ++i) {
+            float l = buffer[i * 2];
+            float r = buffer[i * 2 + 1];
+            if (!std::isfinite(l)) l = 0.0f;
+            if (!std::isfinite(r)) r = 0.0f;
+            __m128 vx = _mm_set_ps(0.0f, 0.0f, r, l);
+
+            __m128 ty = _mm_sub_ps(
+                _mm_add_ps(_mm_mul_ps(tb0, vx), _mm_add_ps(_mm_mul_ps(tb1, tx1), _mm_mul_ps(tb2, tx2))),
+                _mm_add_ps(_mm_mul_ps(ta1, ty1), _mm_mul_ps(ta2, ty2))
+            );
+            tx2 = tx1; tx1 = vx;
+            ty2 = ty1; ty1 = ty;
+
+            __m128 by = _mm_sub_ps(
+                _mm_add_ps(_mm_mul_ps(bb0, ty), _mm_add_ps(_mm_mul_ps(bb1, bx1), _mm_mul_ps(bb2, bx2))),
+                _mm_add_ps(_mm_mul_ps(ba1, by1), _mm_mul_ps(ba2, by2))
+            );
+            bx2 = bx1; bx1 = ty;
+            by2 = by1; by1 = by;
+
+            alignas(16) float by_arr[4];
+            _mm_store_ps(by_arr, by);
+            buffer[i * 2] = by_arr[0];
+            buffer[i * 2 + 1] = by_arr[1];
+        }
+
+        alignas(16) float t_arr[4], b_arr[4];
+        _mm_store_ps(t_arr, tx1); treble_[0].x1 = t_arr[0]; treble_[1].x1 = t_arr[1];
+        _mm_store_ps(t_arr, tx2); treble_[0].x2 = t_arr[0]; treble_[1].x2 = t_arr[1];
+        _mm_store_ps(t_arr, ty1); treble_[0].y1 = t_arr[0]; treble_[1].y1 = t_arr[1];
+        _mm_store_ps(t_arr, ty2); treble_[0].y2 = t_arr[0]; treble_[1].y2 = t_arr[1];
+
+        _mm_store_ps(b_arr, bx1); bass_[0].x1 = b_arr[0]; bass_[1].x1 = b_arr[1];
+        _mm_store_ps(b_arr, bx2); bass_[0].x2 = b_arr[0]; bass_[1].x2 = b_arr[1];
+        _mm_store_ps(b_arr, by1); bass_[0].y1 = b_arr[0]; bass_[1].y1 = b_arr[1];
+        _mm_store_ps(b_arr, by2); bass_[0].y2 = b_arr[0]; bass_[1].y2 = b_arr[1];
+        return;
+#endif
+#else
 #if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
         const float64x2_t tb0 = vdupq_n_f64(treble_[0].b0);
         const float64x2_t tb1 = vdupq_n_f64(treble_[0].b1);
@@ -296,6 +420,7 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         _mm_store_pd(b_arr, by1); bass_[0].y1 = b_arr[0]; bass_[1].y1 = b_arr[1];
         _mm_store_pd(b_arr, by2); bass_[0].y2 = b_arr[0]; bass_[1].y2 = b_arr[1];
         return;
+#endif
 #endif
     }
 

@@ -54,6 +54,27 @@ private:
 
     struct Biquad {
         double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0;
+#if defined(PULSR_F32_BIQUADS)
+        float x1 = 0.0f, x2 = 0.0f, y1 = 0.0f, y2 = 0.0f;
+        inline float process(float x) {
+            if (!std::isfinite(x)) x = 0.0f;
+            const float b0_f = static_cast<float>(b0);
+            const float b1_f = static_cast<float>(b1);
+            const float b2_f = static_cast<float>(b2);
+            const float a1_f = static_cast<float>(a1);
+            const float a2_f = static_cast<float>(a2);
+            float y = b0_f * x + b1_f * x1 + b2_f * x2 - a1_f * y1 - a2_f * y2;
+            if (!std::isfinite(y)) {
+                y = x;
+                x1 = x2 = y1 = y2 = 0.0f;
+            }
+            if (std::abs(y1) < 1e-25f) y1 = 0.0f;
+            if (std::abs(y2) < 1e-25f) y2 = 0.0f;
+            x2 = x1; x1 = x;
+            y2 = y1; y1 = y;
+            return y;
+        }
+#else
         double x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0;
         inline float process(float x) {
             if (!std::isfinite(x)) x = 0.0f;
@@ -68,6 +89,7 @@ private:
             y2 = y1; y1 = y;
             return static_cast<float>(y);
         }
+#endif
     };
 
     static void computeLowShelf(Biquad& bq, double f0, double gainDb, double sampleRate);

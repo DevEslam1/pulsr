@@ -62,8 +62,13 @@ private:
         double env[MAX_CHANNELS] = {};
         // Application: biquad with modulated gain per channel
         double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0;
+#if defined(PULSR_F32_BIQUADS)
+        float x1[MAX_CHANNELS] = {}, x2[MAX_CHANNELS] = {};
+        float y1[MAX_CHANNELS] = {}, y2[MAX_CHANNELS] = {};
+#else
         double x1[MAX_CHANNELS] = {}, x2[MAX_CHANNELS] = {};
         double y1[MAX_CHANNELS] = {}, y2[MAX_CHANNELS] = {};
+#endif
         double currentGainDb = 0.0; // smoothed dynamic gain (cut <= 0 or boost >= 0)
         double lastCoeffGainDb = 0.0;
         

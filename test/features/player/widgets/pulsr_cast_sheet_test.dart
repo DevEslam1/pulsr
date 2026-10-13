@@ -1,10 +1,9 @@
 // test/features/player/widgets/pulsr_cast_sheet_test.dart
 //
-// The Android device-list branch of [PulsrCastSheet] builds a `Material` with
-// both `shape` and `borderRadius`, which trips a framework assertion in debug
-// builds, so it cannot be rendered in a widget test. These tests therefore
-// cover the supported non-Android notice and the static [PulsrCastSheet.show]
-// modal entry point (both under a non-Android target override).
+// These tests cover the supported non-Android notice and the static
+// [PulsrCastSheet.show] modal entry point (both under a non-Android target
+// override). The Android build branch is exercised by
+// pulsr_cast_sheet_coverage_test.dart.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

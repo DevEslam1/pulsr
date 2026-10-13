@@ -1,13 +1,12 @@
 // test/features/player/widgets/pulsr_cast_sheet_coverage_test.dart
 //
 // Extra coverage for [PulsrCastSheet] beyond the base suite. The Android build
-// branch is unreachable in a widget test: its device list creates a
-// `Material(shape: ..., borderRadius: ...)`, and Flutter asserts that a Material
-// cannot carry both, so the build throws before the list can be pumped. What
-// *is* reachable on the Android target is the init / discovery plumbing, which
-// runs in initState before the first build. These tests enter the Android path
-// far enough to run that plumbing, then assert the known build failure so the
-// limitation is pinned rather than silently skipped.
+// branch previously threw during build because its device list created a
+// `Material(shape: ..., borderRadius: ...)`; a framework assertion forbids
+// carrying both (and borderRadius is ignored in release). The duplicate
+// parameter has been removed, so these tests now enter the Android path, run
+// the init / discovery plumbing in initState, and assert the sheet builds
+// cleanly with no pending exception.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -61,7 +60,7 @@ void main() {
   });
 
   testWidgets(
-      'Android init runs the mDNS fallback plumbing before the build assert',
+      'Android init runs the mDNS fallback plumbing and the sheet builds',
       (tester) async {
     // Cast session plugin unavailable -> the mDNS/direct-device fallback path.
     messenger.setMockMethodCallHandler(
@@ -71,13 +70,12 @@ void main() {
 
     await pumpAndroidCastSheet(tester);
 
-    // The known Material(shape + borderRadius) assertion fires during build;
-    // consume it so the test can assert the init plumbing ran.
+    // The former Material(shape + borderRadius) build assertion is fixed;
+    // the sheet must build with no pending exception.
     expect(
       tester.takeException(),
-      isNotNull,
-      reason: 'known Material(shape + borderRadius) assertion on the '
-          'Android build branch',
+      isNull,
+      reason: 'the Android build branch must build cleanly',
     );
 
     // Tear the tree down so the 8s scan-timeout timer is cancelled.
@@ -100,9 +98,8 @@ void main() {
 
     expect(
       tester.takeException(),
-      isNotNull,
-      reason: 'known Material(shape + borderRadius) assertion on the '
-          'Android build branch',
+      isNull,
+      reason: 'the Android build branch must build cleanly',
     );
 
     debugDefaultTargetPlatformOverride = null;

@@ -17,6 +17,12 @@ if(WIN32)
     add_link_options(-static)
 endif()
 
+# Fast float32 recurrence and SIMD for biquad stages (ParametricEQ, DynamicEQ, LoudnessContour, ViperDdc)
+option(PULSR_F32_BIQUADS "Enable float32 fast path for biquad filter stages" ON)
+if(PULSR_F32_BIQUADS)
+    add_compile_definitions(PULSR_F32_BIQUADS=1)
+endif()
+
 # Opt-in ASan/UBSan for the sanitizer pass. Enabled by the gradle
 # testNative task via -DPULSR_TEST_SANITIZERS=ON; not part of the parity build.
 option(PULSR_TEST_SANITIZERS "Build native DSP tests with ASan/UBSan" OFF)

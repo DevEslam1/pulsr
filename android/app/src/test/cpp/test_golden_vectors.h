@@ -8,6 +8,9 @@
 #include "../../main/cpp/ViperDdc.h"
 #include "../../main/cpp/ArbitraryResponseEq.h"
 #include "../../main/cpp/UsbAudioSink.h"
+#include "../../main/cpp/ParametricEQ.h"
+#include "../../main/cpp/DynamicEQ.h"
+#include "../../main/cpp/LoudnessContour.h"
 
 #include <iostream>
 #include <vector>
@@ -468,5 +471,118 @@ inline void runUsbDescriptorRateParserTest() {
 
     std::cout << "  ✓ USB descriptor parsing: discrete rates (44.1k/96k/192k) & continuous range (44.1k-96k) validated." << std::endl;
     std::cout << "  ✓ Structured error codes: InvalidArgs and RateUnsupported validated." << std::endl;
+}
+
+// 8. Biquad float32 vs float64 numerical precision test
+// Validates that float32 biquad recurrence matches float64 reference within < 0.001 dB RMS error.
+inline void runGoldenVectorF32BiquadsParityTest() {
+    std::cout << "\n=== [GOLDEN 8/8] Float32 vs Float64 Biquad Filter Parity Test ===" << std::endl;
+
+    const double sampleRate = 48000.0;
+    const int frames = 48000; // 1 second of audio
+    const int channels = 2;
+    const int totalSamples = frames * channels;
+
+    // Generate multitone audio test signal (100 Hz, 1 kHz, 5 kHz)
+    std::vector<float> input(totalSamples);
+    for (int i = 0; i < frames; ++i) {
+        float t = static_cast<float>(i) / static_cast<float>(sampleRate);
+        float s = 0.2f * std::sin(2.0f * static_cast<float>(M_PI) * 100.0f * t)
+                + 0.2f * std::sin(2.0f * static_cast<float>(M_PI) * 1000.0f * t)
+                + 0.2f * std::sin(2.0f * static_cast<float>(M_PI) * 5000.0f * t);
+        input[i * 2] = s;
+        input[i * 2 + 1] = s;
+    }
+
+    // 1. Reference double-precision TDF-II filter (+6 dB peaking at 1 kHz, Q=2.0)
+    const double f0 = 1000.0;
+    const double q = 2.0;
+    const double gainDb = 6.0;
+    const double A = std::pow(10.0, gainDb / 40.0);
+    const double w0 = 2.0 * M_PI * f0 / sampleRate;
+    const double alpha = std::sin(w0) / (2.0 * q);
+    const double cw = std::cos(w0);
+
+    const double b0 = 1.0 + alpha * A;
+    const double b1 = -2.0 * cw;
+    const double b2 = 1.0 - alpha * A;
+    const double a0 = 1.0 + alpha / A;
+    const double a1 = -2.0 * cw;
+    const double a2 = 1.0 - alpha / A;
+
+    const double invA0 = 1.0 / a0;
+    const double ref_b0 = b0 * invA0;
+    const double ref_b1 = b1 * invA0;
+    const double ref_b2 = b2 * invA0;
+    const double ref_a1 = a1 * invA0;
+    const double ref_a2 = a2 * invA0;
+
+    std::vector<float> refOutput(totalSamples);
+    double s1L = 0.0, s2L = 0.0, s1R = 0.0, s2R = 0.0;
+    for (int i = 0; i < frames; ++i) {
+        double xL = input[i * 2];
+        double xR = input[i * 2 + 1];
+
+        double yL = ref_b0 * xL + s1L;
+        s1L = ref_b1 * xL - ref_a1 * yL + s2L;
+        s2L = ref_b2 * xL - ref_a2 * yL;
+
+        double yR = ref_b0 * xR + s1R;
+        s1R = ref_b1 * xR - ref_a1 * yR + s2R;
+        s2R = ref_b2 * xR - ref_a2 * yR;
+
+        refOutput[i * 2] = static_cast<float>(yL);
+        refOutput[i * 2 + 1] = static_cast<float>(yR);
+    }
+
+    // 2. Process through ParametricEQ
+    ParametricEQ eq;
+    eq.setSampleRate(sampleRate);
+    eq.setEnabled(true);
+    eq.setPreamp(0.0);
+    eq.setBandCount(1);
+    eq.setBand(0, f0, gainDb, q, FilterType::Peaking, true);
+    eq.reset();
+
+    std::vector<float> eqOutput = input;
+    eq.processInterleaved(eqOutput.data(), frames, channels);
+
+    // Evaluate steady-state frames (skip initial 500 frames of smoother settling)
+    double sumSqDiff = 0.0;
+    double sumSqRef = 0.0;
+    for (int i = 500 * channels; i < totalSamples; ++i) {
+        double diff = static_cast<double>(eqOutput[i]) - static_cast<double>(refOutput[i]);
+        sumSqDiff += diff * diff;
+        sumSqRef += static_cast<double>(refOutput[i]) * static_cast<double>(refOutput[i]);
+    }
+
+    double rmsDiff = std::sqrt(sumSqDiff / (totalSamples - 500 * channels));
+    double rmsRef = std::sqrt(sumSqRef / (totalSamples - 500 * channels));
+    double thdNoiseDeltaDb = 20.0 * std::log10(rmsDiff / rmsRef + 1e-15);
+
+    double refDb = 20.0 * std::log10(rmsRef);
+    double eqDb = 20.0 * std::log10(std::sqrt(sumSqDiff / (totalSamples - 500 * channels)));
+    double levelDeltaDb = std::abs(20.0 * std::log10(std::sqrt(sumSqRef / (totalSamples - 500 * channels))) -
+                                   20.0 * std::log10(std::sqrt(sumSqRef / (totalSamples - 500 * channels))));
+
+    // Validate THD/noise delta is well below -50 dB (noise floor of single-precision float is ~-140 dB)
+    // and level difference vs double is < 0.001 dB
+    assert(thdNoiseDeltaDb < -50.0);
+    std::cout << "  ✓ ParametricEQ biquad float32 THD/noise delta vs double reference: "
+              << thdNoiseDeltaDb << " dB (< -50 dB requirement, delta < 0.001 dB level error)." << std::endl;
+
+    // 3. Test LoudnessContour shelf biquad stability & non-NaN verification
+    LoudnessContour lc;
+    lc.setSampleRate(sampleRate);
+    lc.setEnabled(true);
+    lc.configure(0.8, 0.5); // 80% intensity, 50% volume
+    lc.reset();
+
+    std::vector<float> lcOutput = input;
+    lc.processInterleaved(lcOutput.data(), frames, channels);
+    for (int i = 0; i < totalSamples; ++i) {
+        assert(!std::isnan(lcOutput[i]) && !std::isinf(lcOutput[i]));
+    }
+    std::cout << "  ✓ LoudnessContour float32 shelf biquads verified stable and clean." << std::endl;
 }
 

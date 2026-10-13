@@ -420,6 +420,101 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                 computeBandCoeffs(band, band.currentGainDb);
             }
 
+#if defined(PULSR_F32_BIQUADS)
+            const float b0_f = static_cast<float>(band.b0);
+            const float b1_f = static_cast<float>(band.b1);
+            const float b2_f = static_cast<float>(band.b2);
+            const float a1_f = static_cast<float>(band.a1);
+            const float a2_f = static_cast<float>(band.a2);
+
+            if (chCount == 2) {
+#if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
+                float32x2_t vx = { buffer[i * channels], buffer[i * channels + 1] };
+                float32x2_t vx1 = { band.x1[0], band.x1[1] };
+                float32x2_t vx2 = { band.x2[0], band.x2[1] };
+                float32x2_t vy1 = { band.y1[0], band.y1[1] };
+                float32x2_t vy2 = { band.y2[0], band.y2[1] };
+                float32x2_t vb0 = vdup_n_f32(b0_f);
+                float32x2_t vb1 = vdup_n_f32(b1_f);
+                float32x2_t vb2 = vdup_n_f32(b2_f);
+                float32x2_t va1 = vdup_n_f32(a1_f);
+                float32x2_t va2 = vdup_n_f32(a2_f);
+
+                float32x2_t vy = vsub_f32(
+                    vadd_f32(vmul_f32(vb0, vx), vadd_f32(vmul_f32(vb1, vx1), vmul_f32(vb2, vx2))),
+                    vadd_f32(vmul_f32(va1, vy1), vmul_f32(va2, vy2))
+                );
+
+                float y0 = vget_lane_f32(vy, 0);
+                float y1 = vget_lane_f32(vy, 1);
+                if (!std::isfinite(y0) || std::abs(y0) < 1e-25f) y0 = 0.0f;
+                if (!std::isfinite(y1) || std::abs(y1) < 1e-25f) y1 = 0.0f;
+
+                band.x2[0] = band.x1[0]; band.x2[1] = band.x1[1];
+                band.x1[0] = buffer[i * channels]; band.x1[1] = buffer[i * channels + 1];
+                band.y2[0] = band.y1[0]; band.y2[1] = band.y1[1];
+                band.y1[0] = y0; band.y1[1] = y1;
+
+                buffer[i * channels] = y0;
+                buffer[i * channels + 1] = y1;
+#elif defined(PULSR_HAS_SSE2)
+                __m128 vx = _mm_set_ps(0.0f, 0.0f, buffer[i * channels + 1], buffer[i * channels]);
+                __m128 vx1 = _mm_set_ps(0.0f, 0.0f, band.x1[1], band.x1[0]);
+                __m128 vx2 = _mm_set_ps(0.0f, 0.0f, band.x2[1], band.x2[0]);
+                __m128 vy1 = _mm_set_ps(0.0f, 0.0f, band.y1[1], band.y1[0]);
+                __m128 vy2 = _mm_set_ps(0.0f, 0.0f, band.y2[1], band.y2[0]);
+                __m128 vb0 = _mm_set1_ps(b0_f);
+                __m128 vb1 = _mm_set1_ps(b1_f);
+                __m128 vb2 = _mm_set1_ps(b2_f);
+                __m128 va1 = _mm_set1_ps(a1_f);
+                __m128 va2 = _mm_set1_ps(a2_f);
+
+                __m128 vy = _mm_sub_ps(
+                    _mm_add_ps(_mm_mul_ps(vb0, vx), _mm_add_ps(_mm_mul_ps(vb1, vx1), _mm_mul_ps(vb2, vx2))),
+                    _mm_add_ps(_mm_mul_ps(va1, vy1), _mm_mul_ps(va2, vy2))
+                );
+
+                alignas(16) float y_arr[4];
+                _mm_store_ps(y_arr, vy);
+                if (!std::isfinite(y_arr[0]) || std::abs(y_arr[0]) < 1e-25f) y_arr[0] = 0.0f;
+                if (!std::isfinite(y_arr[1]) || std::abs(y_arr[1]) < 1e-25f) y_arr[1] = 0.0f;
+
+                band.x2[0] = band.x1[0]; band.x2[1] = band.x1[1];
+                band.x1[0] = buffer[i * channels]; band.x1[1] = buffer[i * channels + 1];
+                band.y2[0] = band.y1[0]; band.y2[1] = band.y1[1];
+                band.y1[0] = y_arr[0]; band.y1[1] = y_arr[1];
+
+                buffer[i * channels] = y_arr[0];
+                buffer[i * channels + 1] = y_arr[1];
+#else
+                for (int ch = 0; ch < 2; ++ch) {
+                    const float x = buffer[i * channels + ch];
+                    float y = b0_f * x + b1_f * band.x1[ch] + b2_f * band.x2[ch]
+                        - a1_f * band.y1[ch] - a2_f * band.y2[ch];
+                    if (!std::isfinite(y) || std::abs(y) < 1e-25f) y = 0.0f;
+
+                    band.x2[ch] = band.x1[ch];
+                    band.x1[ch] = x;
+                    band.y2[ch] = band.y1[ch];
+                    band.y1[ch] = y;
+                    buffer[i * channels + ch] = y;
+                }
+#endif
+            } else {
+                for (int ch = 0; ch < chCount; ++ch) {
+                    const float x = buffer[i * channels + ch];
+                    float y = b0_f * x + b1_f * band.x1[ch] + b2_f * band.x2[ch]
+                        - a1_f * band.y1[ch] - a2_f * band.y2[ch];
+                    if (!std::isfinite(y) || std::abs(y) < 1e-25f) y = 0.0f;
+
+                    band.x2[ch] = band.x1[ch];
+                    band.x1[ch] = x;
+                    band.y2[ch] = band.y1[ch];
+                    band.y1[ch] = y;
+                    buffer[i * channels + ch] = y;
+                }
+            }
+#else
             if (chCount == 2) {
 #if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
                 float64x2_t vx = { buffer[i * channels], buffer[i * channels + 1] };
@@ -515,6 +610,7 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                     buffer[i * channels + ch] = static_cast<float>(y);
                 }
             }
+#endif
         }
     }
 }

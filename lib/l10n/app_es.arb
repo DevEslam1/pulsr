@@ -703,6 +703,8 @@
   "smartAudioMatchedProfile": "Corrección aplicada: {profile}",
   "smartAudioNoMatch": "No hay corrección de auriculares para este dispositivo",
   "smartAudioAutoCatchAllHint": "El modo automático solo ajusta el sonido cuando reconoce tus auriculares o un perfil de dispositivo guardado; tus ajustes nunca se sobrescriben en modo manual",
+  "smartAudioAutoDacTitle": "Selección automática de DAC USB y Bit-Perfect",
+  "smartAudioAutoDacSubtitle": "Enruta el audio automáticamente a los DAC USB conectados y activa el modo Bit-Perfect para obtener la máxima calidad bit a bit.",
   "experienceModeTitle": "Modo de uso",
   "experienceModeSubtitle": "Elige cuánto control quieres",
   "experienceModeNormal": "Normal",

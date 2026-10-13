@@ -218,18 +218,26 @@ extension PlayerQueueRadio on PlayerQueueController {
       if (room <= 0) return;
 
       final toAppend = eligible.take(room).toList();
+      // AUDIT-FIX: track only the songs the engine actually accepted — a
+      // mid-loop failure must not append songs to the UI queue that were
+      // never enqueued (mirrors the batch-add path in the queue controller).
+      final added = <SongsTableData>[];
       for (final song in toAppend) {
         try {
           await _audioHandler.addToQueueEnd(song);
-        } catch (_) {
+          added.add(song);
+        } catch (e, st) {
+          ErrorLogger.log('Failed to add autoplay song ${song.title}',
+              error: e, stackTrace: st, category: 'PlayerQueueRadio');
           break;
         }
       }
+      if (added.isEmpty || _isClosed()) return;
 
       final fresh = _getState();
-      final updatedQueue = [...fresh.queue, ...toAppend];
+      final updatedQueue = [...fresh.queue, ...added];
       final updatedTiers = Map<int, QueueTier>.from(fresh.trackTiers);
-      for (final song in toAppend) {
+      for (final song in added) {
         updatedTiers[song.id] = QueueTier.autoplay;
       }
 
@@ -325,6 +333,6 @@ extension PlayerQueueRadio on PlayerQueueController {
       ...newUpcoming,
     ];
 
-    await playSong(currentSong, queue: newQueue);
+    await playSong(currentSong, queue: newQueue, preservePlaybackState: true);
   }
 }

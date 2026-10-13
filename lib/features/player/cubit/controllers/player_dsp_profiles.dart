@@ -54,6 +54,11 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         }
       }
 
+      // Auto-select DAC and engage Bit-Perfect (highest quality path)
+      if (await _shouldAutoSelectDac(device)) {
+        await _handleDacAutoRouting(device);
+      }
+
       if (smartEnabled) {
         final matched = await _applySmartAutoEq(smart, key, device);
         await _applySmartQuality(device, matched?.id);
@@ -61,6 +66,42 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     } catch (e, st) {
       ErrorLogger.log('Device profile auto-switch failed',
           error: e, stackTrace: st, category: 'PlayerDspController');
+    }
+  }
+
+  Future<bool> _shouldAutoSelectDac(AudioOutputInfo device) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(PrefsKeys.autoDacSelectBitPerfect) ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> _handleDacAutoRouting(AudioOutputInfo device) async {
+    final settings = _settingsCubit;
+    if (settings == null || _isClosed()) return;
+
+    // 1. If USB DAC is present among available devices but not active, route to it
+    if (!device.isUsbDac) {
+      final dacDevice = device.availableDevices.where((d) =>
+          d.type == 11 || // TYPE_USB_DEVICE
+          d.type == 22 || // TYPE_USB_HEADSET
+          d.typeName.toLowerCase().contains('usb') ||
+          d.name.toLowerCase().contains('dac') ||
+          d.name.toLowerCase().contains('usb')).firstOrNull;
+
+      if (dacDevice != null && !dacDevice.isCurrent) {
+        await settings.selectOutputDevice(dacDevice.id);
+      }
+    }
+
+    // 2. If the current route is a USB DAC, activate Bit-Perfect mode for bit-exact highest fidelity
+    final currentDevice = _settingsCubit?.state.currentOutputDevice ?? device;
+    if (currentDevice.isUsbDac || currentDevice.activeDeviceType == 'usb') {
+      if (!settings.state.bitPerfectOutput) {
+        await settings.setBitPerfectOutput(true);
+      }
     }
   }
 

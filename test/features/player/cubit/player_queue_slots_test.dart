@@ -269,7 +269,7 @@ void main() {
       await buildController().removeQueueItem(0);
       expect(state.queue, isEmpty);
       expect(state.currentSong, isNull);
-      expect(handler.calls, contains('clearQueue'));
+      expect(handler.calls, contains('removeQueueItemAt'));
     });
 
     test('removing the current item advances to the next song', () async {

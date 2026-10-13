@@ -240,8 +240,15 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       updateWidgetThrottled: ({bool force = false}) =>
           widgetBridge.updateWidgetThrottled(state,
               queueVersion: _queueVersion, force: force),
-      onPlaySong: (song, {queue, initialPosition}) =>
-          playSong(song, queue: queue, initialPosition: initialPosition),
+      // AUDIT-FIX: the only caller is the queue-history jump in previous();
+      // preserve the play/pause state so "previous" while paused does not
+      // start playback.
+      onPlaySong: (song, {queue, initialPosition}) => playSong(
+            song,
+            queue: queue,
+            initialPosition: initialPosition,
+            preservePlaybackState: true,
+          ),
     );
     widgetBridge.listenToClicks(
       onPlayPause: togglePlayPause,

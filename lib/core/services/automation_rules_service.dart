@@ -7,6 +7,7 @@ import '../utils/error_logger.dart';
 enum AutomationTrigger {
   bluetoothConnected('Bluetooth Connected'),
   headphonesPlugged('Headphones Plugged In'),
+  usbDacConnected('USB DAC Connected'),
   deviceCharging('Device Charging');
 
   final String label;

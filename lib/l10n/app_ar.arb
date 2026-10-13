@@ -703,6 +703,8 @@
   "smartAudioMatchedProfile": "التصحيح المطابق: {profile}",
   "smartAudioNoMatch": "لا يوجد تصحيح سماعات مطابق لهذا الجهاز",
   "smartAudioAutoCatchAllHint": "لا يعدّل الوضع التلقائي الصوت إلا عند التعرّف على سماعاتك أو على ملف جهاز محفوظ؛ ولا يتم استبدال اختياراتك في الوضع اليدوي",
+  "smartAudioAutoDacTitle": "اختيار USB DAC تلقائيًا مع Bit-Perfect",
+  "smartAudioAutoDacSubtitle": "يوجّه الصوت تلقائيًا إلى أجهزة USB DAC المتصلة ويُفعّل وضع Bit-Perfect للحصول على أقصى جودة مطابقة للبت.",
   "experienceModeTitle": "وضع الاستخدام",
   "experienceModeSubtitle": "اختر مقدار التحكم الذي تريده",
   "experienceModeNormal": "عادي",

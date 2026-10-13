@@ -3586,6 +3586,18 @@ abstract class AppLocalizations {
   /// **'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode'**
   String get smartAudioAutoCatchAllHint;
 
+  /// No description provided for @smartAudioAutoDacTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-Select USB DAC & Bit-Perfect'**
+  String get smartAudioAutoDacTitle;
+
+  /// No description provided for @smartAudioAutoDacSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically routes audio to connected USB DACs and engages Bit-Perfect mode for maximum bit-exact quality.'**
+  String get smartAudioAutoDacSubtitle;
+
   /// No description provided for @experienceModeTitle.
   ///
   /// In en, this message translates to:

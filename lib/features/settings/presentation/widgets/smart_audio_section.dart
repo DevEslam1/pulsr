@@ -11,6 +11,8 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../data/services/device_profile_service.dart';
+import '../../../../core/constants/prefs_keys.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -34,6 +36,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
           : SmartAudioService();
 
   SmartAudioMode _mode = SmartAudioMode.auto;
+  bool _autoDacSelectBitPerfect = true;
   String? _deviceName;
   String? _matchedProfileName;
   String? _lastAppliedProfileName;
@@ -50,6 +53,8 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
     setState(() => _isLoading = true);
     try {
       final mode = await _service.getMode();
+      final prefs = await SharedPreferences.getInstance();
+      final autoDac = prefs.getBool(PrefsKeys.autoDacSelectBitPerfect) ?? true;
       String? deviceName;
       String? matchedName;
       String? lastProfileName;
@@ -85,6 +90,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
       if (!mounted) return;
       setState(() {
         _mode = mode;
+        _autoDacSelectBitPerfect = autoDac;
         _deviceName = deviceName;
         _matchedProfileName = matchedName;
         _lastAppliedProfileName = lastProfileName;
@@ -96,6 +102,13 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _setAutoDacSelect(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.autoDacSelectBitPerfect, enabled);
+    if (!mounted) return;
+    setState(() => _autoDacSelectBitPerfect = enabled);
   }
 
   Future<void> _setMode(SmartAudioMode mode) async {
@@ -350,6 +363,55 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
             ),
           ),
         ],
+        const SizedBox(height: AppSpacing.s12),
+        // AUDIT-FIX: keep the tile inside a Material card — the newer
+        // Flutter SDK asserts when a ListTile's nearest Material is masked
+        // by a colored DecoratedBox (this row previously used a decorated
+        // Container). Matches the app's Material-card house style.
+        Material(
+          color: p.surfaceContainer,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadii.r14All,
+            side: BorderSide(color: p.hairline),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: SwitchListTile.adaptive(
+            value: _autoDacSelectBitPerfect,
+            onChanged: _setAutoDacSelect,
+            activeThumbColor: p.accent,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xxs,
+            ),
+            secondary: Container(
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: p.accent.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.usb_rounded,
+                color: p.accent,
+                size: 20,
+              ),
+            ),
+            title: Text(
+              context.l10n.smartAudioAutoDacTitle,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: AppFontSize.bodySmall,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              context.l10n.smartAudioAutoDacSubtitle,
+              style: TextStyle(
+                color: p.textSecondary,
+                fontSize: AppFontSize.caption,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -1925,6 +1925,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'El modo automático solo ajusta el sonido cuando reconoce tus auriculares o un perfil de dispositivo guardado; tus ajustes nunca se sobrescriben en modo manual';
 
   @override
+  String get smartAudioAutoDacTitle =>
+      'Selección automática de DAC USB y Bit-Perfect';
+
+  @override
+  String get smartAudioAutoDacSubtitle =>
+      'Enruta el audio automáticamente a los DAC USB conectados y activa el modo Bit-Perfect para obtener la máxima calidad bit a bit.';
+
+  @override
   String get experienceModeTitle => 'Modo de uso';
 
   @override

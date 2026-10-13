@@ -173,6 +173,9 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
       case AutomationTrigger.headphonesPlugged:
         icon = Icons.headphones_rounded;
         break;
+      case AutomationTrigger.usbDacConnected:
+        icon = Icons.usb_rounded;
+        break;
       case AutomationTrigger.deviceCharging:
         icon = Icons.battery_charging_full_rounded;
         break;

@@ -484,9 +484,22 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   /// Requests an app media route and reads back the outcome while playing.
-  /// Failure stays in the app; device taps never open a settings page.
+  ///
+  /// On retail builds the platform lacks [MODIFY_AUDIO_ROUTING] and signals
+  /// this via [OutputRouteResult.requiresSystemPicker]. In that case we
+  /// automatically open the system media-output switcher so the user can
+  /// complete the route change, and return `true` so the caller does not also
+  /// show a "switch unavailable" snackbar.
   Future<bool> selectOutputDevice(int deviceId) async {
     final res = await _hiResAudioService.selectOutputDevice(deviceId);
+    if (res.requiresSystemPicker) {
+      // Retail ROM: direct routing is restricted. Hand off to the system
+      // media-output panel which the user can operate without special
+      // permissions. Return true so the sheet does not show an error snackbar.
+      await _hiResAudioService.openOutputSwitcher();
+      await refreshOutputDevice();
+      return true;
+    }
     if (!res.success) {
       safeEmit(state.copyWith(
           errorMessage:

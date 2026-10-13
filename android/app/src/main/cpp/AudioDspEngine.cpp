@@ -210,6 +210,9 @@ void AudioDspEngine::applySampleRateLocked(double sampleRate) {
     updated->resetRequested = false; // Never wipe state on rate transitions
     if (current->reverb.enabled && prewarmedIr) {
         updated->reverb.preparedIr = prewarmedIr;
+        if (prewarmedIr->numPartitions > 0) {
+            reverb_.ensurePartitionCapacity(prewarmedIr->numPartitions);
+        }
     }
     swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(updated));
 }
@@ -522,13 +525,14 @@ void AudioDspEngine::updateParams(SnapshotMutator mutator) {
     std::shared_ptr<const DspParamSnapshot> snap;
     bool shouldBroadcast = false;
     // This is the single choke point for every parameter setter, including all
-    // JNI entry points. Catch allocation failures here so a std::bad_alloc can
-    // never propagate across a JNI frame (undefined behaviour / abort).
+#if defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)
     try {
+#endif
         std::lock_guard<std::mutex> lock(publishMutex_);
         auto current = currentParams_.load();
         if (!current) return;
         auto updated = std::make_shared<DspParamSnapshot>(*current);
+        if (!updated) return;
         updated->resetRequested = false; // Clear reset by default so reset() only fires once
         mutator(*updated);
         SanitizeSnapshot(*updated);
@@ -536,10 +540,12 @@ void AudioDspEngine::updateParams(SnapshotMutator mutator) {
         snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
         swapCurrentLocked(snap);
         shouldBroadcast = (this == &AudioDspEngine::instance());
+#if defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)
     } catch (...) {
         // Leave the previous snapshot in place on failure.
         return;
     }
+#endif
     // Broadcast AFTER releasing publishMutex_. broadcastParams() takes the
     // registry mutex_, while registerEngine() takes the registry mutex_ and then
     // publishMutex_ (via engine->publishParams). Holding publishMutex_ here
@@ -596,6 +602,9 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
                     static_cast<float>(snapshot->reverb.damping));
             }
         }
+    }
+    if (mutableSnap->reverb.preparedIr && mutableSnap->reverb.preparedIr->numPartitions > 0) {
+        reverb_.ensurePartitionCapacity(mutableSnap->reverb.preparedIr->numPartitions);
     }
     if (snapshot->generation >= snapshotGeneration_.load()) {
         snapshotGeneration_.store(snapshot->generation);

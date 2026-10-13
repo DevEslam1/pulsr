@@ -645,7 +645,9 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
               const SizedBox(height: AppSpacing.xs),
               Material(
                 color: p.surfaceContainer,
-                borderRadius: AppRadii.r18All,
+                // AUDIT-FIX: Material forbids shape + borderRadius together (debug
+                // assert; borderRadius is ignored in release). The shape below
+                // already carries the same radius plus the hairline border side.
                 shape: RoundedRectangleBorder(
                   borderRadius: AppRadii.r18All,
                   side: BorderSide(color: p.hairline),

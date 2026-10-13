@@ -337,4 +337,11 @@ class PrefsKeys {
   static const String discordRpcEnabled = 'setting_discord_rpc_enabled';
   static const String discordRpcToken = 'setting_discord_rpc_token';
   static const String discordApplicationId = 'setting_discord_application_id';
+
+  // USB DAC auto-routing: when true, connecting a USB DAC automatically
+  // selects it as the active audio output AND enables Bit-Perfect mode
+  // (the highest quality path). Defaults to true. Can be toggled from
+  // Settings → Audio → Smart Audio.
+  static const String autoDacSelectBitPerfect =
+      'setting_auto_dac_select_bitperfect';
 }

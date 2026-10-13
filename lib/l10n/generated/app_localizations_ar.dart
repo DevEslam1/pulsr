@@ -1919,6 +1919,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'لا يعدّل الوضع التلقائي الصوت إلا عند التعرّف على سماعاتك أو على ملف جهاز محفوظ؛ ولا يتم استبدال اختياراتك في الوضع اليدوي';
 
   @override
+  String get smartAudioAutoDacTitle => 'اختيار USB DAC تلقائيًا مع Bit-Perfect';
+
+  @override
+  String get smartAudioAutoDacSubtitle =>
+      'يوجّه الصوت تلقائيًا إلى أجهزة USB DAC المتصلة ويُفعّل وضع Bit-Perfect للحصول على أقصى جودة مطابقة للبت.';
+
+  @override
   String get experienceModeTitle => 'وضع الاستخدام';
 
   @override

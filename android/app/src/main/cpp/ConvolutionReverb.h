@@ -75,6 +75,10 @@ public:
 
     void drainRetiredIrs();
 
+    void ensurePartitionCapacity(int numPartitions);
+    size_t getHistoryPartitionCount() const { return inputHistoryFreqL_.size(); }
+    size_t getHistoryAllocatedBytes() const;
+
 private:
     static constexpr int kMaxRetired = 256;
     std::shared_ptr<const PreparedIr> retiredRing_[kMaxRetired];

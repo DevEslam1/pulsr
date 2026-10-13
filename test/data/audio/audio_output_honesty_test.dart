@@ -63,10 +63,28 @@ void main() {
     }
   });
 
-  test('a rejected Phone request does not launch a settings page', () async {
+  test('a rejected retail route hands off to the system output switcher',
+      () async {
     when(() => service.selectOutputDevice(1)).thenAnswer((_) async =>
         const OutputRouteResult(
             success: false, error: 'unavailable', requiresSystemPicker: true));
+    when(() => service.openOutputSwitcher()).thenAnswer((_) async => true);
+    final cubit =
+        SettingsCubit(scannerService: _Scanner(), hiResAudioService: service);
+    try {
+      expect(await cubit.selectOutputDevice(1), isTrue);
+      verify(() => service.openOutputSwitcher()).called(1);
+      expect(cubit.state.errorMessage, isNull);
+    } finally {
+      await cubit.close();
+    }
+  });
+
+  test('a rejected route without the picker requirement returns false quietly',
+      () async {
+    when(() => service.selectOutputDevice(1)).thenAnswer((_) async =>
+        const OutputRouteResult(
+            success: false, error: 'unavailable', requiresSystemPicker: false));
     final cubit =
         SettingsCubit(scannerService: _Scanner(), hiResAudioService: service);
     try {

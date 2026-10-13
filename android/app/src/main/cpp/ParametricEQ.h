@@ -87,8 +87,13 @@ private:
     // band.bypass (which computeCoeffs() owns).
     bool soloSkipped_[MAX_BANDS] = {};
 
-    // Per-channel Transposed Direct Form II state: 2 double-precision registers per band per channel
+    // Per-channel Transposed Direct Form II state: 2 delay registers per band per channel
+#if defined(PULSR_F32_BIQUADS)
+    float s1_[MAX_CHANNELS][MAX_BANDS] = {};
+    float s2_[MAX_CHANNELS][MAX_BANDS] = {};
+#else
     double s1_[MAX_CHANNELS][MAX_BANDS] = {};
     double s2_[MAX_CHANNELS][MAX_BANDS] = {};
+#endif
     std::vector<float> tempBuf_;
 };

@@ -790,6 +790,8 @@
   },
   "smartAudioNoMatch": "No headphone correction matched for this device",
   "smartAudioAutoCatchAllHint": "Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode",
+  "smartAudioAutoDacTitle": "Auto-Select USB DAC & Bit-Perfect",
+  "smartAudioAutoDacSubtitle": "Automatically routes audio to connected USB DACs and engages Bit-Perfect mode for maximum bit-exact quality.",
   "experienceModeTitle": "Experience Mode",
   "experienceModeSubtitle": "Choose how much control you want",
   "experienceModeNormal": "Normal",

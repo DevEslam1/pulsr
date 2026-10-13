@@ -487,9 +487,10 @@ ConvolutionReverb::ConvolutionReverb() {
     accumFreqL_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     accumFreqR_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
 
-    // A8 (N-03): Eagerly allocating 512 partitions to prevent RT allocation
-    inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
-    inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+    // Lazy history partition allocation: partitions are grown on-demand up to
+    // active IR's numPartitions (capped at MAX_PREALLOC_PARTITIONS) on control thread.
+    inputHistoryFreqL_.clear();
+    inputHistoryFreqR_.clear();
     directRingL_.assign(4096, 0.0f);
     directRingR_.assign(4096, 0.0f);
     dryDelayL_.assign(PARTITION_SIZE, 0.0f);
@@ -507,7 +508,6 @@ ConvolutionReverb::ConvolutionReverb() {
     irCrossfadeTotal_ = 0;
 
     ensureScratchCapacity(32768);
-    setPreset(ReverbPreset::Room);
     reset();
 }
 
@@ -518,6 +518,14 @@ ConvolutionReverb::~ConvolutionReverb() = default;
 
 void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
     if (!preparedIr_) return;
+    const int allocated = static_cast<int>(inputHistoryFreqL_.size());
+    const int effectivePartitions = std::min(numPartitions, allocated);
+    if (effectivePartitions <= 0) return;
+
+    if (historyHead_ >= effectivePartitions) {
+        historyHead_ = 0;
+    }
+
     const auto& irFreqL = preparedIr_->irFreqL;
 
     FftUtil::fft(fftWorkL_);
@@ -525,9 +533,9 @@ void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
 
     std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
 
-    for (int p = 0; p < numPartitions; ++p) {
-        int histIdx = (historyHead_ - p) % numPartitions;
-        if (histIdx < 0) histIdx += numPartitions;
+    for (int p = 0; p < effectivePartitions; ++p) {
+        int histIdx = (historyHead_ - p) % effectivePartitions;
+        if (histIdx < 0) histIdx += effectivePartitions;
 
         const auto& inFreqL = inputHistoryFreqL_[histIdx];
         const auto& irBlockL = irFreqL[p];
@@ -579,6 +587,14 @@ void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
 
 void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
     if (!preparedIr_) return;
+    const int allocated = static_cast<int>(inputHistoryFreqR_.size());
+    const int effectivePartitions = std::min(numPartitions, allocated);
+    if (effectivePartitions <= 0) return;
+
+    if (historyHead_ >= effectivePartitions) {
+        historyHead_ = 0;
+    }
+
     const auto& irFreqR = preparedIr_->irFreqR;
 
     FftUtil::fft(fftWorkR_);
@@ -586,9 +602,9 @@ void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
 
     std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
 
-    for (int p = 0; p < numPartitions; ++p) {
-        int histIdx = (historyHead_ - p) % numPartitions;
-        if (histIdx < 0) histIdx += numPartitions;
+    for (int p = 0; p < effectivePartitions; ++p) {
+        int histIdx = (historyHead_ - p) % effectivePartitions;
+        if (histIdx < 0) histIdx += effectivePartitions;
 
         const auto& inFreqR = inputHistoryFreqR_[histIdx];
         const auto& irBlockR = irFreqR[p];
@@ -742,7 +758,30 @@ void ConvolutionReverb::updatePreparedIr() {
     preparePartitions();
 }
 
+void ConvolutionReverb::ensurePartitionCapacity(int numPartitions) {
+    if (numPartitions <= 0) return;
+    const int targetPartitions = std::min(numPartitions, MAX_PREALLOC_PARTITIONS);
+    if (static_cast<int>(inputHistoryFreqL_.size()) < targetPartitions) {
+        inputHistoryFreqL_.resize(targetPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+        inputHistoryFreqR_.resize(targetPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+    }
+}
+
+size_t ConvolutionReverb::getHistoryAllocatedBytes() const {
+    size_t bytes = 0;
+    for (const auto& p : inputHistoryFreqL_) {
+        bytes += p.capacity() * sizeof(FftUtil::Complex) + sizeof(p);
+    }
+    for (const auto& p : inputHistoryFreqR_) {
+        bytes += p.capacity() * sizeof(FftUtil::Complex) + sizeof(p);
+    }
+    return bytes;
+}
+
 void ConvolutionReverb::setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir) {
+    if (ir && ir->numPartitions > 0) {
+        ensurePartitionCapacity(ir->numPartitions);
+    }
     if (preparedIr_) {
         // Trigger smooth 25ms crossfade on wet path when swapping IR presets during playback
         if (ir) {
@@ -873,10 +912,12 @@ void ConvolutionReverb::preparePartitions() {
 #endif
     }
 
+    ensurePartitionCapacity(preparedIr_->numPartitions);
+
     // Preserving active audio buffers (inputBlock, prevBlock, accumFreq) during live playback
     // ensures seamless, click-free continuity across IR preset switches.
-    const int usedPartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
-    if (historyHead_ >= usedPartitions) {
+    const int usedPartitions = std::min(preparedIr_->numPartitions, static_cast<int>(inputHistoryFreqL_.size()));
+    if (usedPartitions > 0 && historyHead_ >= usedPartitions) {
         historyHead_ = 0;
     }
 }
@@ -906,8 +947,8 @@ void ConvolutionReverb::reset() {
         std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
         std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
         std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
-        const int usedPartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
-        for (int p = 0; p < usedPartitions && p < static_cast<int>(inputHistoryFreqL_.size()); ++p) {
+        const int usedPartitions = std::min(preparedIr_->numPartitions, static_cast<int>(inputHistoryFreqL_.size()));
+        for (int p = 0; p < usedPartitions; ++p) {
             std::fill(inputHistoryFreqL_[p].begin(), inputHistoryFreqL_[p].end(), FftUtil::Complex(0.0f, 0.0f));
             std::fill(inputHistoryFreqR_[p].begin(), inputHistoryFreqR_[p].end(), FftUtil::Complex(0.0f, 0.0f));
         }
@@ -1171,7 +1212,7 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
 
     // Textbook Uniform-Partitioned Overlap-Save FFT Convolution (for IR > 1024)
     // B-06 clamp: keep effective partitions within preallocated max to guarantee RT safety
-    const int numPartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
+    const int numPartitions = std::min(preparedIr_->numPartitions, static_cast<int>(inputHistoryFreqL_.size()));
 
     for (int i = 0; i < frames; ++i) {
         float inSampleL = inL[i];
@@ -1265,7 +1306,9 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
             std::copy(inputBlockL_.begin(), inputBlockL_.end(), prevBlockL_.begin());
             std::copy(inputBlockR_.begin(), inputBlockR_.end(), prevBlockR_.begin());
 
-            historyHead_ = (historyHead_ + 1) % numPartitions;
+            if (numPartitions > 0) {
+                historyHead_ = (historyHead_ + 1) % numPartitions;
+            }
             inputBlockPos_ = 0;
         }
     }

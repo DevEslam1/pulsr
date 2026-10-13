@@ -1888,31 +1888,15 @@ class PulsrAudioHandler extends BaseAudioHandler
                 }
                 return;
               }
-              // In gapless mode the ConcatenatingAudioSource advances itself, so a
-              // `completed` event at the very end (repeat off) means the queue is
-              // exhausted. The crossfade engine (one source per track) needs a
-              // manual skip only while a next item exists; both paths report queue
-              // completion so the sleep timer's endOfQueue mode can fire.
+              // When a track completes naturally and the player stops or finishes,
+              // auto-advance to the next song in the queue.
               if (state.processingState == ProcessingState.completed &&
                   !_crossfadeManager.isCrossfading) {
-                if (_gaplessMode && _gaplessLoaded) {
-                  if (_activePlayer.loopMode == LoopMode.off) {
-                    // `completed` fires both mid-queue (while ExoPlayer swaps
-                    // to the next item) and at the very end. Mid-queue the
-                    // boundary is already reported by the `currentIndexStream`
-                    // advance, so only the last item reports here — otherwise
-                    // the after-N sleep timer decremented twice per song and
-                    // end-of-queue fired at the first gap.
-                    if (!_activePlayer.hasNext) {
-                      notifySleepTrackCompleted();
-                      unawaited(_sleepTimerManager.onQueueCompleted());
-                    }
-                  }
+                notifySleepTrackCompleted();
+                final nextIdx = _getNextIndex(peek: true);
+                if (nextIdx == null && !_activePlayer.hasNext && _activePlayer.loopMode == LoopMode.off) {
+                  unawaited(_sleepTimerManager.onQueueCompleted());
                 } else {
-                  notifySleepTrackCompleted();
-                  if (_getNextIndex(peek: true) == null) {
-                    unawaited(_sleepTimerManager.onQueueCompleted());
-                  }
                   unawaited(skipToNext().catchError((Object e, StackTrace st) {
                     ErrorLogger.log('Auto-advance skipToNext failed',
                         error: e, stackTrace: st, category: 'AudioHandler');

@@ -10,19 +10,24 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     List<SongsTableData>? queue,
     Duration? initialPosition,
     bool openPlayerIfPlaying = true,
+    bool preservePlaybackState = false,
   }) =>
       _queueMutex.protect(() => _playSongLocked(
             song,
             queue: queue,
             initialPosition: initialPosition,
             openPlayerIfPlaying: openPlayerIfPlaying,
+            preservePlaybackState: preservePlaybackState,
           ));
 
+  /// [preservePlaybackState] — when true (queue shuffle / history jump) the
+  /// engine load keeps the current play/pause state instead of auto-playing.
   Future<void> _playSongLocked(
     SongsTableData song, {
     List<SongsTableData>? queue,
     Duration? initialPosition,
     bool openPlayerIfPlaying = true,
+    bool preservePlaybackState = false,
   }) async {
     _cancelPendingSeek();
     final state = _getState();
@@ -41,7 +46,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       if (queueUnchanged) {
         _emit(state.copyWith(
             playback: state.playback.copyWith(isExpanded: true)));
-        if (!state.isPlaying) {
+        if (!state.isPlaying && !preservePlaybackState) {
           try {
             await _audioHandler.play();
           } catch (e, st) {
@@ -167,7 +172,9 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         effectiveQueue,
         initialIndex: effectiveIndex,
         initialPosition: startPos,
-        autoPlay: true,
+        // AUDIT-FIX: shuffle / history-jump reloads must not start playback
+        // while the player is paused.
+        autoPlay: preservePlaybackState ? state.isPlaying : true,
       );
       if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
         _loadLyrics(song);

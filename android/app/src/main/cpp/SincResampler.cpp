@@ -7,7 +7,7 @@
 #if defined(__ANDROID__)
 #include <android/log.h>
 #endif
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
 
@@ -232,6 +232,7 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
                 float32x4_t vSamp = vld1q_f32(samples);
                 float32x4_t vCoeff = vld1q_f32(&coeffs[tap]);
                 vSum = vmlaq_f32(vSum, vSamp, vCoeff);
+            }
 #if defined(__aarch64__) || defined(_M_ARM64)
             sum = vaddvq_f32(vSum);
 #else

@@ -20,9 +20,11 @@ std::vector<double> parseFloats(const std::string& str) {
     for (char ch : str) {
         if (ch == ',' || ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == ';') {
             if (!token.empty()) {
-                try {
-                    numbers.push_back(std::stod(token));
-                } catch (...) {}
+                char* end = nullptr;
+                double val = std::strtod(token.c_str(), &end);
+                if (end != token.c_str() && std::isfinite(val)) {
+                    numbers.push_back(val);
+                }
                 token.clear();
             }
         } else {
@@ -30,9 +32,11 @@ std::vector<double> parseFloats(const std::string& str) {
         }
     }
     if (!token.empty()) {
-        try {
-            numbers.push_back(std::stod(token));
-        } catch (...) {}
+        char* end = nullptr;
+        double val = std::strtod(token.c_str(), &end);
+        if (end != token.c_str() && std::isfinite(val)) {
+            numbers.push_back(val);
+        }
     }
     return numbers;
 }
@@ -269,6 +273,43 @@ void ViperDdc::applyParams(const ViperDdcParamSet& params) {
 void ViperDdc::process(float* L, float* R, int frames) {
     if (!enabled_ || activeSections_.empty() || !L || !R || frames <= 0) return;
 
+#if defined(PULSR_F32_BIQUADS)
+    for (int i = 0; i < frames; ++i) {
+        float l = L[i];
+        float r = R[i];
+        if (!std::isfinite(l)) l = 0.0f;
+        if (!std::isfinite(r)) r = 0.0f;
+
+        for (auto& sec : activeSections_) {
+            const float a1_f = static_cast<float>(sec.a1);
+            const float a2_f = static_cast<float>(sec.a2);
+            const float b0_f = static_cast<float>(sec.b0);
+            const float b1_f = static_cast<float>(sec.b1);
+            const float b2_f = static_cast<float>(sec.b2);
+
+            float wL = l - a1_f * sec.v1L - a2_f * sec.v2L;
+            float yL = b0_f * wL + b1_f * sec.v1L + b2_f * sec.v2L;
+            if (!std::isfinite(wL) || !std::isfinite(yL)) {
+                sec.v1L = 0.0f; sec.v2L = 0.0f; wL = 0.0f; yL = 0.0f;
+            }
+            if (std::abs(wL) < 1e-30f) wL = 0.0f;
+            sec.v2L = sec.v1L; sec.v1L = wL;
+            l = yL;
+
+            float wR = r - a1_f * sec.v1R - a2_f * sec.v2R;
+            float yR = b0_f * wR + b1_f * sec.v1R + b2_f * sec.v2R;
+            if (!std::isfinite(wR) || !std::isfinite(yR)) {
+                sec.v1R = 0.0f; sec.v2R = 0.0f; wR = 0.0f; yR = 0.0f;
+            }
+            if (std::abs(wR) < 1e-30f) wR = 0.0f;
+            sec.v2R = sec.v1R; sec.v1R = wR;
+            r = yR;
+        }
+
+        L[i] = l;
+        R[i] = r;
+    }
+#else
     for (int i = 0; i < frames; ++i) {
         double l = L[i];
         double r = R[i];
@@ -298,11 +339,126 @@ void ViperDdc::process(float* L, float* R, int frames) {
         L[i] = static_cast<float>(l);
         R[i] = static_cast<float>(r);
     }
+#endif
 }
 
 void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
     if (!enabled_ || activeSections_.empty() || !buffer || frames <= 0 || channels < 2) return;
 
+#if defined(PULSR_F32_BIQUADS)
+    for (int i = 0; i < frames; ++i) {
+        float l = buffer[i * channels];
+        float r = buffer[i * channels + 1];
+        if (!std::isfinite(l)) l = 0.0f;
+        if (!std::isfinite(r)) r = 0.0f;
+
+#if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
+        float32x2_t vin = { l, r };
+        for (auto& sec : activeSections_) {
+            float32x2_t vv1 = { sec.v1L, sec.v1R };
+            float32x2_t vv2 = { sec.v2L, sec.v2R };
+            float32x2_t va1 = vdup_n_f32(static_cast<float>(sec.a1));
+            float32x2_t va2 = vdup_n_f32(static_cast<float>(sec.a2));
+            float32x2_t vb0 = vdup_n_f32(static_cast<float>(sec.b0));
+            float32x2_t vb1 = vdup_n_f32(static_cast<float>(sec.b1));
+            float32x2_t vb2 = vdup_n_f32(static_cast<float>(sec.b2));
+
+            // w = in - a1 * v1 - a2 * v2
+            float32x2_t vw = vsub_f32(vin, vadd_f32(vmul_f32(va1, vv1), vmul_f32(va2, vv2)));
+            // y = b0 * w + b1 * v1 + b2 * v2
+            float32x2_t vy = vadd_f32(vmul_f32(vb0, vw), vadd_f32(vmul_f32(vb1, vv1), vmul_f32(vb2, vv2)));
+
+            float w0 = vget_lane_f32(vw, 0);
+            float w1 = vget_lane_f32(vw, 1);
+            float y0 = vget_lane_f32(vy, 0);
+            float y1 = vget_lane_f32(vy, 1);
+
+            if (!std::isfinite(w0) || !std::isfinite(y0)) {
+                sec.v1L = 0.0f; sec.v2L = 0.0f; w0 = 0.0f; y0 = 0.0f;
+            }
+            if (std::abs(w0) < 1e-30f) w0 = 0.0f;
+            sec.v2L = sec.v1L; sec.v1L = w0;
+
+            if (!std::isfinite(w1) || !std::isfinite(y1)) {
+                sec.v1R = 0.0f; sec.v2R = 0.0f; w1 = 0.0f; y1 = 0.0f;
+            }
+            if (std::abs(w1) < 1e-30f) w1 = 0.0f;
+            sec.v2R = sec.v1R; sec.v1R = w1;
+
+            vin = { y0, y1 };
+        }
+        buffer[i * channels] = vget_lane_f32(vin, 0);
+        buffer[i * channels + 1] = vget_lane_f32(vin, 1);
+#elif defined(PULSR_HAS_SSE2)
+        __m128 vin = _mm_set_ps(0.0f, 0.0f, r, l);
+        for (auto& sec : activeSections_) {
+            __m128 vv1 = _mm_set_ps(0.0f, 0.0f, sec.v1R, sec.v1L);
+            __m128 vv2 = _mm_set_ps(0.0f, 0.0f, sec.v2R, sec.v2L);
+            __m128 va1 = _mm_set1_ps(static_cast<float>(sec.a1));
+            __m128 va2 = _mm_set1_ps(static_cast<float>(sec.a2));
+            __m128 vb0 = _mm_set1_ps(static_cast<float>(sec.b0));
+            __m128 vb1 = _mm_set1_ps(static_cast<float>(sec.b1));
+            __m128 vb2 = _mm_set1_ps(static_cast<float>(sec.b2));
+
+            // w = in - a1 * v1 - a2 * v2
+            __m128 vw = _mm_sub_ps(vin, _mm_add_ps(_mm_mul_ps(va1, vv1), _mm_mul_ps(va2, vv2)));
+            // y = b0 * w + b1 * v1 + b2 * v2
+            __m128 vy = _mm_add_ps(_mm_mul_ps(vb0, vw), _mm_add_ps(_mm_mul_ps(vb1, vv1), _mm_mul_ps(vb2, vv2)));
+
+            alignas(16) float w_arr[4], y_arr[4];
+            _mm_store_ps(w_arr, vw);
+            _mm_store_ps(y_arr, vy);
+
+            if (!std::isfinite(w_arr[0]) || !std::isfinite(y_arr[0])) {
+                sec.v1L = 0.0f; sec.v2L = 0.0f; w_arr[0] = 0.0f; y_arr[0] = 0.0f;
+            }
+            if (std::abs(w_arr[0]) < 1e-30f) w_arr[0] = 0.0f;
+            sec.v2L = sec.v1L; sec.v1L = w_arr[0];
+
+            if (!std::isfinite(w_arr[1]) || !std::isfinite(y_arr[1])) {
+                sec.v1R = 0.0f; sec.v2R = 0.0f; w_arr[1] = 0.0f; y_arr[1] = 0.0f;
+            }
+            if (std::abs(w_arr[1]) < 1e-30f) w_arr[1] = 0.0f;
+            sec.v2R = sec.v1R; sec.v1R = w_arr[1];
+
+            vin = _mm_set_ps(0.0f, 0.0f, y_arr[1], y_arr[0]);
+        }
+        alignas(16) float out_arr[4];
+        _mm_store_ps(out_arr, vin);
+        buffer[i * channels] = out_arr[0];
+        buffer[i * channels + 1] = out_arr[1];
+#else
+        for (auto& sec : activeSections_) {
+            const float a1_f = static_cast<float>(sec.a1);
+            const float a2_f = static_cast<float>(sec.a2);
+            const float b0_f = static_cast<float>(sec.b0);
+            const float b1_f = static_cast<float>(sec.b1);
+            const float b2_f = static_cast<float>(sec.b2);
+
+            float wL = l - a1_f * sec.v1L - a2_f * sec.v2L;
+            float yL = b0_f * wL + b1_f * sec.v1L + b2_f * sec.v2L;
+            if (!std::isfinite(wL) || !std::isfinite(yL)) {
+                sec.v1L = 0.0f; sec.v2L = 0.0f; wL = 0.0f; yL = 0.0f;
+            }
+            if (std::abs(wL) < 1e-30f) wL = 0.0f;
+            sec.v2L = sec.v1L; sec.v1L = wL;
+            l = yL;
+
+            float wR = r - a1_f * sec.v1R - a2_f * sec.v2R;
+            float yR = b0_f * wR + b1_f * sec.v1R + b2_f * sec.v2R;
+            if (!std::isfinite(wR) || !std::isfinite(yR)) {
+                sec.v1R = 0.0f; sec.v2R = 0.0f; wR = 0.0f; yR = 0.0f;
+            }
+            if (std::abs(wR) < 1e-30f) wR = 0.0f;
+            sec.v2R = sec.v1R; sec.v1R = wR;
+            r = yR;
+        }
+
+        buffer[i * channels] = l;
+        buffer[i * channels + 1] = r;
+#endif
+    }
+#else
     for (int i = 0; i < frames; ++i) {
         double l = buffer[i * channels];
         double r = buffer[i * channels + 1];
@@ -409,4 +565,5 @@ void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
         buffer[i * channels + 1] = static_cast<float>(r);
 #endif
     }
+#endif
 }

@@ -42,6 +42,12 @@ if(ANDROID_ABI STREQUAL "armeabi-v7a")
     add_compile_options(-mfpu=neon-vfpv4 -mfloat-abi=softfp)
 endif()
 
+# Fast float32 recurrence and SIMD for biquad stages (ParametricEQ, DynamicEQ, LoudnessContour, ViperDdc)
+option(PULSR_F32_BIQUADS "Enable float32 fast path for biquad filter stages" ON)
+if(PULSR_F32_BIQUADS)
+    add_compile_definitions(PULSR_F32_BIQUADS=1)
+endif()
+
 set(DSP_CORE_SOURCES
     ParametricEQ.cpp
     Crossfeed.cpp

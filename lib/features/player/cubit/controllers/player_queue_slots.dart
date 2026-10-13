@@ -313,9 +313,13 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       ));
       _invalidateQueueSyncResolution();
       try {
-        await _audioHandler.clearQueue();
+        // AUDIT-FIX: removing the last queue item must also drop it from the
+        // engine. clearQueue() keeps the current track loaded and playing (its
+        // documented contract), which left playback running with an empty UI
+        // queue. removeQueueItemAt empties the engine queue and stops it.
+        await _audioHandler.removeQueueItemAt(index);
       } catch (e, st) {
-        ErrorLogger.log('Failed to clear queue in audio handler',
+        ErrorLogger.log('Failed to remove queue item in audio handler',
             error: e, stackTrace: st, category: 'PlayerQueueController');
       }
       return;

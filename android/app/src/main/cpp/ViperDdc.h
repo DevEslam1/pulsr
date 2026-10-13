@@ -15,10 +15,17 @@ public:
         double b2 = 0.0;
         double a1 = 0.0;
         double a2 = 0.0;
+#if defined(PULSR_F32_BIQUADS)
+        float v1L = 0.0f;
+        float v2L = 0.0f;
+        float v1R = 0.0f;
+        float v2R = 0.0f;
+#else
         double v1L = 0.0;
         double v2L = 0.0;
         double v1R = 0.0;
         double v2R = 0.0;
+#endif
     };
 
     static constexpr int MAX_SECTIONS = 256;

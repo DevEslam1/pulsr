@@ -92,6 +92,9 @@ class AutomationTriggerService with WidgetsBindingObserver {
     }
     if (info.isBluetooth) {
       unawaited(_fire(AutomationTrigger.bluetoothConnected));
+    } else if (info.isUsbDac) {
+      unawaited(_fire(AutomationTrigger.usbDacConnected));
+      unawaited(_fire(AutomationTrigger.headphonesPlugged));
     } else if (_isWiredHeadphones(info)) {
       unawaited(_fire(AutomationTrigger.headphonesPlugged));
     }

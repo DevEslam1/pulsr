@@ -1912,6 +1912,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode';
 
   @override
+  String get smartAudioAutoDacTitle => 'Auto-Select USB DAC & Bit-Perfect';
+
+  @override
+  String get smartAudioAutoDacSubtitle =>
+      'Automatically routes audio to connected USB DACs and engages Bit-Perfect mode for maximum bit-exact quality.';
+
+  @override
   String get experienceModeTitle => 'Experience Mode';
 
   @override

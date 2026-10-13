@@ -480,6 +480,222 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
         const double a1 = band.coeffs.a1;
         const double a2 = band.coeffs.a2;
 
+#if defined(PULSR_F32_BIQUADS)
+        const float b0_f = static_cast<float>(b0);
+        const float b1_f = static_cast<float>(b1);
+        const float b2_f = static_cast<float>(b2);
+        const float a1_f = static_cast<float>(a1);
+        const float a2_f = static_cast<float>(a2);
+
+        if (channels == 2) {
+#if defined(PULSR_HAS_NEON)
+            const float32x4_t vb0 = vdupq_n_f32(b0_f);
+            const float32x4_t vb1 = vdupq_n_f32(b1_f);
+            const float32x4_t vb2 = vdupq_n_f32(b2_f);
+            const float32x4_t va1 = vdupq_n_f32(a1_f);
+            const float32x4_t va2 = vdupq_n_f32(a2_f);
+
+            float s1_arr[2] = { s1_[0][b], s1_[1][b] };
+            float s2_arr[2] = { s2_[0][b], s2_[1][b] };
+            float32x2_t vs1 = vld1_f32(s1_arr);
+            float32x2_t vs2 = vld1_f32(s2_arr);
+
+            float* chPtr = buffer;
+            for (int f = 0; f < frames; ++f) {
+                float32x2_t vx = vld1_f32(chPtr);
+                float x0 = vget_lane_f32(vx, 0);
+                float x1 = vget_lane_f32(vx, 1);
+                if (!std::isfinite(x0) || !std::isfinite(x1)) {
+                    vst1_f32(s1_arr, vs1);
+                    vst1_f32(s2_arr, vs2);
+                    if (!std::isfinite(x0)) { x0 = 0.0f; s1_arr[0] = 0.0f; s2_arr[0] = 0.0f; }
+                    if (!std::isfinite(x1)) { x1 = 0.0f; s1_arr[1] = 0.0f; s2_arr[1] = 0.0f; }
+                    vs1 = vld1_f32(s1_arr);
+                    vs2 = vld1_f32(s2_arr);
+                    float x_clean[2] = { x0, x1 };
+                    vx = vld1_f32(x_clean);
+                }
+
+                // y[n] = b0 * x[n] + s1[n-1]
+                float32x2_t vy = vadd_f32(vmul_f32(vget_low_f32(vb0), vx), vs1);
+
+                // s1[n] = b1 * x[n] - a1 * y[n] + s2[n-1]
+                float32x2_t vs1_next = vadd_f32(vsub_f32(vmul_f32(vget_low_f32(vb1), vx), vmul_f32(vget_low_f32(va1), vy)), vs2);
+                // s2[n] = b2 * x[n] - a2 * y[n]
+                float32x2_t vs2_next = vsub_f32(vmul_f32(vget_low_f32(vb2), vx), vmul_f32(vget_low_f32(va2), vy));
+
+                float y0 = vget_lane_f32(vy, 0);
+                float y1 = vget_lane_f32(vy, 1);
+                if (!std::isfinite(y0) || !std::isfinite(y1)) {
+                    if (!std::isfinite(y0)) { y0 = x0; s1_arr[0] = 0.0f; s2_arr[0] = 0.0f; }
+                    else { s1_arr[0] = vget_lane_f32(vs1_next, 0); s2_arr[0] = vget_lane_f32(vs2_next, 0); }
+
+                    if (!std::isfinite(y1)) { y1 = x1; s1_arr[1] = 0.0f; s2_arr[1] = 0.0f; }
+                    else { s1_arr[1] = vget_lane_f32(vs1_next, 1); s2_arr[1] = vget_lane_f32(vs2_next, 1); }
+
+                    chPtr[0] = y0;
+                    chPtr[1] = y1;
+                    vs1 = vld1_f32(s1_arr);
+                    vs2 = vld1_f32(s2_arr);
+                } else {
+                    vs1 = vs1_next;
+                    vs2 = vs2_next;
+                    vst1_f32(chPtr, vy);
+                }
+
+                chPtr += 2;
+            }
+
+            vst1_f32(s1_arr, vs1);
+            vst1_f32(s2_arr, vs2);
+            for (int ch = 0; ch < 2; ++ch) {
+                if (std::abs(s1_arr[ch]) < 1e-25f || !std::isfinite(s1_arr[ch])) s1_arr[ch] = 0.0f;
+                if (std::abs(s2_arr[ch]) < 1e-25f || !std::isfinite(s2_arr[ch])) s2_arr[ch] = 0.0f;
+                s1_[ch][b] = s1_arr[ch];
+                s2_[ch][b] = s2_arr[ch];
+            }
+#elif defined(PULSR_HAS_SSE2)
+            const __m128 vb0 = _mm_set1_ps(b0_f);
+            const __m128 vb1 = _mm_set1_ps(b1_f);
+            const __m128 vb2 = _mm_set1_ps(b2_f);
+            const __m128 va1 = _mm_set1_ps(a1_f);
+            const __m128 va2 = _mm_set1_ps(a2_f);
+
+            __m128 vs1 = _mm_set_ps(0.0f, 0.0f, s1_[1][b], s1_[0][b]);
+            __m128 vs2 = _mm_set_ps(0.0f, 0.0f, s2_[1][b], s2_[0][b]);
+
+            float* chPtr = buffer;
+            for (int f = 0; f < frames; ++f) {
+                __m128 vx = _mm_set_ps(0.0f, 0.0f, chPtr[1], chPtr[0]);
+                alignas(16) float x_arr[4];
+                _mm_store_ps(x_arr, vx);
+
+                if (!std::isfinite(x_arr[0]) || !std::isfinite(x_arr[1])) {
+                    alignas(16) float s1_cur[4], s2_cur[4];
+                    _mm_store_ps(s1_cur, vs1);
+                    _mm_store_ps(s2_cur, vs2);
+                    if (!std::isfinite(x_arr[0])) { x_arr[0] = 0.0f; s1_cur[0] = 0.0f; s2_cur[0] = 0.0f; }
+                    if (!std::isfinite(x_arr[1])) { x_arr[1] = 0.0f; s1_cur[1] = 0.0f; s2_cur[1] = 0.0f; }
+                    vs1 = _mm_set_ps(0.0f, 0.0f, s1_cur[1], s1_cur[0]);
+                    vs2 = _mm_set_ps(0.0f, 0.0f, s2_cur[1], s2_cur[0]);
+                    vx = _mm_set_ps(0.0f, 0.0f, x_arr[1], x_arr[0]);
+                }
+
+                // y[n] = b0 * x[n] + s1[n-1]
+                __m128 vy = _mm_add_ps(_mm_mul_ps(vb0, vx), vs1);
+
+                // s1[n] = b1 * x[n] - a1 * y[n] + s2[n-1]
+                __m128 vs1_next = _mm_add_ps(_mm_sub_ps(_mm_mul_ps(vb1, vx), _mm_mul_ps(va1, vy)), vs2);
+                // s2[n] = b2 * x[n] - a2 * y[n]
+                __m128 vs2_next = _mm_sub_ps(_mm_mul_ps(vb2, vx), _mm_mul_ps(va2, vy));
+
+                alignas(16) float y_arr[4];
+                _mm_store_ps(y_arr, vy);
+
+                if (!std::isfinite(y_arr[0]) || !std::isfinite(y_arr[1])) {
+                    alignas(16) float s1_arr[4], s2_arr[4];
+                    _mm_store_ps(s1_arr, vs1_next);
+                    _mm_store_ps(s2_arr, vs2_next);
+
+                    if (!std::isfinite(y_arr[0])) { y_arr[0] = x_arr[0]; s1_arr[0] = 0.0f; s2_arr[0] = 0.0f; }
+                    if (!std::isfinite(y_arr[1])) { y_arr[1] = x_arr[1]; s1_arr[1] = 0.0f; s2_arr[1] = 0.0f; }
+
+                    chPtr[0] = y_arr[0];
+                    chPtr[1] = y_arr[1];
+                    vs1 = _mm_set_ps(0.0f, 0.0f, s1_arr[1], s1_arr[0]);
+                    vs2 = _mm_set_ps(0.0f, 0.0f, s2_arr[1], s2_arr[0]);
+                } else {
+                    vs1 = vs1_next;
+                    vs2 = vs2_next;
+                    chPtr[0] = y_arr[0];
+                    chPtr[1] = y_arr[1];
+                }
+
+                chPtr += 2;
+            }
+
+            alignas(16) float s1_out[4], s2_out[4];
+            _mm_store_ps(s1_out, vs1);
+            _mm_store_ps(s2_out, vs2);
+
+            for (int ch = 0; ch < 2; ++ch) {
+                float s1 = s1_out[ch];
+                float s2 = s2_out[ch];
+                if (std::abs(s1) < 1e-25f || !std::isfinite(s1)) s1 = 0.0f;
+                if (std::abs(s2) < 1e-25f || !std::isfinite(s2)) s2 = 0.0f;
+                s1_[ch][b] = s1;
+                s2_[ch][b] = s2;
+            }
+#else
+            for (int ch = 0; ch < 2; ++ch) {
+                float s1 = s1_[ch][b];
+                float s2 = s2_[ch][b];
+                float* chPtr = buffer + ch;
+                for (int f = 0; f < frames; ++f) {
+                    const float x0 = *chPtr;
+                    if (!std::isfinite(x0)) {
+                        *chPtr = 0.0f;
+                        s1 = 0.0f;
+                        s2 = 0.0f;
+                        chPtr += 2;
+                        continue;
+                    }
+                    float y0 = b0_f * x0 + s1;
+                    if (!std::isfinite(y0)) {
+                        s1 = 0.0f;
+                        s2 = 0.0f;
+                        y0 = x0;
+                    } else {
+                        s1 = b1_f * x0 - a1_f * y0 + s2;
+                        s2 = b2_f * x0 - a2_f * y0;
+                    }
+                    *chPtr = y0;
+                    chPtr += 2;
+                }
+                if (std::abs(s1) < 1e-25f || !std::isfinite(s1)) s1 = 0.0f;
+                if (std::abs(s2) < 1e-25f || !std::isfinite(s2)) s2 = 0.0f;
+                s1_[ch][b] = s1;
+                s2_[ch][b] = s2;
+            }
+#endif
+        } else {
+            for (int ch = 0; ch < channels; ++ch) {
+                float s1 = s1_[ch][b];
+                float s2 = s2_[ch][b];
+
+                float* chPtr = buffer + ch;
+                for (int f = 0; f < frames; ++f) {
+                    const float x0 = *chPtr;
+                    if (!std::isfinite(x0)) {
+                        *chPtr = 0.0f;
+                        s1 = 0.0f;
+                        s2 = 0.0f;
+                        chPtr += stride;
+                        continue;
+                    }
+
+                    float y0 = b0_f * x0 + s1;
+                    if (!std::isfinite(y0)) {
+                        s1 = 0.0f;
+                        s2 = 0.0f;
+                        y0 = x0;
+                    } else {
+                        s1 = b1_f * x0 - a1_f * y0 + s2;
+                        s2 = b2_f * x0 - a2_f * y0;
+                    }
+
+                    *chPtr = y0;
+                    chPtr += stride;
+                }
+
+                if (std::abs(s1) < 1e-25f || !std::isfinite(s1)) s1 = 0.0f;
+                if (std::abs(s2) < 1e-25f || !std::isfinite(s2)) s2 = 0.0f;
+
+                s1_[ch][b] = s1;
+                s2_[ch][b] = s2;
+            }
+        }
+#else
         if (channels == 2) {
 #if defined(PULSR_HAS_NEON)
             const float64x2_t vb0 = vdupq_n_f64(b0);
@@ -701,6 +917,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
                 s2_[ch][b] = s2;
             }
         }
+#endif
     }
 
     // Disable fade-out countdown. The gains above have been ramping toward unity
