@@ -362,7 +362,9 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     }
 
     _lastEmitTimeByVideoId[videoId] = now;
-    safeEmit(YtmDownloadState(items: {...state.items, videoId: item}));
+    safeEmit(YtmDownloadState(
+        items: Map<String, YtDownloadItem>.unmodifiable(
+            {...state.items, videoId: item})));
   }
 
   @override

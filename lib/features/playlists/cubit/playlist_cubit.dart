@@ -192,7 +192,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             state.copyWith(errorMessage: failure.message, isLoading: false)),
         (playlists) {
           safeEmit(state.copyWith(
-              playlists: playlists, errorMessage: null, isLoading: false));
+              playlists: List.unmodifiable(playlists),
+              errorMessage: null,
+              isLoading: false));
           _updateSmartCounts(playlists);
           if (!_isSeedingChecked) {
             _isSeedingChecked = true;

@@ -66,8 +66,11 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.stereoWidth.lowWidth = clampFinite(s.stereoWidth.lowWidth, 0.0, 2.0, 0.0);
     s.stereoWidth.midWidth = clampFinite(s.stereoWidth.midWidth, 0.0, 2.0, 1.0);
     s.stereoWidth.highWidth = clampFinite(s.stereoWidth.highWidth, 0.0, 2.0, 1.5);
-    s.stereoWidth.lowCrossoverHz = clampFinite(s.stereoWidth.lowCrossoverHz, 20.0, 20000.0, 160.0);
+    s.stereoWidth.lowCrossoverHz = clampFinite(s.stereoWidth.lowCrossoverHz, 20.0, 19980.0, 160.0);
     s.stereoWidth.highCrossoverHz = clampFinite(s.stereoWidth.highCrossoverHz, 20.0, 20000.0, 4000.0);
+    s.stereoWidth.highCrossoverHz = std::clamp(
+        std::max(s.stereoWidth.highCrossoverHz, s.stereoWidth.lowCrossoverHz + 20.0),
+        20.0, 20000.0);
 
     s.loudness.intensity = clampFinite(s.loudness.intensity, 0.0, 1.0, 0.0);
     s.loudness.volumeLinear = clampFinite(s.loudness.volumeLinear, 0.0, 1.0, 1.0);
@@ -106,6 +109,14 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
         s.multibandCompressor.crossoverFreqs[i] =
             clampFinite(s.multibandCompressor.crossoverFreqs[i], 20.0, 20000.0, 150.0 * (i + 1));
     }
+    // Enforce strictly increasing crossover frequencies (f0 < f1 < f2 with >= 20 Hz separation)
+    s.multibandCompressor.crossoverFreqs[0] = std::clamp(s.multibandCompressor.crossoverFreqs[0], 20.0, 19960.0);
+    s.multibandCompressor.crossoverFreqs[1] = std::clamp(
+        std::max(s.multibandCompressor.crossoverFreqs[1], s.multibandCompressor.crossoverFreqs[0] + 20.0),
+        20.0, 19980.0);
+    s.multibandCompressor.crossoverFreqs[2] = std::clamp(
+        std::max(s.multibandCompressor.crossoverFreqs[2], s.multibandCompressor.crossoverFreqs[1] + 20.0),
+        20.0, 20000.0);
 
     s.dynamicBass.strength = clampFinite(s.dynamicBass.strength, 0.0, 8.0, 1.0);
     s.dynamicBass.sideGainLow = clampFinite(s.dynamicBass.sideGainLow, 0.0, 2.0, 0.10);

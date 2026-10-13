@@ -1,5 +1,4 @@
 // lib/features/downloads/presentation/widgets/download_tile.dart
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -65,13 +64,7 @@ class DownloadTile extends StatelessWidget {
         ),
     };
 
-    int? resolvedBytes = task.fileSize;
-    if (resolvedBytes == null && task.filePath != null) {
-      try {
-        final f = File(task.filePath!);
-        if (f.existsSync()) resolvedBytes = f.lengthSync();
-      } catch (_) {}
-    }
+    final resolvedBytes = task.fileSize;
     final formattedSize = resolvedBytes != null && resolvedBytes > 0
         ? Formatters.formatBytes(resolvedBytes)
         : null;
@@ -212,7 +205,7 @@ class DownloadTile extends StatelessWidget {
                       message: '$title ${l10n.statusCancelled.toLowerCase()}',
                       icon: Icons.cancel_outlined,
                       actionLabel: l10n.retry,
-                      onActionPressed: () => cubit.retryDownload(task.videoId),
+                      onActionPressed: () => cubit.queueDownload(task),
                     );
                   },
                 ),

@@ -141,7 +141,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
 
     _emit(state.copyWith(
       queueSlice: state.queueSlice.copyWith(
-        queue: effectiveQueue,
+        queue: List<SongsTableData>.unmodifiable(effectiveQueue),
         currentIndex: effectiveIndex,
       ),
       playback: state.playback.copyWith(
@@ -210,7 +210,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
           // into the fresh state so concurrent ticks keep their latest values.
           _emit(current.copyWith(
             queueSlice: current.queueSlice.copyWith(
-              queue: prevQueue,
+              queue: List<SongsTableData>.unmodifiable(prevQueue),
               currentIndex: prevIndex,
             ),
             playback: current.playback.copyWith(

@@ -379,9 +379,12 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     return queued;
   }
 
-  // FIX-A13: Cancel download by pausing and removing task
+  // FIX-A13: Cancel download by pausing (if pausable) and removing task
   Future<void> cancelDownload(String videoId) async {
-    await pauseDownload(videoId);
+    final task = state.tasks[videoId];
+    if (task != null && task.status.canPause) {
+      await pauseDownload(videoId);
+    }
     await deleteDownload(videoId);
   }
 
@@ -400,6 +403,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           ..remove(videoId);
         safeEmit(state.copyWith(
           tasks: Map<String, DownloadTask>.unmodifiable(remaining),
+          cachedTaskList: List<DownloadTask>.unmodifiable(
+            state.taskList.where((t) => t.videoId != videoId),
+          ),
           clearErrorMessage: true,
         ));
         _scheduleDebouncedStorageStats(); // FIX-A14

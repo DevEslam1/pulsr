@@ -161,7 +161,9 @@ class PlayerMetadataController {
             .toList();
         _emit(state.copyWith(
           playback: state.playback.copyWith(currentSong: updated),
-          queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
+          queueSlice: state.queueSlice.copyWith(
+            queue: List<SongsTableData>.unmodifiable(updatedQueue),
+          ),
         ));
       }
     } catch (e, st) {

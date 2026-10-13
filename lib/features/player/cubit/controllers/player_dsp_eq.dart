@@ -65,7 +65,13 @@ extension PlayerDspEqExtension on PlayerDspController {
   /// PlayerState.dsp.preampDb so the reconciliation path and UI never drift from
   /// the engine (PlayerCubit._syncAudioEffects reads it back from the handler).
   Future<bool> setPreamp(double preampDb) {
-    final clamped = DspParamRanges.preampDb.clampRaw(preampDb);
+    var clamped = DspParamRanges.preampDb.clampRaw(preampDb);
+    if (clamped > 0) {
+      clamped = GainStagingBudget.clampBoostDb(
+        requestedBoostDb: clamped,
+        committedStages: _activeGainStages(excludeEqPreamp: true),
+      );
+    }
     return applyDspEffect(
       featureName: 'Preamp',
       updateDsp: (dsp) => dsp.copyWith(preampDb: clamped),
@@ -85,7 +91,7 @@ extension PlayerDspEqExtension on PlayerDspController {
       if (perSongOverrideActive && !isPerSongRestore) {
         globalEqBackup = state.eqPreset.copyWith(
           name: profile.name,
-          gains: profile.gains,
+          gains: List<double>.unmodifiable(profile.gains),
           bassBoost: profile.bassBoost,
         );
         globalHeadphoneProfileBackup = profile;
@@ -96,7 +102,7 @@ extension PlayerDspEqExtension on PlayerDspController {
           selectedHeadphoneProfile: profile,
           eqPreset: state.eqPreset.copyWith(
             name: profile.name,
-            gains: profile.gains,
+            gains: List<double>.unmodifiable(profile.gains),
             bassBoost: profile.bassBoost,
           ),
         ),
@@ -155,7 +161,7 @@ extension PlayerDspEqExtension on PlayerDspController {
       dsp: state.dsp.copyWith(
         eqPreset: state.eqPreset.copyWith(
           name: 'Custom',
-          gains: currentGains,
+          gains: List<double>.unmodifiable(currentGains),
         ),
         selectedHeadphoneProfile: null,
       ),

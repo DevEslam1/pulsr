@@ -40,7 +40,10 @@ void HarmonicSaturation::setSampleRate(double sampleRate) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
     sampleRate_ = sampleRate;
-    configure(drive_, mix_, tilt_, mode_);
+    for (int c = 0; c < MAX_CHANNELS / 2; ++c) {
+        crossover_[c].configure(sampleRate_, kMultibandCrossoverHz);
+    }
+    configure(drive_, mix_, tilt_, mode_, multiband_);
 }
 
 void HarmonicSaturation::configure(double drive, double mix, double tilt, int mode, bool multiband) {
@@ -49,6 +52,9 @@ void HarmonicSaturation::configure(double drive, double mix, double tilt, int mo
     tilt_ = std::clamp(tilt, 0.0, 1.0);
     mode_ = std::clamp(mode, 0, 2);
     multiband_ = multiband;
+    for (int c = 0; c < MAX_CHANNELS / 2; ++c) {
+        crossover_[c].configure(sampleRate_, kMultibandCrossoverHz);
+    }
     k_ = drive_ * kMaxDrive;
 
     const double fc = kTiltHpHz / (sampleRate_ * OVERSAMPLE_FACTOR);
@@ -75,6 +81,10 @@ void HarmonicSaturation::reset() {
     decimIdx_ = 0;
     std::memset(dryDelay_, 0, sizeof(dryDelay_));
     dryDelayPos_ = 0;
+    for (int c = 0; c < MAX_CHANNELS / 2; ++c) {
+        crossover_[c].reset();
+    }
+    std::memset(subDelay_, 0, sizeof(subDelay_));
 }
 
 static inline float shapeSample(float x, double k, float invNorm, int mode) {
@@ -115,12 +125,32 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
         if (!std::isfinite(inL)) inL = 0.0f;
         if (!std::isfinite(inR)) inR = 0.0f;
 
+        float satInL = inL;
+        float satInR = inR;
+        float subL = 0.0f;
+        float subR = 0.0f;
+
+        if (multiband_) {
+            double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
+            crossover_[0].process(inL, inR, outLpL, outLpR, outHpL, outHpR);
+            subL = static_cast<float>(outLpL);
+            subR = static_cast<float>(outLpR);
+            satInL = static_cast<float>(outHpL);
+            satInR = static_cast<float>(outHpR);
+        }
+
         // FIX M-13: push current input into the dry delay line and read the tap
         // delayed by DRY_DELAY frames (the oversampling FIR group delay).
         const float dryL = dryDelay_[0][dryDelayPos_];
         const float dryR = dryDelay_[1][dryDelayPos_];
-        dryDelay_[0][dryDelayPos_] = inL;
-        dryDelay_[1][dryDelayPos_] = inR;
+        dryDelay_[0][dryDelayPos_] = satInL;
+        dryDelay_[1][dryDelayPos_] = satInR;
+
+        const float delayedSubL = subDelay_[0][dryDelayPos_];
+        const float delayedSubR = subDelay_[1][dryDelayPos_];
+        subDelay_[0][dryDelayPos_] = subL;
+        subDelay_[1][dryDelayPos_] = subR;
+
         dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
 
         // Shift history buffers
@@ -128,22 +158,24 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
             history_[0][t] = history_[0][t - 1];
             history_[1][t] = history_[1][t - 1];
         }
-        history_[0][0] = inL;
-        history_[1][0] = inR;
+        history_[0][0] = satInL;
+        history_[1][0] = satInR;
 
-        float wetL = inL;
-        float wetR = inR;
+        float wetL = satInL;
+        float wetR = satInR;
         // FIX M-13: when the oversampler runs, wet is group-delayed, so mix the
         // delay-matched dry; when it is bypassed (k<=0) wet is the current input,
         // so the dry tap must stay undelayed to keep unity.
-        float dryTapL = inL;
-        float dryTapR = inR;
+        float dryTapL = satInL;
+        float dryTapR = satInR;
+        float subTapL = subL;
+        float subTapR = subR;
 
         if (k > 1e-9) {
             // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
             for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                float subL = 0.0f;
-                float subR = 0.0f;
+                float sub_sL = 0.0f;
+                float sub_sR = 0.0f;
 #if defined(PULSR_HAS_NEON)
                 float32x2_t vSub = vdup_n_f32(0.0f);
                 for (int t = 0; t < TAPS_PER_PHASE; ++t) {
@@ -151,8 +183,8 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
                     float32x2_t vHist = { history_[0][t], history_[1][t] };
                     vSub = vfma_n_f32(vSub, vHist, coeff);
                 }
-                subL = vget_lane_f32(vSub, 0);
-                subR = vget_lane_f32(vSub, 1);
+                sub_sL = vget_lane_f32(vSub, 0);
+                sub_sR = vget_lane_f32(vSub, 1);
 #elif defined(PULSR_HAS_SSE)
                 __m128 vSub = _mm_setzero_ps();
                 for (int t = 0; t < TAPS_PER_PHASE; ++t) {
@@ -163,25 +195,25 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
                 }
                 alignas(16) float subArr[4];
                 _mm_store_ps(subArr, vSub);
-                subL = subArr[0];
-                subR = subArr[1];
+                sub_sL = subArr[0];
+                sub_sR = subArr[1];
 #else
                 for (int t = 0; t < TAPS_PER_PHASE; ++t) {
                     const float coeff = polyphase4x_[p][t];
-                    subL += history_[0][t] * coeff;
-                    subR += history_[1][t] * coeff;
+                    sub_sL += history_[0][t] * coeff;
+                    sub_sR += history_[1][t] * coeff;
                 }
 #endif
 
-                float emphL = subL;
-                float emphR = subR;
+                float emphL = sub_sL;
+                float emphR = sub_sR;
                 if (tilt > 0.0f) {
-                    hpL += hpCoeff * (subL - hpL);
-                    hpR += hpCoeff * (subR - hpR);
+                    hpL += hpCoeff * (sub_sL - hpL);
+                    hpR += hpCoeff * (sub_sR - hpR);
                     if (!std::isfinite(hpL)) hpL = 0.0f;
                     if (!std::isfinite(hpR)) hpR = 0.0f;
-                    emphL = subL + tilt * (subL - hpL);
-                    emphR = subR + tilt * (subR - hpR);
+                    emphL = sub_sL + tilt * (sub_sL - hpL);
+                    emphR = sub_sR + tilt * (sub_sR - hpR);
                 }
 
                 // Store shaped outputs into decimation history ring buffer
@@ -193,14 +225,6 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
 
             // Polyphase FIR decimation: convolve shaped history with the
             // anti-aliasing prototype reconstructed from the polyphase bank.
-            // FIX M-12: the prototype must be reconstructed with INTERLEAVED
-            // indexing, matching the interpolation prototype:
-            //   h_proto[t*OVERSAMPLE_FACTOR + p] = polyphase4x_[p][t]
-            // The previous phase-MAJOR mapping (p*TAPS_PER_PHASE + t) scattered
-            // the four per-phase peaks across lags 2,8,15,21, yielding a
-            // comb-like response that passed (rather than rejected) the images
-            // the 4x waveshaping creates. DC gain is unchanged (coefficient sum
-            // is identical under reordering), so the aliasing was hidden.
             wetL = 0.0f;
             wetR = 0.0f;
 #if defined(PULSR_HAS_NEON)
@@ -258,13 +282,25 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
             // FIX M-13: oversampler ran, so align the dry tap with the wet delay.
             dryTapL = dryL;
             dryTapR = dryR;
+            if (multiband_) {
+                subTapL = delayedSubL;
+                subTapR = delayedSubR;
+            }
         }
 
         if (!std::isfinite(wetL)) wetL = 0.0f;
         if (!std::isfinite(wetR)) wetR = 0.0f;
 
-        L[i] = (1.0f - mix) * dryTapL + mix * wetL;
-        R[i] = (1.0f - mix) * dryTapR + mix * wetR;
+        const float midHighL = (1.0f - mix) * dryTapL + mix * wetL;
+        const float midHighR = (1.0f - mix) * dryTapR + mix * wetR;
+
+        if (multiband_) {
+            L[i] = subTapL + midHighL;
+            R[i] = subTapR + midHighR;
+        } else {
+            L[i] = midHighL;
+            R[i] = midHighR;
+        }
     }
 }
 
@@ -288,11 +324,31 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
             if (!std::isfinite(inL)) inL = 0.0f;
             if (!std::isfinite(inR)) inR = 0.0f;
 
+            float satInL = inL;
+            float satInR = inR;
+            float subL = 0.0f;
+            float subR = 0.0f;
+
+            if (multiband_) {
+                double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
+                crossover_[0].process(inL, inR, outLpL, outLpR, outHpL, outHpR);
+                subL = static_cast<float>(outLpL);
+                subR = static_cast<float>(outLpR);
+                satInL = static_cast<float>(outHpL);
+                satInR = static_cast<float>(outHpR);
+            }
+
             // FIX M-13: dry delay line (matches process()).
             const float dryL = dryDelay_[0][dryDelayPos_];
             const float dryR = dryDelay_[1][dryDelayPos_];
-            dryDelay_[0][dryDelayPos_] = inL;
-            dryDelay_[1][dryDelayPos_] = inR;
+            dryDelay_[0][dryDelayPos_] = satInL;
+            dryDelay_[1][dryDelayPos_] = satInR;
+
+            const float delayedSubL = subDelay_[0][dryDelayPos_];
+            const float delayedSubR = subDelay_[1][dryDelayPos_];
+            subDelay_[0][dryDelayPos_] = subL;
+            subDelay_[1][dryDelayPos_] = subR;
+
             dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
 
             // Shift history buffers
@@ -300,13 +356,15 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 history_[0][t] = history_[0][t - 1];
                 history_[1][t] = history_[1][t - 1];
             }
-            history_[0][0] = inL;
-            history_[1][0] = inR;
+            history_[0][0] = satInL;
+            history_[1][0] = satInR;
 
-            float wetL = inL;
-            float wetR = inR;
-            float dryTapL = inL;
-            float dryTapR = inR;
+            float wetL = satInL;
+            float wetR = satInR;
+            float dryTapL = satInL;
+            float dryTapR = satInR;
+            float subTapL = subL;
+            float subTapR = subR;
 
             if (k > 1e-9) {
                 // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
@@ -419,13 +477,25 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 // FIX M-13: align dry tap with the wet group delay.
                 dryTapL = dryL;
                 dryTapR = dryR;
+                if (multiband_) {
+                    subTapL = delayedSubL;
+                    subTapR = delayedSubR;
+                }
             }
 
             if (!std::isfinite(wetL)) wetL = 0.0f;
             if (!std::isfinite(wetR)) wetR = 0.0f;
 
-            buffer[i * 2] = (1.0f - mix) * dryTapL + mix * wetL;
-            buffer[i * 2 + 1] = (1.0f - mix) * dryTapR + mix * wetR;
+            const float midHighL = (1.0f - mix) * dryTapL + mix * wetL;
+            const float midHighR = (1.0f - mix) * dryTapR + mix * wetR;
+
+            if (multiband_) {
+                buffer[i * 2] = subTapL + midHighL;
+                buffer[i * 2 + 1] = subTapR + midHighR;
+            } else {
+                buffer[i * 2] = midHighL;
+                buffer[i * 2 + 1] = midHighR;
+            }
         }
         return;
     }
@@ -438,15 +508,46 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
     const int mode = mode_;
 
     for (int i = 0; i < frames; ++i) {
+        float subArr[MAX_CHANNELS] = {};
+        float satInArr[MAX_CHANNELS] = {};
+        if (multiband_) {
+            for (int p = 0; p < channels / 2 && p < MAX_CHANNELS / 2; ++p) {
+                const int ch0 = p * 2;
+                const int ch1 = ch0 + 1;
+                double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
+                crossover_[p].process(buffer[i * channels + ch0], buffer[i * channels + ch1],
+                                      outLpL, outLpR, outHpL, outHpR);
+                subArr[ch0] = static_cast<float>(outLpL);
+                subArr[ch1] = static_cast<float>(outLpR);
+                satInArr[ch0] = static_cast<float>(outHpL);
+                satInArr[ch1] = static_cast<float>(outHpR);
+            }
+            if (channels % 2 != 0) {
+                const int chLast = channels - 1;
+                const int p = chLast / 2;
+                if (p < MAX_CHANNELS / 2) {
+                    double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
+                    crossover_[p].process(buffer[i * channels + chLast], buffer[i * channels + chLast],
+                                          outLpL, outLpR, outHpL, outHpR);
+                    subArr[chLast] = static_cast<float>(outLpL);
+                    satInArr[chLast] = static_cast<float>(outHpL);
+                }
+            }
+        }
+
         for (int ch = 0; ch < channels; ++ch) {
             const int idx = i * channels + ch;
-            float inSample = buffer[idx];
+            float inSample = multiband_ ? satInArr[ch] : buffer[idx];
             if (!std::isfinite(inSample)) inSample = 0.0f;
+            float subSample = multiband_ ? subArr[ch] : 0.0f;
 
             // FIX M-13: per-channel dry delay (position advanced once per frame
             // below, after every channel of this frame is stored).
             const float dryDelayed = dryDelay_[ch][dryDelayPos_];
             dryDelay_[ch][dryDelayPos_] = inSample;
+
+            const float delayedSub = subDelay_[ch][dryDelayPos_];
+            subDelay_[ch][dryDelayPos_] = subSample;
 
             for (int t = TAPS_PER_PHASE - 1; t > 0; --t) {
                 history_[ch][t] = history_[ch][t - 1];
@@ -455,6 +556,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
             float wet = inSample;
             float dryTap = inSample;
+            float subTap = subSample;
 
             if (k > 1e-9) {
                 // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
@@ -504,11 +606,15 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
                 // FIX M-13: align dry tap with the wet group delay.
                 dryTap = dryDelayed;
+                if (multiband_) {
+                    subTap = delayedSub;
+                }
             }
 
             if (!std::isfinite(wet)) wet = 0.0f;
 
-            buffer[idx] = (1.0f - mix) * dryTap + mix * wet;
+            const float midHigh = (1.0f - mix) * dryTap + mix * wet;
+            buffer[idx] = multiband_ ? (subTap + midHigh) : midHigh;
         }
         // FIX M-13: advance the shared dry-delay position once per frame.
         dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;

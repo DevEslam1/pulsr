@@ -120,7 +120,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
             merged.add(item);
           }
         }
-        safeEmit(state.copyWith(history: merged.take(historyMax).toList()));
+        safeEmit(state.copyWith(
+            history: List<String>.unmodifiable(merged.take(historyMax))));
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to load search history',
@@ -368,7 +369,9 @@ class SearchCubit extends PulsrCubit<SearchState> {
         ...existing.where((h) => h.toLowerCase() != q.toLowerCase())
       ].take(historyMax).toList();
       await prefs.setStringList(_historyKey, updated);
-      if (!isClosed) safeEmit(state.copyWith(history: updated));
+      if (!isClosed) {
+        safeEmit(state.copyWith(history: List<String>.unmodifiable(updated)));
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to persist search history',
           error: e, stackTrace: st, category: 'SearchCubit');
@@ -384,7 +387,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
       ErrorLogger.log('Failed to clear search history',
           error: e, stackTrace: st, category: 'SearchCubit');
     }
-    if (!isClosed) safeEmit(state.copyWith(history: []));
+    if (!isClosed) safeEmit(state.copyWith(history: const []));
   }
 
   /// Removes a single recent-search entry (case-insensitive).
@@ -393,7 +396,9 @@ class SearchCubit extends PulsrCubit<SearchState> {
     final updated = state.history
         .where((h) => h.toLowerCase() != query.trim().toLowerCase())
         .toList();
-    if (!isClosed) safeEmit(state.copyWith(history: updated));
+    if (!isClosed) {
+      safeEmit(state.copyWith(history: List<String>.unmodifiable(updated)));
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList(_historyKey, updated);
@@ -489,7 +494,9 @@ class SearchCubit extends PulsrCubit<SearchState> {
               _lastPoolFilter = filter;
               _updateHasMore(filtered, pool);
               safeEmit(state.copyWith(
-                  results: filtered, isLoading: false, errorMessage: null));
+                  results: List<SongsTableData>.unmodifiable(filtered),
+                  isLoading: false,
+                  errorMessage: null));
             },
           );
         },
@@ -538,7 +545,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
         _filterWithFuzzy(pool, q, _lastPoolFilter ?? state.selectedFilter);
     if (isClosed || generation != _generation) return;
     _updateHasMore(filtered, pool);
-    safeEmit(state.copyWith(results: filtered));
+    safeEmit(state.copyWith(
+        results: List<SongsTableData>.unmodifiable(filtered)));
   }
 
   @override

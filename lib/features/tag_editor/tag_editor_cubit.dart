@@ -800,6 +800,13 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       _batchCommentEdited = false;
     }
   }
+
+  @override
+  Future<void> close() {
+    _clearHistory();
+    _userEditedFields.clear();
+    return super.close();
+  }
 }
 
 // FIX-M08 / H-10: Distinct outcomes for native bridge responses

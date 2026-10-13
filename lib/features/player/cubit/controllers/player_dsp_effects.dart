@@ -9,6 +9,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   List<GainStage> _activeGainStages({
     bool excludeVolumeBoost = false,
     bool excludeBassBoost = false,
+    bool excludeEqPreamp = false,
   }) {
     final state = _getState();
     // Engine accessors (equalizerManager is a late-final, volumeController is
@@ -32,7 +33,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       // preamp stage here — summing it AND the profile preampGain would
       // double-count (and a negative AutoEQ preamp would wrongly inflate the
       // budget).
-      GainStage('EQ preamp', eqPreampDb),
+      if (!excludeEqPreamp) GainStage('EQ preamp', eqPreampDb),
       GainStage('ReplayGain preamp', rgPreampDb),
       GainStagingBudget.scaledStage('Loudness contour',
           enabled: state.isLoudnessContourEnabled,

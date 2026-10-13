@@ -135,11 +135,11 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
       // Emit the freshly fetched sample first so recovery has no one-tick
       // staleness before the restarted timer produces its next value.
       if (_pollingTimer == null && _listenerCount > 0) {
-        emit(telemetry);
+        if (state != telemetry) emit(telemetry);
         _startPolling();
         return;
       }
-      emit(telemetry);
+      if (state != telemetry) emit(telemetry);
     } catch (e, st) {
       _consecutiveFailures++;
       if (!_didLogFailure) {

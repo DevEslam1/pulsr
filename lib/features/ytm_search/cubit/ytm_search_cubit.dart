@@ -229,7 +229,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       _hasMore =
           added > 0 && more.length >= nextLimit && nextLimit < _maxSearchLimit;
       safeEmit(state.copyWith(
-          results: appended, isLoading: false, errorMessage: null));
+          results: List<YtmTrack>.unmodifiable(appended),
+          isLoading: false,
+          errorMessage: null));
     } catch (e, st) {
       if (gen != _generation || isClosed) return;
       ErrorLogger.log('Failed to load more YTM search results',
@@ -306,7 +308,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           );
           _hasMore = false;
           safeEmit(state.copyWith(
-              results: [track], isLoading: false, errorMessage: null));
+              results: List<YtmTrack>.unmodifiable([track]),
+              isLoading: false,
+              errorMessage: null));
           return;
         } catch (e, st) {
           // FIX-A05: Log failure before falling back to regular search
@@ -324,7 +328,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       _hasMore = results.length >= _searchPageSize &&
           _searchPageSize < _maxSearchLimit;
       safeEmit(state.copyWith(
-          results: results, isLoading: false, errorMessage: null));
+          results: List<YtmTrack>.unmodifiable(results),
+          isLoading: false,
+          errorMessage: null));
       if (results.isNotEmpty) unawaited(_saveToHistory(query));
       // Speculative warm: the first [_warmTopN] hits are the taps users make
       // most often. Resolving each stream URL now (one background player

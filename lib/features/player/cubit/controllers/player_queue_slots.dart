@@ -164,7 +164,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
     _emit(state.copyWith(
-      queueSlice: state.queueSlice.copyWith(queue: retained, currentIndex: 0),
+      queueSlice: state.queueSlice.copyWith(
+        queue: List<SongsTableData>.unmodifiable(retained),
+        currentIndex: 0,
+      ),
     ));
     try {
       await _audioHandler.clearQueue();
@@ -197,7 +200,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _bumpQueueVersion();
     _emit(state.copyWith(
       queueSlice: state.queueSlice.copyWith(
-        queue: previousQueue,
+        queue: List<SongsTableData>.unmodifiable(previousQueue),
         currentIndex: validIndex,
       ),
     ));
@@ -252,7 +255,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _bumpQueueVersion();
     _emit(state.copyWith(
       queueSlice: state.queueSlice.copyWith(
-        queue: updatedQueue,
+        queue: List<SongsTableData>.unmodifiable(updatedQueue),
         currentIndex: newCurrentIndex,
       ),
     ));
@@ -276,7 +279,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _bumpQueueVersion();
       _emit(current.copyWith(
         queueSlice: current.queueSlice.copyWith(
-          queue: state.queue,
+          queue: List<SongsTableData>.unmodifiable(state.queue),
           currentIndex: state.currentIndex,
         ),
         playback: current.playback.copyWith(
@@ -359,7 +362,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         : state.playback;
     _emit(state.copyWith(
       queueSlice: state.queueSlice.copyWith(
-        queue: updatedQueue,
+        queue: List<SongsTableData>.unmodifiable(updatedQueue),
         currentIndex: newIndex,
       ),
       playback: playback,
@@ -378,7 +381,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         final s = _getState();
         _emit(s.copyWith(
           queueSlice: s.queueSlice.copyWith(
-            queue: state.queue,
+            queue: List<SongsTableData>.unmodifiable(state.queue),
             currentIndex: state.currentIndex,
           ),
         ));
@@ -441,7 +444,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _emit(state.copyWith(
         queueSlice: state.queueSlice.copyWith(
           activeQueueSlot: slot,
-          queue: validSongs,
+          queue: List<SongsTableData>.unmodifiable(validSongs),
           currentIndex: safeIdx,
         ),
         playback: state.playback.copyWith(
@@ -600,7 +603,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _bumpQueueVersion();
     _emit(s.copyWith(
       queueSlice: s.queueSlice.copyWith(
-        queue: updatedQueue,
+        queue: List<SongsTableData>.unmodifiable(updatedQueue),
         trackTiers: updatedTiers,
       ),
     ));
@@ -673,7 +676,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _bumpQueueVersion();
     _emit(s.copyWith(
       queueSlice: s.queueSlice.copyWith(
-        queue: updatedQueue,
+        queue: List<SongsTableData>.unmodifiable(updatedQueue),
         trackTiers: updatedTiers,
       ),
     ));
@@ -755,7 +758,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _bumpQueueVersion();
     _emit(s.copyWith(
       queueSlice: s.queueSlice.copyWith(
-        queue: updatedQueue,
+        queue: List<SongsTableData>.unmodifiable(updatedQueue),
         trackTiers: updatedTiers,
       ),
       playback: s.playback.copyWith(

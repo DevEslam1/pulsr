@@ -42,7 +42,9 @@ aaudio_format_t ToAaudioFormat(AAudioSink::Encoding encoding) {
 }  // namespace
 
 bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
-                         aaudio_performance_mode_t perf) {
+                         aaudio_performance_mode_t perf,
+                         int64_t* recoverPrevFramesWritten,
+                         int64_t* recoverPrevWrittenBase) {
     AAudioStreamBuilder* builder = nullptr;
     aaudio_result_t r = AAudio_createStreamBuilder(&builder);
     if (r != AAUDIO_OK) {
@@ -114,10 +116,19 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     }
     exclusive_ =
         AAudioStream_getSharingMode(stream) == AAUDIO_SHARING_MODE_EXCLUSIVE;
-    framesWritten_ = 0;
-    framesWrittenBase_ = 0;
-    readBase_ = 0;
-    readOffset_ = 0;
+    if (recoverPrevFramesWritten != nullptr && recoverPrevWrittenBase != nullptr) {
+        framesWritten_ = *recoverPrevFramesWritten;
+        framesWrittenBase_ = *recoverPrevWrittenBase;
+        readBase_ = AAudioStream_getFramesRead(stream);
+        // Buffered frames from the disconnected stream cannot be drained.
+        // Account for them as discarded so pending-data/EOS cannot hang.
+        readOffset_ = *recoverPrevFramesWritten - *recoverPrevWrittenBase;
+    } else {
+        framesWritten_ = 0;
+        framesWrittenBase_ = 0;
+        readBase_ = 0;
+        readOffset_ = 0;
+    }
     lastXRunCount_.store(AAudioStream_getXRunCount(stream), std::memory_order_relaxed);
     disconnected_.store(false, std::memory_order_release);
 
@@ -189,33 +200,24 @@ bool AAudioSink::RecoverDisconnected() {
     // Current writer thread is active, so do not wait for writers here
     CloseLocked(/* waitForWriters = */ false);
     disconnected_.store(false, std::memory_order_release);
-    const int64_t prevFramesWritten = framesWritten_;
-    const int64_t prevWrittenBase = framesWrittenBase_;
-    const auto restoreTimeline = [&]() {
-        framesWritten_ = prevFramesWritten;
-        framesWrittenBase_ = prevWrittenBase;
-        AAudioStream* st = stream_.load(std::memory_order_acquire);
-        readBase_ = st ? AAudioStream_getFramesRead(st) : 0;
-        // Buffered frames from the disconnected stream cannot be drained.
-        // Account for them as discarded so pending-data/EOS cannot hang.
-        readOffset_ = prevFramesWritten - prevWrittenBase;
-    };
+    int64_t prevFramesWritten = framesWritten_;
+    int64_t prevWrittenBase = framesWrittenBase_;
 
     if (bitPerfect_ &&
-        TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
-        restoreTimeline();
+        TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                &prevFramesWritten, &prevWrittenBase)) {
         LOGI("Recovered AAudio stream in EXCLUSIVE mode");
         return true;
     }
     if (bitPerfect_) return false;
     if (config_.lowLatency &&
-        TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
-        restoreTimeline();
+        TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                &prevFramesWritten, &prevWrittenBase)) {
         LOGI("Recovered AAudio stream in SHARED low-latency mode");
         return true;
     }
-    if (TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_NONE)) {
-        restoreTimeline();
+    if (TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_NONE,
+                &prevFramesWritten, &prevWrittenBase)) {
         LOGI("Recovered AAudio stream in SHARED mode");
         return true;
     }
@@ -302,7 +304,8 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
             float* f = reinterpret_cast<float*>(volumeScratch_.data());
             const int n = remaining / static_cast<int32_t>(sizeof(float));
             for (int i = 0; i < n; ++i) f[i] *= curVol;
-        } else {
+            src = volumeScratch_.data();
+        } else if (config_.encoding == Encoding::Int16) {
             int16_t* s = reinterpret_cast<int16_t*>(volumeScratch_.data());
             const int n = remaining / static_cast<int32_t>(sizeof(int16_t));
             for (int i = 0; i < n; ++i) {
@@ -311,8 +314,8 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
                                   : (v > 32767.0f ? 32767.0f : v);
                 s[i] = static_cast<int16_t>(v);
             }
+            src = volumeScratch_.data();
         }
-        src = volumeScratch_.data();
     }
 
     int32_t framesLeft = remaining / bytesPerFrame_;

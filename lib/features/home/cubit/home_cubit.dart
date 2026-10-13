@@ -145,14 +145,20 @@ class HomeCubit extends PulsrCubit<HomeState> {
           ErrorLogger.log(
               'Skipping category $category fetch: no network connectivity',
               category: 'HomeCubit');
+          if (identical(_categoryFutures[category], future)) {
+            _categoryFutures.remove(category);
+            _categoryFetchTimestamps.remove(category);
+          }
           return <YtmTrack>[];
         }
+        final List<YtmTrack> result;
         if (category == 'Recommended For You') {
+          List<YtmTrack>? recsResult;
           if (_account.isLoggedIn) {
             try {
               final recs =
                   await _account.fetchHomeRecommendations(maxTracks: 50);
-              if (recs.isNotEmpty) return recs;
+              if (recs.isNotEmpty) recsResult = recs;
             } catch (e, st) {
               ErrorLogger.log(
                 'Home recommendations fetch failed; falling back to trending',
@@ -162,31 +168,46 @@ class HomeCubit extends PulsrCubit<HomeState> {
               );
             }
           }
-          try {
-            final trending = await _ytm.trending(limit: 25);
-            if (trending.isNotEmpty) return trending;
-          } catch (e, st) {
-            ErrorLogger.log(
-              'Home trending fetch failed; falling back to search',
-              error: e,
-              stackTrace: st,
-              category: 'HomeCubit',
-            );
+          if (recsResult != null) {
+            result = recsResult;
+          } else {
+            List<YtmTrack>? trendingResult;
+            try {
+              final trending = await _ytm.trending(limit: 25);
+              if (trending.isNotEmpty) trendingResult = trending;
+            } catch (e, st) {
+              ErrorLogger.log(
+                'Home trending fetch failed; falling back to search',
+                error: e,
+                stackTrace: st,
+                category: 'HomeCubit',
+              );
+            }
+            if (trendingResult != null) {
+              result = trendingResult;
+            } else {
+              result = await _ytm.searchWithFallback(
+                  categoryQueries['Recommended For You'] ?? 'top hits music',
+                  limit: 25);
+            }
           }
-          return await _ytm.searchWithFallback(
-              categoryQueries['Recommended For You'] ?? 'top hits music',
-              limit: 25);
-        }
-        if (category == 'Trending Egypt') {
+        } else if (category == 'Trending Egypt') {
           // Deliberately does NOT reuse `_ytm.trending()`. The global trending
           // feed already backs 'Recommended For You', so sharing it produced
           // two identical carousels for anonymous users.
-          return await _ytm.searchWithFallback(
+          result = await _ytm.searchWithFallback(
               categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند',
               limit: 25);
+        } else {
+          final query = categoryQueries[category] ?? '$category songs';
+          result = await _ytm.searchWithFallback(query, limit: 25);
         }
-        final query = categoryQueries[category] ?? '$category songs';
-        return await _ytm.searchWithFallback(query, limit: 25);
+
+        if (result.isEmpty && identical(_categoryFutures[category], future)) {
+          _categoryFutures.remove(category);
+          _categoryFetchTimestamps.remove(category);
+        }
+        return result;
       } catch (e, st) {
         // C-05: Only remove if the cached future is still this in-flight instance
         if (identical(_categoryFutures[category], future)) {
@@ -270,6 +291,7 @@ class HomeCubit extends PulsrCubit<HomeState> {
   @override
   Future<void> close() {
     _account.loginState.removeListener(_onLoginChanged);
+    _monotonicClock.stop();
     clearCache();
     return super.close();
   }

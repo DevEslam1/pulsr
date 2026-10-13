@@ -230,10 +230,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               ListTile(
                 leading: const Icon(Icons.playlist_play_rounded),
                 title: Text(context.l10n.playNext),
-                onTap: () {
+                onTap: () async {
+                  final cubit = context.read<PlayerCubit>();
                   Navigator.pop(ctx);
                   for (final s in songs.reversed) {
-                    context.read<PlayerCubit>().playNext(s);
+                    await cubit.playNext(s);
                   }
                 },
               ),
@@ -241,8 +242,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                 leading: const Icon(Icons.queue_music_rounded),
                 title: Text(context.l10n.addToQueue),
                 onTap: () {
+                  final cubit = context.read<PlayerCubit>();
                   Navigator.pop(ctx);
-                  context.read<PlayerCubit>().addAllToQueue(songs);
+                  cubit.addAllToQueue(songs);
                 },
               ),
             ],

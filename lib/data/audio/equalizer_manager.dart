@@ -811,14 +811,22 @@ class EqualizerManager {
         if (PlatformCapabilities.isAndroid && isEnabled) {
           if (eqBandCount != 10) {
             var nativeOk = true;
-            for (final entry in valid.entries) {
-              final ok = await _effectsChannel.setNativeEqBand(
-                entry.key,
-                targetFreqs[entry.key],
-                entry.value,
-                graphicEqQs(targetFreqs)[entry.key],
+            if (valid.length > 1) {
+              nativeOk = await _effectsChannel.setNativeEqBandsBulk(
+                frequencies: targetFreqs,
+                gains: currentPreset.gains,
+                qs: graphicEqQs(targetFreqs),
               );
-              if (!ok) nativeOk = false;
+            } else {
+              for (final entry in valid.entries) {
+                final ok = await _effectsChannel.setNativeEqBand(
+                  entry.key,
+                  targetFreqs[entry.key],
+                  entry.value,
+                  graphicEqQs(targetFreqs)[entry.key],
+                );
+                if (!ok) nativeOk = false;
+              }
             }
             // Single-application: skip the interpolated legacy mirror when the
             // native stage ACKed and owns the curve (defect 13-01).
@@ -830,14 +838,23 @@ class EqualizerManager {
               await _effectsChannel.setEqBandGains(tenBandGains);
             }
           } else {
-            for (final entry in valid.entries) {
-              await _effectsChannel.setEqBandGain(entry.key, entry.value);
-              await _effectsChannel.setNativeEqBand(
-                entry.key,
-                targetFreqs[entry.key],
-                entry.value,
-                graphicEqQs(targetFreqs)[entry.key],
+            if (valid.length > 1) {
+              await _effectsChannel.setEqBandGains(currentPreset.gains);
+              await _effectsChannel.setNativeEqBandsBulk(
+                frequencies: targetFreqs,
+                gains: currentPreset.gains,
+                qs: graphicEqQs(targetFreqs),
               );
+            } else {
+              for (final entry in valid.entries) {
+                await _effectsChannel.setEqBandGain(entry.key, entry.value);
+                await _effectsChannel.setNativeEqBand(
+                  entry.key,
+                  targetFreqs[entry.key],
+                  entry.value,
+                  graphicEqQs(targetFreqs)[entry.key],
+                );
+              }
             }
           }
         }

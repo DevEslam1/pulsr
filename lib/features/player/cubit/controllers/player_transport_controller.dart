@@ -337,13 +337,17 @@ class PlayerTransportController {
                   currentSong: state.currentSong!.copyWith(isFavorite: isFav),
                   errorMessage: null,
                 ),
-                queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
+                queueSlice: state.queueSlice.copyWith(
+                  queue: List<SongsTableData>.unmodifiable(updatedQueue),
+                ),
               ),
             );
             _updateWidgetThrottled?.call(force: true);
           } else if (state.queue.any((s) => s.id == songId)) {
             _emit(state.copyWith(
-              queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
+              queueSlice: state.queueSlice.copyWith(
+                queue: List<SongsTableData>.unmodifiable(updatedQueue),
+              ),
               playback: state.playback.copyWith(errorMessage: null),
             ));
           }

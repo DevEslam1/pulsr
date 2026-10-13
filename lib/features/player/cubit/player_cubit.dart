@@ -841,6 +841,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     autoSub(
         positionUpdates.throttleTime(PlayerConstants.positionThrottleDuration,
             trailing: true), (pos) {
+      if (state.playback.position == pos) return;
       safeEmit(
           state.copyWith(playback: state.playback.copyWith(position: pos)));
       if (state.isPlaying) {

@@ -214,7 +214,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
               if (isClosed || t != _songsToken) return;
               // FIX-M02: Emit 5,000-cap notice as informational message rather than error
               safeEmit(state.copyWith(
-                  songs: sortedSongs,
+                  songs: List<SongsTableData>.unmodifiable(sortedSongs),
                   infoMessage: hasHitCap
                       ? 'Displaying top 5,000 rated songs (maximum limit).'
                       : null,
@@ -228,7 +228,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             _isLoadingMoreSongs = false;
             if (isClosed || t != _songsToken) return;
             safeEmit(state.copyWith(
-                songs: songs,
+                songs: List<SongsTableData>.unmodifiable(songs),
                 errorMessage: null,
                 isLoading: false,
                 isLoadingMore: false));
@@ -291,8 +291,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _albumsSub = autoSub(_getAlbumsUseCase.watchAlbums(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (albums) =>
-            safeEmit(state.copyWith(albums: albums, errorMessage: null)),
+        (albums) => safeEmit(state.copyWith(
+            albums: List.unmodifiable(albums),
+            errorMessage: null)),
       );
     });
   }
@@ -303,8 +304,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _artistsSub = autoSub(_getArtistsUseCase.watchArtists(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (artists) =>
-            safeEmit(state.copyWith(artists: artists, errorMessage: null)),
+        (artists) => safeEmit(state.copyWith(
+            artists: List.unmodifiable(artists),
+            errorMessage: null)),
       );
     });
   }
@@ -315,8 +317,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _genresSub = autoSub(_getGenresUseCase.watchGenres(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (genres) =>
-            safeEmit(state.copyWith(genres: genres, errorMessage: null)),
+        (genres) => safeEmit(state.copyWith(
+            genres: List.unmodifiable(genres),
+            errorMessage: null)),
       );
     });
   }
@@ -327,7 +330,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _yearsSub = autoSub(_getYearsUseCase.watchYears(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (years) => safeEmit(state.copyWith(years: years, errorMessage: null)),
+        (years) => safeEmit(state.copyWith(
+            years: List.unmodifiable(years),
+            errorMessage: null)),
       );
     });
   }
@@ -340,7 +345,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (favs) {
           if (_pendingFavoriteTargets.isEmpty) {
-            safeEmit(state.copyWith(favorites: favs, errorMessage: null));
+            safeEmit(state.copyWith(
+                favorites: List<SongsTableData>.unmodifiable(favs),
+                errorMessage: null));
             return;
           }
           // A favorite toggle is in flight: the DB still holds the pre-toggle
@@ -374,7 +381,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           });
           final seen = <int>{};
           merged = merged.where((s) => seen.add(s.id)).toList();
-          safeEmit(state.copyWith(favorites: merged, errorMessage: null));
+          safeEmit(state.copyWith(
+              favorites: List<SongsTableData>.unmodifiable(merged),
+              errorMessage: null));
         },
       );
     });
@@ -385,8 +394,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     if (isClosed) return;
     result.fold(
       (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (folders) =>
-          safeEmit(state.copyWith(folders: folders, errorMessage: null)),
+      (folders) => safeEmit(state.copyWith(
+          folders: List.unmodifiable(folders),
+          errorMessage: null)),
     );
   }
 

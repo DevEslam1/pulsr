@@ -87,7 +87,9 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   void addRule(SmartRule rule) {
     final rules = List<SmartRule>.from(state.criteria.rules)..add(rule);
     safeEmit(state.copyWith(
-        criteria: state.criteria.copyWith(rules: rules), errorMessage: null));
+        criteria:
+            state.criteria.copyWith(rules: List<SmartRule>.unmodifiable(rules)),
+        errorMessage: null));
     _updatePreview();
   }
 
@@ -96,7 +98,9 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     final rules = List<SmartRule>.from(state.criteria.rules);
     rules[index] = rule;
     safeEmit(state.copyWith(
-        criteria: state.criteria.copyWith(rules: rules), errorMessage: null));
+        criteria:
+            state.criteria.copyWith(rules: List<SmartRule>.unmodifiable(rules)),
+        errorMessage: null));
     _updatePreview();
   }
 
@@ -104,7 +108,9 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     if (index < 0 || index >= state.criteria.rules.length) return;
     final rules = List<SmartRule>.from(state.criteria.rules)..removeAt(index);
     safeEmit(state.copyWith(
-        criteria: state.criteria.copyWith(rules: rules), errorMessage: null));
+        criteria:
+            state.criteria.copyWith(rules: List<SmartRule>.unmodifiable(rules)),
+        errorMessage: null));
     _updatePreview();
   }
 
@@ -152,7 +158,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
         final truncated = songs.length > previewCap;
         final visible = songs.take(previewCap).toList();
         safeEmit(state.copyWith(
-          previewSongs: visible,
+          previewSongs: List<SongsTableData>.unmodifiable(visible),
           previewTruncated: truncated,
         ));
       },
@@ -160,7 +166,8 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
         if (isClosed || gen != _previewGen) return;
         ErrorLogger.log('Smart playlist preview query failed',
             error: e, stackTrace: st, category: 'SmartPlaylist');
-        safeEmit(state.copyWith(previewSongs: [], previewTruncated: false));
+        safeEmit(
+            state.copyWith(previewSongs: const [], previewTruncated: false));
       },
     );
   }
@@ -198,7 +205,8 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       }
       normalizedRules.add(rule);
     }
-    final criteria = state.criteria.copyWith(rules: normalizedRules);
+    final criteria = state.criteria.copyWith(
+        rules: List<SmartRule>.unmodifiable(normalizedRules));
 
     // A rule the engine cannot evaluate must block the save: saving it would
     // silently widen the playlist (unbuildable rules previously failed open).

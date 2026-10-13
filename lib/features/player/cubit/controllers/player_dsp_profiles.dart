@@ -293,6 +293,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     }
     await step(() => _audioHandler.setEqualizerEnabled(dsp.isEqEnabled));
     await step(() => _audioHandler.applyPreset(dsp.eqPreset));
+    await step(() => _audioHandler.setPreamp(dsp.preampDb));
     await step(() => _audioHandler.setVolumeBoost(dsp.volumeBoost));
     await step(() => _audioHandler.setSaturation(dsp.isSaturationEnabled,
         drive: dsp.saturationDrive,

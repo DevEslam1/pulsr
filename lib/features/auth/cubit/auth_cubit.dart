@@ -18,6 +18,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
   // Set when a sync arrives while one is already in flight; the in-flight pass
   // re-runs once it finishes so an account switch mid-sync is never dropped.
   bool _syncQueued = false;
+  String? _syncingUserId;
   // FIX-C11: Monotonic Stopwatch for sync deduplication
   final Stopwatch _syncStopwatch = Stopwatch();
   static const Duration _syncDedupeWindow = Duration(seconds: 2);
@@ -246,11 +247,15 @@ class AuthCubit extends PulsrCubit<AuthState> {
   }
 
   Future<void> syncNow() async {
-    if (state.user == null) return;
+    final currentUser = state.user;
+    if (currentUser == null) return;
     if (_syncing) {
-      // A sign-out -> sign-in during an in-flight sync must not be dropped:
-      // queue one re-run that starts as soon as the current pass finishes.
-      _syncQueued = true;
+      // Only queue a re-run if the user account actually switched mid-sync:
+      // do NOT queue a duplicate back-to-back sync when signIn... and
+      // authStateChanges both invoke syncNow() for the same user.
+      if (currentUser.uid != _syncingUserId) {
+        _syncQueued = true;
+      }
       return;
     }
     // FIX-C11: Monotonic clock prevents system wall-clock jumps from disrupting sync deduplication
@@ -263,6 +268,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       ..start();
     _syncing = true;
     _syncQueued = false;
+    _syncingUserId = currentUser.uid;
     safeEmit(state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
     try {
       final success = await _cloudSyncService.syncAll();
@@ -287,6 +293,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       ));
     } finally {
       _syncing = false;
+      _syncingUserId = null;
     }
     if (_syncQueued) {
       _syncQueued = false;
@@ -300,7 +307,16 @@ class AuthCubit extends PulsrCubit<AuthState> {
   }
 
   Future<void> signOut() async {
-    await _authService.signOut();
+    _syncQueued = false;
+    _syncingUserId = null;
+    _syncStopwatch
+      ..stop()
+      ..reset();
+    try {
+      await _authService.signOut();
+    } catch (_) {
+      // Best-effort sign out, ensure local state is cleared cleanly
+    }
     if (isClosed) return;
     safeEmit(const AuthState(status: AuthStatus.unauthenticated));
   }

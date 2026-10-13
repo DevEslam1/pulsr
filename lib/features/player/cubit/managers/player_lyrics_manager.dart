@@ -136,7 +136,7 @@ class PlayerLyricsManager {
       }
     }
 
-    if (isStale != null && isStale()) return result;
+    if (isStale != null && isStale()) return null;
 
     if (!hadError &&
         (result == null || result.lines.isEmpty) &&

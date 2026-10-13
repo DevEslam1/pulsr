@@ -2,6 +2,7 @@
 #pragma once
 
 #include "DspParams.h"
+#include "CrossoverUtil.h"
 #include <cmath>
 #include <algorithm>
 
@@ -88,6 +89,9 @@ private:
     static constexpr int DRY_DELAY = 7;
     float dryDelay_[MAX_CHANNELS][DRY_DELAY] = {};
     int dryDelayPos_ = 0;
+    static constexpr double kMultibandCrossoverHz = 150.0;
+    LinkwitzRiley4 crossover_[MAX_CHANNELS / 2];
+    float subDelay_[MAX_CHANNELS][DRY_DELAY] = {};
 
     static const float polyphase4x_[OVERSAMPLE_FACTOR][TAPS_PER_PHASE];
 };

@@ -76,9 +76,9 @@ class PlayerSponsorBlockManager {
       if (isStale != null && isStale()) {
         return const [];
       }
-      _currentSegments = segments;
+      _currentSegments = List.unmodifiable(segments);
       _currentVideoId = videoId;
-      return segments;
+      return _currentSegments;
     } catch (e, st) {
       ErrorLogger.log('Failed to fetch SponsorBlock segments for $videoId',
           error: e, stackTrace: st, category: 'PlayerSponsorBlockManager');

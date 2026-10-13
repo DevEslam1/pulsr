@@ -252,7 +252,7 @@ extension PlayerQueueRadio on PlayerQueueController {
       _bumpQueueVersion();
       _emit(fresh.copyWith(
         queueSlice: fresh.queueSlice.copyWith(
-          queue: updatedQueue,
+          queue: List<SongsTableData>.unmodifiable(updatedQueue),
           trackTiers: updatedTiers,
         ),
       ));

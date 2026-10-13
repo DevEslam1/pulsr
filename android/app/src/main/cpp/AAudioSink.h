@@ -79,7 +79,9 @@ public:
     bool HasPendingData() const;
 
 private:
-    bool TryOpen(aaudio_sharing_mode_t sharing, aaudio_performance_mode_t perf);
+    bool TryOpen(aaudio_sharing_mode_t sharing, aaudio_performance_mode_t perf,
+                 int64_t* recoverPrevFramesWritten = nullptr,
+                 int64_t* recoverPrevWrittenBase = nullptr);
     void CloseLocked(bool waitForWriters = true);
     static void ErrorCallback(AAudioStream* stream, void* userData, aaudio_result_t error);
     bool RecoverDisconnected();
