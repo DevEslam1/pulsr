@@ -46,6 +46,7 @@ mixin SettingsAppearanceSection
               SizedBox(
                 width: double.infinity,
                 child: PulsrSegmentedControl(
+                  fitLabels: true,
                   segments: [
                     PulsrSegment(
                       label: context.l10n.systemDefault,
@@ -102,7 +103,8 @@ mixin SettingsAppearanceSection
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
-              SingleChildScrollView(
+              _ScrollEdgeFade(
+                child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 child: Row(
@@ -159,6 +161,7 @@ mixin SettingsAppearanceSection
                         );
                       }),
                   ],
+                ),
                 ),
               ),
             ],

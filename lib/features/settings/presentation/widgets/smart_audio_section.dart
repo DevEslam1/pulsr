@@ -384,10 +384,12 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
               vertical: AppSpacing.xxs,
             ),
             secondary: Container(
-              padding: const EdgeInsets.all(AppSpacing.xs),
+              width: AppSpacing.s38,
+              height: AppSpacing.s38,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: p.accent.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+                borderRadius: AppRadii.r10All,
               ),
               child: Icon(
                 Icons.usb_rounded,

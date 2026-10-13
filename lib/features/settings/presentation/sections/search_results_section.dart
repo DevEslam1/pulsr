@@ -181,8 +181,11 @@ mixin SettingsSearchResults
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                         decoration: BoxDecoration(
-                          color: p.accent.withValues(alpha: 0.12),
+                          color: p.accent.withValues(alpha: 0.18),
                           borderRadius: AppRadii.r6All,
+                          border: Border.all(
+                            color: p.accent.withValues(alpha: 0.35),
+                          ),
                         ),
                         child: Text(
                           r.category.toUpperCase(),

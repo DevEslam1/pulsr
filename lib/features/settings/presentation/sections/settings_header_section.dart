@@ -14,20 +14,23 @@ mixin SettingsHeaderSection on State<SettingsScreen> {
   Widget _buildTopHeader(BuildContext context) {
     final p = context.palette;
     final horizontalPad = Adaptive.pagePadding(context);
-    if (MediaQuery.viewInsetsOf(context).bottom > 0) {
-      return Padding(
-        padding: EdgeInsets.symmetric(
-            horizontal: horizontalPad, vertical: AppSpacing.xs),
-        child: PulsrSearchField(
-            controller: _searchController,
-            hintText: context.l10n.settingsSearchPlaceholder,
-            onClear: () {
-              if (mounted) setState(() => _searchQuery = '');
-            }),
-      );
-    }
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final compact =
         MediaQuery.sizeOf(context).height < 500 && context.isLandscape;
+
+    // The search field must keep a stable position in the element tree across
+    // keyboard-inset changes. A structural swap when the keyboard opens
+    // recreates the field's TextField element, which drops focus and closes
+    // its text-input connection (the keyboard closes instantly and search
+    // cannot be typed into on phones). The title block is therefore collapsed
+    // with [Visibility] instead of a branch swap.
+    final searchField = PulsrSearchField(
+      controller: _searchController,
+      hintText: context.l10n.settingsSearchPlaceholder,
+      onClear: () {
+        if (mounted) setState(() => _searchQuery = '');
+      },
+    );
 
     if (compact) {
       return Padding(
@@ -41,14 +44,7 @@ mixin SettingsHeaderSection on State<SettingsScreen> {
                     fontSize: AppFontSize.titleLarge,
                     fontWeight: FontWeight.w800)),
             const SizedBox(width: AppSpacing.lg),
-            Expanded(
-                child: PulsrSearchField(
-              controller: _searchController,
-              hintText: context.l10n.settingsSearchPlaceholder,
-              onClear: () {
-                if (mounted) setState(() => _searchQuery = '');
-              },
-            )),
+            Expanded(child: searchField),
           ],
         ),
       );
@@ -56,48 +52,54 @@ mixin SettingsHeaderSection on State<SettingsScreen> {
 
     return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(
-          horizontalPad, AppSpacing.md, horizontalPad, AppSpacing.xs),
+          horizontalPad,
+          keyboardOpen ? AppSpacing.xs : AppSpacing.md,
+          horizontalPad,
+          AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Visibility(
+            visible: !keyboardOpen,
+            maintainState: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      context.l10n.settings,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontSize: AppFontSize.display,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: AppTracking.heading,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s2),
-                    Text(
-                      context.l10n.settingsHeaderTagline(AppConfig.appVersion),
-                      style: TextStyle(
-                        color: p.textTertiary,
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.l10n.settings,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.display,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: AppTracking.heading,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s2),
+                          Text(
+                            context.l10n
+                                .settingsHeaderTagline(AppConfig.appVersion),
+                            style: TextStyle(
+                              color: p.textTertiary,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.sm),
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          // Search Box
-          PulsrSearchField(
-            controller: _searchController,
-            hintText: context.l10n.settingsSearchPlaceholder,
-            onClear: () {
-              if (mounted) setState(() => _searchQuery = '');
-            },
-          ),
+          searchField,
         ],
       ),
     );

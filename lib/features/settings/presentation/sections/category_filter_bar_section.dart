@@ -29,7 +29,8 @@ mixin CategoryFilterBarSection
 
     return SizedBox(
       height: AppSpacing.minTouchTarget,
-      child: ListView.separated(
+      child: _ScrollEdgeFade(
+        child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding:
@@ -89,6 +90,7 @@ mixin CategoryFilterBarSection
             ),
           );
         },
+        ),
       ),
     );
   }

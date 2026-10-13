@@ -246,6 +246,8 @@ class SettingsHeroCard extends StatelessWidget {
                                         horizontal: AppSpacing.s14,
                                         vertical: AppSpacing.xs),
                                     textStyle: const TextStyle(
+                                      fontFamily: fontFamily,
+                                      fontFamilyFallback: fontFallbacks,
                                       fontWeight: FontWeight.w700,
                                       fontSize: AppFontSize.bodySmall,
                                     ),
@@ -535,6 +537,8 @@ class SettingsHeroCard extends StatelessWidget {
                             horizontal: AppSpacing.s14,
                             vertical: AppSpacing.xs),
                         textStyle: const TextStyle(
+                          fontFamily: fontFamily,
+                          fontFamilyFallback: fontFallbacks,
                           fontWeight: FontWeight.w700,
                           fontSize: AppFontSize.bodySmall,
                         ),

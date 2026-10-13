@@ -8,6 +8,25 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 export 'pulsr_elevation.dart';
 
+/// The single app typeface. Applied to [ThemeData], its text theme and every
+/// component style so no surface silently falls back to the platform font.
+const fontFamily = 'Manrope';
+
+/// Fallback chain used whenever [fontFamily] has no glyph coverage (e.g.
+/// Arabic text on platforms without Manrope coverage).
+const fontFallbacks = [
+  '.SF Pro Text',
+  '.SF Pro Display',
+  '.SF UI Text',
+  'SF Pro',
+  '-apple-system',
+  'Noto Sans Arabic',
+  'Segoe UI',
+  'Roboto',
+  'Arial',
+  'sans-serif'
+];
+
 /// Semantic tokens consumed by every screen via `context.palette`.
 @immutable
 class PulsrPalette extends ThemeExtension<PulsrPalette> {
@@ -454,19 +473,6 @@ class AuraTheme {
     final isDark = p.isDark;
     final outlineWidth = isHighContrast ? 1.6 : 1.0;
     final focusRingWidth = isHighContrast ? 2.6 : 1.5;
-    const fontFamily = 'Manrope';
-    const fontFallbacks = [
-      '.SF Pro Text',
-      '.SF Pro Display',
-      '.SF UI Text',
-      'SF Pro',
-      '-apple-system',
-      'Noto Sans Arabic',
-      'Segoe UI',
-      'Roboto',
-      'Arial',
-      'sans-serif'
-    ];
     final baseTextTheme =
         (isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme)
             .apply(
@@ -610,6 +616,8 @@ class AuraTheme {
         ),
         titleTextStyle: TextStyle(
             color: p.textPrimary,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
             fontSize: AppFontSize.titleLarge,
             fontWeight: FontWeight.w800,
             letterSpacing: AppTracking.title),
@@ -636,6 +644,8 @@ class AuraTheme {
           return IconThemeData(color: p.textSecondary, size: 24);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+              fontFamily: fontFamily,
+              fontFamilyFallback: fontFallbacks,
               fontSize: AppFontSize.label,
               fontWeight: states.contains(WidgetState.selected)
                   ? FontWeight.w800
@@ -652,10 +662,14 @@ class AuraTheme {
         unselectedIconTheme: IconThemeData(color: p.textSecondary, size: 24),
         selectedLabelTextStyle: TextStyle(
             color: p.accent,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
             fontWeight: FontWeight.w800,
             fontSize: AppFontSize.label),
         unselectedLabelTextStyle: TextStyle(
             color: p.textSecondary,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
             fontWeight: FontWeight.w600,
             fontSize: AppFontSize.label),
       ),
@@ -667,9 +681,15 @@ class AuraTheme {
         dividerColor: p.hairline,
         labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         labelStyle: const TextStyle(
-            fontWeight: FontWeight.w800, fontSize: AppFontSize.body),
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            fontWeight: FontWeight.w800,
+            fontSize: AppFontSize.body),
         unselectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            fontWeight: FontWeight.w600,
+            fontSize: AppFontSize.body),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.transparent,
@@ -690,10 +710,14 @@ class AuraTheme {
             side: BorderSide(color: p.hairline)),
         labelStyle: TextStyle(
             color: p.textSecondary,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
             fontSize: AppFontSize.bodySmall,
             fontWeight: FontWeight.w600),
         secondaryLabelStyle: TextStyle(
             color: p.accent,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
             fontSize: AppFontSize.bodySmall,
             fontWeight: FontWeight.w700),
       ),
@@ -720,6 +744,8 @@ class AuraTheme {
         backgroundColor: p.surfaceContainerHigh,
         contentTextStyle: TextStyle(
             color: p.textPrimary,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
             fontWeight: FontWeight.w600,
             fontSize: AppFontSize.bodySmall),
         behavior: SnackBarBehavior.floating,
@@ -764,7 +790,11 @@ class AuraTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: p.surfaceContainer,
-        hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.body),
+        hintStyle: TextStyle(
+            color: p.textTertiary,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            fontSize: AppFontSize.body),
         contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md, vertical: AppSpacing.s14),
         border: outlineBorder,
@@ -783,7 +813,10 @@ class AuraTheme {
           shape:
               const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
           textStyle: const TextStyle(
-              fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+              fontFamily: fontFamily,
+              fontFamilyFallback: fontFallbacks,
+              fontWeight: FontWeight.w700,
+              fontSize: AppFontSize.body),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -796,7 +829,10 @@ class AuraTheme {
           shape:
               const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
           textStyle: const TextStyle(
-              fontWeight: FontWeight.w800, fontSize: AppFontSize.body),
+              fontFamily: fontFamily,
+              fontFamilyFallback: fontFallbacks,
+              fontWeight: FontWeight.w800,
+              fontSize: AppFontSize.body),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -808,13 +844,19 @@ class AuraTheme {
           shape:
               const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
           textStyle: const TextStyle(
-              fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+              fontFamily: fontFamily,
+              fontFamilyFallback: fontFallbacks,
+              fontWeight: FontWeight.w700,
+              fontSize: AppFontSize.body),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
             foregroundColor: p.accent,
-            textStyle: const TextStyle(fontWeight: FontWeight.w700)),
+            textStyle: const TextStyle(
+                fontFamily: fontFamily,
+                fontFamilyFallback: fontFallbacks,
+                fontWeight: FontWeight.w700)),
       ),
     );
   }

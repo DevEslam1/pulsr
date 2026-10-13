@@ -1,4 +1,6 @@
 // lib/core/widgets/pulsr_segmented_control.dart
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -29,6 +31,13 @@ class PulsrSegmentedControl extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final bool slidingIndicator;
 
+  /// Measures segment labels and proportions segment widths to their
+  /// content so labels are not truncated mid-word ("Syst..."). Segment
+  /// icons are dropped and content is scaled uniformly down only when the
+  /// available width is still too small. Opt-in; the default keeps the
+  /// classic equal-width behaviour.
+  final bool fitLabels;
+
   const PulsrSegmentedControl({
     super.key,
     required this.segments,
@@ -36,6 +45,7 @@ class PulsrSegmentedControl extends StatelessWidget {
     required this.onChanged,
     this.margin,
     this.slidingIndicator = true,
+    this.fitLabels = false,
   });
 
   @override
@@ -59,16 +69,42 @@ class PulsrSegmentedControl extends StatelessWidget {
             final innerWidth = constraints.maxWidth;
             final segmentWidth = innerWidth / segments.length;
 
+            // fitLabels: proportion segment widths to measured label
+            // widths, dropping icons first when they no longer fit.
+            var weights = List<int>.filled(segments.length, 1);
+            var includeIcons = true;
+            if (fitLabels) {
+              final withIcons = _measuredWeights(context, withIcons: true);
+              final totalWithIcons =
+                  withIcons.fold<int>(0, (a, b) => a + b) / 100.0;
+              includeIcons = totalWithIcons <= innerWidth;
+              weights = includeIcons
+                  ? withIcons
+                  : _measuredWeights(context, withIcons: false);
+            }
+            final totalWeight = weights.fold<int>(0, (a, b) => a + b);
+            double fractionStart(int index) {
+              var sum = 0;
+              for (var k = 0; k < index; k++) {
+                sum += weights[k];
+              }
+              return totalWeight == 0 ? 0 : sum / totalWeight;
+            }
+
             return Stack(
               children: [
                 // Sliding indicator pill
                 AnimatedPositionedDirectional(
                   duration: context.motionMs(240),
                   curve: context.motionCurve(Curves.easeOutCubic),
-                  start: clampedIndex * segmentWidth,
+                  start: fitLabels
+                      ? fractionStart(clampedIndex) * innerWidth
+                      : clampedIndex * segmentWidth,
                   top: 0,
                   bottom: 0,
-                  width: segmentWidth,
+                  width: fitLabels
+                      ? (weights[clampedIndex] / totalWeight) * innerWidth
+                      : segmentWidth,
                   child: Container(
                     decoration: BoxDecoration(
                       color: p.accent,
@@ -88,6 +124,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                   children: [
                     for (var i = 0; i < segments.length; i++)
                       Expanded(
+                        flex: fitLabels ? weights[i] : 1,
                         child: Semantics(
                           selected: clampedIndex == i,
                           button: true,
@@ -103,7 +140,10 @@ class PulsrSegmentedControl extends StatelessWidget {
                                 onChanged(i);
                               }
                             },
-                            child: Padding(
+                            child: fitLabels
+                                ? _fitContent(
+                                    context, i, clampedIndex, includeIcons)
+                                : Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.xs,
                                 vertical: AppSpacing.s10,
@@ -183,6 +223,101 @@ class PulsrSegmentedControl extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Measured flex weights for [fitLabels]: proportional to each
+  /// segment's rendered label width (plus padding, and icon width when
+  /// [withIcons]).
+  List<int> _measuredWeights(BuildContext context,
+      {required bool withIcons}) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    const style = TextStyle(
+      fontSize: AppFontSize.bodySmall,
+      fontWeight: FontWeight.w800,
+    );
+    return [
+      for (final segment in segments)
+        _measureLabel(
+          text: segment.count != null
+              ? '${segment.label} (${segment.count})'
+              : segment.label,
+          style: style,
+          scaler: scaler,
+          direction: direction,
+          withIcons: withIcons,
+        ),
+    ];
+  }
+
+  int _measureLabel({
+    required String text,
+    required TextStyle style,
+    required TextScaler scaler,
+    required TextDirection direction,
+    required bool withIcons,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: direction,
+      maxLines: 1,
+      textScaler: scaler,
+    )..layout();
+    final width = painter.width +
+        AppSpacing.sm * 2 +
+        (withIcons ? 16 + AppSpacing.s6 : 0);
+    return math.max(1, (width * 100).round() + 1);
+  }
+
+  /// Segment content for [fitLabels]: laid out at its natural size and
+  /// scaled down uniformly (never truncated mid-word) when space runs
+  /// out.
+  Widget _fitContent(
+    BuildContext context,
+    int index,
+    int selectedIndex,
+    bool includeIcons,
+  ) {
+    final p = context.palette;
+    final segment = segments[index];
+    final isSelected = selectedIndex == index;
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
+        child: ConstrainedBox(
+          constraints:
+              const BoxConstraints(minHeight: AppSpacing.minTouchTarget - 20),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (includeIcons) ...[
+                Icon(
+                  segment.icon,
+                  size: 16,
+                  color: isSelected ? p.onAccent : p.textSecondary,
+                ),
+                const SizedBox(width: AppSpacing.s6),
+              ],
+              Text(
+                segment.count != null
+                    ? '${segment.label} (${segment.count})'
+                    : segment.label,
+                maxLines: 1,
+                softWrap: false,
+                style: TextStyle(
+                  fontSize: AppFontSize.bodySmall,
+                  fontWeight:
+                      isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected ? p.onAccent : p.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

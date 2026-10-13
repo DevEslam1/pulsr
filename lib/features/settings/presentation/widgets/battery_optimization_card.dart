@@ -132,7 +132,10 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                   textStyle: const TextStyle(
-                      fontSize: AppFontSize.label, fontWeight: FontWeight.w700),
+                      fontFamily: fontFamily,
+                      fontFamilyFallback: fontFallbacks,
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w700),
                 ),
                 onPressed: () async {
                   await BatteryOptimizationService
