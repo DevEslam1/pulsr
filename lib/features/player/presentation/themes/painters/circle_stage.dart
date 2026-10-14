@@ -2,8 +2,8 @@ part of '../circle_player_theme.dart';
 
 /// Luxury Rotary Dial Audio Stage (Bang & Olufsen / Dieter Rams aesthetic):
 /// Features a precision knurled aluminum bezel, circumferential neon progress arc,
-/// orbiting luminous position bead, and central rotating disc with metallic spindle.
-class _CircleArtwork extends StatelessWidget {
+/// orbiting luminous position bead, interactive rotary dial scrubbing, and central rotating disc with metallic spindle.
+class _CircleArtwork extends StatefulWidget {
   final PlayerThemeProps props;
   final Color activeColor;
   final AnimationController rotationController;
@@ -19,14 +19,66 @@ class _CircleArtwork extends StatelessWidget {
   });
 
   @override
+  State<_CircleArtwork> createState() => _CircleArtworkState();
+}
+
+class _CircleArtworkState extends State<_CircleArtwork> {
+  bool _isScrubbing = false;
+  double? _dragProgress;
+  int _lastTickIndex = -1;
+
+  double _angleToProgress(Offset localPos, double size) {
+    final center = Offset(size / 2, size / 2);
+    final dx = localPos.dx - center.dx;
+    final dy = localPos.dy - center.dy;
+    final angle = math.atan2(dy, dx);
+    // Arc starts at 12 o'clock (-pi/2) and sweeps clockwise
+    double normalized = (angle + math.pi / 2) % (2 * math.pi);
+    if (normalized < 0) normalized += 2 * math.pi;
+    return (normalized / (2 * math.pi)).clamp(0.0, 1.0);
+  }
+
+  void _handlePanUpdate(Offset localPos, double dialSize, int durationMs) {
+    final newProgress = _angleToProgress(localPos, dialSize);
+    final tick = (newProgress * 72).floor();
+    if (tick != _lastTickIndex) {
+      if (tick % 6 == 0) {
+        PulsrHaptics.selection();
+      } else {
+        PulsrHaptics.light();
+      }
+      _lastTickIndex = tick;
+    }
+    setState(() {
+      _dragProgress = newProgress;
+    });
+  }
+
+  void _handlePanEnd(int durationMs) {
+    if (_dragProgress != null && durationMs > 0) {
+      final targetMs = (_dragProgress! * durationMs).round();
+      widget.props.cubit.seek(Duration(milliseconds: targetMs));
+    }
+    setState(() {
+      _isScrubbing = false;
+      _dragProgress = null;
+      _lastTickIndex = -1;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final state = props.state;
+    final state = widget.props.state;
     final currentSong = state.currentSong;
     final durationMs = state.duration.inMilliseconds;
     final positionMs = state.position.inMilliseconds;
     final progress =
         durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
+    final activeColor = widget.activeColor;
+    final rotationController = widget.rotationController;
+    final isLandscape = widget.isLandscape;
+    final isTablet = widget.isTablet;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -35,6 +87,9 @@ class _CircleArtwork extends StatelessWidget {
           math.min(constraints.maxWidth, constraints.maxHeight) * 0.95,
           maxDimension,
         );
+
+        final displayProgress =
+            _isScrubbing ? (_dragProgress ?? progress) : progress;
 
         return Center(
           child: SizedBox(
@@ -65,22 +120,44 @@ class _CircleArtwork extends StatelessWidget {
                   child: SizedBox(width: dialSize, height: dialSize),
                 ),
 
-                // 2. Precision Knurled Outer Bezel & Circumference Track
-                CustomPaint(
-                  size: Size(dialSize, dialSize),
-                  painter: _RotaryBezelPainter(
-                    palette: p,
-                    activeColor: activeColor,
-                  ),
-                ),
-
-                // 3. Glowing Circumferential Progress Arc & Orbiting Bead
-                CustomPaint(
-                  size: Size(dialSize, dialSize),
-                  painter: _CircularProgressArcPainter(
-                    activeColor: activeColor,
-                    progress: progress,
-                    isPlaying: state.isPlaying,
+                // 2 & 3. Precision Knurled Bezel & Neon Progress Arc with Radial Dial Scrubbing
+                GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onPanStart: (details) {
+                    setState(() {
+                      _isScrubbing = true;
+                    });
+                    _handlePanUpdate(details.localPosition, dialSize, durationMs);
+                  },
+                  onPanUpdate: (details) {
+                    _handlePanUpdate(details.localPosition, dialSize, durationMs);
+                  },
+                  onPanEnd: (_) => _handlePanEnd(durationMs),
+                  onPanCancel: () {
+                    setState(() {
+                      _isScrubbing = false;
+                      _dragProgress = null;
+                      _lastTickIndex = -1;
+                    });
+                  },
+                  child: Stack(
+                    children: [
+                      CustomPaint(
+                        size: Size(dialSize, dialSize),
+                        painter: _RotaryBezelPainter(
+                          palette: p,
+                          activeColor: activeColor,
+                        ),
+                      ),
+                      CustomPaint(
+                        size: Size(dialSize, dialSize),
+                        painter: _CircularProgressArcPainter(
+                          activeColor: activeColor,
+                          progress: displayProgress,
+                          isPlaying: state.isPlaying,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

@@ -39,7 +39,19 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     if (player.processingState == ProcessingState.completed) {
       return () async {
         try {
-          await player.seek(Duration.zero);
+          if (_songs.isNotEmpty) {
+            await player.seek(Duration.zero, index: 0);
+            _lastGaplessIndex = 0;
+            _currentIndex = 0;
+            _savedQueueIndex = 0;
+            final song = _songs[0];
+            final fastArtUri =
+                song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+            mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
+            _notifyTrackChanged(song);
+          } else {
+            await player.seek(Duration.zero);
+          }
         } catch (_) {}
         final f = player.play();
         _broadcastState(player.playbackEvent);
@@ -196,13 +208,24 @@ mixin PulsrAudioTransport on BaseAudioHandler {
                   initialPosition: Duration.zero);
             }
           } else {
-            // True end-of-queue: restart the current track instead of
-            // pausing. Pausing here drops the foreground service (and with
-            // stopForegroundOnPause the notification) while the user
-            // explicitly asked to keep listening.
-            await _activePlayer.seek(Duration.zero);
-            if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
-              await _activePlayer.play();
+            // True end-of-queue: Reset to track 0 instead of staying on the last track
+            if (_songs.isNotEmpty) {
+              await _activePlayer.seek(Duration.zero, index: 0);
+              _lastGaplessIndex = 0;
+              _currentIndex = 0;
+              _savedQueueIndex = 0;
+              final song = _songs[0];
+              final fastArtUri =
+                  song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+              mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
+              _notifyTrackChanged(song);
+              if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
+                await _activePlayer.play();
+              } else {
+                await _activePlayer.pause();
+              }
+            } else {
+              await _activePlayer.seek(Duration.zero);
             }
             _broadcastState(_activePlayer.playbackEvent);
           }
@@ -218,12 +241,17 @@ mixin PulsrAudioTransport on BaseAudioHandler {
           await _loadSongPaused(nextIdx, initialPosition: Duration.zero);
         }
       } else {
-        // True end-of-queue: same no-dismiss policy as the gapless path.
-        await _activePlayer.seek(Duration.zero);
-        if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
-          await _activePlayer.play();
+        // True end-of-queue: Reset to track 0 instead of staying on the last track
+        if (_songs.isNotEmpty) {
+          if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
+            await playSongAt(0);
+          } else {
+            await _loadSongPaused(0, initialPosition: Duration.zero);
+          }
+        } else {
+          await _activePlayer.seek(Duration.zero);
+          _broadcastState(_activePlayer.playbackEvent);
         }
-        _broadcastState(_activePlayer.playbackEvent);
       }
     } catch (e, st) {
       // Never let a skip kill the service silently: log, keep the queue
@@ -975,4 +1003,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   set cachedHeadsetConfig(HeadsetControlConfig? value);
 
   set _pausedForNoisy(bool value);
+
+  set _savedQueueIndex(int value);
+
+  void _notifyTrackChanged(SongsTableData song);
 }

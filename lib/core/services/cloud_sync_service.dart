@@ -28,7 +28,7 @@ class SyncRecord {
   });
 }
 
-@singleton
+@lazySingleton
 class CloudSyncService {
   final AuthService _authService;
   final IMusicRepository _repository;

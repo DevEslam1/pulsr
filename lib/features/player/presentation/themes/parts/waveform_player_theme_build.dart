@@ -99,7 +99,9 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
             final centerDisplay = isInSplitView
                 ? waveformHeroStage
                 : AnimatedSwitcher(
-                    duration: context.motionMs(300),
+                    duration: context.motionMs(320),
+                    transitionBuilder: (child, anim) =>
+                        playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? LyricsView(
                             key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
@@ -112,7 +114,10 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
                             ? const NowPlayingQueueView(
                                 key: ValueKey('queue_view_waveform'),
                               )
-                            : waveformHeroStage,
+                            : KeyedSubtree(
+                                key: const ValueKey('stage_waveform'),
+                                child: waveformHeroStage,
+                              ),
                   );
 
             final extraBadge = Container(

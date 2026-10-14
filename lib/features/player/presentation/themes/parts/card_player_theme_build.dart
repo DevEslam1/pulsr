@@ -197,7 +197,9 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
               final centerDisplay = isInSplitView
                   ? artworkCard
                   : AnimatedSwitcher(
-                      duration: context.motionMs(300),
+                      duration: context.motionMs(320),
+                      transitionBuilder: (child, anim) =>
+                          playerOverlayTransitionBuilder(context, child, anim),
                       child: state.isLyricsVisible
                           ? LyricsView(
                               key: ValueKey(
@@ -210,7 +212,10 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                           : state.isQueueVisible
                               ? const NowPlayingQueueView(
                                   key: ValueKey('queue_view'))
-                              : artworkCard,
+                              : KeyedSubtree(
+                                  key: const ValueKey('stage_card'),
+                                  child: artworkCard,
+                                ),
                     );
 
               final showVisualizer = visualizerStyle != VisualizerStyle.off &&

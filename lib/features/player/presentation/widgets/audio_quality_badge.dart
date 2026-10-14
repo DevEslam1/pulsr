@@ -7,6 +7,7 @@ import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/theme/aura_theme.dart';
 import 'audio_quality_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -115,7 +116,9 @@ class AudioQualityBadge extends StatelessWidget {
                 Text(
                   info.shortBadgeLabel,
                   style: TextStyle(
-                    color: isUsb ? AppColors.dacGold : Colors.white,
+                    color: isUsb
+                        ? AppColors.dacGold
+                        : context.palette.textPrimary,
                     fontSize: compact ? AppFontSize.tiny : AppFontSize.label,
                     fontWeight: FontWeight.w800,
                     letterSpacing: AppTracking.overline,

@@ -3,8 +3,12 @@ part of '../cd_player_theme.dart';
 /// Custom painter for the realistic iridescent Compact Disc (CD) surface.
 class _CdDiscPainter extends CustomPainter {
   final Color activeColor;
+  final double rotationPhase;
 
-  _CdDiscPainter({required this.activeColor});
+  _CdDiscPainter({
+    required this.activeColor,
+    this.rotationPhase = 0.0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -25,10 +29,11 @@ class _CdDiscPainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, basePaint);
 
-    // 2. Prismatic Rainbow Diffraction Sheen (The signature CD optical effect)
+    // 2. Prismatic Rainbow Diffraction Sheen (Spins with rotation)
     final rainbowPaint = Paint()
       ..shader = SweepGradient(
         center: Alignment.center,
+        transform: GradientRotation(rotationPhase * 2 * math.pi),
         colors: [
           Colors.cyanAccent.withValues(alpha: 0.18),
           Colors.blueAccent.withValues(alpha: 0.22),
@@ -61,10 +66,11 @@ class _CdDiscPainter extends CustomPainter {
       ..blendMode = BlendMode.screen;
     canvas.drawCircle(center, radius - 2, rainbowPaint);
 
-    // 3. Bilateral Radial Specular Flare (Opposing quadrants reflection)
+    // 3. Bilateral Radial Specular Flare (Counter-rotating to stay anchored to virtual light)
     final flarePaint = Paint()
       ..shader = SweepGradient(
         center: Alignment.center,
+        transform: GradientRotation(-rotationPhase * 2 * math.pi),
         colors: [
           AppColors.specularAt(0.0),
           AppColors.specularAt(0.16),
@@ -148,7 +154,8 @@ class _CdDiscPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CdDiscPainter oldDelegate) =>
-      oldDelegate.activeColor != activeColor;
+      oldDelegate.activeColor != activeColor ||
+      oldDelegate.rotationPhase != rotationPhase;
 }
 
 /// Custom painter for the modern, sleek tonearm stick assembly.
@@ -157,6 +164,7 @@ class _CdTonearmPainter extends CustomPainter {
   final double angle;
   final Color activeColor;
   final double armLength;
+  final double liftProgress;
 
   static const double _gimbalRadius = 20.0;
   static const double _innerPivotRadius = 13.0;
@@ -166,6 +174,7 @@ class _CdTonearmPainter extends CustomPainter {
     required this.angle,
     required this.activeColor,
     required this.armLength,
+    this.liftProgress = 1.0,
   });
 
   @override
@@ -312,18 +321,26 @@ class _CdTonearmPainter extends CustomPainter {
   }
 
   void _drawTonearmShadow(Canvas canvas, double l) {
+    final p = liftProgress.clamp(0.0, 1.0);
+    final offset = Offset.lerp(const Offset(11, 13), const Offset(3.5, 4.0), p)!;
+    final blurSigma = 7.0 + (2.5 - 7.0) * p;
+
     final shadowPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.42)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurSigma)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.5
       ..strokeCap = StrokeCap.round;
 
     final shadowPath = Path()
-      ..moveTo(8, 6)
-      ..lineTo(8, l - 18)
-      ..lineTo(3, l);
+      ..moveTo(0, 6)
+      ..lineTo(0, l - 18)
+      ..lineTo(-5, l);
+
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
     canvas.drawPath(shadowPath, shadowPaint);
+    canvas.restore();
   }
 
   void _drawStickTube(Canvas canvas, double l) {
@@ -433,5 +450,6 @@ class _CdTonearmPainter extends CustomPainter {
       oldDelegate.angle != angle ||
       oldDelegate.activeColor != activeColor ||
       oldDelegate.armLength != armLength ||
-      oldDelegate.pivot != pivot;
+      oldDelegate.pivot != pivot ||
+      oldDelegate.liftProgress != liftProgress;
 }

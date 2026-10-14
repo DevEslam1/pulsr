@@ -536,6 +536,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       StreamController<SongsTableData>.broadcast();
   Stream<SongsTableData> get onTrackChanged => _onTrackChangedSubject.stream;
 
+  @override
+  void _notifyTrackChanged(SongsTableData song) {
+    if (!_onTrackChangedSubject.isClosed) {
+      _onTrackChangedSubject.add(song);
+    }
+  }
+
   // T10: CUE sub-track boundaries. Both flags reset on track change so each
   // virtual track seeks once to its start and advances once at its end.
   bool _cueStartSeeked = false;
@@ -1896,6 +1903,28 @@ class PulsrAudioHandler extends BaseAudioHandler
                 final nextIdx = _getNextIndex(peek: true);
                 if (nextIdx == null && !_activePlayer.hasNext && _activePlayer.loopMode == LoopMode.off) {
                   unawaited(_sleepTimerManager.onQueueCompleted());
+                  if (_songs.isNotEmpty) {
+                    if (_gaplessMode && _gaplessLoaded) {
+                      unawaited(() async {
+                        try {
+                          await _activePlayer.seek(Duration.zero, index: 0);
+                          _lastGaplessIndex = 0;
+                          _currentIndex = 0;
+                          _savedQueueIndex = 0;
+                          final song = _songs[0];
+                          final fastArtUri = song.artworkUri != null
+                              ? Uri.tryParse(song.artworkUri!)
+                              : null;
+                          mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
+                          _notifyTrackChanged(song);
+                          await _activePlayer.pause();
+                          _broadcastState(_activePlayer.playbackEvent);
+                        } catch (_) {}
+                      }());
+                    } else {
+                      unawaited(_loadSongPaused(0, initialPosition: Duration.zero));
+                    }
+                  }
                 } else {
                   unawaited(skipToNext().catchError((Object e, StackTrace st) {
                     ErrorLogger.log('Auto-advance skipToNext failed',

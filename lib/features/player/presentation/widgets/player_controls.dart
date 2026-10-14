@@ -1,17 +1,17 @@
 // lib/features/player/presentation/widgets/player_controls.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
-class PlayerControls extends StatelessWidget {
+class PlayerControls extends StatefulWidget {
   final bool isPlaying;
   final bool isShuffle;
   final PlayerRepeatMode repeatMode;
@@ -52,17 +52,55 @@ class PlayerControls extends StatelessWidget {
   });
 
   @override
+  State<PlayerControls> createState() => _PlayerControlsState();
+}
+
+class _PlayerControlsState extends State<PlayerControls> {
+  bool _isPlayPressed = false;
+  double _prevNudgeX = 0.0;
+  double _nextNudgeX = 0.0;
+  Timer? _prevNudgeTimer;
+  Timer? _nextNudgeTimer;
+
+  @override
+  void dispose() {
+    _prevNudgeTimer?.cancel();
+    _nextNudgeTimer?.cancel();
+    super.dispose();
+  }
+
+  void _triggerPrevNudge() {
+    _prevNudgeTimer?.cancel();
+    setState(() => _prevNudgeX = -4.0);
+    _prevNudgeTimer = Timer(const Duration(milliseconds: 140), () {
+      if (mounted) {
+        setState(() => _prevNudgeX = 0.0);
+      }
+    });
+  }
+
+  void _triggerNextNudge() {
+    _nextNudgeTimer?.cancel();
+    setState(() => _nextNudgeX = 4.0);
+    _nextNudgeTimer = Timer(const Duration(milliseconds: 140), () {
+      if (mounted) {
+        setState(() => _nextNudgeX = 0.0);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final l10n = context.l10n;
-    final onPrimaryColor = primaryColor.computeLuminance() > 0.5
+    final onPrimaryColor = widget.primaryColor.computeLuminance() > 0.5
         ? const Color(0xFF101223)
         : Colors.white;
 
-    final shuffleLabel = isShuffle ? l10n.disableShuffle : l10n.enableShuffle;
-    final repeatLabel = repeatMode == PlayerRepeatMode.one
+    final shuffleLabel = widget.isShuffle ? l10n.disableShuffle : l10n.enableShuffle;
+    final repeatLabel = widget.repeatMode == PlayerRepeatMode.one
         ? l10n.repeatOne
-        : repeatMode == PlayerRepeatMode.all
+        : widget.repeatMode == PlayerRepeatMode.all
             ? l10n.repeatAll
             : l10n.repeatOff;
 
@@ -84,12 +122,12 @@ class PlayerControls extends StatelessWidget {
                 button: true,
                 child: _ControlButton(
                   tooltip: shuffleLabel,
-                  isActive: isShuffle,
-                  activeColor: primaryColor,
+                  isActive: widget.isShuffle,
+                  activeColor: widget.primaryColor,
                   inactiveColor: p.textSecondary,
                   onPressed: () {
-                    HapticFeedback.selectionClick();
-                    onToggleShuffle();
+                    PulsrHaptics.selection();
+                    widget.onToggleShuffle();
                   },
                   icon: Icons.shuffle_rounded,
                   iconSize: 22,
@@ -102,53 +140,63 @@ class PlayerControls extends StatelessWidget {
               Semantics(
                 label: l10n.previous,
                 button: true,
-                enabled: hasPrevious,
-                child: Material(
-                  color: Colors.transparent,
-                  shape: const CircleBorder(),
-                  clipBehavior: Clip.antiAlias,
-                  child: Tooltip(
-                    message: l10n.previous,
-                    excludeFromSemantics: true,
-                    child: InkWell(
-                      onTap: hasPrevious
-                          ? () {
-                              HapticFeedback.lightImpact();
-                              onPrevious();
-                            }
-                          : null,
-                      borderRadius: BorderRadius.circular(30),
-                      child: Container(
-                        width: (mainButtonSize * 0.72).clamp(42.0, 52.0),
-                        height: (mainButtonSize * 0.72).clamp(42.0, 52.0),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: hasPrevious
-                              ? p.textPrimary.withValues(alpha: 0.08)
-                              : p.textPrimary.withValues(alpha: 0.03),
-                          border: Border.all(
-                            color: hasPrevious
-                                ? p.textPrimary.withValues(alpha: 0.14)
-                                : p.textPrimary.withValues(alpha: 0.05),
-                            width: 1.0,
+                enabled: widget.hasPrevious,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: _prevNudgeX),
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutBack,
+                  builder: (context, dx, child) => Transform.translate(
+                    offset: Offset(dx, 0),
+                    child: child,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    shape: const CircleBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: Tooltip(
+                      message: l10n.previous,
+                      excludeFromSemantics: true,
+                      child: InkWell(
+                        onTap: widget.hasPrevious
+                            ? () {
+                                PulsrHaptics.light();
+                                _triggerPrevNudge();
+                                widget.onPrevious();
+                              }
+                            : null,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Container(
+                          width: (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          height: (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: widget.hasPrevious
+                                ? p.textPrimary.withValues(alpha: 0.08)
+                                : p.textPrimary.withValues(alpha: 0.03),
+                            border: Border.all(
+                              color: widget.hasPrevious
+                                  ? p.textPrimary.withValues(alpha: 0.14)
+                                  : p.textPrimary.withValues(alpha: 0.05),
+                              width: 1.0,
+                            ),
+                            boxShadow: widget.hasPrevious
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.18),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
                           ),
-                          boxShadow: hasPrevious
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.18),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.skip_previous_rounded,
-                            color: hasPrevious
-                                ? p.textPrimary
-                                : p.textTertiary.withValues(alpha: 0.3),
-                            size: (mainButtonSize * 0.44).clamp(24.0, 32.0),
+                          child: Center(
+                            child: Icon(
+                              Icons.skip_previous_rounded,
+                              color: widget.hasPrevious
+                                  ? p.textPrimary
+                                  : p.textTertiary.withValues(alpha: 0.3),
+                              size: (widget.mainButtonSize * 0.44).clamp(24.0, 32.0),
+                            ),
                           ),
                         ),
                       ),
@@ -161,35 +209,42 @@ class PlayerControls extends StatelessWidget {
 
               // Main Play / Pause Button
               Semantics(
-                label: isPlaying ? l10n.pause : l10n.play,
+                label: widget.isPlaying ? l10n.pause : l10n.play,
                 button: true,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
+                  onTapDown: (_) => setState(() => _isPlayPressed = true),
+                  onTapUp: (_) => setState(() => _isPlayPressed = false),
+                  onTapCancel: () => setState(() => _isPlayPressed = false),
                   onTap: () {
-                    HapticFeedback.mediumImpact();
-                    onPlayPause();
+                    PulsrHaptics.confirm();
+                    widget.onPlayPause();
                   },
-                  child: AnimatedContainer(
-                    duration: context.motionMs(200),
-                    width: mainButtonSize,
-                    height: mainButtonSize,
-                    decoration: BoxDecoration(
+                  child: AnimatedScale(
+                    scale: _isPlayPressed ? 0.92 : 1.0,
+                    duration: Duration(milliseconds: _isPlayPressed ? 90 : 280),
+                    curve: _isPlayPressed ? Curves.easeOutCubic : Curves.easeOutBack,
+                    child: AnimatedContainer(
+                      duration: context.motionMs(200),
+                      width: widget.mainButtonSize,
+                      height: widget.mainButtonSize,
+                      decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Color.lerp(primaryColor, Colors.white, 0.18) ??
-                              primaryColor,
-                          primaryColor,
+                          Color.lerp(widget.primaryColor, Colors.white, 0.18) ??
+                              widget.primaryColor,
+                          widget.primaryColor,
                         ],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: primaryColor.withValues(
-                              alpha: isPlaying ? 0.45 : 0.25),
-                          blurRadius: isPlaying ? 24 : 16,
-                          spreadRadius: isPlaying ? 2 : 0,
+                          color: widget.primaryColor.withValues(
+                              alpha: widget.isPlaying ? 0.45 : 0.25),
+                          blurRadius: widget.isPlaying ? 24 : 16,
+                          spreadRadius: widget.isPlaying ? 2 : 0,
                           offset: const Offset(0, 6),
                         ),
                         BoxShadow(
@@ -199,46 +254,54 @@ class PlayerControls extends StatelessWidget {
                         ),
                       ],
                       border: Border.all(
-                        color: abLoopActive
+                        color: widget.abLoopActive
                             ? p.accent
                             : AppColors.specularAt(0.25),
-                        width: abLoopActive ? 2.2 : 1.2,
+                        width: widget.abLoopActive ? 2.2 : 1.2,
                       ),
                     ),
                     child: Center(
                       child: AnimatedSwitcher(
-                        duration: context.motionMs(180),
-                        transitionBuilder: (child, anim) => ScaleTransition(
-                          scale: anim,
-                          child: child,
-                        ),
-                        child: isBuffering
+                        duration: context.motionMs(260),
+                        transitionBuilder: (child, anim) {
+                          final curved = CurvedAnimation(
+                            parent: anim,
+                            curve: Curves.easeOutBack,
+                          );
+                          return FadeTransition(
+                            opacity: anim,
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.80, end: 1.0).animate(curved),
+                              child: RotationTransition(
+                                turns: Tween<double>(begin: -0.06, end: 0.0).animate(curved),
+                                child: child,
+                              ),
+                            ),
+                          );
+                        },
+                        child: widget.isBuffering
                             ? SizedBox(
                                 key: const ValueKey<String>('buffering'),
-                                width: mainButtonSize * 0.42,
-                                height: mainButtonSize * 0.42,
+                                width: widget.mainButtonSize * 0.42,
+                                height: widget.mainButtonSize * 0.42,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 3,
                                   color: onPrimaryColor,
                                 ),
                               )
                             : Icon(
-                                isPlaying
+                                widget.isPlaying
                                     ? Icons.pause_rounded
                                     : Icons.play_arrow_rounded,
-                                key: ValueKey(isPlaying),
+                                key: ValueKey(widget.isPlaying),
                                 color: onPrimaryColor,
-                                size: mainButtonSize * 0.52,
+                                size: widget.mainButtonSize * 0.52,
                               ),
                       ),
                     ),
-                  ).animate(target: isPlaying ? 1 : 0).scale(
-                        duration: context.motionMs(140),
-                        curve: context.motionCurve(Curves.easeOutBack),
-                        begin: const Offset(0.94, 0.94),
-                        end: const Offset(1.0, 1.0),
-                      ),
+                  ),
                 ),
+              ),
               ),
 
               const SizedBox(width: AppSpacing.s18),
@@ -247,53 +310,63 @@ class PlayerControls extends StatelessWidget {
               Semantics(
                 label: l10n.next,
                 button: true,
-                enabled: hasNext,
-                child: Material(
-                  color: Colors.transparent,
-                  shape: const CircleBorder(),
-                  clipBehavior: Clip.antiAlias,
-                  child: Tooltip(
-                    message: l10n.next,
-                    excludeFromSemantics: true,
-                    child: InkWell(
-                      onTap: hasNext
-                          ? () {
-                              HapticFeedback.lightImpact();
-                              onNext();
-                            }
-                          : null,
-                      borderRadius: BorderRadius.circular(30),
-                      child: Container(
-                        width: (mainButtonSize * 0.72).clamp(42.0, 52.0),
-                        height: (mainButtonSize * 0.72).clamp(42.0, 52.0),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: hasNext
-                              ? p.textPrimary.withValues(alpha: 0.08)
-                              : p.textPrimary.withValues(alpha: 0.03),
-                          border: Border.all(
-                            color: hasNext
-                                ? p.textPrimary.withValues(alpha: 0.14)
-                                : p.textPrimary.withValues(alpha: 0.05),
-                            width: 1.0,
+                enabled: widget.hasNext,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: _nextNudgeX),
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutBack,
+                  builder: (context, dx, child) => Transform.translate(
+                    offset: Offset(dx, 0),
+                    child: child,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    shape: const CircleBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: Tooltip(
+                      message: l10n.next,
+                      excludeFromSemantics: true,
+                      child: InkWell(
+                        onTap: widget.hasNext
+                            ? () {
+                                PulsrHaptics.light();
+                                _triggerNextNudge();
+                                widget.onNext();
+                              }
+                            : null,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Container(
+                          width: (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          height: (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: widget.hasNext
+                                ? p.textPrimary.withValues(alpha: 0.08)
+                                : p.textPrimary.withValues(alpha: 0.03),
+                            border: Border.all(
+                              color: widget.hasNext
+                                  ? p.textPrimary.withValues(alpha: 0.14)
+                                  : p.textPrimary.withValues(alpha: 0.05),
+                              width: 1.0,
+                            ),
+                            boxShadow: widget.hasNext
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.18),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
                           ),
-                          boxShadow: hasNext
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.18),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.skip_next_rounded,
-                            color: hasNext
-                                ? p.textPrimary
-                                : p.textTertiary.withValues(alpha: 0.3),
-                            size: (mainButtonSize * 0.44).clamp(24.0, 32.0),
+                          child: Center(
+                            child: Icon(
+                              Icons.skip_next_rounded,
+                              color: widget.hasNext
+                                  ? p.textPrimary
+                                  : p.textTertiary.withValues(alpha: 0.3),
+                              size: (widget.mainButtonSize * 0.44).clamp(24.0, 32.0),
+                            ),
                           ),
                         ),
                       ),
@@ -310,13 +383,13 @@ class PlayerControls extends StatelessWidget {
                 button: true,
                 child: _ControlButton(
                   tooltip: repeatLabel,
-                  isActive: repeatMode != PlayerRepeatMode.off,
-                  activeColor: primaryColor,
+                  isActive: widget.repeatMode != PlayerRepeatMode.off,
+                  activeColor: widget.primaryColor,
                   inactiveColor: p.textSecondary,
                   onPressed: () {
-                    HapticFeedback.selectionClick();
-                    onToggleRepeat();
-                    final nextMode = switch (repeatMode) {
+                    PulsrHaptics.selection();
+                    widget.onToggleRepeat();
+                    final nextMode = switch (widget.repeatMode) {
                       PlayerRepeatMode.off => PlayerRepeatMode.all,
                       PlayerRepeatMode.all => PlayerRepeatMode.one,
                       PlayerRepeatMode.one => PlayerRepeatMode.off,
@@ -338,7 +411,7 @@ class PlayerControls extends StatelessWidget {
                       duration: const Duration(milliseconds: 1200),
                     );
                   },
-                  icon: repeatMode == PlayerRepeatMode.one
+                  icon: widget.repeatMode == PlayerRepeatMode.one
                       ? Icons.repeat_one_rounded
                       : Icons.repeat_rounded,
                   iconSize: 22,

@@ -1,4 +1,6 @@
 // lib/core/router/safe_navigation.dart
+import 'dart:async';
+import 'package:collection/collection.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,7 +20,21 @@ extension PulsrSafePush on BuildContext {
   static String? _lastLocation;
   static Object? _lastExtra;
   static DateTime? _lastPushAt;
+  static Timer? _clearTimer;
   static const Duration _window = Duration(milliseconds: 600);
+  static const DeepCollectionEquality _equality = DeepCollectionEquality();
+
+  static bool _areExtrasEqual(Object? a, Object? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    if (a is List && b is List) {
+      if (a.length != b.length) return false;
+      if (a.length > 20) {
+        return identical(a.first, b.first) && identical(a.last, b.last);
+      }
+    }
+    return _equality.equals(a, b);
+  }
 
   /// Pushes [location] unless an identical push happened within the last
   /// [_window]; returns whether the navigation was actually performed.
@@ -26,15 +42,31 @@ extension PulsrSafePush on BuildContext {
     final now = DateTime.now();
     final last = _lastPushAt;
     if (_lastLocation == location &&
-        _lastExtra == extra &&
+        _areExtrasEqual(_lastExtra, extra) &&
         last != null &&
         now.difference(last) < _window) {
       return false;
     }
+    _clearTimer?.cancel();
     _lastLocation = location;
     _lastExtra = extra;
     _lastPushAt = now;
+    _clearTimer = Timer(_window, () {
+      _lastLocation = null;
+      _lastExtra = null;
+      _lastPushAt = null;
+      _clearTimer = null;
+    });
     push<void>(location, extra: extra);
     return true;
+  }
+
+  @visibleForTesting
+  static void resetForTesting() {
+    _clearTimer?.cancel();
+    _clearTimer = null;
+    _lastLocation = null;
+    _lastExtra = null;
+    _lastPushAt = null;
   }
 }

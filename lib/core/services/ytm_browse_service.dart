@@ -48,7 +48,7 @@ class YtmBrowseSection {
 
 typedef YtmClockFn = DateTime Function();
 
-@singleton
+@lazySingleton
 class YtmBrowseService {
   final YtmService _ytmService;
   final YtmClockFn _now;

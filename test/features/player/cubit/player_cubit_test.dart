@@ -594,7 +594,7 @@ void main() {
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
-        latencyTracker: tracker,
+        dependencies: PlayerDependencies(latencyTracker: tracker),
       );
       tracker.start(videoId: 'gateVid');
 
@@ -800,7 +800,7 @@ void main() {
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
-        settingsCubit: settingsCubit,
+        dependencies: PlayerDependencies(settingsCubit: settingsCubit),
       );
 
       await settingsCubit.setCrossfade(6.0);
@@ -823,7 +823,7 @@ void main() {
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
-        settingsCubit: settingsCubit,
+        dependencies: PlayerDependencies(settingsCubit: settingsCubit),
       );
 
       // Persisted toggle is pushed on construction…
@@ -860,7 +860,7 @@ void main() {
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
-        widgetService: mockWidgetService,
+        dependencies: PlayerDependencies(widgetService: mockWidgetService),
       );
 
       verify(() => mockWidgetService.listenToWidgetClicks(any())).called(1);

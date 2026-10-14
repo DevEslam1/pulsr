@@ -67,7 +67,7 @@ class YtmDownloadState {
 /// every job to [DownloadsCubit] (the single owner of task state, queueing,
 /// persistence, and foreground-service integration) and only maps that state
 /// back into the per-row [YtDownloadItem] the buttons render.
-@singleton
+@lazySingleton
 class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   final YtDownloadService _service;
   final PlayerCubit _playerCubit;

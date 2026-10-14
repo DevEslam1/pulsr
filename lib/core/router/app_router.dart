@@ -338,7 +338,10 @@ GoRouter createRouter(MediaScannerService scannerService,
           '/downloads',
           '/online-playlist',
         };
-        if (ytmPaths.contains(state.uri.path)) return '/';
+        if (ytmPaths.any(
+            (p) => state.uri.path == p || state.uri.path.startsWith('$p/'))) {
+          return '/';
+        }
       }
       return null;
     },
@@ -532,46 +535,7 @@ GoRouter createRouter(MediaScannerService scannerService,
           );
         },
       ),
-      GoRoute(
-        path: '/online-playlist',
-        name: 'online-playlist',
-        parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) {
-          final extra = state.extra;
-          Widget content;
-          if (extra is OnlinePlaylistDetailArgs) {
-            content = OnlinePlaylistDetailScreen(args: extra);
-          } else if (extra is YtmAccountPlaylist) {
-            content = OnlinePlaylistDetailScreen(
-              args: OnlinePlaylistDetailArgs(
-                playlistId: extra.playlistId,
-                title: extra.title,
-                subtitle: extra.subtitle,
-                artworkUrl: extra.artworkUrl,
-              ),
-            );
-          } else if (extra is OnlinePlaylistEntry) {
-            content = OnlinePlaylistDetailScreen(
-              args: OnlinePlaylistDetailArgs(
-                playlistId: extra.id,
-                title: extra.title,
-                subtitle: extra.uploader,
-                initialTracks: extra.tracks,
-              ),
-            );
-          } else {
-            final id =
-                state.uri.queryParameters['id'] ?? (extra is String ? extra : '');
-            content = OnlinePlaylistDetailScreen(
-              args: OnlinePlaylistDetailArgs(playlistId: id),
-            );
-          }
-          return _buildPulsrPageRoute(
-            key: state.pageKey,
-            child: content,
-          );
-        },
-      ),
+
       GoRoute(
         path: '/recents',
         name: 'recents',
@@ -710,6 +674,46 @@ GoRouter createRouter(MediaScannerService scannerService,
             key: state.pageKey,
             child: const DownloadsScreen(),
           ),
+        ),
+        GoRoute(
+          path: '/online-playlist',
+          name: 'online-playlist',
+          parentNavigatorKey: rootNavigatorKey,
+          pageBuilder: (context, state) {
+            final extra = state.extra;
+            Widget content;
+            if (extra is OnlinePlaylistDetailArgs) {
+              content = OnlinePlaylistDetailScreen(args: extra);
+            } else if (extra is YtmAccountPlaylist) {
+              content = OnlinePlaylistDetailScreen(
+                args: OnlinePlaylistDetailArgs(
+                  playlistId: extra.playlistId,
+                  title: extra.title,
+                  subtitle: extra.subtitle,
+                  artworkUrl: extra.artworkUrl,
+                ),
+              );
+            } else if (extra is OnlinePlaylistEntry) {
+              content = OnlinePlaylistDetailScreen(
+                args: OnlinePlaylistDetailArgs(
+                  playlistId: extra.id,
+                  title: extra.title,
+                  subtitle: extra.uploader,
+                  initialTracks: extra.tracks,
+                ),
+              );
+            } else {
+              final id = state.uri.queryParameters['id'] ??
+                  (extra is String ? extra : '');
+              content = OnlinePlaylistDetailScreen(
+                args: OnlinePlaylistDetailArgs(playlistId: id),
+              );
+            }
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: content,
+            );
+          },
         ),
       ],
       GoRoute(

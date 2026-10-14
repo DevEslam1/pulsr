@@ -58,7 +58,8 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 colors: [
                   Color.lerp(bgColor, Colors.black, 0.45) ?? bgColor,
                   p.bg,
-                  const Color(0xFF080910),
+                  Color.lerp(p.bg, Colors.black, p.isDark ? 0.45 : 0.05) ??
+                      p.bg,
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -269,7 +270,10 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                     final centerDisplay = isInSplitView
                         ? artworkDisplay
                         : AnimatedSwitcher(
-                            duration: context.motionMs(300),
+                            duration: context.motionMs(320),
+                            transitionBuilder: (child, anim) =>
+                                playerOverlayTransitionBuilder(
+                                    context, child, anim),
                             child: state.isLyricsVisible
                                 ? LyricsView(
                                     key: ValueKey(
@@ -283,7 +287,10 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                                     ? const NowPlayingQueueView(
                                         key: ValueKey('queue_view'),
                                       )
-                                    : artworkDisplay,
+                                    : KeyedSubtree(
+                                        key: const ValueKey('stage_classic'),
+                                        child: artworkDisplay,
+                                      ),
                           );
 
                     final visualizer = showVisualizer

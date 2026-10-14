@@ -24,6 +24,7 @@ import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/pulsr_haptics.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -64,6 +65,7 @@ class MiniPlayerState extends State<MiniPlayer> {
   Timer? _verticalSwipeTimer;
   double _verticalDragDy = 0.0;
   double _horizontalDragDx = 0.0;
+  bool _swipeThresholdCrossed = false;
   // AUDIT-FIX: Throttle retry taps on error pill
   DateTime? _lastRetryTime;
 
@@ -413,12 +415,22 @@ class MiniPlayerState extends State<MiniPlayer> {
                     : (_) {
                         if (_swipeInFlight) return;
                         _horizontalDragDx = 0.0;
+                        _swipeThresholdCrossed = false;
+                        setState(() {});
                       },
                 onHorizontalDragUpdate: carouselEnabled
                     ? null
                     : (d) {
                         if (_swipeInFlight) return;
                         _horizontalDragDx += d.delta.dx;
+                        const threshold = 40.0;
+                        if (!_swipeThresholdCrossed && _horizontalDragDx.abs() >= threshold) {
+                          _swipeThresholdCrossed = true;
+                          PulsrHaptics.confirm();
+                        } else if (_swipeThresholdCrossed && _horizontalDragDx.abs() < threshold) {
+                          _swipeThresholdCrossed = false;
+                        }
+                        setState(() {});
                       },
                 onHorizontalDragEnd: carouselEnabled
                     ? null
@@ -427,6 +439,8 @@ class MiniPlayerState extends State<MiniPlayer> {
                         final dx = _horizontalDragDx +
                             d.velocity.pixelsPerSecond.dx * 0.05;
                         _horizontalDragDx = 0.0;
+                        _swipeThresholdCrossed = false;
+                        setState(() {});
                         if (dx.abs() < 24) return;
                         final swipedLeft = dx < 0;
                         unawaited(_applySwipeAction(
@@ -434,6 +448,16 @@ class MiniPlayerState extends State<MiniPlayer> {
                           cubit,
                           swipedLeft: swipedLeft,
                         ));
+                      },
+                onHorizontalDragCancel: carouselEnabled
+                    ? null
+                    : () {
+                        if (_horizontalDragDx != 0.0) {
+                          setState(() {
+                            _horizontalDragDx = 0.0;
+                            _swipeThresholdCrossed = false;
+                          });
+                        }
                       },
                 child: Padding(
                   padding: EdgeInsetsDirectional.fromSTEB(
@@ -690,61 +714,80 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                               // row can never clip, while
                                                               // content areas scale to 2.0x.
                                                               Expanded(
-                                                                child: MediaQuery
-                                                                    .withClampedTextScaling(
-                                                                  minScaleFactor:
-                                                                      0.8,
-                                                                  maxScaleFactor:
-                                                                      1.3,
-                                                                  child: Column(
-                                                                    mainAxisSize:
-                                                                        MainAxisSize
-                                                                            .min,
-                                                                    crossAxisAlignment:
-                                                                        CrossAxisAlignment
-                                                                            .start,
-                                                                    mainAxisAlignment:
-                                                                        MainAxisAlignment
-                                                                            .center,
-                                                                    children: [
-                                                                      Text(
-                                                                        item.title,
-                                                                        maxLines:
-                                                                            1,
-                                                                        overflow:
-                                                                            TextOverflow.ellipsis,
-                                                                        style:
-                                                                            TextStyle(
-                                                                          color: isCurrent
-                                                                              ? p.textPrimary
-                                                                              : p.textSecondary,
-                                                                          fontWeight:
-                                                                              FontWeight.w700,
-                                                                          fontSize:
-                                                                              AppFontSize.body,
+                                                                child: Stack(
+                                                                  alignment: Alignment.centerLeft,
+                                                                  children: [
+                                                                    Transform.translate(
+                                                                      offset: Offset(
+                                                                        _horizontalDragDx != 0.0
+                                                                            ? math.pow(_horizontalDragDx.abs(), 0.78) * _horizontalDragDx.sign
+                                                                            : 0.0,
+                                                                        0,
+                                                                      ),
+                                                                      child: MediaQuery.withClampedTextScaling(
+                                                                        minScaleFactor: 0.8,
+                                                                        maxScaleFactor: 1.3,
+                                                                        child: Column(
+                                                                          mainAxisSize: MainAxisSize.min,
+                                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                                          children: [
+                                                                            Text(
+                                                                              item.title,
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                              style: TextStyle(
+                                                                                color: isCurrent ? p.textPrimary : p.textSecondary,
+                                                                                fontWeight: FontWeight.w700,
+                                                                                fontSize: AppFontSize.body,
+                                                                              ),
+                                                                            ),
+                                                                            const SizedBox(height: AppSpacing.s2),
+                                                                            Text(
+                                                                              item.artist,
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                              style: TextStyle(
+                                                                                color: p.textSecondary,
+                                                                                fontSize: AppFontSize.label,
+                                                                                fontWeight: FontWeight.w500,
+                                                                              ),
+                                                                            ),
+                                                                          ],
                                                                         ),
                                                                       ),
-                                                                      const SizedBox(
-                                                                          height:
-                                                                              AppSpacing.s2),
-                                                                      Text(
-                                                                        item.artist,
-                                                                        maxLines:
-                                                                            1,
-                                                                        overflow:
-                                                                            TextOverflow.ellipsis,
-                                                                        style:
-                                                                            TextStyle(
-                                                                          color:
-                                                                              p.textSecondary,
-                                                                          fontSize:
-                                                                              AppFontSize.label,
-                                                                          fontWeight:
-                                                                              FontWeight.w500,
+                                                                    ),
+                                                                    if (_horizontalDragDx < -8)
+                                                                      PositionedDirectional(
+                                                                        end: 0,
+                                                                        child: Opacity(
+                                                                          opacity: (_horizontalDragDx.abs() / 40.0).clamp(0.0, 1.0),
+                                                                          child: Transform.scale(
+                                                                            scale: _swipeThresholdCrossed ? 1.15 : 0.95,
+                                                                            child: Icon(
+                                                                              Icons.skip_next_rounded,
+                                                                              size: 20,
+                                                                              color: _swipeThresholdCrossed ? p.accent : p.textSecondary,
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      )
+                                                                    else if (_horizontalDragDx > 8)
+                                                                      PositionedDirectional(
+                                                                        start: 0,
+                                                                        child: Opacity(
+                                                                          opacity: (_horizontalDragDx.abs() / 40.0).clamp(0.0, 1.0),
+                                                                          child: Transform.scale(
+                                                                            scale: _swipeThresholdCrossed ? 1.15 : 0.95,
+                                                                            child: Icon(
+                                                                              Icons.skip_previous_rounded,
+                                                                              size: 20,
+                                                                              color: _swipeThresholdCrossed ? p.accent : p.textSecondary,
+                                                                            ),
+                                                                          ),
                                                                         ),
                                                                       ),
-                                                                    ],
-                                                                  ),
+                                                                  ],
                                                                 ),
                                                               ),
                                                             ],
@@ -1362,6 +1405,25 @@ class _MiniProgressWavePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     canvas.drawPath(wavePath, activePaint);
+
+    // Subtle radiant leading glow bead matching activeColor when playing.
+    if (isPlaying && endX > 2.0 && endX <= size.width) {
+      final beadCenter = Offset(endX, centerY);
+      final haloPaint = Paint()
+        ..color = activeColor.withValues(alpha: 0.40)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+      canvas.drawCircle(beadCenter, 4.0, haloPaint);
+
+      final corePaint = Paint()
+        ..color = activeColor
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(beadCenter, 2.5, corePaint);
+
+      final specularPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.90)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(beadCenter, 1.0, specularPaint);
+    }
   }
 
   @override

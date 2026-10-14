@@ -10,6 +10,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'audio_visualizer.dart';
+import 'karaoke_pitch_highway.dart';
 import 'player_controls.dart';
 import 'player_seek_bar.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -34,6 +35,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   int _pitchSemitones = 0;
   double _fontSize = 26.0;
   bool _practiceMode = false;
+  bool _showPitchHighway = true;
   int _practiceLoopLine = -1;
   bool _practiceLoopArmed = true;
   int? _lastScore;
@@ -485,6 +487,17 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                   }
                                 : null,
                           ),
+                          // Pitch Highway Toggle
+                          IconButton.filledTonal(
+                            tooltip: 'Pitch Guide Highway',
+                            isSelected: _showPitchHighway,
+                            icon:
+                                const Icon(Icons.graphic_eq_rounded, size: 18),
+                            visualDensity:
+                                compact ? VisualDensity.compact : null,
+                            onPressed: () => setState(
+                                () => _showPitchHighway = !_showPitchHighway),
+                          ),
                           // Font Size Cycle
                           IconButton(
                             tooltip: context.l10n.karaokeLyricsFontSize,
@@ -609,12 +622,21 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                     Padding(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: AppSpacing.md),
-                                      child: AudioVisualizer(
-                                        style: VisualizerStyle.wave,
-                                        color: p.primary,
-                                        height: 32,
-                                        isPlaying: state.isPlaying,
-                                      ),
+                                      child: _showPitchHighway
+                                          ? KaraokePitchHighway(
+                                              isPlaying: state.isPlaying,
+                                              currentPosition: pos,
+                                              accentColor: p.primary,
+                                              height: 36,
+                                              lyrics: effectiveLyrics,
+                                              activeLineIndex: activeIdx,
+                                            )
+                                          : AudioVisualizer(
+                                              style: VisualizerStyle.wave,
+                                              color: p.primary,
+                                              height: 32,
+                                              isPlaying: state.isPlaying,
+                                            ),
                                     ),
                                     const SizedBox(height: AppSpacing.xs),
                                     buildPlayerControlsSection(
@@ -648,12 +670,21 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                         Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.lg),
-                          child: AudioVisualizer(
-                            style: VisualizerStyle.wave,
-                            color: p.primary,
-                            height: 44,
-                            isPlaying: state.isPlaying,
-                          ),
+                          child: _showPitchHighway
+                              ? KaraokePitchHighway(
+                                  isPlaying: state.isPlaying,
+                                  currentPosition: pos,
+                                  accentColor: p.primary,
+                                  height: 52,
+                                  lyrics: effectiveLyrics,
+                                  activeLineIndex: activeIdx,
+                                )
+                              : AudioVisualizer(
+                                  style: VisualizerStyle.wave,
+                                  color: p.primary,
+                                  height: 44,
+                                  isPlaying: state.isPlaying,
+                                ),
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         buildPlayerControlsSection(isLandscape: false),

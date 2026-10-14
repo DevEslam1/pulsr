@@ -385,23 +385,37 @@ class YtDownloadService {
 
         if (_canceledVideoIds.contains(videoId) || task.isCanceled) {
           _canceledVideoIds.remove(videoId);
-          task.completer
-              .complete(const Left(DownloadFailure('Download canceled')));
+          if (!task.completer.isCompleted) {
+            task.completer
+                .complete(const Left(DownloadFailure('Download canceled')));
+          }
           continue;
         }
 
         if (_activeDownloads.containsKey(videoId)) {
           _activeDownloads[videoId]!.completer.future.then(
-              task.completer.complete,
-              onError: task.completer.completeError);
+              (res) {
+                if (!task.completer.isCompleted) {
+                  task.completer.complete(res);
+                }
+              },
+              onError: (Object e, StackTrace st) {
+                if (!task.completer.isCompleted) {
+                  task.completer.completeError(e, st);
+                }
+              });
           continue;
         }
 
         _activeDownloads[videoId] = task;
         _executeDownload(task).then((result) {
-          task.completer.complete(result);
+          if (!task.completer.isCompleted) {
+            task.completer.complete(result);
+          }
         }).catchError((e) {
-          task.completer.complete(Left(DownloadFailure('Download error: $e')));
+          if (!task.completer.isCompleted) {
+            task.completer.complete(Left(DownloadFailure('Download error: $e')));
+          }
         }).whenComplete(() {
           _activeDownloads.remove(videoId);
           Future.microtask(_processQueue);

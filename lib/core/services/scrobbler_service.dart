@@ -11,7 +11,7 @@ import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 
-@singleton
+@lazySingleton
 class ScrobblerService {
   static const MethodChannel _channel = MethodChannel(PulsrChannels.scrobbler);
   final http.Client _httpClient;

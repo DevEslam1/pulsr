@@ -34,6 +34,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
   bool _glowEnabled = true;
   bool _initializedFromSettings = false;
   bool _showPlayerPreview = false;
+  PlayerThemeMode _selectedPreviewTheme = PlayerThemeMode.classic;
 
   @override
   void didChangeDependencies() {
@@ -275,9 +276,63 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                if (_showPlayerPreview)
+                if (_showPlayerPreview) ...[
+                  SizedBox(
+                    height: 38,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: PlayerThemeMode.values.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(width: AppSpacing.s8),
+                      itemBuilder: (context, index) {
+                        final mode = PlayerThemeMode.values[index];
+                        final isSelected = mode == _selectedPreviewTheme;
+                        return ChoiceChip(
+                          showCheckmark: false,
+                          avatar: Icon(
+                            _getThemeIcon(mode),
+                            size: 16,
+                            color: isSelected
+                                ? Color(_accentColor)
+                                : p.textSecondary,
+                          ),
+                          label: Text(
+                            _getThemeTitle(mode, context),
+                            style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: isSelected
+                                  ? Color(_accentColor)
+                                  : p.textSecondary,
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor:
+                              Color(_accentColor).withValues(alpha: 0.18),
+                          backgroundColor: p.surfaceCard,
+                          side: BorderSide(
+                            color: isSelected
+                                ? Color(_accentColor)
+                                : p.hairline,
+                            width: isSelected ? 1.5 : 1.0,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppRadii.r16All,
+                          ),
+                          onSelected: (_) {
+                            setState(() {
+                              _selectedPreviewTheme = mode;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   Container(
-                    height: 340,
+                    height: 348,
                     clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color: p.bg,
@@ -306,7 +361,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                             bgColor: p.bg,
                           );
                           return ThemeRegistry.preview(
-                            PlayerThemeMode.classic,
+                            _selectedPreviewTheme,
                             props,
                             scale: 0.52,
                           );
@@ -320,7 +375,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         }
                       },
                     ),
-                  )
+                  ),
+                ]
                 else
                   Container(
                     constraints: const BoxConstraints(minHeight: 220),
@@ -494,5 +550,52 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         ),
       ),
     );
+  }
+
+  String _getThemeTitle(PlayerThemeMode mode, BuildContext context) {
+    final l10n = context.l10n;
+    switch (mode) {
+      case PlayerThemeMode.classic:
+        return l10n.settingsThemeClassicStandard;
+      case PlayerThemeMode.card:
+        return l10n.settingsThemeCardGlass;
+      case PlayerThemeMode.circle:
+        return l10n.settingsThemeVinylCircle;
+      case PlayerThemeMode.minimal:
+        return l10n.settingsThemeMinimalist;
+      case PlayerThemeMode.vinyl:
+        return l10n.settingsThemeVinylTurntable;
+      case PlayerThemeMode.cd:
+        return l10n.settingsThemeCdTurntable;
+      case PlayerThemeMode.cassette:
+        return l10n.settingsThemeRetroCassette;
+      case PlayerThemeMode.waveform:
+        return l10n.settingsThemeFullBleed;
+      case PlayerThemeMode.lyricsFocus:
+        return l10n.settingsThemeKaraoke;
+    }
+  }
+
+  IconData _getThemeIcon(PlayerThemeMode mode) {
+    switch (mode) {
+      case PlayerThemeMode.classic:
+        return Icons.art_track_rounded;
+      case PlayerThemeMode.card:
+        return Icons.layers_rounded;
+      case PlayerThemeMode.circle:
+        return Icons.radio_button_checked_rounded;
+      case PlayerThemeMode.minimal:
+        return Icons.crop_portrait_rounded;
+      case PlayerThemeMode.vinyl:
+        return Icons.album_rounded;
+      case PlayerThemeMode.cd:
+        return Icons.disc_full_rounded;
+      case PlayerThemeMode.cassette:
+        return Icons.graphic_eq_rounded;
+      case PlayerThemeMode.waveform:
+        return Icons.waves_rounded;
+      case PlayerThemeMode.lyricsFocus:
+        return Icons.lyrics_rounded;
+    }
   }
 }

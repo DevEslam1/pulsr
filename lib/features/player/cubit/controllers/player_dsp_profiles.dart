@@ -55,6 +55,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       }
 
       // Auto-select DAC and engage Bit-Perfect (highest quality path)
+      _lastAutoAppliedDeviceKey = key;
       if (await _shouldAutoSelectDac(device)) {
         await _handleDacAutoRouting(device);
       }

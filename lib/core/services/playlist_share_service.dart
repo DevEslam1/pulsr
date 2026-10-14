@@ -59,7 +59,7 @@ class SharedPlaylistBundle {
       );
 }
 
-@singleton
+@lazySingleton
 class PlaylistShareService {
   /// Exports a playlist and its songs to a portable JSON bundle.
   String exportPlaylist(String playlistName, List<SongsTableData> songs) {

@@ -71,7 +71,9 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
             final centerDisplay = isInSplitView
                 ? turntableStage
                 : AnimatedSwitcher(
-                    duration: context.motionMs(300),
+                    duration: context.motionMs(320),
+                    transitionBuilder: (child, anim) =>
+                        playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? LyricsView(
                             key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
@@ -84,7 +86,10 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
                             ? const NowPlayingQueueView(
                                 key: ValueKey('queue_view'),
                               )
-                            : turntableStage,
+                            : KeyedSubtree(
+                                key: const ValueKey('stage_vinyl'),
+                                child: turntableStage,
+                              ),
                   );
 
             final controlsColumn = PlayerControlsColumn(

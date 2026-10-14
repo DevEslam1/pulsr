@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/config/app_config.dart';
 import 'package:pulsr/core/router/app_router.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/widgets/entity_by_id_loader.dart';
@@ -169,7 +170,6 @@ void main() {
             '/year',
             '/playlist',
             '/playlist/manage',
-            '/online-playlist',
             '/recents',
             '/smart-playlist-builder',
             '/queue',
@@ -192,6 +192,7 @@ void main() {
       // /browse is always registered and redirects appropriately.
       expect(paths, isNot(contains('/ytm-search')));
       expect(paths, isNot(contains('/ytm-explore')));
+      expect(paths, isNot(contains('/online-playlist')));
       expect(paths, contains('/browse'));
       expect(paths, isNot(contains('/downloads')));
 
@@ -355,10 +356,12 @@ void main() {
         buildRouteWidget(routeFor('/smart-playlist-builder'), context, stateFor('/smart-playlist-builder')),
         isA<SmartPlaylistBuilderScreen>(),
       );
-      expect(
-        buildRouteWidget(routeFor('/online-playlist'), context, stateFor('/online-playlist')),
-        isA<OnlinePlaylistDetailScreen>(),
-      );
+      if (AppConfig.ytmEnabled) {
+        expect(
+          buildRouteWidget(routeFor('/online-playlist'), context, stateFor('/online-playlist')),
+          isA<OnlinePlaylistDetailScreen>(),
+        );
+      }
     });
 
     testWidgets('honour typed extra payloads', (tester) async {
@@ -405,38 +408,40 @@ void main() {
         isA<SmartPlaylistBuilderScreen>(),
       );
 
-      final args = const OnlinePlaylistDetailArgs(playlistId: 'PL1');
-      expect(
-        buildRouteWidget(routeFor('/online-playlist'),
-            context, stateFor('/online-playlist', extra: args)),
-        isA<OnlinePlaylistDetailScreen>(),
-      );
-      const accountPlaylist = YtmAccountPlaylist(
-        playlistId: 'VLPL2',
-        title: 'Account',
-        subtitle: 'Sub',
-      );
-      expect(
-        buildRouteWidget(routeFor('/online-playlist'),
-            context, stateFor('/online-playlist', extra: accountPlaylist)),
-        isA<OnlinePlaylistDetailScreen>(),
-      );
-      const entry = OnlinePlaylistEntry(
-        id: 'PL3',
-        title: 'Entry',
-        uploader: 'Uploader',
-        tracks: [],
-      );
-      expect(
-        buildRouteWidget(routeFor('/online-playlist'),
-            context, stateFor('/online-playlist', extra: entry)),
-        isA<OnlinePlaylistDetailScreen>(),
-      );
-      expect(
-        buildRouteWidget(routeFor('/online-playlist'),
-            context, stateFor('/online-playlist', extra: 'PL4')),
-        isA<OnlinePlaylistDetailScreen>(),
-      );
+      if (AppConfig.ytmEnabled) {
+        final args = const OnlinePlaylistDetailArgs(playlistId: 'PL1');
+        expect(
+          buildRouteWidget(routeFor('/online-playlist'),
+              context, stateFor('/online-playlist', extra: args)),
+          isA<OnlinePlaylistDetailScreen>(),
+        );
+        const accountPlaylist = YtmAccountPlaylist(
+          playlistId: 'VLPL2',
+          title: 'Account',
+          subtitle: 'Sub',
+        );
+        expect(
+          buildRouteWidget(routeFor('/online-playlist'),
+              context, stateFor('/online-playlist', extra: accountPlaylist)),
+          isA<OnlinePlaylistDetailScreen>(),
+        );
+        const entry = OnlinePlaylistEntry(
+          id: 'PL3',
+          title: 'Entry',
+          uploader: 'Uploader',
+          tracks: [],
+        );
+        expect(
+          buildRouteWidget(routeFor('/online-playlist'),
+              context, stateFor('/online-playlist', extra: entry)),
+          isA<OnlinePlaylistDetailScreen>(),
+        );
+        expect(
+          buildRouteWidget(routeFor('/online-playlist'),
+              context, stateFor('/online-playlist', extra: 'PL4')),
+          isA<OnlinePlaylistDetailScreen>(),
+        );
+      }
     });
   });
 

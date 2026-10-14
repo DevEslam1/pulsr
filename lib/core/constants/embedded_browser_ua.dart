@@ -72,7 +72,7 @@ class EmbeddedBrowserUa {
     if (ua.isEmpty || !ua.contains('Chrome/')) return chromeMobile;
     ua = ua
         .replaceAll(RegExp(r';\s*wv\b'), '')
-        .replaceAll(RegExp(r'\bVersion/[\d.]+(?:\.\d+)*\s*'), '')
+        .replaceAll(RegExp(r'\bVersion/\d+(?:\.\d+)*\s*'), '')
         .replaceAll(RegExp(r'\)\s+'), ') ')
         .replaceAll(RegExp(r'\s{2,}'), ' ')
         .trim();
@@ -102,9 +102,20 @@ class EmbeddedBrowserUa {
   // and does NOT touch or wrap any native prototypes (which BotGuard screens for).
   try {
     window.__googleBlockDetected = false;
+    var lastCheck = 0;
+    var checkTimer = null;
+    var observer = null;
     var checkBlock = function () {
       try {
-        var bodyText = (document.body && (document.body.innerText || document.body.textContent)) || '';
+        var href = (window.location && window.location.href) || '';
+        var host = (window.location && window.location.hostname) || '';
+        var isAuthOrChallenge = host.indexOf('accounts.google.com') !== -1 ||
+                                href.indexOf('/ServiceLogin') !== -1 ||
+                                href.indexOf('/signin/') !== -1 ||
+                                href.indexOf('/challenge/') !== -1;
+        if (!isAuthOrChallenge) return;
+
+        var bodyText = (document.body && document.body.textContent) || '';
         if (bodyText.length > 0) {
           var lower = bodyText.toLowerCase();
           // Never trigger block detection on 2FA / Phone approval / challenge screens
@@ -125,12 +136,32 @@ class EmbeddedBrowserUa {
                (lower.indexOf("try using a different browser") !== -1 ||
                 lower.indexOf("browser or app may not be secure") !== -1))) {
             window.__googleBlockDetected = true;
+            if (observer) {
+              try { observer.disconnect(); } catch (e) {}
+            }
           }
         }
       } catch (err) {}
     };
+
+    var throttledCheckBlock = function () {
+      var now = Date.now ? Date.now() : new Date().getTime();
+      if (now - lastCheck < 500) {
+        if (!checkTimer) {
+          checkTimer = setTimeout(function () {
+            checkTimer = null;
+            lastCheck = Date.now ? Date.now() : new Date().getTime();
+            checkBlock();
+          }, 500 - (now - lastCheck));
+        }
+        return;
+      }
+      lastCheck = now;
+      checkBlock();
+    };
+
     if (typeof MutationObserver !== 'undefined') {
-      var observer = new MutationObserver(checkBlock);
+      observer = new MutationObserver(throttledCheckBlock);
       if (document.documentElement) {
         observer.observe(document.documentElement, { childList: true, subtree: true });
       } else {
@@ -145,6 +176,9 @@ class EmbeddedBrowserUa {
   // Google BotGuard actively tests Function.prototype.toString on Intl, WebGL, and Navigator APIs.
   // Any non-native wrapper immediately trips Google's "This browser or app may not be secure" interstitial.
   try {
+    if (window.chrome && window.chrome.webview) {
+      try { delete window.chrome.webview; } catch (e) {}
+    }
     var host = (window.location && window.location.hostname) || '';
     if (host.indexOf('google.com') !== -1 ||
         host.indexOf('youtube.com') !== -1 ||

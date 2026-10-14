@@ -27,7 +27,7 @@ class SponsorBlockSegment {
   }
 }
 
-@singleton
+@lazySingleton
 class SponsorBlockService {
   /// Process-wide fallback for call sites that cannot receive the DI instance
   /// (e.g. PlayerCubit wiring). Prefers the DI singleton once registered so

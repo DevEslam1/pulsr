@@ -77,40 +77,48 @@ class AudioFormats {
     if (clean.isEmpty || clean.endsWith('/') || clean.endsWith(r'\')) {
       return '';
     }
+    final hasPathSeparator = clean.contains('/') || clean.contains(r'\');
+
     // Handle bare extension with leading dot e.g. ".mp3" or ".flac"
-    if (clean.startsWith('.') &&
-        !clean.contains('/') &&
-        !clean.contains(r'\')) {
+    if (clean.startsWith('.') && !hasPathSeparator) {
+      if (clean.startsWith('.trashed-') || clean.startsWith('._')) {
+        return '';
+      }
       final ext = clean.substring(1);
       if (ext.isNotEmpty &&
           !ext.contains('.') &&
           ext != 'nomedia' &&
           ext != 'gitignore') {
-        return ext;
+        if (supportedExtensions.contains(ext) ||
+            nativeDecodableExtensions.contains(ext)) {
+          return ext;
+        }
       }
       return '';
     }
+
     final filename = clean.split('/').last.split(r'\').last;
     if (filename.isEmpty || filename == '.nomedia') {
       return '';
     }
+
+    // Reject hidden dot-prefixed filenames when a path separator is present or
+    // when the filename starts with .trashed- (Android MediaStore) or ._ (macOS AppleDouble)
     if (filename.startsWith('.')) {
-      final sub = filename.substring(1);
-      if (!sub.contains('.')) {
-        if (supportedExtensions.contains(sub) ||
-            nativeDecodableExtensions.contains(sub)) {
-          return sub;
-        }
+      if (hasPathSeparator ||
+          filename.startsWith('.trashed-') ||
+          filename.startsWith('._')) {
         return '';
       }
+      return '';
     }
+
     final dotIndex = filename.lastIndexOf('.');
     if (dotIndex > 0 && dotIndex < filename.length - 1) {
       return filename.substring(dotIndex + 1);
     }
     // If the input was provided directly as an extension (e.g. "mp3" or "flac") without paths or leading dots
-    if (!clean.contains('/') &&
-        !clean.contains(r'\') &&
+    if (!hasPathSeparator &&
         !clean.contains('.') &&
         (supportedExtensions.contains(clean) ||
             nativeDecodableExtensions.contains(clean))) {

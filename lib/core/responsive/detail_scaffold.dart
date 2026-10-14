@@ -63,6 +63,23 @@ class DetailScaffold extends StatelessWidget {
 
     if (shouldSplit) {
       final hinge = context.foldableHinge;
+      Widget rightPane = SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics()),
+        padding: EdgeInsets.only(
+            bottom: PulsrLayoutMetrics.scrollBottom(context)),
+        child: body,
+      );
+
+      if (onRefresh != null) {
+        rightPane = RefreshIndicator(
+          color: p.accent,
+          backgroundColor: p.surfaceContainer,
+          onRefresh: onRefresh!,
+          child: rightPane,
+        );
+      }
+
       content = Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -99,17 +116,32 @@ class DetailScaffold extends StatelessWidget {
           // Right Pane: Content list
           Expanded(
             flex: (rightPaneFlex * 10).round(),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.only(
-                  bottom: PulsrLayoutMetrics.scrollBottom(context)),
-              child: body,
-            ),
+            child: rightPane,
           ),
         ],
       );
     } else {
       // Portrait / single column stacked
+      Widget scrollableContent = ListView(
+        padding: EdgeInsets.only(
+            bottom: PulsrLayoutMetrics.scrollBottom(context)),
+        physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics()),
+        children: [
+          hero,
+          body,
+        ],
+      );
+
+      if (onRefresh != null) {
+        scrollableContent = RefreshIndicator(
+          color: p.accent,
+          backgroundColor: p.surfaceContainer,
+          onRefresh: onRefresh!,
+          child: scrollableContent,
+        );
+      }
+
       content = Center(
         child: ConstrainedBox(
           constraints: PulsrLayoutMetrics.contentConstraints(context),
@@ -124,28 +156,11 @@ class DetailScaffold extends StatelessWidget {
                 elevation: 0,
               ),
               Expanded(
-                child: ListView(
-                  padding: EdgeInsets.only(
-                      bottom: PulsrLayoutMetrics.scrollBottom(context)),
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    hero,
-                    body,
-                  ],
-                ),
+                child: scrollableContent,
               ),
             ],
           ),
         ),
-      );
-    }
-
-    if (onRefresh != null) {
-      content = RefreshIndicator(
-        color: p.accent,
-        backgroundColor: p.surfaceContainer,
-        onRefresh: onRefresh!,
-        child: content,
       );
     }
 

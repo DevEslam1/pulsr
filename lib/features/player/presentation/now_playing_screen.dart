@@ -368,17 +368,30 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
             final offset =
                 _animController.isAnimating ? _anim.value : _dragOffset;
             final progress = (offset / screenHeight).clamp(0.0, 1.0);
-            // Only introduce the (saveLayer-backed) opacity layer while a
-            // dismiss drag is actually in progress.
-            final content = progress > 0.0
-                ? Opacity(
-                    opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
-                    child: child,
-                  )
-                : child;
+            if (progress <= 0.0) {
+              return child!;
+            }
+            // Scale player container down slightly (1.0 -> 0.96) with rounded
+            // top corners during swipe-down dismissal.
+            final scale = (1.0 - progress * 0.04).clamp(0.96, 1.0);
+            final topRadius = Radius.circular(24.0 * progress);
+            final content = Opacity(
+              opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
+              child: child,
+            );
             return Transform.translate(
               offset: Offset(0, offset),
-              child: content,
+              child: Transform.scale(
+                scale: scale,
+                alignment: Alignment.topCenter,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    topLeft: topRadius,
+                    topRight: topRadius,
+                  ),
+                  child: content,
+                ),
+              ),
             );
           },
         ),

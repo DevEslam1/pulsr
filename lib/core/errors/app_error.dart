@@ -246,15 +246,24 @@ AppFailure classifyFailure(Object error, [StackTrace? stackTrace]) {
   if (resolved is AppFailure) return resolved;
   if (resolved is StorageError) {
     if (resolved.code == 'DB_ERROR') {
-      return DatabaseFailure(resolved.userMessage, resolved);
+      return DatabaseFailure(
+          resolved.userMessage, resolved, resolved.stackTrace);
     }
-    return StorageFailure(resolved.userMessage, resolved);
+    return StorageFailure(resolved.userMessage, resolved, resolved.stackTrace);
   }
   if (resolved is PermissionError) {
-    return PermissionFailure(resolved.userMessage, resolved);
+    return PermissionFailure(
+        resolved.userMessage, resolved, resolved.stackTrace);
   }
   if (resolved is AudioError) {
-    return AudioPlaybackFailure(resolved.userMessage, resolved);
+    return AudioPlaybackFailure(
+        resolved.userMessage, resolved, resolved.stackTrace);
   }
-  return GenericFailure(resolved.userMessage, resolved);
+  if (resolved is NetworkError) {
+    return NetworkFailure(resolved.userMessage, resolved, resolved.stackTrace);
+  }
+  if (resolved is YtmError) {
+    return YtmFailure(resolved.userMessage, resolved, resolved.stackTrace);
+  }
+  return GenericFailure(resolved.userMessage, resolved, resolved.stackTrace);
 }

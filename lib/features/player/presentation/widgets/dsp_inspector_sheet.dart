@@ -701,6 +701,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
             style: TextStyle(
               fontSize: AppFontSize.tiny,
               fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
               color: isWarning
                   ? p.warning
                   : (isHighlight ? p.accent : p.textPrimary),

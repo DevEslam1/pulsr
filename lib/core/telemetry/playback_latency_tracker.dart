@@ -462,6 +462,7 @@ class PlaybackLatencyTracker {
     _history.clear();
   }
 
+  @disposeMethod
   void dispose() {
     _reportController.close();
   }

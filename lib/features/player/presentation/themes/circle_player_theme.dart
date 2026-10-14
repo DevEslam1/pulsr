@@ -16,6 +16,7 @@ import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 
 part 'painters/circle_stage.dart';
 part 'parts/circle_player_theme_build.dart';

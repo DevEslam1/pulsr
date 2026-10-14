@@ -43,6 +43,7 @@ import '../../../settings/presentation/widgets/room_correction_sheet.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
@@ -185,6 +186,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   /// switch because the indices then refer to a different frequency plan.
   final Set<int> _mutedBands = <int>{};
   final Set<int> _soloedBands = <int>{};
+  int? _activeDraggedBandIndex;
 
   EqualizerManager? _cachedEqualizerManager;
 

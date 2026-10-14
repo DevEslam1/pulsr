@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math' as math;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
@@ -20,7 +22,8 @@ class ArtworkCacheManager {
   static const int defaultMaxCacheSizeMb =
       100; // 100 MB default maximum cache size
 
-  final Map<String, Uint8List> _memoryCache = {};
+  final LinkedHashMap<String, Uint8List> _memoryCache =
+      LinkedHashMap<String, Uint8List>();
   final Map<String, WeakReference<Uint8List>> _weakMemoryCache = {};
   static const int _maxMemoryItems = 150;
   static const int _maxMemoryBytes = 35 * 1024 * 1024; // 35 MB memory ceiling
@@ -107,8 +110,13 @@ class ArtworkCacheManager {
           final bytes = await file.readAsBytes();
           if (bytes.isNotEmpty) {
             _putMemory(key, bytes);
-            // Touch file to update lastModified for LRU eviction
-            file.setLastModified(DateTime.now()).catchError((_) => file);
+            // Touch file to update lastModified for LRU eviction only if older than 1 hour
+            try {
+              final lastMod = await file.lastModified();
+              if (DateTime.now().difference(lastMod) > const Duration(hours: 1)) {
+                unawaited(file.setLastModified(DateTime.now()).catchError((_) => file));
+              }
+            } catch (_) {}
             return bytes;
           }
         }
@@ -129,8 +137,18 @@ class ArtworkCacheManager {
     try {
       if (_cacheDir == null) await init();
       if (_cacheDir != null) {
-        final file = File(p.join(_cacheDir!.path, _keyToFileName(key)));
-        await file.writeAsBytes(bytes, flush: false);
+        final targetPath = p.join(_cacheDir!.path, _keyToFileName(key));
+        final tempFile = File(p.join(_cacheDir!.path,
+            '${_keyToFileName(key)}.${DateTime.now().microsecondsSinceEpoch}.tmp'));
+        try {
+          await tempFile.writeAsBytes(bytes, flush: false);
+          await tempFile.rename(targetPath);
+        } catch (_) {
+          if (await tempFile.exists()) {
+            await tempFile.delete().catchError((_) => tempFile);
+          }
+          rethrow;
+        }
         _putCount++;
         if (_putCount % _enforceEvery == 0) {
           unawaited(_enforceDiskLimit().catchError((e, st) {
@@ -157,7 +175,8 @@ class ArtworkCacheManager {
     if (bytes.lengthInBytes > largePayloadThreshold) {
       if (_memoryCache.containsKey(key)) {
         final old = _memoryCache.remove(key)!;
-        _currentMemoryBytes -= old.lengthInBytes;
+        _currentMemoryBytes =
+            math.max(0, _currentMemoryBytes - old.lengthInBytes);
       }
       _weakMemoryCache[key] = WeakReference(bytes);
       _weakPruneCounter++;
@@ -171,7 +190,8 @@ class ArtworkCacheManager {
 
     if (_memoryCache.containsKey(key)) {
       final old = _memoryCache.remove(key)!;
-      _currentMemoryBytes -= old.lengthInBytes;
+      _currentMemoryBytes =
+          math.max(0, _currentMemoryBytes - old.lengthInBytes);
     }
     while (_memoryCache.isNotEmpty &&
         (_memoryCache.length >= _maxMemoryItems ||
@@ -179,7 +199,8 @@ class ArtworkCacheManager {
       final firstKey = _memoryCache.keys.first;
       final removed = _memoryCache.remove(firstKey);
       if (removed != null) {
-        _currentMemoryBytes -= removed.lengthInBytes;
+        _currentMemoryBytes =
+            math.max(0, _currentMemoryBytes - removed.lengthInBytes);
       }
     }
     _memoryCache[key] = bytes;
@@ -237,7 +258,7 @@ class ArtworkCacheManager {
     final removed = _memoryCache.remove(key);
     if (removed != null) {
       _currentMemoryBytes =
-          (_currentMemoryBytes - removed.lengthInBytes).clamp(0, _maxMemoryBytes);
+          math.max(0, _currentMemoryBytes - removed.lengthInBytes);
     }
     _weakMemoryCache.remove(key);
     try {
@@ -260,50 +281,58 @@ class ArtworkCacheManager {
     _currentMemoryBytes = 0;
   }
 
+  bool _pendingClean = false;
+
   /// Automatic LRU eviction executed in a background isolate to keep UI frame-rate fluid.
   Future<void> _enforceDiskLimit() async {
-    if (_isCleaning) return;
+    if (_isCleaning) {
+      _pendingClean = true;
+      return;
+    }
     _isCleaning = true;
 
     try {
-      if (_cacheDir == null || !await _cacheDir!.exists()) return;
-      final maxBytes = _maxCacheSizeMb * 1024 * 1024;
-      final dirPath = _cacheDir!.path;
+      do {
+        _pendingClean = false;
+        if (_cacheDir == null || !await _cacheDir!.exists()) return;
+        final maxBytes = _maxCacheSizeMb * 1024 * 1024;
+        final dirPath = _cacheDir!.path;
 
-      await Isolate.run(() {
-        final dir = Directory(dirPath);
-        if (!dir.existsSync()) return;
-        final entities =
-            dir.listSync(followLinks: false).whereType<File>().toList();
+        await Isolate.run(() {
+          final dir = Directory(dirPath);
+          if (!dir.existsSync()) return;
+          final entities =
+              dir.listSync(followLinks: false).whereType<File>().toList();
 
-        int currentSize = 0;
-        final fileList = <({File file, int size, int modifiedMs})>[];
-        for (final f in entities) {
-          try {
-            final stat = f.statSync();
-            currentSize += stat.size;
-            fileList.add((
-              file: f,
-              size: stat.size,
-              modifiedMs: stat.modified.millisecondsSinceEpoch,
-            ));
-          } catch (_) {}
-        }
-
-        if (currentSize > maxBytes) {
-          // Sort oldest first
-          fileList.sort((a, b) => a.modifiedMs.compareTo(b.modifiedMs));
-          final targetBytes = (maxBytes * 0.90).toInt(); // trim down to 90%
-
-          for (final item in fileList) {
-            if (currentSize <= targetBytes) break;
+          int currentSize = 0;
+          final fileList = <({File file, int size, int modifiedMs})>[];
+          for (final f in entities) {
             try {
-              item.file.deleteSync();
-              currentSize -= item.size;
+              final stat = f.statSync();
+              currentSize += stat.size;
+              fileList.add((
+                file: f,
+                size: stat.size,
+                modifiedMs: stat.modified.millisecondsSinceEpoch,
+              ));
             } catch (_) {}
           }
-        }
-      });
+
+          if (currentSize > maxBytes) {
+            // Sort oldest first
+            fileList.sort((a, b) => a.modifiedMs.compareTo(b.modifiedMs));
+            final targetBytes = (maxBytes * 0.90).toInt(); // trim down to 90%
+
+            for (final item in fileList) {
+              if (currentSize <= targetBytes) break;
+              try {
+                item.file.deleteSync();
+                currentSize -= item.size;
+              } catch (_) {}
+            }
+          }
+        });
+      } while (_pendingClean);
     } catch (e, st) {
       ErrorLogger.log('Failed to enforce disk limit in background isolate',
           error: e, stackTrace: st, category: 'ArtworkCacheManager');
@@ -314,7 +343,7 @@ class ArtworkCacheManager {
 
   /// Prefetches artwork for a list of cache keys or URLs in the background.
   Future<void> prefetch(List<String> keys) async {
-    for (final key in keys) {
+    for (final key in keys.take(50)) {
       if (key.isEmpty || _memoryCache.containsKey(key)) continue;
       try {
         await get(key);

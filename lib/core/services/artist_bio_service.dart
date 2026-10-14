@@ -24,12 +24,13 @@ class ArtistInfo {
   });
 }
 
-@singleton
+@lazySingleton
 class ArtistBioService {
   final http.Client _client;
   final bool _ownsClient;
   final LinkedHashMap<String, ArtistInfo> _cache =
       LinkedHashMap<String, ArtistInfo>();
+  final Map<String, Future<ArtistInfo?>> _inFlight = {};
   static const int _maxCacheSize = 150;
 
   ArtistBioService([http.Client? client])
@@ -44,19 +45,28 @@ class ArtistBioService {
 
   /// Fetches artist info and picture from Deezer and Wikipedia APIs.
   /// Returns null immediately when offline-only mode is enabled.
-  Future<ArtistInfo?> getArtistInfo(String artistName) async {
+  Future<ArtistInfo?> getArtistInfo(String artistName) {
     final cleanName = artistName.trim();
     if (cleanName.isEmpty || cleanName.toLowerCase() == 'unknown artist') {
-      return null;
+      return Future.value(null);
     }
 
     final key = cleanName.toLowerCase();
     if (_cache.containsKey(key)) {
       final cached = _cache.remove(key)!;
       _cache[key] = cached; // LRU refresh
-      return cached;
+      return Future.value(cached);
     }
 
+    final existing = _inFlight[key];
+    if (existing != null) return existing;
+
+    final future = _fetchArtistInfo(cleanName, key);
+    _inFlight[key] = future;
+    return future.whenComplete(() => _inFlight.remove(key));
+  }
+
+  Future<ArtistInfo?> _fetchArtistInfo(String cleanName, String key) async {
     try {
       if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
@@ -67,10 +77,11 @@ class ArtistBioService {
     }
 
     try {
+      final wikiTitle = cleanName.replaceAll(RegExp(r'\s+'), '_');
       final deezerUri = Uri.parse(
           'https://api.deezer.com/search/artist?q=${Uri.encodeComponent(cleanName)}&limit=1');
       final wikiUri = Uri.parse(
-          'https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(cleanName)}');
+          'https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(wikiTitle)}');
 
       final deezerFuture = _client
           .get(deezerUri)

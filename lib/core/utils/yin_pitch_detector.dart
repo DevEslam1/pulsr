@@ -166,3 +166,77 @@ class YinPitchDetector {
     );
   }
 }
+
+/// Real-time Exponential Moving Average (EMA) pitch smoother for vocal tracking.
+///
+/// Smooths instantaneous raw YIN pitch detections to eliminate flutter,
+/// octave jumps, and jitter during live singing.
+class EmaPitchSmoother {
+  final double alpha;
+  double? _smoothedFreq;
+  double? _smoothedMidi;
+  int _unvoicedFrames = 0;
+  static const int maxHoldFrames = 4;
+
+  EmaPitchSmoother({this.alpha = 0.28});
+
+  double? get smoothedFrequencyHz => _smoothedFreq;
+  double? get smoothedMidiNote => _smoothedMidi;
+
+  PitchResult smooth(PitchResult raw) {
+    if (!raw.isVoiced) {
+      _unvoicedFrames++;
+      if (_unvoicedFrames > maxHoldFrames) {
+        _smoothedFreq = null;
+        _smoothedMidi = null;
+        return PitchResult.unvoiced;
+      }
+      // Hold last pitch briefly across unvoiced gaps
+      if (_smoothedFreq != null && _smoothedMidi != null) {
+        return PitchResult(
+          frequencyHz: _smoothedFreq!,
+          midiNote: _smoothedMidi!,
+          noteName: raw.noteName,
+          probability: raw.probability * 0.5,
+          isVoiced: true,
+        );
+      }
+      return PitchResult.unvoiced;
+    }
+
+    _unvoicedFrames = 0;
+    if (_smoothedFreq == null || _smoothedMidi == null) {
+      _smoothedFreq = raw.frequencyHz;
+      _smoothedMidi = raw.midiNote;
+    } else {
+      // Octave jump damping: if sudden 2x or 0.5x jump, dampen transition
+      final ratio = raw.frequencyHz / _smoothedFreq!;
+      final isOctaveJump =
+          (ratio > 1.85 && ratio < 2.15) || (ratio > 0.45 && ratio < 0.55);
+      final effectiveAlpha = isOctaveJump ? (alpha * 0.3) : alpha;
+
+      _smoothedFreq =
+          _smoothedFreq! + effectiveAlpha * (raw.frequencyHz - _smoothedFreq!);
+      _smoothedMidi =
+          _smoothedMidi! + effectiveAlpha * (raw.midiNote - _smoothedMidi!);
+    }
+
+    final noteIndex = (_smoothedMidi!.round() % 12 + 12) % 12;
+    final octave = (_smoothedMidi!.round() ~/ 12) - 1;
+    final noteStr = '${YinPitchDetector._noteNames[noteIndex]}$octave';
+
+    return PitchResult(
+      frequencyHz: _smoothedFreq!,
+      midiNote: _smoothedMidi!,
+      noteName: noteStr,
+      probability: raw.probability,
+      isVoiced: true,
+    );
+  }
+
+  void reset() {
+    _smoothedFreq = null;
+    _smoothedMidi = null;
+    _unvoicedFrames = 0;
+  }
+}

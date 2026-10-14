@@ -221,7 +221,7 @@ class _CatmullRomEqPainter extends CustomPainter {
     canvas.drawPath(curvePath, strokePaint);
 
     // 7. Draw Band Control Nodes & Selection Halos
-    _paintBandNodes(canvas, points, midY);
+    _paintBandNodes(canvas, points, midY, size);
   }
 
   void _paintSpectrum(Canvas canvas, Size size) {
@@ -315,7 +315,7 @@ class _CatmullRomEqPainter extends CustomPainter {
     return path;
   }
 
-  void _paintBandNodes(Canvas canvas, List<Offset> points, double midY) {
+  void _paintBandNodes(Canvas canvas, List<Offset> points, double midY, Size size) {
     final dotPaint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
@@ -330,8 +330,31 @@ class _CatmullRomEqPainter extends CustomPainter {
       final hasGain = gains[i].abs() > 0.05;
 
       if (isSelected) {
+        // Vertical frequency cursor line
+        final cursorPaint = Paint()
+          ..color = color.withValues(alpha: 0.40)
+          ..strokeWidth = 1.2
+          ..style = PaintingStyle.stroke;
+        canvas.drawLine(
+          Offset(pt.dx, 0),
+          Offset(pt.dx, size.height),
+          cursorPaint,
+        );
+
+        // Highlighted node outer soft glow
+        final outerGlowPaint = Paint()
+          ..color = color.withValues(alpha: 0.22)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+        canvas.drawCircle(pt, 14.0, outerGlowPaint);
+
         canvas.drawCircle(pt, 9.0, haloPaint);
         canvas.drawCircle(pt, 4.5, dotPaint);
+
+        // Specular center dot
+        final specularPaint = Paint()
+          ..color = Colors.white.withValues(alpha: 0.90)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(pt, 1.8, specularPaint);
       } else if (hasGain) {
         canvas.drawCircle(pt, 3.2, dotPaint);
       } else {

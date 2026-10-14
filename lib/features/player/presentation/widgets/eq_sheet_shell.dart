@@ -1998,6 +1998,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   gains: gains,
                   activeColor: effectiveEnabled ? p.accent : p.textTertiary,
                   height: 52,
+                  selectedBandIndex: _activeDraggedBandIndex,
                   onGainChanged: effectiveEnabled
                       ? (idx, gain) {
                           context.read<PlayerCubit>().setBandGain(idx, gain);

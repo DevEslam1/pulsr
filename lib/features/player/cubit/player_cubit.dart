@@ -6,43 +6,32 @@ import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../../core/bloc/base_cubit.dart';
-import '../../../core/services/lrclib_service.dart';
-import '../../../core/services/scrobbler_service.dart';
 import '../../../core/services/sponsorblock_service.dart';
-import '../../../core/services/ytm_account_service.dart';
-import '../../../core/telemetry/playback_latency_tracker.dart';
 import '../../../core/utils/async_guard.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_handler.dart';
-import '../../../data/audio/per_song_eq_store.dart';
-import '../../../data/audio/per_song_volume_store.dart';
-import '../../../data/audio/song_rating_store.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/radio_station.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
-import '../../../data/services/device_profile_service.dart';
-import '../../../data/services/hires_audio_service.dart';
 import '../../../data/services/settings_profiles_service.dart';
-import '../../../core/services/smart_audio_service.dart';
 import '../../../domain/models/eq_preset.dart';
 import '../../../domain/models/headphone_profile.dart';
 import '../../../core/services/earbud_optimization_service.dart';
-import '../../../core/services/quran_mode_service.dart';
 import '../../../data/audio/comparison_slot.dart';
 import '../../../data/audio/playback_bookmark_store.dart';
 import '../../../data/audio/sleep_timer_manager.dart';
-import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/lyrics_line.dart';
 import '../../../domain/models/quran_mode_profile.dart';
 import '../../../data/services/room_correction_service.dart';
 import '../../../domain/models/audio_effects_config.dart';
 import '../../settings/cubit/settings_cubit.dart';
-import '../../widgets/widget_service.dart';
 import 'controllers/player_controllers.dart';
 import 'managers/player_managers.dart';
 import 'player_constants.dart';
 import 'player_dependencies.dart';
+
+export 'player_dependencies.dart';
 import 'player_state.dart';
 
 part 'player_queue_mixin.dart';
@@ -106,6 +95,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   bool get _isSponsorBlockSeeking => _sponsorBlockSeekGen > 0;
 
   Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
+  List<SponsorBlockSegment> get sponsorBlockSegments =>
+      metadataController.sponsorBlockSegments;
 
   @override
   void invalidateMediaItemResolution() => _mediaItemGuard.next();
@@ -120,36 +111,18 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     required IMusicRepository repository,
     required ToggleFavoriteUseCase toggleFavoriteUseCase,
     PlayerDependencies? dependencies,
-    SettingsCubit? settingsCubit,
-    WidgetService? widgetService,
-    ScrobblerService? scrobblerService,
-    SettingsProfilesService? settingsProfilesService,
-    DeviceProfileService? deviceProfileService,
-    HiResAudioService? hiResAudioService,
-    SmartAudioService? smartAudioService,
-    PlaybackLatencyTracker? latencyTracker,
-    PerSongEqStore? perSongEqStore,
-    PerSongVolumeStore? perSongVolumeStore,
-    SongRatingStore? songRatingStore,
-    SponsorBlockService? sponsorBlockService,
-    LrclibService? lrclibService,
-    YtmAccountService? ytmAccountService,
-    EarbudOptimizationService? earbudOptimizationService,
-    QuranModeService? quranModeService,
-    MediaScannerService? mediaScannerService,
   })  : _audioHandler = audioHandler,
         _repository = repository,
-        _settingsCubit = dependencies?.settingsCubit ?? settingsCubit,
+        _settingsCubit = dependencies?.settingsCubit,
         super(const PlayerState()) {
+    final deps = dependencies ?? const PlayerDependencies();
     metadataController = PlayerMetadataController(
       lyricsManager: PlayerLyricsManager(
-        lrclibService: dependencies?.lrclibService ?? lrclibService,
-        ytmAccountService: dependencies?.ytmAccountService ?? ytmAccountService,
+        lrclibService: deps.lrclibService,
+        ytmAccountService: deps.ytmAccountService,
       ),
       sponsorBlockManager: PlayerSponsorBlockManager(
-        service: dependencies?.sponsorBlockService ??
-            sponsorBlockService ??
-            SponsorBlockService.instance,
+        service: deps.sponsorBlockService ?? SponsorBlockService.instance,
       ),
       repository: _repository,
       getState: () => state,
@@ -160,12 +133,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     dspController = PlayerDspController(
       audioHandler: _audioHandler,
       settingsCubit: _settingsCubit,
-      settingsProfilesService:
-          dependencies?.settingsProfilesService ?? settingsProfilesService,
-      deviceProfileService:
-          dependencies?.deviceProfileService ?? deviceProfileService,
-      hiResAudioService: dependencies?.hiResAudioService ?? hiResAudioService,
-      smartAudioService: dependencies?.smartAudioService ?? smartAudioService,
+      settingsProfilesService: deps.settingsProfilesService,
+      deviceProfileService: deps.deviceProfileService,
+      hiResAudioService: deps.hiResAudioService,
+      smartAudioService: deps.smartAudioService,
       getState: () => state,
       emit: safeEmit,
       syncAudioEffects: _syncAudioEffects,
@@ -173,15 +144,13 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     );
     playbackOptionsController = PlayerPlaybackOptionsController(
       audioHandler: _audioHandler,
-      earbudOptimizationService:
-          dependencies?.earbudOptimizationService ?? earbudOptimizationService,
-      hiResAudioService: dependencies?.hiResAudioService ?? hiResAudioService,
-      perSongEqStore: dependencies?.perSongEqStore ?? perSongEqStore,
-      perSongVolumeStore:
-          dependencies?.perSongVolumeStore ?? perSongVolumeStore,
-      songRatingStore: dependencies?.songRatingStore ?? songRatingStore,
+      earbudOptimizationService: deps.earbudOptimizationService,
+      hiResAudioService: deps.hiResAudioService,
+      perSongEqStore: deps.perSongEqStore,
+      perSongVolumeStore: deps.perSongVolumeStore,
+      songRatingStore: deps.songRatingStore,
       quranManager: PlayerQuranManager(
-        service: dependencies?.quranModeService ?? quranModeService,
+        service: deps.quranModeService,
       ),
       guardDsp: (feature, {showError = true}) =>
           dspController.guardDsp(feature, showError: showError),
@@ -193,10 +162,9 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           metadataController.loadLyrics(song, isOfflineOnly: isOfflineOnly),
     );
     widgetBridge = PlayerWidgetBridge(
-      widgetService: dependencies?.widgetService ?? widgetService,
-      scrobblerService: () =>
-          dependencies?.scrobblerService ?? scrobblerService,
-      latencyTracker: dependencies?.latencyTracker ?? latencyTracker,
+      widgetService: deps.widgetService,
+      scrobblerService: () => deps.scrobblerService,
+      latencyTracker: deps.latencyTracker,
       isQuranMode: () => state.isQuranModeEnabled,
       isClosed: () => isClosed,
       playbackSpeed: () => state.playbackSpeed,
@@ -221,7 +189,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           queueController.debouncedPersistQueueSlots(),
       bumpQueueVersion: () => _queueVersion++,
       isSameTrack: _isSameTrack,
-      latencyTracker: dependencies?.latencyTracker ?? latencyTracker,
+      latencyTracker: deps.latencyTracker,
       onResumePerSongMemory: (song) =>
           unawaited(playbackOptionsController.applyPerSongPlaybackMemory(song)),
       invalidateQueueSyncResolution: invalidateQueueSyncResolution,

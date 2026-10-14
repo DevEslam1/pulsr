@@ -38,6 +38,9 @@ class PlayerMetadataController {
         _isClosed = isClosed,
         _isSameTrack = isSameTrack;
 
+  List<SponsorBlockSegment> get sponsorBlockSegments =>
+      _sponsorBlockManager.currentSegments;
+
   Future<void> loadLyrics(SongsTableData song,
       {bool isOfflineOnly = false}) async {
     if (_isClosed() || !_isSameTrack(_getState().currentSong, song)) return;

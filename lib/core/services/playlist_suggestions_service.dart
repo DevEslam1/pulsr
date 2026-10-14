@@ -15,7 +15,7 @@ class PlaylistSuggestion {
   });
 }
 
-@singleton
+@lazySingleton
 class PlaylistSuggestionsService {
   List<PlaylistSuggestion>? _cachedSuggestions;
   DateTime? _lastGeneratedTime;

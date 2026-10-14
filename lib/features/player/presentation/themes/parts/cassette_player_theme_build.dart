@@ -113,7 +113,9 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
             final centerDisplay = isInSplitView
                 ? cassetteStage
                 : AnimatedSwitcher(
-                    duration: context.motionMs(300),
+                    duration: context.motionMs(320),
+                    transitionBuilder: (child, anim) =>
+                        playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? LyricsView(
                             key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
@@ -126,7 +128,10 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
                             ? const NowPlayingQueueView(
                                 key: ValueKey('queue_view'),
                               )
-                            : cassetteStage,
+                            : KeyedSubtree(
+                                key: const ValueKey('stage_cassette'),
+                                child: cassetteStage,
+                              ),
                   );
 
             final controlsColumn = PlayerControlsColumn(

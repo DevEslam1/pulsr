@@ -63,11 +63,13 @@ void main() {
       audioHandler: handler,
       repository: MockMusicRepository(),
       toggleFavoriteUseCase: MockToggleFavoriteUseCase(),
-      settingsCubit: settings,
-      settingsProfilesService: SettingsProfilesService(),
-      deviceProfileService: DeviceProfileService(),
-      hiResAudioService: fakeHiRes,
-      smartAudioService: SmartAudioService(),
+      dependencies: PlayerDependencies(
+        settingsCubit: settings,
+        settingsProfilesService: SettingsProfilesService(),
+        deviceProfileService: DeviceProfileService(),
+        hiResAudioService: fakeHiRes,
+        smartAudioService: SmartAudioService(),
+      ),
     );
   }
 

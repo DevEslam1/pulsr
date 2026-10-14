@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/now_playing_queue_view.dart
-import 'dart:ui' show lerpDouble;
+import 'dart:ui' show ImageFilter, lerpDouble;
+import '../../../../core/performance/gpu_budget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -267,19 +268,56 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                             animation: animation,
                             builder: (context, child) {
                               final animValue =
-                                  Curves.easeInOut.transform(animation.value);
-                              final elevation = lerpDouble(0, 8, animValue)!;
-                              final scale = lerpDouble(1, 1.02, animValue)!;
-                              return Transform.scale(
-                                scale: scale,
-                                child: Material(
-                                  elevation: elevation,
+                                  Curves.easeOutBack.transform(animation.value);
+                              final scale = lerpDouble(1.0, 1.03, animValue)!;
+                              final allowBlur = !GpuBudget.isGpuSaverActive;
+
+                              Widget proxyCard = Container(
+                                decoration: BoxDecoration(
                                   color: p.surfaceContainerHigh
-                                      .withValues(alpha: 0.95),
-                                  shadowColor: AppColors.scrimAt(0.35),
+                                      .withValues(alpha: 0.85),
+                                  borderRadius: AppRadii.r16All,
+                                  border: Border.all(
+                                    color: p.accent.withValues(alpha: 0.85),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: p.accent
+                                          .withValues(alpha: 0.22 * animValue),
+                                      blurRadius: 16,
+                                      spreadRadius: 1,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                    BoxShadow(
+                                      color:
+                                          AppColors.scrimAt(0.35 * animValue),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
                                   borderRadius: AppRadii.r16All,
                                   child: child,
                                 ),
+                              );
+
+                              if (allowBlur) {
+                                proxyCard = ClipRRect(
+                                  borderRadius: AppRadii.r16All,
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(
+                                        sigmaX: 12, sigmaY: 12),
+                                    child: proxyCard,
+                                  ),
+                                );
+                              }
+
+                              return Transform.scale(
+                                scale: scale,
+                                child: proxyCard,
                               );
                             },
                             child: child,

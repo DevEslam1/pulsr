@@ -3,13 +3,17 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../cubit/player_constants.dart';
+import '../../cubit/player_cubit.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Visual rendering style for the waveform seek bar.
@@ -64,10 +68,38 @@ class WaveformSeekBar extends StatefulWidget {
 
 class _WaveformSeekBarState extends State<WaveformSeekBar> {
   double? _dragValue;
+  double? _dragStartValue;
+  double? _lastHapticCheckMs;
   ({int startIndex, int visibleCount})? _dragFrozenWindow;
   double _zoomScale = 1.0;
   int _lastScaleMs = 0;
   bool _dragStarted = false;
+
+  void _checkHapticBoundaries(double oldVal, double newVal, BuildContext context) {
+    final markers = <double>[];
+    if (widget.loopPointA != null) {
+      markers.add(widget.loopPointA!.inMilliseconds.toDouble());
+    }
+    if (widget.loopPointB != null) {
+      markers.add(widget.loopPointB!.inMilliseconds.toDouble());
+    }
+    try {
+      final cubit = context.read<PlayerCubit>();
+      for (final seg in cubit.sponsorBlockSegments) {
+        markers.add(seg.start.inMilliseconds.toDouble());
+        markers.add(seg.end.inMilliseconds.toDouble());
+      }
+    } catch (_) {}
+
+    final minV = math.min(oldVal, newVal);
+    final maxV = math.max(oldVal, newVal);
+    for (final marker in markers) {
+      if (marker > minV && marker <= maxV) {
+        PulsrHaptics.light();
+        break;
+      }
+    }
+  }
 
   @override
   void didUpdateWidget(covariant WaveformSeekBar oldWidget) {
@@ -245,9 +277,12 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             _dragFrozenWindow = _visibleWindow(totalCount);
                             final ratio = _ratioForDx(details.localPosition.dx,
                                 trackWidth, totalCount);
+                            final seekVal =
+                                (ratio * maxDuration).clamp(0.0, maxDuration);
+                            _dragStartValue = seekVal;
+                            _lastHapticCheckMs = seekVal;
                             setState(() {
-                              _dragValue =
-                                  (ratio * maxDuration).clamp(0.0, maxDuration);
+                              _dragValue = seekVal;
                             });
                           }
                         },
@@ -256,9 +291,15 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (trackWidth > 0 && maxDuration > 0) {
                             final ratio = _ratioForDx(details.localPosition.dx,
                                 trackWidth, totalCount);
+                            final seekVal =
+                                (ratio * maxDuration).clamp(0.0, maxDuration);
+                            if (_lastHapticCheckMs != null) {
+                              _checkHapticBoundaries(
+                                  _lastHapticCheckMs!, seekVal, context);
+                            }
+                            _lastHapticCheckMs = seekVal;
                             setState(() {
-                              _dragValue =
-                                  (ratio * maxDuration).clamp(0.0, maxDuration);
+                              _dragValue = seekVal;
                             });
                           }
                         },
@@ -271,6 +312,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                 Duration(milliseconds: _dragValue!.round()));
                             setState(() {
                               _dragValue = null;
+                              _dragStartValue = null;
+                              _lastHapticCheckMs = null;
                               _dragFrozenWindow = null;
                             });
                           }
@@ -281,6 +324,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (_dragValue != null) {
                             setState(() {
                               _dragValue = null;
+                              _dragStartValue = null;
+                              _lastHapticCheckMs = null;
                               _dragFrozenWindow = null;
                             });
                           }
@@ -301,8 +346,12 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                 .onSeek(Duration(milliseconds: seekMs.round()));
                           }
                         },
-                        child: SizedBox(
-                          height: widget.height,
+                        child: AnimatedContainer(
+                          duration: context.motionMs(200),
+                          curve: Curves.easeOutCubic,
+                          height: _dragValue != null
+                              ? widget.height + 12.0
+                              : widget.height,
                           width: double.infinity,
                           child: Stack(
                             clipBehavior: Clip.none,
@@ -330,6 +379,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                         visibleStart: window.startIndex,
                                         visibleCount: window.visibleCount,
                                         style: widget.style,
+                                        amplitudeScale:
+                                            _dragValue != null ? 1.25 : 1.0,
                                       ),
                                     ),
                                   ),
@@ -337,43 +388,60 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                               ),
                               // Scrub preview bubble follows the finger while dragging.
                               if (_dragValue != null)
-                                PositionedDirectional(
-                                  top: -30,
-                                  start: (progressPercent * trackWidth - 32)
-                                      .clamp(
-                                          0.0,
-                                          (trackWidth - 64)
-                                              .clamp(0.0, trackWidth)),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.xs,
-                                        vertical: AppSpacing.s2),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          context.palette.surfaceContainerHigh,
-                                      borderRadius: AppRadii.r8All,
-                                      border: Border.all(
-                                          color: context.palette.hairline),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.25),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 2),
+                                () {
+                                  final deltaMs = _dragStartValue != null
+                                      ? (_dragValue! - _dragStartValue!).round()
+                                      : 0;
+                                  final deltaStr = deltaMs == 0
+                                      ? '±0:00'
+                                      : '${deltaMs > 0 ? '+' : '-'}${Formatters.formatDuration(Duration(milliseconds: deltaMs.abs()))}';
+
+                                  return PositionedDirectional(
+                                    top: -34,
+                                    start: (progressPercent * trackWidth - 48)
+                                        .clamp(
+                                            0.0,
+                                            (trackWidth - 96)
+                                                .clamp(0.0, trackWidth)),
+                                    child: IgnorePointer(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.s8,
+                                            vertical: AppSpacing.s4),
+                                        decoration: BoxDecoration(
+                                          color: context
+                                              .palette.surfaceContainerHigh
+                                              .withValues(alpha: 0.90),
+                                          borderRadius: AppRadii.r12All,
+                                          border: Border.all(
+                                            color: context.palette.hairline
+                                                .withValues(alpha: 0.6),
+                                            width: 1.0,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.30),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                    child: Text(
-                                      Formatters.formatDuration(
-                                          currentDuration),
-                                      style: TextStyle(
-                                        color: context.palette.textPrimary,
-                                        fontSize: AppFontSize.caption,
-                                        fontWeight: FontWeight.w700,
+                                        child: Text(
+                                          '${Formatters.formatDuration(currentDuration)} ($deltaStr)',
+                                          style: TextStyle(
+                                            color: context.palette.textPrimary,
+                                            fontSize: AppFontSize.caption,
+                                            fontWeight: FontWeight.w700,
+                                            fontFeatures: const [
+                                              FontFeature.tabularFigures()
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
+                                  );
+                                }(),
                             ],
                           ),
                         ),
@@ -475,6 +543,7 @@ class _WaveformPainter extends CustomPainter {
   final int visibleStart;
   final int visibleCount;
   final WaveformVisualizerStyle style;
+  final double amplitudeScale;
 
   _WaveformPainter({
     required this.samples,
@@ -490,6 +559,7 @@ class _WaveformPainter extends CustomPainter {
     this.visibleStart = 0,
     this.visibleCount = 0,
     this.style = WaveformVisualizerStyle.mirroredBars,
+    this.amplitudeScale = 1.0,
   });
 
   @override
@@ -536,8 +606,9 @@ class _WaveformPainter extends CustomPainter {
       switch (style) {
         case WaveformVisualizerStyle.mirroredBars:
           for (int i = 0; i < count; i++) {
-            final double barHeight = (visibleSamples[i] * size.height)
-                .clamp(minBarHeight, size.height);
+            final double barHeight =
+                (visibleSamples[i] * size.height * amplitudeScale)
+                    .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing);
             final double y = (size.height - barHeight) / 2;
             final rect = RRect.fromRectAndRadius(
@@ -549,8 +620,9 @@ class _WaveformPainter extends CustomPainter {
           break;
         case WaveformVisualizerStyle.roundedTopBars:
           for (int i = 0; i < count; i++) {
-            final double barHeight = (visibleSamples[i] * size.height)
-                .clamp(minBarHeight, size.height);
+            final double barHeight =
+                (visibleSamples[i] * size.height * amplitudeScale)
+                    .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing);
             final double y = size.height - barHeight;
             final rect = RRect.fromRectAndCorners(
@@ -564,8 +636,9 @@ class _WaveformPainter extends CustomPainter {
         case WaveformVisualizerStyle.continuousEnvelope:
           final topPath = Path();
           for (int i = 0; i < count; i++) {
-            final double barHeight = (visibleSamples[i] * size.height)
-                .clamp(minBarHeight, size.height);
+            final double barHeight =
+                (visibleSamples[i] * size.height * amplitudeScale)
+                    .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double topY = (size.height - barHeight) / 2;
             if (i == 0) {
@@ -577,8 +650,9 @@ class _WaveformPainter extends CustomPainter {
           final combined = Path.from(topPath);
           combined.lineTo(size.width, size.height / 2);
           for (int i = count - 1; i >= 0; i--) {
-            final double barHeight = (visibleSamples[i] * size.height)
-                .clamp(minBarHeight, size.height);
+            final double barHeight =
+                (visibleSamples[i] * size.height * amplitudeScale)
+                    .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double bottomY = (size.height + barHeight) / 2;
             combined.lineTo(x, bottomY);
@@ -589,8 +663,9 @@ class _WaveformPainter extends CustomPainter {
         case WaveformVisualizerStyle.neonGlowLine:
           final linePath = Path();
           for (int i = 0; i < count; i++) {
-            final double barHeight = (visibleSamples[i] * size.height)
-                .clamp(minBarHeight, size.height);
+            final double barHeight =
+                (visibleSamples[i] * size.height * amplitudeScale)
+                    .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double y = (size.height - barHeight) / 2;
             if (i == 0) {
@@ -749,6 +824,7 @@ class _WaveformPainter extends CustomPainter {
         oldDelegate.visibleStart != visibleStart ||
         oldDelegate.visibleCount != visibleCount ||
         oldDelegate.style != style ||
+        oldDelegate.amplitudeScale != amplitudeScale ||
         !listEquals(oldDelegate.samples, samples);
   }
 }

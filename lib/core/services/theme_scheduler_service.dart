@@ -54,6 +54,7 @@ class ThemeSchedulerService {
     onThemeChange(isNight);
   }
 
+  @disposeMethod
   void dispose() {
     _timer?.cancel();
     _timer = null;

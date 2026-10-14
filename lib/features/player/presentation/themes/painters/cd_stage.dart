@@ -2,7 +2,7 @@ part of '../cd_player_theme.dart';
 
 /// CD Turntable Stage: Rotating iridescent CD disc with song cover,
 /// animated tonearm stick, and interactive gestures.
-class _CdTurntableStage extends StatelessWidget {
+class _CdTurntableStage extends StatefulWidget {
   final PlayerThemeProps props;
   final bool isTablet;
   final bool isLandscape;
@@ -18,7 +18,71 @@ class _CdTurntableStage extends StatelessWidget {
   });
 
   @override
+  State<_CdTurntableStage> createState() => _CdTurntableStageState();
+}
+
+class _CdTurntableStageState extends State<_CdTurntableStage> {
+  double _scrubTurns = 0.0;
+  double? _lastDragAngle;
+  double _tonearmSway = 0.0;
+  bool _isScrubbing = false;
+
+  void _onPlatterPanStart(DragStartDetails details, double cdSize) {
+    final center = Offset(cdSize / 2, cdSize / 2);
+    _lastDragAngle = math.atan2(
+      details.localPosition.dy - center.dy,
+      details.localPosition.dx - center.dx,
+    );
+    setState(() {
+      _isScrubbing = true;
+      _scrubTurns = 0.0;
+      _tonearmSway = 0.0;
+    });
+  }
+
+  void _onPlatterPanUpdate(DragUpdateDetails details, double cdSize) {
+    final center = Offset(cdSize / 2, cdSize / 2);
+    final currentAngle = math.atan2(
+      details.localPosition.dy - center.dy,
+      details.localPosition.dx - center.dx,
+    );
+    if (_lastDragAngle != null) {
+      double delta = currentAngle - _lastDragAngle!;
+      if (delta > math.pi) delta -= 2 * math.pi;
+      if (delta < -math.pi) delta += 2 * math.pi;
+
+      final prevTurn12 = (_scrubTurns * 12).floor();
+      _scrubTurns += delta / (2 * math.pi);
+      final newTurn12 = (_scrubTurns * 12).floor();
+      if (prevTurn12 != newTurn12) {
+        PulsrHaptics.selection();
+      }
+
+      setState(() {
+        _tonearmSway = (delta * 0.15).clamp(-0.06, 0.06);
+      });
+    }
+    _lastDragAngle = currentAngle;
+  }
+
+  void _onPlatterPanEnd(int durationMs, int positionMs) {
+    if (_isScrubbing && durationMs > 0) {
+      // 1 turn ≈ 4 seconds of playback scrub
+      final scrubDeltaMs = (_scrubTurns * 4000).round();
+      final targetMs = (positionMs + scrubDeltaMs).clamp(0, durationMs);
+      widget.props.cubit.seek(Duration(milliseconds: targetMs));
+    }
+    setState(() {
+      _isScrubbing = false;
+      _lastDragAngle = null;
+      _scrubTurns = 0.0;
+      _tonearmSway = 0.0;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final props = widget.props;
     final state = props.state;
     final cubit = props.cubit;
     final activeColor = props.activeColor;
@@ -36,8 +100,8 @@ class _CdTurntableStage extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: isLandscape ? 310 : (isTablet ? 490 : 400),
-          maxWidth: isLandscape ? 330 : (isTablet ? 510 : 420),
+          maxHeight: context.isLandscape ? 310 : (context.isTablet ? 490 : 400),
+          maxWidth: context.isLandscape ? 330 : (context.isTablet ? 510 : 420),
         ),
         child: AspectRatio(
           aspectRatio: 1.02,
@@ -123,26 +187,48 @@ class _CdTurntableStage extends StatelessWidget {
                         ),
                       ),
 
-                      // 2. Rotating Compact Disc with central Album Artwork
+                      // 2. Rotating Compact Disc with central Album Artwork & Platter Scrubbing
                       PositionedDirectional(
                         start: cdLeft,
                         top: cdTop,
                         width: cdSize,
                         height: cdSize,
-                        child: RotationTransition(
-                          turns: rotationController,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // CD Optical Substrate Surface & Iridescent Sheen
-                              CustomPaint(
-                                size: Size(cdSize, cdSize),
-                                painter: _CdDiscPainter(
-                                  activeColor: activeColor,
-                                ),
-                              ),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onPanStart: (d) => _onPlatterPanStart(d, cdSize),
+                          onPanUpdate: (d) => _onPlatterPanUpdate(d, cdSize),
+                          onPanEnd: (_) => _onPlatterPanEnd(
+                            state.duration.inMilliseconds,
+                            state.position.inMilliseconds,
+                          ),
+                          onPanCancel: () {
+                            setState(() {
+                              _isScrubbing = false;
+                              _lastDragAngle = null;
+                              _scrubTurns = 0.0;
+                              _tonearmSway = 0.0;
+                            });
+                          },
+                          child: AnimatedBuilder(
+                            animation: widget.rotationController,
+                            builder: (context, _) {
+                              final totalPhase =
+                                  (widget.rotationController.value + _scrubTurns) % 1.0;
+                              return Transform.rotate(
+                                angle: totalPhase * 2 * math.pi,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    // CD Optical Substrate Surface & Iridescent Sheen
+                                    CustomPaint(
+                                      size: Size(cdSize, cdSize),
+                                      painter: _CdDiscPainter(
+                                        activeColor: activeColor,
+                                        rotationPhase: totalPhase,
+                                      ),
+                                    ),
 
-                              // Center Circular Album Artwork Label
+                                    // Center Circular Album Artwork Label
                               Container(
                                 width: cdSize * 0.44,
                                 height: cdSize * 0.44,
@@ -237,8 +323,11 @@ class _CdTurntableStage extends StatelessWidget {
                               ),
                             ],
                           ),
-                        ),
-                      ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
 
                       // 3. Animated Tonearm "Stick" Assembly
                       Positioned.fill(
@@ -259,11 +348,12 @@ class _CdTurntableStage extends StatelessWidget {
                                 const parkedAngle = -0.12;
 
                                 return AnimatedBuilder(
-                                  animation: tonearmAnimation,
+                                  animation: widget.tonearmAnimation,
                                   builder: (context, child) {
                                     final currentAngle = parkedAngle +
                                         ((playAngle - parkedAngle) *
-                                            tonearmAnimation.value);
+                                            widget.tonearmAnimation.value) +
+                                        _tonearmSway;
 
                                     return CustomPaint(
                                       painter: _CdTonearmPainter(
@@ -271,6 +361,7 @@ class _CdTurntableStage extends StatelessWidget {
                                         angle: currentAngle,
                                         activeColor: activeColor,
                                         armLength: armLength,
+                                        liftProgress: widget.tonearmAnimation.value,
                                       ),
                                     );
                                   },

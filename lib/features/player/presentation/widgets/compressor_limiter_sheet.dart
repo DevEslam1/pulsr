@@ -592,6 +592,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                       color: enabled ? p.primary : p.textTertiary,
                       fontSize: AppFontSize.body,
                       fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   if (defaultValue != null) ...[

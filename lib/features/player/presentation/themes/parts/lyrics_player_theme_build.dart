@@ -188,7 +188,9 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
             final centerDisplay = isInSplitView
                 ? artworkDisplay
                 : AnimatedSwitcher(
-                    duration: context.motionMs(300),
+                    duration: context.motionMs(320),
+                    transitionBuilder: (child, anim) =>
+                        playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? Container(
                             key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
@@ -213,7 +215,10 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                             ? const NowPlayingQueueView(
                                 key: ValueKey('queue_view_lyrics'),
                               )
-                            : artworkDisplay,
+                            : KeyedSubtree(
+                                key: const ValueKey('stage_lyrics_focus'),
+                                child: artworkDisplay,
+                              ),
                   );
 
             final extraBadge = Container(

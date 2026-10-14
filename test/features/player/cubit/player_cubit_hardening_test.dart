@@ -459,7 +459,8 @@ void main() {
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
-        scrobblerService: mockScrobblerService,
+        dependencies:
+            PlayerDependencies(scrobblerService: mockScrobblerService),
       );
 
       await cubit.playSong(sampleSong1);
@@ -482,7 +483,8 @@ void main() {
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
-        scrobblerService: mockScrobblerService,
+        dependencies:
+            PlayerDependencies(scrobblerService: mockScrobblerService),
       );
 
       // Populate slot 1 with missing song
@@ -505,7 +507,8 @@ void main() {
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
-        scrobblerService: mockScrobblerService,
+        dependencies:
+            PlayerDependencies(scrobblerService: mockScrobblerService),
       );
 
       final largeList = List.generate(
@@ -813,7 +816,8 @@ void main() {
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
-        scrobblerService: mockScrobblerService,
+        dependencies:
+            PlayerDependencies(scrobblerService: mockScrobblerService),
       );
 
       // Close must complete cleanly without throwing

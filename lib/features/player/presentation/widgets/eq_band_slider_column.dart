@@ -91,6 +91,12 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
                 }
                 cubit.setBandGain(index, val);
               },
+              onDragStart: () {
+                _setStateSafe(() => _activeDraggedBandIndex = index);
+              },
+              onDragEnd: () {
+                _setStateSafe(() => _activeDraggedBandIndex = null);
+              },
             ),
             const SizedBox(height: AppSpacing.xxs),
             // F-35: fast solo/mute toggles. State is transient (native has no
@@ -218,6 +224,8 @@ class _VerticalEqSlider extends StatefulWidget {
   final Color textColor;
   final ValueChanged<double> onChanged;
   final VoidCallback? onInteraction;
+  final VoidCallback? onDragStart;
+  final VoidCallback? onDragEnd;
 
   static const double min = -15.0;
   static const double max = 15.0;
@@ -233,6 +241,8 @@ class _VerticalEqSlider extends StatefulWidget {
     required this.textColor,
     required this.onChanged,
     this.onInteraction,
+    this.onDragStart,
+    this.onDragEnd,
   });
 
   @override
@@ -321,49 +331,95 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                // Tap-to-set: a deliberate tap on the track jumps the band to
-                // that gain, matching the horizontal DSP sliders.
+                // Tap-to-set: a deliberate tap on the track jumps the band to that gain.
                 onTapDown: (details) {
-                  _handlePointer(details.localPosition.dy, height,
-                      notifyParent: true);
+                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
+                },
+                // Double-tap-to-zero (0.0 dB) reset with confirmation haptics.
+                onDoubleTap: () {
+                  PulsrHaptics.confirm();
+                  widget.onChanged(0.0);
+                  setState(() => _dragGain = 0.0);
                 },
                 onVerticalDragStart: (details) {
                   setState(() => _isDragging = true);
-                  _handlePointer(details.localPosition.dy, height,
-                      notifyParent: true);
+                  widget.onDragStart?.call();
+                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
                 },
                 onVerticalDragUpdate: (details) {
-                  _handlePointer(details.localPosition.dy, height,
-                      notifyParent: true);
+                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
                 },
                 onVerticalDragEnd: (_) {
                   final finalGain = _dragGain ?? widget.value;
                   widget.onChanged(finalGain);
+                  widget.onDragEnd?.call();
                   setState(() {
                     _isDragging = false;
                     _dragGain = null;
                   });
                 },
                 onVerticalDragCancel: () {
+                  widget.onDragEnd?.call();
                   setState(() {
                     _isDragging = false;
                     _dragGain = null;
                   });
                 },
-                child: CustomPaint(
-                  size: Size(constraints.maxWidth, height),
-                  painter: _VerticalSliderPainter(
-                    fraction: fraction,
-                    thumbY: thumbY,
-                    centerY: centerY,
-                    topMargin: topMargin,
-                    bottomMargin: bottomMargin,
-                    isDragging: _isDragging,
-                    isEnabled: widget.isEnabled,
-                    accentColor: widget.accentColor,
-                    trackColor: widget.trackColor,
-                    surfaceColor: widget.surfaceColor,
-                  ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CustomPaint(
+                      size: Size(constraints.maxWidth, height),
+                      painter: _VerticalSliderPainter(
+                        fraction: fraction,
+                        thumbY: thumbY,
+                        centerY: centerY,
+                        topMargin: topMargin,
+                        bottomMargin: bottomMargin,
+                        isDragging: _isDragging,
+                        isEnabled: widget.isEnabled,
+                        accentColor: widget.accentColor,
+                        trackColor: widget.trackColor,
+                        surfaceColor: widget.surfaceColor,
+                      ),
+                    ),
+                    // Floating dB readout badge while dragging
+                    if (_isDragging)
+                      Positioned(
+                        top: (thumbY - 26).clamp(0.0, height - 22.0),
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: widget.surfaceColor.withValues(alpha: 0.95),
+                              borderRadius: AppRadii.r6All,
+                              border: Border.all(
+                                color: widget.accentColor.withValues(alpha: 0.7),
+                                width: 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '${gain > 0 ? "+" : ""}${gain.toStringAsFixed(1)} dB',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: widget.accentColor,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               );
             },
@@ -446,15 +502,18 @@ class _VerticalSliderPainter extends CustomPainter {
       bgPaint,
     );
 
-    // Center 0 dB notch tick
+    // Center 0 dB detent tick mark
+    final isAtZero = (fraction - 0.5).abs() < 0.02;
     final notchPaint = Paint()
-      ..color = trackColor.withValues(alpha: 0.8)
+      ..color = isAtZero
+          ? (isEnabled ? accentColor : trackColor)
+          : trackColor.withValues(alpha: 0.8)
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2.0;
+      ..strokeWidth = isAtZero ? 2.8 : 2.0;
 
     canvas.drawLine(
-      Offset(centerX - 6, centerY),
-      Offset(centerX + 6, centerY),
+      Offset(centerX - (isAtZero ? 9 : 7), centerY),
+      Offset(centerX + (isAtZero ? 9 : 7), centerY),
       notchPaint,
     );
 

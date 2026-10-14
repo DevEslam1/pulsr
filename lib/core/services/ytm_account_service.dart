@@ -85,7 +85,7 @@ enum SessionValidationResult {
   unknown,
 }
 
-@singleton
+@lazySingleton
 class YtmAccountService {
   String? _cachedLikedSongsBrowseId;
 

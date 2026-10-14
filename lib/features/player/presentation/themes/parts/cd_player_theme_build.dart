@@ -71,7 +71,9 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
             final centerDisplay = isInSplitView
                 ? cdStage
                 : AnimatedSwitcher(
-                    duration: context.motionMs(300),
+                    duration: context.motionMs(320),
+                    transitionBuilder: (child, anim) =>
+                        playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? LyricsView(
                             key: ValueKey(
@@ -85,7 +87,10 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
                             ? const NowPlayingQueueView(
                                 key: ValueKey('queue_view'),
                               )
-                            : cdStage,
+                            : KeyedSubtree(
+                                key: const ValueKey('stage_cd'),
+                                child: cdStage,
+                              ),
                   );
 
             final controlsColumn = PlayerControlsColumn(

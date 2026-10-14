@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/arbitrary_eq_sheet.dart';
+import 'package:pulsr/features/player/presentation/widgets/eq_curve_visualizer.dart';
 
 import 'player_sheet_test_support.dart';
 
@@ -41,6 +42,7 @@ void main() {
     expect(find.text('Arbitrary Response EQ'), findsOneWidget);
     expect(find.byType(Switch), findsNWidgets(2));
     expect(find.text('512-tap FIR Filter'), findsOneWidget);
+    expect(find.byType(EqCurveVisualizer), findsOneWidget);
 
     // Top enable switch drives the cubit.
     await tester.tap(find.byType(Switch).first);
@@ -62,7 +64,6 @@ void main() {
     // Apply the current curve.
     await tester.tap(find.text('Apply Curve'));
     await tester.pump();
-    expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('Applied EqualizerAPO GraphicEq curve'), findsOneWidget);
 
     // Reset to flat rewrites the editor.

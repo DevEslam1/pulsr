@@ -49,6 +49,7 @@ dependencies:
   flutter_secure_storage: ^11.0.0
   rxdart: ^0.28.0
   clock: ^1.1.2
+  collection: ^1.19.0
   connectivity_plus: ^6.1.4
   flutter_lyric: ^3.0.7
   video_player: ^2.14.1

@@ -142,7 +142,7 @@ typedef _DartPlayerClient = ({
   String host,
 });
 
-@singleton
+@lazySingleton
 class YtmService {
   static const String channelName = PulsrChannels.ytm;
   static const Duration _defaultSearchTimeout = Duration(seconds: 25);

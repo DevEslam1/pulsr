@@ -126,5 +126,19 @@ void main() {
           isFalse);
       expect(AudioFormats.isSupportedExtension('extensionless_file'), isFalse);
     });
+
+    test('extractExtension rejects dot-prefixed hidden files, .trashed-*, and ._* files', () {
+      expect(AudioFormats.extractExtension('.trashed-12345-track.mp3'), '');
+      expect(AudioFormats.extractExtension('/storage/emulated/0/Music/.trashed-9876.flac'), '');
+      expect(AudioFormats.extractExtension('._track.mp3'), '');
+      expect(AudioFormats.extractExtension('/Volumes/Drive/._song.flac'), '');
+      expect(AudioFormats.extractExtension('/storage/Music/.hidden_track.mp3'), '');
+      expect(AudioFormats.extractExtension(r'C:\Music\.dotfile.wav'), '');
+      expect(AudioFormats.extractExtension('/path/to/.mp3'), '');
+
+      // But bare extensions without path separator are still valid extension queries
+      expect(AudioFormats.extractExtension('.mp3'), 'mp3');
+      expect(AudioFormats.extractExtension('.flac'), 'flac');
+    });
   });
 }

@@ -5,6 +5,7 @@
 // button and the dock icon button were previously copy-pasted into every theme
 // file. They now live here; themes parameterise the handful of visual tokens
 // they actually differ on instead of keeping private copies.
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -58,6 +59,34 @@ String formatSleepTimerRemaining(Duration remaining) {
   final hours = r.inHours;
   final minutes = r.inMinutes.remainder(60);
   return minutes == 0 ? '${hours}h' : '${hours}h ${minutes}m';
+}
+
+/// Upgraded fluid overlay transition builder combining FadeTransition,
+/// a subtle ScaleTransition (0.95 to 1.0), and a vertical SlideTransition
+/// (Offset(0, 0.03) to Offset.zero) driven by context.motionMs(320) and
+/// context.motionCurve(Curves.easeOutCubic).
+Widget playerOverlayTransitionBuilder(
+  BuildContext context,
+  Widget child,
+  Animation<double> animation,
+) {
+  final curved = CurvedAnimation(
+    parent: animation,
+    curve: context.motionCurve(Curves.easeOutCubic),
+  );
+  return FadeTransition(
+    opacity: curved,
+    child: ScaleTransition(
+      scale: Tween<double>(begin: 0.95, end: 1.0).animate(curved),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.0, 0.03),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
+      ),
+    ),
+  );
 }
 
 /// Visual tokens that differ between the copies of the dock icon button.
@@ -165,21 +194,11 @@ class PlayerSwitcherItem extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: AppRadii.r20All,
-          child: AnimatedContainer(
-            duration: context.motionMs(200),
-            curve: context.motionCurve(Curves.easeOutCubic),
+          child: Container(
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? activeColor.withValues(alpha: 0.22)
-                  : Colors.transparent,
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
               borderRadius: AppRadii.r20All,
-              border: isSelected
-                  ? Border.all(
-                      color: activeColor.withValues(alpha: 0.45),
-                      width: 1.0,
-                    )
-                  : null,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -300,8 +319,9 @@ class PlayerAnimatedFavoriteButton extends StatelessWidget {
   }
 }
 
-/// Circular action button used inside the bottom action dock.
-class PlayerDockIconButton extends StatelessWidget {
+/// Circular action button used inside the bottom action dock with press-scale
+/// feedback and refined top-right cutout-bordered badge.
+class PlayerDockIconButton extends StatefulWidget {
   final IconData icon;
   final String tooltip;
   final bool isActive;
@@ -326,7 +346,22 @@ class PlayerDockIconButton extends StatelessWidget {
   });
 
   @override
+  State<PlayerDockIconButton> createState() => _PlayerDockIconButtonState();
+}
+
+class _PlayerDockIconButtonState extends State<PlayerDockIconButton> {
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
+    final style = widget.style;
+    final isTablet = widget.isTablet;
+    final isActive = widget.isActive;
+    final activeColor = widget.activeColor;
+    final inactiveColor = widget.inactiveColor;
+    final badgeText = widget.badgeText;
+    final p = context.palette;
+
     final inner = Center(
       child: Stack(
         clipBehavior: Clip.none,
@@ -348,21 +383,27 @@ class PlayerDockIconButton extends StatelessWidget {
                   : null,
             ),
             child: Icon(
-              icon,
+              widget.icon,
               size: style.iconSizeFor(isTablet),
               color: isActive ? activeColor : inactiveColor,
             ),
           ),
           if (badgeText != null)
             PositionedDirectional(
-              top: -2,
-              end: style.badgeRight,
+              top: -3,
+              end: -1,
               child: Container(
-                padding: EdgeInsets.symmetric(
-                    horizontal: style.badgeHPadding, vertical: AppSpacing.s2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4.0,
+                  vertical: 1.5,
+                ),
                 decoration: BoxDecoration(
                   color: activeColor,
                   borderRadius: AppRadii.circular(style.badgeRadius),
+                  border: Border.all(
+                    color: p.surface,
+                    width: 1.5,
+                  ),
                   boxShadow: style.badgeShadow
                       ? [
                           BoxShadow(
@@ -373,7 +414,7 @@ class PlayerDockIconButton extends StatelessWidget {
                       : null,
                 ),
                 child: Text(
-                  badgeText!,
+                  badgeText,
                   style: TextStyle(
                     color: Colors.black,
                     fontSize: style.badgeFontSize,
@@ -386,34 +427,47 @@ class PlayerDockIconButton extends StatelessWidget {
       ),
     );
 
+    final Widget buttonContent = AnimatedScale(
+      scale: _isPressed ? 0.90 : 1.0,
+      duration: context.motionMs(120),
+      curve: context.motionCurve(Curves.easeOutCubic),
+      child: inner,
+    );
+
     // Preserve the original widget nesting order per variant: the classic copy
     // put the tooltip inside the InkWell, the common copy put it outside.
     final Widget body;
     if (style.tooltipOutside) {
       body = Tooltip(
-        message: tooltip,
+        message: widget.tooltip,
         excludeFromSemantics: true,
         child: InkWell(
-          onTap: onTap,
+          onTap: widget.onTap,
+          onHighlightChanged: (highlighted) {
+            setState(() => _isPressed = highlighted);
+          },
           borderRadius: AppRadii.circular(style.inkWellRadius),
-          child: inner,
+          child: buttonContent,
         ),
       );
     } else {
       body = InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
+        onHighlightChanged: (highlighted) {
+          setState(() => _isPressed = highlighted);
+        },
         borderRadius: AppRadii.circular(style.inkWellRadius),
         child: Tooltip(
-          message: tooltip,
+          message: widget.tooltip,
           excludeFromSemantics: true,
-          child: inner,
+          child: buttonContent,
         ),
       );
     }
 
     return Semantics(
       button: true,
-      label: tooltip,
+      label: widget.tooltip,
       excludeSemantics: true,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
@@ -511,53 +565,81 @@ class PlayerViewSwitcher extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Row(
+                child: Stack(
                   children: [
-                    Expanded(
-                      child: PlayerSwitcherItem(
-                        label: l10n.trackNumber,
-                        icon: trackIcon,
-                        isSelected: isTrack,
-                        activeColor: activeColor,
-                        isTablet: isTablet,
-                        onTap: () {
-                          if (!isTrack) {
-                            HapticFeedback.selectionClick();
-                            cubit.resetOverlayViews();
-                          }
-                        },
+                    AnimatedAlign(
+                      duration: context.motionMs(250),
+                      curve: context.motionCurve(Curves.easeOutCubic),
+                      alignment: isTrack
+                          ? const Alignment(-1.0, 0.0)
+                          : isLyrics
+                              ? const Alignment(0.0, 0.0)
+                              : const Alignment(1.0, 0.0),
+                      child: FractionallySizedBox(
+                        widthFactor: 1 / 3,
+                        heightFactor: 1.0,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: activeColor.withValues(alpha: 0.22),
+                            borderRadius: AppRadii.circular(
+                                math.max(4.0, barRadius - 3.0)),
+                            border: Border.all(
+                              color: activeColor.withValues(alpha: 0.45),
+                              width: 1.0,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    Expanded(
-                      child: PlayerSwitcherItem(
-                        label: l10n.lyrics,
-                        icon: Icons.lyrics_rounded,
-                        isSelected: isLyrics,
-                        activeColor: activeColor,
-                        isTablet: isTablet,
-                        onTap: () {
-                          if (!isLyrics) {
-                            HapticFeedback.selectionClick();
-                            cubit.toggleLyricsVisibility();
-                          }
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: PlayerSwitcherItem(
-                        label: l10n.queue,
-                        icon: Icons.queue_music_rounded,
-                        isSelected: isQueue,
-                        badgeCount: state.queue.length,
-                        activeColor: activeColor,
-                        isTablet: isTablet,
-                        onTap: () {
-                          if (!isQueue) {
-                            HapticFeedback.selectionClick();
-                            cubit.toggleQueueVisibility();
-                          }
-                        },
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: PlayerSwitcherItem(
+                            label: l10n.trackNumber,
+                            icon: trackIcon,
+                            isSelected: isTrack,
+                            activeColor: activeColor,
+                            isTablet: isTablet,
+                            onTap: () {
+                              if (!isTrack) {
+                                HapticFeedback.selectionClick();
+                                cubit.resetOverlayViews();
+                              }
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: PlayerSwitcherItem(
+                            label: l10n.lyrics,
+                            icon: Icons.lyrics_rounded,
+                            isSelected: isLyrics,
+                            activeColor: activeColor,
+                            isTablet: isTablet,
+                            onTap: () {
+                              if (!isLyrics) {
+                                HapticFeedback.selectionClick();
+                                cubit.toggleLyricsVisibility();
+                              }
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: PlayerSwitcherItem(
+                            label: l10n.queue,
+                            icon: Icons.queue_music_rounded,
+                            isSelected: isQueue,
+                            badgeCount: state.queue.length,
+                            activeColor: activeColor,
+                            isTablet: isTablet,
+                            onTap: () {
+                              if (!isQueue) {
+                                HapticFeedback.selectionClick();
+                                cubit.toggleQueueVisibility();
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1094,8 +1176,8 @@ class PlayerTrackHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: isTablet ? 48 : 44,
-                height: isTablet ? 48 : 44,
+                width: 48,
+                height: 48,
                 child: Material(
                   color: AppColors.specularAt(0.06),
                   shape: const CircleBorder(),
@@ -1164,7 +1246,7 @@ class PlayerTrackHeader extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                width: AppSpacing.xxl,
+                width: 48,
                 height: 48,
                 child: Material(
                   color: AppColors.specularAt(0.06),

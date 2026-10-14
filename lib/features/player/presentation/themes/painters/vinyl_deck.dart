@@ -1,7 +1,7 @@
 part of '../vinyl_player_theme.dart';
 
 /// Turntable hero stage: platter, spinning record, tonearm and RPM badge.
-class _VinylTurntableDeck extends StatelessWidget {
+class _VinylTurntableDeck extends StatefulWidget {
   final PlayerThemeProps props;
   final bool isTablet;
   final bool isLandscape;
@@ -17,7 +17,71 @@ class _VinylTurntableDeck extends StatelessWidget {
   });
 
   @override
+  State<_VinylTurntableDeck> createState() => _VinylTurntableDeckState();
+}
+
+class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
+  double _scrubTurns = 0.0;
+  double? _lastDragAngle;
+  double _tonearmSway = 0.0;
+  bool _isScrubbing = false;
+
+  void _onPlatterPanStart(DragStartDetails details, double vinylSize) {
+    final center = Offset(vinylSize / 2, vinylSize / 2);
+    _lastDragAngle = math.atan2(
+      details.localPosition.dy - center.dy,
+      details.localPosition.dx - center.dx,
+    );
+    setState(() {
+      _isScrubbing = true;
+      _scrubTurns = 0.0;
+      _tonearmSway = 0.0;
+    });
+  }
+
+  void _onPlatterPanUpdate(DragUpdateDetails details, double vinylSize) {
+    final center = Offset(vinylSize / 2, vinylSize / 2);
+    final currentAngle = math.atan2(
+      details.localPosition.dy - center.dy,
+      details.localPosition.dx - center.dx,
+    );
+    if (_lastDragAngle != null) {
+      double delta = currentAngle - _lastDragAngle!;
+      if (delta > math.pi) delta -= 2 * math.pi;
+      if (delta < -math.pi) delta += 2 * math.pi;
+
+      final prevTurn12 = (_scrubTurns * 12).floor();
+      _scrubTurns += delta / (2 * math.pi);
+      final newTurn12 = (_scrubTurns * 12).floor();
+      if (prevTurn12 != newTurn12) {
+        PulsrHaptics.selection();
+      }
+
+      setState(() {
+        _tonearmSway = (delta * 0.15).clamp(-0.06, 0.06);
+      });
+    }
+    _lastDragAngle = currentAngle;
+  }
+
+  void _onPlatterPanEnd(int durationMs, int positionMs) {
+    if (_isScrubbing && durationMs > 0) {
+      // 1 turn ≈ 1.8 seconds at 33 1/3 RPM
+      final scrubDeltaMs = (_scrubTurns * 1800).round();
+      final targetMs = (positionMs + scrubDeltaMs).clamp(0, durationMs);
+      widget.props.cubit.seek(Duration(milliseconds: targetMs));
+    }
+    setState(() {
+      _isScrubbing = false;
+      _lastDragAngle = null;
+      _scrubTurns = 0.0;
+      _tonearmSway = 0.0;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final props = widget.props;
     final state = props.state;
     final cubit = props.cubit;
     final activeColor = props.activeColor;
@@ -35,8 +99,8 @@ class _VinylTurntableDeck extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: isLandscape ? 300 : (isTablet ? 480 : 390),
-          maxWidth: isLandscape ? 320 : (isTablet ? 500 : 410),
+          maxHeight: context.isLandscape ? 300 : (context.isTablet ? 480 : 390),
+          maxWidth: context.isLandscape ? 320 : (context.isTablet ? 500 : 410),
         ),
         child: AspectRatio(
           aspectRatio: 1.04,
@@ -157,35 +221,63 @@ class _VinylTurntableDeck extends StatelessWidget {
                           width: vinylSize + 8,
                           height: vinylSize + 8,
                           child: CustomPaint(
-                            painter: _PlatterStrobePainter(),
+                            painter: _PlatterStrobePainter(
+                              activeColor: activeColor,
+                              isPlaying: state.isPlaying,
+                            ),
                           ),
                         ),
 
-                        // 3. Spinning Vinyl Record
+                        // 3. Spinning Vinyl Record & Platter Scrubbing
                         PositionedDirectional(
                           start: vinylLeft,
                           top: vinylTop,
                           width: vinylSize,
                           height: vinylSize,
-                          child: RotationTransition(
-                            turns: rotationController,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF0C0D11),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.scrimAt(0.5),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: CustomPaint(
-                                painter: _VinylGroovesPainter(
-                                  activeColor: activeColor,
-                                ),
-                                child: Center(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onPanStart: (d) => _onPlatterPanStart(d, vinylSize),
+                            onPanUpdate: (d) =>
+                                _onPlatterPanUpdate(d, vinylSize),
+                            onPanEnd: (_) => _onPlatterPanEnd(
+                              state.duration.inMilliseconds,
+                              state.position.inMilliseconds,
+                            ),
+                            onPanCancel: () {
+                              setState(() {
+                                _isScrubbing = false;
+                                _lastDragAngle = null;
+                                _scrubTurns = 0.0;
+                                _tonearmSway = 0.0;
+                              });
+                            },
+                            child: AnimatedBuilder(
+                              animation: widget.rotationController,
+                              builder: (context, _) {
+                                final totalPhase =
+                                    (widget.rotationController.value +
+                                            _scrubTurns) %
+                                        1.0;
+                                return Transform.rotate(
+                                  angle: totalPhase * 2 * math.pi,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: const Color(0xFF0C0D11),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.scrimAt(0.5),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
+                                    child: CustomPaint(
+                                      painter: _VinylGroovesPainter(
+                                        activeColor: activeColor,
+                                        rotationPhase: totalPhase,
+                                      ),
+                                      child: Center(
                                   // Center Album Artwork
                                   child: Container(
                                     width: vinylSize * 0.44,
@@ -240,8 +332,11 @@ class _VinylTurntableDeck extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
 
                         // 4. Animated Tonearm Assembly Layer
                         Positioned.fill(
@@ -260,11 +355,12 @@ class _VinylTurntableDeck extends StatelessWidget {
                                       (step / 120.0).clamp(0.0, 1.0);
                                   final playAngle = 0.35 + (progress * 0.14);
                                   return AnimatedBuilder(
-                                    animation: tonearmAnimation,
+                                    animation: widget.tonearmAnimation,
                                     builder: (context, child) {
                                       final currentAngle = -0.06 +
                                           ((playAngle - (-0.06)) *
-                                              tonearmAnimation.value);
+                                              widget.tonearmAnimation.value) +
+                                          _tonearmSway;
 
                                       return CustomPaint(
                                         painter: _TonearmPainter(
@@ -272,6 +368,8 @@ class _VinylTurntableDeck extends StatelessWidget {
                                           angle: currentAngle,
                                           activeColor: activeColor,
                                           armLength: armLength,
+                                          liftProgress:
+                                              widget.tonearmAnimation.value,
                                         ),
                                       );
                                     },

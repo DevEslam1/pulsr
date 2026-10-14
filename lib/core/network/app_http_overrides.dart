@@ -59,8 +59,21 @@ class AppHttpOverrides extends HttpOverrides {
     };
 
     // Dynamic proxy authentication credentials
+    final authAttempts = <String, int>{};
     client.authenticateProxy = (host, port, scheme, realm) async {
-      if (_config.enabled && _config.hasAuth) {
+      final targetHost = _config.host.trim().toLowerCase();
+      final targetPort = _config.port;
+      if (_config.enabled &&
+          _config.hasAuth &&
+          host.toLowerCase() == targetHost &&
+          port == targetPort) {
+        final authKey = '$host:$port:${realm ?? ''}';
+        final attempts = authAttempts[authKey] ?? 0;
+        if (attempts >= 1) {
+          // Already attempted and rejected (407 retry loop); do not retry
+          return false;
+        }
+        authAttempts[authKey] = attempts + 1;
         client.addProxyCredentials(
           host,
           port,
@@ -158,21 +171,26 @@ class AppHttpOverrides extends HttpOverrides {
       };
 
       if (testConfig.enabled && testConfig.hasAuth) {
-        testClient.addProxyCredentials(
-          testConfig.host,
-          testConfig.port,
-          'Basic',
-          HttpClientBasicCredentials(testConfig.username, testConfig.password),
-        );
+        final authAttempts = <String, int>{};
         testClient.authenticateProxy = (host, port, scheme, realm) async {
-          testClient?.addProxyCredentials(
-            host,
-            port,
-            realm ?? '',
-            HttpClientBasicCredentials(
-                testConfig.username, testConfig.password),
-          );
-          return true;
+          if (host.toLowerCase() == testConfig.host.trim().toLowerCase() &&
+              port == testConfig.port) {
+            final authKey = '$host:$port:${realm ?? ''}';
+            final attempts = authAttempts[authKey] ?? 0;
+            if (attempts >= 1) {
+              return false;
+            }
+            authAttempts[authKey] = attempts + 1;
+            testClient?.addProxyCredentials(
+              host,
+              port,
+              realm ?? '',
+              HttpClientBasicCredentials(
+                  testConfig.username, testConfig.password),
+            );
+            return true;
+          }
+          return false;
         };
       }
 
@@ -398,36 +416,70 @@ class _SocketByteReader {
   final Stream<Uint8List> _stream;
   StreamSubscription<Uint8List>? _sub;
   final List<int> _buffer = [];
+  int _offset = 0;
   Completer<void>? _waitCompleter;
   int _waitCount = 0;
   bool _isDone = false;
+  Object? _error;
+  StackTrace? _errorStack;
+
+  int get _availableBytes => _buffer.length - _offset;
 
   _SocketByteReader(this._stream) {
     _sub = _stream.listen(
       (chunk) {
         _buffer.addAll(chunk);
-        if (_waitCompleter != null && _buffer.length >= _waitCount) {
-          _waitCompleter!.complete();
+        if (_waitCompleter != null && _availableBytes >= _waitCount) {
+          if (!_waitCompleter!.isCompleted) _waitCompleter!.complete();
           _waitCompleter = null;
         }
       },
-      onError: (e) {
-        _waitCompleter?.completeError(e);
-        _waitCompleter = null;
+      onError: (e, st) {
+        _error = e;
+        _errorStack = st;
+        _isDone = true;
+        if (_waitCompleter != null && !_waitCompleter!.isCompleted) {
+          _waitCompleter!.completeError(e, st);
+          _waitCompleter = null;
+        }
       },
       onDone: () {
         _isDone = true;
-        _waitCompleter?.complete();
-        _waitCompleter = null;
+        if (_waitCompleter != null && !_waitCompleter!.isCompleted) {
+          _waitCompleter!.complete();
+          _waitCompleter = null;
+        }
       },
       cancelOnError: true,
     );
   }
 
+  void _compactBufferIfNeeded() {
+    if (_offset > 0 && _offset >= _buffer.length ~/ 2) {
+      _buffer.removeRange(0, _offset);
+      _offset = 0;
+    }
+  }
+
+  void _checkAndRethrowError() {
+    if (_error != null) {
+      final err = _error!;
+      final st = _errorStack ?? StackTrace.current;
+      if (err is Exception) {
+        Error.throwWithStackTrace(err, st);
+      }
+      Error.throwWithStackTrace(
+          SocketException('SOCKS5 socket error: $err'), st);
+    }
+  }
+
   Future<List<int>> readBytes(int count, Duration timeout) async {
-    if (_buffer.length >= count) {
-      final res = _buffer.sublist(0, count);
-      _buffer.removeRange(0, count);
+    _checkAndRethrowError();
+
+    if (_availableBytes >= count) {
+      final res = _buffer.sublist(_offset, _offset + count);
+      _offset += count;
+      _compactBufferIfNeeded();
       return res;
     }
     if (_isDone) {
@@ -435,12 +487,21 @@ class _SocketByteReader {
     }
     _waitCount = count;
     _waitCompleter = Completer<void>();
-    await _waitCompleter!.future.timeout(timeout);
-    if (_buffer.length < count) {
+    try {
+      await _waitCompleter!.future.timeout(timeout);
+    } finally {
+      _waitCompleter = null;
+      _waitCount = 0;
+    }
+
+    _checkAndRethrowError();
+
+    if (_availableBytes < count) {
       throw const SocketException('Incomplete response received from SOCKS5 proxy');
     }
-    final res = _buffer.sublist(0, count);
-    _buffer.removeRange(0, count);
+    final res = _buffer.sublist(_offset, _offset + count);
+    _offset += count;
+    _compactBufferIfNeeded();
     return res;
   }
 

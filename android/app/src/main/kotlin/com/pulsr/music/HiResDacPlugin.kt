@@ -399,6 +399,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 }
                 val previousRate = targetSampleRate
                 val previousDepth = targetBitDepth
+                if (previousRate == sampleRate && previousDepth == bitDepth && mixerAttributesApplied) {
+                    result.success(true)
+                    return
+                }
                 targetSampleRate = sampleRate
                 targetBitDepth = bitDepth
                 val applied = if (bitPerfectRequested) applyBitPerfectMode(true) else true
@@ -1369,9 +1373,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
         val activeDevice = pickActiveOutputDevice(devices)
 
-        val isUsb = activeDevice != null && isUsbOutputType(activeDevice.type)
+        val isUsb = (activeDevice != null && isUsbOutputType(activeDevice.type)) || (activeDevice == null && usbDevice != null)
         val deviceName =
-            if (activeDevice != null) getCleanDeviceName(activeDevice) else "Output route unverified"
+            if (activeDevice != null) getCleanDeviceName(activeDevice)
+            else if (usbDevice != null) getCleanDeviceName(usbDevice)
+            else "Output route unverified"
 
         val sampleRates = activeDevice?.sampleRates?.toList()?.filter { it > 0 } ?: emptyList()
 
@@ -1493,7 +1499,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             isBluetooth -> "bluetooth_transcoded"
             directRouteFallbackActive -> "mixer_attributes_unavailable_fallback_route_only"
             lastBitPerfectReason != null -> lastBitPerfectReason
-            !isUsb -> "exclusive_requires_usb_dac"
+            usbDevice == null -> "exclusive_requires_usb_dac"
             Build.VERSION.SDK_INT < 34 -> "requires_android_14_for_usb"
             !finalIsBitPerfectSupported -> "no_supported_mixer_attributes"
             else -> null

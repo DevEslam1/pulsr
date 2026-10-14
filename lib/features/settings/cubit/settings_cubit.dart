@@ -216,8 +216,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     autoSub(_hiResAudioService.outputDeviceStream, (device) {
       if (isClosed) return;
       final lostBitPerfect = state.bitPerfectOutput &&
-          state.currentOutputDevice?.isBitPerfectActive == true &&
-          !device.isBitPerfectActive &&
+          (state.currentOutputDevice?.isBitPerfectActive == true ||
+              state.currentOutputDevice?.isUsbDac == true) &&
+          !device.isUsbDac &&
           device.activeDeviceType != 'unknown';
       safeEmit(state.copyWith(currentOutputDevice: device));
       // A DAC may have just been plugged/unplugged: re-probe DoP support so the

@@ -36,7 +36,7 @@ class _ArtworkRateLimiter {
   }
 }
 
-@singleton
+@lazySingleton
 class MissingArtworkService {
   final http.Client _client;
   final _ArtworkRateLimiter _rateLimiter = _ArtworkRateLimiter(maxRequests: 5);

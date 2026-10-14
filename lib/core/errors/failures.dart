@@ -18,8 +18,14 @@ typedef Result<T> = Either<AppFailure, T>;
 /// handled by the same exhaustive-matching and reporting code as the canonical
 /// subtypes.
 abstract class AppFailure extends AppError {
-  const AppFailure(String message, [String code = 'APP_FAILURE', Object? cause])
-      : super(code: code, userMessage: message, cause: cause);
+  const AppFailure(String message,
+      [String code = 'APP_FAILURE', Object? cause, StackTrace? stackTrace])
+      : super(
+          code: code,
+          userMessage: message,
+          cause: cause,
+          stackTrace: stackTrace,
+        );
 
   @override
   String toString() => '$runtimeType: $message';
@@ -38,53 +44,66 @@ abstract class AppFailure extends AppError {
 }
 
 class DatabaseFailure extends AppFailure {
-  const DatabaseFailure(String message, [Object? error])
-      : super(message, 'DB_FAILURE', error);
+  const DatabaseFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'DB_FAILURE', error, stackTrace);
 }
 
 class AudioPlaybackFailure extends AppFailure {
-  const AudioPlaybackFailure(String message, [Object? error])
-      : super(message, 'AUDIO_PLAYBACK_FAILURE', error);
+  const AudioPlaybackFailure(String message,
+      [Object? error, StackTrace? stackTrace])
+      : super(message, 'AUDIO_PLAYBACK_FAILURE', error, stackTrace);
 }
 
 class PermissionFailure extends AppFailure {
-  const PermissionFailure(String message, [Object? error])
-      : super(message, 'PERMISSION_FAILURE', error);
+  const PermissionFailure(String message,
+      [Object? error, StackTrace? stackTrace])
+      : super(message, 'PERMISSION_FAILURE', error, stackTrace);
 }
 
 class StorageFailure extends AppFailure {
-  const StorageFailure(String message, [Object? error])
-      : super(message, 'STORAGE_FAILURE', error);
+  const StorageFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'STORAGE_FAILURE', error, stackTrace);
 }
 
 class LyricsFailure extends AppFailure {
-  const LyricsFailure(String message, [Object? error])
-      : super(message, 'LYRICS_FAILURE', error);
+  const LyricsFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'LYRICS_FAILURE', error, stackTrace);
 }
 
 class TagEditFailure extends AppFailure {
-  const TagEditFailure(String message, [Object? error])
-      : super(message, 'TAG_EDIT_FAILURE', error);
+  const TagEditFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'TAG_EDIT_FAILURE', error, stackTrace);
 }
 
 class PlaylistImportFailure extends AppFailure {
-  const PlaylistImportFailure(String message, [Object? error])
-      : super(message, 'PLAYLIST_IMPORT_FAILURE', error);
+  const PlaylistImportFailure(String message,
+      [Object? error, StackTrace? stackTrace])
+      : super(message, 'PLAYLIST_IMPORT_FAILURE', error, stackTrace);
 }
 
 class BackupFailure extends AppFailure {
-  const BackupFailure(String message, [Object? error])
-      : super(message, 'BACKUP_FAILURE', error);
+  const BackupFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'BACKUP_FAILURE', error, stackTrace);
 }
 
 class DownloadFailure extends AppFailure {
-  const DownloadFailure(String message, [Object? error])
-      : super(message, 'DOWNLOAD_FAILURE', error);
+  const DownloadFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'DOWNLOAD_FAILURE', error, stackTrace);
+}
+
+class NetworkFailure extends AppFailure {
+  const NetworkFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'NETWORK_FAILURE', error, stackTrace);
+}
+
+class YtmFailure extends AppFailure {
+  const YtmFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'YTM_FAILURE', error, stackTrace);
 }
 
 /// Catch-all failure used when an [AppError] cannot be mapped to a more
 /// specific domain failure.
 class GenericFailure extends AppFailure {
-  const GenericFailure(String message, [Object? error])
-      : super(message, 'GENERIC_FAILURE', error);
+  const GenericFailure(String message, [Object? error, StackTrace? stackTrace])
+      : super(message, 'GENERIC_FAILURE', error, stackTrace);
 }

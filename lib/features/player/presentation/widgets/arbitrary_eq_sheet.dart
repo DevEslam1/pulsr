@@ -1,14 +1,17 @@
 // lib/features/player/presentation/widgets/arbitrary_eq_sheet.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'eq_curve_visualizer.dart';
 
 class ArbitraryEqSheet extends StatefulWidget {
   const ArbitraryEqSheet({super.key});
@@ -40,13 +43,43 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
     _textController = TextEditingController(
       text: current.isNotEmpty ? current : _presets.values.first,
     );
+    _textController.addListener(_onTextChanged);
     _linearPhase = cubit.isArbitraryEqLinearPhase;
+  }
+
+  void _onTextChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _textController.removeListener(_onTextChanged);
     _textController.dispose();
     super.dispose();
+  }
+
+  ({List<double> frequencies, List<double> gains}) _parseGraphicEq(String text) {
+    final clean = text
+        .replaceFirst(RegExp(r'^GraphicEq:\s*', caseSensitive: false), '')
+        .trim();
+    if (clean.isEmpty) {
+      return (frequencies: <double>[], gains: <double>[]);
+    }
+    final entries = clean.split(';');
+    final freqs = <double>[];
+    final gains = <double>[];
+    for (final entry in entries) {
+      final parts = entry.trim().split(RegExp(r'\s+'));
+      if (parts.length >= 2) {
+        final f = double.tryParse(parts[0]);
+        final g = double.tryParse(parts[1]);
+        if (f != null && g != null) {
+          freqs.add(f);
+          gains.add(g);
+        }
+      }
+    }
+    return (frequencies: freqs, gains: gains);
   }
 
   void _apply(BuildContext context) {
@@ -54,8 +87,10 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
     if (text.isNotEmpty) {
       context.read<PlayerCubit>().setArbitraryEqEnabled(true,
           eqString: text, linearPhase: _linearPhase);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.appliedGraphicEq)),
+      PulsrToast.show(
+        context,
+        message: context.l10n.appliedGraphicEq,
+        icon: Icons.check_circle_rounded,
       );
     }
   }
@@ -70,6 +105,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
           prev.arbitraryEqString != curr.arbitraryEqString,
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
+        final parsed = _parseGraphicEq(_textController.text);
 
         return Container(
           padding: const EdgeInsetsDirectional.fromSTEB(
@@ -212,6 +248,39 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      // Live read-only EqCurveVisualizer preview
+                      ClipRRect(
+                        borderRadius: AppRadii.r10All,
+                        child: Container(
+                          height: 72,
+                          color: p.surface,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s8,
+                            vertical: AppSpacing.xs,
+                          ),
+                          child: EqCurveVisualizer(
+                            gains: parsed.gains.isNotEmpty
+                                ? parsed.gains
+                                : List.filled(10, 0.0),
+                            frequencies: parsed.frequencies.isNotEmpty
+                                ? parsed.frequencies
+                                : null,
+                            activeColor: p.primary,
+                            height: 72,
+                            maxGain: parsed.gains.isNotEmpty
+                                ? math.max(
+                                    12.0,
+                                    parsed.gains
+                                        .map((g) => g.abs())
+                                        .reduce(math.max),
+                                  )
+                                : 12.0,
+                            showGrid: true,
+                            showLabels: false,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       TextField(

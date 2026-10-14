@@ -22,7 +22,7 @@ Future<List<DuplicateGroup>> _findDuplicatesWorker(
   return DuplicateFinderService.findDuplicatesInternal(allSongs);
 }
 
-@singleton
+@lazySingleton
 class DuplicateFinderService {
   /// Scans songs and finds verified duplicate sets.
   /// Pass 1: Identical normalized title + artist, confirmed by album equality

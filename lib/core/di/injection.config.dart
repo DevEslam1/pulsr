@@ -21,6 +21,7 @@ import 'package:pulsr/core/services/artist_bio_service.dart' as _i968;
 import 'package:pulsr/core/services/artwork_cache_manager.dart' as _i305;
 import 'package:pulsr/core/services/auth_service.dart' as _i535;
 import 'package:pulsr/core/services/automation_rules_service.dart' as _i281;
+import 'package:pulsr/core/services/automation_trigger_service.dart' as _i6;
 import 'package:pulsr/core/services/cloud_sync_service.dart' as _i225;
 import 'package:pulsr/core/services/duplicate_finder_service.dart' as _i1027;
 import 'package:pulsr/core/services/earbud_optimization_service.dart' as _i260;
@@ -126,34 +127,18 @@ extension GetItInjectableX on _i174.GetIt {
       dispose: _i953.disposePkgHttpClient,
     );
     gh.singleton<_i305.ArtworkCacheManager>(() => _i305.ArtworkCacheManager());
-    gh.singleton<_i535.AuthService>(() => _i535.AuthService());
     gh.singleton<_i281.AutomationRulesService>(
         () => _i281.AutomationRulesService());
-    gh.singleton<_i1027.DuplicateFinderService>(
-        () => _i1027.DuplicateFinderService());
     gh.singleton<_i260.EarbudOptimizationService>(
         () => _i260.EarbudOptimizationService());
     gh.singleton<_i485.LibraryCacheManager>(
       () => _i485.LibraryCacheManager(),
       dispose: (i) => i.dispose(),
     );
-    gh.singleton<_i118.PlaylistShareService>(
-        () => _i118.PlaylistShareService());
-    gh.singleton<_i179.PlaylistSuggestionsService>(
-        () => _i179.PlaylistSuggestionsService());
     gh.singleton<_i322.QuranModeService>(() => _i322.QuranModeService());
     gh.singleton<_i284.SettingsCache>(() => _i284.SettingsCache());
     gh.singleton<_i991.ThemeSchedulerService>(
-        () => _i991.ThemeSchedulerService());
-    gh.singleton<_i498.YtmCacheManager>(() => _i498.YtmCacheManager());
-    gh.singleton<_i169.YtmClientVersionResolver>(
-        () => _i169.YtmClientVersionResolver());
-    gh.singleton<_i391.YtmService>(
-      () => _i391.YtmService(),
-      dispose: (i) => i.dispose(),
-    );
-    gh.singleton<_i492.YtmUrlCache>(
-      () => _i492.YtmUrlCache(),
+      () => _i991.ThemeSchedulerService(),
       dispose: (i) => i.dispose(),
     );
     gh.singleton<_i401.DynamicThemeCubit>(() => _i401.DynamicThemeCubit());
@@ -167,9 +152,29 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i872.PlaylistExportUseCase());
     gh.lazySingleton<_i558.FlutterSecureStorage>(
         () => storageModule.secureStorage);
+    gh.lazySingleton<_i535.AuthService>(() => _i535.AuthService());
+    gh.lazySingleton<_i1027.DuplicateFinderService>(
+        () => _i1027.DuplicateFinderService());
+    gh.lazySingleton<_i118.PlaylistShareService>(
+        () => _i118.PlaylistShareService());
+    gh.lazySingleton<_i179.PlaylistSuggestionsService>(
+        () => _i179.PlaylistSuggestionsService());
     gh.lazySingleton<_i197.SmartAudioService>(() => _i197.SmartAudioService());
+    gh.lazySingleton<_i498.YtmCacheManager>(() => _i498.YtmCacheManager());
+    gh.lazySingleton<_i169.YtmClientVersionResolver>(
+        () => _i169.YtmClientVersionResolver());
+    gh.lazySingleton<_i391.YtmService>(
+      () => _i391.YtmService(),
+      dispose: (i) => i.dispose(),
+    );
+    gh.lazySingleton<_i492.YtmUrlCache>(
+      () => _i492.YtmUrlCache(),
+      dispose: (i) => i.dispose(),
+    );
     gh.lazySingleton<_i626.PlaybackLatencyTracker>(
-        () => _i626.PlaybackLatencyTracker());
+      () => _i626.PlaybackLatencyTracker(),
+      dispose: (i) => i.dispose(),
+    );
     gh.lazySingleton<_i58.ListenTogetherService>(
         () => _i58.ListenTogetherService());
     gh.lazySingleton<_i818.DeviceProfileService>(
@@ -205,18 +210,26 @@ extension GetItInjectableX on _i174.GetIt {
           ytmAccountService: gh<_i631.YtmAccountService>(),
           mediaScannerService: gh<_i483.MediaScannerService>(),
         ));
-    gh.singleton<_i629.ScrobblerService>(() => _i629.ScrobblerService(
+    gh.lazySingleton<_i629.ScrobblerService>(() => _i629.ScrobblerService(
           gh<_i519.Client>(),
           gh<_i558.FlutterSecureStorage>(),
         ));
+    gh.lazySingleton<_i6.AutomationTriggerService>(
+      () => _i6.AutomationTriggerService(
+        rulesService: gh<_i281.AutomationRulesService>(),
+        profilesService: gh<_i775.SettingsProfilesService>(),
+        hiResAudioService: gh<_i451.HiResAudioService>(),
+      ),
+      dispose: (i) => i.dispose(),
+    );
     gh.lazySingleton<_i622.Clock>(() => const _i622.SystemClock());
-    gh.singleton<_i222.YtmBrowseService>(
+    gh.lazySingleton<_i222.YtmBrowseService>(
         () => _i222.YtmBrowseService.create(gh<_i391.YtmService>()));
     gh.singleton<_i320.IMusicRepository>(
         () => _i627.MusicRepository(gh<_i682.AppDatabase>()));
     gh.factory<_i171.YtmSearchCubit>(
         () => _i171.YtmSearchCubit(service: gh<_i391.YtmService>()));
-    gh.singleton<_i621.LrclibService>(
+    gh.lazySingleton<_i621.LrclibService>(
         () => _i621.LrclibService(client: gh<_i497.HttpClient>()));
     gh.singleton<_i483.MediaScannerService>(
         () => _i483.MediaScannerService(gh<_i320.IMusicRepository>()));
@@ -248,7 +261,7 @@ extension GetItInjectableX on _i174.GetIt {
         ));
     gh.factory<_i431.PlaylistCubit>(() =>
         _i431.PlaylistCubit(playlistUseCases: gh<_i792.PlaylistUseCases>()));
-    gh.singleton<_i225.CloudSyncService>(() => _i225.CloudSyncService(
+    gh.lazySingleton<_i225.CloudSyncService>(() => _i225.CloudSyncService(
           gh<_i535.AuthService>(),
           gh<_i320.IMusicRepository>(),
           gh<_i682.AppDatabase>(),
@@ -260,15 +273,15 @@ extension GetItInjectableX on _i174.GetIt {
               playlistUseCases: gh<_i792.PlaylistUseCases>(),
               db: gh<_i682.AppDatabase>(),
             ));
-    gh.singleton<_i968.ArtistBioService>(
+    gh.lazySingleton<_i968.ArtistBioService>(
         () => _i968.ArtistBioService(gh<_i519.Client>()));
-    gh.singleton<_i417.MissingArtworkService>(
+    gh.lazySingleton<_i417.MissingArtworkService>(
         () => _i417.MissingArtworkService(gh<_i519.Client>()));
-    gh.singleton<_i912.SponsorBlockService>(
+    gh.lazySingleton<_i912.SponsorBlockService>(
         () => _i912.SponsorBlockService(gh<_i519.Client>()));
     gh.lazySingleton<_i593.DownloadService>(() =>
         _i593.DownloadService(lyricsRepository: gh<_i133.LyricsRepository>()));
-    gh.singleton<_i631.YtmAccountService>(
+    gh.lazySingleton<_i631.YtmAccountService>(
       () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()),
       dispose: (i) => i.dispose(),
     );
@@ -336,34 +349,6 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i902.ResumeDownloadUseCase(gh<_i783.IDownloadRepository>()));
     gh.singleton<_i19.RetryDownloadUseCase>(
         () => _i19.RetryDownloadUseCase(gh<_i783.IDownloadRepository>()));
-    gh.lazySingletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
-          audioHandler: await getAsync<_i366.PulsrAudioHandler>(),
-          repository: gh<_i320.IMusicRepository>(),
-          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
-          dependencies: gh<_i1046.PlayerDependencies>(),
-          settingsCubit: gh<_i41.SettingsCubit>(),
-          widgetService: gh<_i42.WidgetService>(),
-          scrobblerService: gh<_i629.ScrobblerService>(),
-          settingsProfilesService: gh<_i775.SettingsProfilesService>(),
-          deviceProfileService: gh<_i818.DeviceProfileService>(),
-          hiResAudioService: gh<_i451.HiResAudioService>(),
-          smartAudioService: gh<_i197.SmartAudioService>(),
-          latencyTracker: gh<_i626.PlaybackLatencyTracker>(),
-          perSongEqStore: gh<_i1054.PerSongEqStore>(),
-          perSongVolumeStore: gh<_i866.PerSongVolumeStore>(),
-          songRatingStore: gh<_i227.SongRatingStore>(),
-          sponsorBlockService: gh<_i912.SponsorBlockService>(),
-          lrclibService: gh<_i621.LrclibService>(),
-          ytmAccountService: gh<_i631.YtmAccountService>(),
-          earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
-          quranModeService: gh<_i322.QuranModeService>(),
-          mediaScannerService: gh<_i483.MediaScannerService>(),
-        ));
-    gh.singletonAsync<_i134.FileIntentHandler>(
-        () async => _i134.FileIntentHandler(
-              gh<_i320.IMusicRepository>(),
-              await getAsync<_i147.PlayerCubit>(),
-            ));
     gh.singleton<_i752.DownloadsCubit>(() => _i752.DownloadsCubit(
           gh<_i634.QueueDownloadUseCase>(),
           gh<_i308.PauseDownloadUseCase>(),
@@ -374,11 +359,22 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i59.GetDownloadStorageStatsUseCase>(),
           gh<_i783.IDownloadRepository>(),
         ));
-    gh.singletonAsync<_i873.YtmDownloadCubit>(
+    gh.lazySingletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
+          audioHandler: await getAsync<_i366.PulsrAudioHandler>(),
+          repository: gh<_i320.IMusicRepository>(),
+          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
+          dependencies: gh<_i147.PlayerDependencies>(),
+        ));
+    gh.lazySingletonAsync<_i873.YtmDownloadCubit>(
         () async => _i873.YtmDownloadCubit(
               gh<_i742.YtDownloadService>(),
               await getAsync<_i147.PlayerCubit>(),
               downloadsCubit: gh<_i752.DownloadsCubit>(),
+            ));
+    gh.singletonAsync<_i134.FileIntentHandler>(
+        () async => _i134.FileIntentHandler(
+              gh<_i320.IMusicRepository>(),
+              await getAsync<_i147.PlayerCubit>(),
             ));
     return this;
   }

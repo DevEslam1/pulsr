@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart' show AsyncMutex;
 
-@singleton
+@lazySingleton
 class YtmCacheManager {
   static const String keyMaxCacheSizeMb = 'setting_stream_cache_max_mb';
   static const int defaultMaxCacheSizeMb = 1024; // 1 GB default

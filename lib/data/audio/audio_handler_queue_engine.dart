@@ -821,6 +821,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     await _activePlayer.setAudioSource(source,
         initialPosition: initialPosition ?? Duration.zero, preload: false);
     if (await _isGenerationCancelled(generation)) return;
+    _notifyTrackChanged(song);
     _broadcastState(_activePlayer.playbackEvent);
   }
 
@@ -1155,6 +1156,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         _repository.recordPlayHistory(song.id);
       }
       _saveCurrentPosition();
+      _notifyTrackChanged(song);
 
       // Resolve high-res artwork off the hot path, like the crossfade engine.
       ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
@@ -1251,11 +1253,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       }
     }
 
-    // If user paused, kill the loop immediately.
-    if (!_activePlayer.playing) {
-      _consecutiveFailures = 0;
-      return;
-    }
     if (_isManualSkip) {
       _isManualSkip = false;
       // Decay consecutive failure counter by 1 on manual skip (M-02) so user interaction
@@ -1280,9 +1277,15 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
+    _notifyTrackChanged(song);
     _planNextStreamResolution();
+    try {
+      await _activePlayer.dspClearGainCurve();
+    } catch (_) {}
     await _activePlayer.setVolume(_calculateReplayGainVolume(song));
-    _repository.recordPlayHistory(song.id);
+    if (_activePlayer.playing) {
+      _repository.recordPlayHistory(song.id);
+    }
     _broadcastState(_activePlayer.playbackEvent);
     _saveCurrentPosition();
 
@@ -1432,6 +1435,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
       _saveCurrentPosition();
+      _notifyTrackChanged(song);
 
       // Unified preload depth: bucket drives ALL stages (scheduler via
       // _smartPrefetch above, triple-buffer here). minimal=1 holds only N+1,
@@ -1654,4 +1658,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
   int get _gaplessLoadGeneration;
   set _gaplessLoadGeneration(int value);
+
+  void _notifyTrackChanged(SongsTableData song);
 }

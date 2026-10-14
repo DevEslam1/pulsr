@@ -69,7 +69,7 @@ class YtmUrlCacheEntry {
 /// - Proactive expiry subtraction (5 min margin) if URL contains `expire` timestamp
 /// - Deterministic time injection via [Clock] for testing
 /// - Explicit single-track or full invalidation on HTTP 403 / 404
-@singleton
+@lazySingleton
 class YtmUrlCache {
   static const int defaultCapacity = 200;
   static const Duration defaultTtl = Duration(hours: 4);

@@ -22,6 +22,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 
 part 'painters/vinyl_deck.dart';
 part 'painters/vinyl_painters.dart';

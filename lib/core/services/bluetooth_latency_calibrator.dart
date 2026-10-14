@@ -59,7 +59,8 @@ class BluetoothLatencyCalibrator {
 
   BluetoothLatencyCalibrator({this.minMs = 0, this.maxMs = 500});
 
-  int clampOffset(int ms) => ms.clamp(minMs, maxMs);
+  int clampOffset(int ms) =>
+      minMs > maxMs ? ms.clamp(maxMs, minMs) : ms.clamp(minMs, maxMs);
 
   /// Interactive tap test: user taps when they HEAR each beep. [tapDeltasMs]
   /// holds tapTime - beepEmitTime per trial (includes ~180ms human reaction).

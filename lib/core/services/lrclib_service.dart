@@ -26,7 +26,7 @@ class _TrackCandidate {
       trackName.toLowerCase().hashCode ^ artistName.toLowerCase().hashCode;
 }
 
-@singleton
+@lazySingleton
 class LrclibService {
   final HttpClient _client;
 

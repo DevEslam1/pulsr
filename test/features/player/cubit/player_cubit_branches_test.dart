@@ -56,8 +56,10 @@ void main() {
         audioHandler: handler,
         repository: repo,
         toggleFavoriteUseCase: toggleFavorite,
-        settingsCubit: settingsCubit,
-        hiResAudioService: hiRes,
+        dependencies: PlayerDependencies(
+          settingsCubit: settingsCubit,
+          hiResAudioService: hiRes,
+        ),
       );
 
   group('mediaItem resolution', () {

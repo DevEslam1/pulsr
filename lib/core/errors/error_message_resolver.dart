@@ -65,6 +65,9 @@ String resolveUiErrorMessage(BuildContext context, String message) {
   if (message.startsWith('Failed to add ') && !message.contains(': ')) {
     return l10n.errAddFailed(message.substring('Failed to add '.length));
   }
+  if (message.startsWith('Failed to remove ') && !message.contains(': ')) {
+    return l10n.errRemoveTrack;
+  }
 
   final queueFull =
       RegExp(r'^Queue full \((\d+)\) - cannot add more$').firstMatch(message);
@@ -227,14 +230,17 @@ class ErrorMessageResolver {
         raw.contains('connection refused') ||
         raw.contains('timed out') ||
         raw.contains('clientexception')) {
-      return (l10n != null && l10n.localeName != 'en')
+      return l10n != null
           ? l10n.errYtmNoConnection
           : 'Network connection error. Please check your internet connection and retry.';
     }
     if (raw.contains('permissiondenied') ||
         raw.contains('permission_denied') ||
-        raw.contains('denied')) {
-      return (l10n != null && l10n.localeName != 'en')
+        raw.contains('permission denied') ||
+        raw.contains('storage permission') ||
+        raw.contains('read_media_audio') ||
+        raw.contains('read_external_storage')) {
+      return l10n != null
           ? l10n.downloadErrorPermission
           : 'Storage permission was denied. Please grant permission in system settings.';
     }
@@ -245,12 +251,12 @@ class ErrorMessageResolver {
       return 'Encountered unexpected or corrupt data format.';
     }
     if (raw.contains('quota') || raw.contains('429')) {
-      return (l10n != null && l10n.localeName != 'en')
+      return l10n != null
           ? l10n.downloadErrorRateLimited
           : 'Too many requests. Please wait a moment and try again.';
     }
     if (raw.contains('unsupported') || raw.contains('notsupported')) {
-      return (l10n != null && l10n.localeName != 'en')
+      return l10n != null
           ? l10n.errYtmUnavailable
           : 'This feature or audio format is not supported on this device.';
     }

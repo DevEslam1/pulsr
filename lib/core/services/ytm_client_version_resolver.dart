@@ -9,7 +9,7 @@ import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
 import '../utils/error_logger.dart';
 
-@singleton
+@lazySingleton
 class YtmClientVersionResolver {
   static const String _prefKeyClientVersion = 'ytm_cached_client_version';
   static const String _prefKeyApiKey = 'ytm_cached_api_key';

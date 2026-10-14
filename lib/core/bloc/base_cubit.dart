@@ -104,6 +104,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
         }
       },
       onError: (Object e, StackTrace s) {
+        if (_closed || isClosed) return;
         if (cancelOnError == true) {
           if (isInitialized) {
             _subs.remove(sub);
@@ -111,7 +112,6 @@ abstract class PulsrCubit<S> extends Cubit<S> {
             completedSynchronously = true;
           }
         }
-        if (_closed || isClosed) return;
         if (onError != null) {
           onError(e, s);
         } else {
@@ -119,6 +119,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
         }
       },
       onDone: () {
+        if (_closed || isClosed) return;
         if (isInitialized) {
           _subs.remove(sub);
         } else {
@@ -155,7 +156,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
   ///     removeFromComposite(_albumsSub);
   ///     _albumsSub = autoSub(...);
   void removeFromComposite(StreamSubscription<dynamic>? sub) {
-    if (sub == null) return;
+    if (sub == null || _closed) return;
     _subs.remove(sub);
   }
 
@@ -169,9 +170,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     return autoSub(
       stream,
       (data) {
-        if (!_closed && !isClosed) {
-          emit(reducer(state, data));
-        }
+        safeEmit(reducer(state, data));
       },
       onError: onError != null ? (e, s) => onError(state, e, s) : null,
     );

@@ -112,9 +112,11 @@ class AdvancedPlaybackBar extends StatelessWidget {
                               ? context.palette.info
                               : null,
                           onPressed: cubit.setAbPointA,
-                          icon: const Text('A',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800, fontSize: 13)),
+                          icon: _buildPointPill(
+                            context: context,
+                            label: 'A',
+                            isActive: state.abPointA != null,
+                          ),
                         ),
                         IconButton(
                           padding: EdgeInsets.zero,
@@ -126,9 +128,11 @@ class AdvancedPlaybackBar extends StatelessWidget {
                               ? context.palette.info
                               : null,
                           onPressed: cubit.setAbPointB,
-                          icon: const Text('B',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800, fontSize: 13)),
+                          icon: _buildPointPill(
+                            context: context,
+                            label: 'B',
+                            isActive: state.abPointB != null,
+                          ),
                         ),
                         IconButton(
                           padding: EdgeInsets.zero,
@@ -202,6 +206,38 @@ class AdvancedPlaybackBar extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildPointPill({
+    required BuildContext context,
+    required String label,
+    required bool isActive,
+  }) {
+    if (!isActive) {
+      return Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: context.palette.info.withValues(alpha: 0.16),
+        borderRadius: AppRadii.r6All,
+        border: Border.all(
+          color: context.palette.info.withValues(alpha: 0.5),
+          width: 1.0,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
+          color: context.palette.info,
+        ),
+      ),
     );
   }
 

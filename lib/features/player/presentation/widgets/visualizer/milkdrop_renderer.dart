@@ -79,7 +79,7 @@ class MilkdropGpuPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final t = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    final t = (DateTime.now().millisecondsSinceEpoch % 3600000) / 1000.0;
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
     shader.setFloat(2, t);
@@ -130,7 +130,7 @@ class MilkdropCanvasPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final t = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    final t = (DateTime.now().millisecondsSinceEpoch % 3600000) / 1000.0;
     final bass = _avg(0, 6);
     final mid = _avg(8, 18);
     final treb = _avg(22, 32);

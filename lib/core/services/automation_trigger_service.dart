@@ -2,6 +2,8 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 
 import '../../domain/models/audio_output_info.dart';
 import '../../data/services/device_profile_service.dart';
@@ -19,6 +21,7 @@ import 'automation_rules_service.dart';
 /// Charging ([AutomationTrigger.deviceCharging]) is **not** wired here because
 /// the app has no reliable charging-state observer in Dart; it is reported as
 /// unsupported by [supportsTrigger] so the UI can gate it instead of faking it.
+@lazySingleton
 class AutomationTriggerService with WidgetsBindingObserver {
   AutomationTriggerService({
     AutomationRulesService? rulesService,
@@ -34,11 +37,13 @@ class AutomationTriggerService with WidgetsBindingObserver {
   final AutomationRulesService _rulesService;
   final SettingsProfilesService _profilesService;
   final HiResAudioService _hiResAudioService;
+  final Mutex _fireMutex = Mutex();
 
   StreamSubscription<AudioOutputInfo>? _outputSub;
   String? _lastDeviceKey;
   bool _initialized = false;
   bool _started = false;
+  bool _streamReceivedFirstEvent = false;
 
   static T _resolve<T extends Object>(T Function() fallback) {
     try {
@@ -54,12 +59,13 @@ class AutomationTriggerService with WidgetsBindingObserver {
   void start() {
     if (_started) return;
     _started = true;
+    _streamReceivedFirstEvent = false;
     try {
       WidgetsBinding.instance.addObserver(this);
     } catch (_) {}
     try {
       _outputSub = _hiResAudioService.outputDeviceStream.listen(
-        _onOutputChanged,
+        _onStreamOutputChanged,
         onError: (Object e, StackTrace st) {
           ErrorLogger.log('Automation output stream error',
               error: e, stackTrace: st, category: 'AutomationTriggerService');
@@ -71,7 +77,6 @@ class AutomationTriggerService with WidgetsBindingObserver {
       ErrorLogger.log('Failed to observe output devices for automation',
           error: e, stackTrace: st, category: 'AutomationTriggerService');
     }
-    _initialized = true;
   }
 
   @override
@@ -79,6 +84,17 @@ class AutomationTriggerService with WidgetsBindingObserver {
     if (state != AppLifecycleState.resumed) return;
     final current = _hiResAudioService.currentOutputInfo;
     if (current != null) _onOutputChanged(current);
+  }
+
+  void _onStreamOutputChanged(AudioOutputInfo info) {
+    if (!_streamReceivedFirstEvent) {
+      _streamReceivedFirstEvent = true;
+      final key = DeviceProfileService.deviceKeyFromInfo(info);
+      _lastDeviceKey = key;
+      _initialized = true;
+      return;
+    }
+    _onOutputChanged(info);
   }
 
   void _onOutputChanged(AudioOutputInfo info) {
@@ -135,37 +151,40 @@ class AutomationTriggerService with WidgetsBindingObserver {
 
   Future<void> _fire(AutomationTrigger trigger) async {
     if (!supportsTrigger(trigger)) return;
-    try {
-      final rules = await _rulesService.getRules();
-      final matching = rules
-          .where((r) => r.enabled && r.trigger == trigger)
-          .toList(growable: false);
-      if (matching.isEmpty) return;
-      if (!getIt.isRegistered<PlayerCubit>()) return;
-      final PlayerCubit player;
-      if (getIt.isReadySync<PlayerCubit>()) {
-        player = getIt<PlayerCubit>();
-      } else {
-        player = await getIt.getAsync<PlayerCubit>();
-      }
-      final profiles = await _profilesService.getProfiles();
-      for (final rule in matching) {
-        SettingsProfile? profile;
-        for (final p in profiles) {
-          if (p.id == rule.targetProfileId) {
-            profile = p;
-            break;
-          }
+    await _fireMutex.protect(() async {
+      try {
+        final rules = await _rulesService.getRules();
+        final matching = rules
+            .where((r) => r.enabled && r.trigger == trigger)
+            .toList(growable: false);
+        if (matching.isEmpty) return;
+        if (!getIt.isRegistered<PlayerCubit>()) return;
+        final PlayerCubit player;
+        if (getIt.isReadySync<PlayerCubit>()) {
+          player = getIt<PlayerCubit>();
+        } else {
+          player = await getIt.getAsync<PlayerCubit>();
         }
-        if (profile == null) continue;
-        await player.applyProfile(profile, manual: true);
+        final profiles = await _profilesService.getProfiles();
+        for (final rule in matching) {
+          SettingsProfile? profile;
+          for (final p in profiles) {
+            if (p.id == rule.targetProfileId) {
+              profile = p;
+              break;
+            }
+          }
+          if (profile == null) continue;
+          await player.applyProfile(profile, manual: true);
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed to apply automation rule for ${trigger.name}',
+            error: e, stackTrace: st, category: 'AutomationTriggerService');
       }
-    } catch (e, st) {
-      ErrorLogger.log('Failed to apply automation rule for ${trigger.name}',
-          error: e, stackTrace: st, category: 'AutomationTriggerService');
-    }
+    });
   }
 
+  @disposeMethod
   void dispose() {
     _outputSub?.cancel();
     _outputSub = null;
@@ -174,6 +193,7 @@ class AutomationTriggerService with WidgetsBindingObserver {
     } catch (_) {}
     _started = false;
     _initialized = false;
+    _streamReceivedFirstEvent = false;
     _lastDeviceKey = null;
   }
 }

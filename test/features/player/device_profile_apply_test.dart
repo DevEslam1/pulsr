@@ -67,10 +67,12 @@ void main() {
       audioHandler: handler,
       repository: repo,
       toggleFavoriteUseCase: fav,
-      settingsCubit: settings,
-      settingsProfilesService: profilesService,
-      deviceProfileService: deviceService,
-      hiResAudioService: fakeHiRes,
+      dependencies: PlayerDependencies(
+        settingsCubit: settings,
+        settingsProfilesService: profilesService,
+        deviceProfileService: deviceService,
+        hiResAudioService: fakeHiRes,
+      ),
     );
   }
 

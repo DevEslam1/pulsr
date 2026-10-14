@@ -7,7 +7,7 @@ import 'package:injectable/injectable.dart';
 import '../config/app_config.dart';
 import '../utils/error_logger.dart';
 
-@singleton
+@lazySingleton
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   bool _googleSignInInitialized = false;
@@ -21,8 +21,25 @@ class AuthService {
       ? FirebaseAuth.instance.authStateChanges()
       : Stream<User?>.value(null);
 
+  Future<void>? _initFuture;
+
   Future<void> initialize() async {
     if (!AppConfig.isCloudSyncAllowed) return;
+    final inFlight = _initFuture;
+    if (inFlight != null) return inFlight;
+
+    final future = _performInitialize();
+    _initFuture = future;
+    try {
+      await future;
+    } finally {
+      if (_initFuture == future) {
+        _initFuture = null;
+      }
+    }
+  }
+
+  Future<void> _performInitialize() async {
     try {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp();

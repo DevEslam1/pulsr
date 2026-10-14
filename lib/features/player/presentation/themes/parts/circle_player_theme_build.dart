@@ -102,7 +102,9 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
             final centerDisplay = isInSplitView
                 ? circleStage
                 : AnimatedSwitcher(
-                    duration: context.motionMs(300),
+                    duration: context.motionMs(320),
+                    transitionBuilder: (child, anim) =>
+                        playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? LyricsView(
                             key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
@@ -115,7 +117,10 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
                             ? const NowPlayingQueueView(
                                 key: ValueKey('queue_view'),
                               )
-                            : circleStage,
+                            : KeyedSubtree(
+                                key: const ValueKey('stage_circle'),
+                                child: circleStage,
+                              ),
                   );
 
             final controlsColumn = PlayerControlsColumn(

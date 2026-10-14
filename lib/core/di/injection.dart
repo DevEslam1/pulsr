@@ -42,33 +42,42 @@ Future<void> configureDependencies() async {
     }
     // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
     // StateError (audio handler -> player cubit -> download cubit -> intents).
+    var audioHandlerReady = false;
     try {
       await getIt
           .getAsync<PulsrAudioHandler>()
           .timeout(const Duration(seconds: 12));
+      audioHandlerReady = true;
     } catch (e, st) {
       ErrorLogger.log('PulsrAudioHandler DI warm-up timed out or failed',
           error: e, stackTrace: st, category: 'DI');
     }
-    try {
-      await getIt.getAsync<PlayerCubit>().timeout(const Duration(seconds: 5));
-    } catch (e, st) {
-      ErrorLogger.log('PlayerCubit DI warm-up timed out or failed',
-          error: e, stackTrace: st, category: 'DI');
-    }
 
-    // Run post-player warm-up concurrently to reduce cold-start latency.
-    await Future.wait<void>([
-      _warmUpAsync<YtmDownloadCubit>('YtmDownloadCubit'),
-      _warmUpAsync<FileIntentHandler>('FileIntentHandler'),
-      _warmUpOverrideStores(),
-    ]);
+    if (audioHandlerReady) {
+      try {
+        await getIt.getAsync<PlayerCubit>().timeout(const Duration(seconds: 5));
+      } catch (e, st) {
+        ErrorLogger.log('PlayerCubit DI warm-up timed out or failed',
+            error: e, stackTrace: st, category: 'DI');
+      }
 
-    try {
-      await getIt.allReady().timeout(const Duration(seconds: 5));
-    } catch (e, st) {
-      ErrorLogger.log('getIt.allReady() warm-up timed out or failed',
-          error: e, stackTrace: st, category: 'DI');
+      // Run post-player warm-up concurrently to reduce cold-start latency.
+      await Future.wait<void>([
+        if (AppConfig.ytmEnabled)
+          _warmUpAsync<YtmDownloadCubit>('YtmDownloadCubit'),
+        _warmUpAsync<FileIntentHandler>('FileIntentHandler'),
+        _warmUpOverrideStores(),
+      ]);
+
+      try {
+        await getIt.allReady().timeout(const Duration(seconds: 5));
+      } catch (e, st) {
+        ErrorLogger.log('getIt.allReady() warm-up timed out or failed',
+            error: e, stackTrace: st, category: 'DI');
+      }
+    } else {
+      // Audio handler failed; skip dependent warm-ups to prevent a 27s stall.
+      await _warmUpOverrideStores();
     }
     validateDependencies(getIt);
   } finally {
@@ -118,7 +127,9 @@ void validateDependencies(GetIt getIt) {
   require<PulsrAudioHandler>();
   require<PlayerCubit>();
   require<DownloadsCubit>();
-  require<YtmDownloadCubit>();
+  if (AppConfig.ytmEnabled) {
+    require<YtmDownloadCubit>();
+  }
 }
 
 bool _isSingletonReady<T extends Object>() {

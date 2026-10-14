@@ -71,18 +71,27 @@ class _WaveformHeroStage extends StatelessWidget {
 
             // 1. Concentric Sonic Pulse Rings expanding from center
             Positioned.fill(
-              child: AnimatedBuilder(
-                animation: waveController,
-                builder: (context, _) {
-                  return RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _SonicRipplesPainter(
-                        color: activeColor,
-                        progress: waveController.value,
-                        isPlaying: isPlaying,
-                        baseRadius: artSize * 0.52,
-                      ),
-                    ),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0.0, end: isPlaying ? 1.0 : 0.0),
+                duration: context.motionMs(450),
+                curve: Curves.easeOutCubic,
+                builder: (context, fadeMultiplier, _) {
+                  if (fadeMultiplier <= 0.001) return const SizedBox.shrink();
+                  return AnimatedBuilder(
+                    animation: waveController,
+                    builder: (context, _) {
+                      return RepaintBoundary(
+                        child: CustomPaint(
+                          painter: _SonicRipplesPainter(
+                            color: activeColor,
+                            progress: waveController.value,
+                            isPlaying: isPlaying,
+                            baseRadius: artSize * 0.52,
+                            fadeMultiplier: fadeMultiplier,
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -107,61 +116,160 @@ class _WaveformHeroStage extends StatelessWidget {
               ),
             ),
 
-            // 3. Center Floating Artwork Squircle with Neon Shadow and Border
+            // 3. Center Floating Artwork Squircle with Neon Shadow, Border, and 3D Perspective Tilt
             Positioned(
-              child: Hero(
-                tag: 'now_playing_art_full',
-                child: Container(
-                  width: artSize,
-                  height: artSize,
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadii.circular(
-                        resolveCustomRadius(context, AppRadii.r28)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: activeColor.withValues(
-                            alpha: isPlaying ? 0.42 : 0.22),
-                        blurRadius: isPlaying ? 48 : 28,
-                        spreadRadius: isPlaying ? 4 : 1,
-                        offset: const Offset(0, 12),
-                      ),
-                      BoxShadow(
-                        color: AppColors.scrimAt(0.50),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: AppColors.specularAt(0.24),
-                      width: 1.5,
-                    ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: song != null
-                      ? CachedArtwork(
-                          id: song.id,
-                          albumId: song.albumId,
-                          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                          type: ArtworkType.AUDIO,
-                          size: artSize,
-                          borderRadius: 28,
-                          highQuality: true,
-                          fallbackIcon: Icons.music_note_rounded,
-                        )
-                      : Container(
-                          color: Colors.black26,
-                          child: Icon(
-                            Icons.music_note_rounded,
-                            size: artSize * 0.4,
-                            color: Colors.white54,
-                          ),
+              child: _TiltableArtworkSquircle(
+                size: artSize,
+                child: Hero(
+                  tag: 'now_playing_art_full',
+                  child: Container(
+                    width: artSize,
+                    height: artSize,
+                    decoration: BoxDecoration(
+                      borderRadius: AppRadii.circular(
+                          resolveCustomRadius(context, AppRadii.r28)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: activeColor.withValues(
+                              alpha: isPlaying ? 0.42 : 0.22),
+                          blurRadius: isPlaying ? 48 : 28,
+                          spreadRadius: isPlaying ? 4 : 1,
+                          offset: const Offset(0, 12),
                         ),
+                        BoxShadow(
+                          color: AppColors.scrimAt(0.50),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: AppColors.specularAt(0.24),
+                        width: 1.5,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: song != null
+                        ? CachedArtwork(
+                            id: song.id,
+                            albumId: song.albumId,
+                            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                            type: ArtworkType.AUDIO,
+                            size: artSize,
+                            borderRadius: 28,
+                            highQuality: true,
+                            fallbackIcon: Icons.music_note_rounded,
+                          )
+                        : Container(
+                            color: Colors.black26,
+                            child: Icon(
+                              Icons.music_note_rounded,
+                              size: artSize * 0.4,
+                              color: Colors.white54,
+                            ),
+                          ),
+                  ),
                 ),
               ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3D Perspective Tilt Squircle: Touch-responsive Matrix4 perspective rotation
+// ---------------------------------------------------------------------------
+class _TiltableArtworkSquircle extends StatefulWidget {
+  final Widget child;
+  final double size;
+
+  const _TiltableArtworkSquircle({
+    required this.child,
+    required this.size,
+  });
+
+  @override
+  State<_TiltableArtworkSquircle> createState() =>
+      _TiltableArtworkSquircleState();
+}
+
+class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _returnController;
+  late Animation<Offset> _returnAnimation;
+  Offset _tilt = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _returnController = AnimationController(vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _returnController.dispose();
+    super.dispose();
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    if (!mounted) return;
+    _returnController.stop();
+    final half = widget.size / 2;
+    if (half <= 0) return;
+    final dx = ((details.localPosition.dx - half) / half).clamp(-1.0, 1.0);
+    final dy = ((details.localPosition.dy - half) / half).clamp(-1.0, 1.0);
+    setState(() {
+      _tilt = Offset(dx, dy);
+    });
+  }
+
+  void _snapBack() {
+    if (!mounted || _tilt == Offset.zero) return;
+    final duration = context.motionMs(400);
+    _returnController.duration = duration;
+    _returnAnimation = Tween<Offset>(
+      begin: _tilt,
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _returnController,
+      curve: context.motionCurve(Curves.easeOutBack),
+    ));
+    _returnController.forward(from: 0.0);
+    _returnAnimation.addListener(() {
+      if (mounted) {
+        setState(() {
+          _tilt = _returnAnimation.value;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const double maxAngle = 0.22; // ~12.6 degrees
+    final transform = Matrix4.identity()
+      ..setEntry(3, 2, 0.001)
+      ..rotateX(-_tilt.dy * maxAngle)
+      ..rotateY(_tilt.dx * maxAngle);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (d) => _onPanUpdate(
+        DragUpdateDetails(
+          localPosition: d.localPosition,
+          globalPosition: d.globalPosition,
+        ),
+      ),
+      onPanUpdate: _onPanUpdate,
+      onPanEnd: (_) => _snapBack(),
+      onPanCancel: _snapBack,
+      child: Transform(
+        transform: transform,
+        alignment: Alignment.center,
+        child: widget.child,
+      ),
     );
   }
 }
@@ -174,17 +282,19 @@ class _SonicRipplesPainter extends CustomPainter {
   final double progress;
   final bool isPlaying;
   final double baseRadius;
+  final double fadeMultiplier;
 
   _SonicRipplesPainter({
     required this.color,
     required this.progress,
     required this.isPlaying,
     required this.baseRadius,
+    this.fadeMultiplier = 1.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (!isPlaying) return;
+    if (fadeMultiplier <= 0.001) return;
 
     final center = Offset(size.width / 2, size.height / 2);
     final maxExpansion = math.max(size.width, size.height) * 0.50;
@@ -193,8 +303,10 @@ class _SonicRipplesPainter extends CustomPainter {
     for (int i = 0; i < ringCount; i++) {
       final ringProgress = (progress + (i / ringCount)) % 1.0;
       final currentRadius = baseRadius + (ringProgress * maxExpansion);
-      // Smooth bell curve opacity: fades in, glows brightly, fades out gently
-      final alpha = (math.sin(ringProgress * math.pi) * 0.40).clamp(0.0, 1.0);
+      // Smooth bell curve opacity scaled by graceful fade-out multiplier
+      final alpha =
+          ((math.sin(ringProgress * math.pi) * 0.40) * fadeMultiplier)
+              .clamp(0.0, 1.0);
 
       final paint = Paint()
         ..style = PaintingStyle.stroke
@@ -210,7 +322,8 @@ class _SonicRipplesPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.isPlaying != isPlaying ||
         oldDelegate.color != color ||
-        oldDelegate.baseRadius != baseRadius;
+        oldDelegate.baseRadius != baseRadius ||
+        oldDelegate.fadeMultiplier != fadeMultiplier;
   }
 }
 
@@ -367,11 +480,22 @@ class _FluidAudioWavesPainter extends CustomPainter {
 // AUDIT-FIX: Clarify spectrum generation nature
 // Synthetic harmonic simulation; not driven by real FFT data.
 // ---------------------------------------------------------------------------
-class _GraphicSpectrumHud extends StatelessWidget {
+class _GraphicSpectrumHud extends StatefulWidget {
   final Color activeColor;
   final bool isPlaying;
   final AnimationController waveController;
 
+  const _GraphicSpectrumHud({
+    required this.activeColor,
+    required this.isPlaying,
+    required this.waveController,
+  });
+
+  @override
+  State<_GraphicSpectrumHud> createState() => _GraphicSpectrumHudState();
+}
+
+class _GraphicSpectrumHudState extends State<_GraphicSpectrumHud> {
   static const List<String> _bandLabels = [
     '32',
     '64',
@@ -385,11 +509,15 @@ class _GraphicSpectrumHud extends StatelessWidget {
     '16k',
   ];
 
-  const _GraphicSpectrumHud({
-    required this.activeColor,
-    required this.isPlaying,
-    required this.waveController,
-  });
+  late final List<double> _peaks;
+  late final List<int> _peakHoldFrames;
+
+  @override
+  void initState() {
+    super.initState();
+    _peaks = List.filled(_bandLabels.length, 0.0);
+    _peakHoldFrames = List.filled(_bandLabels.length, 0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -399,7 +527,7 @@ class _GraphicSpectrumHud extends StatelessWidget {
         color: const Color(0xFF0A0C12).withValues(alpha: 0.85),
         borderRadius: AppRadii.r8All,
         border: Border.all(
-          color: activeColor.withValues(alpha: 0.28),
+          color: widget.activeColor.withValues(alpha: 0.28),
           width: 1,
         ),
         boxShadow: [
@@ -411,19 +539,37 @@ class _GraphicSpectrumHud extends StatelessWidget {
         ],
       ),
       child: AnimatedBuilder(
-        animation: waveController,
+        animation: widget.waveController,
         builder: (context, _) {
-          final t = waveController.value * 2 * math.pi;
+          final t = widget.waveController.value * 2 * math.pi;
 
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: List.generate(_bandLabels.length, (index) {
               // Synthetic harmonic multi-band visualizer simulation based on audio phase
-              final double harmonic = isPlaying
+              final double harmonic = widget.isPlaying
                   ? (math.sin(t * 1.8 + index * 0.9).abs() * 0.65 +
                       math.cos(t * 0.9 - index * 0.4).abs() * 0.35)
                   : 0.12;
-              final int activeSegments = (harmonic * 6).clamp(1, 6).round();
+              final double currentSegments = harmonic * 6;
+              final int activeSegments = currentSegments.clamp(1, 6).round();
+
+              if (widget.isPlaying) {
+                if (currentSegments >= _peaks[index]) {
+                  _peaks[index] = currentSegments;
+                  _peakHoldFrames[index] = 14;
+                } else {
+                  if (_peakHoldFrames[index] > 0) {
+                    _peakHoldFrames[index]--;
+                  } else {
+                    _peaks[index] = math.max(1.0, _peaks[index] - 0.14);
+                  }
+                }
+              } else {
+                _peaks[index] = 1.0;
+                _peakHoldFrames[index] = 0;
+              }
+              final int peakSeg = (_peaks[index] - 0.5).round().clamp(0, 5);
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2.2),
@@ -431,22 +577,45 @@ class _GraphicSpectrumHud extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Vertical LED segments
-                    for (int seg = 5; seg >= 0; seg--)
-                      Container(
-                        width: 8,
-                        height: 2.2,
-                        margin: const EdgeInsets.symmetric(vertical: 0.6),
-                        decoration: BoxDecoration(
-                          color: seg < activeSegments
-                              ? (seg >= 4
-                                  ? Colors.redAccent
-                                  : (seg >= 3
-                                      ? Colors.amberAccent
-                                      : activeColor))
-                              : Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(0.8),
-                        ),
-                      ),
+                    for (int seg = 5; seg >= 0; seg--) ...[
+                      Builder(builder: (_) {
+                        final bool isActive = seg < activeSegments;
+                        final bool isPeak = seg == peakSeg && widget.isPlaying;
+                        Color segColor;
+                        if (isActive || isPeak) {
+                          if (seg >= 4) {
+                            segColor = Colors.redAccent;
+                          } else if (seg >= 3) {
+                            segColor = Colors.amberAccent;
+                          } else {
+                            segColor = widget.activeColor;
+                          }
+                          if (!isActive && isPeak) {
+                            segColor = segColor.withValues(alpha: 0.95);
+                          }
+                        } else {
+                          segColor = Colors.white.withValues(alpha: 0.08);
+                        }
+
+                        return Container(
+                          width: 8,
+                          height: 2.2,
+                          margin: const EdgeInsets.symmetric(vertical: 0.6),
+                          decoration: BoxDecoration(
+                            color: segColor,
+                            borderRadius: BorderRadius.circular(0.8),
+                            boxShadow: isPeak
+                                ? [
+                                    BoxShadow(
+                                      color: segColor.withValues(alpha: 0.6),
+                                      blurRadius: 2,
+                                    )
+                                  ]
+                                : null,
+                          ),
+                        );
+                      }),
+                    ],
                     const SizedBox(height: 2),
                     // Frequency Label
                     Text(

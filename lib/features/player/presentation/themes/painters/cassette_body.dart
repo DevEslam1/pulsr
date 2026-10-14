@@ -235,23 +235,12 @@ class _CassetteBody extends StatelessWidget {
             child: _CassetteTapeCounter(progress: progress),
           ),
 
-          // 3. Horizontal Magnetic Tape Ribbon Path
-          PositionedDirectional(
-            bottom: 28,
-            start: 54,
-            end: 54,
-            height: 14,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF281810),
-                    Color(0xFF482D1F),
-                    Color(0xFF281810),
-                  ],
-                ),
-                borderRadius: AppRadii.r4All,
-                border: Border.all(color: Colors.black87, width: 0.75),
+          // 3. Tangent Magnetic Tape Ribbon Path & Corner Guide Rollers
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _MagneticTapePathPainter(
+                leftTapeRadius: leftTapeRadius,
+                rightTapeRadius: rightTapeRadius,
               ),
             ),
           ),
@@ -495,19 +484,38 @@ class _CassetteTapeCounter extends StatelessWidget {
         children: [
           for (int i = 0; i < 3; i++)
             Container(
+              width: 14,
+              height: 16,
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
               decoration: BoxDecoration(
                 color: const Color(0xFF14161C),
                 borderRadius: BorderRadius.circular(2),
               ),
-              child: Text(
-                digits[i],
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
+              clipBehavior: Clip.hardEdge,
+              alignment: Alignment.center,
+              child: AnimatedSwitcher(
+                duration: context.motionMs(200),
+                transitionBuilder: (child, animation) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.0, -1.0),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: context.motionCurve(Curves.easeOutCubic),
+                    )),
+                    child: child,
+                  );
+                },
+                child: Text(
+                  digits[i],
+                  key: ValueKey<String>('counter_${i}_${digits[i]}'),
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -518,7 +526,7 @@ class _CassetteTapeCounter extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Stereo Dancing VU Meter for Cassette Label
+// Stereo Dancing VU Meter for Cassette Label (Segmented LEDs & Peak-Hold Dot)
 // ---------------------------------------------------------------------------
 class _CassetteStereoVuMeter extends StatefulWidget {
   final Color activeColor;
@@ -536,6 +544,10 @@ class _CassetteStereoVuMeter extends StatefulWidget {
 class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
     with SingleTickerProviderStateMixin {
   late final AnimationController _vuController;
+  double _leftPeak = 0.08;
+  double _rightPeak = 0.08;
+  int _leftPeakHold = 0;
+  int _rightPeakHold = 0;
 
   @override
   void initState() {
@@ -568,31 +580,73 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
     super.dispose();
   }
 
+  void _updatePeaks(double leftLevel, double rightLevel) {
+    if (leftLevel >= _leftPeak) {
+      _leftPeak = leftLevel;
+      _leftPeakHold = 14;
+    } else if (_leftPeakHold > 0) {
+      _leftPeakHold--;
+    } else {
+      _leftPeak = math.max(0.08, _leftPeak - 0.035);
+    }
+
+    if (rightLevel >= _rightPeak) {
+      _rightPeak = rightLevel;
+      _rightPeakHold = 14;
+    } else if (_rightPeakHold > 0) {
+      _rightPeakHold--;
+    } else {
+      _rightPeak = math.max(0.08, _rightPeak - 0.035);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _vuController,
       builder: (context, _) {
         final val = _vuController.value;
-        final leftLevel = widget.isPlaying ? (0.35 + (val * 0.60)) : 0.08;
-        final rightLevel = widget.isPlaying
-            ? (0.30 + ((1.0 - val) * 0.65)).clamp(0.1, 1.0)
+        final theta = val * 2 * math.pi;
+
+        // Common rhythmic beat foundation (L and R pulse together)
+        final beatBase =
+            math.sin(theta).abs() * 0.45 + (math.sin(theta * 2.0).abs() * 0.22);
+
+        // Independent harmonic stereo components at prime ratios
+        final leftHarmonic = math.sin(theta * 3.0 + 0.4).abs() * 0.18 +
+            math.cos(theta * 7.0).abs() * 0.08;
+        final rightHarmonic = math.cos(theta * 5.0 - 0.5).abs() * 0.18 +
+            math.sin(theta * 11.0).abs() * 0.08;
+
+        final leftLevel = widget.isPlaying
+            ? (0.16 + beatBase + leftHarmonic).clamp(0.08, 0.98)
             : 0.08;
+        final rightLevel = widget.isPlaying
+            ? (0.16 + beatBase + rightHarmonic).clamp(0.08, 0.98)
+            : 0.08;
+
+        _updatePeaks(leftLevel, rightLevel);
 
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _buildVuBar('L', leftLevel),
+            _buildVuBar('L', leftLevel, _leftPeak),
             const SizedBox(height: 2.5),
-            _buildVuBar('R', rightLevel),
+            _buildVuBar('R', rightLevel, _rightPeak),
           ],
         );
       },
     );
   }
 
-  Widget _buildVuBar(String channel, double level) {
+  Widget _buildVuBar(String channel, double level, double peak) {
+    const int totalSegments = 10;
+    final int activeSegCount =
+        (level * totalSegments).clamp(0, totalSegments).round();
+    final int peakSegIndex =
+        (peak * totalSegments).clamp(1, totalSegments).round() - 1;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -606,35 +660,47 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
         ),
         const SizedBox(width: 4),
         Container(
-          width: 58,
-          height: 4.5,
+          padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.0),
           decoration: BoxDecoration(
-            color: Colors.black54,
+            color: Colors.black87,
             borderRadius: BorderRadius.circular(2),
+            border: Border.all(color: Colors.white12, width: 0.6),
           ),
-          clipBehavior: Clip.antiAlias,
           child: Row(
-            children: [
-              Expanded(
-                flex: (level * 100).toInt().clamp(5, 100),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.greenAccent.shade400,
-                        Colors.amberAccent,
-                        Colors.redAccent,
-                      ],
-                      stops: const [0.6, 0.85, 1.0],
-                    ),
-                  ),
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(totalSegments, (idx) {
+              final isLit = idx < activeSegCount;
+              final isPeak = idx == peakSegIndex && idx >= activeSegCount;
+              final Color baseColor = idx >= 8
+                  ? const Color(0xFFFF1744)
+                  : (idx >= 6
+                      ? const Color(0xFFFFD600)
+                      : const Color(0xFF00E676));
+
+              final Color segColor = isLit
+                  ? baseColor
+                  : (isPeak
+                      ? baseColor.withValues(alpha: 0.95)
+                      : Colors.white.withValues(alpha: 0.08));
+
+              return Container(
+                width: 4.2,
+                height: 4.0,
+                margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                decoration: BoxDecoration(
+                  color: segColor,
+                  borderRadius: BorderRadius.circular(0.8),
+                  boxShadow: (isLit || isPeak)
+                      ? [
+                          BoxShadow(
+                            color: baseColor.withValues(alpha: 0.65),
+                            blurRadius: 2.5,
+                          ),
+                        ]
+                      : null,
                 ),
-              ),
-              Expanded(
-                flex: ((1.0 - level) * 100).toInt().clamp(0, 95),
-                child: const SizedBox.shrink(),
-              ),
-            ],
+              );
+            }),
           ),
         ),
       ],
@@ -742,4 +808,118 @@ class _SpoolTeethPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _MagneticTapePathPainter extends CustomPainter {
+  final double leftTapeRadius;
+  final double rightTapeRadius;
+
+  _MagneticTapePathPainter({
+    required this.leftTapeRadius,
+    required this.rightTapeRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // Spool centers (matching Row padding 28 + spool radius 45)
+    final leftCenter = Offset(73.0, h / 2);
+    final rightCenter = Offset(w - 73.0, h / 2);
+
+    // Guide roller centers near lower corners
+    final leftRoller = Offset(44.0, h - 22.0);
+    final rightRoller = Offset(w - 44.0, h - 22.0);
+    const rollerRadius = 5.5;
+
+    // Outer tangent start on left tape pack
+    final leftTangent = Offset(
+      leftCenter.dx - leftTapeRadius * 0.96,
+      leftCenter.dy + leftTapeRadius * 0.28,
+    );
+
+    // Outer tangent end on right tape pack
+    final rightTangent = Offset(
+      rightCenter.dx + rightTapeRadius * 0.96,
+      rightCenter.dy + rightTapeRadius * 0.28,
+    );
+
+    // --- 1. Guide Rollers (Metallic Bushings & Pins) ---
+    final rollerBushingPaint = Paint()
+      ..color = const Color(0xFFC89E48)
+      ..style = PaintingStyle.fill;
+
+    final rollerRimPaint = Paint()
+      ..color = const Color(0xFF4A4E62)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    final rollerAxlePaint = Paint()
+      ..color = const Color(0xFF14161F)
+      ..style = PaintingStyle.fill;
+
+    for (final roller in [leftRoller, rightRoller]) {
+      canvas.drawCircle(roller, rollerRadius, rollerBushingPaint);
+      canvas.drawCircle(roller, rollerRadius, rollerRimPaint);
+      canvas.drawCircle(roller, 2.0, rollerAxlePaint);
+    }
+
+    // --- 2. Magnetic Tape Ribbon Path ---
+    final tapePath = Path();
+    tapePath.moveTo(leftTangent.dx, leftTangent.dy);
+    // Line down to left guide roller outer edge
+    tapePath.lineTo(leftRoller.dx - rollerRadius + 1.0, leftRoller.dy);
+    // Wrap around bottom of left roller
+    tapePath.quadraticBezierTo(
+      leftRoller.dx,
+      leftRoller.dy + rollerRadius,
+      leftRoller.dx + rollerRadius + 4.0,
+      leftRoller.dy + rollerRadius - 1.0,
+    );
+    // Straight across the bottom read-head aperture notch
+    tapePath.lineTo(
+      rightRoller.dx - rollerRadius - 4.0,
+      rightRoller.dy + rollerRadius - 1.0,
+    );
+    // Wrap around bottom of right roller
+    tapePath.quadraticBezierTo(
+      rightRoller.dx,
+      rightRoller.dy + rollerRadius,
+      rightRoller.dx + rollerRadius - 1.0,
+      rightRoller.dy,
+    );
+    // Angled up to right tape pack outer tangent
+    tapePath.lineTo(rightTangent.dx, rightTangent.dy);
+
+    // Ferric oxide dark magnetic tape body
+    final tapePaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: const [
+          Color(0xFF382015),
+          Color(0xFF4A2B1D),
+          Color(0xFF26140D),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 7.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // Specular sheen highlight along the tape edge
+    final sheenPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    canvas.drawPath(tapePath, tapePaint);
+    canvas.drawPath(tapePath, sheenPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MagneticTapePathPainter oldDelegate) =>
+      oldDelegate.leftTapeRadius != leftTapeRadius ||
+      oldDelegate.rightTapeRadius != rightTapeRadius;
 }

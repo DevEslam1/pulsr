@@ -281,9 +281,9 @@ class PlayerThemeScaffold extends StatelessWidget {
 
                 final resolvedTopBar = topBar ?? PlayerHeaderBar(props: props);
 
-                final Widget resolvedCenter;
+                final Widget resolvedChild;
                 if (showLyricsAndQueueOverlays && state.isLyricsVisible) {
-                  resolvedCenter = LyricsView(
+                  resolvedChild = LyricsView(
                     key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
                     lyrics: state.lyrics,
                     isLoading: state.isLoadingLyrics,
@@ -291,10 +291,24 @@ class PlayerThemeScaffold extends StatelessWidget {
                     source: state.lyricsSource,
                   );
                 } else if (showLyricsAndQueueOverlays && state.isQueueVisible) {
-                  resolvedCenter = const NowPlayingQueueView();
+                  resolvedChild =
+                      const NowPlayingQueueView(key: ValueKey('queue_view'));
                 } else {
-                  resolvedCenter = body(context, metrics);
+                  resolvedChild = KeyedSubtree(
+                    key: const ValueKey('stage_body'),
+                    child: body(context, metrics),
+                  );
                 }
+
+                final Widget resolvedCenter = showLyricsAndQueueOverlays
+                    ? AnimatedSwitcher(
+                        duration: context.motionMs(320),
+                        transitionBuilder: (child, anim) =>
+                            playerOverlayTransitionBuilder(
+                                context, child, anim),
+                        child: resolvedChild,
+                      )
+                    : resolvedChild;
 
                 final Widget resolvedSeekBar = seekBar != null
                     ? seekBar!(context, metrics)

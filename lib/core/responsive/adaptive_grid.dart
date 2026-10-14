@@ -48,8 +48,10 @@ class PulsrAdaptiveGrid {
           case PulsrBreakpoint.expanded:
             return isLandscape ? 5 : 4;
           case PulsrBreakpoint.large:
+            final itemWidth =
+                math.max(1.0, (customMinItemWidth ?? minCardWidth).toDouble());
             final calculated =
-                (width / (customMinItemWidth ?? minCardWidth)).floor();
+                (math.max(0.0, width) / itemWidth).floor();
             return calculated.clamp(6, 8);
         }
 
@@ -75,10 +77,11 @@ class PulsrAdaptiveGrid {
     double? maxColumns,
   }) {
     final vp = PulsrViewport.of(context);
-    final availableWidth =
-        math.min(vp.width, vp.contentMaxWidth) - (vp.pagePadding * 2);
-    int cols = (availableWidth / (minItemWidth + spacing)).floor();
-    if (maxColumns != null) cols = cols.clamp(1, maxColumns.toInt());
+    final availableWidth = math.max(
+        0.0, math.min(vp.width, vp.contentMaxWidth) - (vp.pagePadding * 2));
+    final divisor = math.max(1.0, minItemWidth + spacing);
+    int cols = (availableWidth / divisor).floor();
+    if (maxColumns != null) cols = cols.clamp(1, math.max(1, maxColumns.toInt()));
     return cols.clamp(1, 12);
   }
 
@@ -127,8 +130,11 @@ class PulsrAdaptiveGrid {
     final pad = horizontalPadding ?? (vp.pagePadding * 2);
     final width = math.min(vp.width, vp.contentMaxWidth);
     final usableWidth = math.max(0.0, width - pad);
-    final count = (usableWidth / minItemWidth).floor();
-    return count.clamp(minColumns, maxColumns);
+    final divisor = math.max(1.0, minItemWidth);
+    final count = (usableWidth / divisor).floor();
+    final effectiveMin = math.min(minColumns, maxColumns);
+    final effectiveMax = math.max(minColumns, maxColumns);
+    return count.clamp(effectiveMin, effectiveMax);
   }
 }
 

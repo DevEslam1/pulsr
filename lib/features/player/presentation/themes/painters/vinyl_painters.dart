@@ -2,8 +2,12 @@ part of '../vinyl_player_theme.dart';
 
 class _VinylGroovesPainter extends CustomPainter {
   final Color activeColor;
+  final double rotationPhase;
 
-  _VinylGroovesPainter({required this.activeColor});
+  _VinylGroovesPainter({
+    required this.activeColor,
+    this.rotationPhase = 0.0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -23,10 +27,11 @@ class _VinylGroovesPainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, basePaint);
 
-    // 2. Bilateral specular reflection (the classic vinyl "butterfly" sheen)
+    // 2. Bilateral specular reflection (counter-rotating to stay anchored to virtual light source)
     final sheenPaint = Paint()
       ..shader = SweepGradient(
         center: Alignment.center,
+        transform: GradientRotation(-rotationPhase * 2 * math.pi),
         colors: [
           AppColors.specularAt(0.0),
           AppColors.specularAt(0.08),
@@ -80,10 +85,20 @@ class _VinylGroovesPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _VinylGroovesPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _VinylGroovesPainter oldDelegate) =>
+      oldDelegate.activeColor != activeColor ||
+      oldDelegate.rotationPhase != rotationPhase;
 }
 
 class _PlatterStrobePainter extends CustomPainter {
+  final Color activeColor;
+  final bool isPlaying;
+
+  _PlatterStrobePainter({
+    this.activeColor = const Color(0xFFE22D2D),
+    this.isPlaying = true,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -104,22 +119,62 @@ class _PlatterStrobePainter extends CustomPainter {
       ..strokeWidth = 4.0;
     canvas.drawCircle(center, radius - 2, bevelPaint);
 
-    // Strobe dots (like Technics SL-1200)
-    final dotPaint = Paint()
-      ..color = AppColors.specularAt(0.5)
-      ..style = PaintingStyle.fill;
+    // Strobe lamp position (bottom-left quadrant at ~2.4 rad)
+    const lampAngle = 2.4;
+    final lampPos = Offset(
+      center.dx + (radius - 2) * math.cos(lampAngle),
+      center.dy + (radius - 2) * math.sin(lampAngle),
+    );
 
+    // Quartz-lock lamp ambient halo when playing
+    if (isPlaying) {
+      final haloPaint = Paint()
+        ..color = activeColor.withValues(alpha: 0.35)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      canvas.drawCircle(lampPos, 10.0, haloPaint);
+    }
+
+    // Strobe dots (Technics SL-1200 style with localized illumination)
     const numDots = 48;
     for (int i = 0; i < numDots; i++) {
       final angle = (i * 2 * math.pi) / numDots;
       final x = center.dx + (radius - 2) * math.cos(angle);
       final y = center.dy + (radius - 2) * math.sin(angle);
-      canvas.drawCircle(Offset(x, y), 0.9, dotPaint);
+
+      Color dotColor = AppColors.specularAt(0.5);
+      double dotRadius = 0.9;
+
+      if (isPlaying) {
+        double diff = (angle - lampAngle).abs();
+        while (diff > math.pi) {
+          diff = (2 * math.pi - diff).abs();
+        }
+        if (diff < 0.55) {
+          final intensity = (1.0 - (diff / 0.55)).clamp(0.0, 1.0);
+          dotColor = Color.lerp(dotColor, activeColor, intensity)!;
+          dotRadius = 0.9 + (0.5 * intensity);
+
+          // Subtle dot bloom under direct illumination
+          if (intensity > 0.4) {
+            final bloomPaint = Paint()
+              ..color = activeColor.withValues(alpha: 0.5 * intensity)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+            canvas.drawCircle(Offset(x, y), dotRadius * 1.6, bloomPaint);
+          }
+        }
+      }
+
+      final dotPaint = Paint()
+        ..color = dotColor
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(x, y), dotRadius, dotPaint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PlatterStrobePainter oldDelegate) =>
+      oldDelegate.activeColor != activeColor ||
+      oldDelegate.isPlaying != isPlaying;
 }
 
 class _TonearmPainter extends CustomPainter {
@@ -127,6 +182,7 @@ class _TonearmPainter extends CustomPainter {
   final double angle;
   final Color activeColor;
   final double armLength;
+  final double liftProgress;
 
   static const double _gimbalRadius = 22.0;
   static const double _screwCircleRadius = 16.0;
@@ -139,6 +195,7 @@ class _TonearmPainter extends CustomPainter {
     required this.angle,
     required this.activeColor,
     required this.armLength,
+    this.liftProgress = 1.0,
   });
 
   @override
@@ -252,14 +309,18 @@ class _TonearmPainter extends CustomPainter {
     shadowPath.cubicTo(6, l * 0.30, -8, l * 0.65, -3, l * 0.90);
     shadowPath.lineTo(-6, l);
 
+    final p = liftProgress.clamp(0.0, 1.0);
+    final offset = Offset.lerp(const Offset(11, 13), const Offset(3.5, 4.0), p)!;
+    final blurSigma = 7.0 + (2.5 - 7.0) * p;
+
     final shadowPaint = Paint()
       ..color = AppColors.scrimLight
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.5
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurSigma);
 
     canvas.save();
-    canvas.translate(7, 7);
+    canvas.translate(offset.dx, offset.dy);
     canvas.drawPath(shadowPath, shadowPaint);
     canvas.restore();
   }
@@ -393,6 +454,7 @@ class _TonearmPainter extends CustomPainter {
     return oldDelegate.angle != angle ||
         oldDelegate.activeColor != activeColor ||
         oldDelegate.armLength != armLength ||
-        oldDelegate.pivot != pivot;
+        oldDelegate.pivot != pivot ||
+        oldDelegate.liftProgress != liftProgress;
   }
 }

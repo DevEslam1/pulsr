@@ -1,4 +1,5 @@
 // lib/core/responsive/two_pane_scaffold.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
@@ -81,8 +82,10 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
-        final computedMasterWidth =
+        final maxAllowedMaster = math.max(0.0, totalWidth - 80.0);
+        final baseMaster =
             masterWidth ?? (totalWidth * listWidthRatio).clamp(280.0, 480.0);
+        final computedMasterWidth = baseMaster.clamp(0.0, maxAllowedMaster);
 
         Widget body = Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -111,19 +114,30 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
         );
 
         if (applyDockPadding) {
-          body = ValueListenableBuilder<double>(
-            valueListenable: PulsrDockTracker.dockHeight,
-            builder: (context, dockHeight, child) {
-              final safeBottom = MediaQuery.paddingOf(context).bottom;
-              final effectiveBottom =
-                  dockHeight > 0 ? (dockHeight + safeBottom) : safeBottom;
-              return Padding(
-                padding: EdgeInsets.only(bottom: effectiveBottom),
-                child: child,
-              );
-            },
-            child: body,
-          );
+          final scoped =
+              context.dependOnInheritedWidgetOfExactType<PulsrDockScope>();
+          final safeBottom = MediaQuery.paddingOf(context).bottom;
+          if (scoped != null) {
+            final effectiveBottom =
+                scoped.height > 0 ? (scoped.height + safeBottom) : safeBottom;
+            body = Padding(
+              padding: EdgeInsets.only(bottom: effectiveBottom),
+              child: body,
+            );
+          } else {
+            body = ValueListenableBuilder<double>(
+              valueListenable: PulsrDockTracker.dockHeight,
+              builder: (context, dockHeight, child) {
+                final effectiveBottom =
+                    dockHeight > 0 ? (dockHeight + safeBottom) : safeBottom;
+                return Padding(
+                  padding: EdgeInsets.only(bottom: effectiveBottom),
+                  child: child,
+                );
+              },
+              child: body,
+            );
+          }
         }
 
         return body;

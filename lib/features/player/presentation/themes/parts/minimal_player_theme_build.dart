@@ -117,7 +117,7 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                           child: AspectRatio(
                             aspectRatio: 1.0,
                             child: Hero(
-                              tag: 'now_playing_art_minimal',
+                              tag: 'now_playing_art_full',
                               child: Container(
                                 decoration: BoxDecoration(
                                   borderRadius: AppRadii.circular(
@@ -174,7 +174,9 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
             final centerDisplay = isInSplitView
                 ? artworkDisplay
                 : AnimatedSwitcher(
-                    duration: context.motionMs(300),
+                    duration: context.motionMs(320),
+                    transitionBuilder: (child, anim) =>
+                        playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? LyricsView(
                             key: ValueKey(
@@ -188,7 +190,10 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                             ? const NowPlayingQueueView(
                                 key: ValueKey('queue_view_minimal'),
                               )
-                            : artworkDisplay,
+                            : KeyedSubtree(
+                                key: const ValueKey('stage_minimal'),
+                                child: artworkDisplay,
+                              ),
                   );
 
             final controlsColumn = PlayerControlsColumn(
@@ -322,6 +327,7 @@ class _MinimalAudiophileTelemetry extends StatelessWidget {
   Widget build(BuildContext context) {
     if (song == null) return const SizedBox.shrink();
 
+    final p = context.palette;
     final ext = (song!.codec != null && song!.codec!.isNotEmpty)
         ? song!.codec!.toUpperCase()
         : (song!.path.contains('.')
@@ -340,55 +346,55 @@ class _MinimalAudiophileTelemetry extends StatelessWidget {
     return MediaQuery.withNoTextScaling(
       child: Container(
         margin: const EdgeInsets.only(top: AppSpacing.s10),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: AppRadii.r8All,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
-          width: 0.8,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: AppRadii.r8All,
+          border: Border.all(
+            color: p.hairline,
+            width: 0.8,
+          ),
         ),
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildChip(ext, isAccent: true),
-            _buildDivider(),
-            _buildChip(sampleRateStr),
-            _buildDivider(),
-            _buildChip(bitDepthStr),
-            if (bitrateStr != null) ...[
-              _buildDivider(),
-              _buildChip(bitrateStr),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildChip(ext, textColor: activeColor),
+              _buildDivider(p.hairline),
+              _buildChip(sampleRateStr, textColor: p.textSecondary),
+              _buildDivider(p.hairline),
+              _buildChip(bitDepthStr, textColor: p.textSecondary),
+              if (bitrateStr != null) ...[
+                _buildDivider(p.hairline),
+                _buildChip(bitrateStr, textColor: p.textSecondary),
+              ],
             ],
-          ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-  Widget _buildChip(String label, {bool isAccent = false}) {
+  Widget _buildChip(String label, {required Color textColor}) {
     return Text(
       label,
       style: TextStyle(
         fontFamily: 'monospace',
         fontSize: 9.5,
         fontWeight: FontWeight.w800,
-        color: isAccent ? activeColor : Colors.white70,
+        color: textColor,
         letterSpacing: 0.6,
       ),
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(Color dividerColor) {
     return Container(
       width: 1,
       height: 9,
       margin: const EdgeInsets.symmetric(horizontal: 7),
-      color: Colors.white24,
+      color: dividerColor,
     );
   }
 }
