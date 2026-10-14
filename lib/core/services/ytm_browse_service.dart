@@ -46,16 +46,22 @@ class YtmBrowseSection {
   });
 }
 
+typedef YtmClockFn = DateTime Function();
+
 @singleton
 class YtmBrowseService {
   final YtmService _ytmService;
-  final DateTime Function() _now;
+  final YtmClockFn _now;
   static const Duration _cacheTtl = Duration(hours: 6);
   DateTime? _lastFetchTime;
   List<YtmBrowseSection>? _cachedSections;
   Completer<List<YtmBrowseSection>>? _pendingFeed;
 
-  YtmBrowseService(this._ytmService, {DateTime Function()? clock})
+  @factoryMethod
+  static YtmBrowseService create(YtmService ytmService) =>
+      YtmBrowseService(ytmService);
+
+  YtmBrowseService(this._ytmService, {YtmClockFn? clock})
       : _now = clock ?? DateTime.now;
 
   /// Clears in-memory browse feed cache upon network/region changes.

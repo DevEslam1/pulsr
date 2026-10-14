@@ -13,9 +13,6 @@ import 'package:pulsr/data/audio/per_song_eq_store.dart';
 import 'package:pulsr/data/audio/per_song_volume_store.dart';
 import 'package:pulsr/data/audio/song_rating_store.dart';
 import 'package:pulsr/data/db/app_database.dart';
-import 'package:pulsr/data/repositories/lyrics_repository.dart';
-import 'package:pulsr/data/services/download_service.dart';
-import 'package:pulsr/data/services/spotify_importer_service.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
@@ -35,16 +32,6 @@ Future<void> get initializationReady => _initializationReady.future;
 Future<void> configureDependencies() async {
   try {
     getIt.init();
-    if (!getIt.isRegistered<LyricsRepository>()) {
-      getIt.registerLazySingleton<LyricsRepository>(() => LyricsRepository());
-    }
-    if (!getIt.isRegistered<DownloadService>()) {
-      getIt.registerLazySingleton<DownloadService>(() => DownloadService());
-    }
-    if (!getIt.isRegistered<SpotifyImporterService>()) {
-      getIt.registerLazySingleton<SpotifyImporterService>(
-          () => SpotifyImporterService());
-    }
     if (!getIt.isRegistered<DiscordRpcService>()) {
       getIt.registerLazySingleton<DiscordRpcService>(
           () => DiscordRpcService.instance);
@@ -69,36 +56,14 @@ Future<void> configureDependencies() async {
       ErrorLogger.log('PlayerCubit DI warm-up timed out or failed',
           error: e, stackTrace: st, category: 'DI');
     }
-    try {
-      await getIt
-          .getAsync<YtmDownloadCubit>()
-          .timeout(const Duration(seconds: 5));
-    } catch (e, st) {
-      ErrorLogger.log('YtmDownloadCubit DI warm-up timed out or failed',
-          error: e, stackTrace: st, category: 'DI');
-    }
-    try {
-      await getIt
-          .getAsync<FileIntentHandler>()
-          .timeout(const Duration(seconds: 5));
-    } catch (e, st) {
-      ErrorLogger.log('FileIntentHandler DI warm-up timed out or failed',
-          error: e, stackTrace: st, category: 'DI');
-    }
-    // Per-song override stores load their SharedPreferences map asynchronously
-    // in their constructors; sync getters (player cubit per-track sync, smart
-    // playlist filters, song-info sheet) must never observe the empty pre-load
-    // map. Await their `ready` futures so the first UI read is authoritative.
-    try {
-      await Future.wait<void>([
-        getIt<SongRatingStore>().ready,
-        getIt<PerSongEqStore>().ready,
-        getIt<PerSongVolumeStore>().ready,
-      ]).timeout(const Duration(seconds: 5));
-    } catch (e, st) {
-      ErrorLogger.log('Per-song override store warm-up timed out or failed',
-          error: e, stackTrace: st, category: 'DI');
-    }
+
+    // Run post-player warm-up concurrently to reduce cold-start latency.
+    await Future.wait<void>([
+      _warmUpAsync<YtmDownloadCubit>('YtmDownloadCubit'),
+      _warmUpAsync<FileIntentHandler>('FileIntentHandler'),
+      _warmUpOverrideStores(),
+    ]);
+
     try {
       await getIt.allReady().timeout(const Duration(seconds: 5));
     } catch (e, st) {
@@ -108,6 +73,34 @@ Future<void> configureDependencies() async {
     validateDependencies(getIt);
   } finally {
     if (!_initializationReady.isCompleted) _initializationReady.complete();
+  }
+}
+
+Future<void> _warmUpAsync<T extends Object>(
+  String name, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  try {
+    if (getIt.isRegistered<T>()) {
+      await getIt.getAsync<T>().timeout(timeout);
+    }
+  } catch (e, st) {
+    ErrorLogger.log('$name DI warm-up timed out or failed',
+        error: e, stackTrace: st, category: 'DI');
+  }
+}
+
+Future<void> _warmUpOverrideStores() async {
+  try {
+    await Future.wait<void>([
+      if (getIt.isRegistered<SongRatingStore>()) getIt<SongRatingStore>().ready,
+      if (getIt.isRegistered<PerSongEqStore>()) getIt<PerSongEqStore>().ready,
+      if (getIt.isRegistered<PerSongVolumeStore>())
+        getIt<PerSongVolumeStore>().ready,
+    ]).timeout(const Duration(seconds: 5));
+  } catch (e, st) {
+    ErrorLogger.log('Per-song override store warm-up timed out or failed',
+        error: e, stackTrace: st, category: 'DI');
   }
 }
 

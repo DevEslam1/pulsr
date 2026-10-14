@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../../../core/services/hires_audio_service.dart';
+import '../../../../data/services/hires_audio_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';

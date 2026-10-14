@@ -1,6 +1,8 @@
 // lib/core/errors/error_message_resolver.dart
 import 'package:flutter/widgets.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../utils/l10n_extensions.dart';
+import '../utils/l10n_holder.dart';
 
 /// Localizes English-only error strings emitted by cubits and services (which
 /// have no `BuildContext`) at the display site. Covers player, YouTube Music,
@@ -9,7 +11,13 @@ import '../utils/l10n_extensions.dart';
 /// Unknown or changed literals pass through untouched, so the UI never breaks
 /// when a new message appears before a key exists for it.
 String resolveUiErrorMessage(BuildContext context, String message) {
-  final l10n = context.l10n;
+  AppLocalizations? l10n;
+  try {
+    l10n = context.l10n;
+  } catch (_) {
+    l10n = L10nHolder.current;
+  }
+  if (l10n == null) return message;
 
   switch (message) {
     case 'Failed to save queue':
@@ -206,18 +214,29 @@ class ErrorMessageResolver {
   const ErrorMessageResolver._();
 
   static String resolveUserFriendly(BuildContext context, Object error) {
+    AppLocalizations? l10n;
+    try {
+      l10n = context.l10n;
+    } catch (_) {
+      l10n = L10nHolder.current;
+    }
+
     final raw = error.toString().toLowerCase();
     if (raw.contains('socketexception') ||
         raw.contains('network') ||
         raw.contains('connection refused') ||
         raw.contains('timed out') ||
         raw.contains('clientexception')) {
-      return 'Network connection error. Please check your internet connection and retry.';
+      return (l10n != null && l10n.localeName != 'en')
+          ? l10n.errYtmNoConnection
+          : 'Network connection error. Please check your internet connection and retry.';
     }
     if (raw.contains('permissiondenied') ||
         raw.contains('permission_denied') ||
         raw.contains('denied')) {
-      return 'Storage permission was denied. Please grant permission in system settings.';
+      return (l10n != null && l10n.localeName != 'en')
+          ? l10n.downloadErrorPermission
+          : 'Storage permission was denied. Please grant permission in system settings.';
     }
     if (raw.contains('filenotfound') || raw.contains('no such file')) {
       return 'The requested audio file was not found on your storage.';
@@ -226,13 +245,18 @@ class ErrorMessageResolver {
       return 'Encountered unexpected or corrupt data format.';
     }
     if (raw.contains('quota') || raw.contains('429')) {
-      return 'Too many requests. Please wait a moment and try again.';
+      return (l10n != null && l10n.localeName != 'en')
+          ? l10n.downloadErrorRateLimited
+          : 'Too many requests. Please wait a moment and try again.';
     }
     if (raw.contains('unsupported') || raw.contains('notsupported')) {
-      return 'This feature or audio format is not supported on this device.';
+      return (l10n != null && l10n.localeName != 'en')
+          ? l10n.errYtmUnavailable
+          : 'This feature or audio format is not supported on this device.';
     }
     try {
-      return context.l10n.libraryReadError;
+      return l10n?.libraryReadError ??
+          'An error occurred while accessing the library.';
     } catch (_) {
       return 'An error occurred while accessing the library.';
     }

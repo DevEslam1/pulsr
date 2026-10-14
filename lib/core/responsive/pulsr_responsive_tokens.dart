@@ -56,15 +56,13 @@ class PulsrViewport {
   /// Factory resolving the viewport directly from the active [BuildContext].
   factory PulsrViewport.fromContext(BuildContext context,
       [BoxConstraints? constraints]) {
-    final mq = MediaQuery.maybeOf(context);
-    final width = mq?.size.width ??
-        (constraints?.maxWidth.isFinite == true
-            ? constraints!.maxWidth
-            : 390.0);
-    final height = mq?.size.height ??
-        (constraints?.maxHeight.isFinite == true
-            ? constraints!.maxHeight
-            : 844.0);
+    final size = MediaQuery.maybeSizeOf(context);
+    final width = (constraints != null && constraints.maxWidth.isFinite)
+        ? constraints.maxWidth
+        : (size?.width ?? 390.0);
+    final height = (constraints != null && constraints.maxHeight.isFinite)
+        ? constraints.maxHeight
+        : (size?.height ?? 844.0);
 
     final orientation =
         width > height ? Orientation.landscape : Orientation.portrait;
@@ -88,7 +86,8 @@ class PulsrViewport {
       deviceClass = PulsrDeviceClass.phone;
     }
 
-    final textScale = mq?.textScaler ?? TextScaler.noScaling;
+    final textScale =
+        MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling;
 
     return PulsrViewport(
       deviceClass: deviceClass,

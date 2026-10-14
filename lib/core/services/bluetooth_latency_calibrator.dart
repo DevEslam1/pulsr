@@ -68,7 +68,7 @@ class BluetoothLatencyCalibrator {
       {int reactionBaselineMs = 180}) {
     final valid = tapDeltasMs.where((d) => d >= 0 && d <= 1500).toList()
       ..sort();
-    if (valid.isEmpty) return estimateBtLatencyForCodec(null);
+    if (valid.isEmpty) return clampOffset(estimateBtLatencyForCodec(null));
     final trimmed =
         valid.length >= 4 ? valid.sublist(1, valid.length - 1) : valid;
     final mean = (trimmed.reduce((a, b) => a + b) / trimmed.length).round();

@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../config/app_config.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 
@@ -49,7 +50,7 @@ class LrclibService {
     try {
       if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('setting_offline_only_mode') == true) return null;
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return null;
     } catch (e, st) {
       ErrorLogger.log('Failed to read offline-only preference for lyrics',
           error: e, stackTrace: st, category: 'Lrclib');

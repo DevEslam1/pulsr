@@ -238,6 +238,19 @@ void main() {
       );
     });
 
+    test('inserts size suffix before query parameters when present on googleusercontent', () {
+      expect(
+        ArtworkCacheManager.toLowQualityArtworkUrl(
+            'https://lh3.googleusercontent.com/abc?authuser=0&token=xyz'),
+        'https://lh3.googleusercontent.com/abc=w200-h200-l80-rj?authuser=0&token=xyz',
+      );
+      expect(
+        ArtworkCacheManager.toLowQualityArtworkUrl(
+            'https://yt3.ggpht.com/avatar?sz=50'),
+        'https://yt3.ggpht.com/avatar=w200-h200-l80-rj?sz=50',
+      );
+    });
+
     test('rewrites ggpht.com the same way', () {
       expect(
         ArtworkCacheManager.toLowQualityArtworkUrl(

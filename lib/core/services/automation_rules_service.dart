@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mutex/mutex.dart';
 import '../utils/error_logger.dart';
 
 enum AutomationTrigger {
@@ -60,6 +61,7 @@ class AutomationRule {
 @singleton
 class AutomationRulesService {
   static const String _keyRules = 'setting_automation_rules';
+  final Mutex _mutex = Mutex();
 
   Future<List<AutomationRule>> getRules() async {
     try {
@@ -78,7 +80,7 @@ class AutomationRulesService {
     return const [];
   }
 
-  Future<void> saveRule(AutomationRule rule) async {
+  Future<void> saveRule(AutomationRule rule) => _mutex.protect(() async {
     final rules = await getRules();
     final updated = List<AutomationRule>.from(rules);
     final idx = updated.indexWhere((r) => r.id == rule.id);
@@ -90,18 +92,18 @@ class AutomationRulesService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
-  }
+  });
 
-  Future<void> deleteRule(String id) async {
+  Future<void> deleteRule(String id) => _mutex.protect(() async {
     final rules = await getRules();
     final updated = rules.where((r) => r.id != id).toList();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
-  }
+  });
 
-  Future<void> clearRules() async {
+  Future<void> clearRules() => _mutex.protect(() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyRules);
-  }
+  });
 }

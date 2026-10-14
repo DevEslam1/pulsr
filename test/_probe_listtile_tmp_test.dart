@@ -116,10 +116,10 @@ void main() {
               ro?.debugCreator?.toString() ?? '(no render creator)';
           final key = '$creator|${chain.take(14).join("|")}';
           if (printed.add(key)) {
-            print('VIOLATION[$label] tile=${w.runtimeType} '
+            debugPrint('VIOLATION[$label] tile=${w.runtimeType} '
                 'intermediate=${intermediate!.runtimeType}');
-            print('  creator: $creator');
-            print('  ancestors: ${chain.join(' << ')}');
+            debugPrint('  creator: $creator');
+            debugPrint('  ancestors: ${chain.join(' << ')}');
           }
         }
       }
@@ -163,7 +163,7 @@ void main() {
     }
 
     FlutterError.onError = prevOnError;
-    print('PROBE COMPLETE. distinct violations: ${printed.length}; '
+    debugPrint('PROBE COMPLETE. distinct violations: ${printed.length}; '
         'captured errors: ${captured.length}');
   });
 }

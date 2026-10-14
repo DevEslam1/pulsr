@@ -7,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../constants/channels.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 
@@ -351,6 +352,10 @@ class ScrobblerService {
     required int durationSec,
   }) async {
     final prefs = await SharedPreferences.getInstance();
+    if (!AppConfig.isCloudSyncAllowed ||
+        prefs.getBool(PrefsKeys.offlineOnlyMode) == true) {
+      return;
+    }
 
     // 1. Last.fm Now Playing
     if (prefs.getBool(keyLastFmEnabled) == true) {
@@ -525,7 +530,7 @@ class ScrobblerService {
     // Offline-only mode (and Pure builds, which have no network): queue
     // locally, never hit the network.
     if (!AppConfig.isCloudSyncAllowed ||
-        prefs.getBool('setting_offline_only_mode') == true) {
+        prefs.getBool(PrefsKeys.offlineOnlyMode) == true) {
       await _enqueueOfflineScrobble(
           artist: artist,
           track: track,
@@ -773,7 +778,7 @@ class ScrobblerService {
       // Offline-only mode (and Pure builds): keep the queue stored, never hit
       // the network.
       if (!AppConfig.isCloudSyncAllowed ||
-          prefs.getBool('setting_offline_only_mode') == true) {
+          prefs.getBool(PrefsKeys.offlineOnlyMode) == true) {
         return;
       }
       final queueJson = prefs.getString(_keyOfflineQueue);

@@ -71,6 +71,7 @@ class AutomationTriggerService with WidgetsBindingObserver {
       ErrorLogger.log('Failed to observe output devices for automation',
           error: e, stackTrace: st, category: 'AutomationTriggerService');
     }
+    _initialized = true;
   }
 
   @override
@@ -93,10 +94,25 @@ class AutomationTriggerService with WidgetsBindingObserver {
     if (info.isBluetooth) {
       unawaited(_fire(AutomationTrigger.bluetoothConnected));
     } else if (info.isUsbDac) {
-      unawaited(_fire(AutomationTrigger.usbDacConnected));
-      unawaited(_fire(AutomationTrigger.headphonesPlugged));
+      unawaited(_handleUsbDacOrHeadphones());
     } else if (_isWiredHeadphones(info)) {
       unawaited(_fire(AutomationTrigger.headphonesPlugged));
+    }
+  }
+
+  Future<void> _handleUsbDacOrHeadphones() async {
+    try {
+      final rules = await _rulesService.getRules();
+      final hasUsbRule = rules.any(
+        (r) => r.enabled && r.trigger == AutomationTrigger.usbDacConnected,
+      );
+      if (hasUsbRule) {
+        await _fire(AutomationTrigger.usbDacConnected);
+      } else {
+        await _fire(AutomationTrigger.headphonesPlugged);
+      }
+    } catch (_) {
+      await _fire(AutomationTrigger.usbDacConnected);
     }
   }
 
@@ -126,7 +142,12 @@ class AutomationTriggerService with WidgetsBindingObserver {
           .toList(growable: false);
       if (matching.isEmpty) return;
       if (!getIt.isRegistered<PlayerCubit>()) return;
-      final player = getIt<PlayerCubit>();
+      final PlayerCubit player;
+      if (getIt.isReadySync<PlayerCubit>()) {
+        player = getIt<PlayerCubit>();
+      } else {
+        player = await getIt.getAsync<PlayerCubit>();
+      }
       final profiles = await _profilesService.getProfiles();
       for (final rule in matching) {
         SettingsProfile? profile;
@@ -152,5 +173,7 @@ class AutomationTriggerService with WidgetsBindingObserver {
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
     _started = false;
+    _initialized = false;
+    _lastDeviceKey = null;
   }
 }

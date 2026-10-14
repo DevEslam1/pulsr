@@ -11,6 +11,7 @@ import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../utils/error_logger.dart';
 import '../config/app_config.dart';
+import '../constants/prefs_keys.dart';
 import 'auth_service.dart';
 
 class SyncRecord {
@@ -103,8 +104,8 @@ class CloudSyncService {
     return sha256.convert(utf8.encode(raw)).toString();
   }
 
-  String _stablePlaylistId(PlaylistsTableData pl) {
-    final prefs = _prefs;
+  String _stablePlaylistId(PlaylistsTableData pl, [SharedPreferences? prefsOverride]) {
+    final prefs = prefsOverride ?? _prefs;
     final cached = prefs?.getString('sync_pl_stable_id_${pl.id}');
     if (cached != null && cached.isNotEmpty) {
       return cached;
@@ -167,7 +168,7 @@ class CloudSyncService {
     // User-facing Offline-only mode: never sync even in network builds.
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('setting_offline_only_mode') == true) return false;
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return false;
     } catch (_) {}
     final user = _authService.currentUser;
     if (user == null) return false;
@@ -247,6 +248,7 @@ class CloudSyncService {
     required bool syncFavorites,
     required bool syncPlaylists,
   }) async {
+    final prefs = await _getPrefs();
     final firestore = FirebaseFirestore.instance;
     final deviceId = await getDeviceId();
     WriteBatch currentBatch = firestore.batch();
@@ -331,7 +333,7 @@ class CloudSyncService {
           playlistRes.fold((l) => <PlaylistsTableData>[], (r) => r);
 
       for (final pl in localPlaylists) {
-        final plDocId = _stablePlaylistId(pl);
+        final plDocId = _stablePlaylistId(pl, prefs);
         final plPayloadRaw =
             '${pl.name}|${pl.createdAt.toIso8601String()}|${pl.isSmart}|${pl.smartCriteria}';
         final plHash = sha256.convert(utf8.encode(plPayloadRaw)).toString();

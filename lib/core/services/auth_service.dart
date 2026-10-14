@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:injectable/injectable.dart';
+import '../config/app_config.dart';
 import '../utils/error_logger.dart';
 
 @singleton
@@ -21,6 +22,7 @@ class AuthService {
       : Stream<User?>.value(null);
 
   Future<void> initialize() async {
+    if (!AppConfig.isCloudSyncAllowed) return;
     try {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp();
@@ -126,6 +128,9 @@ class AuthService {
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       if (!_isFirebaseAvailable) await initialize();
+      if (!_isFirebaseAvailable) {
+        throw Exception('Firebase is not available on this device');
+      }
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email.trim());
     } catch (e, st) {
       ErrorLogger.log('Password reset failed',

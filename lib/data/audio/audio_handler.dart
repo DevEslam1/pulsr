@@ -18,7 +18,7 @@ import '../../core/constants/prefs_keys.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/battery_optimization_service.dart';
-import '../../core/services/hires_audio_service.dart';
+import '../services/hires_audio_service.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../core/telemetry/audio_session_log.dart';

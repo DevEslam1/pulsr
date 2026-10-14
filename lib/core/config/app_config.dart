@@ -1,5 +1,5 @@
-// lib/core/config/app_config.dart
 import 'package:flutter/services.dart';
+import '../constants/channels.dart';
 import '../utils/error_logger.dart';
 
 enum AppEnvironment { dev, prod }
@@ -63,7 +63,7 @@ class AppConfig {
   static Future<bool?> verifyPureNoInternet() async {
     if (!isPure) return false;
     try {
-      const channel = MethodChannel('com.pulsr.music/purity');
+      const channel = MethodChannel(PulsrChannels.purity);
       final bool? hasInternet =
           await channel.invokeMethod<bool>('hasInternetPermission');
       if (hasInternet == null) return null;
@@ -97,7 +97,9 @@ class AppConfig {
   /// Validates that build flavor and runtime environment configuration are aligned.
   static void validateConfiguration() {
     final lowerFlavor = flavor.toLowerCase();
-    if (lowerFlavor == 'prod' && envName.toLowerCase() == 'dev') {
+    if (const bool.hasEnvironment('ENV') &&
+        lowerFlavor == 'prod' &&
+        envName.toLowerCase() == 'dev') {
       throw StateError('CRITICAL: Production flavor cannot run with ENV=dev');
     }
     // Play Store compliance: the dedicated "prod" flavor MUST NOT have YouTube Music enabled

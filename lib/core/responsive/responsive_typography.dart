@@ -105,13 +105,9 @@ class PulsrTextScaleScope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clamped = PulsrResponsiveTypography.clampedTextScaler(
-      context,
-      minScale: minScale,
-      maxScale: maxScale,
-    );
-    return MediaQuery(
-      data: MediaQuery.of(context).copyWith(textScaler: clamped),
+    return MediaQuery.withClampedTextScaling(
+      minScaleFactor: minScale,
+      maxScaleFactor: maxScale,
       child: child,
     );
   }

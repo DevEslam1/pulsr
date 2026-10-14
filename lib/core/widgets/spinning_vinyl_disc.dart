@@ -62,6 +62,9 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
   @override
   void didUpdateWidget(covariant SpinningVinylDisc oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.rotationPeriod != widget.rotationPeriod) {
+      _controller.duration = widget.rotationPeriod;
+    }
     _syncAnimation();
   }
 

@@ -4,7 +4,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/services/automation_rules_service.dart';
 import '../../../../core/services/automation_trigger_service.dart';
-import '../../../../core/services/settings_profiles_service.dart';
+import '../../../../data/services/settings_profiles_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_switch.dart';

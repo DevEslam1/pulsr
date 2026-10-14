@@ -439,4 +439,10 @@ class YtmUrlCache {
   }
 
   DateTime? _parseUrlExpiryStamp(String url) => parseUrlExpiryStamp(url);
+
+  @disposeMethod
+  void dispose() {
+    _persistTimer?.cancel();
+    _persistTimer = null;
+  }
 }

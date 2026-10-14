@@ -117,6 +117,11 @@ class SponsorBlockService {
     // Pulsr Pure / offline-only: never reach the SponsorBlock API.
     if (!AppConfig.isCloudSyncAllowed) return const [];
     await loadPreferences();
+    try {
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return const [];
+    } catch (_) {}
+
     // Letting an empty set short-circuit avoids a pointless request when the
     // user has disabled every category.
     if (!_enabled || _enabledCategories.isEmpty) return const [];

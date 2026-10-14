@@ -3,8 +3,10 @@
 // testConnection()'s response classification: proxy auth rejections must fail
 // before the YouTube 4xx-reachability rule, or wrong proxy credentials report
 // "working".
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/network/app_http_overrides.dart';
+import 'package:pulsr/core/network/proxy_config.dart';
 
 void main() {
   final youtubeUri = Uri.parse('https://music.youtube.com/');
@@ -78,6 +80,62 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.error, isNotEmpty);
+    });
+  });
+
+  group('AppHttpOverrides SOCKS5 connectivity testing', () {
+    test('unreachable SOCKS5 proxy fails with error instead of false-positive success', () async {
+      // Pick a port that is not listening on localhost
+      final config = const ProxyConfig(
+        enabled: true,
+        type: AppProxyType.socks5,
+        host: '127.0.0.1',
+        port: 59999,
+      );
+
+      final result = await AppHttpOverrides.instance.testConnection(
+        configToTest: config,
+        timeout: const Duration(milliseconds: 500),
+      );
+
+      expect(result.success, isFalse);
+      expect(result.error, isNotNull);
+    });
+
+    test('valid SOCKS5 proxy handshake succeeds via testSocks5ViaSocket', () async {
+      // Spin up a minimal loopback SOCKS5 server
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((client) {
+        client.listen((data) {
+          // Greeting [0x05, 0x01, 0x00] -> reply [0x05, 0x00] (no auth)
+          if (data.isNotEmpty && data[0] == 0x05 && data.length <= 4) {
+            client.add([0x05, 0x00]);
+          } else if (data.isNotEmpty && data[0] == 0x05 && data[1] == 0x01) {
+            // Connect request -> reply success [0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 1, 1]
+            client.add([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0, 80]);
+          }
+        });
+      });
+
+      try {
+        final config = ProxyConfig(
+          enabled: true,
+          type: AppProxyType.socks5,
+          host: '127.0.0.1',
+          port: server.port,
+        );
+
+        final result = await AppHttpOverrides.testSocks5ViaSocket(
+          testConfig: config,
+          targetUri: Uri.parse('https://music.youtube.com/'),
+          timeout: const Duration(seconds: 2),
+        );
+
+        expect(result.success, isTrue);
+        expect(result.error, isNull);
+      } finally {
+        await server.close();
+      }
     });
   });
 }

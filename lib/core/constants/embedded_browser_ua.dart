@@ -97,6 +97,50 @@ class EmbeddedBrowserUa {
 (function () {
   'use strict';
 
+  // ── Passive DOM block detector flag ──────────────────────────────────────
+  // Placed BEFORE domain gate: safe on Google/YouTube as it only reads innerText
+  // and does NOT touch or wrap any native prototypes (which BotGuard screens for).
+  try {
+    window.__googleBlockDetected = false;
+    var checkBlock = function () {
+      try {
+        var bodyText = (document.body && (document.body.innerText || document.body.textContent)) || '';
+        if (bodyText.length > 0) {
+          var lower = bodyText.toLowerCase();
+          // Never trigger block detection on 2FA / Phone approval / challenge screens
+          if (lower.indexOf("2-step") !== -1 ||
+              lower.indexOf("check your phone") !== -1 ||
+              lower.indexOf("tap yes") !== -1 ||
+              lower.indexOf("google sent a notification") !== -1 ||
+              lower.indexOf("verification code") !== -1 ||
+              lower.indexOf("security key") !== -1 ||
+              lower.indexOf("authenticator") !== -1 ||
+              lower.indexOf("enter the code") !== -1) {
+            window.__googleBlockDetected = false;
+            return;
+          }
+          // Only true block pages (strict matching):
+          if (lower.indexOf("this browser or app may not be secure") !== -1 ||
+              (lower.indexOf("couldn't sign you in") !== -1 &&
+               (lower.indexOf("try using a different browser") !== -1 ||
+                lower.indexOf("browser or app may not be secure") !== -1))) {
+            window.__googleBlockDetected = true;
+          }
+        }
+      } catch (err) {}
+    };
+    if (typeof MutationObserver !== 'undefined') {
+      var observer = new MutationObserver(checkBlock);
+      if (document.documentElement) {
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+      } else {
+        document.addEventListener('DOMContentLoaded', function () {
+          observer.observe(document.documentElement, { childList: true, subtree: true });
+        });
+      }
+    }
+  } catch (e) {}
+
   // CRITICAL: Do NOT tamper with native prototypes on Google or YouTube authentication domains.
   // Google BotGuard actively tests Function.prototype.toString on Intl, WebGL, and Navigator APIs.
   // Any non-native wrapper immediately trips Google's "This browser or app may not be secure" interstitial.
@@ -596,48 +640,6 @@ class EmbeddedBrowserUa {
             });
           } catch (ex) {}
         }
-      }
-    }
-  } catch (e) {}
-
-  // ── 9. DOM block detector flag ───────────────────────────────────────────
-  try {
-    window.__googleBlockDetected = false;
-    var checkBlock = function () {
-      try {
-        var bodyText = (document.body && (document.body.innerText || document.body.textContent)) || '';
-        if (bodyText.length > 0) {
-          var lower = bodyText.toLowerCase();
-          // Never trigger block detection on 2FA / Phone approval / challenge screens
-          if (lower.indexOf("2-step") !== -1 ||
-              lower.indexOf("check your phone") !== -1 ||
-              lower.indexOf("tap yes") !== -1 ||
-              lower.indexOf("google sent a notification") !== -1 ||
-              lower.indexOf("verification code") !== -1 ||
-              lower.indexOf("security key") !== -1 ||
-              lower.indexOf("authenticator") !== -1 ||
-              lower.indexOf("enter the code") !== -1) {
-            window.__googleBlockDetected = false;
-            return;
-          }
-          // Only true block pages (strict matching):
-          if (lower.indexOf("this browser or app may not be secure") !== -1 ||
-              (lower.indexOf("couldn't sign you in") !== -1 &&
-               (lower.indexOf("try using a different browser") !== -1 ||
-                lower.indexOf("browser or app may not be secure") !== -1))) {
-            window.__googleBlockDetected = true;
-          }
-        }
-      } catch (err) {}
-    };
-    if (typeof MutationObserver !== 'undefined') {
-      var observer = new MutationObserver(checkBlock);
-      if (document.documentElement) {
-        observer.observe(document.documentElement, { childList: true, subtree: true });
-      } else {
-        document.addEventListener('DOMContentLoaded', function () {
-          observer.observe(document.documentElement, { childList: true, subtree: true });
-        });
       }
     }
   } catch (e) {}

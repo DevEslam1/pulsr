@@ -61,6 +61,38 @@ void main() {
       expect(AudioFormats.extractExtension('artist.feat.guest - track.01.m4a'),
           'm4a');
 
+      // Local files with '#' and '?' in filenames (must preserve extension)
+      expect(AudioFormats.extractExtension('Track #1.mp3'), 'mp3');
+      expect(AudioFormats.extractExtension('Symphony #5.flac'), 'flac');
+      expect(
+          AudioFormats.extractExtension('/storage/emulated/0/Music/Track #1.mp3'),
+          'mp3');
+      expect(
+          AudioFormats.extractExtension(
+              r'C:\Users\Music\Album #2\01 - Track #1.flac'),
+          'flac');
+      expect(AudioFormats.extractExtension('Song with ? in name.ogg'), 'ogg');
+      expect(
+          AudioFormats.extractExtension(
+              'file:///storage/emulated/0/Music/Track%20#1.mp3'),
+          'mp3');
+      expect(
+          AudioFormats.isSupportedExtension('Track #1.mp3'),
+          isTrue);
+      expect(
+          AudioFormats.isSupportedExtension('/storage/Music/Symphony #5.flac'),
+          isTrue);
+
+      // HTTP Stream URLs with query parameters
+      expect(
+          AudioFormats.extractExtension(
+              'https://stream.example.com/live.aac?bitrate=320&token=xyz#play'),
+          'aac');
+      expect(
+          AudioFormats.extractExtension(
+              'http://radio.example.org:8000/stream?format=mp3'),
+          '');
+
       // Extensionless paths and filenames (B9 regression tests)
       expect(
           AudioFormats.extractExtension('/storage/emulated/0/Music/song'), '');

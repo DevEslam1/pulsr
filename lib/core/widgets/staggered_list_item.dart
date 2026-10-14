@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../motion/pulsr_motion.dart';
 
@@ -29,6 +30,7 @@ class _StaggeredListItemState extends State<StaggeredListItem>
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
+  Timer? _delayTimer;
 
   @override
   void initState() {
@@ -38,18 +40,16 @@ class _StaggeredListItemState extends State<StaggeredListItem>
       duration: widget.animDuration,
     );
 
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
+    _fadeAnimation = _controller.drive(
+      CurveTween(curve: Curves.easeOut),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: Offset(0.0, widget.slideOffset / 100),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation = _controller.drive(
+      Tween<Offset>(
+        begin: Offset(0.0, widget.slideOffset / 100),
+        end: Offset.zero,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+    );
 
     // Stagger animation capped to the first 15 items for high scroll performance
     if (widget.index < 15) {
@@ -57,7 +57,7 @@ class _StaggeredListItemState extends State<StaggeredListItem>
       if (delay == Duration.zero) {
         _controller.forward();
       } else {
-        Future.delayed(delay, () {
+        _delayTimer = Timer(delay, () {
           if (mounted) {
             _controller.forward();
           }
@@ -70,6 +70,7 @@ class _StaggeredListItemState extends State<StaggeredListItem>
 
   @override
   void dispose() {
+    _delayTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 /// blocked because the key changes.
 extension PulsrSafePush on BuildContext {
   static String? _lastLocation;
+  static Object? _lastExtra;
   static DateTime? _lastPushAt;
   static const Duration _window = Duration(milliseconds: 600);
 
@@ -25,11 +26,13 @@ extension PulsrSafePush on BuildContext {
     final now = DateTime.now();
     final last = _lastPushAt;
     if (_lastLocation == location &&
+        _lastExtra == extra &&
         last != null &&
         now.difference(last) < _window) {
       return false;
     }
     _lastLocation = location;
+    _lastExtra = extra;
     _lastPushAt = now;
     push<void>(location, extra: extra);
     return true;

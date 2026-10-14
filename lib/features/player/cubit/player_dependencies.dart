@@ -1,11 +1,11 @@
 // lib/features/player/cubit/player_dependencies.dart
-import '../../../core/services/device_profile_service.dart';
+import '../../../data/services/device_profile_service.dart';
 import '../../../core/services/earbud_optimization_service.dart';
-import '../../../core/services/hires_audio_service.dart';
+import '../../../data/services/hires_audio_service.dart';
 import '../../../core/services/lrclib_service.dart';
 import '../../../core/services/quran_mode_service.dart';
 import '../../../core/services/scrobbler_service.dart';
-import '../../../core/services/settings_profiles_service.dart';
+import '../../../data/services/settings_profiles_service.dart';
 import '../../../core/services/smart_audio_service.dart';
 import '../../../core/services/sponsorblock_service.dart';
 import '../../../core/services/ytm_account_service.dart';

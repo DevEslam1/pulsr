@@ -114,8 +114,11 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
           body = ValueListenableBuilder<double>(
             valueListenable: PulsrDockTracker.dockHeight,
             builder: (context, dockHeight, child) {
+              final safeBottom = MediaQuery.paddingOf(context).bottom;
+              final effectiveBottom =
+                  dockHeight > 0 ? (dockHeight + safeBottom) : safeBottom;
               return Padding(
-                padding: EdgeInsets.only(bottom: dockHeight),
+                padding: EdgeInsets.only(bottom: effectiveBottom),
                 child: child,
               );
             },

@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/services/earbud_optimization_service.dart';
-import '../../../../core/services/hires_audio_service.dart';
+import '../../../../data/services/hires_audio_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/lrc_parser.dart';
 import '../../../../data/audio/ab_loop_manager.dart';

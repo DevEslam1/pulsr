@@ -122,6 +122,8 @@ class LibraryCacheManager {
 
   /// Clears the library snapshot (e.g. on library reset / full rescan).
   Future<void> clearSnapshot() async {
+    _saveDebounceTimer?.cancel();
+    _saveDebounceTimer = null;
     _inMemorySnapshot = null;
     try {
       await _initFile();
@@ -129,5 +131,11 @@ class LibraryCacheManager {
         await _snapshotFile!.delete();
       }
     } catch (_) {}
+  }
+
+  @disposeMethod
+  void dispose() {
+    _saveDebounceTimer?.cancel();
+    _saveDebounceTimer = null;
   }
 }

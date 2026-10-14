@@ -75,13 +75,22 @@ void main() {
   });
 
   group('HomeCubit category cache', () {
+    const testTracks = <YtmTrack>[
+      YtmTrack(
+        videoId: 'track1',
+        title: 'Song',
+        artist: 'Artist',
+        duration: Duration(minutes: 3),
+      ),
+    ];
+
     test('reuses the cached future within TTL and refetches after expiry',
         () async {
       var calls = 0;
       when(() => mockYtm.searchWithFallback(any(), limit: any(named: 'limit')))
           .thenAnswer((_) async {
         calls++;
-        return const <YtmTrack>[];
+        return testTracks;
       });
 
       final cubit = createCubit();
@@ -100,13 +109,35 @@ void main() {
       await cubit.close();
     });
 
+    test('does not cache empty results so retrying can succeed', () async {
+      var calls = 0;
+      when(() => mockYtm.searchWithFallback(any(), limit: any(named: 'limit')))
+          .thenAnswer((_) async {
+        calls++;
+        return const <YtmTrack>[];
+      });
+
+      final cubit = createCubit();
+      const category = 'Empty Category';
+
+      final res1 = await cubit.categoryFuture(category);
+      expect(res1, isEmpty);
+      expect(calls, 1);
+
+      final res2 = await cubit.categoryFuture(category);
+      expect(res2, isEmpty);
+      expect(calls, 2, reason: 'empty results are not cached');
+
+      await cubit.close();
+    });
+
     test('never overshoots the cap and evicts the oldest entry', () async {
       final calls = <String, int>{};
       when(() => mockYtm.searchWithFallback(any(), limit: any(named: 'limit')))
           .thenAnswer((invocation) async {
         final query = invocation.positionalArguments.first as String;
         calls[query] = (calls[query] ?? 0) + 1;
-        return const <YtmTrack>[];
+        return testTracks;
       });
 
       final cubit = createCubit();

@@ -94,7 +94,8 @@ class PulsrLayoutMetrics {
   static bool shouldUseDialogForSheet(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final isLandscapePhone =
-        PulsrBreakpoint.isLandscape(context) && size.height < 480;
+        PulsrBreakpoint.isLandscape(context) &&
+        size.height < PulsrBreakpoint.shortHeightThreshold;
     return !context.isCompact || isLandscapePhone;
   }
 }

@@ -8,6 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 
 @singleton
@@ -16,7 +17,6 @@ class ArtworkCacheManager {
   factory ArtworkCacheManager() => _instance;
   ArtworkCacheManager._internal();
 
-  static const String _prefMaxCacheSizeMb = 'setting_max_cache_size_mb';
   static const int defaultMaxCacheSizeMb =
       100; // 100 MB default maximum cache size
 
@@ -30,14 +30,30 @@ class ArtworkCacheManager {
   Directory? _cacheDir;
   int _maxCacheSizeMb = defaultMaxCacheSizeMb;
   bool _isCleaning = false;
+  Future<void>? _initFuture;
 
   int get maxCacheSizeMb => _maxCacheSizeMb;
 
   Future<void> init() async {
+    final inFlight = _initFuture;
+    if (inFlight != null) return inFlight;
+
+    final future = _performInit();
+    _initFuture = future;
+    try {
+      await future;
+    } finally {
+      if (_initFuture == future) {
+        _initFuture = null;
+      }
+    }
+  }
+
+  Future<void> _performInit() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       _maxCacheSizeMb =
-          prefs.getInt(_prefMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
+          prefs.getInt(PrefsKeys.settingMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
       final tempDir = await getTemporaryDirectory();
       _cacheDir = Directory(p.join(tempDir.path, 'artwork_cache'));
       if (!await _cacheDir!.exists()) {
@@ -52,8 +68,8 @@ class ArtworkCacheManager {
   Future<void> setMaxCacheSizeMb(int mb) async {
     _maxCacheSizeMb = mb;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_prefMaxCacheSizeMb, mb);
-    _enforceDiskLimit();
+    await prefs.setInt(PrefsKeys.settingMaxCacheSizeMb, mb);
+    unawaited(_enforceDiskLimit());
   }
 
   /// Hashes cache key into a safe filesystem name
@@ -131,11 +147,27 @@ class ArtworkCacheManager {
     }
   }
 
+  int _weakPruneCounter = 0;
+
+  void _pruneDeadWeakReferences() {
+    _weakMemoryCache.removeWhere((_, ref) => ref.target == null);
+  }
+
   void _putMemory(String key, Uint8List bytes) {
     if (bytes.lengthInBytes > largePayloadThreshold) {
+      if (_memoryCache.containsKey(key)) {
+        final old = _memoryCache.remove(key)!;
+        _currentMemoryBytes -= old.lengthInBytes;
+      }
       _weakMemoryCache[key] = WeakReference(bytes);
+      _weakPruneCounter++;
+      if (_weakPruneCounter % 20 == 0) {
+        _pruneDeadWeakReferences();
+      }
       return;
     }
+
+    _weakMemoryCache.remove(key);
 
     if (_memoryCache.containsKey(key)) {
       final old = _memoryCache.remove(key)!;
@@ -152,6 +184,11 @@ class ArtworkCacheManager {
     }
     _memoryCache[key] = bytes;
     _currentMemoryBytes += bytes.lengthInBytes;
+
+    _weakPruneCounter++;
+    if (_weakPruneCounter % 50 == 0) {
+      _pruneDeadWeakReferences();
+    }
   }
 
   /// Calculates total disk cache size in bytes
@@ -197,7 +234,11 @@ class ArtworkCacheManager {
   /// Used when a song's embedded artwork is rewritten in place, so the stale
   /// bitmap is not served back after the file changes.
   Future<void> remove(String key) async {
-    _memoryCache.remove(key);
+    final removed = _memoryCache.remove(key);
+    if (removed != null) {
+      _currentMemoryBytes =
+          (_currentMemoryBytes - removed.lengthInBytes).clamp(0, _maxMemoryBytes);
+    }
     _weakMemoryCache.remove(key);
     try {
       if (_cacheDir == null) await init();
@@ -292,7 +333,14 @@ class ArtworkCacheManager {
         transformed =
             transformed.replaceAll(sizePattern, '=w$width-h$height-l80-rj');
       } else {
-        transformed = '$transformed=w$width-h$height-l80-rj';
+        final queryIndex = transformed.indexOf('?');
+        if (queryIndex != -1) {
+          final base = transformed.substring(0, queryIndex);
+          final query = transformed.substring(queryIndex);
+          transformed = '$base=w$width-h$height-l80-rj$query';
+        } else {
+          transformed = '$transformed=w$width-h$height-l80-rj';
+        }
       }
     } else if (transformed.contains('ytimg.com')) {
       // Use standard default/hqdefault thumbnail instead of maxresdefault for low memory

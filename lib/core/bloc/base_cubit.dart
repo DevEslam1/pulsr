@@ -93,13 +93,24 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     if (_closed) {
       return _NoopSubscription<T>();
     }
-    final sub = stream.listen(
+    late final StreamSubscription<T> sub;
+    var completedSynchronously = false;
+    var isInitialized = false;
+
+    sub = stream.listen(
       (data) {
         if (!_closed && !isClosed) {
           onData(data);
         }
       },
       onError: (Object e, StackTrace s) {
+        if (cancelOnError == true) {
+          if (isInitialized) {
+            _subs.remove(sub);
+          } else {
+            completedSynchronously = true;
+          }
+        }
         if (_closed || isClosed) return;
         if (onError != null) {
           onError(e, s);
@@ -107,9 +118,21 @@ abstract class PulsrCubit<S> extends Cubit<S> {
           addError(e, s);
         }
       },
-      onDone: onDone,
+      onDone: () {
+        if (isInitialized) {
+          _subs.remove(sub);
+        } else {
+          completedSynchronously = true;
+        }
+        onDone?.call();
+      },
       cancelOnError: cancelOnError,
     );
+    isInitialized = true;
+
+    if (completedSynchronously) {
+      return sub;
+    }
     if (_closed) {
       // The cubit closed while an async constructor path was still in flight:
       // drop the late subscription instead of registering with a disposed

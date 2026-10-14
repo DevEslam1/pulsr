@@ -64,13 +64,44 @@ void main() {
   group('PulsrCubit.autoSub', () {
     test('delivers data and is cancelled on close', () async {
       final cubit = _TestCubit();
+      final controller = StreamController<int>();
+      final received = <int>[];
+      cubit.autoSub<int>(controller.stream, received.add);
+      controller.add(1);
+      controller.add(2);
+      await _flush();
+      expect(received, [1, 2]);
+      expect(cubit.activeSubscriptionCount, 1);
+      await cubit.close();
+      expect(cubit.activeSubscriptionCount, 0);
+      await controller.close();
+    });
+
+    test('auto-removes completed subscriptions when stream completes naturally', () async {
+      final cubit = _TestCubit();
+      final controller = StreamController<int>();
+      var doneCalled = false;
+      cubit.autoSub<int>(
+        controller.stream,
+        (_) {},
+        onDone: () => doneCalled = true,
+      );
+      expect(cubit.activeSubscriptionCount, 1);
+      await controller.close();
+      await _flush();
+      expect(doneCalled, isTrue);
+      expect(cubit.activeSubscriptionCount, 0);
+      await cubit.close();
+    });
+
+    test('finite streams auto-remove upon synchronous/asynchronous completion', () async {
+      final cubit = _TestCubit();
       final received = <int>[];
       cubit.autoSub<int>(Stream.fromIterable([1, 2, 3]), received.add);
       await _flush();
       expect(received, [1, 2, 3]);
-      expect(cubit.activeSubscriptionCount, 1);
-      await cubit.close();
       expect(cubit.activeSubscriptionCount, 0);
+      await cubit.close();
     });
 
     test('routes unhandled stream errors to addError', () async {

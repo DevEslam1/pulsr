@@ -71,39 +71,33 @@ Page<dynamic> _buildPulsrPageRoute({
         return child;
       }
 
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves.fastEaseInToSlowEaseOut,
-        reverseCurve: Curves.easeInCubic,
-      );
-      final secondaryCurved = CurvedAnimation(
-        parent: secondaryAnimation,
-        curve: Curves.fastEaseInToSlowEaseOut,
-        reverseCurve: Curves.easeInCubic,
-      );
-
       // Primary entrance: smooth slide in from right with fade
-      final slide = Tween<Offset>(
-        begin: const Offset(0.12, 0.0),
-        end: Offset.zero,
-      ).animate(curved);
-      final fade = Tween<double>(
-        begin: 0.0,
-        end: 1.0,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: const Interval(0.0, 0.75, curve: Curves.easeOut),
-      ));
+      final slide = animation.drive(
+        Tween<Offset>(
+          begin: const Offset(0.12, 0.0),
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.fastEaseInToSlowEaseOut)),
+      );
+      final fade = animation.drive(
+        Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).chain(CurveTween(curve: const Interval(0.0, 0.75, curve: Curves.easeOut))),
+      );
 
       // Secondary exit: subtle Apple-style parallax recession
-      final secondarySlide = Tween<Offset>(
-        begin: Offset.zero,
-        end: const Offset(-0.04, 0.0),
-      ).animate(secondaryCurved);
-      final secondaryFade = Tween<double>(
-        begin: 1.0,
-        end: 0.92,
-      ).animate(secondaryCurved);
+      final secondarySlide = secondaryAnimation.drive(
+        Tween<Offset>(
+          begin: Offset.zero,
+          end: const Offset(-0.04, 0.0),
+        ).chain(CurveTween(curve: Curves.fastEaseInToSlowEaseOut)),
+      );
+      final secondaryFade = secondaryAnimation.drive(
+        Tween<double>(
+          begin: 1.0,
+          end: 0.92,
+        ).chain(CurveTween(curve: Curves.fastEaseInToSlowEaseOut)),
+      );
 
       return SlideTransition(
         position: secondarySlide,
@@ -136,18 +130,17 @@ Page<dynamic> _buildTabPage({
     reverseTransitionDuration: PulsrMotion.state,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       if (!context.motionEnabled) return child;
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
+      final fade = animation.drive(CurveTween(curve: Curves.easeOutCubic));
+      final slide = animation.drive(
+        Tween<Offset>(
+          begin: const Offset(0.0, 0.012),
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
       );
       return FadeTransition(
-        opacity: curved,
+        opacity: fade,
         child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0.0, 0.012),
-            end: Offset.zero,
-          ).animate(curved),
+          position: slide,
           child: child,
         ),
       );
@@ -473,14 +466,12 @@ GoRouter createRouter(MediaScannerService scannerService,
           reverseTransitionDuration: PulsrMotion.layout,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             if (!context.motionEnabled) return child;
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.fastEaseInToSlowEaseOut,
-              reverseCurve: Curves.easeInCubic,
+            final slide = animation.drive(
+              Tween<Offset>(begin: const Offset(0.0, 1.0), end: Offset.zero)
+                  .chain(CurveTween(curve: Curves.fastEaseInToSlowEaseOut)),
             );
             return SlideTransition(
-              position: Tween(begin: const Offset(0.0, 1.0), end: Offset.zero)
-                  .animate(curved),
+              position: slide,
               child: child,
             );
           },
@@ -522,28 +513,36 @@ GoRouter createRouter(MediaScannerService scannerService,
         path: '/playlist/manage',
         name: 'manage-playlist',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final playlist = state.extra is PlaylistsTableData
               ? state.extra as PlaylistsTableData
               : null;
           if (playlist == null) {
-            return Scaffold(
-                body: Center(child: Text(context.l10n.playlistNotFoundHint)));
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: Scaffold(
+                appBar: AppBar(),
+                body: Center(child: Text(context.l10n.playlistNotFoundHint)),
+              ),
+            );
           }
-          return ManagePlaylistScreen(playlist: playlist);
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: ManagePlaylistScreen(playlist: playlist),
+          );
         },
       ),
       GoRoute(
         path: '/online-playlist',
         name: 'online-playlist',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra;
+          Widget content;
           if (extra is OnlinePlaylistDetailArgs) {
-            return OnlinePlaylistDetailScreen(args: extra);
-          }
-          if (extra is YtmAccountPlaylist) {
-            return OnlinePlaylistDetailScreen(
+            content = OnlinePlaylistDetailScreen(args: extra);
+          } else if (extra is YtmAccountPlaylist) {
+            content = OnlinePlaylistDetailScreen(
               args: OnlinePlaylistDetailArgs(
                 playlistId: extra.playlistId,
                 title: extra.title,
@@ -551,9 +550,8 @@ GoRouter createRouter(MediaScannerService scannerService,
                 artworkUrl: extra.artworkUrl,
               ),
             );
-          }
-          if (extra is OnlinePlaylistEntry) {
-            return OnlinePlaylistDetailScreen(
+          } else if (extra is OnlinePlaylistEntry) {
+            content = OnlinePlaylistDetailScreen(
               args: OnlinePlaylistDetailArgs(
                 playlistId: extra.id,
                 title: extra.title,
@@ -561,11 +559,16 @@ GoRouter createRouter(MediaScannerService scannerService,
                 initialTracks: extra.tracks,
               ),
             );
+          } else {
+            final id =
+                state.uri.queryParameters['id'] ?? (extra is String ? extra : '');
+            content = OnlinePlaylistDetailScreen(
+              args: OnlinePlaylistDetailArgs(playlistId: id),
+            );
           }
-          final id =
-              state.uri.queryParameters['id'] ?? (extra is String ? extra : '');
-          return OnlinePlaylistDetailScreen(
-            args: OnlinePlaylistDetailArgs(playlistId: id),
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: content,
           );
         },
       ),
@@ -573,16 +576,22 @@ GoRouter createRouter(MediaScannerService scannerService,
         path: '/recents',
         name: 'recents',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const RecentsScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const RecentsScreen(),
+        ),
       ),
       GoRoute(
         path: '/smart-playlist-builder',
         name: 'smart-playlist-builder',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final initial = state.extra;
-          return SmartPlaylistBuilderScreen(
-            initialPlaylist: initial is PlaylistsTableData ? initial : null,
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: SmartPlaylistBuilderScreen(
+              initialPlaylist: initial is PlaylistsTableData ? initial : null,
+            ),
           );
         },
       ),
@@ -590,53 +599,87 @@ GoRouter createRouter(MediaScannerService scannerService,
         path: '/queue',
         name: 'queue',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const QueueScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const QueueScreen(),
+        ),
       ),
       GoRoute(
         path: '/radio',
         name: 'radio',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const RadioScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const RadioScreen(),
+        ),
       ),
       GoRoute(
         path: '/folder',
         name: 'folder',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final folder =
               state.extra is FolderItem ? state.extra as FolderItem : null;
           if (folder == null) {
-            return Scaffold(
-                body: Center(child: Text(context.l10n.folderNotFound)));
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: Scaffold(
+                appBar: AppBar(),
+                body: Center(child: Text(context.l10n.folderNotFound)),
+              ),
+            );
           }
-          return FolderDetailScreen(folder: folder);
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: FolderDetailScreen(folder: folder),
+          );
         },
       ),
       GoRoute(
         path: '/tag-editor',
         name: 'tag-editor',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra;
           if (extra is List<SongsTableData> && extra.isNotEmpty) {
-            return TagEditorScreen(song: extra.first, batchSongs: extra);
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: TagEditorScreen(song: extra.first, batchSongs: extra),
+            );
           }
           final song = extra is SongsTableData ? extra : null;
           if (song == null) {
-            return Scaffold(
-                body: Center(child: Text(context.l10n.songNotFound)));
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: Scaffold(
+                appBar: AppBar(),
+                body: Center(child: Text(context.l10n.songNotFound)),
+              ),
+            );
           }
-          return TagEditorScreen(song: song);
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: TagEditorScreen(song: song),
+          );
         },
       ),
       GoRoute(
         path: '/proxy-settings',
         name: 'proxy-settings',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => ProxySettingsScreen(
-          initialImportText:
-              state.extra is String ? state.extra as String : null,
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: ProxySettingsScreen(
+            initialImportText:
+                state.extra is String ? state.extra as String : null,
+          ),
         ),
+      ),
+      GoRoute(
+        path: '/browse',
+        name: 'browse',
+        redirect: (context, state) =>
+            AppConfig.ytmEnabled ? '/ytm-search' : '/search',
       ),
       // Gated: only reachable in an ENABLE_YTM build. In prod this collection-if
       // is const-false, so the route and YtmSearchScreen tree-shake away.
@@ -645,56 +688,74 @@ GoRouter createRouter(MediaScannerService scannerService,
           path: '/ytm-search',
           name: 'ytm-search',
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const YtmSearchScreen(),
+          pageBuilder: (context, state) => _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: const YtmSearchScreen(),
+          ),
         ),
         GoRoute(
           path: '/ytm-explore',
           name: 'ytm-explore',
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const YtmBrowseScreen(),
-        ),
-        GoRoute(
-          path: '/browse',
-          name: 'browse',
-          redirect: (context, state) =>
-              AppConfig.ytmEnabled ? '/ytm-search' : '/search',
+          pageBuilder: (context, state) => _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: const YtmBrowseScreen(),
+          ),
         ),
         GoRoute(
           path: '/downloads',
           name: 'downloads',
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const DownloadsScreen(),
+          pageBuilder: (context, state) => _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: const DownloadsScreen(),
+          ),
         ),
       ],
       GoRoute(
         path: '/artwork-grid',
         name: 'artwork-grid',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const ArtworkGridScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const ArtworkGridScreen(),
+        ),
       ),
       GoRoute(
         path: '/duplicate-finder',
         name: 'duplicate-finder',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const DuplicateFinderScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const DuplicateFinderScreen(),
+        ),
       ),
       GoRoute(
         path: '/library-stats',
         name: 'library-stats',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const LibraryStatsScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const LibraryStatsScreen(),
+        ),
       ),
       GoRoute(
         path: '/theme-studio',
         name: 'theme-studio',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const CustomThemeBuilderScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const CustomThemeBuilderScreen(),
+        ),
       ),
       GoRoute(
         path: '/scrobble-stats',
         name: 'scrobble-stats',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const ScrobbleStatsScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const ScrobbleStatsScreen(),
+        ),
       ),
       GoRoute(
         path: '/cloud-backup-dashboard',
@@ -705,26 +766,38 @@ GoRouter createRouter(MediaScannerService scannerService,
         // surface (defects 03-02/22-01/20-03).
         redirect: (context, state) =>
             AppConfig.isCloudSyncAllowed ? null : '/settings',
-        builder: (context, state) => const CloudBackupDashboardScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const CloudBackupDashboardScreen(),
+        ),
       ),
       GoRoute(
         path: '/quran-mode',
         name: 'quran-mode',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const QuranModeScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const QuranModeScreen(),
+        ),
       ),
 
       GoRoute(
         path: '/favorites',
         name: 'favorites',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const FavoritesScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const FavoritesScreen(),
+        ),
       ),
       GoRoute(
         path: '/hidden-folders',
         name: 'hidden-folders',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const HiddenFoldersScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const HiddenFoldersScreen(),
+        ),
       ),
     ],
   );

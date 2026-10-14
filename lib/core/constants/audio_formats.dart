@@ -59,9 +59,21 @@ class AudioFormats {
     return nativeDecodableExtensions.contains(ext);
   }
 
+  static final RegExp _urlSchemeRegex =
+      RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*://');
+
   static String extractExtension(String pathOrExt) {
-    final clean =
-        pathOrExt.split('?').first.split('#').first.trim().toLowerCase();
+    var clean = pathOrExt.trim();
+    if (clean.isEmpty) return '';
+
+    // Only strip '?' query and '#' fragment from non-file URLs.
+    // Local filesystem paths can legitimately contain '#' (e.g. "Track #1.mp3")
+    // or '?' and must not be prematurely truncated.
+    final lower = clean.toLowerCase();
+    if (_urlSchemeRegex.hasMatch(clean) && !lower.startsWith('file://')) {
+      clean = clean.split('?').first.split('#').first.trim();
+    }
+    clean = clean.toLowerCase();
     if (clean.isEmpty || clean.endsWith('/') || clean.endsWith(r'\')) {
       return '';
     }
@@ -84,11 +96,13 @@ class AudioFormats {
     }
     if (filename.startsWith('.')) {
       final sub = filename.substring(1);
-      if (supportedExtensions.contains(sub) ||
-          nativeDecodableExtensions.contains(sub)) {
-        return sub;
+      if (!sub.contains('.')) {
+        if (supportedExtensions.contains(sub) ||
+            nativeDecodableExtensions.contains(sub)) {
+          return sub;
+        }
+        return '';
       }
-      return '';
     }
     final dotIndex = filename.lastIndexOf('.');
     if (dotIndex > 0 && dotIndex < filename.length - 1) {

@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 
 class OnlineTrackMetadata {
@@ -48,7 +49,7 @@ class MetadataSearchService {
     try {
       if (!AppConfig.isCloudSyncAllowed) return const [];
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('setting_offline_only_mode') == true) return const [];
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return const [];
     } catch (e, st) {
       ErrorLogger.log('Failed to read offline-only preference for metadata',
           error: e, stackTrace: st, category: 'MetadataSearch');
@@ -197,6 +198,7 @@ class MetadataSearchService {
   }
 
   Future<String?> downloadArtworkToTemp(String url) async {
+    if (!AppConfig.isCloudSyncAllowed) return null;
     try {
       final uri = Uri.tryParse(url);
       if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {

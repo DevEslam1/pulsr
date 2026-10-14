@@ -17,7 +17,7 @@ import '../../../data/audio/mqa_decoder_helper.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/app_http_overrides.dart';
 import '../../../core/network/proxy_config.dart';
-import '../../../core/services/hires_audio_service.dart';
+import '../../../data/services/hires_audio_service.dart';
 import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/theme_scheduler_service.dart';
 import '../../../core/utils/error_logger.dart';

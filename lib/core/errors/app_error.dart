@@ -244,5 +244,17 @@ AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
 AppFailure classifyFailure(Object error, [StackTrace? stackTrace]) {
   final resolved = resolveAppError(error, stackTrace);
   if (resolved is AppFailure) return resolved;
+  if (resolved is StorageError) {
+    if (resolved.code == 'DB_ERROR') {
+      return DatabaseFailure(resolved.userMessage, resolved);
+    }
+    return StorageFailure(resolved.userMessage, resolved);
+  }
+  if (resolved is PermissionError) {
+    return PermissionFailure(resolved.userMessage, resolved);
+  }
+  if (resolved is AudioError) {
+    return AudioPlaybackFailure(resolved.userMessage, resolved);
+  }
   return GenericFailure(resolved.userMessage, resolved);
 }

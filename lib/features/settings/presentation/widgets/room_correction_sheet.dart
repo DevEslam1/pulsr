@@ -11,7 +11,7 @@ import 'package:just_audio/just_audio.dart' hide PlayerState;
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../../../core/services/room_correction_service.dart';
+import '../../../../data/services/room_correction_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/error_logger.dart';

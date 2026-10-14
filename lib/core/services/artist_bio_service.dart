@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 
 class ArtistInfo {
@@ -26,14 +27,19 @@ class ArtistInfo {
 @singleton
 class ArtistBioService {
   final http.Client _client;
+  final bool _ownsClient;
   final LinkedHashMap<String, ArtistInfo> _cache =
       LinkedHashMap<String, ArtistInfo>();
   static const int _maxCacheSize = 150;
 
-  ArtistBioService([http.Client? client]) : _client = client ?? http.Client();
+  ArtistBioService([http.Client? client])
+      : _client = client ?? http.Client(),
+        _ownsClient = client == null;
 
   void dispose() {
-    _client.close();
+    if (_ownsClient) {
+      _client.close();
+    }
   }
 
   /// Fetches artist info and picture from Deezer and Wikipedia APIs.
@@ -54,7 +60,7 @@ class ArtistBioService {
     try {
       if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('setting_offline_only_mode') == true) return null;
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return null;
     } catch (e, st) {
       ErrorLogger.log('Failed to read offline-only preference for artist bio',
           error: e, stackTrace: st, category: 'ArtistBio');
@@ -76,7 +82,13 @@ class ArtistBioService {
       });
 
       final wikiFuture = _client
-          .get(wikiUri)
+          .get(
+            wikiUri,
+            headers: {
+              'User-Agent':
+                  'PulsrMusic/${AppConfig.appVersion} (https://github.com/DevEslam1)',
+            },
+          )
           .timeout(const Duration(seconds: 6))
           .catchError((e, st) {
         ErrorLogger.log('Wikipedia bio lookup failed for $cleanName',
@@ -109,13 +121,22 @@ class ArtistBioService {
       if (wikiRes.statusCode == 200 && wikiRes.body.isNotEmpty) {
         try {
           final wikiData = json.decode(wikiRes.body);
-          bio = wikiData['extract'] as String?;
+          if (wikiData is Map && wikiData['type'] != 'disambiguation') {
+            bio = wikiData['extract'] as String?;
+          }
         } catch (_) {}
+      }
+
+      final hasSuccess = (res.statusCode == 200 && (pictureUrl != null || fanCount != null)) ||
+          (wikiRes.statusCode == 200 && bio != null);
+
+      if (!hasSuccess && pictureUrl == null && bio == null) {
+        return null;
       }
 
       final info = ArtistInfo(
         name: cleanName,
-        bio: bio ?? '$cleanName is a featured artist in your library.',
+        bio: bio,
         pictureUrl: pictureUrl,
         fanCount: fanCount,
       );

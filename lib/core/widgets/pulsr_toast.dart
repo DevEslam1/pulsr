@@ -280,9 +280,8 @@ class _ToastWidgetState extends State<_ToastWidget>
       return widget.customBottomOffset!;
     }
 
-    final media = MediaQuery.maybeOf(context);
-    final bottomSafeArea = media?.padding.bottom ?? 0.0;
-    final keyboardInset = media?.viewInsets.bottom ?? 0.0;
+    final bottomSafeArea = MediaQuery.maybePaddingOf(context)?.bottom ?? 0.0;
+    final keyboardInset = MediaQuery.maybeViewInsetsOf(context)?.bottom ?? 0.0;
 
     // 1. If software keyboard is active, position above it
     if (keyboardInset > 0) {
@@ -350,7 +349,7 @@ class _ToastWidgetState extends State<_ToastWidget>
           case PulsrToastPosition.top:
             alignment = Alignment.topCenter;
             padding = EdgeInsetsDirectional.only(
-              top: (MediaQuery.maybeOf(context)?.padding.top ?? 24.0) + 16.0,
+              top: (MediaQuery.maybePaddingOf(context)?.top ?? 24.0) + 16.0,
               start: isTablet ? 24.0 : 14.0,
               end: isTablet ? 24.0 : 14.0,
             );

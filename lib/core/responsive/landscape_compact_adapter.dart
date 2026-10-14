@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'pulsr_responsive_tokens.dart';
 
-/// Mixin for stateful widgets that adapt layout for landscape phone mode (height < 500dp).
+/// Mixin for stateful widgets that adapt layout for landscape phone mode (height < 600dp, [PulsrBreakpoint.shortHeightThreshold]).
 mixin LandscapeCompactAdapter<T extends StatefulWidget> on State<T> {
-  /// Whether the screen is currently in landscape phone mode (short height < 500dp).
+  /// Whether the screen is currently in landscape phone mode (short height < 600dp).
   bool get isLandscapeCompact => PulsrViewport.of(context).isShortHeight;
 
   /// Adaptive page or gutter horizontal padding.

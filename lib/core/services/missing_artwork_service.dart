@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../config/app_config.dart';
+import '../constants/prefs_keys.dart';
 import '../di/injection.dart';
 import '../utils/error_logger.dart';
 
@@ -62,7 +63,7 @@ class MissingArtworkService {
     try {
       if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('setting_offline_only_mode') == true) return null;
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return null;
     } catch (e, st) {
       ErrorLogger.log('Failed to read offline-only preference for artwork',
           error: e, stackTrace: st, category: 'MissingArtwork');
@@ -149,7 +150,7 @@ class MissingArtworkService {
     try {
       if (!AppConfig.isCloudSyncAllowed) return 0;
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('setting_offline_only_mode') == true) return 0;
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return 0;
     } catch (e, st) {
       ErrorLogger.log('Failed to read offline-only preference for artwork',
           error: e, stackTrace: st, category: 'MissingArtwork');

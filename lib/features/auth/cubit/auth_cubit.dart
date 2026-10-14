@@ -42,6 +42,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
         // Auto-sync in background on login
         syncNow();
       } else {
+        _syncingUserId = null;
         safeEmit(state.copyWith(
           status: AuthStatus.unauthenticated,
           user: null,
@@ -49,6 +50,15 @@ class AuthCubit extends PulsrCubit<AuthState> {
         ));
       }
     });
+  }
+
+  String? _userUid(User? user) {
+    if (user == null) return null;
+    try {
+      return user.uid;
+    } catch (_) {
+      return 'user-${identityHashCode(user)}';
+    }
   }
 
   Future<void> signInWithGoogle() async {
@@ -249,11 +259,12 @@ class AuthCubit extends PulsrCubit<AuthState> {
   Future<void> syncNow() async {
     final currentUser = state.user;
     if (currentUser == null) return;
+    final currentUid = _userUid(currentUser);
     if (_syncing) {
       // Only queue a re-run if the user account actually switched mid-sync:
       // do NOT queue a duplicate back-to-back sync when signIn... and
       // authStateChanges both invoke syncNow() for the same user.
-      if (currentUser.uid != _syncingUserId) {
+      if (currentUid != _syncingUserId) {
         _syncQueued = true;
       }
       return;
@@ -268,7 +279,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       ..start();
     _syncing = true;
     _syncQueued = false;
-    _syncingUserId = currentUser.uid;
+    _syncingUserId = currentUid;
     safeEmit(state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
     try {
       final success = await _cloudSyncService.syncAll();
