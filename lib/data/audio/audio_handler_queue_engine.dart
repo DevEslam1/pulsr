@@ -155,12 +155,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   bool _crossfadeStartInFlight = false;
 
   Future<void> _startCrossfade(int nextIndex) async {
-    print('[DEBUG-crossfade] _startCrossfade($nextIndex) called, isCrossfading=${_crossfadeManager.isCrossfading}, inFlight=$_crossfadeStartInFlight');
     if (nextIndex < 0 || nextIndex >= _songs.length) return;
     if (_crossfadeManager.isCrossfading || _crossfadeStartInFlight) return;
     _crossfadeStartInFlight = true;
     if (!await _tripleBufferPipeline.claimInactive(PlayerClaim.crossfade)) {
-      print('[DEBUG-crossfade] claimInactive failed');
       _crossfadeStartInFlight = false;
       _failedCrossfadeClaims++;
       if (_failedCrossfadeClaims >= 3) {
@@ -171,14 +169,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     }
     _failedCrossfadeClaims = 0;
     try {
-      print('[DEBUG-crossfade] before protect');
       return await _crossfadeManager.protect(() async {
-        print('[DEBUG-crossfade] inside protect, isCrossfading=${_crossfadeManager.isCrossfading}');
         if (_crossfadeManager.isCrossfading) return;
         if (nextIndex < 0 || nextIndex >= _songs.length) return;
         _crossfadeManager.beginCrossfade(nextIndex);
         final currentFadeId = _crossfadeManager.nextFadeId();
-        print('[DEBUG-crossfade] beginCrossfade done, fadeId=$currentFadeId');
 
         final initialActiveVolume = _calculateReplayGainVolume(currentSong);
         _preCrossfadeVolume = initialActiveVolume;
@@ -221,15 +216,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           final canReusePreload =
               _tripleBufferPipeline.preloadedSongId == nextSong.id &&
                   _tripleBufferPipeline.preloadedSource != null;
-          print('[DEBUG-crossfade] canReusePreload=$canReusePreload');
           if (!canReusePreload) {
             final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
-            print('[DEBUG-crossfade] artUri resolved: $artUri');
             final item = PulsrAudioHandler._songToMediaItem(nextSong, artUri);
             final source = await _resolveAudioSource(nextSong, item);
-            print('[DEBUG-crossfade] source resolved: $source');
             if (_crossfadeManager.currentFadeId != currentFadeId) {
-              print('[DEBUG-crossfade] fadeId mismatch after resolve');
               try {
                 await _inactivePlayer.stop();
               } catch (_) {}
@@ -238,15 +229,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
               } catch (_) {}
               return;
             }
-            print('[DEBUG-crossfade] calling _inactivePlayer.setAudioSource');
             await _inactivePlayer.setAudioSource(source, preload: true);
-            print('[DEBUG-crossfade] setAudioSource finished');
           }
           _tripleBufferPipeline.clearPreload();
           if (!_songs.any((s) => s.id == songId)) return;
 
           if (_crossfadeManager.currentFadeId != currentFadeId) {
-            print('[DEBUG-crossfade] fadeId mismatch after clearPreload');
             try {
               await _inactivePlayer.stop();
             } catch (_) {}
@@ -257,14 +245,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           }
 
           await _inactivePlayer.setVolume(0.0);
-          print('[DEBUG-crossfade] calling _inactivePlayer.play()');
           try {
             await _inactivePlayer
                 .play()
                 .timeout(const Duration(milliseconds: 1000));
-            print('[DEBUG-crossfade] play() returned');
           } catch (playErr) {
-            print('[DEBUG-crossfade] play() threw: $playErr');
             try {
               await _inactivePlayer
                   .play()
@@ -577,7 +562,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             unawaited(_tripleBufferPipeline.preloadNext(_songs[warmIdx]));
           }
         } catch (e, st) {
-          print('[DEBUG-crossfade] Error in crossfade: $e\n$st');
           ErrorLogger.log('Error during crossfade playback',
               error: e, stackTrace: st, category: 'AudioHandler');
           try {
