@@ -69,8 +69,7 @@ void main() {
     when(() => repository.getSongByUri(any()))
         .thenAnswer((_) async => const Right(null));
     when(() => repository.watchAllSongs(
-            searchQuery: any(named: 'searchQuery'),
-            limit: any(named: 'limit')))
+            searchQuery: any(named: 'searchQuery'), limit: any(named: 'limit')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     handler = FileIntentHandler(repository, playerCubit);
   });
@@ -83,8 +82,7 @@ void main() {
     test('rejects empty, over-long and plain dotted inputs', () {
       expect(FileIntentHandler.extractYouTubeVideoId(''), isNull);
       expect(FileIntentHandler.extractYouTubeVideoId('   '), isNull);
-      expect(
-          FileIntentHandler.extractYouTubeVideoId('a' * 2049), isNull);
+      expect(FileIntentHandler.extractYouTubeVideoId('a' * 2049), isNull);
       expect(FileIntentHandler.extractYouTubeVideoId('not.a.video.id'), isNull);
     });
 
@@ -118,8 +116,8 @@ void main() {
   group('handleAudioUri', () {
     test('routes a pulsr voice-search URI through handleVoiceSearch', () async {
       await handler.handleAudioUri('pulsr://voice-search?query=hello');
-      verify(() => repository.watchAllSongs(
-          searchQuery: 'hello', limit: 1)).called(1);
+      verify(() => repository.watchAllSongs(searchQuery: 'hello', limit: 1))
+          .called(1);
     });
 
     test('plays a song when only the original URI matches', () async {
@@ -190,8 +188,7 @@ void main() {
     });
 
     test('swallows errors from the repository', () async {
-      when(() => repository.getSongByPath(any()))
-          .thenThrow(StateError('boom'));
+      when(() => repository.getSongByPath(any())).thenThrow(StateError('boom'));
       await handler.handleAudioUri('/music/explode.mp3');
       verifyNever(() => playerCubit.playSong(any()));
     });
@@ -201,8 +198,7 @@ void main() {
     test('ignores a blank query', () async {
       await handler.handleVoiceSearch('   ');
       verifyNever(() => repository.watchAllSongs(
-          searchQuery: any(named: 'searchQuery'),
-          limit: any(named: 'limit')));
+          searchQuery: any(named: 'searchQuery'), limit: any(named: 'limit')));
     });
 
     test('plays the first matching song', () async {
@@ -234,9 +230,8 @@ void main() {
       final controller = StreamController<Result<List<SongsTableData>>>();
       addTearDown(controller.close);
       when(() => repository.watchAllSongs(
-              searchQuery: any(named: 'searchQuery'),
-              limit: any(named: 'limit')))
-          .thenAnswer((_) => controller.stream);
+          searchQuery: any(named: 'searchQuery'),
+          limit: any(named: 'limit'))).thenAnswer((_) => controller.stream);
 
       await handler.handleVoiceSearch('hang');
       verifyNever(() => playerCubit.playSong(any()));
@@ -267,8 +262,8 @@ void main() {
     test('incoming onAudioFileOpened is handled', () async {
       await messenger.handlePlatformMessage(
         PulsrChannels.fileOpener,
-        const StandardMethodCodec()
-            .encodeMethodCall(const MethodCall('onAudioFileOpened', '/music/x.mp3')),
+        const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('onAudioFileOpened', '/music/x.mp3')),
         (_) {},
       );
       verify(() => repository.getSongByPath('/music/x.mp3')).called(1);
@@ -281,8 +276,8 @@ void main() {
             .encodeMethodCall(const MethodCall('onVoiceSearch', 'hi')),
         (_) {},
       );
-      verify(() => repository.watchAllSongs(
-          searchQuery: 'hi', limit: 1)).called(1);
+      verify(() => repository.watchAllSongs(searchQuery: 'hi', limit: 1))
+          .called(1);
     });
 
     test('incoming call with null arguments is ignored', () async {

@@ -91,7 +91,8 @@ class CanvasRepository {
 
       // Source 1: Community Canvas manifest
       try {
-        final candidate = await _community.search(cleanTitle, cleanArtist, album);
+        final candidate =
+            await _community.search(cleanTitle, cleanArtist, album);
         if (candidate != null &&
             candidate.matches(cleanTitle, cleanArtist, album)) {
           hit = candidate;

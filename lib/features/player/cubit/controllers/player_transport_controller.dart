@@ -19,7 +19,8 @@ class PlayerTransportController {
   final Map<int, SongsTableData>? _slotLookupCache;
   final void Function()? _debouncedPersistQueueSlots;
   final void Function({bool force})? _updateWidgetThrottled;
-  final Future<void> Function(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition})? _onPlaySong;
+  final Future<void> Function(SongsTableData song,
+      {List<SongsTableData>? queue, Duration? initialPosition})? _onPlaySong;
 
   // Monotonic stopwatch for seek throttling. H-05: instance-scoped so separate
   // controller instances (e.g. test + prod) never share throttle state.
@@ -40,7 +41,9 @@ class PlayerTransportController {
     Map<int, SongsTableData>? slotLookupCache,
     void Function()? debouncedPersistQueueSlots,
     void Function({bool force})? updateWidgetThrottled,
-    Future<void> Function(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition})? onPlaySong,
+    Future<void> Function(SongsTableData song,
+            {List<SongsTableData>? queue, Duration? initialPosition})?
+        onPlaySong,
   })  : _audioHandler = audioHandler,
         _getState = getState,
         _emit = emit,
@@ -166,10 +169,16 @@ class PlayerTransportController {
     final state = _getState();
     // If we're at the very beginning of the queue and track position is within 3 seconds,
     // jump to the most recently played track from queueHistory if available.
-    if (state.currentIndex == 0 && state.position.inSeconds <= 3 && state.queueHistory.isNotEmpty && _onPlaySong != null) {
+    if (state.currentIndex == 0 &&
+        state.position.inSeconds <= 3 &&
+        state.queueHistory.isNotEmpty &&
+        _onPlaySong != null) {
       final lastPlayed = state.queueHistory.first;
       final remainingHistory = state.queueHistory.sublist(1);
-      final updatedQueue = [lastPlayed, ...state.queue.where((s) => s.id != lastPlayed.id)];
+      final updatedQueue = [
+        lastPlayed,
+        ...state.queue.where((s) => s.id != lastPlayed.id)
+      ];
       _emit(state.copyWith(
         queueSlice: state.queueSlice.copyWith(
           queueHistory: remainingHistory,
@@ -184,7 +193,8 @@ class PlayerTransportController {
         if (!_isClosed()) {
           final s = _getState();
           _emit(s.copyWith(
-              playback: s.playback.copyWith(errorMessage: 'Skip to previous failed')));
+              playback: s.playback
+                  .copyWith(errorMessage: 'Skip to previous failed')));
         }
       }
       return;

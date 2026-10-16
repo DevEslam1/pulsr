@@ -66,11 +66,14 @@ class PulsrListTile extends StatelessWidget {
     if (contentPadding != null) return contentPadding!;
     switch (density) {
       case PulsrListTileDensity.compact:
-        return const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs);
+        return const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.xs);
       case PulsrListTileDensity.normal:
-        return const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm);
+        return const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.sm);
       case PulsrListTileDensity.relaxed:
-        return const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md);
+        return const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.md);
     }
   }
 
@@ -85,9 +88,7 @@ class PulsrListTile extends StatelessWidget {
           ? AppFontSize.body
           : AppFontSize.bodyLarge,
       fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-      color: enabled
-          ? (selected ? p.accent : p.textPrimary)
-          : p.textTertiary,
+      color: enabled ? (selected ? p.accent : p.textPrimary) : p.textTertiary,
       height: 1.25,
     );
 
@@ -141,9 +142,8 @@ class PulsrListTile extends StatelessWidget {
       ),
     );
 
-    final effectiveBg = selected
-        ? p.accentSoft
-        : (tileColor ?? Colors.transparent);
+    final effectiveBg =
+        selected ? p.accentSoft : (tileColor ?? Colors.transparent);
 
     content = Container(
       decoration: BoxDecoration(

@@ -1826,7 +1826,8 @@ class YtmAccountService {
 
     // Fallback: try playlist fetch with RDAMVM$videoId
     try {
-      final fallbackTracks = await fetchPlaylistTracks('RDAMVM$videoId', maxTracks: maxTracks);
+      final fallbackTracks =
+          await fetchPlaylistTracks('RDAMVM$videoId', maxTracks: maxTracks);
       return fallbackTracks.where((t) => t.videoId != videoId).toList();
     } catch (_) {
       return const [];
@@ -2575,8 +2576,9 @@ class YtmAccountService {
             final details = data['videoDetails'] as Map<String, dynamic>?;
             final audioConfig =
                 data['playerConfig']?['audioConfig'] as Map<String, dynamic>?;
-            final loudnessDb = (audioConfig?['loudnessDb'] as num?)?.toDouble() ??
-                (audioConfig?['perVideoLoudnessDb'] as num?)?.toDouble();
+            final loudnessDb =
+                (audioConfig?['loudnessDb'] as num?)?.toDouble() ??
+                    (audioConfig?['perVideoLoudnessDb'] as num?)?.toDouble();
 
             return YtmStream(
               videoId: videoId,

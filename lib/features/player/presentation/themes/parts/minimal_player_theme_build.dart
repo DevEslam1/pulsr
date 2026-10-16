@@ -100,8 +100,11 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                   final telemetrySpace = (song != null) ? 50.0 : 0.0;
                   final artworkSize = PlayerThemeMetrics.safeArtworkSize(
                     availableWidth: artConstraints.maxWidth,
-                    availableHeight:
-                        math.max(0.0, artConstraints.maxHeight - visualizerSpace - telemetrySpace),
+                    availableHeight: math.max(
+                        0.0,
+                        artConstraints.maxHeight -
+                            visualizerSpace -
+                            telemetrySpace),
                     isTablet: isTablet,
                     maxAllowedOverride: isLandscape ? 280.0 : null,
                   );
@@ -299,8 +302,7 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                     },
                   ),
                 ),
-                SizedBox(
-                    height: (isTablet ? 8.0 : 6.0) * metrics.heightRatio),
+                SizedBox(height: (isTablet ? 8.0 : 6.0) * metrics.heightRatio),
                 controlsColumn,
               ],
             );

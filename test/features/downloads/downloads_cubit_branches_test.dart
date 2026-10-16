@@ -226,8 +226,7 @@ void main() {
     await pumpEventQueue();
     expect(cubit.state.tasks['v1']!.progress, 0.2);
 
-    controller.add(
-        _task('v1', status: DownloadStatus.complete, progress: 1.0));
+    controller.add(_task('v1', status: DownloadStatus.complete, progress: 1.0));
     await pumpEventQueue();
     expect(cubit.state.tasks['v1']!.status, DownloadStatus.complete);
 

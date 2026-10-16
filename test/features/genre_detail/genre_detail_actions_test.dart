@@ -72,8 +72,8 @@ void main() {
   testWidgets('the shuffle button is disabled without tracks', (tester) async {
     await pump(tester, Stream.value(const Right([])));
 
-    final shuffle = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'Shuffle'));
+    final shuffle = tester
+        .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Shuffle'));
     expect(shuffle.onPressed, isNull);
   });
 
@@ -86,4 +86,3 @@ void main() {
     expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
   });
 }
-

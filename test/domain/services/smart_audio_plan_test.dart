@@ -82,7 +82,10 @@ void main() {
       final plan = resolveSmartAudioPlan(
         mode: SmartAudioMode.auto,
         device: _device(
-            name: 'USB DAC', type: 'usb', isBluetooth: false, bitPerfect: false),
+            name: 'USB DAC',
+            type: 'usb',
+            isBluetooth: false,
+            bitPerfect: false),
         trackIsHiRes: false,
         deviceSupportsBitPerfect: false,
       );

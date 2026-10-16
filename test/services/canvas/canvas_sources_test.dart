@@ -28,7 +28,8 @@ void main() {
       });
 
       final source = CommunityCanvas(client: mockClient);
-      final result = await source.search('Levitating', 'Dua Lipa', 'Future Nostalgia');
+      final result =
+          await source.search('Levitating', 'Dua Lipa', 'Future Nostalgia');
 
       expect(result, isNotNull);
       expect(result!.title, 'Levitating');
@@ -65,7 +66,9 @@ void main() {
             'items': [
               {
                 'title': 'Starboy',
-                'artists': [{'name': 'The Weeknd'}],
+                'artists': [
+                  {'name': 'The Weeknd'}
+                ],
                 'album': {
                   'title': 'Starboy',
                   'videoCover': '12345678-1234-1234-1234-123456789abc',
@@ -93,8 +96,12 @@ void main() {
   group('AppleMusicCanvas', () {
     test('searches catalog and resolves editorialVideo', () async {
       final expSeconds = (DateTime.now().millisecondsSinceEpoch ~/ 1000) + 3600;
-      final payload = base64Url.encode(utf8.encode('{"exp":$expSeconds,"iss":"AMPWebPlay"}')).replaceAll('=', '');
-      final header = base64Url.encode(utf8.encode('{"kid":"WebPlayKid"}')).replaceAll('=', '');
+      final payload = base64Url
+          .encode(utf8.encode('{"exp":$expSeconds,"iss":"AMPWebPlay"}'))
+          .replaceAll('=', '');
+      final header = base64Url
+          .encode(utf8.encode('{"kid":"WebPlayKid"}'))
+          .replaceAll('=', '');
       final dummyToken = '$header.$payload.signature';
 
       final mockClient = MockClient((request) async {
@@ -120,7 +127,8 @@ void main() {
                       'albumName': 'Endless Summer Vacation',
                       'editorialVideo': {
                         'motionDetailSquare': {
-                          'video': 'https://video.itunes.apple.com/apple-assets/flowers.mp4'
+                          'video':
+                              'https://video.itunes.apple.com/apple-assets/flowers.mp4'
                         }
                       }
                     }
@@ -135,12 +143,14 @@ void main() {
       });
 
       final source = AppleMusicCanvas(client: mockClient);
-      final result = await source.search('Flowers', 'Miley Cyrus', 'Endless Summer Vacation');
+      final result = await source.search(
+          'Flowers', 'Miley Cyrus', 'Endless Summer Vacation');
 
       expect(result, isNotNull);
       expect(result!.title, 'Flowers');
       expect(result.source, 'apple_music');
-      expect(result.videoUrl, 'https://video.itunes.apple.com/apple-assets/flowers.mp4');
+      expect(result.videoUrl,
+          'https://video.itunes.apple.com/apple-assets/flowers.mp4');
     });
   });
 }

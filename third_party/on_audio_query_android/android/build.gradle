@@ -1,0 +1,22 @@
+plugins {
+    id 'com.android.library'
+}
+
+group 'com.lucasjosino.on_audio_query'
+version '1.0-SNAPSHOT'
+
+android {
+    namespace 'com.lucasjosino.on_audio_query'
+    compileSdk 37
+
+    defaultConfig {
+        minSdk 16
+    }
+}
+
+dependencies {
+    def lifecycle_version = "2.3.1"
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
+}

@@ -303,8 +303,7 @@ void main() {
         ),
       ),
     );
-    when(() => settings.requestBluetoothPermission())
-        .thenAnswer((_) async {});
+    when(() => settings.requestBluetoothPermission()).thenAnswer((_) async {});
     when(() => settings.refreshOutputDevice()).thenAnswer((_) async {});
 
     await tester.pumpWidget(_host(
@@ -454,8 +453,7 @@ void main() {
     final settings = stubSettingsCubit(
       state: const SettingsState().copyWith(currentOutputDevice: _btOutput),
     );
-    when(() => settings.setBluetoothCodec(any()))
-        .thenAnswer((_) async => true);
+    when(() => settings.setBluetoothCodec(any())).thenAnswer((_) async => true);
     when(() => settings.setBluetoothSampleRate(any()))
         .thenAnswer((_) async => true);
     when(() => settings.setBluetoothBitDepth(any()))

@@ -34,11 +34,11 @@ dependencies:
   file_picker: ^12.2.0
   image_picker: ^1.1.2
   share_plus: ^13.3.0
-  home_widget: ^0.9.4
+  home_widget: ^0.10.0
   sentry_flutter: ^8.14.2
-  firebase_core: ^4.14.0
-  firebase_auth: ^6.6.1
-  cloud_firestore: ^6.9.0
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+  cloud_firestore: ^6.10.0
   google_sign_in: ^7.2.0
   flutter_inappwebview: ^6.1.5
   crypto: ^3.0.6
@@ -60,6 +60,10 @@ dependencies:
 dependency_overrides:
   just_audio:
     path: third_party/just_audio
+  on_audio_query_android:
+    path: third_party/on_audio_query_android
+  sentry_flutter:
+    path: third_party/sentry_flutter
 
 dev_dependencies:
   flutter_test:

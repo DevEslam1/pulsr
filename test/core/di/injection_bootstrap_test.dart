@@ -45,7 +45,9 @@ void main() {
 
       // The finally block must always complete the routing gate (I25).
       expect(
-        await initializationReady.then((_) => true).timeout(const Duration(seconds: 5)),
+        await initializationReady
+            .then((_) => true)
+            .timeout(const Duration(seconds: 5)),
         isTrue,
       );
 
@@ -77,11 +79,12 @@ void main() {
       await expectLater(configureDependencies(), throwsA(isA<Object>()));
 
       expect(
-        await initializationReady.then((_) => true).timeout(const Duration(seconds: 5)),
+        await initializationReady
+            .then((_) => true)
+            .timeout(const Duration(seconds: 5)),
         isTrue,
       );
     },
     timeout: const Timeout(Duration(minutes: 2)),
   );
 }
-

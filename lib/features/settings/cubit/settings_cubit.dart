@@ -388,8 +388,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       themeColorSource: themeColorSource,
       waveformSeekBarEnabled:
           prefs.getBool(_keyWaveformSeekBar) ?? current.waveformSeekBarEnabled,
-      canvasEnabled:
-          prefs.getBool(_keyCanvasEnabled) ?? current.canvasEnabled,
+      canvasEnabled: prefs.getBool(_keyCanvasEnabled) ?? current.canvasEnabled,
       canvasAsBackdrop:
           prefs.getBool(_keyCanvasAsBackdrop) ?? current.canvasAsBackdrop,
     );
@@ -1037,8 +1036,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               bpmSyncCrossfadeEnabled: previous.bpmSyncCrossfadeEnabled);
         }
         if (reconciledDirty.contains('automixEnabled')) {
-          loadedState = loadedState.copyWith(
-              automixEnabled: previous.automixEnabled);
+          loadedState =
+              loadedState.copyWith(automixEnabled: previous.automixEnabled);
         }
         if (reconciledDirty.contains('limiterEnabled')) {
           loadedState =

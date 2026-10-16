@@ -4,13 +4,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/earbud_optimization_service.dart';
 import 'package:pulsr/core/widgets/pulsr_switch.dart';
+import 'package:pulsr/domain/models/quran_metadata.dart';
 import 'package:pulsr/domain/models/quran_mode_profile.dart';
+import 'package:pulsr/domain/repositories/quran_repository.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/quran_mode_sheet.dart';
 
 import 'player_sheet_test_support.dart';
+
+class MockQuranRepository extends Mock implements QuranRepository {}
 
 const _btCaps = EarbudCapabilities(
   deviceName: 'Sony XM5',
@@ -49,10 +54,11 @@ MockPlayerCubit quranCubit(
 }) {
   final cubit = stubPlayerCubit(state: state);
   when(() => cubit.setQuranModeEnabled(any())).thenAnswer((_) async {});
+  when(() => cubit.setQuranReciterStyle(any())).thenAnswer((_) async {});
   when(() => cubit.setQuranAmbience(any())).thenAnswer((_) async {});
   when(() => cubit.setQuranWarmth(any())).thenAnswer((_) async {});
-  when(() => cubit.setPlaybackSpeed(any())).thenAnswer((_) async {});
-  when(() => cubit.reapplyQuranProfile()).thenAnswer((_) async {});
+  when(() => cubit.setQuranPlaybackSpeed(any())).thenAnswer((_) async {});
+  when(() => cubit.resetQuranProfile()).thenAnswer((_) async {});
   if (throwCaps) {
     when(() => cubit.detectEarbudCapabilities())
         .thenAnswer((_) async => throw Exception('no earbuds'));
@@ -68,6 +74,19 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(QuranReciterStyle.murattal);
+    registerFallbackValue(QuranBookmark(
+      trackUri: 'test',
+      metadata: const QuranMetadata(
+        surahNumber: 1,
+        surahName: 'Al-Fatihah',
+        ayahStart: 1,
+        ayahEnd: 7,
+        reciter: 'Reciter',
+      ),
+      currentAyah: 1,
+      position: Duration.zero,
+      timestamp: DateTime.now(),
+    ));
   });
 
   group('QuranModePanel', () {
@@ -122,14 +141,14 @@ void main() {
 
       await tester.tap(find.text('0.5x'));
       await tester.pump();
-      verify(() => cubit.setPlaybackSpeed(0.5)).called(1);
+      verify(() => cubit.setQuranPlaybackSpeed(0.5)).called(1);
 
       final reset = find.byType(OutlinedButton);
       await tester.ensureVisible(reset);
       await tester.pumpAndSettle();
       await tester.tap(reset);
       await tester.pump();
-      verify(() => cubit.reapplyQuranProfile()).called(1);
+      verify(() => cubit.resetQuranProfile()).called(1);
     });
 
     testWidgets('refresh re-detects earbud capabilities', (tester) async {
@@ -171,6 +190,79 @@ void main() {
 
       completer.complete(_btCaps);
       await tester.pumpAndSettle();
+    });
+
+    testWidgets(
+        'shows empty state card when current track has no Quran metadata',
+        (tester) async {
+      final repo = MockQuranRepository();
+      when(() => repo.getMetadataForTrack(any())).thenAnswer((_) async => null);
+      when(() => repo.getBookmark(any())).thenAnswer((_) async => null);
+      if (getIt.isRegistered<QuranRepository>()) {
+        getIt.unregister<QuranRepository>();
+      }
+      getIt.registerSingleton<QuranRepository>(repo);
+
+      final cubit = quranCubit(quranState());
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const SingleChildScrollView(child: QuranModePanel()),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No Quran Metadata'), findsOneWidget);
+    });
+
+    testWidgets(
+        'displays Quran metadata, bookmark action, and repeat modes when metadata exists',
+        (tester) async {
+      final repo = MockQuranRepository();
+      const testMetadata = QuranMetadata(
+        surahNumber: 1,
+        surahName: 'Al-Fatihah',
+        ayahStart: 1,
+        ayahEnd: 7,
+        reciter: 'Mishary Alafasy',
+        ayahTimings: [
+          QuranAyahTiming(
+            ayahNumber: 1,
+            start: Duration.zero,
+            end: Duration(seconds: 5),
+          ),
+          QuranAyahTiming(
+            ayahNumber: 2,
+            start: Duration(seconds: 5),
+            end: Duration(seconds: 10),
+          ),
+        ],
+      );
+
+      when(() => repo.getMetadataForTrack('/music/test.flac'))
+          .thenAnswer((_) async => testMetadata);
+      when(() => repo.getBookmark('/music/test.flac'))
+          .thenAnswer((_) async => null);
+      when(() => repo.saveBookmark(any())).thenAnswer((_) async {});
+
+      if (getIt.isRegistered<QuranRepository>()) {
+        getIt.unregister<QuranRepository>();
+      }
+      getIt.registerSingleton<QuranRepository>(repo);
+
+      final state = quranState().copyWith(
+        playback: const PlaybackSlice().copyWith(currentSong: testSong),
+      );
+      final cubit = quranCubit(state);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const SingleChildScrollView(child: QuranModePanel()),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Al-Fatihah (1)'), findsOneWidget);
+      expect(find.text('Mishary Alafasy • Ayah 1-7'), findsOneWidget);
+      expect(find.text('Save Quran Bookmark'), findsOneWidget);
+      expect(find.text('AYAH REPEAT MODE'), findsOneWidget);
     });
 
     testWidgets('QuranModeSheet wraps the panel in a bottom sheet container',

@@ -86,7 +86,8 @@ Map<String, dynamic> _responsiveTrack({
     {
       'musicResponsiveListItemRenderer': {
         if (withPlaylistItemData) 'playlistItemData': {'videoId': videoId},
-        if (navigationEndpoint != null) 'navigationEndpoint': navigationEndpoint,
+        if (navigationEndpoint != null)
+          'navigationEndpoint': navigationEndpoint,
         'flexColumns': [
           {
             'musicResponsiveListItemFlexColumnRenderer': {

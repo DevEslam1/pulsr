@@ -93,20 +93,24 @@ void main() {
   testWidgets('what-changes expander toggles open and closed', (tester) async {
     await pumpSection(tester);
 
-    expect(find.textContaining(l10n.expEqTitle, findRichText: true), findsNothing);
+    expect(
+        find.textContaining(l10n.expEqTitle, findRichText: true), findsNothing);
 
     await tester.tap(find.text(l10n.whatChanges));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.textContaining(l10n.expEqTitle, findRichText: true), findsOneWidget);
-    expect(find.textContaining(l10n.expEqNormal, findRichText: true), findsOneWidget);
+    expect(find.textContaining(l10n.expEqTitle, findRichText: true),
+        findsOneWidget);
+    expect(find.textContaining(l10n.expEqNormal, findRichText: true),
+        findsOneWidget);
 
     await tester.tap(find.text(l10n.whatChanges));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.textContaining(l10n.expEqTitle, findRichText: true), findsNothing);
+    expect(
+        find.textContaining(l10n.expEqTitle, findRichText: true), findsNothing);
   });
 
   testWidgets('mode switch collapses an expanded what-changes panel',
@@ -116,7 +120,8 @@ void main() {
     await tester.tap(find.text(l10n.whatChanges));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.textContaining(l10n.expGainTitle, findRichText: true), findsOneWidget);
+    expect(find.textContaining(l10n.expGainTitle, findRichText: true),
+        findsOneWidget);
 
     cubit.safeEmit(cubit.state.copyWith(
       experienceMode: ExperienceMode.professional,
@@ -125,6 +130,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     // didUpdateWidget collapsed the panel when the mode changed.
-    expect(find.textContaining(l10n.expGainTitle, findRichText: true), findsNothing);
+    expect(find.textContaining(l10n.expGainTitle, findRichText: true),
+        findsNothing);
   });
 }

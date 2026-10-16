@@ -154,8 +154,8 @@ void main() {
   group('searchWithFallback', () {
     test('a non-empty native answer wins without starting the fallback',
         () async {
-      channelHandler = (call) async =>
-          call.method == 'search' ? [_resultRow()] : null;
+      channelHandler =
+          (call) async => call.method == 'search' ? [_resultRow()] : null;
       final service = _newService();
       var httpCalls = 0;
       service.debugHttpClient = MockClient((_) async {
@@ -168,7 +168,8 @@ void main() {
     });
 
     test('an empty native answer promotes the Dart fallback', () async {
-      channelHandler = (call) async => call.method == 'search' ? const [] : null;
+      channelHandler =
+          (call) async => call.method == 'search' ? const [] : null;
       final service = _newService();
       service.debugHttpClient = MockClient((_) async => _json({
             'contents': {
@@ -218,7 +219,9 @@ void main() {
 
     test('a native throw also promotes the fallback', () async {
       channelHandler = (call) async {
-        if (call.method == 'search') throw PlatformException(code: 'YTM_FAILED');
+        if (call.method == 'search') {
+          throw PlatformException(code: 'YTM_FAILED');
+        }
         return null;
       };
       final service = _newService();
@@ -231,7 +234,8 @@ void main() {
   group('Dart InnerTube search parser', () {
     Future<List<dynamic>> fallbackSearch(
         Map<String, dynamic> Function(String body) build) async {
-      channelHandler = (call) async => call.method == 'search' ? const [] : null;
+      channelHandler =
+          (call) async => call.method == 'search' ? const [] : null;
       final service = _newService();
       service.debugHttpClient = MockClient((_) async => _json(build('')));
       return service.searchWithFallback('query');
@@ -305,17 +309,19 @@ void main() {
     });
 
     test('a 429 response feeds the shared rate limiter', () async {
-      channelHandler = (call) async => call.method == 'search' ? const [] : null;
+      channelHandler =
+          (call) async => call.method == 'search' ? const [] : null;
       final service = _newService();
-      service.debugHttpClient = MockClient((_) async =>
-          http.Response('', 429, headers: {'retry-after': '7'}));
+      service.debugHttpClient = MockClient(
+          (_) async => http.Response('', 429, headers: {'retry-after': '7'}));
       await service.searchWithFallback('query');
       expect(YtmRateLimiter.shared.isCoolingDown, isTrue);
     });
 
     test('malformed JSON is swallowed and yields no fallback results',
         () async {
-      channelHandler = (call) async => call.method == 'search' ? const [] : null;
+      channelHandler =
+          (call) async => call.method == 'search' ? const [] : null;
       final service = _newService();
       service.debugHttpClient =
           MockClient((_) async => http.Response('not json', 200));
@@ -387,17 +393,17 @@ void main() {
         ),
         quality: 'high',
       );
-      channelHandler = (call) async =>
-          call.method == 'resolveStream' ? _streamRow() : null;
-      final stream = await _newService()
-          .resolveStream('forceRefresh', forceRefresh: true);
+      channelHandler =
+          (call) async => call.method == 'resolveStream' ? _streamRow() : null;
+      final stream =
+          await _newService().resolveStream('forceRefresh', forceRefresh: true);
       expect(stream.url, 'https://example.com/stream.m4a');
       expect(cache.get('forceRefresh'), isNull);
     });
 
     test('coalesce:false performs an independent resolve', () async {
-      channelHandler = (call) async =>
-          call.method == 'resolveStream' ? _streamRow() : null;
+      channelHandler =
+          (call) async => call.method == 'resolveStream' ? _streamRow() : null;
       final service = _newService();
       final a = service.resolveStream('indep000001', coalesce: false);
       final b = service.resolveStream('indep000001', coalesce: false);
@@ -416,8 +422,8 @@ void main() {
       when(() => account.isLoggedIn).thenReturn(true);
       when(() => account.dataSyncId).thenReturn(null);
       when(() => account.ensureDataSyncId()).thenAnswer((_) async {});
-      when(() => account.resolvePlayerStream(any(),
-              quality: any(named: 'quality')))
+      when(() => account
+              .resolvePlayerStream(any(), quality: any(named: 'quality')))
           .thenAnswer((_) async => YtmStream(
                 videoId: 'account0001',
                 url: 'https://account.example/a.m4a',
@@ -443,8 +449,8 @@ void main() {
               quality: any(named: 'quality')))
           .thenThrow(const YtmException('YTM_AUTH'));
       getIt.registerSingleton<YtmAccountService>(account);
-      channelHandler = (call) async =>
-          call.method == 'resolveStream' ? _streamRow() : null;
+      channelHandler =
+          (call) async => call.method == 'resolveStream' ? _streamRow() : null;
 
       final stream = await _newService().resolveStream('authfail001');
       expect(stream.url, 'https://example.com/stream.m4a');
@@ -543,7 +549,8 @@ void main() {
       when(() => account.isLoggedIn).thenReturn(true);
       when(() => account.cookies).thenReturn('SAPISID=abc; SID=def');
       getIt.registerSingleton<YtmAccountService>(account);
-      channelHandler = (call) async => call.method == 'search' ? const [] : null;
+      channelHandler =
+          (call) async => call.method == 'search' ? const [] : null;
 
       final service = _newService();
       service.debugHttpClient = MockClient((request) async {

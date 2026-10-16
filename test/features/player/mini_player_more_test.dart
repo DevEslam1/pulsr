@@ -230,8 +230,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a downward swipe without a callback is a no-op',
-      (tester) async {
+  testWidgets('a downward swipe without a callback is a no-op', (tester) async {
     final cubit = stubTransport();
     await tester.pumpWidget(sheetHost(
       playerCubit: cubit,

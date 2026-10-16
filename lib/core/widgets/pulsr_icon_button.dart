@@ -34,8 +34,8 @@ class PulsrIconButton extends StatelessWidget {
     final p = context.palette;
     final enabled = onPressed != null;
 
-    final effectiveIconColor = iconColor ??
-        (enabled ? p.textSecondary : p.textTertiary);
+    final effectiveIconColor =
+        iconColor ?? (enabled ? p.textSecondary : p.textTertiary);
 
     Widget button = Container(
       width: size,

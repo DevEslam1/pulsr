@@ -123,10 +123,12 @@ void main() {
     });
     await pumpSheet(tester);
 
-    expect(find.text(AutomationTrigger.bluetoothConnected.label), findsOneWidget);
+    expect(
+        find.text(AutomationTrigger.bluetoothConnected.label), findsOneWidget);
     expect(find.text(AutomationTrigger.deviceCharging.label), findsOneWidget);
     // Supported rule resolves its profile name; charging is not detectable.
-    expect(find.text(l10n.settingsApplyProfileName('My Custom')), findsOneWidget);
+    expect(
+        find.text(l10n.settingsApplyProfileName('My Custom')), findsOneWidget);
     expect(find.text(l10n.settingsNotDetectable), findsOneWidget);
     expect(find.byType(PulsrSwitchListTile), findsNWidgets(2));
   });

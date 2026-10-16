@@ -208,7 +208,9 @@ class _PartySheetState extends State<PartySheet> {
                     ),
                     IconButton(
                       icon: Icon(
-                        _showSettings ? Icons.close_rounded : Icons.settings_rounded,
+                        _showSettings
+                            ? Icons.close_rounded
+                            : Icons.settings_rounded,
                         color: p.textSecondary,
                         size: 20,
                       ),
@@ -255,7 +257,8 @@ class _PartySheetState extends State<PartySheet> {
             hintText: 'https://party.pulsr.app',
             labelText: 'Server URL',
             border: OutlineInputBorder(borderRadius: AppRadii.r12All),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -273,7 +276,8 @@ class _PartySheetState extends State<PartySheet> {
             const SizedBox(width: AppSpacing.xs),
             FilledButton(
               onPressed: () async {
-                await _partyService.setCustomServerUrl(_serverController.text.trim());
+                await _partyService
+                    .setCustomServerUrl(_serverController.text.trim());
                 if (mounted) {
                   setState(() => _showSettings = false);
                 }
@@ -306,7 +310,8 @@ class _PartySheetState extends State<PartySheet> {
             hintText: 'Your display name (optional)',
             prefixIcon: const Icon(Icons.person_outline_rounded),
             border: OutlineInputBorder(borderRadius: AppRadii.r12All),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -317,7 +322,8 @@ class _PartySheetState extends State<PartySheet> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
                 )
               : const Icon(Icons.add_rounded),
           label: const Text('Create New Party'),
@@ -364,7 +370,8 @@ class _PartySheetState extends State<PartySheet> {
                   hintText: '6-CHAR CODE',
                   prefixIcon: const Icon(Icons.vpn_key_rounded),
                   border: OutlineInputBorder(borderRadius: AppRadii.r12All),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
             ),
@@ -383,7 +390,8 @@ class _PartySheetState extends State<PartySheet> {
           const SizedBox(height: AppSpacing.sm),
           Text(
             _errorMessage!,
-            style: const TextStyle(color: Colors.redAccent, fontSize: AppFontSize.bodySmall),
+            style: const TextStyle(
+                color: Colors.redAccent, fontSize: AppFontSize.bodySmall),
           ),
         ],
       ],
@@ -457,11 +465,15 @@ class _PartySheetState extends State<PartySheet> {
                 children: [
                   PulsrBadge(
                     dot: true,
-                    color: isSynced ? PulsrBadgeColor.success : PulsrBadgeColor.warning,
+                    color: isSynced
+                        ? PulsrBadgeColor.success
+                        : PulsrBadgeColor.warning,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    isSynced ? 'Synced (RTT: ${rtt}ms)' : 'Synchronizing clock...',
+                    isSynced
+                        ? 'Synced (RTT: ${rtt}ms)'
+                        : 'Synchronizing clock...',
                     style: TextStyle(
                       fontSize: AppFontSize.tiny,
                       color: p.textSecondary,
@@ -498,7 +510,8 @@ class _PartySheetState extends State<PartySheet> {
 
         // Member list
         ...snap.members.map((member) {
-          final isMe = member.memberId == _partyService.currentMember.value?.memberId;
+          final isMe =
+              member.memberId == _partyService.currentMember.value?.memberId;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
@@ -506,7 +519,9 @@ class _PartySheetState extends State<PartySheet> {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: p.surfaceContainerHigh,
-                  backgroundImage: member.avatarUrl != null ? NetworkImage(member.avatarUrl!) : null,
+                  backgroundImage: member.avatarUrl != null
+                      ? NetworkImage(member.avatarUrl!)
+                      : null,
                   child: member.avatarUrl == null
                       ? Text(
                           member.displayName.isNotEmpty
@@ -530,7 +545,8 @@ class _PartySheetState extends State<PartySheet> {
                             member.displayName,
                             style: TextStyle(
                               fontSize: AppFontSize.body,
-                              fontWeight: isMe ? FontWeight.w800 : FontWeight.w600,
+                              fontWeight:
+                                  isMe ? FontWeight.w800 : FontWeight.w600,
                               color: p.textPrimary,
                             ),
                           ),
@@ -538,7 +554,9 @@ class _PartySheetState extends State<PartySheet> {
                             const SizedBox(width: 6),
                             Text(
                               '(You)',
-                              style: TextStyle(fontSize: AppFontSize.tiny, color: p.textSecondary),
+                              style: TextStyle(
+                                  fontSize: AppFontSize.tiny,
+                                  color: p.textSecondary),
                             ),
                           ],
                         ],
@@ -548,7 +566,8 @@ class _PartySheetState extends State<PartySheet> {
                 ),
                 if (member.isHost)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.2),
                       borderRadius: AppRadii.r6All,
@@ -572,7 +591,8 @@ class _PartySheetState extends State<PartySheet> {
         // Leave Party Button
         OutlinedButton.icon(
           icon: const Icon(Icons.exit_to_app_rounded, color: Colors.redAccent),
-          label: const Text('Leave Party', style: TextStyle(color: Colors.redAccent)),
+          label: const Text('Leave Party',
+              style: TextStyle(color: Colors.redAccent)),
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Colors.redAccent),
             padding: const EdgeInsets.symmetric(vertical: 12),

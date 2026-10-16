@@ -5,12 +5,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/services/earbud_optimization_service.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../domain/models/quran_metadata.dart';
 import '../../../../domain/models/quran_mode_profile.dart';
+import '../../../../domain/repositories/quran_repository.dart';
+import '../../../../data/repositories/quran_repository_impl.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
+import 'quran_error_card.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -55,6 +60,11 @@ class QuranModePanel extends StatefulWidget {
 
 class _QuranModePanelState extends State<QuranModePanel> {
   Future<EarbudCapabilities>? _capsFuture;
+  bool _isApplying = false;
+  QuranMetadata? _metadata;
+  QuranBookmark? _bookmark;
+  QuranRepeatMode _repeatMode = QuranRepeatMode.off;
+  String? _lastLoadedTrackUri;
 
   @override
   void initState() {
@@ -67,6 +77,56 @@ class _QuranModePanelState extends State<QuranModePanel> {
       setState(() {
         _capsFuture = context.read<PlayerCubit>().detectEarbudCapabilities();
       });
+    }
+  }
+
+  Future<void> _checkMetadata(String? uri) async {
+    if (uri == _lastLoadedTrackUri) return;
+    _lastLoadedTrackUri = uri;
+    if (uri == null || uri.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _metadata = null;
+          _bookmark = null;
+        });
+      }
+      return;
+    }
+    try {
+      final repo = getIt.isRegistered<QuranRepository>()
+          ? getIt<QuranRepository>()
+          : QuranRepositoryImpl();
+      final meta = await repo.getMetadataForTrack(uri);
+      final bm = await repo.getBookmark(uri);
+      if (mounted && _lastLoadedTrackUri == uri) {
+        setState(() {
+          _metadata = meta;
+          _bookmark = bm;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _metadata = null;
+          _bookmark = null;
+        });
+      }
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _runQuranAction(Future<void> action) async {
+    if (_isApplying) return;
+    setState(() => _isApplying = true);
+    try {
+      await action;
+    } finally {
+      if (mounted) setState(() => _isApplying = false);
     }
   }
 
@@ -88,11 +148,19 @@ class _QuranModePanelState extends State<QuranModePanel> {
           a.reverbWetDry != b.reverbWetDry ||
           a.isSaturationEnabled != b.isSaturationEnabled ||
           a.saturationMix != b.saturationMix ||
-          a.playbackSpeed != b.playbackSpeed,
+          a.playbackSpeed != b.playbackSpeed ||
+          a.errorMessage != b.errorMessage ||
+          a.currentSong != b.currentSong,
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
-        final enabled = state.isQuranModeEnabled;
+        final enabled = state.isQuranModeEnabled && !_isApplying;
         final style = state.quranReciterStyle;
+        final currentTrackUri =
+            state.currentSong?.uri ?? state.currentSong?.path;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _checkMetadata(currentTrackUri);
+        });
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,9 +200,17 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       ],
                     ),
                   ),
-                  PulsrSwitch(
-                    value: enabled,
-                    onChanged: (v) => unawaited(cubit.setQuranModeEnabled(v)),
+                  Semantics(
+                    label: context.l10n.quranMode,
+                    value: state.isQuranModeEnabled ? 'On' : 'Off',
+                    child: PulsrSwitch(
+                      value: state.isQuranModeEnabled,
+                      onChanged: _isApplying
+                          ? null
+                          : (v) => unawaited(
+                                _runQuranAction(cubit.setQuranModeEnabled(v)),
+                              ),
+                    ),
                   ),
                 ],
               ),
@@ -164,22 +240,29 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 itemBuilder: (context, i) {
                   final s = QuranReciterStyle.values[i];
                   final selected = s == style;
-                  return ChoiceChip(
+                  return Semantics(
+                    label: '${context.l10n.reciterStyle}: ${s.label}',
                     selected: selected,
-                    onSelected: (_) {
-                      HapticFeedback.selectionClick();
-                      cubit.setQuranReciterStyle(s);
-                    },
-                    label: Text(s.label),
-                    labelStyle: TextStyle(
-                      color: selected ? p.onAccent : p.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: AppFontSize.label,
+                    child: ChoiceChip(
+                      selected: selected,
+                      onSelected: _isApplying
+                          ? null
+                          : (_) {
+                              HapticFeedback.selectionClick();
+                              unawaited(_runQuranAction(
+                                  cubit.setQuranReciterStyle(s)));
+                            },
+                      label: Text(s.label),
+                      labelStyle: TextStyle(
+                        color: selected ? p.onAccent : p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: AppFontSize.label,
+                      ),
+                      backgroundColor: p.surfaceContainer,
+                      selectedColor: p.accent,
+                      side: BorderSide(color: p.hairline),
+                      showCheckmark: false,
                     ),
-                    backgroundColor: p.surfaceContainer,
-                    selectedColor: p.accent,
-                    side: BorderSide(color: p.hairline),
-                    showCheckmark: false,
                   );
                 },
               ),
@@ -194,6 +277,30 @@ class _QuranModePanelState extends State<QuranModePanel> {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
+            _buildQuranMetadataCard(context, p, state, cubit),
+            const SizedBox(height: AppSpacing.md),
+
+            if (_isApplying)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: LinearProgressIndicator(),
+              ),
+            if (_isApplying) const SizedBox(height: AppSpacing.sm),
+
+            if ((state.errorMessage ?? '').contains('Quran'))
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: QuranErrorCard(
+                  message: state.errorMessage!,
+                  onRetry: enabled
+                      ? () => unawaited(
+                            _runQuranAction(cubit.reapplyQuranProfile()),
+                          )
+                      : null,
+                ),
+              ),
+            if ((state.errorMessage ?? '').contains('Quran'))
+              const SizedBox(height: AppSpacing.sm),
 
             // Tuning sliders
             _QuranSliderTile(
@@ -208,9 +315,31 @@ class _QuranModePanelState extends State<QuranModePanel> {
               valueLabel: state.isReverbEnabled
                   ? '${(state.reverbWetDry * 100).round()}%'
                   : '0%',
-              onChanged: cubit.setQuranAmbience,
+              onChanged: (value) => unawaited(
+                _runQuranAction(cubit.setQuranAmbience(value)),
+              ),
               applyOnRelease: true,
             ),
+            if (state.isReverbEnabled)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  start: AppSpacing.s20,
+                  end: AppSpacing.s20,
+                  bottom: AppSpacing.xs,
+                ),
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton.icon(
+                    onPressed: enabled
+                        ? () => unawaited(
+                              _runQuranAction(cubit.setQuranAmbience(0)),
+                            )
+                        : null,
+                    icon: const Icon(Icons.volume_off_rounded, size: 18),
+                    label: Text(context.l10n.noneLabel),
+                  ),
+                ),
+              ),
             _QuranSliderTile(
               icon: Icons.local_fire_department_rounded,
               title: context.l10n.dspVocalWarmth,
@@ -223,7 +352,9 @@ class _QuranModePanelState extends State<QuranModePanel> {
               valueLabel: state.isSaturationEnabled
                   ? '${(state.saturationMix * 100).round()}%'
                   : '0%',
-              onChanged: cubit.setQuranWarmth,
+              onChanged: (value) => unawaited(
+                _runQuranAction(cubit.setQuranWarmth(value)),
+              ),
               applyOnRelease: true,
             ),
 
@@ -270,8 +401,13 @@ class _QuranModePanelState extends State<QuranModePanel> {
                           ? a
                           : b)
                 },
-                onSelectionChanged:
-                    enabled ? (v) => cubit.setPlaybackSpeed(v.first) : null,
+                onSelectionChanged: enabled
+                    ? (v) => unawaited(
+                          _runQuranAction(
+                            cubit.setQuranPlaybackSpeed(v.first),
+                          ),
+                        )
+                    : null,
                 style: ButtonStyle(
                   foregroundColor: WidgetStatePropertyAll(p.textPrimary),
                   side: WidgetStatePropertyAll(BorderSide(color: p.hairline)),
@@ -386,8 +522,13 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed:
-                          enabled ? () => cubit.reapplyQuranProfile() : null,
+                      onPressed: enabled
+                          ? () => unawaited(
+                                _runQuranAction(
+                                  cubit.resetQuranProfile(),
+                                ),
+                              )
+                          : null,
                       icon: const Icon(Icons.restart_alt_rounded, size: 18),
                       label: Text(context.l10n.resetProfile),
                       style: OutlinedButton.styleFrom(
@@ -413,6 +554,251 @@ class _QuranModePanelState extends State<QuranModePanel> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildQuranMetadataCard(
+    BuildContext context,
+    PulsrPalette p,
+    PlayerState state,
+    PlayerCubit cubit,
+  ) {
+    final meta = _metadata;
+    if (meta == null || !meta.isValid) {
+      // Empty-state card for non-Quran tracks or tracks without Quran catalog metadata
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+        padding: const EdgeInsets.all(AppSpacing.s14),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: AppRadii.r14All,
+          border: Border.all(color: p.hairline),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.menu_book_outlined, size: 22, color: p.textSecondary),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.quranNoMetadataTitle,
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    context.l10n.quranNoMetadataDesc,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      color: p.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Valid Quran Metadata card
+    final bm = _bookmark;
+    final hasTimings = meta.ayahTimings.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+      padding: const EdgeInsets.all(AppSpacing.s14),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.r16All,
+        border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.15),
+                  borderRadius: AppRadii.r10All,
+                ),
+                child:
+                    Icon(Icons.auto_stories_rounded, color: p.accent, size: 20),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${meta.surahName} (${meta.surahNumber})',
+                      style: TextStyle(
+                        fontSize: AppFontSize.bodySmall,
+                        fontWeight: FontWeight.w800,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      '${meta.reciter} • Ayah ${meta.ayahStart}-${meta.ayahEnd}',
+                      style: TextStyle(
+                        fontSize: AppFontSize.caption,
+                        color: p.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          Divider(height: 1, color: p.hairline),
+          const SizedBox(height: AppSpacing.s10),
+
+          // Bookmark & Resume actions
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final uri = _lastLoadedTrackUri;
+                  if (uri == null) return;
+                  final currentAyah = meta.ayahStart;
+                  final newBookmark = QuranBookmark(
+                    trackUri: uri,
+                    metadata: meta,
+                    currentAyah: currentAyah,
+                    position: state.position,
+                    timestamp: DateTime.now(),
+                  );
+                  final repo = getIt.isRegistered<QuranRepository>()
+                      ? getIt<QuranRepository>()
+                      : QuranRepositoryImpl();
+                  final messenger = ScaffoldMessenger.of(context);
+                  final l10n = context.l10n;
+                  await repo.saveBookmark(newBookmark);
+                  if (mounted) {
+                    setState(() => _bookmark = newBookmark);
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.quranBookmarkSaved(
+                            meta.surahName, currentAyah)),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.bookmark_add_outlined, size: 16),
+                label: Text(context.l10n.quranSaveBookmark,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: p.accent,
+                  side: BorderSide(color: p.accent.withValues(alpha: 0.4)),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              if (bm != null) ...[
+                FilledButton.tonalIcon(
+                  onPressed: () => cubit.seek(bm.position),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                  label: Text(
+                    context.l10n.quranResumePrompt(meta.surahName,
+                        bm.currentAyah, _formatDuration(bm.position)),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                IconButton(
+                  tooltip: context.l10n.quranClearBookmark,
+                  icon: Icon(Icons.bookmark_remove_outlined,
+                      color: p.error, size: 18),
+                  onPressed: () async {
+                    final uri = _lastLoadedTrackUri;
+                    if (uri == null) return;
+                    final repo = getIt.isRegistered<QuranRepository>()
+                        ? getIt<QuranRepository>()
+                        : QuranRepositoryImpl();
+                    await repo.clearBookmark(uri);
+                    if (mounted) setState(() => _bookmark = null);
+                  },
+                ),
+              ],
+            ],
+          ),
+
+          // Repeat controls (only active when accurate timings exist)
+          if (hasTimings) ...[
+            const SizedBox(height: AppSpacing.s10),
+            Text(
+              'AYAH REPEAT MODE',
+              style: TextStyle(
+                fontSize: AppFontSize.tiny,
+                fontWeight: FontWeight.w800,
+                letterSpacing: AppTracking.wide,
+                color: p.accent,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: Text(context.l10n.quranRepeatOff),
+                  selected: _repeatMode == QuranRepeatMode.off,
+                  onSelected: (_) =>
+                      setState(() => _repeatMode = QuranRepeatMode.off),
+                  labelStyle: TextStyle(
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w600,
+                    color: _repeatMode == QuranRepeatMode.off
+                        ? p.onAccent
+                        : p.textPrimary,
+                  ),
+                ),
+                ChoiceChip(
+                  label: Text(context.l10n.quranRepeatAyah),
+                  selected: _repeatMode == QuranRepeatMode.singleAyah,
+                  onSelected: (_) =>
+                      setState(() => _repeatMode = QuranRepeatMode.singleAyah),
+                  labelStyle: TextStyle(
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w600,
+                    color: _repeatMode == QuranRepeatMode.singleAyah
+                        ? p.onAccent
+                        : p.textPrimary,
+                  ),
+                ),
+                ChoiceChip(
+                  label: Text(context.l10n.quranRepeatRange),
+                  selected: _repeatMode == QuranRepeatMode.range,
+                  onSelected: (_) =>
+                      setState(() => _repeatMode = QuranRepeatMode.range),
+                  labelStyle: TextStyle(
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w600,
+                    color: _repeatMode == QuranRepeatMode.range
+                        ? p.onAccent
+                        : p.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 

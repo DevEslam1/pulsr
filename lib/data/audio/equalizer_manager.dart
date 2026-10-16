@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
+import '../../core/telemetry/dsp_reliability_tracker.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
@@ -1308,9 +1309,8 @@ class EqualizerManager {
         : prevDrive;
     final targetMix =
         mix != null ? DspParamRanges.saturationMix.clampRaw(mix) : prevMix;
-    final targetTilt = tilt != null
-        ? DspParamRanges.saturationTilt.clampRaw(tilt)
-        : prevTilt;
+    final targetTilt =
+        tilt != null ? DspParamRanges.saturationTilt.clampRaw(tilt) : prevTilt;
     final targetMode =
         mode != null ? DspParamRanges.saturationMode.clamp(mode) : prevMode;
     final targetMultiband = multiband ?? prevMultiband;
@@ -1383,9 +1383,10 @@ class EqualizerManager {
     final targetDdcName = profileName ?? prevDdcName;
     final resolvedContent = ddcContent ??
         (coeffs != null && coeffs.isNotEmpty ? coeffs.join(' ') : null);
-    final targetDdcContent = (resolvedContent != null && resolvedContent.isNotEmpty)
-        ? resolvedContent
-        : prevDdcContent;
+    final targetDdcContent =
+        (resolvedContent != null && resolvedContent.isNotEmpty)
+            ? resolvedContent
+            : prevDdcContent;
 
     try {
       if (PlatformCapabilities.isAndroid) {
@@ -1450,8 +1451,7 @@ class EqualizerManager {
       try {
         final sysRatio = await _effectsChannel.getSystemMusicVolume();
         if (sysRatio.isFinite && sysRatio >= 0.0) {
-          targetVolumeLinear =
-              DspParamRanges.volumeLinear.clampRaw(sysRatio);
+          targetVolumeLinear = DspParamRanges.volumeLinear.clampRaw(sysRatio);
         }
       } catch (e, st) {
         ErrorLogger.log(
@@ -2067,6 +2067,7 @@ class EqualizerManager {
       Object e,
       StackTrace st,
     ) {
+      DspReliabilityTracker.instance.recordSessionReattachFailure(e);
       ErrorLogger.log(
         'reapplyToSession chain failed',
         error: e,
@@ -2089,6 +2090,7 @@ class EqualizerManager {
     _reattachChain = _reattachChain
         .then((_) => _effectsLock.lock(() => _pushFullEffectState()))
         .catchError((Object e, StackTrace st) {
+      DspReliabilityTracker.instance.recordRouteResyncFailure(e);
       ErrorLogger.log(
         'resyncActiveEffects failed',
         error: e,
@@ -2139,6 +2141,7 @@ class EqualizerManager {
         category: 'EqualizerManager',
       );
     } catch (e, st) {
+      DspReliabilityTracker.instance.recordSessionReattachFailure(e);
       ErrorLogger.log(
         'reapplyToSession($sessionId) failed',
         error: e,

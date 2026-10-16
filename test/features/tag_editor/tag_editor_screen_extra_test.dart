@@ -63,8 +63,8 @@ void main() {
   Future<void> pumpEditor(WidgetTester tester,
       {required SongsTableData song, List<SongsTableData>? batch}) async {
     useScreenSize(tester, const Size(800, 1800));
-    await tester.pumpWidget(screenHarness(
-        child: TagEditorScreen(song: song, batchSongs: batch)));
+    await tester.pumpWidget(
+        screenHarness(child: TagEditorScreen(song: song, batchSongs: batch)));
     await tester.pumpAndSettle();
   }
 
@@ -202,8 +202,8 @@ void main() {
 
     // The cubit also surfaces its own "for these tracks" error snackbar, so
     // match on the shared prefix.
-    expect(
-        find.textContaining('No matching online metadata found'), findsOneWidget);
+    expect(find.textContaining('No matching online metadata found'),
+        findsOneWidget);
     await tester.pump(const Duration(seconds: 5));
   });
 }

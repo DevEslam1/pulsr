@@ -37,8 +37,8 @@ void main() {
     });
 
     test('rejects a path that does not exist when checkExists is true', () {
-      final missing = File(
-          '${tempDir.path}${Platform.pathSeparator}does_not_exist.mp3');
+      final missing =
+          File('${tempDir.path}${Platform.pathSeparator}does_not_exist.mp3');
       expect(SafeFilePath.validate(missing.path), isNull);
     });
 
@@ -50,8 +50,7 @@ void main() {
     });
 
     test('rejects a directory', () {
-      final sub = Directory(
-          '${tempDir.path}${Platform.pathSeparator}a_subdir');
+      final sub = Directory('${tempDir.path}${Platform.pathSeparator}a_subdir');
       sub.createSync();
       expect(SafeFilePath.validate(sub.path), isNull);
     });

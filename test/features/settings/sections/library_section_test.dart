@@ -79,8 +79,7 @@ void main() {
     expect(h.cubit.state.isScanning, isFalse);
   });
 
-  testWidgets('duration filter dialog can save a new minimum',
-      (tester) async {
+  testWidgets('duration filter dialog can save a new minimum', (tester) async {
     final h = await pumpSettingsCategory(
       tester,
       category: 'library',
@@ -136,8 +135,7 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('remove-missing-files flow: cancel then confirm',
-      (tester) async {
+  testWidgets('remove-missing-files flow: cancel then confirm', (tester) async {
     final h = await pumpSettingsCategory(tester, category: 'library');
     addTearDown(h.cubit.close);
 

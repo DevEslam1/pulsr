@@ -206,7 +206,8 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
           final mood = id.substring(5);
           return _container(
             id,
-            _AutoBrowseStrings.t(PulsrAudioHandler._browseLanguage, 'mood.$mood'),
+            _AutoBrowseStrings.t(
+                PulsrAudioHandler._browseLanguage, 'mood.$mood'),
             subtitle: _AutoBrowseStrings.t(
                 PulsrAudioHandler._browseLanguage, 'mood.$mood.sub'),
           );
@@ -364,8 +365,9 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
           _container(
             'action_sleep_timer',
             _t('settings.sleep'),
-            subtitle:
-                _sleepTimerManager.isActive ? _t('state.active') : _t('state.off'),
+            subtitle: _sleepTimerManager.isActive
+                ? _t('state.active')
+                : _t('state.off'),
             style: _kBrowseListExtras,
           ),
         ];
@@ -639,7 +641,8 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     if (mediaId.startsWith('album_')) {
       final id = int.tryParse(mediaId.substring(6));
       if (id != null) {
-        await _loadSongsIfAny(_unwrapSongs(await _repository.getAlbumSongs(id)));
+        await _loadSongsIfAny(
+            _unwrapSongs(await _repository.getAlbumSongs(id)));
         return true;
       }
     }

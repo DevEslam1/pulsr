@@ -64,7 +64,9 @@ void main() {
   });
 
   group('CanvasBackdrop', () {
-    testWidgets('renders fallback artwork when song has no canvas or while loading', (tester) async {
+    testWidgets(
+        'renders fallback artwork when song has no canvas or while loading',
+        (tester) async {
       const fallbackKey = ValueKey('fallback_art');
       final dummySong = SongsTableData(
         id: 1,

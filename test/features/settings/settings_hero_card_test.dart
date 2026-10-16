@@ -166,8 +166,8 @@ void main() {
       ),
     );
     final expectedMinutes = DateTime.now().difference(tenMinAgo).inMinutes;
-    expect(find.text(l10n.lastSyncedMinutesAgo(expectedMinutes)),
-        findsOneWidget);
+    expect(
+        find.text(l10n.lastSyncedMinutesAgo(expectedMinutes)), findsOneWidget);
 
     final fiveHoursAgo = DateTime.now().subtract(const Duration(hours: 5));
     await pump(

@@ -33,8 +33,7 @@ void main() {
       secureValues[inv.namedArguments[#key] as String] =
           inv.namedArguments[#value] as String;
     });
-    when(() => storage.delete(key: any(named: 'key')))
-        .thenAnswer((inv) async {
+    when(() => storage.delete(key: any(named: 'key'))).thenAnswer((inv) async {
       secureValues.remove(inv.namedArguments[#key] as String);
     });
 
@@ -194,7 +193,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(secureValues.containsKey(
-        ScrobblerService.keyListenBrainzTokenSecure), isFalse);
+    expect(
+        secureValues.containsKey(ScrobblerService.keyListenBrainzTokenSecure),
+        isFalse);
   });
 }

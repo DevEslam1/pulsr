@@ -82,7 +82,8 @@ void main() {
       expect(prefs.getBool(PrefsKeys.strictBitPerfect), isFalse);
     });
 
-    test('Strict forces Bit-Perfect + bypass + follow-track together', () async {
+    test('Strict forces Bit-Perfect + bypass + follow-track together',
+        () async {
       await cubit.setStrictBitPerfect(true);
       expect(cubit.state.strictBitPerfect, isTrue);
       expect(cubit.state.bitPerfectOutput, isTrue);

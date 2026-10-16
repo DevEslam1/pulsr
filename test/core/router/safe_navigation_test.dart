@@ -13,8 +13,7 @@ void main() {
       initialLocation: '/',
       routes: [
         GoRoute(
-            path: '/',
-            builder: (_, __) => const Scaffold(body: Text('home'))),
+            path: '/', builder: (_, __) => const Scaffold(body: Text('home'))),
         GoRoute(
             path: '/a', builder: (_, __) => const Scaffold(body: Text('a'))),
         GoRoute(
@@ -49,18 +48,18 @@ void main() {
     router.dispose();
   });
 
-  testWidgets('pushDebounced debounces distinct Map instances with identical contents and clears extra after window',
+  testWidgets(
+      'pushDebounced debounces distinct Map instances with identical contents and clears extra after window',
       (tester) async {
     final router = GoRouter(
       initialLocation: '/',
       routes: [
         GoRoute(
-            path: '/',
-            builder: (_, __) => const Scaffold(body: Text('home'))),
+            path: '/', builder: (_, __) => const Scaffold(body: Text('home'))),
         GoRoute(
             path: '/detail',
-            builder: (_, state) =>
-                Scaffold(body: Text('detail: ${(state.extra as Map?)?['id']}'))),
+            builder: (_, state) => Scaffold(
+                body: Text('detail: ${(state.extra as Map?)?['id']}'))),
       ],
     );
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
@@ -68,16 +67,20 @@ void main() {
     final home = tester.element(find.text('home'));
     // First push with Map extra
     expect(
-        home.pushDebounced('/detail',
-            extra: {'id': 123, 'tags': ['audiophile', 'flac']}),
+        home.pushDebounced('/detail', extra: {
+          'id': 123,
+          'tags': ['audiophile', 'flac']
+        }),
         isTrue);
     await tester.pumpAndSettle();
 
     final detail = tester.element(find.text('detail: 123'));
     // Distinct Map instance with identical contents within the debounce window
     expect(
-        detail.pushDebounced('/detail',
-            extra: {'id': 123, 'tags': ['audiophile', 'flac']}),
+        detail.pushDebounced('/detail', extra: {
+          'id': 123,
+          'tags': ['audiophile', 'flac']
+        }),
         isFalse,
         reason: 'Map with equal deep content must be debounced');
 
@@ -87,10 +90,13 @@ void main() {
 
     // After debounce window, the push is allowed again
     expect(
-        detail.pushDebounced('/detail',
-            extra: {'id': 123, 'tags': ['audiophile', 'flac']}),
+        detail.pushDebounced('/detail', extra: {
+          'id': 123,
+          'tags': ['audiophile', 'flac']
+        }),
         isTrue,
-        reason: 'Push is allowed once debounce window expires and clears extra');
+        reason:
+            'Push is allowed once debounce window expires and clears extra');
     await tester.pumpAndSettle();
 
     // Pump past the 600ms debounce timer so no fakeAsync timers remain

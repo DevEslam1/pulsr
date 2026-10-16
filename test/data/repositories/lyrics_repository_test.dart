@@ -93,8 +93,7 @@ void main() {
             durationSeconds: any(named: 'durationSeconds'),
           )).thenAnswer((_) async => null);
 
-      when(() => mockYtm.fetchYtmLyrics(any()))
-          .thenAnswer((_) async => null);
+      when(() => mockYtm.fetchYtmLyrics(any())).thenAnswer((_) async => null);
 
       final lrc = await repository.fetchLyricsLrc(
         title: 'Unknown Track',

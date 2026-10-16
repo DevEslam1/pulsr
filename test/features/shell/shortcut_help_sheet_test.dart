@@ -30,10 +30,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Keyboard Shortcuts'), findsOneWidget);
-    expect(find.text('Desktop and tablet quick navigation keys'), findsOneWidget);
+    expect(
+        find.text('Desktop and tablet quick navigation keys'), findsOneWidget);
 
     // One row per binding: 12 keys.
-    for (final key in ['Space', '→', '←', '↑', '↓', 'N', 'P', 'F', 'M', 'L', 'Q', '?']) {
+    for (final key in [
+      'Space',
+      '→',
+      '←',
+      '↑',
+      '↓',
+      'N',
+      'P',
+      'F',
+      'M',
+      'L',
+      'Q',
+      '?'
+    ]) {
       expect(find.text(key), findsOneWidget, reason: 'missing key $key');
     }
 

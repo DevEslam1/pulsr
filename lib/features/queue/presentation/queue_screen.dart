@@ -45,7 +45,9 @@ class QueueScreen extends StatelessWidget {
               builder: (context, isAutoplay) {
                 return IconButton(
                   icon: Icon(
-                    isAutoplay ? Icons.all_inclusive_rounded : Icons.all_inclusive,
+                    isAutoplay
+                        ? Icons.all_inclusive_rounded
+                        : Icons.all_inclusive,
                     color: isAutoplay ? p.accent : p.textTertiary,
                   ),
                   tooltip: isAutoplay ? 'Autoplay: ON' : 'Autoplay: OFF',
@@ -295,7 +297,8 @@ class QueueScreen extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: ExpansionTile(
                             tilePadding: EdgeInsets.zero,
-                            leading: Icon(Icons.history_rounded, color: p.accent, size: 20),
+                            leading: Icon(Icons.history_rounded,
+                                color: p.accent, size: 20),
                             title: Text(
                               'Recently Played (${state.queueHistory.length})',
                               style: TextStyle(
@@ -304,10 +307,12 @@ class QueueScreen extends StatelessWidget {
                                 fontSize: AppFontSize.body,
                               ),
                             ),
-                            children: state.queueHistory.take(10).map((histSong) {
+                            children:
+                                state.queueHistory.take(10).map((histSong) {
                               return ListTile(
                                 dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.xs),
                                 leading: CachedArtwork(
                                   id: histSong.id,
                                   remoteUrl: histSong.remoteArtworkUrl,
@@ -338,19 +343,25 @@ class QueueScreen extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
-                                      icon: Icon(Icons.playlist_add_rounded, color: p.accent, size: 20),
+                                      icon: Icon(Icons.playlist_add_rounded,
+                                          color: p.accent, size: 20),
                                       tooltip: 'Add to queue',
                                       onPressed: () {
                                         PulsrHaptics.confirm();
-                                        context.read<PlayerCubit>().addToQueue(histSong);
+                                        context
+                                            .read<PlayerCubit>()
+                                            .addToQueue(histSong);
                                       },
                                     ),
                                     IconButton(
-                                      icon: Icon(Icons.play_arrow_rounded, color: p.accent, size: 22),
+                                      icon: Icon(Icons.play_arrow_rounded,
+                                          color: p.accent, size: 22),
                                       tooltip: 'Play',
                                       onPressed: () {
                                         PulsrHaptics.tap();
-                                        context.read<PlayerCubit>().playSong(histSong);
+                                        context
+                                            .read<PlayerCubit>()
+                                            .playSong(histSong);
                                       },
                                     ),
                                   ],

@@ -398,8 +398,7 @@ class _SidebarBrandHeader extends StatelessWidget {
 
     if (!isExtended) {
       return Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(
-            0, topPad, 0, AppSpacing.xs),
+        padding: EdgeInsetsDirectional.fromSTEB(0, topPad, 0, AppSpacing.xs),
         child: Center(
           child: GestureDetector(
             onTap: onToggle,

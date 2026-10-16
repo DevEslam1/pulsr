@@ -297,7 +297,8 @@ Future<void> main() async {
           if (onlineAllowed && prefs != null) {
             unawaited(DiscordRpcService.instance.init(prefs).then((_) {
               if (getIt.isRegistered<PlayerCubit>()) {
-                DiscordRpcService.instance.bindToPlayerCubit(getIt<PlayerCubit>());
+                DiscordRpcService.instance
+                    .bindToPlayerCubit(getIt<PlayerCubit>());
               }
             }).catchError((e, st) {
               ErrorLogger.log('DiscordRpcService init failed',
@@ -338,8 +339,12 @@ Future<void> main() async {
             final scrubbedMessage = msg != null
                 ? SentryMessage(
                     ErrorLogger.redactPii(msg.formatted),
-                    template: msg.template != null ? ErrorLogger.redactPii(msg.template!) : null,
-                    params: msg.params?.map((p) => p is String ? ErrorLogger.redactPii(p) : p).toList(),
+                    template: msg.template != null
+                        ? ErrorLogger.redactPii(msg.template!)
+                        : null,
+                    params: msg.params
+                        ?.map((p) => p is String ? ErrorLogger.redactPii(p) : p)
+                        .toList(),
                   )
                 : null;
             return event.copyWith(

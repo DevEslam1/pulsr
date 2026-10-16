@@ -1,0 +1,119 @@
+// test/domain/models/quran_metadata_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/domain/models/quran_metadata.dart';
+
+void main() {
+  group('QuranAyahTiming', () {
+    test('instantiates and serializes accurately', () {
+      const timing = QuranAyahTiming(
+        ayahNumber: 1,
+        start: Duration(seconds: 0),
+        end: Duration(seconds: 5),
+      );
+      final map = timing.toMap();
+      final restored = QuranAyahTiming.fromMap(map);
+      expect(restored.ayahNumber, 1);
+      expect(restored.start, Duration.zero);
+      expect(restored.end, const Duration(seconds: 5));
+      expect(restored, timing);
+    });
+  });
+
+  group('QuranMetadata', () {
+    test('validates correct Surah range and fields', () {
+      const valid = QuranMetadata(
+        surahNumber: 1,
+        surahName: 'Al-Fatihah',
+        ayahStart: 1,
+        ayahEnd: 7,
+        reciter: 'Mishary Alafasy',
+      );
+      expect(valid.isValid, isTrue);
+      expect(valid.totalAyahs, 7);
+
+      const invalidSurahLow = QuranMetadata(
+        surahNumber: 0,
+        surahName: 'Invalid',
+        ayahStart: 1,
+        ayahEnd: 5,
+        reciter: 'Reciter',
+      );
+      expect(invalidSurahLow.isValid, isFalse);
+
+      const invalidSurahHigh = QuranMetadata(
+        surahNumber: 115,
+        surahName: 'Invalid',
+        ayahStart: 1,
+        ayahEnd: 5,
+        reciter: 'Reciter',
+      );
+      expect(invalidSurahHigh.isValid, isFalse);
+
+      const invalidAyahEnd = QuranMetadata(
+        surahNumber: 2,
+        surahName: 'Al-Baqarah',
+        ayahStart: 10,
+        ayahEnd: 5,
+        reciter: 'Reciter',
+      );
+      expect(invalidAyahEnd.isValid, isFalse);
+    });
+
+    test('serializes and deserializes accurately', () {
+      const original = QuranMetadata(
+        surahNumber: 114,
+        surahName: 'An-Nas',
+        ayahStart: 1,
+        ayahEnd: 6,
+        reciter: 'Abdul Basit',
+        source: 'Tanzil',
+        ayahTimings: [
+          QuranAyahTiming(
+            ayahNumber: 1,
+            start: Duration(seconds: 0),
+            end: Duration(seconds: 4),
+          ),
+          QuranAyahTiming(
+            ayahNumber: 2,
+            start: Duration(seconds: 4),
+            end: Duration(seconds: 8),
+          ),
+        ],
+      );
+
+      final map = original.toMap();
+      final restored = QuranMetadata.fromMap(map);
+
+      expect(restored, original);
+      expect(restored.timingForAyah(1)?.end, const Duration(seconds: 4));
+      expect(restored.timingForAyah(2)?.start, const Duration(seconds: 4));
+      expect(restored.timingForAyah(99), isNull);
+    });
+  });
+
+  group('QuranBookmark', () {
+    test('validates bookmark fields and isolation', () {
+      const metadata = QuranMetadata(
+        surahNumber: 18,
+        surahName: 'Al-Kahf',
+        ayahStart: 1,
+        ayahEnd: 110,
+        reciter: 'Minshawi',
+      );
+
+      final bookmark = QuranBookmark(
+        trackUri: 'content://quran/surah18.mp3',
+        metadata: metadata,
+        currentAyah: 10,
+        position: const Duration(minutes: 2, seconds: 15),
+        timestamp: DateTime(2026, 10, 16),
+      );
+
+      expect(bookmark.isValid, isTrue);
+
+      final map = bookmark.toMap();
+      final restored = QuranBookmark.fromMap(map);
+      expect(restored, bookmark);
+    });
+  });
+}

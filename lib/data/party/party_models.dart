@@ -162,8 +162,7 @@ class PartyPlayback {
       isPlaying: json['isPlaying'] as bool? ?? false,
       positionMs: (json['positionMs'] as num?)?.toInt() ?? 0,
       anchorMs: (json['anchorMs'] as num?)?.toInt() ?? 0,
-      effectivePositionMs:
-          (json['effectivePositionMs'] as num?)?.toInt() ?? 0,
+      effectivePositionMs: (json['effectivePositionMs'] as num?)?.toInt() ?? 0,
       updatedBy: json['updatedBy'] as String?,
       startedBy: json['startedBy'] as String?,
       startedByName: json['startedByName'] as String?,

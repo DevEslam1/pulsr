@@ -148,18 +148,28 @@ extension PlayerQueueRadio on PlayerQueueController {
   static String normalizeTitle(String title) {
     return title
         .toLowerCase()
-        .replaceAll(RegExp(r'[\(\[\{].*?[\)\]\}]'), '') // remove parenthesized content
+        .replaceAll(
+            RegExp(r'[\(\[\{].*?[\)\]\}]'), '') // remove parenthesized content
         .replaceAll(RegExp(r'[^a-z0-9]'), '') // keep only alphanumeric
         .trim();
   }
 
   /// Tests if two tracks represent the same recording using normalized title and artists.
-  static bool isSameRecording(String titleA, String artistA, String titleB, String artistB) {
+  static bool isSameRecording(
+      String titleA, String artistA, String titleB, String artistB) {
     final normA = normalizeTitle(titleA);
     final normB = normalizeTitle(titleB);
     if (normA.isNotEmpty && normA == normB) {
-      final artSetA = artistA.toLowerCase().split(RegExp(r'[,&/\\]')).map((e) => e.trim()).toSet();
-      final artSetB = artistB.toLowerCase().split(RegExp(r'[,&/\\]')).map((e) => e.trim()).toSet();
+      final artSetA = artistA
+          .toLowerCase()
+          .split(RegExp(r'[,&/\\]'))
+          .map((e) => e.trim())
+          .toSet();
+      final artSetB = artistB
+          .toLowerCase()
+          .split(RegExp(r'[,&/\\]'))
+          .map((e) => e.trim())
+          .toSet();
       if (artSetA.intersection(artSetB).isNotEmpty) {
         return true;
       }
@@ -168,12 +178,15 @@ extension PlayerQueueRadio on PlayerQueueController {
   }
 
   /// Fetches radio tracks via YtmService and appends them to the queue as QueueTier.autoplay.
-  Future<void> fetchAndEnqueueAutoplay(String seedVideoId, {String? seedArtist}) async {
-    final ytmService = getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null;
+  Future<void> fetchAndEnqueueAutoplay(String seedVideoId,
+      {String? seedArtist}) async {
+    final ytmService =
+        getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null;
     if (ytmService == null) return;
 
     try {
-      final radioTracks = await ytmService.getRadioTracks(seedVideoId, limit: 15);
+      final radioTracks =
+          await ytmService.getRadioTracks(seedVideoId, limit: 15);
       if (radioTracks.isEmpty || _isClosed()) return;
 
       final s = _getState();
@@ -193,13 +206,18 @@ extension PlayerQueueRadio on PlayerQueueController {
         if (playedAndQueuedIds.contains(track.videoId)) continue;
 
         // Duplicate recording check
-        final hasDup = s.queue.any((q) => isSameRecording(q.title, q.artist, track.title, track.artist)) ||
-            s.queueHistory.any((h) => isSameRecording(h.title, h.artist, track.title, track.artist));
+        final hasDup = s.queue.any((q) => isSameRecording(
+                q.title, q.artist, track.title, track.artist)) ||
+            s.queueHistory.any((h) =>
+                isSameRecording(h.title, h.artist, track.title, track.artist));
         if (hasDup) continue;
 
         // Artist limits: max 4 for seed artist, max 2 for other artists (matching BitChord)
         final trackArtist = track.artist.trim().toLowerCase();
-        final limit = (normalizedSeedArtist.isNotEmpty && trackArtist.contains(normalizedSeedArtist)) ? 4 : 2;
+        final limit = (normalizedSeedArtist.isNotEmpty &&
+                trackArtist.contains(normalizedSeedArtist))
+            ? 4
+            : 2;
         final currentCount = artistCounts[trackArtist] ?? 0;
         if (currentCount >= limit) continue;
 
@@ -318,7 +336,8 @@ extension PlayerQueueRadio on PlayerQueueController {
     final shuffledContext = List<SongsTableData>.from(contextTracks)..shuffle();
     _avoidIdentityShuffle(contextTracks, shuffledContext);
 
-    final shuffledAutoplay = List<SongsTableData>.from(autoplayTracks)..shuffle();
+    final shuffledAutoplay = List<SongsTableData>.from(autoplayTracks)
+      ..shuffle();
     _avoidIdentityShuffle(autoplayTracks, shuffledAutoplay);
 
     final newUpcoming = [

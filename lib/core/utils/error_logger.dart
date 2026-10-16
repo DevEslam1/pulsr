@@ -23,7 +23,7 @@ class ErrorLogger {
       r'/(?:data/user/\d+|storage/emulated/\d+)/[^/\s\n\r"\)]+',
       caseSensitive: false);
   static final _userIdRegex = RegExp(
-      r'\b(userId|user_id|memberId)\s*[:=]\s*["'']?[A-Za-z0-9_-]+["'']?',
+      r'\b(userId|user_id|memberId)\s*[:=]\s*["' ']?[A-Za-z0-9_-]+["' ']?',
       caseSensitive: false);
 
   /// Redacts PII including email addresses, auth tokens, session cookies,

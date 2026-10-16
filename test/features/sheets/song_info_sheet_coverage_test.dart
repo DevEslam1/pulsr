@@ -23,8 +23,7 @@ void main() {
 
   late List<MethodCall> ringtoneCalls;
 
-  Future<Object?> Function(MethodCall) handler =
-      (call) async => null;
+  Future<Object?> Function(MethodCall) handler = (call) async => null;
 
   void stubRingtone() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -54,7 +53,8 @@ void main() {
     final cubit = stubPlayerCubit();
     when(() => cubit.setSongRating(any(), any())).thenAnswer((_) async {});
     when(() => cubit.setSongEqOverride(any(), any())).thenAnswer((_) async {});
-    when(() => cubit.setSongVolumeOverride(any(), any())).thenAnswer((_) async {});
+    when(() => cubit.setSongVolumeOverride(any(), any()))
+        .thenAnswer((_) async {});
     when(() => cubit.saveDspSnapshot()).thenAnswer((_) async {});
     when(() => cubit.saveBookmark()).thenAnswer((_) async => true);
     when(() => cubit.clearBookmark()).thenAnswer((_) async {});
@@ -205,8 +205,7 @@ void main() {
     addTearDown(() => dir.deleteSync(recursive: true));
     final file = File('${dir.path}${Platform.pathSeparator}track.flac')
       ..writeAsBytesSync(List<int>.filled(64, 0));
-    final song =
-        testSong.copyWith(path: file.path);
+    final song = testSong.copyWith(path: file.path);
 
     tester.view.physicalSize = const Size(1000, 3600);
     tester.view.devicePixelRatio = 1.0;
@@ -230,7 +229,8 @@ void main() {
     expect(find.byType(SnackBar), findsOneWidget);
   });
 
-  testWidgets('BPM dialog rejects an out-of-range value and accepts a valid one',
+  testWidgets(
+      'BPM dialog rejects an out-of-range value and accepts a valid one',
       (tester) async {
     final cubit = baseCubit();
     await pumpSheet(tester, cubit: cubit);

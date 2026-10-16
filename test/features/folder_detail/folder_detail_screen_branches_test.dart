@@ -37,8 +37,8 @@ _Library _library({List<SongsTableData> favorites = const []}) {
   when(() => cubit.state).thenReturn(LibraryState(favorites: favorites));
   when(() => cubit.stream).thenAnswer((_) => const Stream.empty());
   when(() => cubit.toggleFavorite(any())).thenAnswer((_) async {});
-    when(() => cubit.toggleFolderExclusion(any()))
-        .thenAnswer((_) async => const Right<AppFailure, void>(null));
+  when(() => cubit.toggleFolderExclusion(any()))
+      .thenAnswer((_) async => const Right<AppFailure, void>(null));
   return cubit;
 }
 
@@ -86,7 +86,8 @@ void main() {
     );
   }
 
-  SongsTableData song(int id, String title) => createTestSong(id: id, title: title);
+  SongsTableData song(int id, String title) =>
+      createTestSong(id: id, title: title);
 
   Future<void> openSheet(WidgetTester tester) async {
     await tester.tap(find.byIcon(Icons.info_outline_rounded));
@@ -107,8 +108,7 @@ void main() {
     expect(find.text('D'), findsOneWidget);
   });
 
-  testWidgets('an excluded folder shows the collage overlay',
-      (tester) async {
+  testWidgets('an excluded folder shows the collage overlay', (tester) async {
     await tester.pumpWidget(build(
       Stream.value(Right([song(1, 'A'), song(2, 'B')])),
       folder: const FolderItem(
@@ -123,8 +123,7 @@ void main() {
     expect(find.text('Excluded from scan'), findsWidgets);
   });
 
-  testWidgets('play-next and add-to-queue reach the player',
-      (tester) async {
+  testWidgets('play-next and add-to-queue reach the player', (tester) async {
     final player = stubPlayerCubit();
     when(() => player.playNext(any())).thenAnswer((_) async {});
     when(() => player.addAllToQueue(any())).thenAnswer((_) async {});
@@ -145,10 +144,8 @@ void main() {
     verify(() => player.addAllToQueue(any())).called(1);
   });
 
-  testWidgets('copy places the folder path on the clipboard',
-      (tester) async {
-    await tester.pumpWidget(
-        build(Stream.value(Right([song(1, 'A')]))));
+  testWidgets('copy places the folder path on the clipboard', (tester) async {
+    await tester.pumpWidget(build(Stream.value(Right([song(1, 'A')]))));
     await settle(tester);
 
     await openSheet(tester);

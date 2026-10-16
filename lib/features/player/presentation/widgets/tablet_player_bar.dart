@@ -308,13 +308,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                           .onOpenNowPlaying,
                                                       child: ClipRRect(
                                                         borderRadius:
-                                                            BorderRadius
-                                                                .circular(
-                                                                    isShortHeight
-                                                                        ? AppRadii
-                                                                            .r8
-                                                                        : AppRadii
-                                                                            .r10),
+                                                            BorderRadius.circular(
+                                                                isShortHeight
+                                                                    ? AppRadii
+                                                                        .r8
+                                                                    : AppRadii
+                                                                        .r10),
                                                         child: CachedArtwork(
                                                           id: song.id,
                                                           albumId: song.albumId,
@@ -344,10 +343,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                       constraints:
                                                           BoxConstraints(
                                                         maxWidth: isShortHeight
-                                                            ? (leftMaxWidth - 78)
-                                                                .clamp(80.0, 180.0)
-                                                            : (leftMaxWidth - 90)
-                                                                .clamp(60.0, 160.0),
+                                                            ? (leftMaxWidth -
+                                                                    78)
+                                                                .clamp(
+                                                                    80.0, 180.0)
+                                                            : (leftMaxWidth -
+                                                                    90)
+                                                                .clamp(60.0,
+                                                                    160.0),
                                                       ),
                                                       child: GestureDetector(
                                                         onTap: widget
@@ -374,12 +377,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w700,
-                                                                fontSize:
-                                                                    isShortHeight
-                                                                        ? AppFontSize
-                                                                            .label
-                                                                        : AppFontSize
-                                                                            .bodySmall,
+                                                                fontSize: isShortHeight
+                                                                    ? AppFontSize
+                                                                        .label
+                                                                    : AppFontSize
+                                                                        .bodySmall,
                                                               ),
                                                             ),
                                                             const SizedBox(
@@ -398,12 +400,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w500,
-                                                                fontSize:
-                                                                    isShortHeight
-                                                                        ? AppFontSize
-                                                                            .tiny
-                                                                        : AppFontSize
-                                                                            .label,
+                                                                fontSize: isShortHeight
+                                                                    ? AppFontSize
+                                                                        .tiny
+                                                                    : AppFontSize
+                                                                        .label,
                                                               ),
                                                             ),
                                                             if (!isShortHeight) ...[
@@ -416,7 +417,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                 activeColor:
                                                                     activeColor,
                                                                 compact: true,
-                                                                showDevice: false,
+                                                                showDevice:
+                                                                    false,
                                                               ),
                                                             ],
                                                           ],
@@ -508,32 +510,50 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                 children: [
                                                                   // Shuffle
                                                                   Semantics(
-                                                                    label: state.isShuffle
-                                                                        ? l10n.disableShuffle
-                                                                        : l10n.enableShuffle,
-                                                                    button: true,
-                                                                    child: Tooltip(
+                                                                    label: state
+                                                                            .isShuffle
+                                                                        ? l10n
+                                                                            .disableShuffle
+                                                                        : l10n
+                                                                            .enableShuffle,
+                                                                    button:
+                                                                        true,
+                                                                    child:
+                                                                        Tooltip(
                                                                       message: state.isShuffle
-                                                                          ? l10n.disableShuffle
-                                                                          : l10n.enableShuffle,
-                                                                      child: Material(
-                                                                        color: Colors.transparent,
-                                                                        shape: const CircleBorder(),
-                                                                        clipBehavior: Clip.antiAlias,
-                                                                        child: InkWell(
-                                                                          onTap: () {
+                                                                          ? l10n
+                                                                              .disableShuffle
+                                                                          : l10n
+                                                                              .enableShuffle,
+                                                                      child:
+                                                                          Material(
+                                                                        color: Colors
+                                                                            .transparent,
+                                                                        shape:
+                                                                            const CircleBorder(),
+                                                                        clipBehavior:
+                                                                            Clip.antiAlias,
+                                                                        child:
+                                                                            InkWell(
+                                                                          onTap:
+                                                                              () {
                                                                             HapticFeedback.selectionClick();
                                                                             cubit.toggleShuffle();
                                                                           },
-                                                                          child: AnimatedContainer(
-                                                                            duration: const Duration(milliseconds: 180),
-                                                                            width: isShortHeight ? 30 : 36,
-                                                                            height: isShortHeight ? 30 : 36,
-                                                                            decoration: BoxDecoration(
+                                                                          child:
+                                                                              AnimatedContainer(
+                                                                            duration:
+                                                                                const Duration(milliseconds: 180),
+                                                                            width: isShortHeight
+                                                                                ? 30
+                                                                                : 36,
+                                                                            height: isShortHeight
+                                                                                ? 30
+                                                                                : 36,
+                                                                            decoration:
+                                                                                BoxDecoration(
                                                                               shape: BoxShape.circle,
-                                                                              color: state.isShuffle
-                                                                                  ? activeColor.withValues(alpha: 0.16)
-                                                                                  : Colors.transparent,
+                                                                              color: state.isShuffle ? activeColor.withValues(alpha: 0.16) : Colors.transparent,
                                                                               border: state.isShuffle
                                                                                   ? Border.all(
                                                                                       color: activeColor.withValues(alpha: 0.35),
@@ -541,13 +561,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                                     )
                                                                                   : null,
                                                                             ),
-                                                                            child: Center(
+                                                                            child:
+                                                                                Center(
                                                                               child: Icon(
                                                                                 Icons.shuffle_rounded,
                                                                                 size: isShortHeight ? 17 : 20,
-                                                                                color: state.isShuffle
-                                                                                    ? activeColor
-                                                                                    : p.textSecondary,
+                                                                                color: state.isShuffle ? activeColor : p.textSecondary,
                                                                               ),
                                                                             ),
                                                                           ),
@@ -557,27 +576,45 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                   ),
                                                                   SizedBox(
                                                                       width: isShortHeight
-                                                                          ? AppSpacing.s10
-                                                                          : AppSpacing.s14),
+                                                                          ? AppSpacing
+                                                                              .s10
+                                                                          : AppSpacing
+                                                                              .s14),
                                                                   // Previous Button
                                                                   Semantics(
-                                                                    label: l10n.previous,
-                                                                    button: true,
-                                                                    child: Tooltip(
-                                                                      message: l10n.previous,
-                                                                      child: Material(
-                                                                        color: Colors.transparent,
-                                                                        shape: const CircleBorder(),
-                                                                        clipBehavior: Clip.antiAlias,
-                                                                        child: InkWell(
-                                                                          onTap: () {
+                                                                    label: l10n
+                                                                        .previous,
+                                                                    button:
+                                                                        true,
+                                                                    child:
+                                                                        Tooltip(
+                                                                      message: l10n
+                                                                          .previous,
+                                                                      child:
+                                                                          Material(
+                                                                        color: Colors
+                                                                            .transparent,
+                                                                        shape:
+                                                                            const CircleBorder(),
+                                                                        clipBehavior:
+                                                                            Clip.antiAlias,
+                                                                        child:
+                                                                            InkWell(
+                                                                          onTap:
+                                                                              () {
                                                                             HapticFeedback.lightImpact();
                                                                             cubit.previous();
                                                                           },
-                                                                          child: Container(
-                                                                            width: isShortHeight ? 34 : 40,
-                                                                            height: isShortHeight ? 34 : 40,
-                                                                            decoration: BoxDecoration(
+                                                                          child:
+                                                                              Container(
+                                                                            width: isShortHeight
+                                                                                ? 34
+                                                                                : 40,
+                                                                            height: isShortHeight
+                                                                                ? 34
+                                                                                : 40,
+                                                                            decoration:
+                                                                                BoxDecoration(
                                                                               shape: BoxShape.circle,
                                                                               color: p.textPrimary.withValues(alpha: 0.08),
                                                                               border: Border.all(
@@ -592,7 +629,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                                 ),
                                                                               ],
                                                                             ),
-                                                                            child: Center(
+                                                                            child:
+                                                                                Center(
                                                                               child: Icon(
                                                                                 Icons.skip_previous_rounded,
                                                                                 size: isShortHeight ? 20 : 24,
@@ -606,31 +644,54 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                   ),
                                                                   SizedBox(
                                                                       width: isShortHeight
-                                                                          ? AppSpacing.s10
-                                                                          : AppSpacing.s14),
+                                                                          ? AppSpacing
+                                                                              .s10
+                                                                          : AppSpacing
+                                                                              .s14),
                                                                   // Main Play / Pause Button
                                                                   Semantics(
-                                                                    label: state.isPlaying
-                                                                        ? l10n.pause
-                                                                        : l10n.play,
-                                                                    button: true,
-                                                                    child: Tooltip(
+                                                                    label: state
+                                                                            .isPlaying
+                                                                        ? l10n
+                                                                            .pause
+                                                                        : l10n
+                                                                            .play,
+                                                                    button:
+                                                                        true,
+                                                                    child:
+                                                                        Tooltip(
                                                                       message: state.isPlaying
-                                                                          ? l10n.pause
-                                                                          : l10n.play,
-                                                                      child: GestureDetector(
-                                                                        behavior: HitTestBehavior.opaque,
-                                                                        onTap: () {
-                                                                          HapticFeedback.mediumImpact();
-                                                                          cubit.togglePlayPause();
+                                                                          ? l10n
+                                                                              .pause
+                                                                          : l10n
+                                                                              .play,
+                                                                      child:
+                                                                          GestureDetector(
+                                                                        behavior:
+                                                                            HitTestBehavior.opaque,
+                                                                        onTap:
+                                                                            () {
+                                                                          HapticFeedback
+                                                                              .mediumImpact();
+                                                                          cubit
+                                                                              .togglePlayPause();
                                                                         },
-                                                                        child: AnimatedContainer(
-                                                                          duration: const Duration(milliseconds: 180),
-                                                                          width: isShortHeight ? 40 : 48,
-                                                                          height: isShortHeight ? 40 : 48,
-                                                                          decoration: BoxDecoration(
-                                                                            shape: BoxShape.circle,
-                                                                            gradient: LinearGradient(
+                                                                        child:
+                                                                            AnimatedContainer(
+                                                                          duration:
+                                                                              const Duration(milliseconds: 180),
+                                                                          width: isShortHeight
+                                                                              ? 40
+                                                                              : 48,
+                                                                          height: isShortHeight
+                                                                              ? 40
+                                                                              : 48,
+                                                                          decoration:
+                                                                              BoxDecoration(
+                                                                            shape:
+                                                                                BoxShape.circle,
+                                                                            gradient:
+                                                                                LinearGradient(
                                                                               begin: Alignment.topLeft,
                                                                               end: Alignment.bottomRight,
                                                                               colors: [
@@ -640,8 +701,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                             ),
                                                                             boxShadow: [
                                                                               BoxShadow(
-                                                                                color: activeColor.withValues(
-                                                                                    alpha: state.isPlaying ? 0.45 : 0.28),
+                                                                                color: activeColor.withValues(alpha: state.isPlaying ? 0.45 : 0.28),
                                                                                 blurRadius: isShortHeight ? 12 : 18,
                                                                                 spreadRadius: state.isPlaying ? 1.5 : 0.5,
                                                                                 offset: const Offset(0, 2),
@@ -652,26 +712,25 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                                 offset: const Offset(0, 2),
                                                                               ),
                                                                             ],
-                                                                            border: Border.all(
+                                                                            border:
+                                                                                Border.all(
                                                                               color: Colors.white.withValues(alpha: 0.30),
                                                                               width: 1.2,
                                                                             ),
                                                                           ),
-                                                                          child: Center(
-                                                                            child: AnimatedSwitcher(
+                                                                          child:
+                                                                              Center(
+                                                                            child:
+                                                                                AnimatedSwitcher(
                                                                               duration: const Duration(milliseconds: 160),
                                                                               transitionBuilder: (child, anim) => ScaleTransition(
                                                                                 scale: anim,
                                                                                 child: child,
                                                                               ),
                                                                               child: Icon(
-                                                                                state.isPlaying
-                                                                                    ? Icons.pause_rounded
-                                                                                    : Icons.play_arrow_rounded,
+                                                                                state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                                                                                 key: ValueKey<bool>(state.isPlaying),
-                                                                                color: activeColor.computeLuminance() > 0.5
-                                                                                    ? const Color(0xFF101223)
-                                                                                    : Colors.white,
+                                                                                color: activeColor.computeLuminance() > 0.5 ? const Color(0xFF101223) : Colors.white,
                                                                                 size: isShortHeight ? 22 : 26,
                                                                               ),
                                                                             ),
@@ -682,27 +741,45 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                   ),
                                                                   SizedBox(
                                                                       width: isShortHeight
-                                                                          ? AppSpacing.s10
-                                                                          : AppSpacing.s14),
+                                                                          ? AppSpacing
+                                                                              .s10
+                                                                          : AppSpacing
+                                                                              .s14),
                                                                   // Next Button
                                                                   Semantics(
-                                                                    label: l10n.next,
-                                                                    button: true,
-                                                                    child: Tooltip(
-                                                                      message: l10n.next,
-                                                                      child: Material(
-                                                                        color: Colors.transparent,
-                                                                        shape: const CircleBorder(),
-                                                                        clipBehavior: Clip.antiAlias,
-                                                                        child: InkWell(
-                                                                          onTap: () {
+                                                                    label: l10n
+                                                                        .next,
+                                                                    button:
+                                                                        true,
+                                                                    child:
+                                                                        Tooltip(
+                                                                      message: l10n
+                                                                          .next,
+                                                                      child:
+                                                                          Material(
+                                                                        color: Colors
+                                                                            .transparent,
+                                                                        shape:
+                                                                            const CircleBorder(),
+                                                                        clipBehavior:
+                                                                            Clip.antiAlias,
+                                                                        child:
+                                                                            InkWell(
+                                                                          onTap:
+                                                                              () {
                                                                             HapticFeedback.lightImpact();
                                                                             cubit.next();
                                                                           },
-                                                                          child: Container(
-                                                                            width: isShortHeight ? 34 : 40,
-                                                                            height: isShortHeight ? 34 : 40,
-                                                                            decoration: BoxDecoration(
+                                                                          child:
+                                                                              Container(
+                                                                            width: isShortHeight
+                                                                                ? 34
+                                                                                : 40,
+                                                                            height: isShortHeight
+                                                                                ? 34
+                                                                                : 40,
+                                                                            decoration:
+                                                                                BoxDecoration(
                                                                               shape: BoxShape.circle,
                                                                               color: p.textPrimary.withValues(alpha: 0.08),
                                                                               border: Border.all(
@@ -717,7 +794,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                                 ),
                                                                               ],
                                                                             ),
-                                                                            child: Center(
+                                                                            child:
+                                                                                Center(
                                                                               child: Icon(
                                                                                 Icons.skip_next_rounded,
                                                                                 size: isShortHeight ? 20 : 24,
@@ -731,40 +809,60 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                   ),
                                                                   SizedBox(
                                                                       width: isShortHeight
-                                                                          ? AppSpacing.s10
-                                                                          : AppSpacing.s14),
+                                                                          ? AppSpacing
+                                                                              .s10
+                                                                          : AppSpacing
+                                                                              .s14),
                                                                   // Repeat
                                                                   Semantics(
-                                                                    label: state.repeatMode == PlayerRepeatMode.one
-                                                                        ? l10n.repeatOne
-                                                                        : state.repeatMode == PlayerRepeatMode.all
+                                                                    label: state.repeatMode ==
+                                                                            PlayerRepeatMode
+                                                                                .one
+                                                                        ? l10n
+                                                                            .repeatOne
+                                                                        : state.repeatMode ==
+                                                                                PlayerRepeatMode.all
                                                                             ? l10n.repeatAll
                                                                             : l10n.repeatOff,
-                                                                    button: true,
-                                                                    child: Tooltip(
-                                                                      message: state.repeatMode == PlayerRepeatMode.one
+                                                                    button:
+                                                                        true,
+                                                                    child:
+                                                                        Tooltip(
+                                                                      message: state.repeatMode ==
+                                                                              PlayerRepeatMode.one
                                                                           ? l10n.repeatOne
                                                                           : state.repeatMode == PlayerRepeatMode.all
                                                                               ? l10n.repeatAll
                                                                               : l10n.repeatOff,
-                                                                      child: Material(
-                                                                        color: Colors.transparent,
-                                                                        shape: const CircleBorder(),
-                                                                        clipBehavior: Clip.antiAlias,
-                                                                        child: InkWell(
-                                                                          onTap: () {
+                                                                      child:
+                                                                          Material(
+                                                                        color: Colors
+                                                                            .transparent,
+                                                                        shape:
+                                                                            const CircleBorder(),
+                                                                        clipBehavior:
+                                                                            Clip.antiAlias,
+                                                                        child:
+                                                                            InkWell(
+                                                                          onTap:
+                                                                              () {
                                                                             HapticFeedback.selectionClick();
                                                                             cubit.toggleRepeat();
                                                                           },
-                                                                          child: AnimatedContainer(
-                                                                            duration: const Duration(milliseconds: 180),
-                                                                            width: isShortHeight ? 30 : 36,
-                                                                            height: isShortHeight ? 30 : 36,
-                                                                            decoration: BoxDecoration(
+                                                                          child:
+                                                                              AnimatedContainer(
+                                                                            duration:
+                                                                                const Duration(milliseconds: 180),
+                                                                            width: isShortHeight
+                                                                                ? 30
+                                                                                : 36,
+                                                                            height: isShortHeight
+                                                                                ? 30
+                                                                                : 36,
+                                                                            decoration:
+                                                                                BoxDecoration(
                                                                               shape: BoxShape.circle,
-                                                                              color: state.repeatMode != PlayerRepeatMode.off
-                                                                                  ? activeColor.withValues(alpha: 0.16)
-                                                                                  : Colors.transparent,
+                                                                              color: state.repeatMode != PlayerRepeatMode.off ? activeColor.withValues(alpha: 0.16) : Colors.transparent,
                                                                               border: state.repeatMode != PlayerRepeatMode.off
                                                                                   ? Border.all(
                                                                                       color: activeColor.withValues(alpha: 0.35),
@@ -772,15 +870,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                                     )
                                                                                   : null,
                                                                             ),
-                                                                            child: Center(
+                                                                            child:
+                                                                                Center(
                                                                               child: Icon(
-                                                                                state.repeatMode == PlayerRepeatMode.one
-                                                                                    ? Icons.repeat_one_rounded
-                                                                                    : Icons.repeat_rounded,
+                                                                                state.repeatMode == PlayerRepeatMode.one ? Icons.repeat_one_rounded : Icons.repeat_rounded,
                                                                                 size: isShortHeight ? 17 : 20,
-                                                                                color: state.repeatMode != PlayerRepeatMode.off
-                                                                                    ? activeColor
-                                                                                    : p.textSecondary,
+                                                                                color: state.repeatMode != PlayerRepeatMode.off ? activeColor : p.textSecondary,
                                                                               ),
                                                                             ),
                                                                           ),
@@ -792,11 +887,10 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                               ),
                                                             ),
                                                             SizedBox(
-                                                                height:
-                                                                    isShortHeight
-                                                                        ? 2
-                                                                        : AppSpacing
-                                                                            .xxs),
+                                                                height: isShortHeight
+                                                                    ? 2
+                                                                    : AppSpacing
+                                                                        .xxs),
                                                             // Seekbar Row
                                                             BlocSelector<
                                                                 PlayerCubit,
@@ -925,168 +1019,170 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                     children: [
                                                       if (!isShortHeight) ...[
                                                         // Volume Mute / Slider
-                                                      ValueListenableBuilder<
-                                                          double?>(
-                                                        valueListenable:
-                                                            _dragVolumeNotifier,
-                                                        builder: (context,
-                                                            dragVolume, _) {
-                                                          final effectiveVolume =
-                                                              (dragVolume ??
-                                                                      handlerVolume)
-                                                                  .clamp(
-                                                                      0.0, 1.0);
-                                                          final isMuted = cubit
-                                                                  .isMuted ||
-                                                              effectiveVolume <=
-                                                                  0.0;
-                                                          return Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
-                                                            children: [
-                                                              IconButton(
-                                                                visualDensity:
-                                                                    VisualDensity
-                                                                        .compact,
-                                                                padding:
-                                                                    EdgeInsets
-                                                                        .zero,
-                                                                constraints:
-                                                                    const BoxConstraints(
-                                                                        minWidth:
-                                                                            48,
-                                                                        minHeight:
-                                                                            48),
-                                                                icon: Icon(
-                                                                  isMuted
-                                                                      ? Icons
-                                                                          .volume_off_rounded
-                                                                      : (effectiveVolume <
-                                                                              0.5
-                                                                          ? Icons
-                                                                              .volume_down_rounded
-                                                                          : Icons
-                                                                              .volume_up_rounded),
-                                                                  color: p
-                                                                      .textSecondary,
-                                                                  size: 19,
+                                                        ValueListenableBuilder<
+                                                            double?>(
+                                                          valueListenable:
+                                                              _dragVolumeNotifier,
+                                                          builder: (context,
+                                                              dragVolume, _) {
+                                                            final effectiveVolume =
+                                                                (dragVolume ??
+                                                                        handlerVolume)
+                                                                    .clamp(0.0,
+                                                                        1.0);
+                                                            final isMuted = cubit
+                                                                    .isMuted ||
+                                                                effectiveVolume <=
+                                                                    0.0;
+                                                            return Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                IconButton(
+                                                                  visualDensity:
+                                                                      VisualDensity
+                                                                          .compact,
+                                                                  padding:
+                                                                      EdgeInsets
+                                                                          .zero,
+                                                                  constraints: const BoxConstraints(
+                                                                      minWidth:
+                                                                          48,
+                                                                      minHeight:
+                                                                          48),
+                                                                  icon: Icon(
+                                                                    isMuted
+                                                                        ? Icons
+                                                                            .volume_off_rounded
+                                                                        : (effectiveVolume <
+                                                                                0.5
+                                                                            ? Icons.volume_down_rounded
+                                                                            : Icons.volume_up_rounded),
+                                                                    color: p
+                                                                        .textSecondary,
+                                                                    size: 19,
+                                                                  ),
+                                                                  tooltip: isMuted
+                                                                      ? l10n
+                                                                          .unmute
+                                                                      : l10n
+                                                                          .mute,
+                                                                  onPressed:
+                                                                      () {
+                                                                    _dragVolumeNotifier
+                                                                            .value =
+                                                                        null;
+                                                                    cubit
+                                                                        .toggleMute();
+                                                                  },
                                                                 ),
-                                                                tooltip: isMuted
-                                                                    ? l10n
-                                                                        .unmute
-                                                                    : l10n.mute,
-                                                                onPressed: () {
-                                                                  _dragVolumeNotifier
-                                                                          .value =
-                                                                      null;
-                                                                  cubit
-                                                                      .toggleMute();
-                                                                },
-                                                              ),
-                                                              SizedBox(
-                                                                width: 80,
-                                                                child:
-                                                                    Semantics(
-                                                                  label: l10n
-                                                                      .volume,
-                                                                  value:
-                                                                      '${(effectiveVolume * 100).round()}%',
+                                                                SizedBox(
+                                                                  width: 80,
                                                                   child:
-                                                                      PulsrSlider(
-                                                                    min: 0.0,
-                                                                    max: 1.0,
+                                                                      Semantics(
+                                                                    label: l10n
+                                                                        .volume,
                                                                     value:
-                                                                        effectiveVolume,
-                                                                    activeColor:
-                                                                        p.textPrimary,
-                                                                    onChangeStart: (v) =>
+                                                                        '${(effectiveVolume * 100).round()}%',
+                                                                    child:
+                                                                        PulsrSlider(
+                                                                      min: 0.0,
+                                                                      max: 1.0,
+                                                                      value:
+                                                                          effectiveVolume,
+                                                                      activeColor:
+                                                                          p.textPrimary,
+                                                                      onChangeStart:
+                                                                          (v) =>
+                                                                              _dragVolumeNotifier.value = v,
+                                                                      onChanged:
+                                                                          (v) {
                                                                         _dragVolumeNotifier
-                                                                            .value = v,
-                                                                    onChanged:
-                                                                        (v) {
-                                                                      _dragVolumeNotifier
-                                                                          .value = v;
-                                                                      cubit.setVolume(
-                                                                          v);
-                                                                    },
-                                                                    onChangeEnd:
-                                                                        (v) {
-                                                                      _dragVolumeNotifier
-                                                                              .value =
-                                                                          null;
-                                                                      cubit.setVolume(
-                                                                          v);
-                                                                    },
+                                                                            .value = v;
+                                                                        cubit.setVolume(
+                                                                            v);
+                                                                      },
+                                                                      onChangeEnd:
+                                                                          (v) {
+                                                                        _dragVolumeNotifier.value =
+                                                                            null;
+                                                                        cubit.setVolume(
+                                                                            v);
+                                                                      },
+                                                                    ),
                                                                   ),
                                                                 ),
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
-                                                      ),
-                                                      const SizedBox(
-                                                          width: AppSpacing.s2),
-
-                                                      // DAC / Output
-                                                      IconButton(
-                                                        visualDensity:
-                                                            VisualDensity
-                                                                .compact,
-                                                        padding:
-                                                            EdgeInsets.zero,
-                                                        constraints:
-                                                            const BoxConstraints(
-                                                                minWidth: 48,
-                                                                minHeight: 48),
-                                                        icon: Icon(
-                                                          Icons
-                                                              .settings_input_component_rounded,
-                                                          size: 19,
-                                                          color: settingsState
-                                                                      .currentOutputDevice
-                                                                      ?.isUsbDac ==
-                                                                  true
-                                                              ? AppColors
-                                                                  .dacGold
-                                                              : p.textSecondary,
+                                                              ],
+                                                            );
+                                                          },
                                                         ),
-                                                        tooltip: l10n
-                                                            .audioOutputAndDac,
-                                                        onPressed: () =>
-                                                            AudioQualitySheet
-                                                                .show(
-                                                                    context,
-                                                                    song,
-                                                                    activeColor),
-                                                      ),
+                                                        const SizedBox(
+                                                            width:
+                                                                AppSpacing.s2),
 
-                                                      // Equalizer
-                                                      IconButton(
-                                                        visualDensity:
-                                                            VisualDensity
-                                                                .compact,
-                                                        padding:
-                                                            EdgeInsets.zero,
-                                                        constraints:
-                                                            const BoxConstraints(
-                                                                minWidth: 48,
-                                                                minHeight: 48),
-                                                        icon: Icon(
-                                                          Icons
-                                                              .equalizer_rounded,
-                                                          size: 19,
-                                                          color: state
-                                                                  .isEqEnabled
-                                                              ? activeColor
-                                                              : p.textSecondary,
+                                                        // DAC / Output
+                                                        IconButton(
+                                                          visualDensity:
+                                                              VisualDensity
+                                                                  .compact,
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          constraints:
+                                                              const BoxConstraints(
+                                                                  minWidth: 48,
+                                                                  minHeight:
+                                                                      48),
+                                                          icon: Icon(
+                                                            Icons
+                                                                .settings_input_component_rounded,
+                                                            size: 19,
+                                                            color: settingsState
+                                                                        .currentOutputDevice
+                                                                        ?.isUsbDac ==
+                                                                    true
+                                                                ? AppColors
+                                                                    .dacGold
+                                                                : p.textSecondary,
+                                                          ),
+                                                          tooltip: l10n
+                                                              .audioOutputAndDac,
+                                                          onPressed: () =>
+                                                              AudioQualitySheet
+                                                                  .show(
+                                                                      context,
+                                                                      song,
+                                                                      activeColor),
                                                         ),
-                                                        tooltip: l10n.equalizer,
-                                                        onPressed: () =>
-                                                            EqualizerSheet.show(
-                                                                context),
-                                                      ),
 
+                                                        // Equalizer
+                                                        IconButton(
+                                                          visualDensity:
+                                                              VisualDensity
+                                                                  .compact,
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          constraints:
+                                                              const BoxConstraints(
+                                                                  minWidth: 48,
+                                                                  minHeight:
+                                                                      48),
+                                                          icon: Icon(
+                                                            Icons
+                                                                .equalizer_rounded,
+                                                            size: 19,
+                                                            color: state
+                                                                    .isEqEnabled
+                                                                ? activeColor
+                                                                : p.textSecondary,
+                                                          ),
+                                                          tooltip:
+                                                              l10n.equalizer,
+                                                          onPressed: () =>
+                                                              EqualizerSheet
+                                                                  .show(
+                                                                      context),
+                                                        ),
                                                       ],
                                                       // Queue inspector toggle
                                                       if (widget
@@ -1098,15 +1194,21 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                   .compact,
                                                           padding:
                                                               EdgeInsets.zero,
-                                                          constraints:
-                                                              BoxConstraints(
-                                                                  minWidth: isShortHeight ? 36 : 48,
-                                                                  minHeight:
-                                                                      isShortHeight ? 36 : 48),
+                                                          constraints: BoxConstraints(
+                                                              minWidth:
+                                                                  isShortHeight
+                                                                      ? 36
+                                                                      : 48,
+                                                              minHeight:
+                                                                  isShortHeight
+                                                                      ? 36
+                                                                      : 48),
                                                           icon: Icon(
                                                             Icons
                                                                 .queue_music_rounded,
-                                                            size: isShortHeight ? 18 : 19,
+                                                            size: isShortHeight
+                                                                ? 18
+                                                                : 19,
                                                             color: widget
                                                                     .isInspectorOpen
                                                                 ? activeColor
@@ -1127,8 +1229,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                             EdgeInsets.zero,
                                                         constraints:
                                                             BoxConstraints(
-                                                                minWidth: isShortHeight ? 36 : 48,
-                                                                minHeight: isShortHeight ? 36 : 48),
+                                                                minWidth:
+                                                                    isShortHeight
+                                                                        ? 36
+                                                                        : 48,
+                                                                minHeight:
+                                                                    isShortHeight
+                                                                        ? 36
+                                                                        : 48),
                                                         icon: Icon(
                                                           Icons
                                                               .open_in_full_rounded,

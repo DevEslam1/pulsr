@@ -123,8 +123,7 @@ class SongTile extends StatelessWidget {
                                 ? AppSpacing.s6
                                 : AppSpacing.s10);
 
-                        final showIndex =
-                            !isTileUltraNarrow && index != null;
+                        final showIndex = !isTileUltraNarrow && index != null;
                         final showArtworkInTile = showArtwork &&
                             (!isTileMicro || availableWidth >= 70);
                         final showDurationInTile =
@@ -147,9 +146,7 @@ class SongTile extends StatelessWidget {
 
                         return Container(
                           constraints: BoxConstraints(
-                              minHeight: dense
-                                  ? 44
-                                  : (isTileNarrow ? 48 : 56)),
+                              minHeight: dense ? 44 : (isTileNarrow ? 48 : 56)),
                           padding: EdgeInsets.symmetric(
                             horizontal: padH,
                             vertical: dense ? AppSpacing.s2 : AppSpacing.s6,
@@ -268,8 +265,7 @@ class SongTile extends StatelessWidget {
                                             child: Text(
                                               subtitleOverride ?? song.artist,
                                               maxLines: 1,
-                                              overflow:
-                                                  TextOverflow.ellipsis,
+                                              overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 color: p.textSecondary,
                                                 fontSize: AppFontSize.label,
@@ -306,9 +302,9 @@ class SongTile extends StatelessWidget {
                                       child: IconButton(
                                         icon: Icon(Icons.more_vert_rounded,
                                             size: 20, color: p.textTertiary),
-                                        tooltip: MaterialLocalizations.of(
-                                                context)
-                                            .moreButtonTooltip,
+                                        tooltip:
+                                            MaterialLocalizations.of(context)
+                                                .moreButtonTooltip,
                                         onPressed: onMorePressed,
                                         visualDensity: VisualDensity.compact,
                                       ),

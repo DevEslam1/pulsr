@@ -63,13 +63,19 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     Color? successSoft,
     Color? errorSoft,
     Color? warningSoft,
-  })  : surfaceElevated = surfaceElevated ?? (isDark ? surfaceContainerHigh : surface),
-        surfaceOverlay = surfaceOverlay ?? (isDark ? const Color(0xCC12121A) : const Color(0xE0FFFFFF)),
-        scrimLight = scrimLight ?? (isDark ? const Color(0x26000000) : const Color(0x14000000)),
-        scrimMedium = scrimMedium ?? (isDark ? const Color(0x66000000) : const Color(0x40000000)),
-        scrimHeavy = scrimHeavy ?? (isDark ? const Color(0xB3000000) : const Color(0x80000000)),
+  })  : surfaceElevated =
+            surfaceElevated ?? (isDark ? surfaceContainerHigh : surface),
+        surfaceOverlay = surfaceOverlay ??
+            (isDark ? const Color(0xCC12121A) : const Color(0xE0FFFFFF)),
+        scrimLight = scrimLight ??
+            (isDark ? const Color(0x26000000) : const Color(0x14000000)),
+        scrimMedium = scrimMedium ??
+            (isDark ? const Color(0x66000000) : const Color(0x40000000)),
+        scrimHeavy = scrimHeavy ??
+            (isDark ? const Color(0xB3000000) : const Color(0x80000000)),
         borderSubtle = borderSubtle ?? hairline,
-        borderStrong = borderStrong ?? (isDark ? const Color(0x2EFFFFFF) : const Color(0x33000000)),
+        borderStrong = borderStrong ??
+            (isDark ? const Color(0x2EFFFFFF) : const Color(0x33000000)),
         accentSoft = accentSoft ?? accentContainer,
         accentMedium = accentMedium ?? const Color(0x409B9EF5),
         successSoft = successSoft ?? const Color(0x264CAF50),
@@ -228,15 +234,17 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       isDark: t < 0.5 ? isDark : other.isDark,
       playerCard: Color.lerp(playerCard, other.playerCard, t) ?? playerCard,
       deepShade: Color.lerp(deepShade, other.deepShade, t) ?? deepShade,
-      surfaceElevated:
-          Color.lerp(surfaceElevated, other.surfaceElevated, t) ?? surfaceElevated,
+      surfaceElevated: Color.lerp(surfaceElevated, other.surfaceElevated, t) ??
+          surfaceElevated,
       surfaceOverlay:
           Color.lerp(surfaceOverlay, other.surfaceOverlay, t) ?? surfaceOverlay,
       scrimLight: Color.lerp(scrimLight, other.scrimLight, t) ?? scrimLight,
       scrimMedium: Color.lerp(scrimMedium, other.scrimMedium, t) ?? scrimMedium,
       scrimHeavy: Color.lerp(scrimHeavy, other.scrimHeavy, t) ?? scrimHeavy,
-      borderSubtle: Color.lerp(borderSubtle, other.borderSubtle, t) ?? borderSubtle,
-      borderStrong: Color.lerp(borderStrong, other.borderStrong, t) ?? borderStrong,
+      borderSubtle:
+          Color.lerp(borderSubtle, other.borderSubtle, t) ?? borderSubtle,
+      borderStrong:
+          Color.lerp(borderStrong, other.borderStrong, t) ?? borderStrong,
       accentSoft: Color.lerp(accentSoft, other.accentSoft, t) ?? accentSoft,
       accentMedium:
           Color.lerp(accentMedium, other.accentMedium, t) ?? accentMedium,
@@ -923,4 +931,3 @@ class AuraThemePreset {
         colors: [primaryColor, secondaryColor],
       );
 }
-

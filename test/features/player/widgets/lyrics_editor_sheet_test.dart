@@ -136,8 +136,9 @@ void main() {
 
       // Delete the last row.
       tester
-          .widget<IconButton>(
-              find.widgetWithIcon(IconButton, Icons.delete_outline_rounded).last)
+          .widget<IconButton>(find
+              .widgetWithIcon(IconButton, Icons.delete_outline_rounded)
+              .last)
           .onPressed!();
       await tester.pump();
       expect(find.byType(TextFormField), findsNWidgets(2));

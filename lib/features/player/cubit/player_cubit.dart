@@ -212,11 +212,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       // preserve the play/pause state so "previous" while paused does not
       // start playback.
       onPlaySong: (song, {queue, initialPosition}) => playSong(
-            song,
-            queue: queue,
-            initialPosition: initialPosition,
-            preservePlaybackState: true,
-          ),
+        song,
+        queue: queue,
+        initialPosition: initialPosition,
+        preservePlaybackState: true,
+      ),
     );
     widgetBridge.listenToClicks(
       onPlayPause: togglePlayPause,

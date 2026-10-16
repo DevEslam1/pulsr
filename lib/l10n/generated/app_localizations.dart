@@ -14747,6 +14747,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Playback components did not become ready in time. Retrying usually fixes a slow cold start.'**
   String get bootStartupFailedMessage;
+
+  /// Action to force full-state DSP resync
+  ///
+  /// In en, this message translates to:
+  /// **'Resync DSP'**
+  String get dspResyncAction;
+
+  /// Progress state while DSP is resyncing
+  ///
+  /// In en, this message translates to:
+  /// **'Resyncing DSP...'**
+  String get dspResyncing;
+
+  /// Success message after DSP resync
+  ///
+  /// In en, this message translates to:
+  /// **'DSP engine & effects resynced successfully'**
+  String get dspResyncSuccess;
+
+  /// Failure message after DSP resync
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to resync DSP: {error}'**
+  String dspResyncFailure(String error);
+
+  /// Title for DSP reliability counters section
+  ///
+  /// In en, this message translates to:
+  /// **'RELIABILITY TELEMETRY'**
+  String get dspReliabilityTitle;
+
+  /// Count of native setter rejections
+  ///
+  /// In en, this message translates to:
+  /// **'Setter Rejections'**
+  String get dspNativeSetterRejections;
+
+  /// Count of bridge timeouts
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge Timeouts'**
+  String get dspBridgeTimeouts;
+
+  /// Count of route resync failures
+  ///
+  /// In en, this message translates to:
+  /// **'Route Resync Failures'**
+  String get dspRouteResyncFailures;
+
+  /// Count of session reattach failures
+  ///
+  /// In en, this message translates to:
+  /// **'Session Reattach Failures'**
+  String get dspSessionReattachFailures;
+
+  /// Count of auto-degrade activations and recoveries
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-Degrades (Trig/Recov)'**
+  String get dspAutoDegradeEvents;
+
+  /// Action to reset DSP reliability counters
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Counters'**
+  String get dspResetCounters;
+
+  /// Header for latest redacted bridge error
+  ///
+  /// In en, this message translates to:
+  /// **'Latest Redacted Bridge Error'**
+  String get dspLatestError;
+
+  /// Empty state title when current track has no Quran metadata
+  ///
+  /// In en, this message translates to:
+  /// **'No Quran Metadata'**
+  String get quranNoMetadataTitle;
+
+  /// Empty state description when current track has no Quran metadata
+  ///
+  /// In en, this message translates to:
+  /// **'This track has no verified Quran metadata (Surah/Ayah). Verse tracking and bookmarking are isolated from regular music.'**
+  String get quranNoMetadataDesc;
+
+  /// Message when Quran bookmark is saved
+  ///
+  /// In en, this message translates to:
+  /// **'Quran bookmark saved: {surah} Ayah {ayah}'**
+  String quranBookmarkSaved(String surah, int ayah);
+
+  /// Button to resume Quran from bookmark
+  ///
+  /// In en, this message translates to:
+  /// **'Resume {surah} • Ayah {ayah} ({time})'**
+  String quranResumePrompt(String surah, int ayah, String time);
+
+  /// Button to save Quran bookmark
+  ///
+  /// In en, this message translates to:
+  /// **'Save Quran Bookmark'**
+  String get quranSaveBookmark;
+
+  /// Button to clear Quran bookmark
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Quran Bookmark'**
+  String get quranClearBookmark;
+
+  /// Toggle to repeat the current Ayah
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat Ayah'**
+  String get quranRepeatAyah;
+
+  /// Toggle to repeat a range of Ayahs
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat Range'**
+  String get quranRepeatRange;
+
+  /// Repeat mode off
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat: Off'**
+  String get quranRepeatOff;
 }
 
 class _AppLocalizationsDelegate

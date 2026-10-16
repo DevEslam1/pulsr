@@ -157,8 +157,7 @@ void main() {
     await drain(tester);
   });
 
-  testWidgets('the currently-playing station toggles playback',
-      (tester) async {
+  testWidgets('the currently-playing station toggles playback', (tester) async {
     final song = createTestSong(path: 'https://b.example.com/live');
     when(() => player.state).thenReturn(PlayerState(
       playback: PlaybackSlice(currentSong: song, isPlaying: true),
@@ -225,8 +224,7 @@ void main() {
     await drain(tester);
   });
 
-  testWidgets('manual import with no valid streams reports it',
-      (tester) async {
+  testWidgets('manual import with no valid streams reports it', (tester) async {
     await pumpRadio(tester);
 
     await tester.tap(find.byIcon(Icons.playlist_add_rounded));

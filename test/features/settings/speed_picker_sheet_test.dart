@@ -136,10 +136,12 @@ void main() {
     await tester.drag(find.byType(PulsrSlider), const Offset(60, 0));
     await tester.pump();
 
-    verify(() => player.setPlaybackPitch(any())).called(greaterThanOrEqualTo(1));
+    verify(() => player.setPlaybackPitch(any()))
+        .called(greaterThanOrEqualTo(1));
   });
 
-  testWidgets('SpeedPickerSheet.show opens the sheet from a host', (tester) async {
+  testWidgets('SpeedPickerSheet.show opens the sheet from a host',
+      (tester) async {
     when(() => player.state).thenReturn(const PlayerState());
     await tester.pumpWidget(
       BlocProvider<PlayerCubit>.value(

@@ -163,7 +163,8 @@ class ListenTogetherService {
 
     String? deviceId = prefs.getString('pulsr_device_unique_id');
     if (deviceId == null) {
-      deviceId = 'pulsr_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(999999)}';
+      deviceId =
+          'pulsr_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(999999)}';
       await prefs.setString('pulsr_device_unique_id', deviceId);
     }
 
@@ -214,7 +215,8 @@ class ListenTogetherService {
   /// Join an existing party with a 6-character room code.
   Future<String> joinParty(String code, {String? nickname}) async {
     lastError.value = null;
-    final cleanedCode = code.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final cleanedCode =
+        code.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     if (cleanedCode.length != 6) {
       final err = 'Party code must be 6 alphanumeric characters';
       lastError.value = err;
@@ -280,7 +282,8 @@ class ListenTogetherService {
     }
   }
 
-  Future<void> _saveSession(String serverBase, String code, String token) async {
+  Future<void> _saveSession(
+      String serverBase, String code, String token) async {
     _activeServerBase = serverBase;
     _activeCode = code;
     _activeToken = token;
@@ -321,7 +324,8 @@ class ListenTogetherService {
       _channelSub = _channel!.stream.listen(
         _onWebSocketMessage,
         onError: (e, st) {
-          ErrorLogger.log('Party WebSocket error', error: e, stackTrace: st, category: 'PARTY');
+          ErrorLogger.log('Party WebSocket error',
+              error: e, stackTrace: st, category: 'PARTY');
           _scheduleReconnect();
         },
         onDone: () {
@@ -333,7 +337,8 @@ class ListenTogetherService {
       _startReconciliationTicker();
       connectionState.value = PartyConnectionState.live;
     } catch (e, st) {
-      ErrorLogger.log('Party WebSocket connect failed', error: e, stackTrace: st, category: 'PARTY');
+      ErrorLogger.log('Party WebSocket connect failed',
+          error: e, stackTrace: st, category: 'PARTY');
       _scheduleReconnect();
     }
   }
@@ -394,7 +399,8 @@ class ListenTogetherService {
     try {
       _channel!.sink.add(jsonEncode(frame));
     } catch (e) {
-      ErrorLogger.log('Failed to send WebSocket frame', error: e, category: 'PARTY');
+      ErrorLogger.log('Failed to send WebSocket frame',
+          error: e, category: 'PARTY');
     }
   }
 
@@ -479,8 +485,10 @@ class ListenTogetherService {
           partySnapshot.value = PartySnapshot(
             code: currentSnap.code,
             createdAtMs: currentSnap.createdAtMs,
-            maxMembers: (json['maxMembers'] as num?)?.toInt() ?? currentSnap.maxMembers,
-            hostOnlyControl: json['hostOnlyControl'] as bool? ?? currentSnap.hostOnlyControl,
+            maxMembers:
+                (json['maxMembers'] as num?)?.toInt() ?? currentSnap.maxMembers,
+            hostOnlyControl:
+                json['hostOnlyControl'] as bool? ?? currentSnap.hostOnlyControl,
             members: members,
             playback: currentSnap.playback,
             queue: currentSnap.queue,
@@ -508,7 +516,8 @@ class ListenTogetherService {
           break;
       }
     } catch (e, st) {
-      ErrorLogger.log('Error processing party frame', error: e, stackTrace: st, category: 'PARTY');
+      ErrorLogger.log('Error processing party frame',
+          error: e, stackTrace: st, category: 'PARTY');
     }
   }
 
@@ -526,14 +535,17 @@ class ListenTogetherService {
       if (_isReconcilingInbound) return;
 
       // When Host state changes, broadcast playback frame to the room
-      _broadcastHostPlayback(state.currentSong, state.isPlaying, state.position);
+      _broadcastHostPlayback(
+          state.currentSong, state.isPlaying, state.position);
     });
   }
 
-  void _broadcastHostPlayback(SongsTableData? song, bool isPlaying, Duration position) {
+  void _broadcastHostPlayback(
+      SongsTableData? song, bool isPlaying, Duration position) {
     if (!inParty) return;
 
-    final serverNow = _clock.serverNowMs() ?? DateTime.now().millisecondsSinceEpoch;
+    final serverNow =
+        _clock.serverNowMs() ?? DateTime.now().millisecondsSinceEpoch;
     final track = song != null
         ? PartyTrack(
             videoId: song.remoteId ?? song.id.toString(),
@@ -661,7 +673,8 @@ class ListenTogetherService {
     }
   }
 
-  Future<void> _loadTrackForParty(PartyTrack track, PartyPlayback playback) async {
+  Future<void> _loadTrackForParty(
+      PartyTrack track, PartyPlayback playback) async {
     final playerCubit = getIt<PlayerCubit>();
 
     // 1. Try matching local database first
@@ -669,12 +682,15 @@ class ListenTogetherService {
     try {
       final repo = getIt<IMusicRepository>();
       final localSongsResult = await repo.getAllSongs();
-      final localSongs = localSongsResult.fold((_) => <SongsTableData>[], (s) => s);
+      final localSongs =
+          localSongsResult.fold((_) => <SongsTableData>[], (s) => s);
       match = localSongs.where((s) => s.remoteId == track.videoId).firstOrNull;
       if (match == null && track.title.isNotEmpty) {
-        match = localSongs.where((s) =>
-            s.title.toLowerCase() == track.title.toLowerCase() &&
-            s.artist.toLowerCase() == track.artist.toLowerCase()).firstOrNull;
+        match = localSongs
+            .where((s) =>
+                s.title.toLowerCase() == track.title.toLowerCase() &&
+                s.artist.toLowerCase() == track.artist.toLowerCase())
+            .firstOrNull;
       }
     } catch (_) {}
 

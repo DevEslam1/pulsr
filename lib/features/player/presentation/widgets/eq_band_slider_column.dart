@@ -333,7 +333,8 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                 behavior: HitTestBehavior.opaque,
                 // Tap-to-set: a deliberate tap on the track jumps the band to that gain.
                 onTapDown: (details) {
-                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
+                  _handlePointer(details.localPosition.dy, height,
+                      notifyParent: true);
                 },
                 // Double-tap-to-zero (0.0 dB) reset with confirmation haptics.
                 onDoubleTap: () {
@@ -344,10 +345,12 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                 onVerticalDragStart: (details) {
                   setState(() => _isDragging = true);
                   widget.onDragStart?.call();
-                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
+                  _handlePointer(details.localPosition.dy, height,
+                      notifyParent: true);
                 },
                 onVerticalDragUpdate: (details) {
-                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
+                  _handlePointer(details.localPosition.dy, height,
+                      notifyParent: true);
                 },
                 onVerticalDragEnd: (_) {
                   final finalGain = _dragGain ?? widget.value;
@@ -391,12 +394,15 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                         right: 0,
                         child: Center(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
-                              color: widget.surfaceColor.withValues(alpha: 0.95),
+                              color:
+                                  widget.surfaceColor.withValues(alpha: 0.95),
                               borderRadius: AppRadii.r6All,
                               border: Border.all(
-                                color: widget.accentColor.withValues(alpha: 0.7),
+                                color:
+                                    widget.accentColor.withValues(alpha: 0.7),
                                 width: 1.0,
                               ),
                               boxShadow: [
@@ -413,7 +419,9 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 color: widget.accentColor,
-                                fontFeatures: const [FontFeature.tabularFigures()],
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
                               ),
                             ),
                           ),

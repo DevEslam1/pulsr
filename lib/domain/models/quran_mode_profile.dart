@@ -100,6 +100,29 @@ class QuranModeProfile {
         gains: gainsOverride ?? eqGains,
       );
 
+  QuranModeProfile copyWith({
+    bool? reverbEnabled,
+    double? reverbWetDry,
+    bool? saturationEnabled,
+    double? saturationMix,
+    double? playbackSpeed,
+  }) =>
+      QuranModeProfile(
+        style: style,
+        eqGains: eqGains,
+        reverbEnabled: reverbEnabled ?? this.reverbEnabled,
+        reverbPreset: reverbPreset,
+        reverbWetDry: reverbWetDry ?? this.reverbWetDry,
+        saturationEnabled: saturationEnabled ?? this.saturationEnabled,
+        saturationDrive: saturationDrive,
+        saturationMix: saturationMix ?? this.saturationMix,
+        saturationTilt: saturationTilt,
+        dynamicsEnabled: dynamicsEnabled,
+        dynamicsPreset: dynamicsPreset,
+        playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+        preampDb: preampDb,
+      );
+
   static const Map<QuranReciterStyle, QuranModeProfile> presets = {
     QuranReciterStyle.murattal: QuranModeProfile(
       style: QuranReciterStyle.murattal,

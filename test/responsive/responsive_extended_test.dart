@@ -123,7 +123,8 @@ void main() {
         tester,
         const MediaQueryData(size: Size(1400, 700)),
       );
-      expect(PulsrLayoutMetrics.heroHeight(tallLandscape), closeTo(294.0, 0.01));
+      expect(
+          PulsrLayoutMetrics.heroHeight(tallLandscape), closeTo(294.0, 0.01));
 
       final tinyPortrait = await pumpContext(
         tester,
@@ -196,8 +197,7 @@ void main() {
       expect(value, 80.0);
     });
 
-    testWidgets('context extension mirrors the static metrics',
-        (tester) async {
+    testWidgets('context extension mirrors the static metrics', (tester) async {
       late double maxWidth;
       late double hero;
       late double field;
@@ -469,8 +469,8 @@ void main() {
             child: Builder(
               builder: (context) {
                 standard = PulsrAdaptiveGrid.columns(context);
-                custom = PulsrAdaptiveGrid.columns(context,
-                    customMinItemWidth: 200);
+                custom =
+                    PulsrAdaptiveGrid.columns(context, customMinItemWidth: 200);
                 return const SizedBox.shrink();
               },
             ),
@@ -600,4 +600,3 @@ void main() {
     });
   });
 }
-

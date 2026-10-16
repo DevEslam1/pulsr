@@ -3,6 +3,7 @@
 import '../../../../core/services/quran_mode_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../domain/models/quran_mode_profile.dart';
+import '../../../../domain/models/quran_style_tuning.dart';
 import '../quran_restore_snapshot.dart';
 
 /// Manages Quran Mode lifecycle, preset profiles, and DSP state snapshots.
@@ -56,6 +57,32 @@ class PlayerQuranManager {
       return true;
     } catch (e, st) {
       ErrorLogger.log('Failed to set Quran reciter style: $style',
+          error: e, stackTrace: st, category: 'PlayerQuranManager');
+      return false;
+    }
+  }
+
+  Future<QuranStyleTuning> getStyleTuning(QuranReciterStyle style) async {
+    final service = _service;
+    if (service == null) return const QuranStyleTuning();
+    try {
+      return await service.getStyleTuning(style);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load Quran style tuning',
+          error: e, stackTrace: st, category: 'PlayerQuranManager');
+      return const QuranStyleTuning();
+    }
+  }
+
+  Future<bool> setStyleTuning(
+      QuranReciterStyle style, QuranStyleTuning tuning) async {
+    final service = _service;
+    if (service == null) return true;
+    try {
+      await service.setStyleTuning(style, tuning);
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to save Quran style tuning',
           error: e, stackTrace: st, category: 'PlayerQuranManager');
       return false;
     }

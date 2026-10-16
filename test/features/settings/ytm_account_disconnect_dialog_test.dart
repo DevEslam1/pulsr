@@ -88,8 +88,7 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('while disconnecting every action is disabled',
-      (tester) async {
+  testWidgets('while disconnecting every action is disabled', (tester) async {
     final completer = Completer<void>();
     when(() => account.logout()).thenAnswer((_) => completer.future);
 

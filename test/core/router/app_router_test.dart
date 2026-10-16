@@ -290,7 +290,8 @@ void main() {
   });
 
   group('simple widget builders', () {
-    Widget buildRouteWidget(GoRoute route, BuildContext context, GoRouterState state) {
+    Widget buildRouteWidget(
+        GoRoute route, BuildContext context, GoRouterState state) {
       if (route.pageBuilder != null) {
         final page = route.pageBuilder!(context, state);
         if (page is CustomTransitionPage) return page.child;
@@ -299,7 +300,8 @@ void main() {
       if (route.builder != null) {
         return route.builder!(context, state);
       }
-      throw StateError('Route ${route.path} has neither builder nor pageBuilder');
+      throw StateError(
+          'Route ${route.path} has neither builder nor pageBuilder');
     }
 
     testWidgets('construct their screens without side effects', (tester) async {
@@ -310,7 +312,8 @@ void main() {
         isA<SplashScreen>(),
       );
       expect(
-        buildRouteWidget(routeFor('/onboarding'), context, stateFor('/onboarding')),
+        buildRouteWidget(
+            routeFor('/onboarding'), context, stateFor('/onboarding')),
         isA<OnboardingScreen>(),
       );
       expect(
@@ -331,34 +334,41 @@ void main() {
         '/favorites',
         '/hidden-folders',
       ]) {
-        final widget = buildRouteWidget(routeFor(path), context, stateFor(path));
+        final widget =
+            buildRouteWidget(routeFor(path), context, stateFor(path));
         expect(widget, isA<Widget>(), reason: path);
       }
 
       // Extra-optional builders with no extra fall back safely with an AppBar.
       expect(
-        buildRouteWidget(routeFor('/proxy-settings'), context, stateFor('/proxy-settings')),
+        buildRouteWidget(
+            routeFor('/proxy-settings'), context, stateFor('/proxy-settings')),
         isA<ProxySettingsScreen>(),
       );
-      final folderFallback = buildRouteWidget(routeFor('/folder'), context, stateFor('/folder'));
+      final folderFallback =
+          buildRouteWidget(routeFor('/folder'), context, stateFor('/folder'));
       expect(folderFallback, isA<Scaffold>());
       expect((folderFallback as Scaffold).appBar, isNotNull);
 
-      final tagFallback = buildRouteWidget(routeFor('/tag-editor'), context, stateFor('/tag-editor'));
+      final tagFallback = buildRouteWidget(
+          routeFor('/tag-editor'), context, stateFor('/tag-editor'));
       expect(tagFallback, isA<Scaffold>());
       expect((tagFallback as Scaffold).appBar, isNotNull);
 
-      final playlistFallback = buildRouteWidget(routeFor('/playlist/manage'), context, stateFor('/playlist/manage'));
+      final playlistFallback = buildRouteWidget(
+          routeFor('/playlist/manage'), context, stateFor('/playlist/manage'));
       expect(playlistFallback, isA<Scaffold>());
       expect((playlistFallback as Scaffold).appBar, isNotNull);
 
       expect(
-        buildRouteWidget(routeFor('/smart-playlist-builder'), context, stateFor('/smart-playlist-builder')),
+        buildRouteWidget(routeFor('/smart-playlist-builder'), context,
+            stateFor('/smart-playlist-builder')),
         isA<SmartPlaylistBuilderScreen>(),
       );
       if (AppConfig.ytmEnabled) {
         expect(
-          buildRouteWidget(routeFor('/online-playlist'), context, stateFor('/online-playlist')),
+          buildRouteWidget(routeFor('/online-playlist'), context,
+              stateFor('/online-playlist')),
           isA<OnlinePlaylistDetailScreen>(),
         );
       }
@@ -367,8 +377,8 @@ void main() {
     testWidgets('honour typed extra payloads', (tester) async {
       await pumpContext(tester);
 
-      final proxy = buildRouteWidget(routeFor('/proxy-settings'),
-          context, stateFor('/proxy-settings', extra: '1.2.3.4:80'));
+      final proxy = buildRouteWidget(routeFor('/proxy-settings'), context,
+          stateFor('/proxy-settings', extra: '1.2.3.4:80'));
       expect(proxy, isA<ProxySettingsScreen>());
       expect((proxy as ProxySettingsScreen).initialImportText, '1.2.3.4:80');
 
@@ -379,40 +389,40 @@ void main() {
         isExcluded: false,
       );
       expect(
-        buildRouteWidget(routeFor('/folder'),
-            context, stateFor('/folder', extra: folder)),
+        buildRouteWidget(
+            routeFor('/folder'), context, stateFor('/folder', extra: folder)),
         isA<FolderDetailScreen>(),
       );
 
       final song = _song(1);
       expect(
-        buildRouteWidget(routeFor('/tag-editor'),
-            context, stateFor('/tag-editor', extra: song)),
+        buildRouteWidget(routeFor('/tag-editor'), context,
+            stateFor('/tag-editor', extra: song)),
         isA<TagEditorScreen>(),
       );
       expect(
-        buildRouteWidget(routeFor('/tag-editor'),
-            context, stateFor('/tag-editor', extra: [song])),
+        buildRouteWidget(routeFor('/tag-editor'), context,
+            stateFor('/tag-editor', extra: [song])),
         isA<TagEditorScreen>(),
       );
 
       final playlist = _playlist();
       expect(
-        buildRouteWidget(routeFor('/playlist/manage'),
-            context, stateFor('/playlist/manage', extra: playlist)),
+        buildRouteWidget(routeFor('/playlist/manage'), context,
+            stateFor('/playlist/manage', extra: playlist)),
         isA<ManagePlaylistScreen>(),
       );
       expect(
-        buildRouteWidget(routeFor('/smart-playlist-builder'),
-            context, stateFor('/smart-playlist-builder', extra: playlist)),
+        buildRouteWidget(routeFor('/smart-playlist-builder'), context,
+            stateFor('/smart-playlist-builder', extra: playlist)),
         isA<SmartPlaylistBuilderScreen>(),
       );
 
       if (AppConfig.ytmEnabled) {
         final args = const OnlinePlaylistDetailArgs(playlistId: 'PL1');
         expect(
-          buildRouteWidget(routeFor('/online-playlist'),
-              context, stateFor('/online-playlist', extra: args)),
+          buildRouteWidget(routeFor('/online-playlist'), context,
+              stateFor('/online-playlist', extra: args)),
           isA<OnlinePlaylistDetailScreen>(),
         );
         const accountPlaylist = YtmAccountPlaylist(
@@ -421,8 +431,8 @@ void main() {
           subtitle: 'Sub',
         );
         expect(
-          buildRouteWidget(routeFor('/online-playlist'),
-              context, stateFor('/online-playlist', extra: accountPlaylist)),
+          buildRouteWidget(routeFor('/online-playlist'), context,
+              stateFor('/online-playlist', extra: accountPlaylist)),
           isA<OnlinePlaylistDetailScreen>(),
         );
         const entry = OnlinePlaylistEntry(
@@ -432,13 +442,13 @@ void main() {
           tracks: [],
         );
         expect(
-          buildRouteWidget(routeFor('/online-playlist'),
-              context, stateFor('/online-playlist', extra: entry)),
+          buildRouteWidget(routeFor('/online-playlist'), context,
+              stateFor('/online-playlist', extra: entry)),
           isA<OnlinePlaylistDetailScreen>(),
         );
         expect(
-          buildRouteWidget(routeFor('/online-playlist'),
-              context, stateFor('/online-playlist', extra: 'PL4')),
+          buildRouteWidget(routeFor('/online-playlist'), context,
+              stateFor('/online-playlist', extra: 'PL4')),
           isA<OnlinePlaylistDetailScreen>(),
         );
       }

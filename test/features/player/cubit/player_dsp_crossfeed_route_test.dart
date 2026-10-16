@@ -100,15 +100,16 @@ void main() {
     test('built-in speaker / car / hdmi are bypassed', () {
       expect(PlayerDspController.routeWantsCrossfeed(device(type: 'builtin')),
           isFalse);
-      expect(
-          PlayerDspController.routeWantsCrossfeed(device(type: 'car')), isFalse);
+      expect(PlayerDspController.routeWantsCrossfeed(device(type: 'car')),
+          isFalse);
       expect(PlayerDspController.routeWantsCrossfeed(device(type: 'hdmi')),
           isFalse);
     });
   });
 
   group('crossfeed route gating', () {
-    test('speaker route: preference preserved, engine push gated off', () async {
+    test('speaker route: preference preserved, engine push gated off',
+        () async {
       useDevice(device(type: 'builtin'));
       await controller.setCrossfeed(true, delayUs: 300, feedDb: -8.0, mode: 1);
       expect(state.isCrossfeedEnabled, isTrue); // stored preference kept
@@ -122,7 +123,8 @@ void main() {
       expect(handler.lastEnabled, isTrue);
     });
 
-    test('reevaluateCrossfeedForRoute bypasses then restores without touching '
+    test(
+        'reevaluateCrossfeedForRoute bypasses then restores without touching '
         'the stored preference', () async {
       useDevice(device(bluetooth: true));
       await controller.setCrossfeed(true);

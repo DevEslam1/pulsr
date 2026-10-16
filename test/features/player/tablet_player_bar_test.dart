@@ -212,7 +212,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('transport and quick-action taps reach the cubit', (tester) async {
+  testWidgets('transport and quick-action taps reach the cubit',
+      (tester) async {
     var inspectorTaps = 0;
     var openTaps = 0;
     await tester.pumpWidget(createSubject(

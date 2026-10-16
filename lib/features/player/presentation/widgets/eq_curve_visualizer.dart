@@ -315,7 +315,8 @@ class _CatmullRomEqPainter extends CustomPainter {
     return path;
   }
 
-  void _paintBandNodes(Canvas canvas, List<Offset> points, double midY, Size size) {
+  void _paintBandNodes(
+      Canvas canvas, List<Offset> points, double midY, Size size) {
     final dotPaint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;

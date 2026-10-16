@@ -116,7 +116,8 @@ class AppUpdateService {
   }
 
   static const String defaultRepo = 'pulsr-audio/pulsr';
-  static const MethodChannel _updaterChannel = MethodChannel(PulsrChannels.updater);
+  static const MethodChannel _updaterChannel =
+      MethodChannel(PulsrChannels.updater);
 
   final http.Client _client;
   String _repo = defaultRepo;
@@ -141,7 +142,8 @@ class AppUpdateService {
 
     try {
       final currentVersion = currentVersionOverride ?? AppConfig.appVersion;
-      final uri = Uri.parse('https://api.github.com/repos/$_repo/releases/latest');
+      final uri =
+          Uri.parse('https://api.github.com/repos/$_repo/releases/latest');
       final res = await _client.get(
         uri,
         headers: {
@@ -182,7 +184,8 @@ class AppUpdateService {
   }) async {
     final apkUrl = info.apkUrl;
     if (apkUrl == null || apkUrl.isEmpty) {
-      throw StateError('No APK download URL available for release ${info.version}');
+      throw StateError(
+          'No APK download URL available for release ${info.version}');
     }
 
     _isDownloading = true;
@@ -209,7 +212,8 @@ class AppUpdateService {
       final response = await _client.send(request);
 
       if (response.statusCode != 200) {
-        throw HttpException('HTTP download failed with code ${response.statusCode}');
+        throw HttpException(
+            'HTTP download failed with code ${response.statusCode}');
       }
 
       final totalBytes = response.contentLength ?? 0;

@@ -147,11 +147,8 @@ extension PlayerDspFollowRate on PlayerDspController {
       }
     } catch (e, st) {
       _lastFollowedBtCodecRate = null;
-      ErrorLogger.log(
-          'Bluetooth codec rate alignment failed ($target)',
-          error: e,
-          stackTrace: st,
-          category: 'PlayerDspController');
+      ErrorLogger.log('Bluetooth codec rate alignment failed ($target)',
+          error: e, stackTrace: st, category: 'PlayerDspController');
     }
   }
 }

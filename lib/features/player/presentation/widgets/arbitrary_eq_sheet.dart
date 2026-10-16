@@ -58,7 +58,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
     super.dispose();
   }
 
-  ({List<double> frequencies, List<double> gains}) _parseGraphicEq(String text) {
+  ({List<double> frequencies, List<double> gains}) _parseGraphicEq(
+      String text) {
     final clean = text
         .replaceFirst(RegExp(r'^GraphicEq:\s*', caseSensitive: false), '')
         .trim();

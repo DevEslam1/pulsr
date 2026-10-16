@@ -22,6 +22,7 @@ import '../services/hires_audio_service.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../core/telemetry/audio_session_log.dart';
+import '../../core/telemetry/dsp_reliability_tracker.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/audio_output_info.dart';
@@ -743,6 +744,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         await _equalizerManager.resyncActiveEffects();
       }
     } catch (e, st) {
+      DspReliabilityTracker.instance.recordRouteResyncFailure(e);
       ErrorLogger.log('Failed to refresh Bluetooth route and sync effects',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
@@ -1777,7 +1779,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       ErrorLogger.log('Failed to load headset control config',
           error: e, stackTrace: st, category: 'AudioHandler');
     }));
- 
+
     _equalizerManager.attachDspPipeline(_dspPipeline);
     unawaited(_equalizerManager.syncNativeLatency(assumedOutputSampleRate));
 
@@ -1901,7 +1903,9 @@ class PulsrAudioHandler extends BaseAudioHandler
                   !_crossfadeManager.isCrossfading) {
                 notifySleepTrackCompleted();
                 final nextIdx = _getNextIndex(peek: true);
-                if (nextIdx == null && !_activePlayer.hasNext && _activePlayer.loopMode == LoopMode.off) {
+                if (nextIdx == null &&
+                    !_activePlayer.hasNext &&
+                    _activePlayer.loopMode == LoopMode.off) {
                   unawaited(_sleepTimerManager.onQueueCompleted());
                   if (_songs.isNotEmpty) {
                     if (_gaplessMode && _gaplessLoaded) {
@@ -1915,14 +1919,16 @@ class PulsrAudioHandler extends BaseAudioHandler
                           final fastArtUri = song.artworkUri != null
                               ? Uri.tryParse(song.artworkUri!)
                               : null;
-                          mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
+                          mediaItem.add(PulsrAudioHandler._songToMediaItem(
+                              song, fastArtUri));
                           _notifyTrackChanged(song);
                           await _activePlayer.pause();
                           _broadcastState(_activePlayer.playbackEvent);
                         } catch (_) {}
                       }());
                     } else {
-                      unawaited(_loadSongPaused(0, initialPosition: Duration.zero));
+                      unawaited(
+                          _loadSongPaused(0, initialPosition: Duration.zero));
                     }
                   }
                 } else {

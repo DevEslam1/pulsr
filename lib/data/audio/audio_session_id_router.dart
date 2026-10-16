@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../../core/utils/error_logger.dart';
+import '../../core/telemetry/dsp_reliability_tracker.dart';
 
 /// Single source of truth for routing Android audio session ids from the
 /// active just_audio player into the DSP/equalizer stack.
@@ -95,6 +96,7 @@ class AudioSessionIdRouter {
       if (callback != null) callback();
     }).catchError((Object e, StackTrace st) {
       _routeResyncPending = false;
+      DspReliabilityTracker.instance.recordRouteResyncFailure(e);
       ErrorLogger.log(
         'AudioSessionIdRouter route resync error',
         error: e,

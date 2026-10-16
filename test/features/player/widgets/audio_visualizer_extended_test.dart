@@ -97,8 +97,8 @@ void main() {
   });
 
   testWidgets('decay hooks drive the bar data to baseline', (tester) async {
-    await tester.pumpWidget(
-        visualizer(preferSimulated: true, isPlaying: false));
+    await tester
+        .pumpWidget(visualizer(preferSimulated: true, isPlaying: false));
     await tester.pump();
 
     final state =

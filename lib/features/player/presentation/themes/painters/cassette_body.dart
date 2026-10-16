@@ -65,10 +65,14 @@ class _CassetteBody extends StatelessWidget {
                   child: Stack(
                     children: [
                       // 1. Four Corner Screws
-                      const PositionedDirectional(top: 4, start: 4, child: _CassetteScrew()),
-                      const PositionedDirectional(top: 4, end: 4, child: _CassetteScrew()),
-                      const PositionedDirectional(bottom: 4, start: 4, child: _CassetteScrew()),
-                      const PositionedDirectional(bottom: 4, end: 4, child: _CassetteScrew()),
+                      const PositionedDirectional(
+                          top: 4, start: 4, child: _CassetteScrew()),
+                      const PositionedDirectional(
+                          top: 4, end: 4, child: _CassetteScrew()),
+                      const PositionedDirectional(
+                          bottom: 4, start: 4, child: _CassetteScrew()),
+                      const PositionedDirectional(
+                          bottom: 4, end: 4, child: _CassetteScrew()),
 
                       // 2. Main Cassette Body Layout
                       Padding(
@@ -569,7 +573,8 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
         _vuController.repeat(reverse: true);
       } else {
         _vuController.stop();
-        _vuController.animateTo(0.0, duration: const Duration(milliseconds: 300));
+        _vuController.animateTo(0.0,
+            duration: const Duration(milliseconds: 300));
       }
     }
   }

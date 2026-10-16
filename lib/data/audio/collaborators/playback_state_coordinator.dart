@@ -21,6 +21,7 @@ class PlaybackStateCoordinator {
   int _lastHighRatePositionEmitMs = 0;
 
   bool _positionDirty = false;
+
   /// Guards against overlapping persist calls: a slow save (longer than the
   /// periodic tick, or a manual [triggerSaveIfDirty]) must not start a
   /// second write while the first is still in flight.
@@ -56,7 +57,8 @@ class PlaybackStateCoordinator {
     _saveTimer = Timer.periodic(saveInterval, (_) {
       if (_disposed) return;
       // Skip periodic write if position delta since last save is under the threshold (I4)
-      final delta = (_lastEmittedPosition - _lastSavedPosition).inMilliseconds.abs();
+      final delta =
+          (_lastEmittedPosition - _lastSavedPosition).inMilliseconds.abs();
       if (delta < minDeltaMs) return;
       _executeSave();
     });

@@ -58,8 +58,7 @@ void main() {
     );
   }
 
-  testWidgets('renders brand title and tagline before routing',
-      (tester) async {
+  testWidgets('renders brand title and tagline before routing', (tester) async {
     SharedPreferences.setMockInitialValues({'onboarding_completed': true});
 
     await tester.pumpWidget(buildApp());

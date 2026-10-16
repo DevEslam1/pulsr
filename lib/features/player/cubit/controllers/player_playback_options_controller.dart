@@ -23,6 +23,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/quran_mode_profile.dart';
+import '../../../../domain/models/quran_style_tuning.dart';
 import '../managers/player_quran_manager.dart';
 import '../player_state.dart';
 import '../quran_restore_snapshot.dart';
@@ -60,6 +61,8 @@ class PlayerPlaybackOptionsController {
   int _quranToggleGen = 0;
   bool? _targetQuranModeEnabled;
   int _reciterStyleGen = 0;
+  int _quranWarmthGen = 0;
+  int _quranAmbienceGen = 0;
   StreamSubscription<bool>? _abLoopSub;
 
   bool get isClosed => _isClosed();

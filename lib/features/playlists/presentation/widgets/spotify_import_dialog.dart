@@ -76,7 +76,8 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         onProgress: (completed, total) {
           if (!mounted) return;
           setState(() {
-            _statusMessage = 'Matching tracks on YouTube Music ($completed/$total)...';
+            _statusMessage =
+                'Matching tracks on YouTube Music ($completed/$total)...';
             _progressFraction = total > 0 ? completed / total : null;
           });
         },
@@ -140,7 +141,8 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
             TextField(
               controller: _urlController,
               autofocus: true,
-              style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+              style:
+                  TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
                 hintText: 'https://open.spotify.com/playlist/...',
                 hintStyle: TextStyle(
@@ -263,7 +265,9 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
                       padding:
                           const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                       child: Text(
-                        t.artist.isNotEmpty ? '${t.title} · ${t.artist}' : t.title,
+                        t.artist.isNotEmpty
+                            ? '${t.title} · ${t.artist}'
+                            : t.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -329,8 +333,8 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               foregroundColor: p.onAccent,
               shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
-            child:
-                const Text('Done', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: const Text('Done',
+                style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ];
 

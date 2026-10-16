@@ -45,7 +45,8 @@ class CanvasArtwork {
   bool matches(String wantTitle, String wantArtist, String? wantAlbum) {
     final cleanWantTitle = cleanNoise(wantTitle);
     final normWantTitle = normalizeForMatch(cleanWantTitle);
-    final ourTitle = title != null ? normalizeForMatch(cleanNoise(title!)) : null;
+    final ourTitle =
+        title != null ? normalizeForMatch(cleanNoise(title!)) : null;
 
     final titleOk = ourTitle == null ||
         normWantTitle.isEmpty ||
@@ -59,8 +60,8 @@ class CanvasArtwork {
         wantArtist.trim().isEmpty ||
         (titleArtists.isNotEmpty &&
             ourArtists.isNotEmpty &&
-            titleArtists.any((want) =>
-                ourArtists.any((our) => our == want || our.contains(want) || want.contains(our))));
+            titleArtists.any((want) => ourArtists.any((our) =>
+                our == want || our.contains(want) || want.contains(our))));
 
     final albumOk = album == null ||
         album!.trim().isEmpty ||

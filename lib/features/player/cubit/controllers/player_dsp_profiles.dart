@@ -85,12 +85,14 @@ extension PlayerDspProfilesExtension on PlayerDspController {
 
     // 1. If USB DAC is present among available devices but not active, route to it
     if (!device.isUsbDac) {
-      final dacDevice = device.availableDevices.where((d) =>
-          d.type == 11 || // TYPE_USB_DEVICE
-          d.type == 22 || // TYPE_USB_HEADSET
-          d.typeName.toLowerCase().contains('usb') ||
-          d.name.toLowerCase().contains('dac') ||
-          d.name.toLowerCase().contains('usb')).firstOrNull;
+      final dacDevice = device.availableDevices
+          .where((d) =>
+              d.type == 11 || // TYPE_USB_DEVICE
+              d.type == 22 || // TYPE_USB_HEADSET
+              d.typeName.toLowerCase().contains('usb') ||
+              d.name.toLowerCase().contains('dac') ||
+              d.name.toLowerCase().contains('usb'))
+          .firstOrNull;
 
       if (dacDevice != null && !dacDevice.isCurrent) {
         await settings.selectOutputDevice(dacDevice.id);

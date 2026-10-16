@@ -16,6 +16,8 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
+import 'package:pulsr/domain/repositories/quran_repository.dart';
+import 'package:pulsr/data/repositories/quran_repository_impl.dart';
 import 'package:pulsr/services/discord/discord_rpc_service.dart';
 import 'package:pulsr/services/updater/app_update_service.dart';
 import 'injection.config.dart';
@@ -39,6 +41,9 @@ Future<void> configureDependencies() async {
     if (!getIt.isRegistered<AppUpdateService>()) {
       getIt.registerLazySingleton<AppUpdateService>(
           () => AppUpdateService.instance);
+    }
+    if (!getIt.isRegistered<QuranRepository>()) {
+      getIt.registerLazySingleton<QuranRepository>(() => QuranRepositoryImpl());
     }
     // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
     // StateError (audio handler -> player cubit -> download cubit -> intents).

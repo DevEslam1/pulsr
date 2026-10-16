@@ -38,8 +38,7 @@ void main() {
           password: any(named: 'password'),
           bypassHosts: any(named: 'bypassHosts'),
         )).thenAnswer((_) async {});
-    when(() => cubit.importProxiesFromText(any()))
-        .thenAnswer((_) async => 2);
+    when(() => cubit.importProxiesFromText(any())).thenAnswer((_) async => 2);
     when(() => cubit.clearProxyList()).thenAnswer((_) async {});
     when(() => cubit.testAllProxies()).thenAnswer((_) async {});
     when(() => cubit.sortProxiesByLatency()).thenAnswer((_) async {});
@@ -113,7 +112,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('7890'), findsWidgets);
-    expect(find.text(l10n.proxyPresetApplied('Clash / V2Ray', '127.0.0.1', 7890)),
+    expect(
+        find.text(l10n.proxyPresetApplied('Clash / V2Ray', '127.0.0.1', 7890)),
         findsOneWidget);
   });
 
@@ -133,8 +133,8 @@ void main() {
 
   testWidgets('test button shows the successful verdict card', (tester) async {
     stubState(const SettingsState(proxyEnabled: true, proxyHost: '1.2.3.4'));
-    when(() => cubit.testProxyConnection(any())).thenAnswer(
-        (_) async => (success: true, latencyMs: 42, error: null));
+    when(() => cubit.testProxyConnection(any()))
+        .thenAnswer((_) async => (success: true, latencyMs: 42, error: null));
     await pump(tester);
 
     await tester.tap(find.text(l10n.testProxy));
@@ -146,10 +146,9 @@ void main() {
   });
 
   testWidgets('test button shows the failure verdict card', (tester) async {
-    stubState(
-        const SettingsState(proxyEnabled: true, proxyHost: '1.2.3.4'));
-    when(() => cubit.testProxyConnection(any())).thenAnswer((_) async =>
-        (success: false, latencyMs: 0, error: 'refused'));
+    stubState(const SettingsState(proxyEnabled: true, proxyHost: '1.2.3.4'));
+    when(() => cubit.testProxyConnection(any())).thenAnswer(
+        (_) async => (success: false, latencyMs: 0, error: 'refused'));
     await pump(tester);
 
     await tester.tap(find.text(l10n.testProxy));
@@ -190,8 +189,8 @@ void main() {
 
     expect(find.text(l10n.importProxies), findsWidgets);
 
-    final fieldFinder = find.byWidgetPredicate(
-        (w) => w is TextField && w.maxLines == 6);
+    final fieldFinder =
+        find.byWidgetPredicate((w) => w is TextField && w.maxLines == 6);
     await tester.enterText(fieldFinder, '1.2.3.4:8080:user:pass');
     await tester.pump();
 

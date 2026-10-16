@@ -8276,4 +8276,74 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bootStartupFailedMessage =>
       'Playback components did not become ready in time. Retrying usually fixes a slow cold start.';
+
+  @override
+  String get dspResyncAction => 'Resync DSP';
+
+  @override
+  String get dspResyncing => 'Resyncing DSP...';
+
+  @override
+  String get dspResyncSuccess => 'DSP engine & effects resynced successfully';
+
+  @override
+  String dspResyncFailure(String error) {
+    return 'Failed to resync DSP: $error';
+  }
+
+  @override
+  String get dspReliabilityTitle => 'RELIABILITY TELEMETRY';
+
+  @override
+  String get dspNativeSetterRejections => 'Setter Rejections';
+
+  @override
+  String get dspBridgeTimeouts => 'Bridge Timeouts';
+
+  @override
+  String get dspRouteResyncFailures => 'Route Resync Failures';
+
+  @override
+  String get dspSessionReattachFailures => 'Session Reattach Failures';
+
+  @override
+  String get dspAutoDegradeEvents => 'Auto-Degrades (Trig/Recov)';
+
+  @override
+  String get dspResetCounters => 'Reset Counters';
+
+  @override
+  String get dspLatestError => 'Latest Redacted Bridge Error';
+
+  @override
+  String get quranNoMetadataTitle => 'No Quran Metadata';
+
+  @override
+  String get quranNoMetadataDesc =>
+      'This track has no verified Quran metadata (Surah/Ayah). Verse tracking and bookmarking are isolated from regular music.';
+
+  @override
+  String quranBookmarkSaved(String surah, int ayah) {
+    return 'Quran bookmark saved: $surah Ayah $ayah';
+  }
+
+  @override
+  String quranResumePrompt(String surah, int ayah, String time) {
+    return 'Resume $surah • Ayah $ayah ($time)';
+  }
+
+  @override
+  String get quranSaveBookmark => 'Save Quran Bookmark';
+
+  @override
+  String get quranClearBookmark => 'Clear Quran Bookmark';
+
+  @override
+  String get quranRepeatAyah => 'Repeat Ayah';
+
+  @override
+  String get quranRepeatRange => 'Repeat Range';
+
+  @override
+  String get quranRepeatOff => 'Repeat: Off';
 }

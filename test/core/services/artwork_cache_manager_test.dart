@@ -238,7 +238,9 @@ void main() {
       );
     });
 
-    test('inserts size suffix before query parameters when present on googleusercontent', () {
+    test(
+        'inserts size suffix before query parameters when present on googleusercontent',
+        () {
       expect(
         ArtworkCacheManager.toLowQualityArtworkUrl(
             'https://lh3.googleusercontent.com/abc?authuser=0&token=xyz'),
@@ -281,7 +283,9 @@ void main() {
       expect(manager.getDiskCacheSizeBytes(), completes);
     });
 
-    test('trimMemoryForPressure clears memory caches without destroying disk cache', () async {
+    test(
+        'trimMemoryForPressure clears memory caches without destroying disk cache',
+        () async {
       await manager.put('cached_art', _bytes(2048));
       expect(await manager.getDiskCacheSizeBytes(), greaterThan(0));
 

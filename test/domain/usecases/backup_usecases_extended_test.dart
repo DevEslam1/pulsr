@@ -140,7 +140,9 @@ void main() {
         'song_ratings_v1': jsonEncode({'id:9': 4}),
       });
       await insertSong(
-          id: 9, title: 'Portable', remoteId: 'remote9',
+          id: 9,
+          title: 'Portable',
+          remoteId: 'remote9',
           path: '/music/portable.mp3');
       final decoded =
           jsonDecode(await exportUseCase.execute()) as Map<String, dynamic>;
@@ -168,8 +170,8 @@ void main() {
 
     test('executeFromFile reads valid content', () async {
       final json = jsonEncode({'version': 1, 'favorites': []});
-      final result = await importUseCase
-          .executeFromFile(_FakeFile(json.length, json));
+      final result =
+          await importUseCase.executeFromFile(_FakeFile(json.length, json));
       expect(result.restoredFavoritesCount, 0);
     });
 
@@ -203,9 +205,9 @@ void main() {
   });
 
   group('validateSchema', () {
-    void expectInvalid(Map<String, dynamic> data) =>
-        expect(() => ImportBackupUseCase.validateSchema(data),
-            throwsA(isA<FormatException>()));
+    void expectInvalid(Map<String, dynamic> data) => expect(
+        () => ImportBackupUseCase.validateSchema(data),
+        throwsA(isA<FormatException>()));
 
     test('accepts a minimal valid schema', () {
       ImportBackupUseCase.validateSchema({'version': 1});
@@ -257,12 +259,17 @@ void main() {
   });
 
   group('ImportBackupUseCase restore', () {
-    test('restores favorites, history, excluded folders, settings and downloads',
+    test(
+        'restores favorites, history, excluded folders, settings and downloads',
         () async {
       await insertSong(id: 10, title: 'A', path: '/music/a.mp3');
       await insertSong(id: 11, title: 'B', path: '/music/b.mp3');
-      await insertSong(id: 12, title: 'C', path: 'ytmusic://vidC',
-          remoteId: 'vidC', source: SongSource.youtube);
+      await insertSong(
+          id: 12,
+          title: 'C',
+          path: 'ytmusic://vidC',
+          remoteId: 'vidC',
+          source: SongSource.youtube);
       await repository.toggleFolderExclusion('/already/excluded');
 
       final payload = {
@@ -324,8 +331,8 @@ void main() {
       expect(result.restoredPlaylistsCount, 1);
       expect(result.restoredDownloadsCount, 2);
       expect(result.unmatchedPaths, contains('/missing/file.mp3'));
-      expect(result.restoredSettingsCount,
-          (payload['settings']! as Map).length);
+      expect(
+          result.restoredSettingsCount, (payload['settings']! as Map).length);
 
       final songA = await (db.select(db.songsTable)
             ..where((t) => t.id.equals(10)))
@@ -352,14 +359,13 @@ void main() {
       expect(prefs.getInt(PrefsKeys.eqBandCount), 10);
       expect(prefs.getString(PrefsKeys.eqCustomFrequencies), 'freqs');
       expect(prefs.getDouble('setting_playback_speed'), 1.25);
-      expect(
-          (await repository.getExcludedFolderPaths()).getOrElse((_) => []),
+      expect((await repository.getExcludedFolderPaths()).getOrElse((_) => []),
           containsAll(['/already/excluded', '/new/excluded']));
     });
 
     test('restores per-song data remapped onto fresh ids', () async {
-      await insertSong(id: 50, title: 'Song', remoteId: 'v50',
-          path: '/music/song.mp3');
+      await insertSong(
+          id: 50, title: 'Song', remoteId: 'v50', path: '/music/song.mp3');
       final payload = {
         'version': 4,
         'ratings': {'yt:v50': 5},
@@ -385,8 +391,8 @@ void main() {
     test('restores queue and smart playlist update', () async {
       await insertSong(id: 1, title: 'Q1', path: '/music/q1.mp3');
       await insertSong(id: 2, title: 'Q2', path: '/music/q2.mp3');
-      final existing = (await repository.createPlaylist('Existing')).fold(
-          (_) => -1, (r) => r);
+      final existing = (await repository.createPlaylist('Existing'))
+          .fold((_) => -1, (r) => r);
 
       final payload = {
         'version': 4,
@@ -413,8 +419,8 @@ void main() {
       expect(current.songId, 2);
       expect(current.positionMs, 4242);
 
-      final pl = (await repository.getPlaylistById(existing))
-          .getOrElse((_) => null);
+      final pl =
+          (await repository.getPlaylistById(existing)).getOrElse((_) => null);
       expect(pl!.smartCriteria, '{"rules":[]}');
     });
 

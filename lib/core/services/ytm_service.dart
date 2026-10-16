@@ -1032,7 +1032,8 @@ class YtmService {
   }
 
   /// Fetches radio / autoplay recommendations for [videoId].
-  Future<List<YtmTrack>> getRadioTracks(String videoId, {int limit = 25}) async {
+  Future<List<YtmTrack>> getRadioTracks(String videoId,
+      {int limit = 25}) async {
     final cleanId = videoId.trim();
     if (cleanId.isEmpty) return const [];
 
@@ -1042,18 +1043,21 @@ class YtmService {
           ? getIt<YtmAccountService>()
           : null;
       if (accountService != null) {
-        final tracks = await accountService.fetchRadioTracks(cleanId, maxTracks: limit);
+        final tracks =
+            await accountService.fetchRadioTracks(cleanId, maxTracks: limit);
         if (tracks.isNotEmpty) {
           return tracks;
         }
       }
     } catch (e) {
-      debugPrint('[YTM_SERVICE] fetchRadioTracks via YtmAccountService error: $e');
+      debugPrint(
+          '[YTM_SERVICE] fetchRadioTracks via YtmAccountService error: $e');
     }
 
     // 2. Fallback to getPlaylistTracks with RDAMVM$videoId
     try {
-      final fallbackTracks = await getPlaylistTracks('RDAMVM$cleanId', limit: limit);
+      final fallbackTracks =
+          await getPlaylistTracks('RDAMVM$cleanId', limit: limit);
       return fallbackTracks.where((t) => t.videoId != cleanId).toList();
     } catch (e) {
       debugPrint('[YTM_SERVICE] getRadioTracks fallback error: $e');

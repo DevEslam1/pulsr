@@ -57,15 +57,14 @@ void main() {
     fake.jsResult = true;
     await fireYtmLoad(tester);
 
-    expect(
-        find.text('YouTube Music is restricted in your region'), findsOneWidget);
+    expect(find.text('YouTube Music is restricted in your region'),
+        findsOneWidget);
     expect(find.text('Force Egypt Mode'), findsOneWidget);
     expect(find.text('Open YouTube Web'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('Force Egypt Mode clears the banner and reloads',
-      (tester) async {
+  testWidgets('Force Egypt Mode clears the banner and reloads', (tester) async {
     fake.url = WebUri('https://music.youtube.com/');
     fake.jsResult = true;
     await fireYtmLoad(tester);
@@ -74,8 +73,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('YouTube Music is restricted in your region'),
-        findsNothing);
+    expect(
+        find.text('YouTube Music is restricted in your region'), findsNothing);
     expect(fake.lastLoadedRequest, isNotNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -97,8 +96,8 @@ void main() {
     fake.url = WebUri('https://music.youtube.com/');
     fake.jsResult = false;
     await fireYtmLoad(tester);
-    expect(find.text('YouTube Music is restricted in your region'),
-        findsNothing);
+    expect(
+        find.text('YouTube Music is restricted in your region'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -106,8 +105,8 @@ void main() {
     fake.url = WebUri('https://music.youtube.com/');
     fake.jsError = StateError('no js');
     await fireYtmLoad(tester);
-    expect(find.text('YouTube Music is restricted in your region'),
-        findsNothing);
+    expect(
+        find.text('YouTube Music is restricted in your region'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

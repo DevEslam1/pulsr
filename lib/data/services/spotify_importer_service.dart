@@ -116,8 +116,7 @@ class SpotifyImporterService {
       if (host != 'spotify.com' && !host.endsWith('.spotify.com')) {
         return null;
       }
-      final segments =
-          uri.pathSegments.where((s) => s.isNotEmpty).toList();
+      final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
       final playlistIdx = segments.indexOf('playlist');
       if (playlistIdx != -1 && playlistIdx + 1 < segments.length) {
         final id = segments[playlistIdx + 1];
@@ -139,7 +138,8 @@ class SpotifyImporterService {
     try {
       response = await _httpClient.get(embedUrl, headers: {
         'User-Agent': userAgent,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       }).timeout(const Duration(seconds: 12));
     } catch (e, st) {
       ErrorLogger.log('Failed to fetch Spotify embed page: $playlistId',
@@ -173,8 +173,8 @@ class SpotifyImporterService {
         final pageProps = props?['pageProps'] as Map<String, dynamic>?;
         final state = pageProps?['state'] as Map<String, dynamic>?;
         final data = state?['data'] as Map<String, dynamic>?;
-        final entity = (data?['entity'] ?? pageProps?['entity'])
-            as Map<String, dynamic>?;
+        final entity =
+            (data?['entity'] ?? pageProps?['entity']) as Map<String, dynamic>?;
 
         playlistTitle = (entity?['name'] ?? entity?['title']) as String?;
 
@@ -218,11 +218,12 @@ class SpotifyImporterService {
       try {
         final oembedUrl = Uri.parse(
             'https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/$playlistId');
-        final oembedResp = await _httpClient
-            .get(oembedUrl, headers: {'User-Agent': userAgent})
-            .timeout(const Duration(seconds: 6));
+        final oembedResp = await _httpClient.get(oembedUrl, headers: {
+          'User-Agent': userAgent
+        }).timeout(const Duration(seconds: 6));
         if (oembedResp.statusCode == 200) {
-          final oembedData = jsonDecode(oembedResp.body) as Map<String, dynamic>;
+          final oembedData =
+              jsonDecode(oembedResp.body) as Map<String, dynamic>;
           playlistTitle = oembedData['title'] as String?;
         }
       } catch (_) {}

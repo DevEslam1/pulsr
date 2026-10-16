@@ -25,7 +25,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({'setting_offline_only_mode': false});
+    SharedPreferences.setMockInitialValues(
+        {'setting_offline_only_mode': false});
   });
 
   group('ArtistBioService', () {

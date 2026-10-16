@@ -67,8 +67,7 @@ MockPlayerCubit stubPlayerCubit({
 }) {
   final cubit = MockPlayerCubit();
   when(() => cubit.state).thenReturn(state ?? const PlayerState());
-  when(() => cubit.stream)
-      .thenAnswer((_) => const Stream<PlayerState>.empty());
+  when(() => cubit.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
   when(() => cubit.rawPositionStream)
       .thenAnswer((_) => positionStream ?? const Stream<Duration>.empty());
   return cubit;

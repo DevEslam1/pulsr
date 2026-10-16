@@ -567,7 +567,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         final samples = (irData.sampleRate > 0 &&
                 engineRate > 0 &&
                 irData.sampleRate != engineRate)
-            ? IrFileParser.resample(irData.samples, irData.sampleRate, engineRate)
+            ? IrFileParser.resample(
+                irData.samples, irData.sampleRate, engineRate)
             : irData.samples;
         if (samples.isNotEmpty && await loadCustomImpulseResponse(samples)) {
           final prefs = await SharedPreferences.getInstance();

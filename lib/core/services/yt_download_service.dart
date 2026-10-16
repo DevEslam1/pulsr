@@ -393,17 +393,15 @@ class YtDownloadService {
         }
 
         if (_activeDownloads.containsKey(videoId)) {
-          _activeDownloads[videoId]!.completer.future.then(
-              (res) {
-                if (!task.completer.isCompleted) {
-                  task.completer.complete(res);
-                }
-              },
-              onError: (Object e, StackTrace st) {
-                if (!task.completer.isCompleted) {
-                  task.completer.completeError(e, st);
-                }
-              });
+          _activeDownloads[videoId]!.completer.future.then((res) {
+            if (!task.completer.isCompleted) {
+              task.completer.complete(res);
+            }
+          }, onError: (Object e, StackTrace st) {
+            if (!task.completer.isCompleted) {
+              task.completer.completeError(e, st);
+            }
+          });
           continue;
         }
 
@@ -414,7 +412,8 @@ class YtDownloadService {
           }
         }).catchError((e) {
           if (!task.completer.isCompleted) {
-            task.completer.complete(Left(DownloadFailure('Download error: $e')));
+            task.completer
+                .complete(Left(DownloadFailure('Download error: $e')));
           }
         }).whenComplete(() {
           _activeDownloads.remove(videoId);
@@ -645,8 +644,8 @@ class YtDownloadService {
         ErrorLogger.addBreadcrumb('Download tagging: $videoId',
             category: 'download');
         final artPath = artworkFuture != null ? await artworkFuture : null;
-        embeddedLyrics = await _tag(temp.path, song,
-            artworkPath: artPath, lyrics: lrcText);
+        embeddedLyrics =
+            await _tag(temp.path, song, artworkPath: artPath, lyrics: lrcText);
       }
 
       if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
@@ -1029,7 +1028,8 @@ class YtDownloadService {
     }
 
     // Ensure each chunk meets the minimum chunk size threshold
-    while (targetChunks > 1 && (totalBytes / targetChunks) < _minChunkThreshold) {
+    while (
+        targetChunks > 1 && (totalBytes / targetChunks) < _minChunkThreshold) {
       targetChunks ~/= 2;
     }
 
@@ -1170,9 +1170,8 @@ class YtDownloadService {
         for (var i = 0; i < concurrentChunks; i++) {
           final chunkIndex = i;
           final start = i * chunkSize;
-          final end = (i == concurrentChunks - 1)
-              ? total - 1
-              : (start + chunkSize - 1);
+          final end =
+              (i == concurrentChunks - 1) ? total - 1 : (start + chunkSize - 1);
           if (start >= total) break;
 
           final partFile =

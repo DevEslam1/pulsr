@@ -65,8 +65,8 @@ void main() {
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
-    await tester.pumpWidget(
-        buildScreen(cubit, player, auth, keyboard: keyboard));
+    await tester
+        .pumpWidget(buildScreen(cubit, player, auth, keyboard: keyboard));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pump(const Duration(milliseconds: 400));

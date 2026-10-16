@@ -394,7 +394,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
           if (_crossfadeManager.automixEnabled) {
             try {
-              final outDurationSec = (outDuration?.inMilliseconds ?? 0) / 1000.0;
+              final outDurationSec =
+                  (outDuration?.inMilliseconds ?? 0) / 1000.0;
               final inDurationSec = (nextSong.durationMs > 0
                       ? nextSong.durationMs
                       : (_inactivePlayer.duration?.inMilliseconds ?? 0)) /
@@ -402,12 +403,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
               final currentSongTrackId = currentSong?.id.toString() ?? '';
               final nextSongTrackId = nextSong.id.toString();
 
-              final outAnalysis = _crossfadeManager.bpmDetector.estimateTrackAnalysis(
+              final outAnalysis =
+                  _crossfadeManager.bpmDetector.estimateTrackAnalysis(
                 trackId: currentSongTrackId,
                 durationSeconds: outDurationSec,
                 explicitBpm: _crossfadeManager.bpmOverrides[currentSongTrackId],
               );
-              final inAnalysis = _crossfadeManager.bpmDetector.estimateTrackAnalysis(
+              final inAnalysis =
+                  _crossfadeManager.bpmDetector.estimateTrackAnalysis(
                 trackId: nextSongTrackId,
                 durationSeconds: inDurationSec,
                 explicitBpm: _crossfadeManager.bpmOverrides[nextSongTrackId],
@@ -432,8 +435,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
                 }
                 // Tempo stretch: adjust playback speed on incoming track if sped up
                 if (automixPlan.incomingPlaybackRate > 1.0) {
-                  final targetSpeed = (_activePlayer.speed * automixPlan.incomingPlaybackRate)
-                      .clamp(0.25, 3.0);
+                  final targetSpeed =
+                      (_activePlayer.speed * automixPlan.incomingPlaybackRate)
+                          .clamp(0.25, 3.0);
                   await _inactivePlayer.setSpeed(targetSpeed);
                 }
               }

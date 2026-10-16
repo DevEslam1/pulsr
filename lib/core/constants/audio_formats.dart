@@ -59,8 +59,7 @@ class AudioFormats {
     return nativeDecodableExtensions.contains(ext);
   }
 
-  static final RegExp _urlSchemeRegex =
-      RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*://');
+  static final RegExp _urlSchemeRegex = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*://');
 
   static String extractExtension(String pathOrExt) {
     var clean = pathOrExt.trim();

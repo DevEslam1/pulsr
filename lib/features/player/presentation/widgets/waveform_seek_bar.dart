@@ -75,7 +75,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   int _lastScaleMs = 0;
   bool _dragStarted = false;
 
-  void _checkHapticBoundaries(double oldVal, double newVal, BuildContext context) {
+  void _checkHapticBoundaries(
+      double oldVal, double newVal, BuildContext context) {
     final markers = <double>[];
     if (widget.loopPointA != null) {
       markers.add(widget.loopPointA!.inMilliseconds.toDouble());
@@ -257,12 +258,12 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                     final ratio = (_dragValue! /
                                             widget.duration.inMilliseconds)
                                         .clamp(0.0, 1.0);
-                                    _dragValue = (ratio *
-                                            widget.duration.inMilliseconds)
-                                        .clamp(
-                                            0.0,
-                                            widget.duration.inMilliseconds
-                                                .toDouble());
+                                    _dragValue =
+                                        (ratio * widget.duration.inMilliseconds)
+                                            .clamp(
+                                                0.0,
+                                                widget.duration.inMilliseconds
+                                                    .toDouble());
                                   }
                                 }
                               });

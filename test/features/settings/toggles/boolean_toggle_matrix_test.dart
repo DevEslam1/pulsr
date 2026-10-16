@@ -40,9 +40,15 @@ class _Toggle {
 final List<_Toggle> _toggles = [
   _Toggle('gaplessPlayback', true, 'setting_gapless',
       (c) => c.state.gaplessPlayback, (c, v) => c.setGapless(v)),
-  _Toggle('autoHideSystemMedia', true, 'setting_auto_hide_system_media',
-      (c) => c.state.autoHideSystemMedia, (c, v) => c.setAutoHideSystemMedia(v)),
-  _Toggle('resumeAfterInterruption', true,
+  _Toggle(
+      'autoHideSystemMedia',
+      true,
+      'setting_auto_hide_system_media',
+      (c) => c.state.autoHideSystemMedia,
+      (c, v) => c.setAutoHideSystemMedia(v)),
+  _Toggle(
+      'resumeAfterInterruption',
+      true,
       PrefsKeys.resumeAfterInterruption,
       (c) => c.state.resumeAfterInterruption,
       (c, v) => c.setResumeAfterInterruption(v)),
@@ -64,40 +70,66 @@ final List<_Toggle> _toggles = [
       (c) => c.state.offlineOnlyMode, (c, v) => c.setOfflineOnlyMode(v)),
   _Toggle('proxyEnabled', false, 'setting_proxy_enabled',
       (c) => c.state.proxyEnabled, (c, v) => c.setProxyEnabled(v)),
-  _Toggle('bypassDspOnBitPerfect', true, PrefsKeys.bypassDspOnBitPerfect,
+  _Toggle(
+      'bypassDspOnBitPerfect',
+      true,
+      PrefsKeys.bypassDspOnBitPerfect,
       (c) => c.state.bypassDspOnBitPerfect,
       (c, v) => c.setBypassDspOnBitPerfect(v)),
-  _Toggle('followTrackSampleRate', true, PrefsKeys.followTrackSampleRate,
+  _Toggle(
+      'followTrackSampleRate',
+      true,
+      PrefsKeys.followTrackSampleRate,
       (c) => c.state.followTrackSampleRate,
       (c, v) => c.setFollowTrackSampleRate(v)),
-  _Toggle('hedgedResolutionEnabled', true, PrefsKeys.hedgedResolutionEnabled,
+  _Toggle(
+      'hedgedResolutionEnabled',
+      true,
+      PrefsKeys.hedgedResolutionEnabled,
       (c) => c.state.hedgedResolutionEnabled,
       (c, v) => c.setHedgedResolutionEnabled(v)),
-  _Toggle('adaptiveQualityEnabled', true, PrefsKeys.adaptiveQualityEnabled,
+  _Toggle(
+      'adaptiveQualityEnabled',
+      true,
+      PrefsKeys.adaptiveQualityEnabled,
       (c) => c.state.adaptiveQualityEnabled,
       (c, v) => c.setAdaptiveQualityEnabled(v)),
   _Toggle('dspSnapshotEnabled', true, PrefsKeys.dspSnapshotEnabled,
       (c) => c.state.dspSnapshotEnabled, (c, v) => c.setDspSnapshotEnabled(v)),
   _Toggle('sessionLogEnabled', true, PrefsKeys.audioSessionLogEnabled,
       (c) => c.state.sessionLogEnabled, (c, v) => c.setSessionLogEnabled(v)),
-  _Toggle('outputFormatNegotiationEnabled', true,
+  _Toggle(
+      'outputFormatNegotiationEnabled',
+      true,
       PrefsKeys.outputFormatNegotiationEnabled,
       (c) => c.state.outputFormatNegotiationEnabled,
       (c, v) => c.setOutputFormatNegotiationEnabled(v)),
   _Toggle('floatOutputEnabled', true, PrefsKeys.floatOutputEnabled,
       (c) => c.state.floatOutputEnabled, (c, v) => c.setFloatOutputEnabled(v)),
-  _Toggle('usbHardwareVolumeEnabled', false, PrefsKeys.usbHardwareVolumeEnabled,
+  _Toggle(
+      'usbHardwareVolumeEnabled',
+      false,
+      PrefsKeys.usbHardwareVolumeEnabled,
       (c) => c.state.usbHardwareVolumeEnabled,
       (c, v) async => await c.setUsbHardwareVolumeEnabled(v)),
-  _Toggle('aaudioPreferExclusive', true, PrefsKeys.aaudioPreferExclusive,
+  _Toggle(
+      'aaudioPreferExclusive',
+      true,
+      PrefsKeys.aaudioPreferExclusive,
       (c) => c.state.aaudioPreferExclusive,
       (c, v) => c.setAaudioPreferExclusive(v)),
-  _Toggle('bpmSyncCrossfadeEnabled', false, PrefsKeys.bpmSyncCrossfadeEnabled,
+  _Toggle(
+      'bpmSyncCrossfadeEnabled',
+      false,
+      PrefsKeys.bpmSyncCrossfadeEnabled,
       (c) => c.state.bpmSyncCrossfadeEnabled,
       (c, v) => c.setBpmSyncCrossfadeEnabled(v)),
-  _Toggle('dvcEnabled', false, PrefsKeys.dvcEnabled,
-      (c) => c.state.dvcEnabled, (c, v) => c.setDvcEnabled(v)),
-  _Toggle('aaudioOutputEnabled', false, PrefsKeys.aaudioOutputEnabled,
+  _Toggle('dvcEnabled', false, PrefsKeys.dvcEnabled, (c) => c.state.dvcEnabled,
+      (c, v) => c.setDvcEnabled(v)),
+  _Toggle(
+      'aaudioOutputEnabled',
+      false,
+      PrefsKeys.aaudioOutputEnabled,
       (c) => c.state.aaudioOutputEnabled,
       (c, v) => c.setAaudioOutputEnabled(v)),
 ];
@@ -120,7 +152,8 @@ void main() {
 
   group('Boolean toggle matrix (default / enable / disable / persist)', () {
     for (final t in _toggles) {
-      test('${t.name}: ${t.defaultValue} -> ${!t.defaultValue} persists', () async {
+      test('${t.name}: ${t.defaultValue} -> ${!t.defaultValue} persists',
+          () async {
         final cubit = SettingsCubit(scannerService: scanner);
         await cubit.preferencesReady;
 

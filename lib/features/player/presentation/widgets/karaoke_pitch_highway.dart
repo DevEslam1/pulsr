@@ -110,7 +110,9 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
   }
 
   void _syncAnimation() {
-    if (widget.isPlaying && context.motionEnabled && !KaraokePitchHighway.isTesting) {
+    if (widget.isPlaying &&
+        context.motionEnabled &&
+        !KaraokePitchHighway.isTesting) {
       if (!_animController.isAnimating) {
         _animController.repeat();
       }
@@ -175,7 +177,8 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
     // Add natural human vibrato (5.5 Hz) and vocal drift
     final vibrato = math.sin(_phase * 4.0) * 0.35;
     final microDrift = math.sin(_phase * 1.5) * 0.2;
-    final targetMidi = (baseMidi + vibrato + microDrift).clamp(_minMidi, _maxMidi);
+    final targetMidi =
+        (baseMidi + vibrato + microDrift).clamp(_minMidi, _maxMidi);
 
     final freqHz = 440.0 * math.pow(2.0, (targetMidi - 69.0) / 12.0);
     return PitchResult(
@@ -188,7 +191,20 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
   }
 
   static String _noteNameFromMidi(int midi) {
-    const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const names = [
+      'C',
+      'C#',
+      'D',
+      'D#',
+      'E',
+      'F',
+      'F#',
+      'G',
+      'G#',
+      'A',
+      'A#',
+      'B'
+    ];
     final idx = (midi % 12 + 12) % 12;
     final oct = (midi ~/ 12) - 1;
     return '${names[idx]}$oct';
@@ -412,7 +428,8 @@ class _PitchHighwayPainter extends CustomPainter {
       final specularPaint = Paint()
         ..color = AppColors.specularAt(0.9)
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(cursorCenter - const Offset(1.2, 1.2), 1.5, specularPaint);
+      canvas.drawCircle(
+          cursorCenter - const Offset(1.2, 1.2), 1.5, specularPaint);
     }
   }
 

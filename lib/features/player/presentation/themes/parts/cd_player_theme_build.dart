@@ -180,11 +180,10 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, artConstraints) {
-                        final double availableWidth = artConstraints.maxWidth -
-                            (isTablet ? 64.0 : 28.0);
+                        final double availableWidth =
+                            artConstraints.maxWidth - (isTablet ? 64.0 : 28.0);
                         final double availableHeight =
-                            artConstraints.maxHeight -
-                                (isTablet ? 36.0 : 20.0);
+                            artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
                         final double maxAllowed = isTablet ? 560.0 : 420.0;
                         final double rawSize =
                             math.min(availableWidth, availableHeight);

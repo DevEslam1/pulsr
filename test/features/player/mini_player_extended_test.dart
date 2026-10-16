@@ -107,8 +107,7 @@ void main() {
     verify(() => cubit.adjustVolume(-0.05)).called(1);
   });
 
-  testWidgets('progress bar records an optimistic seek on tap',
-      (tester) async {
+  testWidgets('progress bar records an optimistic seek on tap', (tester) async {
     final cubit = stubTransport();
 
     await tester.pumpWidget(sheetHost(

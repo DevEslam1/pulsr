@@ -322,7 +322,8 @@ class _CdTonearmPainter extends CustomPainter {
 
   void _drawTonearmShadow(Canvas canvas, double l) {
     final p = liftProgress.clamp(0.0, 1.0);
-    final offset = Offset.lerp(const Offset(11, 13), const Offset(3.5, 4.0), p)!;
+    final offset =
+        Offset.lerp(const Offset(11, 13), const Offset(3.5, 4.0), p)!;
     final blurSigma = 7.0 + (2.5 - 7.0) * p;
 
     final shadowPaint = Paint()
@@ -371,7 +372,8 @@ class _CdTonearmPainter extends CustomPainter {
       ..color = Colors.white.withValues(alpha: 0.4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5;
-    canvas.drawLine(const Offset(-1.5, 2), Offset(-1.5, tubeLength - 2), tubeEdgePaint);
+    canvas.drawLine(
+        const Offset(-1.5, 2), Offset(-1.5, tubeLength - 2), tubeEdgePaint);
   }
 
   void _drawStylusHead(Canvas canvas, double l) {

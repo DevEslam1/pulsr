@@ -38,18 +38,21 @@ void main() {
       final json = {
         'tag_name': 'v1.2.0',
         'html_url': 'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.0',
-        'body': '## What is new\n- Added Discord Rich Presence\n- Added In-App Updater',
+        'body':
+            '## What is new\n- Added Discord Rich Presence\n- Added In-App Updater',
         'published_at': '2026-10-12T00:00:00Z',
         'assets': [
           {
             'name': 'source-code.zip',
             'state': 'uploaded',
-            'browser_download_url': 'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.0/source.zip',
+            'browser_download_url':
+                'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.0/source.zip',
           },
           {
             'name': 'pulsr-1.2.0.apk',
             'state': 'uploaded',
-            'browser_download_url': 'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.0/pulsr-1.2.0.apk',
+            'browser_download_url':
+                'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.0/pulsr-1.2.0.apk',
           },
         ],
       };
@@ -57,8 +60,10 @@ void main() {
       final info = UpdateInfo.fromGitHubJson(json);
       expect(info.version, '1.2.0');
       expect(info.tagName, 'v1.2.0');
-      expect(info.releaseUrl, 'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.0');
-      expect(info.apkUrl, 'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.0/pulsr-1.2.0.apk');
+      expect(info.releaseUrl,
+          'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.0');
+      expect(info.apkUrl,
+          'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.0/pulsr-1.2.0.apk');
       expect(info.notes, contains('Added Discord Rich Presence'));
     });
 

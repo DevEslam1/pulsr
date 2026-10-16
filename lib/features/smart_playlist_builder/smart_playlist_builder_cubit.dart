@@ -205,8 +205,8 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       }
       normalizedRules.add(rule);
     }
-    final criteria = state.criteria.copyWith(
-        rules: List<SmartRule>.unmodifiable(normalizedRules));
+    final criteria = state.criteria
+        .copyWith(rules: List<SmartRule>.unmodifiable(normalizedRules));
 
     // A rule the engine cannot evaluate must block the save: saving it would
     // silently widen the playlist (unbuildable rules previously failed open).

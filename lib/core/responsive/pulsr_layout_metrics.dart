@@ -93,8 +93,7 @@ class PulsrLayoutMetrics {
   // ── Sheet / Dialog Adaptive Decisions (Fixes G6, Phase 2.4) ────────────────
   static bool shouldUseDialogForSheet(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final isLandscapePhone =
-        PulsrBreakpoint.isLandscape(context) &&
+    final isLandscapePhone = PulsrBreakpoint.isLandscape(context) &&
         size.height < PulsrBreakpoint.shortHeightThreshold;
     return !context.isCompact || isLandscapePhone;
   }

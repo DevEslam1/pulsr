@@ -148,8 +148,7 @@ void main() {
     expect(find.byIcon(Icons.delete_outline_rounded), findsOneWidget);
   });
 
-  testWidgets('toggling auto-switch persists the preference',
-      (tester) async {
+  testWidgets('toggling auto-switch persists the preference', (tester) async {
     await pumpSection(tester);
 
     await tester.tap(find.byType(SwitchListTile));

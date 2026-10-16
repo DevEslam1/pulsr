@@ -97,7 +97,8 @@ class _PlayerControlsState extends State<PlayerControls> {
         ? const Color(0xFF101223)
         : Colors.white;
 
-    final shuffleLabel = widget.isShuffle ? l10n.disableShuffle : l10n.enableShuffle;
+    final shuffleLabel =
+        widget.isShuffle ? l10n.disableShuffle : l10n.enableShuffle;
     final repeatLabel = widget.repeatMode == PlayerRepeatMode.one
         ? l10n.repeatOne
         : widget.repeatMode == PlayerRepeatMode.all
@@ -166,8 +167,10 @@ class _PlayerControlsState extends State<PlayerControls> {
                             : null,
                         borderRadius: BorderRadius.circular(30),
                         child: Container(
-                          width: (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
-                          height: (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          width:
+                              (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          height:
+                              (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: widget.hasPrevious
@@ -182,7 +185,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                             boxShadow: widget.hasPrevious
                                 ? [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.18),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.18),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -195,7 +199,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                               color: widget.hasPrevious
                                   ? p.textPrimary
                                   : p.textTertiary.withValues(alpha: 0.3),
-                              size: (widget.mainButtonSize * 0.44).clamp(24.0, 32.0),
+                              size: (widget.mainButtonSize * 0.44)
+                                  .clamp(24.0, 32.0),
                             ),
                           ),
                         ),
@@ -223,85 +228,90 @@ class _PlayerControlsState extends State<PlayerControls> {
                   child: AnimatedScale(
                     scale: _isPlayPressed ? 0.92 : 1.0,
                     duration: Duration(milliseconds: _isPlayPressed ? 90 : 280),
-                    curve: _isPlayPressed ? Curves.easeOutCubic : Curves.easeOutBack,
+                    curve: _isPlayPressed
+                        ? Curves.easeOutCubic
+                        : Curves.easeOutBack,
                     child: AnimatedContainer(
                       duration: context.motionMs(200),
                       width: widget.mainButtonSize,
                       height: widget.mainButtonSize,
                       decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color.lerp(widget.primaryColor, Colors.white, 0.18) ??
-                              widget.primaryColor,
-                          widget.primaryColor,
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color.lerp(
+                                    widget.primaryColor, Colors.white, 0.18) ??
+                                widget.primaryColor,
+                            widget.primaryColor,
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: widget.primaryColor.withValues(
+                                alpha: widget.isPlaying ? 0.45 : 0.25),
+                            blurRadius: widget.isPlaying ? 24 : 16,
+                            spreadRadius: widget.isPlaying ? 2 : 0,
+                            offset: const Offset(0, 6),
+                          ),
+                          BoxShadow(
+                            color: AppColors.scrimAt(0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
                         ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: widget.primaryColor.withValues(
-                              alpha: widget.isPlaying ? 0.45 : 0.25),
-                          blurRadius: widget.isPlaying ? 24 : 16,
-                          spreadRadius: widget.isPlaying ? 2 : 0,
-                          offset: const Offset(0, 6),
+                        border: Border.all(
+                          color: widget.abLoopActive
+                              ? p.accent
+                              : AppColors.specularAt(0.25),
+                          width: widget.abLoopActive ? 2.2 : 1.2,
                         ),
-                        BoxShadow(
-                          color: AppColors.scrimAt(0.25),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: widget.abLoopActive
-                            ? p.accent
-                            : AppColors.specularAt(0.25),
-                        width: widget.abLoopActive ? 2.2 : 1.2,
                       ),
-                    ),
-                    child: Center(
-                      child: AnimatedSwitcher(
-                        duration: context.motionMs(260),
-                        transitionBuilder: (child, anim) {
-                          final curved = CurvedAnimation(
-                            parent: anim,
-                            curve: Curves.easeOutBack,
-                          );
-                          return FadeTransition(
-                            opacity: anim,
-                            child: ScaleTransition(
-                              scale: Tween<double>(begin: 0.80, end: 1.0).animate(curved),
-                              child: RotationTransition(
-                                turns: Tween<double>(begin: -0.06, end: 0.0).animate(curved),
-                                child: child,
-                              ),
-                            ),
-                          );
-                        },
-                        child: widget.isBuffering
-                            ? SizedBox(
-                                key: const ValueKey<String>('buffering'),
-                                width: widget.mainButtonSize * 0.42,
-                                height: widget.mainButtonSize * 0.42,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 3,
-                                  color: onPrimaryColor,
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: context.motionMs(260),
+                          transitionBuilder: (child, anim) {
+                            final curved = CurvedAnimation(
+                              parent: anim,
+                              curve: Curves.easeOutBack,
+                            );
+                            return FadeTransition(
+                              opacity: anim,
+                              child: ScaleTransition(
+                                scale: Tween<double>(begin: 0.80, end: 1.0)
+                                    .animate(curved),
+                                child: RotationTransition(
+                                  turns: Tween<double>(begin: -0.06, end: 0.0)
+                                      .animate(curved),
+                                  child: child,
                                 ),
-                              )
-                            : Icon(
-                                widget.isPlaying
-                                    ? Icons.pause_rounded
-                                    : Icons.play_arrow_rounded,
-                                key: ValueKey(widget.isPlaying),
-                                color: onPrimaryColor,
-                                size: widget.mainButtonSize * 0.52,
                               ),
+                            );
+                          },
+                          child: widget.isBuffering
+                              ? SizedBox(
+                                  key: const ValueKey<String>('buffering'),
+                                  width: widget.mainButtonSize * 0.42,
+                                  height: widget.mainButtonSize * 0.42,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                    color: onPrimaryColor,
+                                  ),
+                                )
+                              : Icon(
+                                  widget.isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  key: ValueKey(widget.isPlaying),
+                                  color: onPrimaryColor,
+                                  size: widget.mainButtonSize * 0.52,
+                                ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
               ),
 
               const SizedBox(width: AppSpacing.s18),
@@ -336,8 +346,10 @@ class _PlayerControlsState extends State<PlayerControls> {
                             : null,
                         borderRadius: BorderRadius.circular(30),
                         child: Container(
-                          width: (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
-                          height: (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          width:
+                              (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          height:
+                              (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: widget.hasNext
@@ -352,7 +364,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                             boxShadow: widget.hasNext
                                 ? [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.18),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.18),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -365,7 +378,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                               color: widget.hasNext
                                   ? p.textPrimary
                                   : p.textTertiary.withValues(alpha: 0.3),
-                              size: (widget.mainButtonSize * 0.44).clamp(24.0, 32.0),
+                              size: (widget.mainButtonSize * 0.44)
+                                  .clamp(24.0, 32.0),
                             ),
                           ),
                         ),

@@ -114,8 +114,8 @@ class LyricsTranslationService {
         return LyricsTranslationResult(lines: lines);
       }
 
-      final isSameLang = detectedSource.isNotEmpty &&
-          _isSameLanguage(detectedSource, target);
+      final isSameLang =
+          detectedSource.isNotEmpty && _isSameLanguage(detectedSource, target);
 
       final entry = _CachedTranslation(
         sourceLanguage: detectedSource,
@@ -193,7 +193,8 @@ class LyricsTranslationService {
       String detectedSource = 'auto';
 
       for (final batch in batches) {
-        var answer = await _requestRomanizationBatch(batch, fallbackTargetLanguage);
+        var answer =
+            await _requestRomanizationBatch(batch, fallbackTargetLanguage);
         if (answer == null && detectedSource != 'auto') {
           // Retry using InputTools with detected source
           answer = await _requestInputToolsBatch(batch, detectedSource);
@@ -269,7 +270,8 @@ class LyricsTranslationService {
       lines: updatedLines,
       sourceLanguage: cached.sourceLanguage,
       fromCache: true,
-      isSameLanguage: _isSameLanguage(cached.sourceLanguage, cached.targetLanguage),
+      isSameLanguage:
+          _isSameLanguage(cached.sourceLanguage, cached.targetLanguage),
       isRomanized: cached.isRomanized,
     );
   }
@@ -350,10 +352,14 @@ class LyricsTranslationService {
       final String source =
           (data.length > 2 && data[2] != null) ? data[2].toString() : '';
 
-      final parts = fullTranslated.split(_markerRegex).map((s) => s.trim()).toList();
+      final parts =
+          fullTranslated.split(_markerRegex).map((s) => s.trim()).toList();
       if (parts.length != batch.texts.length) {
         // Fallback newline splitting if delimiter was touched
-        final nlParts = fullTranslated.split(RegExp(r'\r?\n')).map((s) => s.trim()).toList();
+        final nlParts = fullTranslated
+            .split(RegExp(r'\r?\n'))
+            .map((s) => s.trim())
+            .toList();
         if (nlParts.length == batch.texts.length) {
           return _BatchAnswer(translations: nlParts, sourceLanguage: source);
         }
@@ -411,7 +417,8 @@ class LyricsTranslationService {
       final String source =
           (data.length > 2 && data[2] != null) ? data[2].toString() : '';
 
-      final parts = fullRomanized.split(_markerRegex).map((s) => s.trim()).toList();
+      final parts =
+          fullRomanized.split(_markerRegex).map((s) => s.trim()).toList();
       if (parts.length == batch.texts.length) {
         return _BatchAnswer(translations: parts, sourceLanguage: source);
       }
@@ -452,7 +459,8 @@ class LyricsTranslationService {
       final resultObj = data[1][0][1][0]?.toString() ?? '';
       final parts = resultObj.split(_markerRegex).map((s) => s.trim()).toList();
       if (parts.length == batch.texts.length) {
-        return _BatchAnswer(translations: parts, sourceLanguage: sourceLanguage);
+        return _BatchAnswer(
+            translations: parts, sourceLanguage: sourceLanguage);
       }
       return null;
     } catch (_) {

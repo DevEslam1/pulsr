@@ -351,9 +351,9 @@ class DiscordRpcService {
 
       switch (op) {
         case DiscordOpcode.hello:
-          final interval = (d is Map ? d['heartbeat_interval'] as num? : null)
-                  ?.toInt() ??
-              41250;
+          final interval =
+              (d is Map ? d['heartbeat_interval'] as num? : null)?.toInt() ??
+                  41250;
           _handleHello(interval);
           break;
 
@@ -545,8 +545,7 @@ class DiscordRpcService {
     final adjustedRemainingMs = (remainingMs / speed).round();
     final endTime = durationMs > 0 ? nowMs + adjustedRemainingMs : null;
 
-    final speedSuffix =
-        (speed != 1.0) ? ' [${speed.toStringAsFixed(2)}x]' : '';
+    final speedSuffix = (speed != 1.0) ? ' [${speed.toStringAsFixed(2)}x]' : '';
     final details = '${song.title}$speedSuffix';
     final state = song.artist.isNotEmpty ? song.artist : 'Unknown Artist';
 

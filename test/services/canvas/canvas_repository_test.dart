@@ -10,7 +10,9 @@ class _FakeCommunity extends CommunityCanvas {
   final CanvasArtwork? answer;
 
   @override
-  Future<CanvasArtwork?> search(String title, String artist, String? album) async => answer;
+  Future<CanvasArtwork?> search(
+          String title, String artist, String? album) async =>
+      answer;
 }
 
 class _FakeApple extends AppleMusicCanvas {
@@ -18,7 +20,9 @@ class _FakeApple extends AppleMusicCanvas {
   final CanvasArtwork? answer;
 
   @override
-  Future<CanvasArtwork?> search(String title, String artist, String? album) async => answer;
+  Future<CanvasArtwork?> search(
+          String title, String artist, String? album) async =>
+      answer;
 }
 
 class _FakeTidal extends TidalCanvas {
@@ -26,12 +30,15 @@ class _FakeTidal extends TidalCanvas {
   final CanvasArtwork? answer;
 
   @override
-  Future<CanvasArtwork?> search(String title, String artist, String? album) async => answer;
+  Future<CanvasArtwork?> search(
+          String title, String artist, String? album) async =>
+      answer;
 }
 
 class _FakeCache extends CanvasCache {
   @override
-  Future<String?> getOrDownloadVideo(String videoUrl) async => '/fake/cache/video.mp4';
+  Future<String?> getOrDownloadVideo(String videoUrl) async =>
+      '/fake/cache/video.mp4';
 }
 
 void main() {
@@ -64,7 +71,8 @@ void main() {
       expect(result.localFilePath, '/fake/cache/video.mp4');
     });
 
-    test('falls back to Apple Music when Community misses (Source 2)', () async {
+    test('falls back to Apple Music when Community misses (Source 2)',
+        () async {
       final repo = CanvasRepository(
         cache: _FakeCache(),
         communityCanvas: _FakeCommunity(null),
@@ -111,7 +119,8 @@ void main() {
       expect(result!.source, 'tidal');
     });
 
-    test('caches negative answers so subsequent calls do not query network', () async {
+    test('caches negative answers so subsequent calls do not query network',
+        () async {
       final repo = CanvasRepository(
         cache: CanvasCache(),
         communityCanvas: _FakeCommunity(null),
@@ -119,10 +128,12 @@ void main() {
         tidalCanvas: _FakeTidal(null),
       );
 
-      final result1 = await repo.canvasForTrack(title: 'Miss Track', artist: 'Artist');
+      final result1 =
+          await repo.canvasForTrack(title: 'Miss Track', artist: 'Artist');
       expect(result1, isNull);
 
-      final result2 = await repo.canvasForTrack(title: 'Miss Track', artist: 'Artist');
+      final result2 =
+          await repo.canvasForTrack(title: 'Miss Track', artist: 'Artist');
       expect(result2, isNull);
     });
   });

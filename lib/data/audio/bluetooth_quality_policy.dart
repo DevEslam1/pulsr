@@ -116,8 +116,8 @@ BluetoothQualityPlan resolveBluetoothQualityPlan({
   required List<int> codecSelectableBitDepths,
 }) {
   final tier = bluetoothCodecTier(codecName);
-  final isLc3 = (codecName ?? '').toUpperCase().replaceAll('-', ' ').trim() ==
-      'LC3';
+  final isLc3 =
+      (codecName ?? '').toUpperCase().replaceAll('-', ' ').trim() == 'LC3';
   final leAudio = isLeAudio || isLc3;
 
   // Item 1: only the opt-in forces the float path; without it the historical
@@ -130,8 +130,7 @@ BluetoothQualityPlan resolveBluetoothQualityPlan({
 
   // Prefer the codec's own depth so the LSB scale matches the link; fall back to
   // the track depth when the codec reports nothing.
-  final ditherBitDepth =
-      sanitizeDitherBitDepth(codecBitDepth ?? trackBitDepth);
+  final ditherBitDepth = sanitizeDitherBitDepth(codecBitDepth ?? trackBitDepth);
 
   // Item 3: only align when the user asked for Hi-Res, the track rate is known,
   // the codec advertises a *different* rate that it can actually switch to.

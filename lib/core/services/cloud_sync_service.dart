@@ -104,7 +104,8 @@ class CloudSyncService {
     return sha256.convert(utf8.encode(raw)).toString();
   }
 
-  String _stablePlaylistId(PlaylistsTableData pl, [SharedPreferences? prefsOverride]) {
+  String _stablePlaylistId(PlaylistsTableData pl,
+      [SharedPreferences? prefsOverride]) {
     final prefs = prefsOverride ?? _prefs;
     final cached = prefs?.getString('sync_pl_stable_id_${pl.id}');
     if (cached != null && cached.isNotEmpty) {

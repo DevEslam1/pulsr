@@ -22,8 +22,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
-class MockRoomCorrectionService extends Mock
-    implements RoomCorrectionService {}
+class MockRoomCorrectionService extends Mock implements RoomCorrectionService {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,8 +44,7 @@ void main() {
 
     captureGate = Completer<bool>();
     service = MockRoomCorrectionService();
-    when(() => service.startCapture())
-        .thenAnswer((_) => captureGate.future);
+    when(() => service.startCapture()).thenAnswer((_) => captureGate.future);
     when(() => service.isCapturing).thenReturn(true);
     when(() => service.stopCapture()).thenAnswer((_) async => Int16List(0));
     if (getIt.isRegistered<RoomCorrectionService>()) {

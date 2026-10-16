@@ -65,7 +65,8 @@ void main() {
       expect(AudioFormats.extractExtension('Track #1.mp3'), 'mp3');
       expect(AudioFormats.extractExtension('Symphony #5.flac'), 'flac');
       expect(
-          AudioFormats.extractExtension('/storage/emulated/0/Music/Track #1.mp3'),
+          AudioFormats.extractExtension(
+              '/storage/emulated/0/Music/Track #1.mp3'),
           'mp3');
       expect(
           AudioFormats.extractExtension(
@@ -76,9 +77,7 @@ void main() {
           AudioFormats.extractExtension(
               'file:///storage/emulated/0/Music/Track%20#1.mp3'),
           'mp3');
-      expect(
-          AudioFormats.isSupportedExtension('Track #1.mp3'),
-          isTrue);
+      expect(AudioFormats.isSupportedExtension('Track #1.mp3'), isTrue);
       expect(
           AudioFormats.isSupportedExtension('/storage/Music/Symphony #5.flac'),
           isTrue);
@@ -127,12 +126,18 @@ void main() {
       expect(AudioFormats.isSupportedExtension('extensionless_file'), isFalse);
     });
 
-    test('extractExtension rejects dot-prefixed hidden files, .trashed-*, and ._* files', () {
+    test(
+        'extractExtension rejects dot-prefixed hidden files, .trashed-*, and ._* files',
+        () {
       expect(AudioFormats.extractExtension('.trashed-12345-track.mp3'), '');
-      expect(AudioFormats.extractExtension('/storage/emulated/0/Music/.trashed-9876.flac'), '');
+      expect(
+          AudioFormats.extractExtension(
+              '/storage/emulated/0/Music/.trashed-9876.flac'),
+          '');
       expect(AudioFormats.extractExtension('._track.mp3'), '');
       expect(AudioFormats.extractExtension('/Volumes/Drive/._song.flac'), '');
-      expect(AudioFormats.extractExtension('/storage/Music/.hidden_track.mp3'), '');
+      expect(AudioFormats.extractExtension('/storage/Music/.hidden_track.mp3'),
+          '');
       expect(AudioFormats.extractExtension(r'C:\Music\.dotfile.wav'), '');
       expect(AudioFormats.extractExtension('/path/to/.mp3'), '');
 

@@ -150,8 +150,7 @@ class PlaybackVolumeController {
       final loudnessDb =
           videoId != null ? ytmService?.getLoudnessDb(videoId) : null;
       if (loudnessDb != null && loudnessDb.isFinite) {
-        final gainMultiplier =
-            math.pow(10.0, -loudnessDb / 20.0).toDouble();
+        final gainMultiplier = math.pow(10.0, -loudnessDb / 20.0).toDouble();
         final normalized = finalVolume * gainMultiplier;
         // Peak limiter: ceiling at 0.985
         finalVolume = math.min(normalized, 0.985);

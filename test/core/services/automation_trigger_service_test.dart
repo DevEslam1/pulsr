@@ -65,7 +65,9 @@ void main() {
   });
 
   group('AutomationTriggerService', () {
-    test('ignores initial boot emission even when currentOutputInfo starts as null', () async {
+    test(
+        'ignores initial boot emission even when currentOutputInfo starts as null',
+        () async {
       final trackingRules = TrackingRulesService();
       final triggerService = AutomationTriggerService(
         hiResAudioService: fakeHiRes,
@@ -114,10 +116,22 @@ void main() {
     });
 
     test('supportsTrigger reports charging as unsupported', () {
-      expect(AutomationTriggerService.supportsTrigger(AutomationTrigger.deviceCharging), isFalse);
-      expect(AutomationTriggerService.supportsTrigger(AutomationTrigger.bluetoothConnected), isTrue);
-      expect(AutomationTriggerService.supportsTrigger(AutomationTrigger.headphonesPlugged), isTrue);
-      expect(AutomationTriggerService.supportsTrigger(AutomationTrigger.usbDacConnected), isTrue);
+      expect(
+          AutomationTriggerService.supportsTrigger(
+              AutomationTrigger.deviceCharging),
+          isFalse);
+      expect(
+          AutomationTriggerService.supportsTrigger(
+              AutomationTrigger.bluetoothConnected),
+          isTrue);
+      expect(
+          AutomationTriggerService.supportsTrigger(
+              AutomationTrigger.headphonesPlugged),
+          isTrue);
+      expect(
+          AutomationTriggerService.supportsTrigger(
+              AutomationTrigger.usbDacConnected),
+          isTrue);
     });
   });
 }

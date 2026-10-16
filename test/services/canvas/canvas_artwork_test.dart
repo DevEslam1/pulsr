@@ -4,8 +4,10 @@ import 'package:pulsr/services/canvas/canvas_artwork.dart';
 
 void main() {
   group('CanvasArtwork normalization & matching', () {
-    test('normalizeForMatch removes punctuation, diacritics, and extra spaces', () {
-      expect(normalizeForMatch('Beyoncé - CRAZY IN LOVE!'), 'beyonce crazy in love');
+    test('normalizeForMatch removes punctuation, diacritics, and extra spaces',
+        () {
+      expect(normalizeForMatch('Beyoncé - CRAZY IN LOVE!'),
+          'beyonce crazy in love');
       expect(normalizeForMatch('AC/DC'), 'ac dc');
       expect(normalizeForMatch('  Track   (Remastered)  '), 'track remastered');
     });
@@ -21,7 +23,8 @@ void main() {
       expect(splitArtists('Drake feat. 21 Savage'), ['drake', '21 savage']);
       expect(splitArtists('Jay-Z & Alicia Keys'), ['jay z', 'alicia keys']);
       expect(splitArtists('Marshmello x Bastille'), ['marshmello', 'bastille']);
-      expect(splitArtists('Artist A, Artist B with Artist C'), ['artist a', 'artist b', 'artist c']);
+      expect(splitArtists('Artist A, Artist B with Artist C'),
+          ['artist a', 'artist b', 'artist c']);
     });
 
     test('matches verifies track title, artists and album', () {
@@ -34,19 +37,25 @@ void main() {
       );
 
       // Exact match
-      expect(art.matches('Blinding Lights', 'The Weeknd', 'After Hours'), isTrue);
+      expect(
+          art.matches('Blinding Lights', 'The Weeknd', 'After Hours'), isTrue);
 
       // Match with noise stripped in search query
-      expect(art.matches('Blinding Lights (Official Video)', 'The Weeknd', 'After Hours'), isTrue);
+      expect(
+          art.matches(
+              'Blinding Lights (Official Video)', 'The Weeknd', 'After Hours'),
+          isTrue);
 
       // Match without knowing album
       expect(art.matches('Blinding Lights', 'The Weeknd', null), isTrue);
 
       // Rejects different title by same artist
-      expect(art.matches('Save Your Tears', 'The Weeknd', 'After Hours'), isFalse);
+      expect(
+          art.matches('Save Your Tears', 'The Weeknd', 'After Hours'), isFalse);
 
       // Rejects different artist
-      expect(art.matches('Blinding Lights', 'Someone Else', 'After Hours'), isFalse);
+      expect(art.matches('Blinding Lights', 'Someone Else', 'After Hours'),
+          isFalse);
     });
   });
 }

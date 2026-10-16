@@ -11,19 +11,23 @@ void main() {
     });
 
     test('redactPii scrubs auth tokens, cookies, and bearer credentials', () {
-      final input1 = 'Cookie: SAPISID=abcdef123456; HSID=789xyz; visitor_data=vis999;';
+      final input1 =
+          'Cookie: SAPISID=abcdef123456; HSID=789xyz; visitor_data=vis999;';
       final output1 = ErrorLogger.redactPii(input1);
       expect(output1, contains('SAPISID=[REDACTED_TOKEN]'));
       expect(output1, contains('HSID=[REDACTED_TOKEN]'));
       expect(output1, isNot(contains('abcdef123456')));
 
-      final input2 = 'Request headers: Authorization: Bearer eyJhbGciOiJIUzI1Ni...';
+      final input2 =
+          'Request headers: Authorization: Bearer eyJhbGciOiJIUzI1Ni...';
       final output2 = ErrorLogger.redactPii(input2);
       expect(output2, contains('[REDACTED_TOKEN]'));
       expect(output2, isNot(contains('eyJhbGciOiJIUzI1Ni...')));
     });
 
-    test('redactPii scrubs user and home directory paths (Windows, macOS, Linux)', () {
+    test(
+        'redactPii scrubs user and home directory paths (Windows, macOS, Linux)',
+        () {
       final winPath = r'Failed to open C:\Users\Eslam\Music\track.flac';
       final winOutput = ErrorLogger.redactPii(winPath);
       expect(winOutput, contains('[REDACTED_USER_PATH]'));
@@ -40,8 +44,10 @@ void main() {
       expect(linuxOutput, isNot(contains('/home/eslam')));
     });
 
-    test('redactPii scrubs Android internal app and storage directory paths', () {
-      final appPath = 'Database file at /data/user/0/com.pulsr.music/databases/pulsr.db';
+    test('redactPii scrubs Android internal app and storage directory paths',
+        () {
+      final appPath =
+          'Database file at /data/user/0/com.pulsr.music/databases/pulsr.db';
       final appOutput = ErrorLogger.redactPii(appPath);
       expect(appOutput, contains('[REDACTED_DEVICE_PATH]'));
       expect(appOutput, isNot(contains('/data/user/0/com.pulsr.music')));

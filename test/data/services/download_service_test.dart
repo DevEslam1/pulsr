@@ -21,7 +21,8 @@ void main() {
       expect(DownloadService.carriesTags('FLAC'), isTrue);
     });
 
-    test('correctly rejects containers that do not carry standard ID3/MP4 tags', () {
+    test('correctly rejects containers that do not carry standard ID3/MP4 tags',
+        () {
       expect(DownloadService.carriesTags('webm'), isFalse);
       expect(DownloadService.carriesTags('opus'), isFalse);
       expect(DownloadService.carriesTags('wav'), isFalse);

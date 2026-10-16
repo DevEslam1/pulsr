@@ -545,8 +545,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
         _filterWithFuzzy(pool, q, _lastPoolFilter ?? state.selectedFilter);
     if (isClosed || generation != _generation) return;
     _updateHasMore(filtered, pool);
-    safeEmit(state.copyWith(
-        results: List<SongsTableData>.unmodifiable(filtered)));
+    safeEmit(
+        state.copyWith(results: List<SongsTableData>.unmodifiable(filtered)));
   }
 
   @override

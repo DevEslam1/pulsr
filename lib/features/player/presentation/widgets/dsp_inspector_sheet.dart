@@ -7,7 +7,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/telemetry/dsp_reliability_tracker.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
+import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/dsp_debug_report.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -52,6 +55,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
     with WidgetsBindingObserver {
   DspDebugReport? _report;
   bool _isLoading = true;
+  bool _isResyncing = false;
+  int _pipelineLatencyFrames = 0;
   Timer? _autoRefreshTimer;
 
   @override
@@ -96,12 +101,62 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
     if (!silent) {
       setState(() => _isLoading = true);
     }
-    final report = await AudioEffectsChannel().getDspDebugReport();
-    if (mounted) {
-      setState(() {
-        _report = report;
-        _isLoading = false;
-      });
+    try {
+      final reportFuture = AudioEffectsChannel().getDspDebugReport();
+      final latencyFuture = AudioEffectsChannel().getPipelineLatencyFrames();
+      final results = await Future.wait([reportFuture, latencyFuture]);
+      final report = results[0] as DspDebugReport;
+      final latencyFrames = results[1] as int;
+      if (mounted) {
+        setState(() {
+          _report = report;
+          _pipelineLatencyFrames = latencyFrames;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _resyncDsp(BuildContext context) async {
+    if (_isResyncing) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
+    final errorColor = Theme.of(context).colorScheme.error;
+    setState(() => _isResyncing = true);
+    try {
+      if (getIt.isRegistered<EqualizerManager>()) {
+        await getIt<EqualizerManager>().resyncActiveEffects();
+      } else {
+        await AudioEffectsChannel().resyncForTrack(44100);
+      }
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.dspResyncSuccess),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.dspResyncFailure(e.toString())),
+            backgroundColor: errorColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isResyncing = false);
+        await _refreshReport(silent: true);
+      }
     }
   }
 
@@ -297,6 +352,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               const EngineTelemetryPanel(initialExpanded: true),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildReliabilityCard(p),
                               const SizedBox(height: AppSpacing.md),
 
                               // Active Effects Summary Header
@@ -614,6 +671,33 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
             ),
           ],
           const SizedBox(height: AppSpacing.s10),
+          // Resync DSP Action Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isResyncing ? null : () => _resyncDsp(context),
+              icon: _isResyncing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.sync_rounded, size: 18),
+              label: Text(
+                _isResyncing
+                    ? context.l10n.dspResyncing
+                    : context.l10n.dspResyncAction,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: p.accent,
+                foregroundColor: p.onAccent,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s10),
           Divider(height: 1, color: p.hairline),
           const SizedBox(height: AppSpacing.s10),
 
@@ -645,6 +729,22 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                 isDspActive ? context.l10n.dspStatOn : context.l10n.dspStatOff,
                 isHighlight: isDspActive,
               ),
+              _buildStatChip(
+                p,
+                'CODEC',
+                currentOutputDevice?.btCodecName ?? 'PCM',
+              ),
+              _buildStatChip(
+                p,
+                'LATENCY',
+                '${((_pipelineLatencyFrames / (currentOutputDevice?.sampleRate ?? 44100)) * 1000.0).toStringAsFixed(1)} ms ($_pipelineLatencyFrames f)',
+              ),
+              _buildStatChip(
+                p,
+                'BIT-PERFECT',
+                isBypassed ? 'BYPASSED' : 'OFF',
+                isHighlight: isBypassed,
+              ),
               if (rep?.hasOemAudio == true)
                 _buildStatChip(
                   p,
@@ -664,6 +764,149 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReliabilityCard(PulsrPalette p) {
+    return StreamBuilder<DspReliabilityCounters>(
+      stream: DspReliabilityTracker.instance.stream,
+      initialData: DspReliabilityTracker.instance.counters,
+      builder: (context, snapshot) {
+        final counters =
+            snapshot.data ?? DspReliabilityTracker.instance.counters;
+        final hasError = counters.lastRedactedError != null &&
+            counters.lastRedactedError!.isNotEmpty;
+
+        return Container(
+          padding: const EdgeInsets.all(AppSpacing.s14),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            borderRadius: AppRadii.r16All,
+            border: Border.all(color: p.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.monitor_heart_rounded, size: 18, color: p.accent),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    context.l10n.dspReliabilityTitle,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.wide,
+                      color: p.accent,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () async {
+                      await DspReliabilityTracker.instance.resetCounters();
+                      if (mounted) setState(() {});
+                    },
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: Text(
+                      context.l10n.dspResetCounters,
+                      style: TextStyle(
+                        fontSize: AppFontSize.tiny,
+                        fontWeight: FontWeight.w700,
+                        color: p.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Divider(height: 1, color: p.hairline),
+              const SizedBox(height: AppSpacing.s10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildStatChip(
+                    p,
+                    context.l10n.dspNativeSetterRejections,
+                    '${counters.nativeSetterRejection}',
+                    isWarning: counters.nativeSetterRejection > 0,
+                  ),
+                  _buildStatChip(
+                    p,
+                    context.l10n.dspBridgeTimeouts,
+                    '${counters.bridgeTimeoutFailure}',
+                    isWarning: counters.bridgeTimeoutFailure > 0,
+                  ),
+                  _buildStatChip(
+                    p,
+                    context.l10n.dspRouteResyncFailures,
+                    '${counters.routeResyncFailure}',
+                    isWarning: counters.routeResyncFailure > 0,
+                  ),
+                  _buildStatChip(
+                    p,
+                    context.l10n.dspSessionReattachFailures,
+                    '${counters.sessionReattachFailure}',
+                    isWarning: counters.sessionReattachFailure > 0,
+                  ),
+                  _buildStatChip(
+                    p,
+                    context.l10n.dspAutoDegradeEvents,
+                    '${counters.autoDegradeActivation} / ${counters.autoDegradeRecovery}',
+                    isWarning: counters.autoDegradeActivation > 0,
+                  ),
+                ],
+              ),
+              if (hasError) ...[
+                const SizedBox(height: AppSpacing.s10),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.s10),
+                  decoration: BoxDecoration(
+                    color: p.error.withValues(alpha: 0.1),
+                    borderRadius: AppRadii.r10All,
+                    border: Border.all(color: p.error.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.error_outline_rounded,
+                          size: 16, color: p.error),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.l10n.dspLatestError,
+                              style: TextStyle(
+                                fontSize: AppFontSize.micro,
+                                fontWeight: FontWeight.w800,
+                                color: p.error,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              counters.lastRedactedError!,
+                              style: TextStyle(
+                                fontSize: AppFontSize.caption,
+                                color: p.textPrimary,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 

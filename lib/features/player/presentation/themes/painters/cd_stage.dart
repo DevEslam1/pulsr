@@ -213,7 +213,9 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                             animation: widget.rotationController,
                             builder: (context, _) {
                               final totalPhase =
-                                  (widget.rotationController.value + _scrubTurns) % 1.0;
+                                  (widget.rotationController.value +
+                                          _scrubTurns) %
+                                      1.0;
                               return Transform.rotate(
                                 angle: totalPhase * 2 * math.pi,
                                 child: Stack(
@@ -229,105 +231,113 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                                     ),
 
                                     // Center Circular Album Artwork Label
-                              Container(
-                                width: cdSize * 0.44,
-                                height: cdSize * 0.44,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.28),
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.4),
-                                      blurRadius: 8,
-                                      spreadRadius: -1,
+                                    Container(
+                                      width: cdSize * 0.44,
+                                      height: cdSize * 0.44,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.28),
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: 0.4),
+                                            blurRadius: 8,
+                                            spreadRadius: -1,
+                                          ),
+                                        ],
+                                      ),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: song != null
+                                          ? CachedArtwork(
+                                              id: song.id,
+                                              albumId: song.albumId,
+                                              remoteUrl:
+                                                  song.remoteArtworkUrl ??
+                                                      song.artworkUri,
+                                              type: ArtworkType.AUDIO,
+                                              size: cdSize * 0.44,
+                                              borderRadius: 999,
+                                              highQuality: true,
+                                              fallbackIcon:
+                                                  Icons.music_note_rounded,
+                                            )
+                                          : const Icon(
+                                              Icons.album_rounded,
+                                              size: 48,
+                                              color: Colors.white38,
+                                            ),
+                                    ),
+
+                                    // Inner Translucent Clamping Hub Ring
+                                    Container(
+                                      width: cdSize * 0.20,
+                                      height: cdSize * 0.20,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.08),
+                                        border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.35),
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                    ),
+
+                                    // Center Metallic Spindle Hub Ring & Spindle Hole
+                                    Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: RadialGradient(
+                                          colors: [
+                                            Colors.grey.shade300,
+                                            Colors.grey.shade600,
+                                            const Color(0xFF141720),
+                                          ],
+                                          stops: const [0.0, 0.55, 1.0],
+                                        ),
+                                        border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.5),
+                                          width: 1.0,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: 0.6),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Center(
+                                        // Spindle center hole
+                                        child: Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: const Color(0xFF0C0D11),
+                                            border: Border.all(
+                                              color: Colors.white24,
+                                              width: 0.6,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
-                                clipBehavior: Clip.antiAlias,
-                                child: song != null
-                                    ? CachedArtwork(
-                                        id: song.id,
-                                        albumId: song.albumId,
-                                        remoteUrl: song.remoteArtworkUrl ??
-                                            song.artworkUri,
-                                        type: ArtworkType.AUDIO,
-                                        size: cdSize * 0.44,
-                                        borderRadius: 999,
-                                        highQuality: true,
-                                        fallbackIcon: Icons.music_note_rounded,
-                                      )
-                                    : const Icon(
-                                        Icons.album_rounded,
-                                        size: 48,
-                                        color: Colors.white38,
-                                      ),
-                              ),
-
-                              // Inner Translucent Clamping Hub Ring
-                              Container(
-                                width: cdSize * 0.20,
-                                height: cdSize * 0.20,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.35),
-                                    width: 1.0,
-                                  ),
-                                ),
-                              ),
-
-                              // Center Metallic Spindle Hub Ring & Spindle Hole
-                              Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: RadialGradient(
-                                    colors: [
-                                      Colors.grey.shade300,
-                                      Colors.grey.shade600,
-                                      const Color(0xFF141720),
-                                    ],
-                                    stops: const [0.0, 0.55, 1.0],
-                                  ),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    width: 1.0,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.6),
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  // Spindle center hole
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: const Color(0xFF0C0D11),
-                                      border: Border.all(
-                                        color: Colors.white24,
-                                        width: 0.6,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
+                        ),
+                      ),
 
                       // 3. Animated Tonearm "Stick" Assembly
                       Positioned.fill(
@@ -361,7 +371,8 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                                         angle: currentAngle,
                                         activeColor: activeColor,
                                         armLength: armLength,
-                                        liftProgress: widget.tonearmAnimation.value,
+                                        liftProgress:
+                                            widget.tonearmAnimation.value,
                                       ),
                                     );
                                   },

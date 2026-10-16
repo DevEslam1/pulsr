@@ -82,7 +82,8 @@ Page<dynamic> _buildPulsrPageRoute({
         Tween<double>(
           begin: 0.0,
           end: 1.0,
-        ).chain(CurveTween(curve: const Interval(0.0, 0.75, curve: Curves.easeOut))),
+        ).chain(CurveTween(
+            curve: const Interval(0.0, 0.75, curve: Curves.easeOut))),
       );
 
       // Secondary exit: subtle Apple-style parallax recession

@@ -304,9 +304,8 @@ class _SonicRipplesPainter extends CustomPainter {
       final ringProgress = (progress + (i / ringCount)) % 1.0;
       final currentRadius = baseRadius + (ringProgress * maxExpansion);
       // Smooth bell curve opacity scaled by graceful fade-out multiplier
-      final alpha =
-          ((math.sin(ringProgress * math.pi) * 0.40) * fadeMultiplier)
-              .clamp(0.0, 1.0);
+      final alpha = ((math.sin(ringProgress * math.pi) * 0.40) * fadeMultiplier)
+          .clamp(0.0, 1.0);
 
       final paint = Paint()
         ..style = PaintingStyle.stroke

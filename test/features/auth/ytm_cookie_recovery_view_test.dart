@@ -92,7 +92,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.textContaining('YouTube rejected these cookies'), findsOneWidget);
+    expect(
+        find.textContaining('YouTube rejected these cookies'), findsOneWidget);
     verify(() => account.logout()).called(1);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -115,8 +116,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('CookieMismatch navigates past the interstitial',
-      (tester) async {
+  testWidgets('CookieMismatch navigates past the interstitial', (tester) async {
     await pumpSheet(tester);
     final controller = wireWebViewController(tester, fake);
     final params = webViewParams(tester);

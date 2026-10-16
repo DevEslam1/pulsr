@@ -290,7 +290,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
                           foregroundColor: p.onAccent,
                         ),
                         onPressed: _installDownloaded,
-                        icon: const Icon(Icons.install_mobile_rounded, size: 18),
+                        icon:
+                            const Icon(Icons.install_mobile_rounded, size: 18),
                         label: const Text('Install Now'),
                       ),
                     ] else if (!_downloading) ...[

@@ -118,8 +118,7 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
   });
 
-  testWidgets('renders the error state and retry re-renders',
-      (tester) async {
+  testWidgets('renders the error state and retry re-renders', (tester) async {
     when(() => useCases.watchPlaylists())
         .thenAnswer((_) => Stream.value(const Left(DatabaseFailure('boom'))));
     await pumpSheet(tester);
@@ -204,8 +203,7 @@ void main() {
     expect(find.text('open-sheet'), findsOneWidget);
   });
 
-  testWidgets('existing-playlist failure surfaces the message',
-      (tester) async {
+  testWidgets('existing-playlist failure surfaces the message', (tester) async {
     when(() => useCases.watchPlaylists())
         .thenAnswer((_) => Stream.value(Right([playlist])));
     when(() => useCases.addSongToPlaylist(1, 101))

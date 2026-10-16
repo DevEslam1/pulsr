@@ -21,7 +21,8 @@ void main() {
 
   group('CanvasCache Memory LRU', () {
     test('maintains bounded memory LRU entries', () {
-      final cache = CanvasCache(maxMemoryEntries: 3, customCacheDirPath: tempDir.path);
+      final cache =
+          CanvasCache(maxMemoryEntries: 3, customCacheDirPath: tempDir.path);
 
       cache.putInMemory('k1', const CanvasArtwork(videoUrl: 'u1', title: 'T1'));
       cache.putInMemory('k2', const CanvasArtwork(videoUrl: 'u2', title: 'T2'));
@@ -69,11 +70,13 @@ void main() {
         customCacheDirPath: tempDir.path,
       );
 
-      final path1 = await cache.getOrDownloadVideo('https://example.com/v1.mp4');
+      final path1 =
+          await cache.getOrDownloadVideo('https://example.com/v1.mp4');
       expect(path1, isNotNull);
       expect(File(path1!).existsSync(), isTrue);
 
-      final path2 = await cache.getOrDownloadVideo('https://example.com/v2.mp4');
+      final path2 =
+          await cache.getOrDownloadVideo('https://example.com/v2.mp4');
       expect(path2, isNotNull);
       expect(File(path2!).existsSync(), isTrue);
 
@@ -81,7 +84,8 @@ void main() {
       expect(await cache.currentDiskUsageBytes(), 400);
 
       // Third download brings total to 600 bytes > 500 bytes limit -> oldest file evicted!
-      final path3 = await cache.getOrDownloadVideo('https://example.com/v3.mp4');
+      final path3 =
+          await cache.getOrDownloadVideo('https://example.com/v3.mp4');
       expect(path3, isNotNull);
       expect(File(path3!).existsSync(), isTrue);
 

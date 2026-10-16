@@ -19,8 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
-class MockRoomCorrectionService extends Mock
-    implements RoomCorrectionService {}
+class MockRoomCorrectionService extends Mock implements RoomCorrectionService {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

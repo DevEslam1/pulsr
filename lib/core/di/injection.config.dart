@@ -57,6 +57,7 @@ import 'package:pulsr/data/party/listen_together_service.dart' as _i58;
 import 'package:pulsr/data/repositories/download_repository_impl.dart' as _i877;
 import 'package:pulsr/data/repositories/lyrics_repository.dart' as _i133;
 import 'package:pulsr/data/repositories/music_repository.dart' as _i627;
+import 'package:pulsr/data/repositories/quran_repository_impl.dart' as _i992;
 import 'package:pulsr/data/repositories/smart_playlist_engine.dart' as _i399;
 import 'package:pulsr/data/scanner/media_scanner_service.dart' as _i483;
 import 'package:pulsr/data/services/device_profile_service.dart' as _i818;
@@ -71,6 +72,7 @@ import 'package:pulsr/domain/repositories/download_repository_interface.dart'
     as _i783;
 import 'package:pulsr/domain/repositories/music_repository_interface.dart'
     as _i320;
+import 'package:pulsr/domain/repositories/quran_repository.dart' as _i880;
 import 'package:pulsr/domain/repositories/smart_playlist_engine_interface.dart'
     as _i632;
 import 'package:pulsr/domain/usecases/delete_download.dart' as _i839;
@@ -104,6 +106,7 @@ import 'package:pulsr/features/widgets/widget_service.dart' as _i42;
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart'
     as _i873;
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart' as _i171;
+import 'package:shared_preferences/shared_preferences.dart' as _i460;
 
 extension GetItInjectableX on _i174.GetIt {
 // initializes the registration of main-scope dependencies inside of GetIt
@@ -229,6 +232,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i627.MusicRepository(gh<_i682.AppDatabase>()));
     gh.factory<_i171.YtmSearchCubit>(
         () => _i171.YtmSearchCubit(service: gh<_i391.YtmService>()));
+    gh.lazySingleton<_i880.QuranRepository>(
+        () => _i992.QuranRepositoryImpl(gh<_i460.SharedPreferences>()));
     gh.lazySingleton<_i621.LrclibService>(
         () => _i621.LrclibService(client: gh<_i497.HttpClient>()));
     gh.singleton<_i483.MediaScannerService>(

@@ -592,8 +592,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     var list = songs;
     final ratingStore = _ratingStore;
     final audioHandler = _audioHandler;
-    final ratingSnapshot = ratingStore?.snapshotRatings() ?? const <String, int>{};
-    final bpmSnapshot = audioHandler?.bpmOverrideStore.snapshot() ?? const <String, double>{};
+    final ratingSnapshot =
+        ratingStore?.snapshotRatings() ?? const <String, int>{};
+    final bpmSnapshot =
+        audioHandler?.bpmOverrideStore.snapshot() ?? const <String, double>{};
 
     if (dartRules.isNotEmpty) {
       list = list
@@ -629,8 +631,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   ) {
     final ratingStore = _ratingStore;
     final audioHandler = _audioHandler;
-    final ratingSnapshot = ratingStore?.snapshotRatings() ?? const <String, int>{};
-    final bpmSnapshot = audioHandler?.bpmOverrideStore.snapshot() ?? const <String, double>{};
+    final ratingSnapshot =
+        ratingStore?.snapshotRatings() ?? const <String, int>{};
+    final bpmSnapshot =
+        audioHandler?.bpmOverrideStore.snapshot() ?? const <String, double>{};
 
     var list = merged
         .where((s) =>
@@ -707,8 +711,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       switch (rule.field) {
         SmartRuleField.rating =>
           _matchesRating(song, rule, ratingSnapshot: ratingSnapshot),
-        SmartRuleField.bpm =>
-          _matchesBpm(song, rule, bpmSnapshot: bpmSnapshot),
+        SmartRuleField.bpm => _matchesBpm(song, rule, bpmSnapshot: bpmSnapshot),
         SmartRuleField.artist => _matchesText(song.artist, rule),
         SmartRuleField.album => _matchesText(song.album, rule),
         SmartRuleField.title => _matchesText(song.title, rule),

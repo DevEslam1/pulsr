@@ -78,7 +78,8 @@ void main() {
       }
     });
 
-    File writeArt(String name, DateTime modified, {List<int> bytes = const [1, 2, 3]}) {
+    File writeArt(String name, DateTime modified,
+        {List<int> bytes = const [1, 2, 3]}) {
       final f = File('${tempDir.path}${Platform.pathSeparator}$name');
       f.writeAsBytesSync(bytes);
       f.setLastModifiedSync(modified);
@@ -90,12 +91,16 @@ void main() {
       final service = WidgetService();
       final now = DateTime.now();
 
-      final veryOld = writeArt('pulsr_widget_art_old.png', now.subtract(const Duration(days: 30)));
-      final justStale =
-          writeArt('pulsr_widget_art_stale.png', now.subtract(const Duration(days: 8)));
-      final boundary = writeArt('pulsr_widget_art_7d.png', now.subtract(const Duration(days: 7)));
-      final fresh = writeArt('pulsr_widget_art_fresh.png', now.subtract(const Duration(hours: 3)));
-      final unrelated = writeArt('unrelated.png', now.subtract(const Duration(days: 90)));
+      final veryOld = writeArt(
+          'pulsr_widget_art_old.png', now.subtract(const Duration(days: 30)));
+      final justStale = writeArt(
+          'pulsr_widget_art_stale.png', now.subtract(const Duration(days: 8)));
+      final boundary = writeArt(
+          'pulsr_widget_art_7d.png', now.subtract(const Duration(days: 7)));
+      final fresh = writeArt(
+          'pulsr_widget_art_fresh.png', now.subtract(const Duration(hours: 3)));
+      final unrelated =
+          writeArt('unrelated.png', now.subtract(const Duration(days: 90)));
 
       await service.pruneOldWidgetArtwork(tempDir);
 
@@ -127,7 +132,8 @@ void main() {
       expect(remaining.length, 50);
       // The 10 oldest (indices 0..9) were evicted.
       for (var i = 0; i < 10; i++) {
-        expect(files[i].existsSync(), isFalse, reason: 'file $i should be pruned');
+        expect(files[i].existsSync(), isFalse,
+            reason: 'file $i should be pruned');
       }
       for (var i = 10; i < 60; i++) {
         expect(files[i].existsSync(), isTrue, reason: 'file $i should survive');
@@ -139,8 +145,8 @@ void main() {
       final service = WidgetService();
       final now = DateTime.now();
 
-      final subDir = Directory(
-          '${tempDir.path}${Platform.pathSeparator}pulsr_widget_art');
+      final subDir =
+          Directory('${tempDir.path}${Platform.pathSeparator}pulsr_widget_art');
       subDir.createSync(recursive: true);
 
       final inSub = File(
@@ -202,7 +208,8 @@ void main() {
 
     test('saves full now-playing content for a song', () async {
       await service.updateNowPlaying(
-        song: _song(id: 7, title: 'My Track', artist: 'The Artist', album: 'The Album'),
+        song: _song(
+            id: 7, title: 'My Track', artist: 'The Artist', album: 'The Album'),
         isPlaying: true,
         position: const Duration(seconds: 30),
         duration: const Duration(minutes: 3),
@@ -337,7 +344,11 @@ void main() {
 
       expect(
         received.map((u) => u.toString()).toList(),
-        ['pulsrwidget://play_pause', 'pulsrwidget://next', 'pulsrwidget://favorite'],
+        [
+          'pulsrwidget://play_pause',
+          'pulsrwidget://next',
+          'pulsrwidget://favorite'
+        ],
       );
     });
   });

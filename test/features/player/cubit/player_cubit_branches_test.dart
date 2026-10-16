@@ -37,8 +37,7 @@ void main() {
       ..realSeek = true;
     repo = MockMusicRepository();
     toggleFavorite = MockToggleFavoriteUseCase();
-    when(() => repo.getSongById(any()))
-        .thenAnswer((_) async => right(null));
+    when(() => repo.getSongById(any())).thenAnswer((_) async => right(null));
     when(() => repo.getSongsByIds(any()))
         .thenAnswer((_) async => right(<SongsTableData>[]));
     when(() => repo.findMatchingLocalSong(
@@ -63,8 +62,7 @@ void main() {
       );
 
   group('mediaItem resolution', () {
-    test('non-numeric id resolves to a synthetic song with extras',
-        () async {
+    test('non-numeric id resolves to a synthetic song with extras', () async {
       final cubit = buildCubit();
       addTearDown(cubit.close);
 
@@ -127,8 +125,7 @@ void main() {
 
     test('resolves a numeric id through the repository', () async {
       final song = buildSong(7);
-      when(() => repo.getSongById(7))
-          .thenAnswer((_) async => right(song));
+      when(() => repo.getSongById(7)).thenAnswer((_) async => right(song));
       final cubit = buildCubit();
       addTearDown(cubit.close);
 

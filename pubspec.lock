@@ -873,10 +873,10 @@ packages:
     dependency: "direct main"
     description:
       name: home_widget
-      sha256: b8d377e6a5aacc65193170addf252cce7868fa621b740cdd7b517a233871c185
+      sha256: "1dbfdfbb3b47de24639adfba352050d85d66af112b9cc3ec5bf7627a7813abcb"
       url: "https://pub.dev"
     source: hosted
-    version: "0.9.4"
+    version: "0.10.0"
   hooks:
     dependency: transitive
     description:
@@ -1253,12 +1253,11 @@ packages:
     source: hosted
     version: "2.9.0"
   on_audio_query_android:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: on_audio_query_android
-      sha256: c0b946011ee7aa8ec76b21837f0cb0007120ac291202ed6c6fb4c498ba2ff6fe
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/on_audio_query_android"
+      relative: true
+    source: path
     version: "1.1.0"
   on_audio_query_ios:
     dependency: transitive
@@ -1527,10 +1526,9 @@ packages:
   sentry_flutter:
     dependency: "direct main"
     description:
-      name: sentry_flutter
-      sha256: "5ba2cf40646a77d113b37a07bd69f61bb3ec8a73cbabe5537b05a7c89d2656f8"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/sentry_flutter"
+      relative: true
+    source: path
     version: "8.14.2"
   share_plus:
     dependency: "direct main"

@@ -23,7 +23,8 @@ void main() {
 
     test('antiFingerprint JS guards Google auth hosts', () {
       expect(EmbeddedBrowserUa.antiFingerprint, contains('google.com'));
-      expect(EmbeddedBrowserUa.antiFingerprint, contains('__googleBlockDetected'));
+      expect(
+          EmbeddedBrowserUa.antiFingerprint, contains('__googleBlockDetected'));
       expect(EmbeddedBrowserUa.antiFingerprint, contains('webdriver'));
     });
   });

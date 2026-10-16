@@ -128,7 +128,9 @@ class RecordingAudioHandler extends TestPulsrAudioHandler {
 
   @override
   Future<void> setViperDdc(bool enabled,
-          {String? profileName, List<double>? coeffs, String? ddcContent}) async =>
+          {String? profileName,
+          List<double>? coeffs,
+          String? ddcContent}) async =>
       _record('setViperDdc');
 
   @override

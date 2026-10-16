@@ -146,176 +146,162 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 borderAlpha: 0.12,
               );
 
-                    final bottomDock = PlayerBottomActionDock(
-                      props: props,
-                      isTablet: isTablet,
-                      barWidth: metrics.pillBarWidth,
-                      barHeight: metrics.pillBarHeight,
-                      dockIconStyle: PlayerDockIconStyle.classic,
-                    );
+              final bottomDock = PlayerBottomActionDock(
+                props: props,
+                isTablet: isTablet,
+                barWidth: metrics.pillBarWidth,
+                barHeight: metrics.pillBarHeight,
+                dockIconStyle: PlayerDockIconStyle.classic,
+              );
 
-                    final artworkDisplay = GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => cubit.toggleLyricsVisibility(),
-                      onDoubleTap: () {
-                        switch (nowPlayingDoubleTap) {
-                          case NowPlayingDoubleTapAction.toggleFavorite:
-                            if (song != null) cubit.toggleFavorite(song.id);
-                            break;
-                          case NowPlayingDoubleTapAction.toggleLyrics:
-                            cubit.toggleLyricsVisibility();
-                            break;
-                          case NowPlayingDoubleTapAction.none:
-                            break;
-                        }
-                      },
-                      onHorizontalDragEnd: (details) {
-                        if (nowPlayingArtworkSwipe ==
-                                NowPlayingArtworkSwipeAction.nextPrev &&
-                            details.primaryVelocity != null) {
-                          if (details.primaryVelocity! < -200) {
-                            cubit.next();
-                          } else if (details.primaryVelocity! > 200) {
-                            cubit.previous();
-                          }
-                        }
-                      },
-                      child: Center(
-                        key: const ValueKey('artwork_view'),
-                        child: AnimatedScale(
-                          scale: state.isPlaying ? 1.0 : 0.97,
+              final artworkDisplay = GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => cubit.toggleLyricsVisibility(),
+                onDoubleTap: () {
+                  switch (nowPlayingDoubleTap) {
+                    case NowPlayingDoubleTapAction.toggleFavorite:
+                      if (song != null) cubit.toggleFavorite(song.id);
+                      break;
+                    case NowPlayingDoubleTapAction.toggleLyrics:
+                      cubit.toggleLyricsVisibility();
+                      break;
+                    case NowPlayingDoubleTapAction.none:
+                      break;
+                  }
+                },
+                onHorizontalDragEnd: (details) {
+                  if (nowPlayingArtworkSwipe ==
+                          NowPlayingArtworkSwipeAction.nextPrev &&
+                      details.primaryVelocity != null) {
+                    if (details.primaryVelocity! < -200) {
+                      cubit.next();
+                    } else if (details.primaryVelocity! > 200) {
+                      cubit.previous();
+                    }
+                  }
+                },
+                child: Center(
+                  key: const ValueKey('artwork_view'),
+                  child: AnimatedScale(
+                    scale: state.isPlaying ? 1.0 : 0.97,
+                    duration: context.motionMs(320),
+                    curve: context.motionCurve(Curves.easeOutCubic),
+                    child: AspectRatio(
+                      aspectRatio: 1.0,
+                      child: Hero(
+                        tag: 'now_playing_art_full',
+                        child: AnimatedContainer(
                           duration: context.motionMs(320),
-                          curve: context
-                              .motionCurve(Curves.easeOutCubic),
-                          child: AspectRatio(
-                            aspectRatio: 1.0,
-                            child: Hero(
-                              tag: 'now_playing_art_full',
-                              child: AnimatedContainer(
-                                duration: context.motionMs(320),
-                                curve: context.motionCurve(
-                                    Curves.easeOutCubic),
-                                decoration: BoxDecoration(
-                                  borderRadius:
-                                      AppRadii.circular(artRadius),
-                                  border: Border.all(
-                                    color: Colors.white
-                                        .withValues(alpha: 0.14),
-                                    width: 1.2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: activeColor.withValues(
-                                        alpha: state.isPlaying
-                                            ? 0.40
-                                            : 0.18,
-                                      ),
-                                      blurRadius:
-                                          state.isPlaying ? 44 : 26,
-                                      spreadRadius:
-                                          state.isPlaying ? 2 : 0,
-                                      offset: const Offset(0, 16),
-                                    ),
-                                    BoxShadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.35),
-                                      blurRadius: 18,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius:
-                                      AppRadii.circular(artRadius),
-                                  child: song != null
-                                      ? (!canvasAsBackdrop
-                                          ? CanvasBackdrop(
-                                              song: song,
-                                              isPlaying: state.isPlaying,
-                                              isBackdropMode: false,
-                                              borderRadius:
-                                                  AppRadii.circular(artRadius),
-                                              fallbackArtwork: CachedArtwork(
-                                                id: song.id,
-                                                albumId: song.albumId,
-                                                remoteUrl:
-                                                    song.remoteArtworkUrl ??
-                                                        song.artworkUri,
-                                                type: ArtworkType.AUDIO,
-                                                size: double.infinity,
-                                                borderRadius: 26.8,
-                                                highQuality: true,
-                                              ),
-                                            )
-                                          : CachedArtwork(
-                                              id: song.id,
-                                              albumId: song.albumId,
-                                              remoteUrl:
-                                                  song.remoteArtworkUrl ??
-                                                      song.artworkUri,
-                                              type: ArtworkType.AUDIO,
-                                              size: double.infinity,
-                                              borderRadius: 26.8,
-                                              highQuality: true,
-                                            ))
-                                      : const SizedBox.shrink(),
-                                ),
-                              ),
+                          curve: context.motionCurve(Curves.easeOutCubic),
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadii.circular(artRadius),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.14),
+                              width: 1.2,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: activeColor.withValues(
+                                  alpha: state.isPlaying ? 0.40 : 0.18,
+                                ),
+                                blurRadius: state.isPlaying ? 44 : 26,
+                                spreadRadius: state.isPlaying ? 2 : 0,
+                                offset: const Offset(0, 16),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: AppRadii.circular(artRadius),
+                            child: song != null
+                                ? (!canvasAsBackdrop
+                                    ? CanvasBackdrop(
+                                        song: song,
+                                        isPlaying: state.isPlaying,
+                                        isBackdropMode: false,
+                                        borderRadius:
+                                            AppRadii.circular(artRadius),
+                                        fallbackArtwork: CachedArtwork(
+                                          id: song.id,
+                                          albumId: song.albumId,
+                                          remoteUrl: song.remoteArtworkUrl ??
+                                              song.artworkUri,
+                                          type: ArtworkType.AUDIO,
+                                          size: double.infinity,
+                                          borderRadius: 26.8,
+                                          highQuality: true,
+                                        ),
+                                      )
+                                    : CachedArtwork(
+                                        id: song.id,
+                                        albumId: song.albumId,
+                                        remoteUrl: song.remoteArtworkUrl ??
+                                            song.artworkUri,
+                                        type: ArtworkType.AUDIO,
+                                        size: double.infinity,
+                                        borderRadius: 26.8,
+                                        highQuality: true,
+                                      ))
+                                : const SizedBox.shrink(),
                           ),
                         ),
                       ),
+                    ),
+                  ),
+                ),
+              );
+
+              final centerDisplay = isInSplitView
+                  ? artworkDisplay
+                  : AnimatedSwitcher(
+                      duration: context.motionMs(320),
+                      transitionBuilder: (child, anim) =>
+                          playerOverlayTransitionBuilder(context, child, anim),
+                      child: state.isLyricsVisible
+                          ? LyricsView(
+                              key: ValueKey(
+                                  'lyrics_${song?.id}_${song?.remoteId}'),
+                              lyrics: state.lyrics,
+                              isLoading: state.isLoadingLyrics,
+                              activeColor: activeColor,
+                              source: state.lyricsSource,
+                            )
+                          : state.isQueueVisible
+                              ? const NowPlayingQueueView(
+                                  key: ValueKey('queue_view'),
+                                )
+                              : KeyedSubtree(
+                                  key: const ValueKey('stage_classic'),
+                                  child: artworkDisplay,
+                                ),
                     );
 
-                    final centerDisplay = isInSplitView
-                        ? artworkDisplay
-                        : AnimatedSwitcher(
-                            duration: context.motionMs(320),
-                            transitionBuilder: (child, anim) =>
-                                playerOverlayTransitionBuilder(
-                                    context, child, anim),
-                            child: state.isLyricsVisible
-                                ? LyricsView(
-                                    key: ValueKey(
-                                        'lyrics_${song?.id}_${song?.remoteId}'),
-                                    lyrics: state.lyrics,
-                                    isLoading: state.isLoadingLyrics,
-                                    activeColor: activeColor,
-                                    source: state.lyricsSource,
-                                  )
-                                : state.isQueueVisible
-                                    ? const NowPlayingQueueView(
-                                        key: ValueKey('queue_view'),
-                                      )
-                                    : KeyedSubtree(
-                                        key: const ValueKey('stage_classic'),
-                                        child: artworkDisplay,
-                                      ),
-                          );
-
-                    final visualizer = showVisualizer
-                        ? Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 360),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.lg,
-                                    vertical: AppSpacing.xxs),
-                                child: AudioVisualizer(
-                                  style: visualizerStyle,
-                                  color: activeColor,
-                                  height: visualizerStyle ==
-                                          VisualizerStyle.circular
-                                      ? 65
-                                      : 36,
-                                  isPlaying: state.isPlaying,
-                                  audioSessionId: state.audioSessionId,
-                                  trackSeed: song?.id,
-                                ),
-                              ),
-                            ),
-                          )
-                        : const SizedBox.shrink();
+              final visualizer = showVisualizer
+                  ? Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg,
+                              vertical: AppSpacing.xxs),
+                          child: AudioVisualizer(
+                            style: visualizerStyle,
+                            color: activeColor,
+                            height: visualizerStyle == VisualizerStyle.circular
+                                ? 65
+                                : 36,
+                            isPlaying: state.isPlaying,
+                            audioSessionId: state.audioSessionId,
+                            trackSeed: song?.id,
+                          ),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink();
 
               final controlsColumn = PlayerControlsColumn(
                 props: props,
@@ -340,8 +326,8 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
               if (isInSplitView) {
                 return LayoutBuilder(
                   builder: (context, splitConstraints) {
-                    final double availableWidth = splitConstraints.maxWidth -
-                        (isTablet ? 48.0 : 32.0);
+                    final double availableWidth =
+                        splitConstraints.maxWidth - (isTablet ? 48.0 : 32.0);
                     final double availableHeight =
                         splitConstraints.maxHeight - 340.0;
                     final double rawSize =
@@ -351,8 +337,8 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                             .clamp(180.0, 420.0);
 
                     return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                       child: Column(
                         children: [
                           Expanded(
@@ -453,18 +439,14 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                     child: LayoutBuilder(
                       builder: (context, artConstraints) {
                         final double availableWidth =
-                            artConstraints.maxWidth -
-                                (isTablet ? 64.0 : 32.0);
+                            artConstraints.maxWidth - (isTablet ? 64.0 : 32.0);
                         final double availableHeight =
-                            artConstraints.maxHeight -
-                                (isTablet ? 36.0 : 20.0);
-                        final double maxAllowed =
-                            isTablet ? 560.0 : 420.0;
+                            artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
+                        final double maxAllowed = isTablet ? 560.0 : 420.0;
                         final double rawSize =
                             math.min(availableWidth, availableHeight);
-                        final double dynamicArtSize = rawSize <= 0
-                            ? 0.0
-                            : math.min(rawSize, maxAllowed);
+                        final double dynamicArtSize =
+                            rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
 
                         return Center(
                           child: ConstrainedBox(
@@ -486,8 +468,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                   ),
                   if (showVisualizer) visualizer,
                   SizedBox(
-                      height:
-                          (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
+                      height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
                   controlsColumn,
                 ],
               );

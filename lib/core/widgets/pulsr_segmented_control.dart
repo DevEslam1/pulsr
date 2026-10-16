@@ -144,47 +144,49 @@ class PulsrSegmentedControl extends StatelessWidget {
                                 ? _fitContent(
                                     context, i, clampedIndex, includeIcons)
                                 : Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.xs,
-                                vertical: AppSpacing.s10,
-                              ),
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  minHeight: AppSpacing.minTouchTarget - 20,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      segments[i].icon,
-                                      size: 16,
-                                      color: clampedIndex == i
-                                          ? p.onAccent
-                                          : p.textSecondary,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.xs,
+                                      vertical: AppSpacing.s10,
                                     ),
-                                    const SizedBox(width: AppSpacing.s6),
-                                    Flexible(
-                                      child: Text(
-                                        segments[i].count != null
-                                            ? '${segments[i].label} (${segments[i].count})'
-                                            : segments[i].label,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: AppFontSize.bodySmall,
-                                          fontWeight: clampedIndex == i
-                                              ? FontWeight.w800
-                                              : FontWeight.w600,
-                                          color: clampedIndex == i
-                                              ? p.onAccent
-                                              : p.textSecondary,
-                                        ),
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        minHeight:
+                                            AppSpacing.minTouchTarget - 20,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            segments[i].icon,
+                                            size: 16,
+                                            color: clampedIndex == i
+                                                ? p.onAccent
+                                                : p.textSecondary,
+                                          ),
+                                          const SizedBox(width: AppSpacing.s6),
+                                          Flexible(
+                                            child: Text(
+                                              segments[i].count != null
+                                                  ? '${segments[i].label} (${segments[i].count})'
+                                                  : segments[i].label,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: AppFontSize.bodySmall,
+                                                fontWeight: clampedIndex == i
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w600,
+                                                color: clampedIndex == i
+                                                    ? p.onAccent
+                                                    : p.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                                  ),
                           ),
                         ),
                       ),
@@ -230,8 +232,7 @@ class PulsrSegmentedControl extends StatelessWidget {
   /// Measured flex weights for [fitLabels]: proportional to each
   /// segment's rendered label width (plus padding, and icon width when
   /// [withIcons]).
-  List<int> _measuredWeights(BuildContext context,
-      {required bool withIcons}) {
+  List<int> _measuredWeights(BuildContext context, {required bool withIcons}) {
     final scaler = MediaQuery.textScalerOf(context);
     final direction = Directionality.of(context);
     const style = TextStyle(
@@ -310,8 +311,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                 softWrap: false,
                 style: TextStyle(
                   fontSize: AppFontSize.bodySmall,
-                  fontWeight:
-                      isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                   color: isSelected ? p.onAccent : p.textSecondary,
                 ),
               ),

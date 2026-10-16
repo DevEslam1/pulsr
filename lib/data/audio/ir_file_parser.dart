@@ -224,12 +224,14 @@ class IrFileParser {
   /// that need it. Returns [input] unchanged when the rates match or inputs are
   /// degenerate. The result is capped at [maxSamples] frames.
   static List<double> resample(List<double> input, int fromRate, int toRate) {
-    if (input.length < 2 || fromRate <= 0 || toRate <= 0 || fromRate == toRate) {
+    if (input.length < 2 ||
+        fromRate <= 0 ||
+        toRate <= 0 ||
+        fromRate == toRate) {
       return input;
     }
     final double ratio = toRate / fromRate;
-    final int outLength =
-        math.min((input.length * ratio).floor(), maxSamples);
+    final int outLength = math.min((input.length * ratio).floor(), maxSamples);
     if (outLength <= 0) return <double>[];
 
     // Half-width of the sinc kernel in INPUT samples. On downsampling the
@@ -266,12 +268,14 @@ class IrFileParser {
   /// explicitly trade quality for cost.
   static List<double> resampleLinear(
       List<double> input, int fromRate, int toRate) {
-    if (input.length < 2 || fromRate <= 0 || toRate <= 0 || fromRate == toRate) {
+    if (input.length < 2 ||
+        fromRate <= 0 ||
+        toRate <= 0 ||
+        fromRate == toRate) {
       return input;
     }
     final double ratio = toRate / fromRate;
-    final int outLength =
-        math.min((input.length * ratio).floor(), maxSamples);
+    final int outLength = math.min((input.length * ratio).floor(), maxSamples);
     if (outLength <= 0) return <double>[];
     final double step = fromRate / toRate;
     final int n = input.length;

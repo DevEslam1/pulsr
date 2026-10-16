@@ -84,7 +84,9 @@ void main() {
   });
 
   group('AppHttpOverrides SOCKS5 connectivity testing', () {
-    test('unreachable SOCKS5 proxy fails with error instead of false-positive success', () async {
+    test(
+        'unreachable SOCKS5 proxy fails with error instead of false-positive success',
+        () async {
       // Pick a port that is not listening on localhost
       final config = const ProxyConfig(
         enabled: true,
@@ -102,7 +104,8 @@ void main() {
       expect(result.error, isNotNull);
     });
 
-    test('valid SOCKS5 proxy handshake succeeds via testSocks5ViaSocket', () async {
+    test('valid SOCKS5 proxy handshake succeeds via testSocks5ViaSocket',
+        () async {
       // Spin up a minimal loopback SOCKS5 server
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((client) {

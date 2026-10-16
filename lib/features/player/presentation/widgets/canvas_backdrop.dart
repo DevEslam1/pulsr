@@ -46,7 +46,8 @@ class CanvasBackdrop extends StatefulWidget {
 }
 
 class _CanvasBackdropState extends State<CanvasBackdrop> {
-  CanvasRepository get _repository => widget.repository ?? CanvasRepository.instance;
+  CanvasRepository get _repository =>
+      widget.repository ?? CanvasRepository.instance;
 
   VideoPlayerController? _controller;
   CanvasArtwork? _canvas;
@@ -115,12 +116,14 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
       if (local != null && File(local).existsSync()) {
         controller = VideoPlayerController.file(File(local));
       } else {
-        controller = VideoPlayerController.networkUrl(Uri.parse(canvas.videoUrl));
+        controller =
+            VideoPlayerController.networkUrl(Uri.parse(canvas.videoUrl));
       }
 
       await controller.initialize();
       await controller.setLooping(true);
-      await controller.setVolume(0.0); // Never emit sound to avoid interrupting music
+      await controller
+          .setVolume(0.0); // Never emit sound to avoid interrupting music
 
       if (!mounted || _resolvedSongId != songId) {
         await controller.dispose();
@@ -298,8 +301,11 @@ class CanvasToggleChip extends StatelessWidget {
           context.read<SettingsCubit>().toggleCanvasEnabled(next);
           PulsrToast.show(
             context,
-            message: next ? 'Canvas & Motion Artwork enabled' : 'Canvas disabled',
-            icon: next ? Icons.motion_photos_on_rounded : Icons.motion_photos_off_rounded,
+            message:
+                next ? 'Canvas & Motion Artwork enabled' : 'Canvas disabled',
+            icon: next
+                ? Icons.motion_photos_on_rounded
+                : Icons.motion_photos_off_rounded,
           );
         },
         borderRadius: AppRadii.r20All,

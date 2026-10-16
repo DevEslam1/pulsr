@@ -424,10 +424,12 @@ class MiniPlayerState extends State<MiniPlayer> {
                         if (_swipeInFlight) return;
                         _horizontalDragDx += d.delta.dx;
                         const threshold = 40.0;
-                        if (!_swipeThresholdCrossed && _horizontalDragDx.abs() >= threshold) {
+                        if (!_swipeThresholdCrossed &&
+                            _horizontalDragDx.abs() >= threshold) {
                           _swipeThresholdCrossed = true;
                           PulsrHaptics.confirm();
-                        } else if (_swipeThresholdCrossed && _horizontalDragDx.abs() < threshold) {
+                        } else if (_swipeThresholdCrossed &&
+                            _horizontalDragDx.abs() < threshold) {
                           _swipeThresholdCrossed = false;
                         }
                         setState(() {});
@@ -715,22 +717,35 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                               // content areas scale to 2.0x.
                                                               Expanded(
                                                                 child: Stack(
-                                                                  alignment: Alignment.centerLeft,
+                                                                  alignment:
+                                                                      Alignment
+                                                                          .centerLeft,
                                                                   children: [
-                                                                    Transform.translate(
-                                                                      offset: Offset(
-                                                                        _horizontalDragDx != 0.0
-                                                                            ? math.pow(_horizontalDragDx.abs(), 0.78) * _horizontalDragDx.sign
+                                                                    Transform
+                                                                        .translate(
+                                                                      offset:
+                                                                          Offset(
+                                                                        _horizontalDragDx !=
+                                                                                0.0
+                                                                            ? math.pow(_horizontalDragDx.abs(), 0.78) *
+                                                                                _horizontalDragDx.sign
                                                                             : 0.0,
                                                                         0,
                                                                       ),
-                                                                      child: MediaQuery.withClampedTextScaling(
-                                                                        minScaleFactor: 0.8,
-                                                                        maxScaleFactor: 1.3,
-                                                                        child: Column(
-                                                                          mainAxisSize: MainAxisSize.min,
-                                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                                      child: MediaQuery
+                                                                          .withClampedTextScaling(
+                                                                        minScaleFactor:
+                                                                            0.8,
+                                                                        maxScaleFactor:
+                                                                            1.3,
+                                                                        child:
+                                                                            Column(
+                                                                          mainAxisSize:
+                                                                              MainAxisSize.min,
+                                                                          crossAxisAlignment:
+                                                                              CrossAxisAlignment.start,
+                                                                          mainAxisAlignment:
+                                                                              MainAxisAlignment.center,
                                                                           children: [
                                                                             Text(
                                                                               item.title,
@@ -757,14 +772,22 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                         ),
                                                                       ),
                                                                     ),
-                                                                    if (_horizontalDragDx < -8)
+                                                                    if (_horizontalDragDx <
+                                                                        -8)
                                                                       PositionedDirectional(
                                                                         end: 0,
-                                                                        child: Opacity(
-                                                                          opacity: (_horizontalDragDx.abs() / 40.0).clamp(0.0, 1.0),
-                                                                          child: Transform.scale(
-                                                                            scale: _swipeThresholdCrossed ? 1.15 : 0.95,
-                                                                            child: Icon(
+                                                                        child:
+                                                                            Opacity(
+                                                                          opacity: (_horizontalDragDx.abs() / 40.0).clamp(
+                                                                              0.0,
+                                                                              1.0),
+                                                                          child:
+                                                                              Transform.scale(
+                                                                            scale: _swipeThresholdCrossed
+                                                                                ? 1.15
+                                                                                : 0.95,
+                                                                            child:
+                                                                                Icon(
                                                                               Icons.skip_next_rounded,
                                                                               size: 20,
                                                                               color: _swipeThresholdCrossed ? p.accent : p.textSecondary,
@@ -772,14 +795,23 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                           ),
                                                                         ),
                                                                       )
-                                                                    else if (_horizontalDragDx > 8)
+                                                                    else if (_horizontalDragDx >
+                                                                        8)
                                                                       PositionedDirectional(
-                                                                        start: 0,
-                                                                        child: Opacity(
-                                                                          opacity: (_horizontalDragDx.abs() / 40.0).clamp(0.0, 1.0),
-                                                                          child: Transform.scale(
-                                                                            scale: _swipeThresholdCrossed ? 1.15 : 0.95,
-                                                                            child: Icon(
+                                                                        start:
+                                                                            0,
+                                                                        child:
+                                                                            Opacity(
+                                                                          opacity: (_horizontalDragDx.abs() / 40.0).clamp(
+                                                                              0.0,
+                                                                              1.0),
+                                                                          child:
+                                                                              Transform.scale(
+                                                                            scale: _swipeThresholdCrossed
+                                                                                ? 1.15
+                                                                                : 0.95,
+                                                                            child:
+                                                                                Icon(
                                                                               Icons.skip_previous_rounded,
                                                                               size: 20,
                                                                               color: _swipeThresholdCrossed ? p.accent : p.textSecondary,
@@ -908,7 +940,11 @@ class MiniPlayerState extends State<MiniPlayer> {
                                           // AUDIT-FIX: Cooldown to avoid rapid repeated retries on error pill
                                           final now = DateTime.now();
                                           if (_lastRetryTime != null &&
-                                              now.difference(_lastRetryTime!).inMilliseconds < 1000) {
+                                              now
+                                                      .difference(
+                                                          _lastRetryTime!)
+                                                      .inMilliseconds <
+                                                  1000) {
                                             return;
                                           }
                                           _lastRetryTime = now;

@@ -100,8 +100,8 @@ void main() {
     await pumpSheet(tester);
     await fire(tester, (c) {
       final params = webViewParams(tester);
-      params.onLoadStop?.call(
-          c, WebUri('https://accounts.google.com/v3/signin/blocked'));
+      params.onLoadStop
+          ?.call(c, WebUri('https://accounts.google.com/v3/signin/blocked'));
     });
 
     expect(find.byIcon(Icons.gpp_bad_rounded), findsOneWidget);
@@ -117,8 +117,8 @@ void main() {
     await pumpSheet(tester);
     await fire(tester, (c) {
       final params = webViewParams(tester);
-      params.onLoadStop?.call(
-          c, WebUri('https://accounts.google.com/v3/signin/blocked'));
+      params.onLoadStop
+          ?.call(c, WebUri('https://accounts.google.com/v3/signin/blocked'));
     });
 
     // Default identity is mobile -> the switch offers Safari Mobile.
@@ -141,8 +141,8 @@ void main() {
     await pumpSheet(tester);
     await fire(tester, (c) {
       final params = webViewParams(tester);
-      params.onLoadStop?.call(
-          c, WebUri('https://accounts.google.com/v3/signin/blocked'));
+      params.onLoadStop
+          ?.call(c, WebUri('https://accounts.google.com/v3/signin/blocked'));
     });
 
     final retryBtn = find.text('Retry');
@@ -180,8 +180,7 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets('an auth-in-progress URL is a no-op (no bounce)',
-      (tester) async {
+  testWidgets('an auth-in-progress URL is a no-op (no bounce)', (tester) async {
     await pumpSheet(tester);
     await fire(tester, (c) {
       final params = webViewParams(tester);

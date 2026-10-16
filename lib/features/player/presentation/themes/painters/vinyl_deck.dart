@@ -278,65 +278,70 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                         rotationPhase: totalPhase,
                                       ),
                                       child: Center(
-                                  // Center Album Artwork
-                                  child: Container(
-                                    width: vinylSize * 0.44,
-                                    height: vinylSize * 0.44,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: AppColors.specularAt(0.3),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        if (song != null)
-                                          CachedArtwork(
-                                            id: song.id,
-                                            albumId: song.albumId,
-                                            remoteUrl: song.remoteArtworkUrl ??
-                                                song.artworkUri,
-                                            type: ArtworkType.AUDIO,
-                                            size: vinylSize * 0.44,
-                                            borderRadius: 999,
-                                            highQuality: true,
-                                            fallbackIcon:
-                                                Icons.music_note_rounded,
-                                          ),
-                                        // Center Spindle Hole
-                                        Container(
-                                          width: 18,
-                                          height: 18,
+                                        // Center Album Artwork
+                                        child: Container(
+                                          width: vinylSize * 0.44,
+                                          height: vinylSize * 0.44,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            gradient: RadialGradient(
-                                              colors: [
-                                                Colors.grey.shade400,
-                                                Colors.grey.shade800,
-                                                AppColors.darkSurface,
-                                              ],
-                                              stops: const [0.0, 0.6, 1.0],
-                                            ),
                                             border: Border.all(
-                                              color: Colors.white30,
-                                              width: 1,
+                                              color: AppColors.specularAt(0.3),
+                                              width: 1.5,
                                             ),
                                           ),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              if (song != null)
+                                                CachedArtwork(
+                                                  id: song.id,
+                                                  albumId: song.albumId,
+                                                  remoteUrl:
+                                                      song.remoteArtworkUrl ??
+                                                          song.artworkUri,
+                                                  type: ArtworkType.AUDIO,
+                                                  size: vinylSize * 0.44,
+                                                  borderRadius: 999,
+                                                  highQuality: true,
+                                                  fallbackIcon:
+                                                      Icons.music_note_rounded,
+                                                ),
+                                              // Center Spindle Hole
+                                              Container(
+                                                width: 18,
+                                                height: 18,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  gradient: RadialGradient(
+                                                    colors: [
+                                                      Colors.grey.shade400,
+                                                      Colors.grey.shade800,
+                                                      AppColors.darkSurface,
+                                                    ],
+                                                    stops: const [
+                                                      0.0,
+                                                      0.6,
+                                                      1.0
+                                                    ],
+                                                  ),
+                                                  border: Border.all(
+                                                    color: Colors.white30,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+                          ),
+                        ),
 
                         // 4. Animated Tonearm Assembly Layer
                         Positioned.fill(

@@ -128,7 +128,8 @@ void main() {
     expect(find.text(l10n.settingsExtendedSpeedRange), findsOneWidget);
     expect(find.text(l10n.settingsAudioNormalization), findsOneWidget);
     // Gapless ON with crossfade > 0 exposes the one-tap resolver.
-    expect(find.text(l10n.settingsTurnOffGaplessEnableCrossfade), findsOneWidget);
+    expect(
+        find.text(l10n.settingsTurnOffGaplessEnableCrossfade), findsOneWidget);
   });
 
   testWidgets('conflict resolver, info dialog and toggles drive the cubit',
@@ -223,8 +224,7 @@ void main() {
       (tester) async {
     final handler = MockAudioHandler();
     when(() => handler.isAudioNormalizationEnabled).thenReturn(false);
-    when(() => handler.setAdvancedSpeedEnabled(any()))
-        .thenAnswer((_) async {});
+    when(() => handler.setAdvancedSpeedEnabled(any())).thenAnswer((_) async {});
     when(() => handler.setAudioNormalizationEnabled(any()))
         .thenAnswer((_) async {});
     getIt.registerSingleton<PulsrAudioHandler>(handler);

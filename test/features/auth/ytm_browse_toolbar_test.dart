@@ -43,14 +43,13 @@ void main() {
   });
 
   Future<void> pumpBrowse(WidgetTester tester) async {
-    await tester.pumpWidget(
-        ytmHost(const YtmWebLoginSheet(isBrowseMode: true)));
+    await tester
+        .pumpWidget(ytmHost(const YtmWebLoginSheet(isBrowseMode: true)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  testWidgets('back and forward are disabled with no history',
-      (tester) async {
+  testWidgets('back and forward are disabled with no history', (tester) async {
     await pumpBrowse(tester);
     final back = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded));
@@ -61,8 +60,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('a quick-navigation chip navigates the web view',
-      (tester) async {
+  testWidgets('a quick-navigation chip navigates the web view', (tester) async {
     await pumpBrowse(tester);
     wireWebViewController(tester, fake);
     await tester.tap(find.text('Explore'));

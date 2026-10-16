@@ -66,8 +66,8 @@ class DetailScaffold extends StatelessWidget {
       Widget rightPane = SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics()),
-        padding: EdgeInsets.only(
-            bottom: PulsrLayoutMetrics.scrollBottom(context)),
+        padding:
+            EdgeInsets.only(bottom: PulsrLayoutMetrics.scrollBottom(context)),
         child: body,
       );
 
@@ -123,8 +123,8 @@ class DetailScaffold extends StatelessWidget {
     } else {
       // Portrait / single column stacked
       Widget scrollableContent = ListView(
-        padding: EdgeInsets.only(
-            bottom: PulsrLayoutMetrics.scrollBottom(context)),
+        padding:
+            EdgeInsets.only(bottom: PulsrLayoutMetrics.scrollBottom(context)),
         physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics()),
         children: [

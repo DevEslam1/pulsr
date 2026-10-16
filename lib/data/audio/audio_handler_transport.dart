@@ -215,9 +215,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
               _currentIndex = 0;
               _savedQueueIndex = 0;
               final song = _songs[0];
-              final fastArtUri =
-                  song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
-              mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
+              final fastArtUri = song.artworkUri != null
+                  ? Uri.tryParse(song.artworkUri!)
+                  : null;
+              mediaItem
+                  .add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
               _notifyTrackChanged(song);
               if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
                 await _activePlayer.play();

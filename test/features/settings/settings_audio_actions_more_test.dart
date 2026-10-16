@@ -64,7 +64,8 @@ void main() {
     return handler;
   }
 
-  test('handler-backed toggles succeed and a rejected AAudio/multi-output reverts',
+  test(
+      'handler-backed toggles succeed and a rejected AAudio/multi-output reverts',
       () async {
     final handler = registeredHandler();
     var aaudioResult = true;
@@ -163,7 +164,8 @@ void main() {
     await cubit.preferencesReady;
 
     await cubit.setDspPreference('native');
-    verify(() => manager.setDspPreference(any())).called(greaterThanOrEqualTo(1));
+    verify(() => manager.setDspPreference(any()))
+        .called(greaterThanOrEqualTo(1));
 
     cubit.safeEmit(cubit.state.copyWith(bitPerfectOutput: true));
     await cubit.setBypassDspOnBitPerfect(true);

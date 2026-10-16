@@ -100,8 +100,8 @@ void main() {
       expect(cubit.state.visualizerStyle, VisualizerStyle.bar);
       expect(cubit.state.miniPlayerSwipeLeft, MiniPlayerSwipeAction.next);
       expect(cubit.state.miniPlayerSwipeRight, MiniPlayerSwipeAction.prev);
-      expect(
-          cubit.state.nowPlayingDoubleTap, NowPlayingDoubleTapAction.toggleFavorite);
+      expect(cubit.state.nowPlayingDoubleTap,
+          NowPlayingDoubleTapAction.toggleFavorite);
       expect(cubit.state.nowPlayingArtworkSwipe,
           NowPlayingArtworkSwipeAction.nextPrev);
     });
@@ -190,7 +190,8 @@ void main() {
       addTearDown(cubit.close);
       await cubit.preferencesReady;
 
-      verify(() => manager.setDspPreference(any())).called(greaterThanOrEqualTo(1));
+      verify(() => manager.setDspPreference(any()))
+          .called(greaterThanOrEqualTo(1));
       verify(() => manager.setBypassDspForBitPerfect(any()))
           .called(greaterThanOrEqualTo(1));
     });
@@ -313,8 +314,8 @@ void main() {
       });
       final storage = MockSecureStorage();
       final store = <String, String>{};
-      when(() => storage.read(key: any(named: 'key'))).thenAnswer((inv) async =>
-          store[inv.namedArguments[#key] as String]);
+      when(() => storage.read(key: any(named: 'key')))
+          .thenAnswer((inv) async => store[inv.namedArguments[#key] as String]);
       when(() => storage.write(
             key: any(named: 'key'),
             value: any(named: 'value'),
@@ -322,7 +323,8 @@ void main() {
         store[inv.namedArguments[#key] as String] =
             inv.namedArguments[#value] as String;
       });
-      when(() => storage.delete(key: any(named: 'key'))).thenAnswer((inv) async {
+      when(() => storage.delete(key: any(named: 'key')))
+          .thenAnswer((inv) async {
         store.remove(inv.namedArguments[#key] as String);
       });
 

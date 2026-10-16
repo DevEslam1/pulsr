@@ -108,7 +108,8 @@ void main() {
 
     cubit = MockSettingsCubit();
     when(() => cubit.state).thenReturn(const SettingsState());
-    when(() => cubit.setUsbHardwareVolumeEnabled(any())).thenAnswer((inv) async {
+    when(() => cubit.setUsbHardwareVolumeEnabled(any()))
+        .thenAnswer((inv) async {
       hwVolumeCalls.add(inv.positionalArguments.first as bool);
       return true;
     });
@@ -269,8 +270,7 @@ void main() {
         greaterThanOrEqualTo(2));
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('streaming refuses to start without permission',
-      (tester) async {
+  testWidgets('streaming refuses to start without permission', (tester) async {
     status = attachedStatus(
       permitted: false,
       streamingSupported: true,

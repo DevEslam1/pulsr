@@ -87,7 +87,8 @@ void main() {
       expect(aligned, 126.0);
 
       // 175 BPM folded towards 90 BPM
-      final halfAligned = AutomixTransitionPlanner.alignTempoOctave(90.0, 180.0);
+      final halfAligned =
+          AutomixTransitionPlanner.alignTempoOctave(90.0, 180.0);
       expect(halfAligned, 90.0);
     });
 
@@ -97,7 +98,9 @@ void main() {
       expect(speedUp, closeTo(1.05, 0.01));
     });
 
-    test('assessTransitionTier chooses beatmatched tier for close tempi and high confidence', () {
+    test(
+        'assessTransitionTier chooses beatmatched tier for close tempi and high confidence',
+        () {
       final trackA = TrackAnalysis(
         trackId: 'a',
         bpm: 124.0,
@@ -145,7 +148,9 @@ void main() {
       expect(verdict.reasons, contains('tempo-distance'));
     });
 
-    test('assessTransitionTier degrades to plainCrossfade if confidence is very low', () {
+    test(
+        'assessTransitionTier degrades to plainCrossfade if confidence is very low',
+        () {
       final trackA = TrackAnalysis(
         trackId: 'a',
         bpm: 120.0,

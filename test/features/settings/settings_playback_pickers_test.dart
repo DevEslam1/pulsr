@@ -106,7 +106,8 @@ void main() {
 
     expect(find.text(l10n.npDoubleTap), findsOneWidget);
     await tapOption(tester, l10n.settingsDoubleTapToggleLyrics);
-    expect(cubit.state.nowPlayingDoubleTap, NowPlayingDoubleTapAction.toggleLyrics);
+    expect(cubit.state.nowPlayingDoubleTap,
+        NowPlayingDoubleTapAction.toggleLyrics);
   });
 
   testWidgets('artwork-swipe picker can disable the gesture', (tester) async {
@@ -121,7 +122,8 @@ void main() {
 
     expect(find.text(l10n.npArtworkSwipe), findsOneWidget);
     await tapOption(tester, l10n.settingsArtworkSwipeDisabled);
-    expect(cubit.state.nowPlayingArtworkSwipe, NowPlayingArtworkSwipeAction.none);
+    expect(
+        cubit.state.nowPlayingArtworkSwipe, NowPlayingArtworkSwipeAction.none);
   });
 
   testWidgets('streaming quality picker writes streamingQuality',
@@ -141,8 +143,7 @@ void main() {
     expect(cubit.state.streamingQuality, YtmAudioQuality.medium);
   });
 
-  testWidgets('download quality picker writes downloadQuality',
-      (tester) async {
+  testWidgets('download quality picker writes downloadQuality', (tester) async {
     await launch(
       tester,
       (context) => showQualityPickerSheet(

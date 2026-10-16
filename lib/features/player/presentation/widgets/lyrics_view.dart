@@ -560,9 +560,7 @@ class _LyricsViewState extends State<LyricsView> {
                         : (_translationMode == 1
                             ? Icons.g_translate_rounded
                             : Icons.spellcheck_rounded),
-                    color: _translationMode > 0
-                        ? p.accent
-                        : widget.activeColor,
+                    color: _translationMode > 0 ? p.accent : widget.activeColor,
                     size: 20,
                   ),
             tooltip: _translationMode == 0

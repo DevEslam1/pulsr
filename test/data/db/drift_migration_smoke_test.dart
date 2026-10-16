@@ -7,7 +7,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Drift Migration Smoke Tests', () {
-    test('fresh database initializes schema v11 with all tables and indexes', () async {
+    test('fresh database initializes schema v11 with all tables and indexes',
+        () async {
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(() async => await db.close());
 
@@ -19,7 +20,8 @@ void main() {
       expect(db.migrationFailed, isFalse);
     });
 
-    test('v10 database migrates to v11 cleanly and creates constraints', () async {
+    test('v10 database migrates to v11 cleanly and creates constraints',
+        () async {
       final connection = NativeDatabase.memory(
         setup: (rawDb) {
           // Set user_version to 10 and construct pre-v11 schema
@@ -136,7 +138,9 @@ void main() {
       expect(db.migrationFailed, isFalse);
 
       // Verify that v11 indexes were created
-      final indexes = await db.customSelect("SELECT name FROM sqlite_master WHERE type='index';").get();
+      final indexes = await db
+          .customSelect("SELECT name FROM sqlite_master WHERE type='index';")
+          .get();
       final indexNames = indexes.map((row) => row.read<String>('name')).toSet();
       expect(indexNames.contains('idx_songs_lower_path'), isTrue);
       expect(indexNames.contains('idx_playlists_name'), isTrue);

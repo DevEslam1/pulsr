@@ -69,8 +69,7 @@ void main() {
     return manager;
   }
 
-  Future<void> pumpSheet(
-      WidgetTester tester, FakeEqualizerManager manager,
+  Future<void> pumpSheet(WidgetTester tester, FakeEqualizerManager manager,
       {PlayerCubit? cubit}) async {
     await tester.pumpWidget(sheetHost(
       playerCubit: cubit ?? stubPlayerCubit(),
@@ -96,8 +95,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    final threshold =
-        tester.widgetList<Slider>(find.byType(Slider)).first;
+    final threshold = tester.widgetList<Slider>(find.byType(Slider)).first;
     expect(threshold.value, closeTo(-7.5, 0.001));
     // Limiter is now on, so the threshold slider is enabled.
     final resetIcons = find.byIcon(Icons.settings_backup_restore);
@@ -118,8 +116,7 @@ void main() {
         .add(const PlayerState(dsp: DspSlice(isLimiterEnabled: true)));
     await tester.pumpAndSettle();
 
-    final threshold =
-        tester.widgetList<Slider>(find.byType(Slider)).first;
+    final threshold = tester.widgetList<Slider>(find.byType(Slider)).first;
     expect(threshold.value, closeTo(-12.0, 0.001));
   });
 
@@ -131,8 +128,7 @@ void main() {
     await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
 
-    final threshold =
-        tester.widgetList<Slider>(find.byType(Slider)).first;
+    final threshold = tester.widgetList<Slider>(find.byType(Slider)).first;
     threshold.onChanged!(threshold.min);
     await tester.pumpAndSettle();
     expect(manager.limiterThresholdDb, -30.0);

@@ -29,8 +29,7 @@ void main() {
     });
 
     test('extracts valid ID from URL without query params', () {
-      const url =
-          'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M';
+      const url = 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M';
       expect(
         SpotifyImporterService.extractPlaylistId(url),
         '37i9dQZF1DXcBWIGoYBM5M',
@@ -109,7 +108,8 @@ void main() {
 ''';
 
       final mockClient = MockClient((request) async {
-        if (request.url.path.contains('/embed/playlist/37i9dQZF1DXcBWIGoYBM5M')) {
+        if (request.url.path
+            .contains('/embed/playlist/37i9dQZF1DXcBWIGoYBM5M')) {
           return http.Response(fakeHtml, 200);
         }
         return http.Response('Not Found', 404);
@@ -152,7 +152,8 @@ void main() {
 ''';
 
       final mockClient = MockClient((request) async {
-        if (request.url.path.contains('/embed/playlist/37i9dQZF1DXcBWIGoYBM5M')) {
+        if (request.url.path
+            .contains('/embed/playlist/37i9dQZF1DXcBWIGoYBM5M')) {
           return http.Response(fakeHtml, 200);
         }
         if (request.url.path.contains('/oembed')) {
@@ -191,7 +192,8 @@ void main() {
       await db.close();
     });
 
-    test('imports Spotify playlist, resolves YTM tracks and creates local playlist',
+    test(
+        'imports Spotify playlist, resolves YTM tracks and creates local playlist',
         () async {
       const nextDataJson = {
         'props': {
@@ -217,7 +219,8 @@ void main() {
           '<script id="__NEXT_DATA__" type="application/json">${jsonEncode(nextDataJson)}</script>';
 
       final mockClient = MockClient((request) async {
-        if (request.url.path.contains('/embed/playlist/37i9dQZF1DXcBWIGoYBM5M')) {
+        if (request.url.path
+            .contains('/embed/playlist/37i9dQZF1DXcBWIGoYBM5M')) {
           return http.Response(fakeHtml, 200);
         }
         return http.Response('Not Found', 404);

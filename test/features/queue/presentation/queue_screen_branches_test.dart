@@ -42,7 +42,8 @@ void main() {
     await getIt.reset();
   });
 
-  MockPlayerCubit buildPlayer(List<SongsTableData> songs, {int currentIndex = 0}) {
+  MockPlayerCubit buildPlayer(List<SongsTableData> songs,
+      {int currentIndex = 0}) {
     final player = MockPlayerCubit();
     when(() => player.state).thenReturn(PlayerState(
       playback: PlaybackSlice(
@@ -125,8 +126,8 @@ void main() {
     when(() => getSongs.getAllSongs())
         .thenAnswer((_) async => Right([seed, other]));
     when(() => suggestions.buildAutoDjQueue(any(), any(),
-            limit: any(named: 'limit'), excludeIds: any(named: 'excludeIds')))
-        .thenReturn([other]);
+        limit: any(named: 'limit'),
+        excludeIds: any(named: 'excludeIds'))).thenReturn([other]);
     getIt.registerSingleton<GetSongsUseCase>(getSongs);
     getIt.registerSingleton<PlaylistSuggestionsService>(suggestions);
 

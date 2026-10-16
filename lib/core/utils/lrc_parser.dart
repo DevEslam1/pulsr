@@ -549,9 +549,8 @@ class LrcParser {
       final rawVocal = map['vocal'];
       final rawBg = map['bg'];
       final rawAlign = map['align'];
-      final alignment = rawAlign == 'end'
-          ? LyricAlignment.end
-          : LyricAlignment.start;
+      final alignment =
+          rawAlign == 'end' ? LyricAlignment.end : LyricAlignment.start;
 
       lines.add(LyricsLine(
         timestamp: Duration(milliseconds: rawMs is num ? rawMs.toInt() : 0),

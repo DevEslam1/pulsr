@@ -47,8 +47,7 @@ void main() {
       expect(dspSheetRebuildGate(_base, _base), isFalse);
     });
 
-    test('a non-identical copy sharing the same dsp slice returns false',
-        () {
+    test('a non-identical copy sharing the same dsp slice returns false', () {
       final copy = _base.copyWith();
       expect(dspSheetRebuildGate(_base, copy), isFalse);
     });
@@ -100,7 +99,9 @@ void main() {
           ),
       'eqPreset.bandsMap': () => _diff(
             (d) => d.copyWith(
-              eqPreset: d.eqPreset.copyWith(bandsMap: const {1: [2.0]}),
+              eqPreset: d.eqPreset.copyWith(bandsMap: const {
+                1: [2.0]
+              }),
             ),
           ),
       // Booleans (default false -> true) and inverted defaults.

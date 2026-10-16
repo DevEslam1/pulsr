@@ -57,8 +57,8 @@ void main() {
   Future<void> pumpEditor(WidgetTester tester,
       {required SongsTableData song, List<SongsTableData>? batch}) async {
     useScreenSize(tester, const Size(800, 1600));
-    await tester.pumpWidget(screenHarness(
-        child: TagEditorScreen(song: song, batchSongs: batch)));
+    await tester.pumpWidget(
+        screenHarness(child: TagEditorScreen(song: song, batchSongs: batch)));
     await tester.pumpAndSettle();
   }
 
@@ -106,8 +106,7 @@ void main() {
     expect(find.byType(TagFieldWidget), findsWidgets);
   });
 
-  testWidgets('auto-fetch with no online matches reports it',
-      (tester) async {
+  testWidgets('auto-fetch with no online matches reports it', (tester) async {
     await pumpEditor(tester, song: createTestSong(id: 1, title: 'My Song'));
 
     await tester.tap(find.text('Auto-Fetch Tags & Cover Art'));
@@ -120,8 +119,7 @@ void main() {
       (tester) async {
     await pumpEditor(tester, song: createTestSong(id: 1, title: 'My Song'));
 
-    await tester.enterText(
-        find.widgetWithText(TextFormField, 'My Song'), '');
+    await tester.enterText(find.widgetWithText(TextFormField, 'My Song'), '');
     await tester.pump();
 
     await tester.tap(find.text('Save'));

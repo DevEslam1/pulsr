@@ -40,9 +40,7 @@ void main() {
                 ?.fontFamily,
             manrope);
         expect(
-            theme.textButtonTheme.style?.textStyle
-                ?.resolve(states)
-                ?.fontFamily,
+            theme.textButtonTheme.style?.textStyle?.resolve(states)?.fontFamily,
             manrope);
       });
 

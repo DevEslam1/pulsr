@@ -379,8 +379,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                   if (showVisualizer) visualizer,
 
                   SizedBox(
-                      height:
-                          (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
+                      height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
 
                   // Bottom Card with Controls and EQ Action Dock
                   Padding(

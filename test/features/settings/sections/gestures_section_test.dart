@@ -49,8 +49,7 @@ void main() {
     );
   });
 
-  testWidgets('right-swipe picker selects next track and pops',
-      (tester) async {
+  testWidgets('right-swipe picker selects next track and pops', (tester) async {
     final h = await pumpSettingsCategory(tester, category: 'look');
     addTearDown(h.cubit.close);
 

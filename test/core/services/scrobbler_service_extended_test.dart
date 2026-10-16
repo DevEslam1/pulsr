@@ -41,8 +41,7 @@ void main() {
     secure = MockSecureStorage();
     when(() => secure.read(key: any(named: 'key'))).thenAnswer(
         (inv) async => secureStore[inv.namedArguments[const Symbol('key')]]);
-    when(() => secure.write(
-            key: any(named: 'key'), value: any(named: 'value')))
+    when(() => secure.write(key: any(named: 'key'), value: any(named: 'value')))
         .thenAnswer((inv) async {
       secureStore[inv.namedArguments[const Symbol('key')] as String] =
           inv.namedArguments[const Symbol('value')] as String;
@@ -252,7 +251,8 @@ void main() {
 
       await service.checkPendingScrobble();
 
-      expect(httpRequests.any((r) => r.body.contains('track.scrobble')), isTrue);
+      expect(
+          httpRequests.any((r) => r.body.contains('track.scrobble')), isTrue);
       expect(prefs.getInt('scrobbler_last_song'), isNull);
       expect(prefs.getString('scrobbler_last_artist'), isNull);
     });
@@ -325,8 +325,7 @@ void main() {
   });
 
   group('credential migration', () {
-    test('migrates prefs secrets into secure storage and wipes them',
-        () async {
+    test('migrates prefs secrets into secure storage and wipes them', () async {
       SharedPreferences.setMockInitialValues({
         ScrobblerService.keyLastFmApiKey: 'api',
         ScrobblerService.keyLastFmSecret: 'secret',

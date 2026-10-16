@@ -540,9 +540,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 borderRadius: AppRadii.r4All,
               ),
               child: Text(
-                (dev?.isLeAudio ?? false)
-                    ? 'LE'
-                    : (dev?.btCodecName ?? 'BT'),
+                (dev?.isLeAudio ?? false) ? 'LE' : (dev?.btCodecName ?? 'BT'),
                 style: TextStyle(
                   color: p.accent,
                   fontSize: AppFontSize.caption,
@@ -674,8 +672,7 @@ class _BluetoothQualityHint extends StatelessWidget {
     final parts = <String>[
       if (d.btCodecName != null && d.btCodecName!.isNotEmpty) d.btCodecName!,
       if (isLe) context.l10n.settingsBluetoothLeAudio,
-      if (d.btSampleRateHz != null)
-        '${(d.btSampleRateHz! / 1000).round()} kHz',
+      if (d.btSampleRateHz != null) '${(d.btSampleRateHz! / 1000).round()} kHz',
       if (d.btBitDepth != null) '${d.btBitDepth}-bit',
     ];
     final text = parts.isEmpty

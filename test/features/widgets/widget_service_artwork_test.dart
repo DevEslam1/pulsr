@@ -115,8 +115,7 @@ void main() {
     expect(_lastSaved(calls, 'artworkFailed'), isFalse);
   });
 
-  test('a second update for the same song reuses the cached artwork',
-      () async {
+  test('a second update for the same song reuses the cached artwork', () async {
     final source = File('${tempDir.path}${Platform.pathSeparator}cover.png')
       ..writeAsBytesSync([9, 8, 7]);
     final song = _song(id: 22, artworkUri: source.uri.toString());
@@ -156,8 +155,7 @@ void main() {
   test('listenToWidgetClicks parses the path form and forwards known actions',
       () async {
     _messenger.setMockMethodCallHandler(_eventChannel, (call) async => null);
-    addTearDown(
-        () => _messenger.setMockMethodCallHandler(_eventChannel, null));
+    addTearDown(() => _messenger.setMockMethodCallHandler(_eventChannel, null));
 
     final received = <Uri?>[];
     final sub = service.listenToWidgetClicks(received.add);

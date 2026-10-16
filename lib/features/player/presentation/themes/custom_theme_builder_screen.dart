@@ -313,9 +313,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                               Color(_accentColor).withValues(alpha: 0.18),
                           backgroundColor: p.surfaceCard,
                           side: BorderSide(
-                            color: isSelected
-                                ? Color(_accentColor)
-                                : p.hairline,
+                            color:
+                                isSelected ? Color(_accentColor) : p.hairline,
                             width: isSelected ? 1.5 : 1.0,
                           ),
                           shape: RoundedRectangleBorder(
@@ -376,8 +375,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                       },
                     ),
                   ),
-                ]
-                else
+                ] else
                   Container(
                     constraints: const BoxConstraints(minHeight: 220),
                     padding: const EdgeInsets.all(AppSpacing.md),

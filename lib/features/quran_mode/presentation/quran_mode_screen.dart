@@ -31,7 +31,7 @@ class QuranModeScreen extends StatelessWidget {
             child: const SingleChildScrollView(
               padding:
                   EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.xl),
-          child: QuranModePanel(),
+              child: QuranModePanel(),
             ),
           ),
         ),

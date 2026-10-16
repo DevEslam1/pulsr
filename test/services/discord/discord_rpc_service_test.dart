@@ -214,7 +214,8 @@ void main() {
 
       await service.setToken('test_discord_token_123');
       expect(service.token, 'test_discord_token_123');
-      expect(prefs.getString(PrefsKeys.discordRpcToken), 'test_discord_token_123');
+      expect(
+          prefs.getString(PrefsKeys.discordRpcToken), 'test_discord_token_123');
 
       await service.setEnabled(true);
       expect(service.isEnabled, isTrue);

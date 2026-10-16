@@ -78,8 +78,7 @@ void main() {
     expect(find.text(l10n.artworkCache), findsOneWidget);
     expect(find.text(l10n.maximumArtworkCacheLimit), findsOneWidget);
     expect(
-        find.text(l10n.maxMbAutoEvicts(
-            ArtworkCacheManager().maxCacheSizeMb)),
+        find.text(l10n.maxMbAutoEvicts(ArtworkCacheManager().maxCacheSizeMb)),
         findsOneWidget);
     // YTM is compile-time disabled so the stream cache row is absent.
     expect(find.text(l10n.youtubeStreamDiskCache), findsNothing);
@@ -87,8 +86,7 @@ void main() {
     expect(find.textContaining('Lyrics'), findsWidgets);
   });
 
-  testWidgets('maximum cache picker changes the manager limit',
-      (tester) async {
+  testWidgets('maximum cache picker changes the manager limit', (tester) async {
     // The bottom-sheet container draws a colored DecoratedBox directly around
     // the picker's ListTiles, which trips a debug-only framework assertion.
     // Ignore that specific framework diagnostic; the interaction is real.

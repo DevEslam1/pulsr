@@ -107,9 +107,23 @@ class AutomixTransitionPlanner {
   static const double defaultBassSwapFraction = 0.70;
 
   static const Map<String, int> keyIndex = {
-    'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
-    'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8,
-    'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11,
+    'C': 0,
+    'C#': 1,
+    'Db': 1,
+    'D': 2,
+    'D#': 3,
+    'Eb': 3,
+    'E': 4,
+    'F': 5,
+    'F#': 6,
+    'Gb': 6,
+    'G': 7,
+    'G#': 8,
+    'Ab': 8,
+    'A': 9,
+    'A#': 10,
+    'Bb': 10,
+    'B': 11,
   };
 
   /// Folds [incomingBpm] into octave nearest to [outgoingBpm] (e.g., 63 BPM vs 126 BPM).
@@ -135,14 +149,17 @@ class AutomixTransitionPlanner {
 
   /// Checks harmonic compatibility using Circle of Fifths.
   static bool areHarmonicallyCompatible(String keyA, String keyB) {
-    if (keyA.isEmpty || keyB.isEmpty) return true; // Without evidence, don't disqualify
+    if (keyA.isEmpty || keyB.isEmpty) {
+      return true; // Without evidence, don't disqualify
+    }
     final rootA = _extractKeyRoot(keyA);
     final rootB = _extractKeyRoot(keyB);
     final indexA = keyIndex[rootA];
     final indexB = keyIndex[rootB];
     if (indexA == null || indexB == null) return true;
 
-    final distance = math.min((indexA - indexB + 12) % 12, (indexB - indexA + 12) % 12);
+    final distance =
+        math.min((indexA - indexB + 12) % 12, (indexB - indexA + 12) % 12);
     final isMinorA = keyA.endsWith('m');
     final isMinorB = keyB.endsWith('m');
 
@@ -264,7 +281,8 @@ class AutomixTransitionPlanner {
         fadeSeconds: outLength - tStart,
         incomingCueTime: _findAudibleStart(incoming),
         policyReasons: policy.reasons,
-        reason: shouldStart ? 'automix-plain-crossfade' : 'before-plain-crossfade',
+        reason:
+            shouldStart ? 'automix-plain-crossfade' : 'before-plain-crossfade',
       );
     }
 
@@ -288,7 +306,8 @@ class AutomixTransitionPlanner {
 
     // Mix-in cue: skip quiet intro / lead-in on incoming track
     final incomingCue = _resolveIncomingCueTime(incoming, inLength);
-    final incomingHandoff = _resolveIncomingHandoffTime(incoming, inLength, incomingCue);
+    final incomingHandoff =
+        _resolveIncomingHandoffTime(incoming, inLength, incomingCue);
 
     // Fade duration in musical beats (4, 8, 16 beats)
     final transitionBeats = _calculateTransitionBeats(
@@ -299,7 +318,8 @@ class AutomixTransitionPlanner {
     );
 
     final calculatedOverlapSec = transitionBeats * outBeatSec;
-    final overlapSec = calculatedOverlapSec.clamp(autoMinSeconds, autoMaxSeconds);
+    final overlapSec =
+        calculatedOverlapSec.clamp(autoMinSeconds, autoMaxSeconds);
 
     // Align transition start to outgoing downbeat or phrase
     final mixOutTarget = _resolveMixOutTarget(outgoing, outLength);
@@ -330,14 +350,17 @@ class AutomixTransitionPlanner {
       outgoingPlaybackRate: 1.0,
       handoffDuration: effectiveFadeSec,
       transitionBeats: transitionBeats,
-      bassSwap: policy.tier == TransitionTier.beatmatched || policy.tier == TransitionTier.djBlend,
+      bassSwap: policy.tier == TransitionTier.beatmatched ||
+          policy.tier == TransitionTier.djBlend,
       bassSwapFraction: bassSwapFraction,
       filterSweep: policy.tier == TransitionTier.djFilter ? 1.0 : 0.0,
       outgoingBpm: outBpm,
       incomingBpm: alignedInBpm,
       beatSeconds: outBeatSec,
       policyReasons: policy.reasons,
-      reason: shouldStart ? 'automix-${policy.tier.name}' : 'before-${policy.tier.name}',
+      reason: shouldStart
+          ? 'automix-${policy.tier.name}'
+          : 'before-${policy.tier.name}',
     );
   }
 

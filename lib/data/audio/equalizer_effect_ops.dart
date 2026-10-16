@@ -183,12 +183,10 @@ extension EqualizerEffectOps on EqualizerManager {
     final targetFeed = feedDb != null
         ? DspParamRanges.crossfeedFeedDb.clamp(feedDb)
         : prevFeed;
-    final targetFcut = fcut != null
-        ? DspParamRanges.crossfeedFcut.clamp(fcut)
-        : prevFcut;
-    final targetMode = mode != null
-        ? DspParamRanges.crossfeedMode.clamp(mode)
-        : prevMode;
+    final targetFcut =
+        fcut != null ? DspParamRanges.crossfeedFcut.clamp(fcut) : prevFcut;
+    final targetMode =
+        mode != null ? DspParamRanges.crossfeedMode.clamp(mode) : prevMode;
 
     try {
       if (PlatformCapabilities.isAndroid) {

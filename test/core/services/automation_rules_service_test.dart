@@ -49,7 +49,8 @@ void main() {
       expect(await service.getRules(), isEmpty);
     });
 
-    test('concurrent saveRule calls serialize without overwriting each other', () async {
+    test('concurrent saveRule calls serialize without overwriting each other',
+        () async {
       final futures = List.generate(
         10,
         (i) => service.saveRule(

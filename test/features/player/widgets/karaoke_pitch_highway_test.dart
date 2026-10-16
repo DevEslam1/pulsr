@@ -48,7 +48,8 @@ void main() {
     expect(find.byType(CustomPaint), findsWidgets);
   });
 
-  testWidgets('updates smoothly when playing and position advances', (tester) async {
+  testWidgets('updates smoothly when playing and position advances',
+      (tester) async {
     await tester.pumpWidget(buildHighway(position: const Duration(seconds: 1)));
     await tester.pump();
 
@@ -69,9 +70,11 @@ void main() {
     expect(find.byType(KaraokePitchHighway), findsOneWidget);
   });
 
-  testWidgets('processes provided audioBuffer through YIN detector', (tester) async {
+  testWidgets('processes provided audioBuffer through YIN detector',
+      (tester) async {
     // Generate a 440 Hz sine wave buffer
-    final buffer = List<double>.generate(1024, (i) => 0.5 * (i % 32 < 16 ? 1.0 : -1.0));
+    final buffer =
+        List<double>.generate(1024, (i) => 0.5 * (i % 32 < 16 ? 1.0 : -1.0));
     await tester.pumpWidget(buildHighway(isPlaying: true, audioBuffer: buffer));
     await tester.pump();
 

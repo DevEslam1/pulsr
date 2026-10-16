@@ -41,8 +41,10 @@ void main() {
     cubit = MockPlayerCubit();
     currentState = const PlayerState();
     when(() => cubit.state).thenAnswer((_) => currentState);
-    when(() => cubit.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
-    when(() => cubit.applyHeadphoneProfile(any())).thenAnswer((invocation) async {
+    when(() => cubit.stream)
+        .thenAnswer((_) => const Stream<PlayerState>.empty());
+    when(() => cubit.applyHeadphoneProfile(any()))
+        .thenAnswer((invocation) async {
       final profile = invocation.positionalArguments[0] as HeadphoneProfile?;
       if (profile != null) {
         currentState = currentState.copyWith(

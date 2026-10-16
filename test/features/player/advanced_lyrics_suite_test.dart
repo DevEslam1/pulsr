@@ -27,7 +27,8 @@ void main() {
       expect(wt.progressAt(2500), 1.0);
     });
 
-    test('LyricsLine detects background vocal via isBackground or brackets', () {
+    test('LyricsLine detects background vocal via isBackground or brackets',
+        () {
       const normalLine = LyricsLine(
         timestamp: Duration(seconds: 1),
         text: 'Lead vocal line',
@@ -96,7 +97,8 @@ void main() {
       final service = LyricsTranslationService(client: mockClient);
       final lines = [
         const LyricsLine(timestamp: Duration(seconds: 1), text: 'Hola mundo'),
-        const LyricsLine(timestamp: Duration(seconds: 3), text: 'Buenas noches'),
+        const LyricsLine(
+            timestamp: Duration(seconds: 3), text: 'Buenas noches'),
       ];
 
       final result1 = await service.translateLyrics(
@@ -153,7 +155,8 @@ void main() {
   group('LyricsShareCardRenderer', () {
     test('renders 1080x1920 high resolution card to PNG bytes', () async {
       final lines = [
-        const LyricsLine(timestamp: Duration(seconds: 10), text: 'Every breath you take'),
+        const LyricsLine(
+            timestamp: Duration(seconds: 10), text: 'Every breath you take'),
         const LyricsLine(
           timestamp: Duration(seconds: 14),
           text: '(Every move you make)',

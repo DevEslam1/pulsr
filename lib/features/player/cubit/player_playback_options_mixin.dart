@@ -115,7 +115,7 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> setQuranModeEnabled(bool enabled) =>
       playbackOptionsController.setQuranModeEnabled(enabled);
 
-  void setQuranReciterStyle(QuranReciterStyle style) =>
+  Future<void> setQuranReciterStyle(QuranReciterStyle style) =>
       playbackOptionsController.setQuranReciterStyle(style);
 
   void toggleAbLoop() => playbackOptionsController.toggleAbLoop();
@@ -130,8 +130,14 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> setQuranWarmth(double value) =>
       playbackOptionsController.setQuranWarmth(value);
 
+  Future<void> setQuranPlaybackSpeed(double value) =>
+      playbackOptionsController.setQuranPlaybackSpeed(value);
+
   Future<void> reapplyQuranProfile() =>
       playbackOptionsController.reapplyQuranProfile();
+
+  Future<void> resetQuranProfile() =>
+      playbackOptionsController.resetQuranProfile();
 
   Future<bool> updateLyrics(List<LyricsLine> lines) =>
       playbackOptionsController.updateLyrics(lines);

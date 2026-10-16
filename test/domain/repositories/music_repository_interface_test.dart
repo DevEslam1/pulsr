@@ -110,11 +110,12 @@ void main() {
         _song(id: 4, path: 'ytmusic://vid', source: SongSource.youtube),
       ]);
 
-      final direct =
-          (await repo.watchSongsInFolder('/music/rock').first).getOrElse((_) => []);
+      final direct = (await repo.watchSongsInFolder('/music/rock').first)
+          .getOrElse((_) => []);
       final ids = direct.map((s) => s.id).toSet();
       expect(ids, containsAll([1, 3]));
-      expect(ids, isNot(contains(2)), reason: 'subfolder is not a direct child');
+      expect(ids, isNot(contains(2)),
+          reason: 'subfolder is not a direct child');
       expect(ids, isNot(contains(4)), reason: 'remote rows are excluded');
     });
 

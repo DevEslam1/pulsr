@@ -31,7 +31,8 @@ void main() {
 
     player = MockPlayerCubit();
     when(() => player.state).thenReturn(const PlayerState());
-    when(() => player.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
+    when(() => player.stream)
+        .thenAnswer((_) => const Stream<PlayerState>.empty());
 
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -118,7 +119,9 @@ void main() {
         .setMockStreamHandler(
       const EventChannel(PulsrChannels.castSessionEvents),
       MockStreamHandler.inline(
-        onListen: (args, events) { sessionSink = events; },
+        onListen: (args, events) {
+          sessionSink = events;
+        },
       ),
     );
 
@@ -192,8 +195,7 @@ void main() {
     // Rescan through the session discovery path.
     await tester.tap(find.byIcon(Icons.refresh_rounded));
     await tester.pump();
-    expect(
-        calls.where((c) => c == 'session:stopDiscovery').length,
+    expect(calls.where((c) => c == 'session:stopDiscovery').length,
         greaterThanOrEqualTo(1));
 
     await tester.pump(const Duration(seconds: 11));
@@ -206,7 +208,9 @@ void main() {
         .setMockStreamHandler(
       const EventChannel(PulsrChannels.castEvents),
       MockStreamHandler.inline(
-        onListen: (args, events) { deviceSink = events; },
+        onListen: (args, events) {
+          deviceSink = events;
+        },
       ),
     );
 

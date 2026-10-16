@@ -127,11 +127,9 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 50));
 
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump();
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.byType(SyncDiagnosticsSheet), findsOneWidget);

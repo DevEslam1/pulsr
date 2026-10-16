@@ -44,8 +44,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  testWidgets('YTM web options sheet lists every destination',
-      (tester) async {
+  testWidgets('YTM web options sheet lists every destination', (tester) async {
     await launch(tester, showYtmWebOptionsSheet);
 
     expect(find.text(l10n.youtubeMusicWeb), findsOneWidget);

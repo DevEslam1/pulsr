@@ -127,10 +127,12 @@ class _CircleArtworkState extends State<_CircleArtwork> {
                     setState(() {
                       _isScrubbing = true;
                     });
-                    _handlePanUpdate(details.localPosition, dialSize, durationMs);
+                    _handlePanUpdate(
+                        details.localPosition, dialSize, durationMs);
                   },
                   onPanUpdate: (details) {
-                    _handlePanUpdate(details.localPosition, dialSize, durationMs);
+                    _handlePanUpdate(
+                        details.localPosition, dialSize, durationMs);
                   },
                   onPanEnd: (_) => _handlePanEnd(durationMs),
                   onPanCancel: () {

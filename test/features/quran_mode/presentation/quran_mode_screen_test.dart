@@ -33,8 +33,7 @@ void main() {
   testWidgets('renders the full-screen Quran Mode surface and forwards toggles',
       (tester) async {
     final cubit = stubPlayerCubit();
-    when(() => cubit.detectEarbudCapabilities())
-        .thenAnswer((_) async => _caps);
+    when(() => cubit.detectEarbudCapabilities()).thenAnswer((_) async => _caps);
     when(() => cubit.setQuranModeEnabled(any())).thenAnswer((_) async {});
     when(() => cubit.setQuranReciterStyle(any())).thenAnswer((_) async {});
     when(() => cubit.setQuranAmbience(any())).thenAnswer((_) async {});

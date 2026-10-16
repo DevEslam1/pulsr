@@ -20,8 +20,7 @@ class MockPlayerCubit extends Mock implements PlayerCubit {}
 PlayerCubit stubPlayerCubit([PlayerState? state]) {
   final cubit = MockPlayerCubit();
   when(() => cubit.state).thenReturn(state ?? const PlayerState());
-  when(() => cubit.stream)
-      .thenAnswer((_) => const Stream<PlayerState>.empty());
+  when(() => cubit.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
   return cubit;
 }
 

@@ -121,7 +121,8 @@ void main() {
       expect(state.crossfeedMode, 1);
     });
 
-    test('setCrossfeedMode applies even when crossfeed is disabled '
+    test(
+        'setCrossfeedMode applies even when crossfeed is disabled '
         '(guardCondition false skips the bit-perfect guard)', () async {
       await controller.setCrossfeedMode(2);
       expect(handler.calls, contains('setCrossfeedMode'));
@@ -164,7 +165,11 @@ void main() {
 
     test('setSubCrossover maps parameters', () async {
       await controller.setSubCrossover(true,
-          cornerHz: 100, slopeDbPerOct: 12, gain: 0.5, bassMono: true, antiPop: false);
+          cornerHz: 100,
+          slopeDbPerOct: 12,
+          gain: 0.5,
+          bassMono: true,
+          antiPop: false);
       expect(state.isSubCrossoverEnabled, isTrue);
       expect(state.subCrossoverCornerHz, 100);
       expect(state.subCrossoverBassMono, isTrue);
@@ -293,11 +298,11 @@ void main() {
     });
 
     test('mergeRoomCorrectionWithHeadphoneCurve and export IR', () {
-      final merged = controller.mergeRoomCorrectionWithHeadphoneCurve(
-          const [1.0, 2.0, 3.0]);
+      final merged = controller
+          .mergeRoomCorrectionWithHeadphoneCurve(const [1.0, 2.0, 3.0]);
       expect(merged, isA<List<double>>());
-      final ir = controller.exportCorrectionImpulseResponse(
-          const [1.0, 2.0, 3.0]);
+      final ir =
+          controller.exportCorrectionImpulseResponse(const [1.0, 2.0, 3.0]);
       expect(ir, isA<List<double>>());
     });
   });

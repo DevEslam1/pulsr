@@ -271,7 +271,8 @@ class AppHttpOverrides extends HttpOverrides {
 
   /// Performs raw SOCKS5 RFC 1928 greeting & CONNECT handshake.
   @visibleForTesting
-  static Future<({bool success, int latencyMs, String? error})> testSocks5ViaSocket({
+  static Future<({bool success, int latencyMs, String? error})>
+      testSocks5ViaSocket({
     required ProxyConfig testConfig,
     required Uri targetUri,
     Duration timeout = const Duration(seconds: 10),
@@ -290,7 +291,12 @@ class AppHttpOverrides extends HttpOverrides {
 
       // 1. SOCKS5 greeting
       if (testConfig.hasAuth) {
-        socket.add([0x05, 0x02, 0x00, 0x02]); // Offer NO AUTH (0x00) and USER/PASS (0x02)
+        socket.add([
+          0x05,
+          0x02,
+          0x00,
+          0x02
+        ]); // Offer NO AUTH (0x00) and USER/PASS (0x02)
       } else {
         socket.add([0x05, 0x01, 0x00]); // Offer NO AUTH (0x00)
       }
@@ -302,7 +308,8 @@ class AppHttpOverrides extends HttpOverrides {
       }
       final selectedMethod = greetingReply[1];
       if (selectedMethod == 0xFF) {
-        throw const SocketException('SOCKS5 proxy rejected authentication methods (0xFF)');
+        throw const SocketException(
+            'SOCKS5 proxy rejected authentication methods (0xFF)');
       }
 
       // 2. Authentication (RFC 1929) if required
@@ -316,12 +323,19 @@ class AppHttpOverrides extends HttpOverrides {
           throw const SocketException(
               'SOCKS5 username and password must each be 255 bytes or fewer');
         }
-        socket.add([0x01, userBytes.length, ...userBytes, passBytes.length, ...passBytes]);
+        socket.add([
+          0x01,
+          userBytes.length,
+          ...userBytes,
+          passBytes.length,
+          ...passBytes
+        ]);
         await socket.flush();
 
         final authReply = await reader.readBytes(2, timeout);
         if (authReply[1] != 0x00) {
-          throw SocketException('SOCKS5 authentication failed (status: ${authReply[1]})');
+          throw SocketException(
+              'SOCKS5 authentication failed (status: ${authReply[1]})');
         }
       }
 
@@ -483,7 +497,8 @@ class _SocketByteReader {
       return res;
     }
     if (_isDone) {
-      throw const SocketException('Connection closed before bytes were received');
+      throw const SocketException(
+          'Connection closed before bytes were received');
     }
     _waitCount = count;
     _waitCompleter = Completer<void>();
@@ -497,7 +512,8 @@ class _SocketByteReader {
     _checkAndRethrowError();
 
     if (_availableBytes < count) {
-      throw const SocketException('Incomplete response received from SOCKS5 proxy');
+      throw const SocketException(
+          'Incomplete response received from SOCKS5 proxy');
     }
     final res = _buffer.sublist(_offset, _offset + count);
     _offset += count;

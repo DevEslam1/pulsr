@@ -74,7 +74,8 @@ class ServerClock {
 
     final cutoff = receivedAtLocalMs - sampleTtlMs;
     final usable = _samples.where((s) => s.takenAtMs >= cutoff).toList();
-    final candidates = usable.isNotEmpty ? usable : List<_ClockSample>.from(_samples);
+    final candidates =
+        usable.isNotEmpty ? usable : List<_ClockSample>.from(_samples);
 
     if (candidates.isEmpty) return;
 

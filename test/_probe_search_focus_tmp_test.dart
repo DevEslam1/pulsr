@@ -20,7 +20,9 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockAuthCubit extends Mock implements AuthCubit {}
 
 void main() {
@@ -41,9 +43,11 @@ void main() {
 
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(const MethodChannel(PulsrChannels.hiresDac), null);
+        .setMockMethodCallHandler(
+            const MethodChannel(PulsrChannels.hiresDac), null);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(const MethodChannel(PulsrChannels.audioEffects), null);
+        .setMockMethodCallHandler(
+            const MethodChannel(PulsrChannels.audioEffects), null);
   });
 
   Widget buildScreen(SettingsCubit cubit, PlayerCubit player, AuthCubit auth,
@@ -101,17 +105,17 @@ void main() {
     await tester.tap(tf);
     await tester.pump();
 
-    bool hasFocus() =>
-        tester.widget<EditableText>(find.byType(EditableText).first)
-            .focusNode
-            .hasFocus;
+    bool hasFocus() => tester
+        .widget<EditableText>(find.byType(EditableText).first)
+        .focusNode
+        .hasFocus;
 
     debugPrint('PROBE focus-after-tap=${hasFocus()} '
         'connection=${tester.testTextInput.isVisible}');
 
     // 2. Keyboard animates open -> viewInsets.bottom > 0 -> subtree swap.
-    await tester.pumpWidget(
-        buildScreen(cubit, player, auth, keyboard: 844 * 0.35));
+    await tester
+        .pumpWidget(buildScreen(cubit, player, auth, keyboard: 844 * 0.35));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
@@ -123,8 +127,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     debugPrint('PROBE query-after-enter="${tester.widget<TextField>(
-      find.byType(TextField).first,
-    ).controller?.text}" '
+              find.byType(TextField).first,
+            ).controller?.text}" '
         'results=${find.byType(ListTile).evaluate().length} tiles');
 
     // 4. Keyboard closes.

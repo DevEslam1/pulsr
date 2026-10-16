@@ -70,7 +70,8 @@ void main() {
       'dev.fluttercommunity.plus/connectivity_status',
       'com.pulsr.music/purity',
     ]) {
-      messenger.setMockMethodCallHandler(MethodChannel(channel), (_) async => null);
+      messenger.setMockMethodCallHandler(
+          MethodChannel(channel), (_) async => null);
     }
 
     SharedPreferences.setMockInitialValues({});
@@ -93,7 +94,8 @@ void main() {
     getIt.registerSingleton<GetFavoritesUseCase>(GetFavoritesUseCase(repo));
     getIt.registerSingleton<ToggleFavoriteUseCase>(ToggleFavoriteUseCase(repo));
     getIt.registerSingleton<SearchMusicUseCase>(SearchMusicUseCase(repo));
-    getIt.registerSingleton<PlaylistUseCases>(PlaylistUseCases(repo, smartEngine));
+    getIt.registerSingleton<PlaylistUseCases>(
+        PlaylistUseCases(repo, smartEngine));
     getIt.registerSingleton<FolderUseCases>(FolderUseCases(repo));
     getIt.registerSingleton<WidgetService>(WidgetService());
 
@@ -134,8 +136,8 @@ void main() {
           searchUseCase: SearchMusicUseCase(repo),
           folderUseCases: FolderUseCases(repo),
         ));
-    getIt.registerFactory<PlaylistCubit>(
-        () => PlaylistCubit(playlistUseCases: PlaylistUseCases(repo, smartEngine)));
+    getIt.registerFactory<PlaylistCubit>(() =>
+        PlaylistCubit(playlistUseCases: PlaylistUseCases(repo, smartEngine)));
     getIt.registerSingleton<SettingsCubit>(
         SettingsCubit(scannerService: scannerService));
 

@@ -13,8 +13,30 @@ class BpmDetector {
 
   /// Default musical keys
   static const List<String> standardKeys = [
-    'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B',
-    'Am', 'Bbm', 'Bm', 'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'G#m',
+    'C',
+    'C#',
+    'D',
+    'Eb',
+    'E',
+    'F',
+    'F#',
+    'G',
+    'Ab',
+    'A',
+    'Bb',
+    'B',
+    'Am',
+    'Bbm',
+    'Bm',
+    'Cm',
+    'C#m',
+    'Dm',
+    'Ebm',
+    'Em',
+    'Fm',
+    'F#m',
+    'Gm',
+    'G#m',
   ];
 
   final Map<String, TrackAnalysis> _cache = {};
@@ -56,7 +78,8 @@ class BpmDetector {
         final updated = calculateBeatGrid(
           trackId: trackId,
           bpm: explicitBpm,
-          durationSeconds: durationSeconds > 0 ? durationSeconds : cached.duration,
+          durationSeconds:
+              durationSeconds > 0 ? durationSeconds : cached.duration,
           key: explicitKey ?? cached.key,
           beatConfidence: beatConfidence ?? 0.8,
           mixInCueMs: mixInCueMs,
@@ -68,12 +91,14 @@ class BpmDetector {
       return cached;
     }
 
-    final effectiveBpm = (explicitBpm != null && explicitBpm >= 40 && explicitBpm <= 240)
-        ? explicitBpm
-        : 120.0;
-    final effectiveConfidence = (explicitBpm != null && explicitBpm >= 40 && explicitBpm <= 240)
-        ? (beatConfidence ?? 0.85)
-        : 0.3;
+    final effectiveBpm =
+        (explicitBpm != null && explicitBpm >= 40 && explicitBpm <= 240)
+            ? explicitBpm
+            : 120.0;
+    final effectiveConfidence =
+        (explicitBpm != null && explicitBpm >= 40 && explicitBpm <= 240)
+            ? (beatConfidence ?? 0.85)
+            : 0.3;
 
     final analysis = calculateBeatGrid(
       trackId: trackId,

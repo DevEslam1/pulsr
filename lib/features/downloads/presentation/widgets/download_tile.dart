@@ -171,7 +171,8 @@ class DownloadTile extends StatelessWidget {
                           PulsrBadge(
                             label: statusLabel,
                             color: switch (task.status) {
-                              DownloadStatus.complete => PulsrBadgeColor.success,
+                              DownloadStatus.complete =>
+                                PulsrBadgeColor.success,
                               DownloadStatus.failed => PulsrBadgeColor.error,
                               DownloadStatus.paused => PulsrBadgeColor.neutral,
                               _ => PulsrBadgeColor.accent,

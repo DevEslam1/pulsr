@@ -112,8 +112,7 @@ void main() {
         });
         if (intermediate != null) {
           final ro = e.renderObject;
-          final creator =
-              ro?.debugCreator?.toString() ?? '(no render creator)';
+          final creator = ro?.debugCreator?.toString() ?? '(no render creator)';
           final key = '$creator|${chain.take(14).join("|")}';
           if (printed.add(key)) {
             debugPrint('VIOLATION[$label] tile=${w.runtimeType} '

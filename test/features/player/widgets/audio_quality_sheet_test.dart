@@ -97,7 +97,8 @@ void main() {
       await tester.pumpWidget(sheetHost(
         playerCubit: player,
         settingsCubit: settings,
-        child: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+        child:
+            const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
       ));
       await tester.pump();
 
@@ -111,8 +112,7 @@ void main() {
         (tester) async {
       final player = stubPlayerCubit();
       final settings = stubSettingsCubit();
-      when(() => settings.setStreamingQuality(any()))
-          .thenAnswer((_) async {});
+      when(() => settings.setStreamingQuality(any())).thenAnswer((_) async {});
 
       await tester.pumpWidget(sheetHost(
         playerCubit: player,
@@ -138,7 +138,8 @@ void main() {
       await tester.pumpWidget(sheetHost(
         playerCubit: player,
         settingsCubit: settings,
-        child: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+        child:
+            const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
       ));
       await tester.pump();
 
@@ -160,7 +161,8 @@ void main() {
       await tester.pumpWidget(sheetHost(
         playerCubit: player,
         settingsCubit: settings,
-        child: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+        child:
+            const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
       ));
       await tester.pump();
 

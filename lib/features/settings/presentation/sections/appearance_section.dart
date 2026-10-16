@@ -105,63 +105,64 @@ mixin SettingsAppearanceSection
               const SizedBox(height: AppSpacing.sm),
               _ScrollEdgeFade(
                 child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  children: [
-                    for (final (index, color)
-                        in AppColors.customAccents.indexed)
-                      Builder(builder: (context) {
-                        final isSelected =
-                            state.customAccentColorValue == color.toARGB32();
-                        return Padding(
-                          padding: const EdgeInsetsDirectional.only(
-                              end: AppSpacing.sm),
-                          child: Semantics(
-                            button: true,
-                            selected: isSelected,
-                            label: '${context.l10n.accentColor} ${index + 1}',
-                            child: GestureDetector(
-                              onTap: () => cubit.setCustomAccentColor(color),
-                              child: AnimatedContainer(
-                                duration: context.motionMs(200),
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? p.textPrimary
-                                        : Colors.transparent,
-                                    width: 2.5,
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      for (final (index, color)
+                          in AppColors.customAccents.indexed)
+                        Builder(builder: (context) {
+                          final isSelected =
+                              state.customAccentColorValue == color.toARGB32();
+                          return Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                                end: AppSpacing.sm),
+                            child: Semantics(
+                              button: true,
+                              selected: isSelected,
+                              label: '${context.l10n.accentColor} ${index + 1}',
+                              child: GestureDetector(
+                                onTap: () => cubit.setCustomAccentColor(color),
+                                child: AnimatedContainer(
+                                  duration: context.motionMs(200),
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? p.textPrimary
+                                          : Colors.transparent,
+                                      width: 2.5,
+                                    ),
+                                    boxShadow: isSelected
+                                        ? [
+                                            BoxShadow(
+                                              color:
+                                                  color.withValues(alpha: 0.5),
+                                              blurRadius: 12,
+                                              spreadRadius: 2,
+                                            ),
+                                          ]
+                                        : null,
                                   ),
-                                  boxShadow: isSelected
-                                      ? [
-                                          BoxShadow(
-                                            color: color.withValues(alpha: 0.5),
-                                            blurRadius: 12,
-                                            spreadRadius: 2,
-                                          ),
-                                        ]
+                                  child: isSelected
+                                      ? Icon(
+                                          Icons.check_rounded,
+                                          size: 22,
+                                          color: color.computeLuminance() > 0.5
+                                              ? Colors.black
+                                              : Colors.white,
+                                        )
                                       : null,
                                 ),
-                                child: isSelected
-                                    ? Icon(
-                                        Icons.check_rounded,
-                                        size: 22,
-                                        color: color.computeLuminance() > 0.5
-                                            ? Colors.black
-                                            : Colors.white,
-                                      )
-                                    : null,
                               ),
                             ),
-                          ),
-                        );
-                      }),
-                  ],
-                ),
+                          );
+                        }),
+                    ],
+                  ),
                 ),
               ),
             ],

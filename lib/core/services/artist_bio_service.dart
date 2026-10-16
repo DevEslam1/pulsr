@@ -102,10 +102,10 @@ class ArtistBioService {
           )
           .timeout(const Duration(seconds: 6))
           .catchError((e, st) {
-        ErrorLogger.log('Wikipedia bio lookup failed for $cleanName',
-            error: e, stackTrace: st, category: 'ArtistBio');
-        return http.Response('', 500);
-      });
+            ErrorLogger.log('Wikipedia bio lookup failed for $cleanName',
+                error: e, stackTrace: st, category: 'ArtistBio');
+            return http.Response('', 500);
+          });
 
       final results = await Future.wait([deezerFuture, wikiFuture]);
       final res = results[0];
@@ -138,8 +138,9 @@ class ArtistBioService {
         } catch (_) {}
       }
 
-      final hasSuccess = (res.statusCode == 200 && (pictureUrl != null || fanCount != null)) ||
-          (wikiRes.statusCode == 200 && bio != null);
+      final hasSuccess =
+          (res.statusCode == 200 && (pictureUrl != null || fanCount != null)) ||
+              (wikiRes.statusCode == 200 && bio != null);
 
       if (!hasSuccess && pictureUrl == null && bio == null) {
         return null;

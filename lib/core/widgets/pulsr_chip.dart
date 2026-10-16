@@ -50,12 +50,12 @@ class PulsrChip extends StatelessWidget {
         ? (variant == PulsrChipVariant.action ? effectiveAccent : p.accentSoft)
         : p.surfaceContainer;
 
-    final borderColor = selected
-        ? effectiveAccent
-        : p.borderSubtle;
+    final borderColor = selected ? effectiveAccent : p.borderSubtle;
 
     final textColor = selected
-        ? (variant == PulsrChipVariant.action ? p.textOnAccent : effectiveAccent)
+        ? (variant == PulsrChipVariant.action
+            ? p.textOnAccent
+            : effectiveAccent)
         : p.textSecondary;
 
     final iconColor = textColor;

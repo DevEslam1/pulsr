@@ -84,7 +84,8 @@ void main() {
   }
 
   Future<void> settleFrames(WidgetTester tester,
-      {int frames = 2, Duration step = const Duration(milliseconds: 400)}) async {
+      {int frames = 2,
+      Duration step = const Duration(milliseconds: 400)}) async {
     for (var i = 0; i < frames; i++) {
       await tester.pump(step);
     }

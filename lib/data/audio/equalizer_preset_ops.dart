@@ -86,8 +86,8 @@ extension EqualizerPresetOps on EqualizerManager {
       final futures = <Future<void>>[];
       for (int i = 0; i < targetFreqs.length; i++) {
         futures.add(
-          _effectsChannel.setNativeEqBand(i, targetFreqs[i], 0.0,
-              graphicEqQs(targetFreqs)[i]),
+          _effectsChannel.setNativeEqBand(
+              i, targetFreqs[i], 0.0, graphicEqQs(targetFreqs)[i]),
         );
       }
       await Future.wait(futures);

@@ -8,6 +8,7 @@ import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/dsp_debug_report.dart';
 import '../../domain/models/dsp_telemetry.dart';
+import '../../core/telemetry/dsp_reliability_tracker.dart';
 
 class AudioEffectsChannel {
   Future<bool> awaitControlUpdates() async {
@@ -71,9 +72,7 @@ class AudioEffectsChannel {
     }
     if (call.method == 'onSystemVolumeChanged') {
       final dynamic args = call.arguments;
-      if (args is num &&
-          args.isFinite &&
-          !_systemVolumeController.isClosed) {
+      if (args is num && args.isFinite && !_systemVolumeController.isClosed) {
         _systemVolumeController.add(args.toDouble().clamp(0.0, 1.0));
       }
       return;
@@ -90,16 +89,35 @@ class AudioEffectsChannel {
     // Built-in ceiling so a caller that forgets its own .timeout() can never
     // hang forever (setSincResamplerQuality did, and the audio handler awaits
     // it during cold-start init). Callers may still apply a tighter timeout.
-    final result = await _channel
-        .invokeMethod<dynamic>(method, arguments)
-        .timeout(const Duration(seconds: 5));
-    if (result == false) {
-      throw PlatformException(
-        code: 'DSP_NOT_APPLIED',
-        message: '$method was rejected by the native audio engine',
-      );
+    try {
+      final result = await _channel
+          .invokeMethod<dynamic>(method, arguments)
+          .timeout(const Duration(seconds: 5));
+      if (result == false) {
+        DspReliabilityTracker.instance.recordNativeSetterRejection(method);
+        throw PlatformException(
+          code: 'DSP_NOT_APPLIED',
+          message: '$method was rejected by the native audio engine',
+        );
+      }
+      return result;
+    } on PlatformException catch (e) {
+      if (e.code == 'DSP_NOT_APPLIED') {
+        DspReliabilityTracker.instance
+            .recordNativeSetterRejection(method, e.message);
+      } else {
+        DspReliabilityTracker.instance
+            .recordBridgeTimeoutFailure(method, e.message);
+      }
+      rethrow;
+    } on TimeoutException catch (e) {
+      DspReliabilityTracker.instance
+          .recordBridgeTimeoutFailure(method, 'Timeout: $e');
+      rethrow;
+    } catch (e) {
+      DspReliabilityTracker.instance.recordBridgeTimeoutFailure(method, e);
+      rethrow;
     }
-    return result;
   }
 
   /// Drops the singleton and closes its route stream (BUG-25).
@@ -398,6 +416,7 @@ class AudioEffectsChannel {
         category: 'AudioEffectsChannel',
       );
     } catch (e, st) {
+      DspReliabilityTracker.instance.recordSessionReattachFailure(e);
       ErrorLogger.log(
         'Failed to set audioSessionId ($sessionId)',
         error: e,
@@ -1879,6 +1898,7 @@ class AudioEffectsChannel {
         'channels': channels,
       }).timeout(const Duration(seconds: 2));
     } catch (e, st) {
+      DspReliabilityTracker.instance.recordRouteResyncFailure(e);
       ErrorLogger.log(
         'Failed to resync DSP for track ($sampleRate Hz)',
         error: e,
@@ -1945,12 +1965,13 @@ class AudioEffectsChannel {
       _autoDegradeStreamController.stream;
 
   void _handleAutoDegradeTransition(int currentStages) {
-    if (_lastKnownDegradedStages == 0 &&
-        currentStages != 0 &&
-        !_autoDegradeStreamController.isClosed) {
-      // After dispose() the controller is closed and add() would throw a
-      // StateError out of getTelemetry()/getAutoDegradedStages() polling.
-      _autoDegradeStreamController.add(currentStages);
+    if (_lastKnownDegradedStages == 0 && currentStages != 0) {
+      DspReliabilityTracker.instance.recordAutoDegradeActivation(currentStages);
+      if (!_autoDegradeStreamController.isClosed) {
+        _autoDegradeStreamController.add(currentStages);
+      }
+    } else if (_lastKnownDegradedStages != 0 && currentStages == 0) {
+      DspReliabilityTracker.instance.recordAutoDegradeRecovery();
     }
     _lastKnownDegradedStages = currentStages;
   }

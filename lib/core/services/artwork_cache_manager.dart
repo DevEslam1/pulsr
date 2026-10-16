@@ -55,8 +55,8 @@ class ArtworkCacheManager {
   Future<void> _performInit() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _maxCacheSizeMb =
-          prefs.getInt(PrefsKeys.settingMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
+      _maxCacheSizeMb = prefs.getInt(PrefsKeys.settingMaxCacheSizeMb) ??
+          defaultMaxCacheSizeMb;
       final tempDir = await getTemporaryDirectory();
       _cacheDir = Directory(p.join(tempDir.path, 'artwork_cache'));
       if (!await _cacheDir!.exists()) {
@@ -113,8 +113,11 @@ class ArtworkCacheManager {
             // Touch file to update lastModified for LRU eviction only if older than 1 hour
             try {
               final lastMod = await file.lastModified();
-              if (DateTime.now().difference(lastMod) > const Duration(hours: 1)) {
-                unawaited(file.setLastModified(DateTime.now()).catchError((_) => file));
+              if (DateTime.now().difference(lastMod) >
+                  const Duration(hours: 1)) {
+                unawaited(file
+                    .setLastModified(DateTime.now())
+                    .catchError((_) => file));
               }
             } catch (_) {}
             return bytes;

@@ -257,8 +257,10 @@ class DsdDecoderHelper {
     // Guard against excessive decoded PCM RAM usage on low-memory mobile devices
     final dsdSampleRate = (dsdRate > 0 ? dsdRate : 64) * 44100;
     final totalDsdBits = dsdL.length * 8;
-    final estimatedPcmFrames = (totalDsdBits * targetSampleRate) ~/ dsdSampleRate;
-    final estimatedPcmBytes = estimatedPcmFrames * 2 * 4; // stereo 32-bit float PCM
+    final estimatedPcmFrames =
+        (totalDsdBits * targetSampleRate) ~/ dsdSampleRate;
+    final estimatedPcmBytes =
+        estimatedPcmFrames * 2 * 4; // stereo 32-bit float PCM
     const maxPcmBytes = 400 * 1024 * 1024; // 400 MB safe threshold
     if (estimatedPcmBytes > maxPcmBytes) {
       throw DsdUnsupportedException(

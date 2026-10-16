@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'io.sentry.flutter'
+    compileSdk 37
+
+    defaultConfig {
+        minSdk 19
+    }
+
+    buildTypes {
+        release {
+            consumerProguardFiles 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    api 'io.sentry:sentry-android:7.22.4'
+    testImplementation "junit:junit:4.13.2"
+}

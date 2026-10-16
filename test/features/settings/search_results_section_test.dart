@@ -61,7 +61,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
-    expect(find.text(l10n.settingsNoSettingsFound('zzzznotathing')), findsNothing);
+    expect(
+        find.text(l10n.settingsNoSettingsFound('zzzznotathing')), findsNothing);
   });
 
   testWidgets('top-level destination entries jump to their category',
@@ -69,7 +70,8 @@ void main() {
     final h = await pumpSettingsCategory(
       tester,
       category: 'sound',
-      seedState: const SettingsState(experienceMode: ExperienceMode.professional),
+      seedState:
+          const SettingsState(experienceMode: ExperienceMode.professional),
     );
     addTearDown(h.cubit.close);
 
@@ -87,12 +89,12 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('leaf entries toggle their state and navigate',
-      (tester) async {
+  testWidgets('leaf entries toggle their state and navigate', (tester) async {
     final h = await pumpSettingsCategory(
       tester,
       category: 'look',
-      seedState: const SettingsState(experienceMode: ExperienceMode.professional),
+      seedState:
+          const SettingsState(experienceMode: ExperienceMode.professional),
     );
     addTearDown(h.cubit.close);
 
@@ -130,7 +132,8 @@ void main() {
     final h = await pumpSettingsCategory(
       tester,
       category: 'sound',
-      seedState: const SettingsState(experienceMode: ExperienceMode.professional),
+      seedState:
+          const SettingsState(experienceMode: ExperienceMode.professional),
     );
     addTearDown(h.cubit.close);
 
@@ -145,7 +148,8 @@ void main() {
     final h = await pumpSettingsCategory(
       tester,
       category: 'sound',
-      seedState: const SettingsState(experienceMode: ExperienceMode.professional),
+      seedState:
+          const SettingsState(experienceMode: ExperienceMode.professional),
     );
     addTearDown(h.cubit.close);
 

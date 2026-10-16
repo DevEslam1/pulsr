@@ -76,8 +76,7 @@ void main() {
       expect(s.geolocationEnabled, isFalse);
       expect(s.mediaPlaybackRequiresUserGesture, isFalse);
       expect(s.useShouldOverrideUrlLoading, isTrue);
-      expect(s.mixedContentMode,
-          MixedContentMode.MIXED_CONTENT_NEVER_ALLOW);
+      expect(s.mixedContentMode, MixedContentMode.MIXED_CONTENT_NEVER_ALLOW);
       expect(s.requestedWithHeaderOriginAllowList, isEmpty);
     });
 
@@ -99,7 +98,8 @@ void main() {
           YtmWebLoginSheet.evaluateNavigation(
               Uri.parse('https://accounts.google.com/v3/signin')),
           NavigationActionPolicy.ALLOW);
-      expect(YtmWebLoginSheet.evaluateNavigation(Uri.parse('https://youtu.be/x')),
+      expect(
+          YtmWebLoginSheet.evaluateNavigation(Uri.parse('https://youtu.be/x')),
           NavigationActionPolicy.ALLOW);
       expect(
           YtmWebLoginSheet.evaluateNavigation(
@@ -144,8 +144,7 @@ void main() {
     });
   });
 
-  testWidgets('shows the loading body before settings resolve',
-      (tester) async {
+  testWidgets('shows the loading body before settings resolve', (tester) async {
     await tester.pumpWidget(ytmHost(const YtmWebLoginSheet()));
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     expect(find.text('Sign in to YouTube Music'), findsOneWidget);
@@ -159,8 +158,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('browse mode renders its toolbar and nav chips',
-      (tester) async {
+  testWidgets('browse mode renders its toolbar and nav chips', (tester) async {
     await pumpSheet(tester, isBrowseMode: true);
     expect(find.byTooltip('Back'), findsOneWidget);
     expect(find.byTooltip('Forward'), findsOneWidget);

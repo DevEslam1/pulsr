@@ -79,8 +79,8 @@ void main() {
     });
 
     test('requiredPreflightBytes is twice the estimate plus 10MB', () {
-      final s = stream(bitrateKbps: 128,
-          duration: const Duration(seconds: 180));
+      final s =
+          stream(bitrateKbps: 128, duration: const Duration(seconds: 180));
       expect(YtDownloadService.requiredPreflightBytes(s),
           YtDownloadService.estimateBytes(s) * 2 + 10 * 1024 * 1024);
     });
@@ -90,8 +90,7 @@ void main() {
       expect(YtDownloadService.requiredLifetime(tiny),
           const Duration(minutes: 1) + const Duration(minutes: 2));
 
-      final huge =
-          stream(bitrateKbps: 320, duration: const Duration(hours: 6));
+      final huge = stream(bitrateKbps: 320, duration: const Duration(hours: 6));
       expect(YtDownloadService.requiredLifetime(huge),
           const Duration(minutes: 30) + const Duration(minutes: 2));
     });
@@ -129,8 +128,8 @@ void main() {
     test('sanitizeFilename fills empty parts and strips reserved chars', () {
       expect(YtDownloadService.sanitizeFilename('', '', 'mp3'),
           'Unknown Artist - Unknown Title.mp3');
-      final cleaned = YtDownloadService.sanitizeFilename(
-          'a/b:c', 'd?e*f', 'mp3');
+      final cleaned =
+          YtDownloadService.sanitizeFilename('a/b:c', 'd?e*f', 'mp3');
       expect(cleaned, 'a_b_c - d_e_f.mp3');
     });
 
@@ -169,25 +168,18 @@ void main() {
           YtDownloadService.sniffContainerBytes(
               [0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70]),
           (ext: 'm4a', mime: 'audio/mp4'));
-      expect(
-          YtDownloadService.sniffContainerBytes([0x1A, 0x45, 0xDF, 0xA3]),
+      expect(YtDownloadService.sniffContainerBytes([0x1A, 0x45, 0xDF, 0xA3]),
           (ext: 'webm', mime: 'audio/webm'));
       expect(
-          YtDownloadService.sniffContainerBytes(
-              [0x4F, 0x67, 0x67, 0x53, 0x00]),
+          YtDownloadService.sniffContainerBytes([0x4F, 0x67, 0x67, 0x53, 0x00]),
           (ext: 'ogg', mime: 'audio/ogg'));
-      expect(
-          YtDownloadService.sniffContainerBytes([0x66, 0x4C, 0x61, 0x43]),
+      expect(YtDownloadService.sniffContainerBytes([0x66, 0x4C, 0x61, 0x43]),
           (ext: 'flac', mime: 'audio/flac'));
-      expect(
-          YtDownloadService.sniffContainerBytes([0x49, 0x44, 0x33, 0x04]),
+      expect(YtDownloadService.sniffContainerBytes([0x49, 0x44, 0x33, 0x04]),
           (ext: 'mp3', mime: 'audio/mpeg'));
-      expect(
-          YtDownloadService.sniffContainerBytes([0xFF, 0xFB, 0x90, 0x00]),
+      expect(YtDownloadService.sniffContainerBytes([0xFF, 0xFB, 0x90, 0x00]),
           (ext: 'mp3', mime: 'audio/mpeg'));
-      expect(
-          YtDownloadService.sniffContainerBytes([0x00, 0x01, 0x02]),
-          isNull);
+      expect(YtDownloadService.sniffContainerBytes([0x00, 0x01, 0x02]), isNull);
     });
   });
 
@@ -305,8 +297,8 @@ void main() {
             preferM4a: any(named: 'preferM4a'),
           )).thenAnswer((_) async => stream());
 
-      final resolved = await service.resolveDownloadStream('vidTest0001',
-          'high', true);
+      final resolved =
+          await service.resolveDownloadStream('vidTest0001', 'high', true);
       expect(resolved.videoId, 'vidTest0001');
       expect(service.getResolvedStream('vidTest0001'), isNotNull);
     });

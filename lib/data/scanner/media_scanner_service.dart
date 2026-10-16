@@ -672,9 +672,11 @@ class MediaScannerService {
               updates.add((
                 songId: song.id,
                 path: song.path,
-                sampleRate: sampleRate != null && sampleRate > 0 ? sampleRate : null,
+                sampleRate:
+                    sampleRate != null && sampleRate > 0 ? sampleRate : null,
                 bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
-                bitrateKbps: bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
+                bitrateKbps:
+                    bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
                 codec: (codec != null && codec.isNotEmpty) ? codec : null,
                 loudnessRange: lraVal,
               ));

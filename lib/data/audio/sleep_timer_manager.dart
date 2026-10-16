@@ -350,7 +350,10 @@ class SleepTimerManager {
     if (player == null || !player.playing) return;
     _preFadeVolume ??= _resolveFadeBaseline(player);
 
-    if (!_nativeCurveArmed && !_nativeCurveArming && remainingSeconds <= 15 && remainingSeconds > 0) {
+    if (!_nativeCurveArmed &&
+        !_nativeCurveArming &&
+        remainingSeconds <= 15 &&
+        remainingSeconds > 0) {
       final totalMs = remainingSeconds * 1000;
       final points = (totalMs / 20).ceil().clamp(2, 201);
       final segmentMs = (totalMs / (points - 1)).ceil().clamp(1, 1000);

@@ -53,9 +53,8 @@ class MusicRepository implements IMusicRepository {
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final trimmed = searchQuery.trim();
         final useTrigram = shouldUseTrigram(trimmed);
-        final ftsQuery = useTrigram
-            ? toTrigramFtsQuery(trimmed)
-            : _toFtsQuery(trimmed);
+        final ftsQuery =
+            useTrigram ? toTrigramFtsQuery(trimmed) : _toFtsQuery(trimmed);
 
         if (ftsQuery != null && !AppDatabase.ftsRebuildFailed) {
           return _watchSongsFts(
@@ -219,7 +218,9 @@ class MusicRepository implements IMusicRepository {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return false;
     // Check for CJK Ideographs / Hiragana / Katakana / Hangul
-    final hasCjk = RegExp(r'[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]').hasMatch(trimmed);
+    final hasCjk =
+        RegExp(r'[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]')
+            .hasMatch(trimmed);
     if (hasCjk) return true;
     // Or short query (<= 3 chars) or substring search with spaces/fragments
     return trimmed.length <= 3;
@@ -1783,7 +1784,9 @@ class MusicRepository implements IMusicRepository {
           }
         }
 
-        if (rawCueContent == null || rawCueContent.isEmpty || effectiveCuePath == null) {
+        if (rawCueContent == null ||
+            rawCueContent.isEmpty ||
+            effectiveCuePath == null) {
           _cueContentHashCache.remove(container.path);
           continue;
         }
@@ -2586,7 +2589,17 @@ class MusicRepository implements IMusicRepository {
 
   @override
   Future<Result<void>> updateAudioQualityBatch(
-      List<({int songId, String path, int? sampleRate, int? bitDepth, int? bitrateKbps, String? codec, double? loudnessRange})> updates) async {
+      List<
+              ({
+                int songId,
+                String path,
+                int? sampleRate,
+                int? bitDepth,
+                int? bitrateKbps,
+                String? codec,
+                double? loudnessRange
+              })>
+          updates) async {
     if (updates.isEmpty) return const Right(null);
     try {
       await _db.batch((batch) {

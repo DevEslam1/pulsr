@@ -16,7 +16,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('renders, toggles, compiles and selects a preset', (tester) async {
+  testWidgets('renders, toggles, compiles and selects a preset',
+      (tester) async {
     tester.view.physicalSize = const Size(900, 2600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -27,8 +28,7 @@ void main() {
     final cubit = stubPlayerCubit();
     when(() => cubit.setLiveProgEnabled(any(), code: any(named: 'code')))
         .thenAnswer((_) async {});
-    when(() => cubit.setLiveProgSlider(any(), any()))
-        .thenAnswer((_) async {});
+    when(() => cubit.setLiveProgSlider(any(), any())).thenAnswer((_) async {});
 
     await tester.pumpWidget(sheetHost(
       playerCubit: cubit,
@@ -69,8 +69,7 @@ void main() {
     final cubit = stubPlayerCubit();
     when(() => cubit.setLiveProgEnabled(any(), code: any(named: 'code')))
         .thenAnswer((_) async {});
-    when(() => cubit.setLiveProgSlider(any(), any()))
-        .thenAnswer((_) async {});
+    when(() => cubit.setLiveProgSlider(any(), any())).thenAnswer((_) async {});
 
     await tester.pumpWidget(sheetHost(
       playerCubit: cubit,

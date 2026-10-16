@@ -80,7 +80,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   int _waveformGeneration = 0;
   Timer? _waveformDebounce;
 
-  void _checkHapticBoundaries(double oldVal, double newVal, BuildContext context) {
+  void _checkHapticBoundaries(
+      double oldVal, double newVal, BuildContext context) {
     final markers = <double>[];
     if (widget.loopPointA != null) {
       markers.add(widget.loopPointA!.inMilliseconds.toDouble());
@@ -396,9 +397,10 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   final ratio = maxDuration > 0
                       ? (effectiveValue / maxDuration).clamp(0.0, 1.0)
                       : 0.0;
-                  final deltaMs = (_dragStartValue != null && _dragValue != null)
-                      ? (_dragValue! - _dragStartValue!).round()
-                      : 0;
+                  final deltaMs =
+                      (_dragStartValue != null && _dragValue != null)
+                          ? (_dragValue! - _dragStartValue!).round()
+                          : 0;
                   final deltaStr = deltaMs == 0
                       ? '±0:00'
                       : '${deltaMs > 0 ? '+' : '-'}${Formatters.formatDuration(Duration(milliseconds: deltaMs.abs()))}';
@@ -431,27 +433,28 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                               height: isDragging ? 38.0 : 32.0,
                               semanticLabel: semanticLabel,
                               activeColor: widget.activeColor,
-                              inactiveColor:
-                                  Theme.of(context).brightness == Brightness.dark
-                                      ? AppColors.specularStrong
-                                      : context.palette.hairline
-                                          .withValues(alpha: 0.8),
+                              inactiveColor: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? AppColors.specularStrong
+                                  : context.palette.hairline
+                                      .withValues(alpha: 0.8),
                               isWavy: true,
                               animateWave: isPlaying && enabled,
                               onChangeStart: enabled
                                   ? (val) {
                                       _tapSeekPending = true;
-                                      _tapSeekRatio =
-                                          val.clamp(0.0, maxDuration.toDouble());
+                                      _tapSeekRatio = val.clamp(
+                                          0.0, maxDuration.toDouble());
                                       _dragStartValue = _tapSeekRatio;
                                       _lastHapticCheckMs = _tapSeekRatio;
-                                      setState(() => _dragValue = _tapSeekRatio);
+                                      setState(
+                                          () => _dragValue = _tapSeekRatio);
                                     }
                                   : null,
                               onChanged: enabled
                                   ? (val) {
-                                      final clampedVal =
-                                          val.clamp(0.0, maxDuration.toDouble());
+                                      final clampedVal = val.clamp(
+                                          0.0, maxDuration.toDouble());
                                       if (_tapSeekRatio != null &&
                                           (clampedVal - _tapSeekRatio!).abs() >
                                               200) {
@@ -469,11 +472,12 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                                   : (_) {},
                               onChangeEnd: enabled
                                   ? (val) {
-                                      final target =
-                                          (_tapSeekPending && _tapSeekRatio != null)
-                                              ? _tapSeekRatio!
-                                                  .clamp(0.0, maxDuration.toDouble())
-                                              : val.clamp(0.0, maxDuration.toDouble());
+                                      final target = (_tapSeekPending &&
+                                              _tapSeekRatio != null)
+                                          ? _tapSeekRatio!.clamp(
+                                              0.0, maxDuration.toDouble())
+                                          : val.clamp(
+                                              0.0, maxDuration.toDouble());
                                       widget.onSeek(Duration(
                                           milliseconds: target.round()));
                                       setState(() {

@@ -239,5 +239,35 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
     });
+
+    testWidgets('shows Resync DSP button and reliability counters',
+        (tester) async {
+      mockChannel(
+        status: debugStatus(),
+        telemetry: List<dynamic>.generate(17, (_) => 0.0),
+      );
+      final player = stubPlayerCubit(state: attachedState());
+      final settings = stubSettingsCubit();
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: player,
+        settingsCubit: settings,
+        child: const DspInspectorSheet(),
+      ));
+      await settle(tester);
+
+      // Verify Resync DSP button is present and clickable
+      final resyncFinder = find.byType(ElevatedButton);
+      expect(resyncFinder, findsOneWidget);
+      await tester.tap(resyncFinder);
+      await settle(tester);
+
+      // Verify reliability section header is rendered
+      expect(find.byIcon(Icons.monitor_heart_rounded), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    });
   });
 }

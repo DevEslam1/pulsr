@@ -205,9 +205,8 @@ class LyricsShareCardRenderer {
       painters.add(tp);
 
       TextPainter? subTp;
-      final sub = (showTranslation
-          ? (line.translation ?? line.romanization)
-          : null);
+      final sub =
+          (showTranslation ? (line.translation ?? line.romanization) : null);
       if (sub != null && sub.isNotEmpty && sub != line.text) {
         subTp = TextPainter(
           text: TextSpan(

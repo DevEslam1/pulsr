@@ -118,7 +118,8 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
                         playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? LyricsView(
-                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            key: ValueKey(
+                                'lyrics_${song?.id}_${song?.remoteId}'),
                             lyrics: state.lyrics,
                             isLoading: state.isLoadingLyrics,
                             activeColor: activeColor,
@@ -149,7 +150,8 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
             if (isInSplitView) {
               return SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                   child: Column(
                     children: [
                       Expanded(child: cassetteStage),
@@ -160,107 +162,107 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
               );
             }
 
-        if (isLandscape) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+            if (isLandscape) {
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(
+                                top: metrics.switcherTopPad,
+                                bottom: metrics.switcherBottomPad,
+                              ),
+                              child: viewSwitcher,
+                            ),
+                            Expanded(
+                              child: centerDisplay,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        flex: 6,
+                        child: SingleChildScrollView(
+                          child: controlsColumn,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return SafeArea(
+              child: Column(
                 children: [
+                  const PlayerPlayHandle(),
+                  PlayerTopBar(props: widget.props, isTablet: isTablet),
+
+                  // Top View Switcher (lyrics bar: Track | Lyrics | Queue)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: metrics.switcherTopPad,
+                      bottom: metrics.switcherBottomPad,
+                    ),
+                    child: viewSwitcher,
+                  ),
+
+                  // Center: Cassette / Lyrics / Queue
                   Expanded(
-                    flex: 5,
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(
-                            top: metrics.switcherTopPad,
-                            bottom: metrics.switcherBottomPad,
+                    child: LayoutBuilder(
+                      builder: (context, artConstraints) {
+                        final double availableWidth =
+                            artConstraints.maxWidth - (isTablet ? 64.0 : 28.0);
+                        final double availableHeight =
+                            artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
+                        final double maxW = isTablet ? 560.0 : 440.0;
+                        final double maxH = isTablet ? 360.0 : 300.0;
+                        final double rawW = math.min(availableWidth, maxW);
+                        final double rawH = math.min(availableHeight, maxH);
+                        final double cassetteW = rawW <= 0 ? 0.0 : rawW;
+                        final double cassetteH = rawH <= 0 ? 0.0 : rawH;
+
+                        return Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: (state.isLyricsVisible ||
+                                      state.isQueueVisible)
+                                  ? (isTablet ? 560.0 : double.infinity)
+                                  : cassetteW,
+                              maxHeight: (state.isLyricsVisible ||
+                                      state.isQueueVisible)
+                                  ? double.infinity
+                                  : cassetteH,
+                            ),
+                            child: centerDisplay,
                           ),
-                          child: viewSwitcher,
-                        ),
-                        Expanded(
-                          child: centerDisplay,
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    flex: 6,
-                    child: SingleChildScrollView(
-                      child: controlsColumn,
-                    ),
+
+                  SizedBox(
+                      height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
+
+                  // Bottom Controls Section
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                    child: controlsColumn,
                   ),
                 ],
               ),
-            ),
-          );
-        }
-
-        return SafeArea(
-          child: Column(
-            children: [
-              const PlayerPlayHandle(),
-              PlayerTopBar(props: widget.props, isTablet: isTablet),
-
-              // Top View Switcher (lyrics bar: Track | Lyrics | Queue)
-              Padding(
-                padding: EdgeInsets.only(
-                  top: metrics.switcherTopPad,
-                  bottom: metrics.switcherBottomPad,
-                ),
-                child: viewSwitcher,
-              ),
-
-              // Center: Cassette / Lyrics / Queue
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, artConstraints) {
-                    final double availableWidth =
-                        artConstraints.maxWidth - (isTablet ? 64.0 : 28.0);
-                    final double availableHeight =
-                        artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
-                    final double maxW = isTablet ? 560.0 : 440.0;
-                    final double maxH = isTablet ? 360.0 : 300.0;
-                    final double rawW = math.min(availableWidth, maxW);
-                    final double rawH = math.min(availableHeight, maxH);
-                    final double cassetteW = rawW <= 0 ? 0.0 : rawW;
-                    final double cassetteH = rawH <= 0 ? 0.0 : rawH;
-
-                    return Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth:
-                              (state.isLyricsVisible || state.isQueueVisible)
-                                  ? (isTablet ? 560.0 : double.infinity)
-                                  : cassetteW,
-                          maxHeight:
-                              (state.isLyricsVisible || state.isQueueVisible)
-                                  ? double.infinity
-                                  : cassetteH,
-                        ),
-                        child: centerDisplay,
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              SizedBox(
-                  height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
-
-              // Bottom Controls Section
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                child: controlsColumn,
-              ),
-            ],
-          ),
-          );
-        },
-      ),
-    ],
-  );
-}
+            );
+          },
+        ),
+      ],
+    );
+  }
 }

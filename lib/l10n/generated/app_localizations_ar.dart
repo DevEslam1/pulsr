@@ -8220,4 +8220,74 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get bootStartupFailedMessage =>
       'لم تصبح مكوّنات التشغيل جاهزة في الوقت المحدد. إعادة المحاولة تحلّ عادةً مشكلة بدء التشغيل البطيء.';
+
+  @override
+  String get dspResyncAction => 'إعادة مزامنة DSP';
+
+  @override
+  String get dspResyncing => 'جارٍ إعادة مزامنة DSP...';
+
+  @override
+  String get dspResyncSuccess => 'تمت إعادة مزامنة محرك وتأثيرات DSP بنجاح';
+
+  @override
+  String dspResyncFailure(String error) {
+    return 'فشلت إعادة مزامنة DSP: $error';
+  }
+
+  @override
+  String get dspReliabilityTitle => 'تشخيصات الموثوقية';
+
+  @override
+  String get dspNativeSetterRejections => 'رفض الإعدادات الأصلية';
+
+  @override
+  String get dspBridgeTimeouts => 'مهلات الجسر';
+
+  @override
+  String get dspRouteResyncFailures => 'فشل مزامنة المسار';
+
+  @override
+  String get dspSessionReattachFailures => 'فشل إعادة ربط الجلسة';
+
+  @override
+  String get dspAutoDegradeEvents => 'التخفيض التلقائي (تفعيل/استعادة)';
+
+  @override
+  String get dspResetCounters => 'تصفير العدادات';
+
+  @override
+  String get dspLatestError => 'آخر خطأ منقح في الجسر';
+
+  @override
+  String get quranNoMetadataTitle => 'لا تتوفر بيانات وصفية للقرآن';
+
+  @override
+  String get quranNoMetadataDesc =>
+      'هذا المسار لا يحتوي على بيانات قرآنية معتمدة (سورة/آية). تتبع الآيات والعلامات معزول تماماً عن الموسيقى العادية.';
+
+  @override
+  String quranBookmarkSaved(String surah, int ayah) {
+    return 'تم حفظ علامة القرآن: $surah آية $ayah';
+  }
+
+  @override
+  String quranResumePrompt(String surah, int ayah, String time) {
+    return 'متابعة $surah • آية $ayah ($time)';
+  }
+
+  @override
+  String get quranSaveBookmark => 'حفظ علامة القرآن';
+
+  @override
+  String get quranClearBookmark => 'مسح علامة القرآن';
+
+  @override
+  String get quranRepeatAyah => 'تكرار الآية';
+
+  @override
+  String get quranRepeatRange => 'تكرار النطاق';
+
+  @override
+  String get quranRepeatOff => 'التكرار: متوقف';
 }

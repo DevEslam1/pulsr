@@ -56,8 +56,7 @@ void main() {
       (tester) async {
     await pumpSheet(tester);
     expect(find.text('Sign in to YouTube Music'), findsOneWidget);
-    expect(
-        find.text('Connect account to sync Liked Music automatically'),
+    expect(find.text('Connect account to sync Liked Music automatically'),
         findsOneWidget);
     expect(find.text('Done'), findsOneWidget);
     expect(find.byIcon(Icons.refresh_rounded), findsOneWidget);
@@ -72,10 +71,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Logged In Successfully'), findsOneWidget);
-    expect(find.text('Account connected! Tap "Done" to finish.'),
-        findsOneWidget);
     expect(
-        find.text('Login detected! Tap the green "Done" button to complete setup.'),
+        find.text('Account connected! Tap "Done" to finish.'), findsOneWidget);
+    expect(
+        find.text(
+            'Login detected! Tap the green "Done" button to complete setup.'),
         findsOneWidget);
     expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -145,14 +145,12 @@ void main() {
 
     verify(() => account.clearSessionWebViewCookies()).called(1);
     verify(() => account.logout()).called(1);
-    expect(
-        find.text('Cookies and cache cleared. Reloading YouTube Music...'),
+    expect(find.text('Cookies and cache cleared. Reloading YouTube Music...'),
         findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('Done with no detected cookies prompts the user',
-      (tester) async {
+  testWidgets('Done with no detected cookies prompts the user', (tester) async {
     await pumpSheet(tester);
     await tester.tap(find.text('Done'));
     await tester.pump();

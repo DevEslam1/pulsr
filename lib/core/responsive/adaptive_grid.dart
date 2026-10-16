@@ -50,8 +50,7 @@ class PulsrAdaptiveGrid {
           case PulsrBreakpoint.large:
             final itemWidth =
                 math.max(1.0, (customMinItemWidth ?? minCardWidth).toDouble());
-            final calculated =
-                (math.max(0.0, width) / itemWidth).floor();
+            final calculated = (math.max(0.0, width) / itemWidth).floor();
             return calculated.clamp(6, 8);
         }
 
@@ -81,7 +80,9 @@ class PulsrAdaptiveGrid {
         0.0, math.min(vp.width, vp.contentMaxWidth) - (vp.pagePadding * 2));
     final divisor = math.max(1.0, minItemWidth + spacing);
     int cols = (availableWidth / divisor).floor();
-    if (maxColumns != null) cols = cols.clamp(1, math.max(1, maxColumns.toInt()));
+    if (maxColumns != null) {
+      cols = cols.clamp(1, math.max(1, maxColumns.toInt()));
+    }
     return cols.clamp(1, 12);
   }
 

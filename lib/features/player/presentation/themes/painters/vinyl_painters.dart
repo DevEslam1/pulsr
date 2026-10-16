@@ -310,7 +310,8 @@ class _TonearmPainter extends CustomPainter {
     shadowPath.lineTo(-6, l);
 
     final p = liftProgress.clamp(0.0, 1.0);
-    final offset = Offset.lerp(const Offset(11, 13), const Offset(3.5, 4.0), p)!;
+    final offset =
+        Offset.lerp(const Offset(11, 13), const Offset(3.5, 4.0), p)!;
     final blurSigma = 7.0 + (2.5 - 7.0) * p;
 
     final shadowPaint = Paint()

@@ -163,8 +163,7 @@ class StreamResolutionPipeline {
               : effectiveQuality == 'medium'
                   ? 128
                   : 160;
-          final defaultCodec =
-              effectiveQuality == 'medium' ? 'AAC' : 'OPUS';
+          final defaultCodec = effectiveQuality == 'medium' ? 'AAC' : 'OPUS';
           onStreamResolved?.call(
             song,
             cached.bitrateKbps ?? defaultKbps,

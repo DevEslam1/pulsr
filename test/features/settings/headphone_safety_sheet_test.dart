@@ -121,8 +121,7 @@ void main() {
     await disposeSheet(tester);
   });
 
-  testWidgets('telemetry polling refreshes the displayed dose',
-      (tester) async {
+  testWidgets('telemetry polling refreshes the displayed dose', (tester) async {
     await pumpSheet(tester);
     expect(find.text('30.0%'), findsOneWidget);
 
@@ -168,7 +167,8 @@ void main() {
     await disposeSheet(tester);
   });
 
-  testWidgets('confirming the reset dialog resets the dose and shows a snackbar',
+  testWidgets(
+      'confirming the reset dialog resets the dose and shows a snackbar',
       (tester) async {
     await pumpSheet(tester);
 

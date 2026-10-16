@@ -112,7 +112,9 @@ class _PulsrCardState extends State<PulsrCard> {
     // Use variant-directed elevation if not manually set
     if (widget.elevation == PulsrCardElevation.none) {
       if (widget.variant == PulsrCardVariant.elevated) {
-        return _isHovered ? PulsrElevation.level2(context) : PulsrElevation.level1(context);
+        return _isHovered
+            ? PulsrElevation.level2(context)
+            : PulsrElevation.level1(context);
       }
       return _isHovered ? PulsrElevation.level1(context) : null;
     }
@@ -121,11 +123,17 @@ class _PulsrCardState extends State<PulsrCard> {
       case PulsrCardElevation.none:
         return _isHovered ? PulsrElevation.level1(context) : null;
       case PulsrCardElevation.low:
-        return _isHovered ? PulsrElevation.level2(context) : PulsrElevation.level1(context);
+        return _isHovered
+            ? PulsrElevation.level2(context)
+            : PulsrElevation.level1(context);
       case PulsrCardElevation.medium:
-        return _isHovered ? PulsrElevation.level3(context) : PulsrElevation.level2(context);
+        return _isHovered
+            ? PulsrElevation.level3(context)
+            : PulsrElevation.level2(context);
       case PulsrCardElevation.high:
-        return _isHovered ? PulsrElevation.level4(context) : PulsrElevation.level3(context);
+        return _isHovered
+            ? PulsrElevation.level4(context)
+            : PulsrElevation.level3(context);
     }
   }
 

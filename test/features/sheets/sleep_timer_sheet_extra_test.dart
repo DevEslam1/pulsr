@@ -87,9 +87,10 @@ void main() {
     when(() => cubit.sleepTimerMode).thenReturn(SleepTimerMode.endOfQueue);
     await openSheet(tester);
 
-    expect(find.text('Music will stop at the end of the queue'), findsOneWidget);
-    final chip =
-        tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'End of queue'));
+    expect(
+        find.text('Music will stop at the end of the queue'), findsOneWidget);
+    final chip = tester
+        .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'End of queue'));
     expect(chip.selected, isTrue);
   });
 
@@ -98,7 +99,8 @@ void main() {
     when(() => cubit.sleepTimerRemainingTracks).thenReturn(1);
     await openSheet(tester);
 
-    expect(find.text('Music will stop at the end of this track'), findsOneWidget);
+    expect(
+        find.text('Music will stop at the end of this track'), findsOneWidget);
   });
 
   testWidgets('multiple remaining tracks reports the count', (tester) async {

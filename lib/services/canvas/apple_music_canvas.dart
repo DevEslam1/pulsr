@@ -141,8 +141,7 @@ class AppleMusicCanvas {
 
       final List<MapEntry<int, Map<String, dynamic>>> ranked = [];
       for (final rec in records) {
-        final scoreVal =
-            _score(rec, album, artist, album, albumIsSelf: true);
+        final scoreVal = _score(rec, album, artist, album, albumIsSelf: true);
         if (scoreVal != null) {
           ranked.add(MapEntry(scoreVal, rec));
         }
@@ -192,9 +191,8 @@ class AppleMusicCanvas {
     final attributes = song['attributes'] as Map<String, dynamic>? ?? {};
     final hitName = attributes['name']?.toString() ?? '';
     final hitArtist = attributes['artistName']?.toString() ?? '';
-    final hitAlbum = albumIsSelf
-        ? hitName
-        : (attributes['albumName']?.toString() ?? '');
+    final hitAlbum =
+        albumIsSelf ? hitName : (attributes['albumName']?.toString() ?? '');
 
     if (_isCompilation(hitName) || _isCompilation(hitAlbum)) return null;
 
@@ -334,14 +332,16 @@ class AppleMusicCanvas {
       return (str != null && str.trim().isNotEmpty) ? str : null;
     }
 
-    final square = extract('motionDetailSquare') ?? extract('motionSquareVideo1x1');
+    final square =
+        extract('motionDetailSquare') ?? extract('motionSquareVideo1x1');
     final raw = extract('motionDetailRaw');
     final tall = extract('motionDetailTall') ?? extract('motionTallVideo3x4');
     final primary = square ?? raw ?? tall;
     if (primary == null) return null;
 
     final candidates = [square, raw, tall].whereType<String>().toList();
-    final alternate = candidates.firstWhere((c) => c != primary, orElse: () => '');
+    final alternate =
+        candidates.firstWhere((c) => c != primary, orElse: () => '');
     return (primary, alternate.isNotEmpty ? alternate : null);
   }
 
@@ -432,8 +432,10 @@ class AppleMusicCanvas {
     try {
       final parts = jwt.split('.');
       if (parts.length < 2) return false;
-      final header = utf8.decode(base64Url.decode(base64Url.normalize(parts[0])));
-      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final header =
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[0])));
+      final payload =
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
       return header.contains('WebPlayKid') || payload.contains('AMPWebPlay');
     } catch (_) {
       return false;
@@ -444,7 +446,8 @@ class AppleMusicCanvas {
     try {
       final parts = jwt.split('.');
       if (parts.length < 2) return null;
-      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final payload =
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
       final match = RegExp(r'"exp"\s*:\s*(\d+)').firstMatch(payload);
       if (match != null) {
         final sec = int.tryParse(match.group(1)!);

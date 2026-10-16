@@ -67,7 +67,8 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
       if (user != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Connected as ${user.globalName} (@${user.username})'),
+            content:
+                Text('Connected as ${user.globalName} (@${user.username})'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -372,7 +373,8 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                           onPressed: _disconnect,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: p.error,
-                            side: BorderSide(color: p.error.withValues(alpha: 0.5)),
+                            side: BorderSide(
+                                color: p.error.withValues(alpha: 0.5)),
                           ),
                           child: const Text('Disconnect'),
                         ),
@@ -395,7 +397,8 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                                   color: Colors.white,
                                 ),
                               )
-                            : Text(hasToken ? 'Update Token' : 'Connect Account'),
+                            : Text(
+                                hasToken ? 'Update Token' : 'Connect Account'),
                       ),
                     ),
                   ],

@@ -454,9 +454,8 @@ void main() {
       }
       return _stream(
         videoId: 'vidExpire001',
-        expiresAt: DateTime.now()
-            .add(const Duration(hours: 3))
-            .millisecondsSinceEpoch,
+        expiresAt:
+            DateTime.now().add(const Duration(hours: 3)).millisecondsSinceEpoch,
       );
     });
     server = (request) async => sequential(_m4aBody(2 * 1024 * 1024));

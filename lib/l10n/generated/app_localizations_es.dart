@@ -8341,4 +8341,74 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get bootStartupFailedMessage =>
       'Los componentes de reproducción no estuvieron listos a tiempo. Reintentar suele solucionar un inicio en frío lento.';
+
+  @override
+  String get dspResyncAction => 'Resincronizar DSP';
+
+  @override
+  String get dspResyncing => 'Resincronizando DSP...';
+
+  @override
+  String get dspResyncSuccess => 'DSP y efectos resincronizados con éxito';
+
+  @override
+  String dspResyncFailure(String error) {
+    return 'Error al resincronizar DSP: $error';
+  }
+
+  @override
+  String get dspReliabilityTitle => 'TELEMETRÍA DE FIABILIDAD';
+
+  @override
+  String get dspNativeSetterRejections => 'Rechazos de configuración nativa';
+
+  @override
+  String get dspBridgeTimeouts => 'Tiempos de espera del puente';
+
+  @override
+  String get dspRouteResyncFailures => 'Fallos de resincronización de ruta';
+
+  @override
+  String get dspSessionReattachFailures => 'Fallos de reconexión de sesión';
+
+  @override
+  String get dspAutoDegradeEvents => 'Auto-degradaciones (Act/Rec)';
+
+  @override
+  String get dspResetCounters => 'Restablecer contadores';
+
+  @override
+  String get dspLatestError => 'Último error redactado del puente';
+
+  @override
+  String get quranNoMetadataTitle => 'Sin metadatos del Corán';
+
+  @override
+  String get quranNoMetadataDesc =>
+      'Esta pista no tiene metadatos verificados del Corán (Sura/Aya). El seguimiento de versos está aislado de la música ordinaria.';
+
+  @override
+  String quranBookmarkSaved(String surah, int ayah) {
+    return 'Marcador del Corán guardado: $surah Aya $ayah';
+  }
+
+  @override
+  String quranResumePrompt(String surah, int ayah, String time) {
+    return 'Reanudar $surah • Aya $ayah ($time)';
+  }
+
+  @override
+  String get quranSaveBookmark => 'Guardar marcador del Corán';
+
+  @override
+  String get quranClearBookmark => 'Borrar marcador del Corán';
+
+  @override
+  String get quranRepeatAyah => 'Repetir Aya';
+
+  @override
+  String get quranRepeatRange => 'Repetir rango';
+
+  @override
+  String get quranRepeatOff => 'Repetir: Apagado';
 }

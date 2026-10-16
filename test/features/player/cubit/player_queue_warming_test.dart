@@ -74,8 +74,8 @@ void main() {
 
     test('skips local, downloaded and remote-id-less tracks', () async {
       final local = buildSong(1);
-      final downloaded =
-          buildSong(2, source: SongSource.youtube, remoteId: 'v2', isDownloaded: true);
+      final downloaded = buildSong(2,
+          source: SongSource.youtube, remoteId: 'v2', isDownloaded: true);
       final noRemote = buildSong(3, source: SongSource.youtube);
       buildController().warmStreams([local, downloaded, noRemote]);
       await Future<void>.delayed(const Duration(milliseconds: 50));

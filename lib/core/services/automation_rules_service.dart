@@ -81,29 +81,29 @@ class AutomationRulesService {
   }
 
   Future<void> saveRule(AutomationRule rule) => _mutex.protect(() async {
-    final rules = await getRules();
-    final updated = List<AutomationRule>.from(rules);
-    final idx = updated.indexWhere((r) => r.id == rule.id);
-    if (idx >= 0) {
-      updated[idx] = rule;
-    } else {
-      updated.add(rule);
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
-  });
+        final rules = await getRules();
+        final updated = List<AutomationRule>.from(rules);
+        final idx = updated.indexWhere((r) => r.id == rule.id);
+        if (idx >= 0) {
+          updated[idx] = rule;
+        } else {
+          updated.add(rule);
+        }
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
+      });
 
   Future<void> deleteRule(String id) => _mutex.protect(() async {
-    final rules = await getRules();
-    final updated = rules.where((r) => r.id != id).toList();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
-  });
+        final rules = await getRules();
+        final updated = rules.where((r) => r.id != id).toList();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
+      });
 
   Future<void> clearRules() => _mutex.protect(() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyRules);
-  });
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_keyRules);
+      });
 }

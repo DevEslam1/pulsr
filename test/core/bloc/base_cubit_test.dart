@@ -77,7 +77,8 @@ void main() {
       await controller.close();
     });
 
-    test('auto-removes completed subscriptions when stream completes naturally', () async {
+    test('auto-removes completed subscriptions when stream completes naturally',
+        () async {
       final cubit = _TestCubit();
       final controller = StreamController<int>();
       var doneCalled = false;
@@ -94,7 +95,8 @@ void main() {
       await cubit.close();
     });
 
-    test('finite streams auto-remove upon synchronous/asynchronous completion', () async {
+    test('finite streams auto-remove upon synchronous/asynchronous completion',
+        () async {
       final cubit = _TestCubit();
       final received = <int>[];
       cubit.autoSub<int>(Stream.fromIterable([1, 2, 3]), received.add);
@@ -168,7 +170,8 @@ void main() {
       final cubit = _TestCubit();
       final controller = StreamController<int>();
       addTearDown(controller.close);
-      cubit.emitOnEach<int>(controller.stream, (current, data) => current + data);
+      cubit.emitOnEach<int>(
+          controller.stream, (current, data) => current + data);
       controller.add(2);
       controller.add(3);
       await _flush();
@@ -206,7 +209,8 @@ void main() {
 
     test('prunes already-fired timers on the next registration', () async {
       final cubit = _TestCubit();
-      final fired = cubit.autoTimer(Timer(const Duration(milliseconds: 1), () {}));
+      final fired =
+          cubit.autoTimer(Timer(const Duration(milliseconds: 1), () {}));
       await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(fired.isActive, isFalse);
       cubit.autoTimer(Timer(const Duration(hours: 1), () {}));
@@ -236,7 +240,9 @@ void main() {
       expect(cubit.activeResourceCount, 0);
     });
 
-    test('closing cubit whose teardown throws does not throw StateError or addError', () async {
+    test(
+        'closing cubit whose teardown throws does not throw StateError or addError',
+        () async {
       final cubit = _TestCubit();
       // Even if errors occur in teardown, closing completes without throwing StateError
       await expectLater(cubit.close(), completes);

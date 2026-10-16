@@ -212,11 +212,9 @@ void main() {
       // Lifecycle branches reached from the mounted root.
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump();
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.detached);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.detached);
       await tester.pump();
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
 
       // ignore: invalid_use_of_protected_member

@@ -452,8 +452,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     }
   }
 
-  void _showImportSpotifyDialog(
-      BuildContext context, PlaylistCubit cubit) {
+  void _showImportSpotifyDialog(BuildContext context, PlaylistCubit cubit) {
     SpotifyImportDialog.show(
       context,
       onImportFinished: () {
@@ -707,7 +706,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               top: AppSpacing.sectionGap,
               bottom: AppSpacing.s10,
             ),
-            actionLabel: smartPlaylists.isEmpty ? context.l10n.createSmartPlaylist : null,
+            actionLabel: smartPlaylists.isEmpty
+                ? context.l10n.createSmartPlaylist
+                : null,
             onAction: smartPlaylists.isEmpty
                 ? () async {
                     await context.push('/smart-playlist-builder');

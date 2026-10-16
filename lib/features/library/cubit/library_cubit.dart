@@ -292,8 +292,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (albums) => safeEmit(state.copyWith(
-            albums: List.unmodifiable(albums),
-            errorMessage: null)),
+            albums: List.unmodifiable(albums), errorMessage: null)),
       );
     });
   }
@@ -305,8 +304,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (artists) => safeEmit(state.copyWith(
-            artists: List.unmodifiable(artists),
-            errorMessage: null)),
+            artists: List.unmodifiable(artists), errorMessage: null)),
       );
     });
   }
@@ -318,8 +316,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (genres) => safeEmit(state.copyWith(
-            genres: List.unmodifiable(genres),
-            errorMessage: null)),
+            genres: List.unmodifiable(genres), errorMessage: null)),
       );
     });
   }
@@ -331,8 +328,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (years) => safeEmit(state.copyWith(
-            years: List.unmodifiable(years),
-            errorMessage: null)),
+            years: List.unmodifiable(years), errorMessage: null)),
       );
     });
   }
@@ -395,8 +391,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     result.fold(
       (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (folders) => safeEmit(state.copyWith(
-          folders: List.unmodifiable(folders),
-          errorMessage: null)),
+          folders: List.unmodifiable(folders), errorMessage: null)),
     );
   }
 

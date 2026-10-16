@@ -107,7 +107,8 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
                         playerOverlayTransitionBuilder(context, child, anim),
                     child: state.isLyricsVisible
                         ? LyricsView(
-                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            key: ValueKey(
+                                'lyrics_${song?.id}_${song?.remoteId}'),
                             lyrics: state.lyrics,
                             isLoading: state.isLoadingLyrics,
                             activeColor: activeColor,
@@ -230,8 +231,7 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
                   ),
                 ),
 
-                SizedBox(
-                    height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
+                SizedBox(height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
 
                 // Bottom Controls Section
                 Padding(
