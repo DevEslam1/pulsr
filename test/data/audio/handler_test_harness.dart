@@ -99,6 +99,7 @@ class FakeNativeAudioPlayer extends AudioPlayerPlatform {
     duration = const Duration(minutes: 3, seconds: 30);
     currentIndex = request.initialIndex ?? 0;
     position = request.initialPosition ?? Duration.zero;
+    buffered = const Duration(seconds: 10);
     emitPlayback(processingState: ProcessingStateMessage.ready);
     return LoadResponse(duration: duration);
   }
@@ -107,7 +108,11 @@ class FakeNativeAudioPlayer extends AudioPlayerPlatform {
   Future<PlayResponse> play(PlayRequest request) async {
     playing = true;
     _data.add(PlayerDataMessage(playing: true));
-    emitPlayback();
+    emitPlayback(
+      processingState: sourceCount > 0
+          ? ProcessingStateMessage.ready
+          : ProcessingStateMessage.idle,
+    );
     return PlayResponse();
   }
 

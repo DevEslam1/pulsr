@@ -155,10 +155,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   bool _crossfadeStartInFlight = false;
 
   Future<void> _startCrossfade(int nextIndex) async {
+    print('[DEBUG-crossfade] _startCrossfade($nextIndex) called, isCrossfading=${_crossfadeManager.isCrossfading}, inFlight=$_crossfadeStartInFlight');
     if (nextIndex < 0 || nextIndex >= _songs.length) return;
     if (_crossfadeManager.isCrossfading || _crossfadeStartInFlight) return;
     _crossfadeStartInFlight = true;
     if (!await _tripleBufferPipeline.claimInactive(PlayerClaim.crossfade)) {
+      print('[DEBUG-crossfade] claimInactive failed');
       _crossfadeStartInFlight = false;
       _failedCrossfadeClaims++;
       if (_failedCrossfadeClaims >= 3) {
@@ -169,11 +171,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     }
     _failedCrossfadeClaims = 0;
     try {
+      print('[DEBUG-crossfade] before protect');
       return await _crossfadeManager.protect(() async {
+        print('[DEBUG-crossfade] inside protect, isCrossfading=${_crossfadeManager.isCrossfading}');
         if (_crossfadeManager.isCrossfading) return;
         if (nextIndex < 0 || nextIndex >= _songs.length) return;
         _crossfadeManager.beginCrossfade(nextIndex);
         final currentFadeId = _crossfadeManager.nextFadeId();
+        print('[DEBUG-crossfade] beginCrossfade done, fadeId=$currentFadeId');
 
         final initialActiveVolume = _calculateReplayGainVolume(currentSong);
         _preCrossfadeVolume = initialActiveVolume;
@@ -212,10 +217,36 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           // Synchronize speed on inactive player before loading & playback
           await _inactivePlayer.setSpeed(_activePlayer.speed);
           await _inactivePlayer.setPitch(_pitch);
+
+          final canReusePreload =
+              _tripleBufferPipeline.preloadedSongId == nextSong.id &&
+                  _tripleBufferPipeline.preloadedSource != null;
+          print('[DEBUG-crossfade] canReusePreload=$canReusePreload');
+          if (!canReusePreload) {
+            final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
+            print('[DEBUG-crossfade] artUri resolved: $artUri');
+            final item = PulsrAudioHandler._songToMediaItem(nextSong, artUri);
+            final source = await _resolveAudioSource(nextSong, item);
+            print('[DEBUG-crossfade] source resolved: $source');
+            if (_crossfadeManager.currentFadeId != currentFadeId) {
+              print('[DEBUG-crossfade] fadeId mismatch after resolve');
+              try {
+                await _inactivePlayer.stop();
+              } catch (_) {}
+              try {
+                await _activePlayer.setVolume(initialActiveVolume);
+              } catch (_) {}
+              return;
+            }
+            print('[DEBUG-crossfade] calling _inactivePlayer.setAudioSource');
+            await _inactivePlayer.setAudioSource(source, preload: true);
+            print('[DEBUG-crossfade] setAudioSource finished');
+          }
           _tripleBufferPipeline.clearPreload();
           if (!_songs.any((s) => s.id == songId)) return;
 
           if (_crossfadeManager.currentFadeId != currentFadeId) {
+            print('[DEBUG-crossfade] fadeId mismatch after clearPreload');
             try {
               await _inactivePlayer.stop();
             } catch (_) {}
@@ -226,20 +257,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           }
 
           await _inactivePlayer.setVolume(0.0);
-          // Wait for the inactive player to be ACTUALLY playing at volume 0
-          // before starting the gain ramp. play() resolves when the command is
-          // sent, not when ExoPlayer has decoded its first frame — on slow
-          // decoders or buffered streams the ramp can advance to ~0.3 before
-          // any audio is emitted, causing a pop/click burst at the crossfade
-          // start. We poll processingState until it leaves 'loading' (≤1000ms)
-          // and then give the mixer one extra period to settle at zero gain.
+          print('[DEBUG-crossfade] calling _inactivePlayer.play()');
           try {
             await _inactivePlayer
                 .play()
                 .timeout(const Duration(milliseconds: 1000));
-          } catch (_) {
-            // FIX-#6: The fallback play() must also have a timeout — without one,
-            // a hung native decoder deadlocks the crossfade engine indefinitely.
+            print('[DEBUG-crossfade] play() returned');
+          } catch (playErr) {
+            print('[DEBUG-crossfade] play() threw: $playErr');
             try {
               await _inactivePlayer
                   .play()
@@ -248,7 +273,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
               ErrorLogger.log(
                   'Inactive player hung on play(); aborting crossfade',
                   category: 'AudioHandler');
-              rethrow; // let crossfade error handler clean up
+              rethrow;
             } catch (_) {}
           }
 
@@ -292,7 +317,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           final ps = _inactivePlayer.processingState;
           if (ps != ProcessingState.ready && ps != ProcessingState.buffering) {
             ErrorLogger.log(
-                'Inactive player not ready for crossfade (state: $ps); aborting crossfade',
+                'Inactive player not ready for crossfade (state: $ps); falling back to direct transition',
                 category: 'AudioHandler');
             try {
               await _inactivePlayer.stop();
@@ -300,6 +325,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             try {
               await _activePlayer.setVolume(initialActiveVolume);
             } catch (_) {}
+            await playSongAt(nextIndex);
             return;
           }
 
@@ -537,7 +563,21 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           // ProcessingState.completed never fires.  Notify the sleep timer here
           // so track-count-based timers decrement correctly.
           notifySleepTrackCompleted();
+
+          // Schedule lookahead preload for the next transition on the newly-inactive player
+          final depth = _preloadCountForCurrentBucket;
+          final warmIdx = (!_gaplessMode && _activePlayer.shuffleModeEnabled)
+              ? _getNextIndex(peek: true)
+              : (resolvedIndex + 1 < _songs.length ? resolvedIndex + 1 : null);
+          if (!_gaplessMode &&
+              depth >= 1 &&
+              warmIdx != null &&
+              warmIdx >= 0 &&
+              warmIdx < _songs.length) {
+            unawaited(_tripleBufferPipeline.preloadNext(_songs[warmIdx]));
+          }
         } catch (e, st) {
+          print('[DEBUG-crossfade] Error in crossfade: $e\n$st');
           ErrorLogger.log('Error during crossfade playback',
               error: e, stackTrace: st, category: 'AudioHandler');
           try {
@@ -1446,8 +1486,15 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       // standard=2 adds N+2, generous=3 keeps full lookahead.
       final depth = _preloadCountForCurrentBucket;
       // Only preload onto inactive player when crossfade is active
-      if (!_gaplessMode && depth >= 1 && _songs.length > index + 1) {
-        unawaited(_tripleBufferPipeline.preloadNext(_songs[index + 1]));
+      final warmIdx = (!_gaplessMode && _activePlayer.shuffleModeEnabled)
+          ? _getNextIndex(peek: true)
+          : (index + 1 < _songs.length ? index + 1 : null);
+      if (!_gaplessMode &&
+          depth >= 1 &&
+          warmIdx != null &&
+          warmIdx >= 0 &&
+          warmIdx < _songs.length) {
+        unawaited(_tripleBufferPipeline.preloadNext(_songs[warmIdx]));
       }
       if (!_gaplessMode && depth >= 2 && _songs.length > index + 2) {
         unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
