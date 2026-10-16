@@ -324,6 +324,35 @@ class DynamicEqBandConfig {
     this.enabled = true,
   });
 
+  /// Specialized Dynamic EQ band tuned for Tajweed sibilance suppression
+  /// on whistling letters (Safir: ص، س، ز) without dulling high-frequency air.
+  static const DynamicEqBandConfig tajweedDeEsser = DynamicEqBandConfig(
+    frequency: 6500.0,
+    q: 2.8,
+    thresholdDb: -26.0,
+    ratio: 4.0,
+    attackMs: 2.0,
+    releaseMs: 50.0,
+    maxCutDb: -9.0,
+    mode: 0,
+    filterType: 0,
+    enabled: true,
+  );
+
+  /// Dynamic resonance tamer for close-mic proximity effect and chest resonance.
+  static const DynamicEqBandConfig vocalWarmthTamer = DynamicEqBandConfig(
+    frequency: 320.0,
+    q: 2.2,
+    thresholdDb: -22.0,
+    ratio: 2.5,
+    attackMs: 10.0,
+    releaseMs: 100.0,
+    maxCutDb: -6.0,
+    mode: 0,
+    filterType: 0,
+    enabled: true,
+  );
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

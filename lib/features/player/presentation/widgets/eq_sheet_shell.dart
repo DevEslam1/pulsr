@@ -2002,6 +2002,19 @@ extension _EqSheetShell on _EqualizerSheetState {
                   onGainChanged: effectiveEnabled
                       ? (idx, gain) {
                           context.read<PlayerCubit>().setBandGain(idx, gain);
+                          if (_autoPreampEnabled) {
+                            final updatedGains = List<double>.from(gains);
+                            if (idx >= 0 && idx < updatedGains.length) {
+                              updatedGains[idx] = gain;
+                            }
+                            double maxBoost = 0.0;
+                            for (final g in updatedGains) {
+                              if (g > maxBoost) maxBoost = g;
+                            }
+                            context.read<PlayerCubit>().setPreamp(
+                                  maxBoost > 0.0 ? -maxBoost : 0.0,
+                                );
+                          }
                         }
                       : null,
                 ),
@@ -2105,11 +2118,80 @@ extension _EqSheetShell on _EqualizerSheetState {
                     ),
                   ],
                   const Spacer(),
-                  // Anchored actions: Reset EQ & Edit Frequency
-                  // Firmly pinned to the right edge via Spacer with no unbounded flex neighbor.
+                  // Anchored actions: Auto-Preamp, Reset EQ & Edit Frequency
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Tooltip(
+                        message: _autoPreampEnabled
+                            ? 'Auto Preamp: Active (Clipping Protected)'
+                            : 'Auto Preamp: Off (Tap to protect against clipping)',
+                        child: InkWell(
+                          borderRadius: AppRadii.r8All,
+                          onTap: dspBlocked != null
+                              ? null
+                              : () {
+                                  HapticFeedback.selectionClick();
+                                  _setStateSafe(() {
+                                    _autoPreampEnabled = !_autoPreampEnabled;
+                                    if (_autoPreampEnabled) {
+                                      double maxBoost = 0.0;
+                                      for (final g in state.eqPreset.gains) {
+                                        if (g > maxBoost) maxBoost = g;
+                                      }
+                                      cubit.setPreamp(
+                                        maxBoost > 0.0 ? -maxBoost : 0.0,
+                                      );
+                                    }
+                                  });
+                                },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal:
+                                  isWide ? AppSpacing.s8 : AppSpacing.s6,
+                              vertical: AppSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _autoPreampEnabled
+                                  ? p.accent.withValues(alpha: 0.16)
+                                  : p.surfaceContainer,
+                              borderRadius: AppRadii.r8All,
+                              border: Border.all(
+                                color:
+                                    _autoPreampEnabled ? p.accent : p.hairline,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _autoPreampEnabled
+                                      ? Icons.shield_rounded
+                                      : Icons.shield_outlined,
+                                  size: 16,
+                                  color: _autoPreampEnabled
+                                      ? p.accent
+                                      : p.textSecondary,
+                                ),
+                                if (isWide) ...[
+                                  const SizedBox(width: AppSpacing.xxs),
+                                  Text(
+                                    'Auto Preamp',
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      color: _autoPreampEnabled
+                                          ? p.accent
+                                          : p.textSecondary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
                       Tooltip(
                         message: context.l10n.resetToFlat,
                         child: InkWell(

@@ -1,6 +1,6 @@
-// test/domain/models/quran_metadata_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/quran_metadata.dart';
+import 'package:pulsr/domain/models/quran_surah.dart';
 
 void main() {
   group('QuranAyahTiming', () {
@@ -114,6 +114,45 @@ void main() {
       final map = bookmark.toMap();
       final restored = QuranBookmark.fromMap(map);
       expect(restored, bookmark);
+    });
+  });
+
+  group('QuranSurah & Reciters Catalog', () {
+    test('contains all 114 canonical Surahs with valid fields', () {
+      expect(QuranSurah.canonicalSurahs.length, 114);
+
+      final fatihah = QuranSurah.byNumber(1);
+      expect(fatihah, isNotNull);
+      expect(fatihah!.nameTransliteration, 'Al-Fatihah');
+      expect(fatihah.nameArabic, 'الفاتحة');
+      expect(fatihah.totalAyahs, 7);
+      expect(fatihah.isMeccan, isTrue);
+      expect(fatihah.revelationPlace, 'Meccan');
+
+      final baqarah = QuranSurah.byNumber(2);
+      expect(baqarah, isNotNull);
+      expect(baqarah!.totalAyahs, 286);
+      expect(baqarah.isMeccan, isFalse);
+      expect(baqarah.revelationPlace, 'Medinan');
+
+      final nas = QuranSurah.byNumber(114);
+      expect(nas, isNotNull);
+      expect(nas!.nameTransliteration, 'An-Nas');
+
+      expect(QuranSurah.byNumber(0), isNull);
+      expect(QuranSurah.byNumber(115), isNull);
+    });
+
+    test('contains renowned reciters with valid Riwayah', () {
+      expect(QuranReciter.canonicalReciters, isNotEmpty);
+      final alafasy =
+          QuranReciter.canonicalReciters.firstWhere((r) => r.id == 'alafasy');
+      expect(alafasy.nameEnglish, contains('Alafasy'));
+      expect(alafasy.riwayah, contains('Hafs'));
+
+      final warsh = QuranReciter.canonicalReciters
+          .firstWhere((r) => r.id == 'yassin_warsh');
+      expect(warsh.riwayah, contains('Warsh'));
     });
   });
 }

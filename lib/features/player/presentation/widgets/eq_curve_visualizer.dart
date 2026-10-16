@@ -71,6 +71,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     if (isInteractive && widget.gains.isNotEmpty) {
       visualizer = GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onDoubleTapDown: (details) => _handleDoubleTap(details.localPosition),
         onPanStart: (details) => _handlePanStart(details.localPosition),
         onPanUpdate: (details) => _handlePanUpdate(details.localPosition),
         onPanEnd: (_) => _handlePanEnd(),
@@ -83,6 +84,34 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
       label: context.l10n.equalizerResponseCurve,
       child: visualizer,
     );
+  }
+
+  void _handleDoubleTap(Offset localPos) {
+    if (widget.gains.isEmpty) return;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final size = renderBox.size;
+    final stepX = widget.gains.length > 1
+        ? size.width / (widget.gains.length - 1)
+        : size.width;
+
+    int closestIndex = 0;
+    double minDistance = double.infinity;
+    for (int i = 0; i < widget.gains.length; i++) {
+      final bandX = i * stepX;
+      final dist = (localPos.dx - bandX).abs();
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = i;
+      }
+    }
+
+    final hitTolerance = math.max(stepX / 2, 32.0);
+    if (minDistance <= hitTolerance) {
+      widget.onBandSelected?.call(closestIndex);
+      HapticFeedback.mediumImpact();
+      widget.onGainChanged?.call(closestIndex, 0.0);
+    }
   }
 
   void _handlePanStart(Offset localPos) {
@@ -260,6 +289,28 @@ class _CatmullRomEqPainter extends CustomPainter {
     for (final level in gridLevels) {
       final y = midY - (level * verticalScale);
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    if (size.height >= 48) {
+      final labelStyle = TextStyle(
+        color: color.withValues(alpha: 0.38),
+        fontSize: 8.5,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.2,
+      );
+      final tp = TextPainter(textDirection: TextDirection.ltr);
+
+      tp.text = TextSpan(text: '+${maxGain.toInt()} dB', style: labelStyle);
+      tp.layout();
+      tp.paint(canvas, Offset(6, midY - verticalScale - 1));
+
+      tp.text = TextSpan(text: '0 dB', style: labelStyle);
+      tp.layout();
+      tp.paint(canvas, Offset(6, midY - tp.height / 2));
+
+      tp.text = TextSpan(text: '-${maxGain.toInt()} dB', style: labelStyle);
+      tp.layout();
+      tp.paint(canvas, Offset(6, midY + verticalScale - tp.height));
     }
   }
 

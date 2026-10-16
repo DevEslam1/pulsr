@@ -16,6 +16,7 @@ import '../../cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
 import 'quran_error_card.dart';
+import 'quran_mushaf_view.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -271,7 +272,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               child: Text(
-                '${style.tagline} • ${style.description}',
+                '${style.tagline} • ${style.sanctuaryName.isNotEmpty ? style.sanctuaryName : style.description}',
                 style: TextStyle(
                     color: p.textTertiary, fontSize: AppFontSize.label),
               ),
@@ -551,6 +552,35 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     color: p.textTertiary, fontSize: AppFontSize.tiny),
               ),
             ),
+            if (state.isQuranModeEnabled) ...[
+              const SizedBox(height: AppSpacing.md),
+              QuranMushafView(
+                metadata: _metadata,
+                currentPosition: state.position,
+                onSeek: (pos) => cubit.seek(pos),
+                onSelectSurah: (surahNum) async {
+                  final repo = getIt.isRegistered<QuranRepository>()
+                      ? getIt<QuranRepository>()
+                      : QuranRepositoryImpl();
+                  final surah = repo.getSurah(surahNum);
+                  if (surah != null) {
+                    final newMeta = QuranMetadata(
+                      surahNumber: surah.number,
+                      surahName: surah.nameTransliteration,
+                      ayahStart: 1,
+                      ayahEnd: surah.totalAyahs,
+                      reciter: style.label,
+                    );
+                    final uri = _lastLoadedTrackUri ??
+                        state.currentSong?.uri ??
+                        state.currentSong?.path ??
+                        'quran://surah${surah.number}';
+                    await repo.saveMetadataForTrack(uri, newMeta);
+                    if (mounted) setState(() => _metadata = newMeta);
+                  }
+                },
+              ),
+            ],
           ],
         );
       },
@@ -758,8 +788,10 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 ChoiceChip(
                   label: Text(context.l10n.quranRepeatOff),
                   selected: _repeatMode == QuranRepeatMode.off,
-                  onSelected: (_) =>
-                      setState(() => _repeatMode = QuranRepeatMode.off),
+                  onSelected: (_) {
+                    setState(() => _repeatMode = QuranRepeatMode.off);
+                    cubit.clearAbLoop();
+                  },
                   labelStyle: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w600,
@@ -771,8 +803,13 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 ChoiceChip(
                   label: Text(context.l10n.quranRepeatAyah),
                   selected: _repeatMode == QuranRepeatMode.singleAyah,
-                  onSelected: (_) =>
-                      setState(() => _repeatMode = QuranRepeatMode.singleAyah),
+                  onSelected: (_) {
+                    setState(() => _repeatMode = QuranRepeatMode.singleAyah);
+                    final active = meta.timingForAyah(meta.ayahStart);
+                    if (active != null) {
+                      cubit.setAbLoopRange(active.start, active.end);
+                    }
+                  },
                   labelStyle: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w600,
@@ -784,8 +821,13 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 ChoiceChip(
                   label: Text(context.l10n.quranRepeatRange),
                   selected: _repeatMode == QuranRepeatMode.range,
-                  onSelected: (_) =>
-                      setState(() => _repeatMode = QuranRepeatMode.range),
+                  onSelected: (_) {
+                    setState(() => _repeatMode = QuranRepeatMode.range);
+                    if (meta.ayahTimings.isNotEmpty) {
+                      cubit.setAbLoopRange(meta.ayahTimings.first.start,
+                          meta.ayahTimings.last.end);
+                    }
+                  },
                   labelStyle: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w600,

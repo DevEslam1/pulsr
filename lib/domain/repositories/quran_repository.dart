@@ -1,5 +1,5 @@
-// lib/domain/repositories/quran_repository.dart
 import '../models/quran_metadata.dart';
+import '../models/quran_surah.dart';
 
 /// Clean interface for Quran catalog and bookmarks.
 ///
@@ -27,4 +27,16 @@ abstract class QuranRepository {
 
   /// Returns all persisted Quran bookmarks.
   Future<List<QuranBookmark>> getAllBookmarks();
+
+  /// Returns the canonical catalog of all 114 Surahs.
+  List<QuranSurah> getSurahs();
+
+  /// Returns canonical information for a specific Surah by number (1..114).
+  QuranSurah? getSurah(int surahNumber);
+
+  /// Returns canonical list of renowned reciters across Riwayahs.
+  List<QuranReciter> getReciters();
+
+  /// Returns verified verse texts for a given Surah.
+  List<QuranAyahText> getAyahsForSurah(int surahNumber);
 }

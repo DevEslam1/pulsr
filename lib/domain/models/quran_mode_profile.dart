@@ -17,38 +17,46 @@ enum QuranReciterStyle {
     'Murattal',
     'Clear & measured',
     'Balanced presence for everyday recitation',
+    'Studio Intimate',
   ),
   mujawwad(
     'Mujawwad',
     'Melodic & ornamental',
     'Warmth and room for melodic phrasing',
+    'Al-Masjid An-Nabawi (Medina)',
   ),
   tarawih(
     'Tarawih',
     'Extended recitation',
     'Spacious, comfortable long sessions',
+    'Al-Masjid Al-Haram (Mecca)',
   ),
   memorization(
     'Memorization',
     'Slow & precise',
     'Maximum clarity at a slower pace',
+    'Makharij Articulation Lab',
   ),
   sleepMode(
     'Sleep',
     'Soft & warm',
     'Gentle, low-fatigue bedtime listening',
+    'Grand Dome Sanctuary',
   ),
   studyMode(
     'Study & Tajweed',
     'Articulation',
     'Highlights makharij and consonants',
+    'Tajweed Precision Chamber',
   );
 
-  const QuranReciterStyle(this.label, this.tagline, this.description);
+  const QuranReciterStyle(this.label, this.tagline, this.description,
+      [this.sanctuaryName = '']);
 
   final String label;
   final String tagline;
   final String description;
+  final String sanctuaryName;
 }
 
 /// A fully-resolved Quran audio profile.

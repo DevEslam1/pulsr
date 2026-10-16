@@ -97,7 +97,46 @@ void main() {
       expect(updatedGain!, greaterThan(0.0));
 
       await gesture.up();
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    });
+
+    testWidgets('resets band gain to 0 dB on double tap', (tester) async {
+      int? resetBand;
+      double? resetGain;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 300,
+                height: 100,
+                child: EqCurveVisualizer(
+                  gains: const [4.0, 3.0, 2.0, 1.0, 0.0],
+                  activeColor: Colors.amber,
+                  height: 100,
+                  onBandSelected: (band) {
+                    resetBand = band;
+                  },
+                  onGainChanged: (band, gain) {
+                    resetGain = gain;
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Double tap on middle band (band 2)
+      final center = tester.getCenter(find.byType(EqCurveVisualizer));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(resetBand, equals(2));
+      expect(resetGain, equals(0.0));
     });
 
     testWidgets('renders properly under RTL directionality', (tester) async {

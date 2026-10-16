@@ -84,5 +84,21 @@ void main() {
       expect(await repo.getBookmark('any'), isNull);
       expect(await repo.getAllBookmarks(), isEmpty);
     });
+
+    test('provides canonical Surahs, reciters, and Ayah texts', () {
+      final repo = QuranRepositoryImpl();
+      expect(repo.getSurahs().length, 114);
+      expect(repo.getSurah(1)?.nameTransliteration, 'Al-Fatihah');
+      expect(repo.getReciters(), isNotEmpty);
+
+      final fatihahAyahs = repo.getAyahsForSurah(1);
+      expect(fatihahAyahs.length, 7);
+      expect(
+          fatihahAyahs.first.textArabic, contains('الرَّحْمَٰنِ الرَّحِيمِ'));
+
+      final nasAyahs = repo.getAyahsForSurah(114);
+      expect(nasAyahs.length, 6);
+      expect(nasAyahs.last.textArabic, contains('النَّاسِ'));
+    });
   });
 }

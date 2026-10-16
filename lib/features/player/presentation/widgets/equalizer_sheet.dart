@@ -187,6 +187,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   final Set<int> _mutedBands = <int>{};
   final Set<int> _soloedBands = <int>{};
   int? _activeDraggedBandIndex;
+  bool _autoPreampEnabled = false;
 
   EqualizerManager? _cachedEqualizerManager;
 

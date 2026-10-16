@@ -23,6 +23,13 @@ extension PlayerPlaybackOptionsLyricsExtension
     _syncAbLoopFromHandler();
   }
 
+  void setAbLoopRange(Duration start, Duration end) {
+    final songId = _getState().currentSong?.id;
+    _audioHandler.abLoopManager.setA(start, songId: songId);
+    _audioHandler.abLoopManager.setB(end, songId: songId);
+    _syncAbLoopFromHandler();
+  }
+
   void toggleAbLoop() {
     final s = _getState();
     if (!s.abLoopEnabled && (s.abPointA == null || s.abPointB == null)) {

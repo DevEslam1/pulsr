@@ -106,6 +106,9 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
 
   void clearAbLoop() => playbackOptionsController.clearAbLoop();
 
+  void setAbLoopRange(Duration start, Duration end) =>
+      playbackOptionsController.setAbLoopRange(start, end);
+
   void setTrackDelayMs(int delayMs) =>
       playbackOptionsController.setTrackDelayMs(delayMs);
 
