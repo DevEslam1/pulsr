@@ -1,5 +1,16 @@
 {
   "clients": {
+    "VISIONOS": {
+      "clientNameId": "101",
+      "clientVersion": "1.02",
+      "requiresPoToken": false,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": false,
+      "supportsBrowse": false,
+      "requiresJsSignature": false,
+      "priority": 12
+    },
     "ANDROID_VR": {
       "clientNameId": "28",
       "clientVersion": "1.63.27",

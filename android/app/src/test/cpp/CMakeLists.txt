@@ -104,16 +104,4 @@ pulsr_add_test(test_sinc_resampler ${MAIN_CPP}/SincResampler.cpp)
 pulsr_add_test(test_dop_framer)
 pulsr_add_test(test_resampler_polyphase ${MAIN_CPP}/SincResampler.cpp)
 
-pulsr_add_test(test_dsp_effects
-    ${REVERB_SRCS}
-    ${MAIN_CPP}/LookaheadLimiter.cpp
-    ${MAIN_CPP}/Crossfeed.cpp
-    ${MAIN_CPP}/ParametricEQ.cpp
-    ${MAIN_CPP}/DsdDecoder.cpp
-    ${MAIN_CPP}/MultibandCompressor.cpp
-    ${MAIN_CPP}/HarmonicSaturation.cpp
-    ${MAIN_CPP}/StereoWidth.cpp
-    ${MAIN_CPP}/DynamicEQ.cpp
-    ${MAIN_CPP}/SubCrossover.cpp
-    ${MAIN_CPP}/DynamicBass.cpp
-)
+pulsr_add_test(test_dsp_effects ${DSP_SRCS})

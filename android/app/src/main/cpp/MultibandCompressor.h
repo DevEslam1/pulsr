@@ -20,6 +20,10 @@ public:
     void applyParams(const MultibandCompressorParamSet& params);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const {
+        return (!enabled_ && smoothedEnabledMix_ >= 1e-4f) ||
+               (enabled_ && smoothedEnabledMix_ < 0.9999f);
+    }
     void reset();
 
     void processInterleaved(float* buffer, int frames, int channels = 2);
@@ -34,6 +38,7 @@ private:
     double computeBandGain(int band, double envDb);
 
     bool enabled_ = false;
+    float smoothedEnabledMix_ = 0.0f;
     double sampleRate_ = 48000.0;
 
     std::atomic<bool> paramsChanged_{false};

@@ -94,6 +94,16 @@ internal class JsDecipherCache(
 
     /**
      * Applies transform operations to signature.
+     *
+     * Semantics mirror the real player's helpers exactly (verified against
+     * yt-dlp's JS solver output for the same raw signatures):
+     * - `swap:k` is the player's `PB`, which swaps index 0 with index
+     *   `k % length` — an out-of-range `k` wraps around instead of being
+     *   skipped. Skipping changed every byte of the result for signatures
+     *   shorter than `k`, so the URL was signed with a garbage value.
+     * - `splice:k` is `chars.splice(0, k)` on a split string, which removes
+     *   `min(k, length)` leading characters — it empties the value when
+     *   `k >= length` instead of being a no-op.
      */
     fun applyTransforms(signature: String, steps: List<String>): String {
         var chars = signature.toCharArray()
@@ -105,16 +115,18 @@ internal class JsDecipherCache(
                 }
                 "splice" -> {
                     val count = parts.getOrNull(1)?.toIntOrNull() ?: 0
-                    if (count in 1 until chars.size) {
-                        chars = chars.sliceArray(count until chars.size)
+                    if (count > 0 && chars.isNotEmpty()) {
+                        val drop = minOf(count, chars.size)
+                        chars = chars.sliceArray(drop until chars.size)
                     }
                 }
                 "swap" -> {
                     val index = parts.getOrNull(1)?.toIntOrNull() ?: 0
-                    if (index in 0 until chars.size && chars.isNotEmpty()) {
+                    if (chars.isNotEmpty()) {
+                        val wrapped = ((index % chars.size) + chars.size) % chars.size
                         val tmp = chars[0]
-                        chars[0] = chars[index]
-                        chars[index] = tmp
+                        chars[0] = chars[wrapped]
+                        chars[wrapped] = tmp
                     }
                 }
             }

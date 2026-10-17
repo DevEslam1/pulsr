@@ -30,7 +30,14 @@ public:
     void configure(double drive, double mix, double tilt, int mode = 0, bool multiband = false);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
-    int getLatencyFrames() const { return enabled_ && k_ > 1e-9 ? DRY_DELAY : 0; }
+    bool isRamping() const {
+        return (!enabled_ && smoothedEnabledMix_ >= 1e-4f) ||
+               (enabled_ && smoothedEnabledMix_ < 0.9999f) ||
+               (modeCrossfadeProgress_ < 1.0f);
+    }
+    int getLatencyFrames() const {
+        return (enabled_ || smoothedEnabledMix_ >= 1e-4f) && k_ > 1e-9 ? DRY_DELAY : 0;
+    }
     bool isMultiband() const { return multiband_; }
     void applyParams(const SaturationParamSet& params);
     void reset();
@@ -58,11 +65,14 @@ private:
     double mix_ = 0.5;
     double tilt_ = 0.0;
     int mode_ = 0;              // 0 = Tape, 1 = Tube, 2 = Analog
+    int prevMode_ = 0;
+    float modeCrossfadeProgress_ = 1.0f;
     bool multiband_ = false;    // 6-band crossover mid-band warmth mode
     double k_ = 0.0;            // drive sharpness
     float tiltHpCoeff_ = 0.0f;  // one-pole HP coeff for pre-emphasis
     float dcCoeff_ = 0.9995f;   // DC-blocker pole (rate-derived in configure)
     bool enabled_ = false;
+    float smoothedEnabledMix_ = 0.0f;
 
     float hpState_[MAX_CHANNELS] = {};
     float history_[MAX_CHANNELS][TAPS_PER_PHASE] = {};

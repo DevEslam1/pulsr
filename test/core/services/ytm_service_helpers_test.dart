@@ -358,6 +358,110 @@ void main() {
       expect(service.isBotCoolingDown, isFalse);
     });
 
+    test('repeated challenges escalate the window but never mid-episode', () {
+      var now = DateTime(2026, 1, 1, 12);
+      final service = _newService()..debugClock = () => now;
+
+      service.recordFailure('e1', const YtmException('BOT_CHALLENGE'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 45));
+
+      // A second note inside the active episode neither resets nor extends it.
+      now = now.add(const Duration(seconds: 10));
+      service.recordFailure('e2', const YtmException('BOT_CHALLENGE'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 35));
+
+      // Once the window lapses, the next episode doubles the base window.
+      now = now.add(const Duration(seconds: 36));
+      expect(service.isBotCoolingDown, isFalse);
+      service.recordFailure('e3', const YtmException('BOT_CHALLENGE'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 90));
+
+      now = now.add(const Duration(seconds: 91));
+      service.recordFailure('e4', const YtmException('BOT_CHALLENGE'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 180));
+
+      // Capped: further episodes hold at the ceiling.
+      now = now.add(const Duration(seconds: 181));
+      service.recordFailure('e5', const YtmException('BOT_CHALLENGE'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 180));
+    });
+
+    test('a long clean gap decays the escalation streak', () {
+      var now = DateTime(2026, 1, 1, 12);
+      final service = _newService()..debugClock = () => now;
+
+      service.recordFailure('d1', const YtmException('BOT_CHALLENGE'));
+      now = now.add(const Duration(seconds: 46));
+      service.recordFailure('d2', const YtmException('BOT_CHALLENGE'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 90));
+
+      // Decay counts *clean* time: the d2 window itself (90s) is not clean, so
+      // the gap has to outlast it plus the decay period.
+      now = now.add(const Duration(minutes: 11, seconds: 91));
+      service.recordFailure('d3', const YtmException('BOT_CHALLENGE'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 45));
+    });
+
+    test('a successful resolve resets the streak and lifts the window', () {
+      final now = DateTime(2026, 1, 1, 12);
+      final service = _newService()..debugClock = () => now;
+
+      service.recordFailure('s1', const YtmException('BOT_CHALLENGE'));
+      service.debugNoteResolveSuccess();
+      expect(service.isBotCoolingDown, isFalse);
+
+      service.recordFailure('s2', const YtmException('BOT_CHALLENGE'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 45));
+    });
+
+    test('IP blocks escalate to their own, longer ceiling', () {
+      var now = DateTime(2026, 1, 1, 12);
+      final service = _newService()..debugClock = () => now;
+
+      service.recordFailure('i1', const YtmException('IP_BLOCKED'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 180));
+      now = now.add(const Duration(seconds: 181));
+      service.recordFailure('i2', const YtmException('IP_BLOCKED'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 360));
+      now = now.add(const Duration(seconds: 361));
+      service.recordFailure('i3', const YtmException('IP_BLOCKED'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 720));
+      now = now.add(const Duration(seconds: 721));
+      service.recordFailure('i4', const YtmException('IP_BLOCKED'));
+      expect(service.debugBotCooldownRemaining, const Duration(seconds: 720));
+    });
+
+    test('notePlaybackFailure classifies raw stream errors into the ledger', () {
+      final service = _newService();
+      service.notePlaybackFailure(
+          'p1', Exception("Sign in to confirm you're not a bot"));
+      expect(service.isBotCoolingDown, isTrue);
+      expect(service.isVideoCoolingDown('p1'), isTrue);
+    });
+
+    test('notePlaybackFailure delegates structured block signals', () {
+      final service = _newService();
+      service.notePlaybackFailure('p2', const YtmException('IP_BLOCKED'));
+      expect(service.isBotCoolingDown, isTrue);
+
+      service.debugClearBotCooldown();
+      service.notePlaybackFailure('p3', Exception('PO_TOKEN_INVALID'));
+      expect(service.isBotCoolingDown, isTrue);
+    });
+
+    test('notePlaybackFailure ignores verdicts a fresh resolve can fix', () {
+      final service = _newService();
+      service.notePlaybackFailure('p4', const YtmException('YTM_TIMEOUT'));
+      service.notePlaybackFailure('p5', const YtmException('VIDEO_GONE'));
+      service.notePlaybackFailure('p6', Exception('HTTP 404 not found'));
+      service.notePlaybackFailure('p7', Exception('connection reset'));
+      expect(service.isBotCoolingDown, isFalse);
+      expect(service.isVideoCoolingDown('p4'), isFalse);
+      expect(service.isVideoCoolingDown('p5'), isFalse);
+      expect(service.isVideoCoolingDown('p6'), isFalse);
+      expect(service.isVideoCoolingDown('p7'), isFalse);
+    });
+
     test('onAuthExpired emits', () async {
       final service = _newService();
       final events = <void>[];

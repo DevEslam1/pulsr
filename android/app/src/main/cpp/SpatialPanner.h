@@ -17,6 +17,9 @@ public:
     void setMono(bool mono);
     double getBalance() const { return targetBalance_; }
     bool isMono() const { return mono_; }
+    bool isRamping() const {
+        return std::abs(targetBalance_ - smoothedBalance_) > 1e-4;
+    }
     void applyParams(const PannerParamSet& params);
     void reset();
 

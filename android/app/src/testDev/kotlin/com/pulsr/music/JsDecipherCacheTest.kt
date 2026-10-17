@@ -69,12 +69,54 @@ class JsDecipherCacheTest {
         val cache = JsDecipherCache()
         val emptyResult = cache.applyTransforms("abc", emptyList())
         assertEquals("abc", emptyResult)
+    }
 
-        val outOfBoundsSplice = cache.applyTransforms("abc", listOf("splice:10"))
-        assertEquals("abc", outOfBoundsSplice)
+    /**
+     * Real `PB` swaps index 0 with `index % length` (yt-dlp solver parity:
+     * an out-of-range index wraps instead of being skipped). Skipping used to
+     * produce a garbage signature for every input shorter than the index.
+     */
+    @Test
+    fun testSwapIndexWrapsModuloLength() {
+        val cache = JsDecipherCache()
+        assertEquals("bac", cache.applyTransforms("abc", listOf("swap:10")))
+        assertEquals(
+            cache.applyTransforms("abc", listOf("swap:1")),
+            cache.applyTransforms("abc", listOf("swap:10")),
+        )
+        assertEquals(
+            cache.applyTransforms("abcdef", listOf("swap:8")),
+            cache.applyTransforms("abcdef", listOf("swap:2")),
+        )
+        // swap:0 is the JS `a[0]` vs `a[0]` no-op
+        assertEquals("abcdef", cache.applyTransforms("abcdef", listOf("swap:0")))
+    }
 
-        val outOfBoundsSwap = cache.applyTransforms("abc", listOf("swap:10"))
-        assertEquals("abc", outOfBoundsSwap)
+    /**
+     * Real `LP` is `split("").splice(0, k)` which drops `min(k, length)`
+     * characters — `k >= length` empties the value rather than passing it
+     * through untouched.
+     */
+    @Test
+    fun testSpliceRemovesMinCountLength() {
+        val cache = JsDecipherCache()
+        assertEquals("", cache.applyTransforms("abc", listOf("splice:10")))
+        assertEquals("", cache.applyTransforms("abc", listOf("splice:3")))
+        assertEquals("abc", cache.applyTransforms("abc", listOf("splice:0")))
+        assertEquals("abc", cache.applyTransforms("abc", listOf("splice:-1")))
+        assertEquals("cdef", cache.applyTransforms("abcdef", listOf("splice:2")))
+    }
+
+    /**
+     * Cross-checked against the real `P1` transform and yt-dlp's JS solver for
+     * the same step list from the 2026-10 web player.
+     */
+    @Test
+    fun testRealPlayerStepListParity() {
+        val cache = JsDecipherCache()
+        val realSteps = listOf("reverse", "splice:1", "swap:53", "splice:3", "swap:18", "swap:61")
+        assertEquals("EFDCBI", cache.applyTransforms("ABCDEFGHIJ", realSteps))
+        assertEquals("a5987eb43210", cache.applyTransforms("0123456789abcdef", realSteps))
     }
 
     @Test

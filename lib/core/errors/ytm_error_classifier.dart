@@ -21,6 +21,25 @@ enum YtmBlockSignal {
   signatureDecipherFailed,
   sabrEnforced;
 
+  /// Machine code for this signal (`botChallenge` → `BOT_CHALLENGE`), the
+  /// inverse of [fromCode] for codes the app constructs itself. `name`
+  /// upper-cased is not it: it drops the underscore (`BOTCHALLENGE`), and a
+  /// [YtmException] built from that code stops being recognised as a bot/IP
+  /// verdict by its own `signal`/`isBotBlocked` getters.
+  String get wireCode => switch (this) {
+        YtmBlockSignal.rateLimited => 'RATE_LIMITED',
+        YtmBlockSignal.ipBlocked => 'IP_BLOCKED',
+        YtmBlockSignal.botChallenge => 'BOT_CHALLENGE',
+        YtmBlockSignal.poTokenInvalid => 'PO_TOKEN_INVALID',
+        YtmBlockSignal.clientDeprecated => 'CLIENT_DEPRECATED',
+        YtmBlockSignal.geoBlocked => 'GEO_BLOCKED',
+        YtmBlockSignal.signInRequired => 'SIGN_IN_REQUIRED',
+        YtmBlockSignal.videoGone => 'VIDEO_GONE',
+        YtmBlockSignal.networkUnavailable => 'YTM_NETWORK',
+        YtmBlockSignal.signatureDecipherFailed => 'SIGNATURE_DECIPHER_FAILED',
+        YtmBlockSignal.sabrEnforced => 'SABR_ENFORCED',
+      };
+
   static YtmBlockSignal? fromCode(String code) {
     switch (code.toUpperCase()) {
       case 'YTM_NETWORK':

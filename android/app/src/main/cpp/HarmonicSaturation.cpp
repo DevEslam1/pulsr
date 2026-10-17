@@ -50,7 +50,17 @@ void HarmonicSaturation::configure(double drive, double mix, double tilt, int mo
     drive_ = std::clamp(drive, 0.0, 1.0);
     mix_ = std::clamp(mix, 0.0, 1.0);
     tilt_ = std::clamp(tilt, 0.0, 1.0);
-    mode_ = std::clamp(mode, 0, 2);
+    const int newMode = std::clamp(mode, 0, 2);
+    if (newMode != mode_) {
+        if ((enabled_ || smoothedEnabledMix_ >= 1e-4f) && k_ > 1e-9) {
+            prevMode_ = mode_;
+            modeCrossfadeProgress_ = 0.0f;
+        } else {
+            prevMode_ = newMode;
+            modeCrossfadeProgress_ = 1.0f;
+        }
+        mode_ = newMode;
+    }
     multiband_ = multiband;
     for (int c = 0; c < MAX_CHANNELS / 2; ++c) {
         crossover_[c].configure(sampleRate_, kMultibandCrossoverHz);
@@ -85,6 +95,9 @@ void HarmonicSaturation::reset() {
         crossover_[c].reset();
     }
     std::memset(subDelay_, 0, sizeof(subDelay_));
+    smoothedEnabledMix_ = enabled_ ? 1.0f : 0.0f;
+    prevMode_ = mode_;
+    modeCrossfadeProgress_ = 1.0f;
 }
 
 static inline float shapeSample(float x, double k, float invNorm, int mode) {
@@ -108,7 +121,20 @@ static inline float shapeSample(float x, double k, float invNorm, int mode) {
 }
 
 void HarmonicSaturation::process(float* L, float* R, int frames) {
-    if (!enabled_ || !L || !R || frames <= 0) return;
+    const float targetEnabledMix = enabled_ ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!L || !R || frames <= 0) return;
+
+    // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
+    const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startEnabledMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetEnabledMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetEnabledMix) < 1e-4f) {
+        smoothedEnabledMix_ = targetEnabledMix;
+    }
+    const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
+    float currentEnabledMix = startEnabledMix;
 
     const double k = k_;
     const float mix = static_cast<float>(mix_);
@@ -218,10 +244,25 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
 
                 // Store shaped outputs into decimation history ring buffer
                 const int dIdx = (decimIdx_ + p) % DECIM_HISTORY_LEN;
-                decimHistory_[0][dIdx] = shapeSample(emphL, k, invNorm, mode);
-                decimHistory_[1][dIdx] = shapeSample(emphR, k, invNorm, mode);
+                float shL = shapeSample(emphL, k, invNorm, mode);
+                float shR = shapeSample(emphR, k, invNorm, mode);
+                if (modeCrossfadeProgress_ < 1.0f) {
+                    const float oldShL = shapeSample(emphL, k, invNorm, prevMode_);
+                    const float oldShR = shapeSample(emphR, k, invNorm, prevMode_);
+                    const float cfAngle = modeCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
+                    const float oldW = std::cos(cfAngle);
+                    const float newW = std::sin(cfAngle);
+                    shL = oldW * oldShL + newW * shL;
+                    shR = oldW * oldShR + newW * shR;
+                }
+                decimHistory_[0][dIdx] = shL;
+                decimHistory_[1][dIdx] = shR;
             }
             decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
+            if (modeCrossfadeProgress_ < 1.0f) {
+                const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+                modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
+            }
 
             // Polyphase FIR decimation: convolve shaped history with the
             // anti-aliasing prototype reconstructed from the polyphase bank.
@@ -268,7 +309,7 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
 #endif
 
             // DC blocker for asymmetric modes
-            if (mode != 0) {
+            if (mode != 0 || (modeCrossfadeProgress_ < 1.0f && prevMode_ != 0)) {
                 float yL = wetL - dcX_[0] + dcCoeff_ * dcY_[0];
                 float yR = wetR - dcX_[1] + dcCoeff_ * dcY_[1];
                 dcX_[0] = wetL;
@@ -279,12 +320,13 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
                 wetR = yR;
             }
 
-            // FIX M-13: oversampler ran, so align the dry tap with the wet delay.
-            dryTapL = dryL;
-            dryTapR = dryR;
+            // Align dry tap with wet delay, smoothly crossfading dry path
+            // during enable/disable so phase comb filtering does not occur.
+            dryTapL = currentEnabledMix * dryL + (1.0f - currentEnabledMix) * satInL;
+            dryTapR = currentEnabledMix * dryR + (1.0f - currentEnabledMix) * satInR;
             if (multiband_) {
-                subTapL = delayedSubL;
-                subTapR = delayedSubR;
+                subTapL = currentEnabledMix * delayedSubL + (1.0f - currentEnabledMix) * subL;
+                subTapR = currentEnabledMix * delayedSubR + (1.0f - currentEnabledMix) * subR;
             }
         }
 
@@ -294,19 +336,45 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
         const float midHighL = (1.0f - mix) * dryTapL + mix * wetL;
         const float midHighR = (1.0f - mix) * dryTapR + mix * wetR;
 
-        if (multiband_) {
-            L[i] = subTapL + midHighL;
-            R[i] = subTapR + midHighR;
+        const float outL = multiband_ ? (subTapL + midHighL) : midHighL;
+        const float outR = multiband_ ? (subTapR + midHighR) : midHighR;
+
+        // Equal-power crossfading for wet/dry enable/disable
+        float dryW, wetW;
+        if (currentEnabledMix >= 0.9999f) {
+            dryW = 0.0f;
+            wetW = 1.0f;
+        } else if (currentEnabledMix <= 0.0001f) {
+            dryW = 1.0f;
+            wetW = 0.0f;
         } else {
-            L[i] = midHighL;
-            R[i] = midHighR;
+            const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+            dryW = std::cos(angle);
+            wetW = std::sin(angle);
         }
+
+        L[i] = dryW * inL + wetW * outL;
+        R[i] = dryW * inR + wetW * outR;
+        currentEnabledMix += mixStep;
     }
 }
 
 void HarmonicSaturation::processInterleaved(float* buffer, int frames, int channels) {
     channels = std::clamp(channels, 1, MAX_CHANNELS);
-    if (!enabled_ || !buffer || frames <= 0 || channels <= 0) return;
+    const float targetEnabledMix = enabled_ ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!buffer || frames <= 0 || channels <= 0) return;
+
+    // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
+    const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startEnabledMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetEnabledMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetEnabledMix) < 1e-4f) {
+        smoothedEnabledMix_ = targetEnabledMix;
+    }
+    const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
+    float currentEnabledMix = startEnabledMix;
 
     if (channels == 2) {
         const double k = k_;
@@ -413,10 +481,25 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
                     // Store shaped outputs into decimation history ring buffer
                     const int dIdx = (decimIdx_ + p) % DECIM_HISTORY_LEN;
-                    decimHistory_[0][dIdx] = shapeSample(emphL, k, invNorm, mode);
-                    decimHistory_[1][dIdx] = shapeSample(emphR, k, invNorm, mode);
+                    float shL = shapeSample(emphL, k, invNorm, mode);
+                    float shR = shapeSample(emphR, k, invNorm, mode);
+                    if (modeCrossfadeProgress_ < 1.0f) {
+                        const float oldShL = shapeSample(emphL, k, invNorm, prevMode_);
+                        const float oldShR = shapeSample(emphR, k, invNorm, prevMode_);
+                        const float cfAngle = modeCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
+                        const float oldW = std::cos(cfAngle);
+                        const float newW = std::sin(cfAngle);
+                        shL = oldW * oldShL + newW * shL;
+                        shR = oldW * oldShR + newW * shR;
+                    }
+                    decimHistory_[0][dIdx] = shL;
+                    decimHistory_[1][dIdx] = shR;
                 }
                 decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
+                if (modeCrossfadeProgress_ < 1.0f) {
+                    const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+                    modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
+                }
 
                 wetL = 0.0f;
                 wetR = 0.0f;
@@ -463,7 +546,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 #endif
 
                 // DC blocker for asymmetric modes
-                if (mode != 0) {
+                if (mode != 0 || (modeCrossfadeProgress_ < 1.0f && prevMode_ != 0)) {
                     float yL = wetL - dcX_[0] + dcCoeff_ * dcY_[0];
                     float yR = wetR - dcX_[1] + dcCoeff_ * dcY_[1];
                     dcX_[0] = wetL;
@@ -474,12 +557,13 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                     wetR = yR;
                 }
 
-                // FIX M-13: align dry tap with the wet group delay.
-                dryTapL = dryL;
-                dryTapR = dryR;
+                // Align dry tap with wet delay, smoothly crossfading dry path
+                // during enable/disable so phase comb filtering does not occur.
+                dryTapL = currentEnabledMix * dryL + (1.0f - currentEnabledMix) * satInL;
+                dryTapR = currentEnabledMix * dryR + (1.0f - currentEnabledMix) * satInR;
                 if (multiband_) {
-                    subTapL = delayedSubL;
-                    subTapR = delayedSubR;
+                    subTapL = currentEnabledMix * delayedSubL + (1.0f - currentEnabledMix) * subL;
+                    subTapR = currentEnabledMix * delayedSubR + (1.0f - currentEnabledMix) * subR;
                 }
             }
 
@@ -489,13 +573,26 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
             const float midHighL = (1.0f - mix) * dryTapL + mix * wetL;
             const float midHighR = (1.0f - mix) * dryTapR + mix * wetR;
 
-            if (multiband_) {
-                buffer[i * 2] = subTapL + midHighL;
-                buffer[i * 2 + 1] = subTapR + midHighR;
+            const float outL = multiband_ ? (subTapL + midHighL) : midHighL;
+            const float outR = multiband_ ? (subTapR + midHighR) : midHighR;
+
+            // Equal-power crossfading for wet/dry enable/disable
+            float dryW, wetW;
+            if (currentEnabledMix >= 0.9999f) {
+                dryW = 0.0f;
+                wetW = 1.0f;
+            } else if (currentEnabledMix <= 0.0001f) {
+                dryW = 1.0f;
+                wetW = 0.0f;
             } else {
-                buffer[i * 2] = midHighL;
-                buffer[i * 2 + 1] = midHighR;
+                const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+                dryW = std::cos(angle);
+                wetW = std::sin(angle);
             }
+
+            buffer[i * 2] = dryW * inL + wetW * outL;
+            buffer[i * 2 + 1] = dryW * inR + wetW * outR;
+            currentEnabledMix += mixStep;
         }
         return;
     }
@@ -576,11 +673,23 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
                     // Store shaped output into decimation history ring buffer
                     const int dIdx = (decimIdx_ + p) % DECIM_HISTORY_LEN;
-                    decimHistory_[ch][dIdx] = shapeSample(emph, k, invNorm, mode);
+                    float sh = shapeSample(emph, k, invNorm, mode);
+                    if (modeCrossfadeProgress_ < 1.0f) {
+                        const float oldSh = shapeSample(emph, k, invNorm, prevMode_);
+                        const float cfAngle = modeCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
+                        const float oldW = std::cos(cfAngle);
+                        const float newW = std::sin(cfAngle);
+                        sh = oldW * oldSh + newW * sh;
+                    }
+                    decimHistory_[ch][dIdx] = sh;
                 }
                 // Only advance decimIdx_ once per frame (after all channels processed)
                 if (ch == channels - 1) {
                     decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
+                    if (modeCrossfadeProgress_ < 1.0f) {
+                        const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+                        modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
+                    }
                 }
 
                 // Polyphase FIR decimation
@@ -597,25 +706,44 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 }
                 wet *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
 
-                if (mode != 0) {
+                if (mode != 0 || (modeCrossfadeProgress_ < 1.0f && prevMode_ != 0)) {
                     float y = wet - dcX_[ch] + dcCoeff_ * dcY_[ch];
                     dcX_[ch] = wet;
                     dcY_[ch] = y;
                     wet = y;
                 }
 
-                // FIX M-13: align dry tap with the wet group delay.
-                dryTap = dryDelayed;
+                // Align dry tap with wet delay, smoothly crossfading dry path
+                // during enable/disable so phase comb filtering does not occur.
+                dryTap = currentEnabledMix * dryDelayed + (1.0f - currentEnabledMix) * inSample;
                 if (multiband_) {
-                    subTap = delayedSub;
+                    subTap = currentEnabledMix * delayedSub + (1.0f - currentEnabledMix) * subSample;
                 }
             }
 
             if (!std::isfinite(wet)) wet = 0.0f;
 
             const float midHigh = (1.0f - mix) * dryTap + mix * wet;
-            buffer[idx] = multiband_ ? (subTap + midHigh) : midHigh;
+            const float outCh = multiband_ ? (subTap + midHigh) : midHigh;
+            const float inOrig = buffer[idx];
+
+            // Equal-power crossfading for wet/dry enable/disable
+            float dryW, wetW;
+            if (currentEnabledMix >= 0.9999f) {
+                dryW = 0.0f;
+                wetW = 1.0f;
+            } else if (currentEnabledMix <= 0.0001f) {
+                dryW = 1.0f;
+                wetW = 0.0f;
+            } else {
+                const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+                dryW = std::cos(angle);
+                wetW = std::sin(angle);
+            }
+
+            buffer[idx] = dryW * inOrig + wetW * outCh;
         }
+        currentEnabledMix += mixStep;
         // FIX M-13: advance the shared dry-delay position once per frame.
         dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
     }

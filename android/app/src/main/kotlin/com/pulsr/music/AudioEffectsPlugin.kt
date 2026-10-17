@@ -1394,6 +1394,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun restoreNativeStateAfterBypass() {
         if (!isNativeDspLoaded) return
+        recalculateActiveStages()
         lastNativeResamplerEnabled = null
         lastNativeEqEnabled = null
         lastNativeCrossfeedEnabled = null
@@ -1408,7 +1409,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeDynamicBassParams = null
 
         try { nativeSetSincResamplerEnabled(isSincResamplerEnabled) } catch (_: Exception) {}
-        try { nativeSetEqEnabled(isEqEnabled && dspPreference == "native") } catch (_: Exception) {}
+        try { nativeSetEqEnabled(isEqEnabled && currentEqOwner == EqOwner.NATIVE) } catch (_: Exception) {}
         try { nativeSetCrossfeedEnabled(isCrossfeedEnabled) } catch (_: Exception) {}
         try { nativeSetLimiterEnabled(isLimiterEnabled) } catch (_: Exception) {}
         try { nativeSetReverbEnabled(isReverbEnabled) } catch (_: Exception) {}
@@ -1417,6 +1418,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try { nativeSetLoudnessContourEnabled(isLoudnessContourEnabled) } catch (_: Exception) {}
         try { nativeSetSubCrossoverEnabled(isSubCrossoverEnabled) } catch (_: Exception) {}
         try { nativeSetDynamicEqEnabled(isDynamicEqEnabled) } catch (_: Exception) {}
+        try { nativeSetViperDdcEnabled(isViperDdcEnabled) } catch (_: Exception) {}
+        try { nativeSetArbitraryEqEnabled(isArbitraryEqEnabled) } catch (_: Exception) {}
+        try { nativeSetLiveProgEnabled(isLiveProgEnabled) } catch (_: Exception) {}
         // FIX M-10: clear MBC dedup cache so all band params are re-pushed after bypass restore
         lastNativeMultibandCompressorBands.clear()
         lastNativeMultibandCompressorCrossovers = null
@@ -3008,6 +3012,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val preference = call.argument<String>("preference") ?: "native"
                     dspPreference = preference
                     recalculateActiveStages()
+                    if (isNativeDspLoaded) {
+                        try { nativeSetEqEnabled(isEqEnabled && currentEqOwner == EqOwner.NATIVE) } catch (_: Exception) {}
+                    }
                     // Do not tear down the Android session EQ here. Both DSP
                     // paths are audible: the native chain runs inside
                     // ExoPlayer's audio sink, and the HAL chain runs on the
@@ -3107,9 +3114,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                     ?.putInt("dvc_saved_volume", dvcSavedSystemVolume)
                                     ?.putBoolean("dvc_enabled", true)
                                     ?.apply()
+                                // Fade down before changing system stream volume to max
+                                if (isNativeDspLoaded) {
+                                    try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
+                                    try { Thread.sleep(20) } catch (_: InterruptedException) {}
+                                }
                                 val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                                 if (max > 0) {
                                     am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
+                                }
+                                if (isNativeDspLoaded) {
+                                    try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
                                 }
                             }
                             dvcEnabled = true
@@ -3117,10 +3132,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         } else {
                             dvcEnabled = false
                             dvcActive = false
-                            dvcGain = 1.0
                             if (dvcSavedSystemVolume >= 0 && am != null) {
+                                if (isNativeDspLoaded) {
+                                    try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
+                                    try { Thread.sleep(20) } catch (_: InterruptedException) {}
+                                }
                                 am.setStreamVolume(AudioManager.STREAM_MUSIC, dvcSavedSystemVolume, 0)
                             }
+                            dvcGain = 1.0
                             dvcSavedSystemVolume = -1
                             dvcPrefs?.edit()?.clear()?.apply()
                             if (isNativeDspLoaded) {
@@ -3157,6 +3176,24 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val isDop = bypass && (call.argument<Boolean>("isDop") ?: isDopActive)
                     synchronized(stateLock) {
                         if (bypass != isBitPerfectBypassActive || isDop != isDopActive) {
+                            if (bypass && !isBitPerfectBypassActive) bypassSavedStages = activeDspStages
+                            // Hearing-safety: fade down before changing raw PCM path or system stream volume
+                            if (bypass && dvcEnabled) {
+                                dvcActive = false
+                                if (isNativeDspLoaded) {
+                                    try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
+                                    try { Thread.sleep(20) } catch (_: InterruptedException) {}
+                                }
+                                if (dvcSavedSystemVolume >= 0) {
+                                    try {
+                                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                                        am?.setStreamVolume(AudioManager.STREAM_MUSIC, dvcSavedSystemVolume, 0)
+                                    } catch (_: Throwable) {}
+                                }
+                                if (isNativeDspLoaded) {
+                                    try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Throwable) {}
+                                }
+                            }
                             if (isNativeDspLoaded) {
                                 try {
                                     nativeSetBitPerfectParams(bypass, isDop)
@@ -3165,31 +3202,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                     return
                                 }
                             }
-                            if (bypass && !isBitPerfectBypassActive) bypassSavedStages = activeDspStages
                             isBitPerfectBypassActive = bypass
                             isDopActive = isDop
-                            // Mirror into the native snapshot so the C++ early-return
-                            // fires even if a stages mask is stale after reattach.
-                            // Guard the JNI call: an UnsatisfiedLinkError (a Throwable,
-                            // not an Exception) crashes if libpulsr_dsp failed to load.
-                            // DVC cannot apply its float gain through the bypass
-                            // early-return, so suspend it while bit-perfect is active.
-                            // Hearing-safety: DVC pins STREAM_MUSIC to device max and
-                            // attenuates digitally; the bypass early-return drops that
-                            // digital attenuation, so restore the user's saved system
-                            // volume to avoid full-scale PCM at max hardware volume.
-                            if (bypass && dvcEnabled) {
-                                dvcActive = false
-                                if (isNativeDspLoaded) {
-                                    try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Throwable) {}
-                                }
-                                if (dvcSavedSystemVolume >= 0) {
-                                    try {
-                                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                        am?.setStreamVolume(AudioManager.STREAM_MUSIC, dvcSavedSystemVolume, 0)
-                                    } catch (_: Throwable) {}
-                                }
-                            }
                             if (bypass) {
                                 // Immediately disable virtualizer/loudness/bass + native stages
                                 try { virtualizer?.enabled = false } catch (_: Exception) {}
@@ -3198,35 +3212,30 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 try { dynamicsProcessing?.enabled = false } catch (_: Exception) {}
                                 recalculateActiveStages()
                             } else {
+                                recalculateActiveStages()
                                 try { virtualizer?.enabled = isVirtualizerEnabled } catch (_: Exception) {}
                                 try { loudnessEnhancer?.enabled = volumeBoostMilliBels > 0 } catch (_: Exception) {}
                                 try { bassBoost?.enabled = bassBoostStrength > 0 } catch (_: Exception) {}
                                 // Same suppression-aware DP enable rule as everywhere else.
                                 updateDpEnabled()
+                                updateLegacyEqualizer()
                                 restoreNativeStateAfterBypass()
-                                // Hearing-safety: re-establish DVC after leaving
-                                // bit-perfect. Re-pin STREAM_MUSIC to device max and
-                                // re-apply the digital gain so loudness returns to the
-                                // pre-bypass (hardware*digital) level rather than
-                                // staying at the user's raw system volume.
-                                if (dvcEnabled) {
-                                    if (isNativeDspLoaded) {
-                                        dvcActive = true
-                                        try {
-                                            val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                            if (am != null) {
-                                                val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                                                if (max > 0) {
-                                                    am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
-                                                }
+                                // Hearing-safety: re-establish DVC after leaving bit-perfect.
+                                // Fade down before restoring stream volume to max, then fade back up to dvcGain.
+                                if (dvcEnabled && isNativeDspLoaded) {
+                                    dvcActive = true
+                                    try {
+                                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                                        if (am != null) {
+                                            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                            if (max > 0) {
+                                                try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
+                                                try { Thread.sleep(20) } catch (_: InterruptedException) {}
+                                                am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
                                             }
-                                        } catch (_: Throwable) {
                                         }
-                                        try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {
-                                        }
-                                    } else {
-                                        Log.w(TAG, "Cannot re-pin DVC to max volume on bypass restore: native DSP engine not loaded")
-                                    }
+                                    } catch (_: Throwable) {}
+                                    try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
                                 }
                             }
                         }

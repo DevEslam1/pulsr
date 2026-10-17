@@ -1,5 +1,6 @@
 // lib/data/audio/stream_pre_resolver.dart
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../db/app_database.dart';
 import '../../core/services/ytm_url_cache.dart';
@@ -8,25 +9,69 @@ import '../../domain/models/ytm_track.dart';
 typedef StreamUrlResolver = Future<YtmStream> Function(String videoId,
     {String quality});
 
-/// Pool holding preconnected TCP hosts to eliminate DNS + TCP handshake from critical path.
+/// DNS warm-up pool for edge hosts about to be opened by the platform player.
+///
+/// Resolving the host ahead of playback warms the OS resolver cache that
+/// ExoPlayer / just_audio later consult, removing DNS from the
+/// start-of-stream critical path. The pool holds no sockets itself: one opened
+/// here could not be handed to the platform player, so the DNS answer is the
+/// part that carries over.
 class PreconnectedSocketPool {
   static final PreconnectedSocketPool _instance = PreconnectedSocketPool._();
   factory PreconnectedSocketPool() => _instance;
   PreconnectedSocketPool._();
 
-  final Set<String> _preconnectedHosts = {};
-  bool isPreconnected(String host) => _preconnectedHosts.contains(host);
+  /// How long a successful lookup counts as warm. Kept short so an aged answer
+  /// (or a moved edge after a network switch) is re-resolved rather than
+  /// treated as permanently warm.
+  static const Duration warmTtl = Duration(minutes: 2);
 
-  Future<void> preconnect(Uri uri) async {
-    try {
-      final host = uri.host;
-      if (host.isEmpty || _preconnectedHosts.contains(host)) return;
-      _preconnectedHosts.add(host);
-    } catch (_) {}
+  static const Duration _lookupTimeout = Duration(seconds: 3);
+
+  final Map<String, DateTime> _warmedAt = {};
+  final Map<String, Future<void>> _inFlight = {};
+
+  /// Test seam replacing the real `InternetAddress.lookup`.
+  @visibleForTesting
+  Future<void> Function(String host)? debugLookupOverride;
+
+  bool isPreconnected(String host) {
+    final warmedAt = _warmedAt[host];
+    if (warmedAt == null) return false;
+    if (DateTime.now().difference(warmedAt) >= warmTtl) {
+      _warmedAt.remove(host);
+      return false;
+    }
+    return true;
   }
 
+  /// Best-effort DNS warm-up for [uri]'s host. Never throws; concurrent calls
+  /// for the same host share one lookup.
+  Future<void> preconnect(Uri uri) {
+    final host = uri.host;
+    if (host.isEmpty || isPreconnected(host)) return Future<void>.value();
+    final existing = _inFlight[host];
+    if (existing != null) return existing;
+
+    final lookup = debugLookupOverride ?? _lookupHost;
+    final future = Future<void>.sync(() async {
+      await lookup(host).timeout(_lookupTimeout);
+      _warmedAt[host] = DateTime.now();
+    }).catchError((Object _) {}).whenComplete(() {
+      // Block body on purpose: returning the removed future here would make
+      // whenComplete await the very future it is completing (self-deadlock).
+      _inFlight.remove(host);
+    });
+    _inFlight[host] = future;
+    return future;
+  }
+
+  static Future<void> _lookupHost(String host) =>
+      InternetAddress.lookup(host).then((_) {});
+
   void clear() {
-    _preconnectedHosts.clear();
+    _warmedAt.clear();
+    _inFlight.clear();
   }
 }
 
@@ -48,6 +93,11 @@ class StreamPreResolver {
   final bool Function(String videoId)? isAlreadyPrefetching;
   final int preResolveWindowSize;
 
+  /// Optional live override for [preResolveWindowSize], evaluated on every
+  /// plan so the host can bind the warm depth to the current buffer bucket and
+  /// metered-connection policy instead of a value fixed at construction.
+  final int Function()? windowSizeProvider;
+
   Timer? _debounceTimer;
   final Map<String, Object> _activeResolutionTokens = {};
   final Set<String> _inFlightVideoIds = {};
@@ -61,6 +111,7 @@ class StreamPreResolver {
     this.isAlreadyPrefetching,
     this.repeatQueueProvider,
     this.preResolveWindowSize = 1,
+    this.windowSizeProvider,
   });
 
   /// Test entry point mirroring the production constructor so unit tests can
@@ -74,6 +125,7 @@ class StreamPreResolver {
     bool Function(String videoId)? isAlreadyPrefetching,
     bool Function()? repeatQueueProvider,
     int preResolveWindowSize = 1,
+    int Function()? windowSizeProvider,
   }) =>
       StreamPreResolver(
         resolveUrl: resolveUrl,
@@ -83,6 +135,7 @@ class StreamPreResolver {
         isAlreadyPrefetching: isAlreadyPrefetching,
         repeatQueueProvider: repeatQueueProvider,
         preResolveWindowSize: preResolveWindowSize,
+        windowSizeProvider: windowSizeProvider,
       );
 
   final bool Function()? repeatQueueProvider;
@@ -190,6 +243,13 @@ class StreamPreResolver {
     if (queue.isEmpty || currentIndex < 0) return;
 
     final repeatQueue = repeatQueueProvider?.call() ?? false;
+    final requestedWindow =
+        windowSizeProvider?.call() ?? preResolveWindowSize;
+    final window = requestedWindow < 1
+        ? 1
+        : (requestedWindow > defaultPreResolveCount
+            ? defaultPreResolveCount
+            : requestedWindow);
     final nextSongs = _determineNextSongs(
       queue: queue,
       currentIndex: currentIndex,
@@ -197,7 +257,7 @@ class StreamPreResolver {
       shuffleIndices: shuffleIndices,
       explicitNextSong: explicitNextSong,
       repeatQueue: repeatQueue,
-      count: preResolveWindowSize,
+      count: window,
     );
 
     if (nextSongs.isEmpty) return;

@@ -36,6 +36,10 @@ public:
     void processInterleaved(float* buffer, int frames, int channels);
 
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const {
+        return (!enabled_ && smoothedStrength_ > 1e-4) ||
+               (enabled_ && std::abs(smoothedStrength_ - strength_) > 1e-4);
+    }
 
     static void getPresetValues(int preset, int& xLow, int& xHigh,
                                 int& yLow, int& yHigh,

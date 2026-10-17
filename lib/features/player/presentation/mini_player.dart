@@ -54,7 +54,6 @@ class MiniPlayer extends StatefulWidget {
 class MiniPlayerState extends State<MiniPlayer> {
   PageController? _pageController;
   bool _controllerDisposed = false;
-  int _lastKnownIndex = -1;
   int? _pendingSyncIndex;
   int? _pendingQueueLength;
   bool _hasPendingPostFrameSync = false;
@@ -121,7 +120,6 @@ class MiniPlayerState extends State<MiniPlayer> {
     super.initState();
     final initialIndex = context.read<PlayerCubit>().state.currentIndex;
     final safeInitial = initialIndex >= 0 ? initialIndex : 0;
-    _lastKnownIndex = safeInitial;
     _pageController = PageController(initialPage: safeInitial);
     _isInteracting.addListener(_onInteractionChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -219,30 +217,36 @@ class MiniPlayerState extends State<MiniPlayer> {
         _schedulePostFrameSync();
         return;
       }
+      final maxPage = controller.position.viewportDimension > 0
+          ? (controller.position.maxScrollExtent /
+                  controller.position.viewportDimension)
+              .round()
+          : queueLength - 1;
+
+      // If the scroll position has not yet laid out the new queue size (e.g. queue
+      // was just replaced or enlarged), maxPage is still based on the old extent.
+      // Defer to post-frame so PageView has laid out with the new itemCount first.
+      if (safeIndex > maxPage) {
+        _pendingSyncIndex = safeIndex;
+        _pendingQueueLength = queueLength;
+        _schedulePostFrameSync();
+        return;
+      }
+
       _pendingSyncIndex = null;
       _pendingQueueLength = null;
-      if (_lastKnownIndex != safeIndex) {
-        if (controller.page?.round() != safeIndex) {
-          try {
-            final maxPage = controller.position.viewportDimension > 0
-                ? (controller.position.maxScrollExtent /
-                        controller.position.viewportDimension)
-                    .round()
-                : queueLength - 1;
-            if (safeIndex <= maxPage && !_controllerDisposed) {
-              controller.jumpToPage(safeIndex);
-              _lastKnownIndex = safeIndex;
-            }
-          } catch (e, st) {
-            // AUDIT-FIX: Prevent repeated jump retries on jump failure
-            _lastKnownIndex = safeIndex;
-            if (e is! FlutterError) {
-              ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
-                  error: e, stackTrace: st, category: 'MiniPlayer');
-            }
+
+      final currentPage = controller.page?.round();
+      if (currentPage != safeIndex) {
+        try {
+          if (!_controllerDisposed) {
+            controller.jumpToPage(safeIndex);
           }
-        } else {
-          _lastKnownIndex = safeIndex;
+        } catch (e, st) {
+          if (e is! FlutterError) {
+            ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
+                error: e, stackTrace: st, category: 'MiniPlayer');
+          }
         }
       }
     } catch (e, st) {
@@ -294,6 +298,30 @@ class MiniPlayerState extends State<MiniPlayer> {
     if (_pendingSyncIndex != null) {
       _schedulePostFrameSync();
     }
+    // Ensure the PageView is synced to the active track after build/layout
+    final playerState = context.read<PlayerCubit>().state;
+    final currentQ = playerState.queue.isNotEmpty
+        ? playerState.queue
+        : (playerState.currentSong != null
+            ? [playerState.currentSong!]
+            : const <SongsTableData>[]);
+    if (currentQ.isNotEmpty) {
+      final targetIdx =
+          playerState.currentIndex.clamp(0, currentQ.length - 1).toInt();
+      final ctrl = _pageController;
+      if (ctrl != null &&
+          ctrl.hasClients &&
+          !_isInteracting.value &&
+          !_swipeInFlight) {
+        final curPage = ctrl.page?.round();
+        if (curPage != null && curPage != targetIdx) {
+          _pendingSyncIndex = targetIdx;
+          _pendingQueueLength = currentQ.length;
+          _schedulePostFrameSync();
+        }
+      }
+    }
+
     // Narrow subscription: only the vinyl theme decision is read here, so an
     // unrelated settings change must not rebuild the mini player (A-11).
     final playerThemeMode = context
@@ -313,6 +341,7 @@ class MiniPlayerState extends State<MiniPlayer> {
     final content = BlocConsumer<PlayerCubit, PlayerState>(
       listenWhen: (a, b) =>
           a.currentIndex != b.currentIndex ||
+          a.currentSong?.id != b.currentSong?.id ||
           listContentDiffers(a.queue, b.queue),
       listener: (context, state) {
         if (!mounted || _controllerDisposed) return;
@@ -602,7 +631,6 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                               .value &&
                                                           page !=
                                                               currentIndex) {
-                                                        _lastKnownIndex = page;
                                                         if (mounted) {
                                                           setState(() {
                                                             _swipeInFlight =

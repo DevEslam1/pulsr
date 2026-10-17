@@ -1,28 +1,10 @@
 // lib/data/audio/collaborators/stream_resolution_pipeline.dart
 import 'dart:async';
-import 'dart:collection';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
-
-class CachedStreamUrl {
-  final String url;
-  final String? userAgent;
-  final String? cookies;
-  final DateTime expires;
-  final int? bitrateKbps;
-  final String? codec;
-  CachedStreamUrl(
-    this.url,
-    this.expires, {
-    this.userAgent,
-    this.cookies,
-    this.bitrateKbps,
-    this.codec,
-  });
-}
 
 /// BUG-06: an in-flight resolve together with a completion marker, so a
 /// superseded future whose identity no longer matches the map cannot be left
@@ -35,8 +17,9 @@ class _InFlightResolve {
   bool done = false;
 }
 
-/// Pipeline resolving YouTube Music stream URLs, integrating multi-layer caching,
-/// in-flight deduplication, and error classification.
+/// Pipeline resolving YouTube Music stream URLs, gating playback-time checks,
+/// deduplicating in-flight resolves, and classifying errors. Resolved URLs are
+/// cached by [YtmUrlCache] under [YtmService]; this class keeps no second copy.
 class StreamResolutionPipeline {
   final YtmService ytmService;
   final PlaybackLatencyTracker? Function()? getLatencyTracker;
@@ -49,23 +32,7 @@ class StreamResolutionPipeline {
   /// racing a second Dart-level chain here only doubled native load.
   bool hedgedEnabled;
 
-  /// Explicit LinkedHashMap preserving strict insertion-order for LRU cache eviction.
-  final LinkedHashMap<String, CachedStreamUrl> _streamCache = LinkedHashMap();
   final Map<String, _InFlightResolve> _inFlightResolves = {};
-  final Map<String, int> _videoIdEpochs = {};
-  int _resolveEpoch = 0;
-
-  int get resolveEpoch => _resolveEpoch;
-
-  /// Cap on the in-memory URL cache. Without a bound it grew for every distinct
-  /// `videoId:quality` seen in a session.
-  static const int _maxCacheEntries = 128;
-  static int get maxCacheEntries => _maxCacheEntries;
-
-  /// Treat a cached URL that expires within this window as already stale, so we
-  /// re-resolve rather than hand just_audio a URL that 403s a moment into
-  /// playback.
-  static const Duration _expirySafetyMargin = Duration(seconds: 60);
 
   StreamResolutionPipeline({
     required this.ytmService,
@@ -75,36 +42,15 @@ class StreamResolutionPipeline {
     this.onStreamResolved,
   });
 
-  LinkedHashMap<String, CachedStreamUrl> get streamCache => _streamCache;
-
   void invalidateCache(String videoId) {
     // Keys are `videoId:quality`; anchor the prefix to the separator so a
     // shorter id can never match a sibling key.
-    _streamCache.removeWhere((k, _) => k.startsWith('$videoId:'));
     _inFlightResolves.removeWhere((k, _) => k.startsWith('$videoId:'));
-    _videoIdEpochs[videoId] = (_videoIdEpochs[videoId] ?? 0) + 1;
   }
 
-  /// Clears in-flight and cached stream URLs and advances the epoch so
-  /// in-flight resolutions bound to the old network path cannot write back.
+  /// Drops in-flight resolves bound to the old network path.
   void clearNetworkCaches() {
-    _streamCache.clear();
     _inFlightResolves.clear();
-    _videoIdEpochs.clear();
-    _resolveEpoch++;
-  }
-
-  /// Evicts expired entries first, then oldest-inserted (insertion-order LRU),
-  /// to keep the URL cache bounded across a long session.
-  void pruneCache() => _pruneCache();
-
-  void _pruneCache() {
-    if (_streamCache.length <= _maxCacheEntries) return;
-    final now = DateTime.now();
-    _streamCache.removeWhere((_, v) => !v.expires.isAfter(now));
-    while (_streamCache.length > _maxCacheEntries) {
-      _streamCache.remove(_streamCache.keys.first);
-    }
   }
 
   Future<({String url, String? userAgent, String? cookies, String quality})>
@@ -146,40 +92,8 @@ class StreamResolutionPipeline {
         effectivePrefs.getString('setting_streaming_quality') ??
         'high';
     final cacheKey = '$videoId:${effectiveQuality.toLowerCase()}';
-    final resolveEpoch = _resolveEpoch;
-    final videoEpoch = _videoIdEpochs[videoId] ?? 0;
 
     if (!forceRefresh) {
-      final cached = _streamCache[cacheKey];
-      if (cached != null) {
-        if (cached.expires.isAfter(DateTime.now().add(_expirySafetyMargin))) {
-          _streamCache.remove(cacheKey);
-          _streamCache[cacheKey] = cached;
-          try {
-            getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
-          } catch (_) {}
-          final defaultKbps = effectiveQuality == 'low'
-              ? 64
-              : effectiveQuality == 'medium'
-                  ? 128
-                  : 160;
-          final defaultCodec = effectiveQuality == 'medium' ? 'AAC' : 'OPUS';
-          onStreamResolved?.call(
-            song,
-            cached.bitrateKbps ?? defaultKbps,
-            cached.codec ?? defaultCodec,
-          );
-          return (
-            url: cached.url,
-            userAgent: cached.userAgent,
-            cookies: cached.cookies,
-            quality: effectiveQuality,
-          );
-        } else {
-          // Eagerly evict expired stream cache entry
-          _streamCache.remove(cacheKey);
-        }
-      }
       final inFlight = _inFlightResolves[cacheKey];
       if (inFlight != null && !inFlight.done) {
         return await inFlight.future;
@@ -223,38 +137,6 @@ class StreamResolutionPipeline {
               : 'OPUS');
 
       onStreamResolved?.call(song, realBitrate, realCodec);
-
-      // F4: one expiry parser, not a second one. `int.parse` on a malformed or
-      // out-of-range `expire` threw straight out of the resolver — surfacing as
-      // "resolution failed" for a URL that was perfectly fine — and only the
-      // `?expire=` query form was read, while `YtmStream.expiryFromUrl` handles
-      // both that and the `/expire/<epoch>/` path form without throwing.
-      final rawExpireStamp =
-          stream.expiresAt ?? YtmStream.expiryFromUrl(stream.url);
-      final expireStamp = (rawExpireStamp != null &&
-              rawExpireStamp > 0 &&
-              rawExpireStamp < 100000000000)
-          ? rawExpireStamp * 1000
-          : rawExpireStamp;
-      final DateTime expireAt;
-      if (expireStamp != null) {
-        expireAt = DateTime.fromMillisecondsSinceEpoch(expireStamp);
-      } else {
-        expireAt = DateTime.now().add(const Duration(hours: 5));
-      }
-
-      if (_resolveEpoch == resolveEpoch &&
-          (_videoIdEpochs[videoId] ?? 0) == videoEpoch) {
-        _streamCache[cacheKey] = CachedStreamUrl(
-          stream.url,
-          expireAt,
-          userAgent: stream.userAgent,
-          cookies: stream.cookies,
-          bitrateKbps: realBitrate,
-          codec: realCodec,
-        );
-        _pruneCache();
-      }
 
       try {
         getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);

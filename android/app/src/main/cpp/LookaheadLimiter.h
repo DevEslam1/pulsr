@@ -30,6 +30,7 @@ public:
     bool isEnabled() const { return enabled_; }
     void applyParams(const LimiterParamSet& params);
     void reset();
+    bool isDraining() const { return envelope_ < 0.999f; }
 
     // Read from the control thread (getPipelineLatencyFrames) while the audio
     // thread writes lookaheadSamples_ in configure(); mirror it to an atomic so

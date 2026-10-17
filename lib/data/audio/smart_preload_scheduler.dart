@@ -174,6 +174,11 @@ class SmartPreloadScheduler {
 
   bool _meteredCache = false;
 
+  /// Last known metered-connection state, refreshed in the background on each
+  /// schedule pass. Lets other preload stages (e.g. stream URL pre-resolution)
+  /// apply the same data-cost policy.
+  bool get isMeteredCached => _meteredCache;
+
   Future<void> _refreshMeteredState() async {
     try {
       _meteredCache = await ConnectivityGuard.isMeteredConnection();

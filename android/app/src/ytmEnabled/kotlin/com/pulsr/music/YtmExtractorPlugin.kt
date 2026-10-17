@@ -134,7 +134,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 plugin.executor.execute {
                     runCatching {
                         plugin.ensureExtractorReady()
-                        PlayerJavaScript.warmUp()
+                        PlayerJavaScript.warmUp(ctx)
                     }
                 }
             }

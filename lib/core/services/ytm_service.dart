@@ -190,8 +190,46 @@ class YtmService {
 
   /// Extended cooldown for IP-level blocks (every client fails instantly).
   static const _ipBlockCooldown = Duration(seconds: 180);
+
+  /// Ceiling for the escalating bot-challenge window: 45s → 90s → 180s.
+  /// Retrying a persistent gate every 45s in lockstep is what keeps it
+  /// refusing; a longer window also stops burning full native chains.
+  static const _maxBotCooldown = Duration(minutes: 3);
+
+  /// Ceiling for the escalating IP-block window: 180s → 360s → 720s.
+  static const _maxIpBlockCooldown = Duration(minutes: 12);
+
+  /// A challenge-free gap longer than this resets the escalation streak, so a
+  /// single bad minute hours ago does not inflate today's cooldowns.
+  static const _challengeStreakDecay = Duration(minutes: 10);
+
+  /// Consecutive challenge episodes (each a window started while no other was
+  /// active). Multiplies the next window; reset by any successful resolve, a
+  /// network-path change, or [_challengeStreakDecay] of clean time.
+  int _challengeStreak = 0;
+  DateTime _lastChallengeAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   DateTime _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
   YtmException? _lastBotChallenge;
+
+  /// Injectable clock for the cooldown ledger; tests advance it instead of
+  /// sleeping out real 45s/180s windows.
+  DateTime Function() _now = DateTime.now;
+
+  @visibleForTesting
+  set debugClock(DateTime Function() clock) => _now = clock;
+
+  /// Remaining bot/IP cooldown, or null when none is active.
+  @visibleForTesting
+  Duration? get debugBotCooldownRemaining {
+    final remaining = _botChallengeUntil.difference(_now());
+    return remaining.isNegative ? null : remaining;
+  }
+
+  /// Test-only: exercise the success path (cooldown + streak reset).
+  @visibleForTesting
+  void debugNoteResolveSuccess({String? videoId}) =>
+      _noteResolveSuccess(videoId: videoId);
 
   /// Pushes bot-cooldown transitions to the UI without a polling timer: the
   /// value flips to true when a cooldown starts and back to false exactly when
@@ -204,14 +242,14 @@ class YtmService {
     if (_disposed) return;
     _botCooldownTimer?.cancel();
     _botCooldownTimer = null;
-    final remaining = _botChallengeUntil.difference(DateTime.now());
+    final remaining = _botChallengeUntil.difference(_now());
     if (remaining <= Duration.zero) {
       if (botCooldownNotifier.value) botCooldownNotifier.value = false;
       return;
     }
     if (!botCooldownNotifier.value) botCooldownNotifier.value = true;
     _botCooldownTimer = Timer(remaining, () {
-      if (DateTime.now().isBefore(_botChallengeUntil)) {
+      if (_now().isBefore(_botChallengeUntil)) {
         _syncBotCooldownNotifier();
       } else if (botCooldownNotifier.value) {
         botCooldownNotifier.value = false;
@@ -261,7 +299,7 @@ class YtmService {
   bool isVideoCoolingDown(String videoId) {
     final until = _videoCooldownUntil[videoId];
     if (until == null) return false;
-    if (DateTime.now().isBefore(until)) return true;
+    if (_now().isBefore(until)) return true;
     _videoCooldownUntil.remove(videoId);
     return false;
   }
@@ -275,7 +313,7 @@ class YtmService {
       _noteBotChallenge(err, videoId: videoId);
     } else {
       // Non-bot failures track per-video without tripping a global bot challenge
-      final now = DateTime.now();
+      final now = _now();
       _pruneVideoFailureMaps(now);
       final failures = _videoFailures.putIfAbsent(videoId, () => []);
       failures.removeWhere((t) => now.difference(t).inSeconds > 60);
@@ -286,7 +324,62 @@ class YtmService {
     }
   }
 
-  bool get isBotCoolingDown => DateTime.now().isBefore(_botChallengeUntil);
+  /// Notes a post-resolve playback failure (a stream URL that 403s mid-track)
+  /// into the same ledger resolve failures feed, so a bot/IP verdict surfaced
+  /// during playback engages the cooldown for the queue's next resolves.
+  ///
+  /// Only egress verdicts qualify: a burned URL or a dropped connection is
+  /// remedied by re-resolving, and must not silence the native tiers.
+  /// [videoId] may be empty for a pseudo-song with no remote id, in which case
+  /// only the global cooldown is affected.
+  void notePlaybackFailure(String videoId, Object error) {
+    final info = YtmErrorClassifier.classify(error);
+    final signal = info.signal;
+    if (signal == null ||
+        (signal != YtmBlockSignal.botChallenge &&
+            signal != YtmBlockSignal.ipBlocked &&
+            signal != YtmBlockSignal.poTokenInvalid &&
+            signal != YtmBlockSignal.rateLimited)) {
+      return;
+    }
+    recordFailure(
+      videoId,
+      // Always rebuild from the classified signal: a source-born
+      // `YtmException` may carry a mangled code, and the classifier's verdict
+      // is the authoritative one.
+      YtmException(
+        signal.wireCode,
+        error is YtmException ? (error.details ?? info.message) : info.message,
+        error is YtmException ? error.traceId : null,
+      ),
+    );
+  }
+
+  bool get isBotCoolingDown => _now().isBefore(_botChallengeUntil);
+
+  /// Window for a *new* challenge episode: the signal's base cooldown doubled
+  /// per consecutive episode, capped, with a clean-gap reset for the streak.
+  /// Episodes (not raw events) are counted so the account and native tiers
+  /// noting the same challenge — and retry loops — cannot inflate the streak.
+  Duration _nextChallengeWindow(YtmException e, DateTime now) {
+    // Decay is measured from the end of the previous episode, when one existed:
+    // time spent inside a block is not "clean time", and with the IP ceiling
+    // (12m) longer than the decay (10m), measuring from the challenge start
+    // would reset the streak before every follow-up IP episode.
+    final cleanSince = _botChallengeUntil.isAfter(_lastChallengeAt)
+        ? _botChallengeUntil
+        : _lastChallengeAt;
+    if (now.difference(cleanSince) > _challengeStreakDecay) {
+      _challengeStreak = 0;
+    }
+    _lastChallengeAt = now;
+    _challengeStreak = (_challengeStreak + 1).clamp(1, 5);
+    final isIp = e.isIpBlocked;
+    final base = isIp ? _ipBlockCooldown : _botCooldown;
+    final cap = isIp ? _maxIpBlockCooldown : _maxBotCooldown;
+    final scaled = base * (1 << (_challengeStreak - 1));
+    return scaled > cap ? cap : scaled;
+  }
 
   void _noteBotChallenge(YtmException e, {String? videoId}) {
     if (e.isBotBlocked || e.isIpBlocked || e.isThrottled) {
@@ -294,25 +387,31 @@ class YtmService {
     }
     final signal = e.signal;
     if (signal != null) breaker.recordFailure(signal);
-    final now = DateTime.now();
+    final now = _now();
+    final blocked = e.isBotBlocked || e.isIpBlocked || e.isThrottled;
 
-    // FIX-C01: Key circuit breaker per videoId (3 failures within 60s)
+    if (blocked) {
+      // While a window is active it is never extended: one resolve attempt can
+      // note a challenge from both racing tiers, and a retry loop would
+      // otherwise hold the window open forever instead of outlasting it.
+      if (!_botChallengeUntil.isAfter(now)) {
+        _botChallengeUntil = now.add(_nextChallengeWindow(e, now));
+      }
+      if (videoId != null && videoId.isNotEmpty) {
+        _videoCooldownUntil[videoId] = _botChallengeUntil;
+      }
+    }
+
+    // FIX-C01: per-video failure ledger (3 failures within 60s) for the
+    // non-block failures; a repeated single-video failure gets skipped too.
     if (videoId != null && videoId.isNotEmpty) {
       _pruneVideoFailureMaps(now);
       final failures = _videoFailures.putIfAbsent(videoId, () => []);
       failures.removeWhere((t) => now.difference(t).inSeconds > 60);
       failures.add(now);
-
-      if (e.isIpBlocked || e.isBotBlocked || e.isThrottled) {
-        final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
-        _videoCooldownUntil[videoId] = now.add(cooldown);
-        _botChallengeUntil = now.add(cooldown);
-      } else if (failures.length >= 3) {
+      if (!blocked && failures.length >= 3) {
         _videoCooldownUntil[videoId] = now.add(_videoFailureCooldown);
       }
-    } else if (e.isIpBlocked || e.isBotBlocked || e.isThrottled) {
-      final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
-      _botChallengeUntil = now.add(cooldown);
     }
     _syncBotCooldownNotifier();
   }
@@ -323,6 +422,10 @@ class YtmService {
   /// in, and every retry inside the window rethrew the stale challenge.
   void _noteResolveSuccess({String? videoId}) {
     breaker.recordSuccess();
+    // A success proves the egress is clean again, so escalation restarts from
+    // the base window rather than punishing the next unrelated blip.
+    _challengeStreak = 0;
+    _lastChallengeAt = DateTime.fromMillisecondsSinceEpoch(0);
     if (videoId != null) {
       _videoFailures.remove(videoId);
       _videoCooldownUntil.remove(videoId);
@@ -345,6 +448,8 @@ class YtmService {
       _videoFailures.clear();
       _videoCooldownUntil.clear();
     }
+    _challengeStreak = 0;
+    _lastChallengeAt = DateTime.fromMillisecondsSinceEpoch(0);
     _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _lastBotChallenge = null;
     _syncBotCooldownNotifier();

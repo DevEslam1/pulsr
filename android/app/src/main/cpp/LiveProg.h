@@ -11,8 +11,18 @@ class LiveProg {
 public:
     LiveProg();
     void setSampleRate(double sampleRate);
-    void setEnabled(bool enabled) { enabled_ = enabled; }
+    void setEnabled(bool enabled, bool immediate = false) {
+        enabled_ = enabled;
+        if (immediate) {
+            smoothedEnabledMix_ = (enabled && isCompiled_ && !sampleBytecode_.empty()) ? 1.0f : 0.0f;
+        }
+    }
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const {
+        return (!enabled_ && smoothedEnabledMix_ >= 1e-4f) ||
+               (enabled_ && smoothedEnabledMix_ < 0.9999f) ||
+               (programCrossfadeProgress_ < 1.0f && !prevSampleBytecode_.empty());
+    }
     void applyParams(const LiveProgParamSet& params);
     void reset();
 
@@ -84,9 +94,16 @@ private:
     std::vector<Instruction> initBytecode_;
     std::vector<Instruction> sampleBytecode_;
 
+    float smoothedEnabledMix_ = 0.0f;
+    std::vector<Instruction> prevSampleBytecode_;
+    std::vector<double> prevMemory_;
+    int prevIdxSpl0_ = -1;
+    int prevIdxSpl1_ = -1;
+    float programCrossfadeProgress_ = 1.0f;
+
     int getOrRegisterVar(const std::string& name);
     bool compileScript(const std::string& code);
-    void executeBytecode(const std::vector<Instruction>& program);
+    void executeBytecode(const std::vector<Instruction>& program, std::vector<double>& memory);
     void applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>& program);
 
     static constexpr int MAX_BYTECODE = 8192;

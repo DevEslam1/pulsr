@@ -1675,12 +1675,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
 
     _memoryManager = AudioMemoryManager(
-      onEvictOldestCacheRequested: () {
-        _streamResolutionPipeline.pruneCache();
-      },
-      onBackgroundReleaseRequested: () {
-        _streamResolutionPipeline.pruneCache();
-      },
       onPreloadRejected: (key, sizeBytes) {
         debugPrint(
             '[AudioHandler] Preload rejected for $key ($sizeBytes bytes)');
@@ -1708,6 +1702,12 @@ class PulsrAudioHandler extends BaseAudioHandler
           _prefetching.contains(id),
       repeatQueueProvider: () =>
           playbackState.value.repeatMode == AudioServiceRepeatMode.all,
+      // Warm as deep as the live buffer bucket allows (minimal=1, standard=2,
+      // generous=3), except on metered connections where the scheduler's
+      // data-cost policy caps it at the single next track.
+      windowSizeProvider: () => _preloadScheduler.isMeteredCached
+          ? 1
+          : _preloadCountForCurrentBucket,
     );
 
     _formatDecoder = FormatAwareDecoder(
@@ -2560,11 +2560,13 @@ class PulsrAudioHandler extends BaseAudioHandler
   static bool _isStreamUrl(String path) =>
       path.startsWith('http://') || path.startsWith('https://');
 
-  /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized
-  /// one until it nears expiry. Throws [YtmException] when nothing usable comes
-  /// back, so the caller can tell "network down" from "skip this track".
+  /// Returns a currently-valid stream URL for a YouTube row, reusing the
+  /// shared [YtmUrlCache] entry until it nears expiry. Throws [YtmException]
+  /// when nothing usable comes back, so the caller can tell "network down"
+  /// from "skip this track".
   ///
-  /// Delegated to [_streamResolutionPipeline] to unify in-memory caching and deduplication.
+  /// Delegated to [_streamResolutionPipeline] for gating and in-flight
+  /// deduplication.
   /// [quality] is reported back because it is part of every downstream cache key
   /// ([YtmUrlCache], the disk cache slot); the caller cannot assume `high`.
   @override

@@ -230,8 +230,16 @@ void main() {
     // 9. DownloadsCubit.cancelDownload pauses and deletes task
     test('9. DownloadsCubit.cancelDownload pauses and deletes task', () async {
       final mockRepo = MockDownloadRepository();
+      final task = DownloadTask(
+        id: 'vid_abc',
+        videoId: 'vid_abc',
+        title: 'Track',
+        artist: 'Artist',
+        status: DownloadStatus.downloading,
+        createdAt: DateTime(2026, 1, 1),
+      );
       when(() => mockRepo.reconcileOnBoot()).thenAnswer((_) async {});
-      when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => []);
+      when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => [task]);
       when(() => mockRepo.observeDownloads())
           .thenAnswer((_) => const Stream.empty());
       when(() => mockRepo.pauseDownload('vid_abc'))
@@ -264,6 +272,12 @@ void main() {
         storageStatsUseCase,
         mockRepo,
       );
+
+      // FIX-A13 guard: cancelDownload only pauses a task that is known to be
+      // pausable — wait for _init to hydrate state.tasks from the repository.
+      await pumpEventQueue();
+      expect(cubit.state.tasks.containsKey('vid_abc'), isTrue,
+          reason: 'init must hydrate the download task before cancel');
 
       await cubit.cancelDownload('vid_abc');
 

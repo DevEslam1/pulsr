@@ -214,7 +214,7 @@ class YtmResolvingSource extends StreamAudioSource {
           debugPrint(
               '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}');
           if (_isFatalSignal(classified)) {
-            final code = (classified.signal?.name ?? 'UNKNOWN').toUpperCase();
+            final code = classified.signal?.wireCode ?? 'UNKNOWN';
             final fatalErr = retryErr is YtmException
                 ? retryErr
                 : YtmException(code, classified.message);
@@ -237,7 +237,7 @@ class YtmResolvingSource extends StreamAudioSource {
       // Only fatal signals qualify: bot challenges and unavailable tracks won't
       // resolve on re-request; network blips should still get a retry.
       if (_isFatalSignal(classified)) {
-        final code = (classified.signal?.name ?? 'UNKNOWN').toUpperCase();
+        final code = classified.signal?.wireCode ?? 'UNKNOWN';
         final fatalErr =
             err is YtmException ? err : YtmException(code, classified.message);
         _permanentFailure = fatalErr;

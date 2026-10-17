@@ -74,6 +74,14 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       category: 'AudioHandler',
     );
 
+    // Feed the resolve-failure ledger: a bot/IP verdict surfaced mid-stream
+    // (the URL starts 403ing the moment the egress gets challenged) is the
+    // same egress verdict a failed resolve produces, and it must engage the
+    // cooldown so the queue's following resolves fail fast instead of burning
+    // native chains against a blocked IP. Runs for background pre-fetches too
+    // — before the isCurrentTrack guard on purpose: the egress is shared.
+    _ytmService.notePlaybackFailure(song.remoteId ?? '', error);
+
     // Invalidate poToken only on a verdict that a fresh attestation can fix.
     // `contains('403')` matched the digits anywhere in the message — including
     // inside a video id, an itag or a byte count — and bare `bot` matched
@@ -82,10 +90,18 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     final signal = info.signal;
     if (signal == YtmBlockSignal.botChallenge ||
         signal == YtmBlockSignal.poTokenInvalid) {
-      _ytmService.invalidatePoToken().catchError((e, st) {
-        ErrorLogger.log('poToken invalidation failed',
-            error: e, stackTrace: st, category: 'AudioHandler');
-      });
+      // Invalidate AND re-mint off the critical path: leaving the token null
+      // makes the next native chain pay the BotGuard mint inline (~2-4s), and
+      // an immediate user retry would run against no token at all.
+      unawaited(() async {
+        try {
+          await _ytmService.invalidatePoToken();
+          await _ytmService.ensurePoTokenReady();
+        } catch (e, st) {
+          ErrorLogger.log('poToken invalidation failed',
+              error: e, stackTrace: st, category: 'AudioHandler');
+        }
+      }());
     }
     // CRITICAL GUARD: If the error occurred on a pre-fetched background track or queued item
     // that is not currently playing, NEVER pause playback, skip, or increment failures!
@@ -273,6 +289,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   /// `expire`/`ip` signature and return 403 when the egress IP changes.
   void clearNetworkCaches() {
     _streamResolutionPipeline.clearNetworkCaches();
+    // DNS answers (and any warm edges) are pinned to the old route.
+    PreconnectedSocketPool().clear();
     cancelPrefetches(); // also clears _prefetching
   }
 

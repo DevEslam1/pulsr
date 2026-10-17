@@ -658,6 +658,7 @@ void AudioDspEngine::resetInternal() {
     for (int b = 0; b < MultibandCompressor::NUM_BANDS; ++b) {
         mbCompGrDb_[b].store(0.0f, std::memory_order_relaxed);
     }
+    const auto* snap = currentParamsPtr_.load(std::memory_order_relaxed);
 }
 
 void AudioDspEngine::reset() {
@@ -863,19 +864,21 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
 
     // Nonlinear/custom stages may boost even without a positive EQ knob.
     hasNetPositiveGain |=
-        ((stages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled) ||
-        ((stages & STAGE_VIPER_DDC) && snapshot->viperDdc.enabled) ||
-        ((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled) ||
+        (((stages & STAGE_ARBITRARY_EQ) || arbitraryEq_.isRamping()) && (snapshot->arbitraryEq.enabled || arbitraryEq_.isRamping())) ||
+        (((stages & STAGE_VIPER_DDC) || viperDdc_.isRamping()) && (snapshot->viperDdc.enabled || viperDdc_.isRamping())) ||
+        (((stages & STAGE_LIVE_PROG) || liveProg_.isRamping()) && (snapshot->liveProg.enabled || liveProg_.isRamping())) ||
         ((stages & STAGE_REVERB) && snapshot->reverb.enabled) ||
         ((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled) ||
         ((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled) ||
-        ((stages & STAGE_SATURATION) && snapshot->saturation.enabled) ||
+        (((stages & STAGE_SATURATION) || saturation_.isRamping()) && (snapshot->saturation.enabled || saturation_.isRamping())) ||
         ((stages & STAGE_PANNER) && std::abs(snapshot->panner.balance) > 0.001) ||
         // Crossfeed and SubCrossover can sum channels above unity at low
         // frequencies; guard them too. The old heuristic omitted these, so their
         // boosts could reach the final hard clamp and click when toggling.
         ((stages & STAGE_CROSSFEED) && snapshot->crossfeed.enabled) ||
-        ((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled);
+        ((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled) ||
+        // DVC boost (> 1.0 / > 0 dB) must be guarded by lookahead limiter to prevent DAC clipping
+        (snapshot->directVolume.enabled && (snapshot->directVolume.gainLinear > 1.001 || smoothedDirectVolume_ > 1.001));
     // The lookahead limiter runs only when the chain can boost above unity (or
     // the limiter stage is explicitly enabled). A transparent, no-op chain — a
     // centered panner, a mono downmix, or every stage off — must stay
@@ -885,7 +888,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // hasNetPositiveGain above — NOT by forcing the limiter always-on, which
     // added latency to neutral chains and broke bit-exact bypass.
     const bool runLimiter = hasNetPositiveGain ||
-        ((stages & STAGE_LIMITER) && snapshot->limiter.enabled);
+        ((stages & STAGE_LIMITER) && snapshot->limiter.enabled) ||
+        limiter_.isDraining();
     const bool dvcActive = snapshot->directVolume.enabled &&
         (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(snapshot->directVolume.gainLinear - 1.0) > 1e-4);
     const bool nonUnityGain = (stages != 0) ||
@@ -896,20 +900,25 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                               crossfeed_.isRamping() || stereoWidth_.isRamping() ||
                               reverb_.isRamping() ||
                               loudnessContour_.isRamping() || dynamicEq_.isRamping() ||
-                              subCrossover_.isRamping();
+                              subCrossover_.isRamping() ||
+                              saturation_.isRamping() || arbitraryEq_.isRamping() ||
+                              viperDdc_.isRamping() || liveProg_.isRamping() ||
+                              dynamicBass_.isRamping() || multibandCompressor_.isRamping() ||
+                              panner_.isRamping();
 
     if (nonUnityGain) {
         // Apply smoothed ReplayGain pre-gain before EQ stage
         if (std::abs(smoothedReplayGain_ - 1.0) > 1e-4 || std::abs(startReplayGain - 1.0) > 1e-4) {
-            // Ramp per frame so all channels share the same gain for a frame.
-            double currentRg = startReplayGain;
-            const double rgIncrement = (smoothedReplayGain_ - startReplayGain) / static_cast<double>(frames);
+            // S-curve smoothstep ramp per frame so all channels share the same gain for a frame.
+            const double rgDelta = smoothedReplayGain_ - startReplayGain;
+            const double invFrames = (frames > 1) ? (1.0 / static_cast<double>(frames - 1)) : 0.0;
             for (int f = 0; f < frames; ++f) {
-                const float g = static_cast<float>(currentRg);
+                const double t = static_cast<double>(f) * invFrames;
+                const double s = (frames > 1) ? (t * t * (3.0 - 2.0 * t)) : 1.0;
+                const float g = static_cast<float>(startReplayGain + s * rgDelta);
                 for (int ch = 0; ch < channels; ++ch) {
                     buffer[f * channels + ch] *= g;
                 }
-                currentRg += rgIncrement;
             }
         }
 
@@ -927,13 +936,15 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 1b. Arbitrary Response EQ (EqualizerAPO GraphicEq)
-        if ((stages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled) {
+        arbitraryEq_.setEnabled((stages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled);
+        if ((stages & STAGE_ARBITRARY_EQ) || arbitraryEq_.isRamping()) {
             arbitraryEq_.processInterleaved(buffer, frames, channels);
             if (channels >= 2) blockLatency += arbitraryEq_.getLatencyFrames();
         }
 
         // 1c. ViPER-DDC (Digital Dynamic Correction)
-        if ((stages & STAGE_VIPER_DDC) && snapshot->viperDdc.enabled) {
+        viperDdc_.setEnabled((stages & STAGE_VIPER_DDC) && snapshot->viperDdc.enabled);
+        if ((stages & STAGE_VIPER_DDC) || viperDdc_.isRamping()) {
             viperDdc_.processInterleaved(buffer, frames, channels);
         }
 
@@ -944,12 +955,13 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 2b. Native Multiband Compressor Stage — 4-band LR4 dynamics (stereo channels 0 and 1)
-        if ((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled && channels >= 2) {
+        multibandCompressor_.setEnabled((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled);
+        if (((stages & STAGE_MULTIBAND_COMPRESSOR) || multibandCompressor_.isRamping()) && channels >= 2) {
             multibandCompressor_.processInterleaved(buffer, frames, channels);
         }
 
         // 3. Spatial Panner & Balance (All channels) — positioner before reverb for natural acoustics
-        if (stages & STAGE_PANNER) {
+        if ((stages & STAGE_PANNER) || panner_.isRamping()) {
             panner_.processInterleaved(buffer, frames, channels);
         }
 
@@ -961,7 +973,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         // 5. Harmonic Saturation / Exciter Stage — 4x oversampled with anti-aliasing.
         //    Runs BEFORE reverb so harmonics are generated on the dry signal and
         //    the reverb tail is not re-saturated (which muddies the wet signal).
-        if (stages & STAGE_SATURATION) {
+        saturation_.setEnabled((stages & STAGE_SATURATION) && snapshot->saturation.enabled);
+        if ((stages & STAGE_SATURATION) || saturation_.isRamping()) {
             saturation_.processInterleaved(buffer, frames, channels);
             blockLatency += saturation_.getLatencyFrames();
         }
@@ -973,7 +986,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 6b. Live Programmable DSP Stage
-        if ((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled) {
+        liveProg_.setEnabled((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled);
+        if ((stages & STAGE_LIVE_PROG) || liveProg_.isRamping()) {
             liveProg_.processInterleaved(buffer, frames, channels);
         }
 
@@ -989,7 +1003,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 8b. Dynamic Bass Stage (ViPER-modeled Dynamic System, stereo channels 0 and 1)
-        if ((stages & STAGE_DYNAMIC_BASS) && snapshot->dynamicBass.enabled && channels >= 2) {
+        if (((stages & STAGE_DYNAMIC_BASS) || dynamicBass_.isRamping()) && channels >= 2) {
             dynamicBass_.processInterleaved(buffer, frames, channels);
         }
 
@@ -1017,15 +1031,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                 smoothedDirectVolume_ = dvcTarget;
             }
             if (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(startDvc - 1.0) > 1e-4) {
-                // Ramp per frame so all channels share the same gain for a frame.
-                double currentDvc = startDvc;
-                const double dvcIncrement = (smoothedDirectVolume_ - startDvc) / static_cast<double>(frames);
+                // S-curve smoothstep ramp per frame so all channels share the same gain for a frame.
+                const double dvcDelta = smoothedDirectVolume_ - startDvc;
+                const double invFrames = (frames > 1) ? (1.0 / static_cast<double>(frames - 1)) : 0.0;
                 for (int f = 0; f < frames; ++f) {
-                    const float g = static_cast<float>(currentDvc);
+                    const double t = static_cast<double>(f) * invFrames;
+                    const double s = (frames > 1) ? (t * t * (3.0 - 2.0 * t)) : 1.0;
+                    const float g = static_cast<float>(startDvc + s * dvcDelta);
                     for (int ch = 0; ch < channels; ++ch) {
                         buffer[f * channels + ch] *= g;
                     }
-                    currentDvc += dvcIncrement;
                 }
             }
         }

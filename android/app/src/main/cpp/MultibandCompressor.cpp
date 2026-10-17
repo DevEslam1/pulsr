@@ -77,6 +77,7 @@ void MultibandCompressor::reset() {
     crossoverHigh_.reset();
     allpassLowPath_.reset();
     allpassHighPath_.reset();
+    smoothedEnabledMix_ = enabled_ ? 1.0f : 0.0f;
     for (int b = 0; b < NUM_BANDS; ++b) {
         envelopeDb_[b] = 0.0;        // linear amplitude envelope, starts at silence
         smoothedGainDb_[b] = 0.0;
@@ -130,15 +131,20 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         paramsChanged_.store(false, std::memory_order_release);
     }
 
-    bool allBandsZero = true;
-    for (int b = 0; b < NUM_BANDS; ++b) {
-        if (std::abs(smoothedGainDb_[b]) > 0.01) {
-            allBandsZero = false;
-            break;
-        }
-    }
-    if (!enabled_ && allBandsZero) return;
+    const float targetEnabledMix = enabled_ ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
     if (!buffer || frames <= 0 || channels < 2) return;
+
+    // Smooth stage bypass/enable over 20 ms to prevent clicks and phase jumps against dry signal
+    constexpr double kTau = 0.020;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startEnabledMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetEnabledMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetEnabledMix) < 1e-4f) {
+        smoothedEnabledMix_ = targetEnabledMix;
+    }
+    const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
+    float currentEnabledMix = startEnabledMix;
 
     int framesRemaining = frames;
     int offset = 0;
@@ -148,23 +154,6 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
 
         // 1. Split chunk into 4 frequency bands via Linkwitz-Riley 4th order
         //    crossovers, with allpass phase compensation for flat reconstruction.
-        //
-        // FIX M-11 (now implemented): the 3-crossover tree is phase-coherent.
-        // crossoverMid_(f1) splits x into lowHalf = LP_f1(x) and highHalf =
-        // HP_f1(x). crossoverLow_(f0) splits the low half (band0/band1) and
-        // crossoverHigh_(f2) splits the high half (band2/band3). An LR4 section's
-        // LP+HP is a 2nd-order allpass, so at unity gain band0+band1 =
-        // AP_f0(lowHalf) and band2+band3 = AP_f2(highHalf). Summing those raw
-        // gives AP_f0(LP_f1 x) + AP_f2(HP_f1 x): the halves meet at f1 with
-        // MISMATCHED allpass phase (f0 != f2) -> ripple/dips near the crossovers,
-        // even when every band is at unity (true bypass). Fix: before each
-        // sub-split, cross-apply the sibling's allpass so both halves carry the
-        // same phase at f1 - lowHalf through AP_f2, highHalf through AP_f0:
-        //     band0+band1 = AP_f0(AP_f2(LP_f1 x)),  band2+band3 = AP_f2(AP_f0(HP_f1 x))
-        // Allpasses are LTI and commute, so both share the factor AP_f0*AP_f2 and
-        // the full sum is AP_f0*AP_f2*(LP_f1 + HP_f1) x = AP_f0*AP_f2*AP_f1 * x,
-        // a cascade of three allpasses => unity magnitude (flat) reconstruction.
-        // Each LR4 allpass is read as its (LP + HP) output sum.
         for (int i = 0; i < chunkFrames; ++i) {
             const int inIdx = (offset + i) * channels;
             const double inL = buffer[inIdx];
@@ -173,10 +162,7 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
             double lowHalfL, lowHalfR, highHalfL, highHalfR;
             crossoverMid_.process(inL, inR, lowHalfL, lowHalfR, highHalfL, highHalfR);
 
-            // Allpass-compensate each half (LR4 allpass = LP + HP). Applying the
-            // allpass to a half before its sub-split is equivalent to applying it
-            // to both sibling bands - LP_f0+HP_f0 = AP_f0 passes it through
-            // unchanged - and costs one LR4 per half instead of two.
+            // Allpass-compensate each half (LR4 allpass = LP + HP).
             double apLpL, apLpR, apHpL, apHpR;
             allpassLowPath_.process(lowHalfL, lowHalfR, apLpL, apLpR, apHpL, apHpR);
             const double lowCompL = apLpL + apHpL;  // AP_f2(lowHalf)
@@ -208,8 +194,7 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
                 const float sL = bandBufferL_[b][i];
                 const float sR = bandBufferR_[b][i];
 
-                // Level detector: instantaneous peak. Ballistics (attack/release)
-                // are applied once, to the gain in computeBandGain().
+                // Level detector: instantaneous peak.
                 const double peak = std::max(std::abs(sL), std::abs(sR));
                 envelopeDb_[b] = peak;
 
@@ -223,55 +208,31 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
             }
         }
 
-        // 3. Recombine all 4 bands into output buffer
-        int i = 0;
-        if (channels == 2) {
-#if defined(PULSR_HAS_NEON)
-            for (; i + 4 <= chunkFrames; i += 4) {
-                float32x4_t v0L = vld1q_f32(&bandBufferL_[0][i]);
-                float32x4_t v1L = vld1q_f32(&bandBufferL_[1][i]);
-                float32x4_t v2L = vld1q_f32(&bandBufferL_[2][i]);
-                float32x4_t v3L = vld1q_f32(&bandBufferL_[3][i]);
-                float32x4_t sumL = vaddq_f32(vaddq_f32(v0L, v1L), vaddq_f32(v2L, v3L));
-
-                float32x4_t v0R = vld1q_f32(&bandBufferR_[0][i]);
-                float32x4_t v1R = vld1q_f32(&bandBufferR_[1][i]);
-                float32x4_t v2R = vld1q_f32(&bandBufferR_[2][i]);
-                float32x4_t v3R = vld1q_f32(&bandBufferR_[3][i]);
-                float32x4_t sumR = vaddq_f32(vaddq_f32(v0R, v1R), vaddq_f32(v2R, v3R));
-
-                float32x4x2_t vOut = { sumL, sumR };
-                vst2q_f32(buffer + (offset + i) * 2, vOut);
-            }
-#elif defined(PULSR_HAS_SSE)
-            for (; i + 4 <= chunkFrames; i += 4) {
-                __m128 v0L = _mm_loadu_ps(&bandBufferL_[0][i]);
-                __m128 v1L = _mm_loadu_ps(&bandBufferL_[1][i]);
-                __m128 v2L = _mm_loadu_ps(&bandBufferL_[2][i]);
-                __m128 v3L = _mm_loadu_ps(&bandBufferL_[3][i]);
-                __m128 sumL = _mm_add_ps(_mm_add_ps(v0L, v1L), _mm_add_ps(v2L, v3L));
-
-                __m128 v0R = _mm_loadu_ps(&bandBufferR_[0][i]);
-                __m128 v1R = _mm_loadu_ps(&bandBufferR_[1][i]);
-                __m128 v2R = _mm_loadu_ps(&bandBufferR_[2][i]);
-                __m128 v3R = _mm_loadu_ps(&bandBufferR_[3][i]);
-                __m128 sumR = _mm_add_ps(_mm_add_ps(v0R, v1R), _mm_add_ps(v2R, v3R));
-
-                __m128 lo = _mm_unpacklo_ps(sumL, sumR);
-                __m128 hi = _mm_unpackhi_ps(sumL, sumR);
-                _mm_storeu_ps(buffer + (offset + i) * 2, lo);
-                _mm_storeu_ps(buffer + (offset + i) * 2 + 4, hi);
-            }
-#endif
-        }
-        for (; i < chunkFrames; ++i) {
+        // 3. Recombine all 4 bands into output buffer with equal-power wet/dry crossfade
+        for (int i = 0; i < chunkFrames; ++i) {
             const int outIdx = (offset + i) * channels;
-            // FIX M-11: with the allpass phase compensation applied at step 1,
-            // this band sum reconstructs flat (unity magnitude) when all bands
-            // are at unity gain - the net path is the allpass cascade
-            // AP_f0*AP_f2*AP_f1 (phase/group-delay only, no magnitude ripple).
-            buffer[outIdx] = bandBufferL_[0][i] + bandBufferL_[1][i] + bandBufferL_[2][i] + bandBufferL_[3][i];
-            buffer[outIdx + 1] = bandBufferR_[0][i] + bandBufferR_[1][i] + bandBufferR_[2][i] + bandBufferR_[3][i];
+            const float inL = buffer[outIdx];
+            const float inR = buffer[outIdx + 1];
+
+            const float wetL = bandBufferL_[0][i] + bandBufferL_[1][i] + bandBufferL_[2][i] + bandBufferL_[3][i];
+            const float wetR = bandBufferR_[0][i] + bandBufferR_[1][i] + bandBufferR_[2][i] + bandBufferR_[3][i];
+
+            float dryW, wetW;
+            if (currentEnabledMix >= 0.9999f) {
+                dryW = 0.0f;
+                wetW = 1.0f;
+            } else if (currentEnabledMix <= 0.0001f) {
+                dryW = 1.0f;
+                wetW = 0.0f;
+            } else {
+                const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+                dryW = std::cos(angle);
+                wetW = std::sin(angle);
+            }
+
+            buffer[outIdx] = dryW * inL + wetW * wetL;
+            buffer[outIdx + 1] = dryW * inR + wetW * wetR;
+            currentEnabledMix += mixStep;
         }
 
         offset += chunkFrames;

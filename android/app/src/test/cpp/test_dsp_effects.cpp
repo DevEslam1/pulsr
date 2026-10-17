@@ -9,6 +9,10 @@
 #include "../../main/cpp/DynamicEQ.h"
 #include "../../main/cpp/SubCrossover.h"
 #include "../../main/cpp/DynamicBass.h"
+#include "../../main/cpp/ArbitraryResponseEq.h"
+#include "../../main/cpp/ViperDdc.h"
+#include "../../main/cpp/LiveProg.h"
+#include "../../main/cpp/AudioDspEngine.h"
 #include <cassert>
 #include <iostream>
 #include <vector>
@@ -290,6 +294,381 @@ void testDynamicBass() {
     std::cout << "PASS: DynamicBass verified (boosted peak = " << maxPeak << " > 0.25)." << std::endl;
 }
 
+
+// -------------------------------------------------------------
+// Transition Smoothing & Continuity Regression Tests
+// -------------------------------------------------------------
+
+static void checkSignalContinuity(const std::vector<float>& prevBlock,
+                                  const std::vector<float>& curBlock,
+                                  int channels,
+                                  float maxAllowedDelta,
+                                  const std::string& testName) {
+    if (prevBlock.empty() || curBlock.empty()) return;
+    int frames = static_cast<int>(curBlock.size()) / channels;
+    for (int ch = 0; ch < channels; ++ch) {
+        float lastPrev = prevBlock[prevBlock.size() - channels + ch];
+        float firstCur = curBlock[ch];
+        float stepAtBoundary = std::abs(firstCur - lastPrev);
+        if (std::isnan(firstCur) || std::isinf(firstCur)) {
+            std::cerr << "FAIL [" << testName << "]: NaN/Inf at block boundary ch " << ch << std::endl;
+            std::exit(1);
+        }
+        if (stepAtBoundary > maxAllowedDelta) {
+            std::cerr << "FAIL [" << testName << "]: Discontinuity at block boundary ch " << ch
+                      << ": delta = " << stepAtBoundary << " (max allowed = " << maxAllowedDelta << ")" << std::endl;
+            std::exit(1);
+        }
+        for (int i = 1; i < frames; ++i) {
+            float prevSample = curBlock[(i - 1) * channels + ch];
+            float curSample = curBlock[i * channels + ch];
+            if (std::isnan(curSample) || std::isinf(curSample)) {
+                std::cerr << "FAIL [" << testName << "]: NaN/Inf inside block at frame " << i << std::endl;
+                std::exit(1);
+            }
+            float step = std::abs(curSample - prevSample);
+            if (step > maxAllowedDelta) {
+                std::cerr << "FAIL [" << testName << "]: Internal discontinuity at frame " << i
+                          << ": delta = " << step << " (max allowed = " << maxAllowedDelta << ")" << std::endl;
+                std::exit(1);
+            }
+        }
+    }
+}
+
+static std::vector<float> generateSineWave(int numFrames, int channels, float freq, float sampleRate, float amp, int startFrame = 0) {
+    std::vector<float> buf(numFrames * channels);
+    for (int i = 0; i < numFrames; ++i) {
+        float t = static_cast<float>(startFrame + i) / sampleRate;
+        float s = amp * std::sin(2.0f * static_cast<float>(M_PI) * freq * t);
+        for (int ch = 0; ch < channels; ++ch) {
+            buf[i * channels + ch] = s;
+        }
+    }
+    return buf;
+}
+
+static void testHarmonicSaturationTransitions() {
+    std::cout << "Testing HarmonicSaturation enable/disable and mode transitions..." << std::endl;
+    HarmonicSaturation sat;
+    sat.configure(0.8, 1.0, 0.0, 0);
+    sat.setEnabled(false);
+
+    const int blockSize = 256;
+    const int channels = 2;
+    std::vector<float> prevBlock;
+    int currentFrame = 0;
+    const float maxDelta = 0.08f;
+
+    // 1. Process 10 blocks disabled
+    for (int b = 0; b < 10; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        sat.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "Saturation Disabled");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // 2. Enable saturation -> verify smooth ramp-in
+    sat.setEnabled(true);
+    for (int b = 0; b < 20; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        sat.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "Saturation Enabling");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // 3. Switch mode while running
+    sat.configure(1.2, 1.0, 0.0, 1);
+    for (int b = 0; b < 20; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        sat.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "Saturation Mode Switch");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // 4. Disable saturation -> verify smooth ramp-out
+    sat.setEnabled(false);
+    for (int b = 0; b < 20; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        sat.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "Saturation Disabling");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    std::cout << "PASS: HarmonicSaturation transitions verified smooth & bounded." << std::endl;
+}
+
+static void testArbitraryEqTransitions() {
+    std::cout << "Testing ArbitraryResponseEq enable/disable and profile crossfading..." << std::endl;
+    ArbitraryResponseEq eq;
+    eq.setSampleRate(48000.0);
+    eq.setEnabled(false);
+
+    const int blockSize = 256;
+    const int channels = 2;
+    std::vector<float> prevBlock;
+    int currentFrame = 0;
+    const float maxDelta = 0.08f;
+
+    // Disabled blocks
+    for (int b = 0; b < 10; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        eq.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ArbitraryEq Disabled");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Load profile 1 and enable
+    std::string profile1 = "GraphicEQ: 20 0; 440 6; 1000 -6; 20000 0";
+    eq.loadGraphicEqString(profile1);
+    eq.setEnabled(true);
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        eq.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ArbitraryEq Enabling");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Reconfigure profile 2 on the fly (crossfade)
+    std::string profile2 = "GraphicEQ: 20 -10; 440 -6; 1000 6; 20000 0";
+    eq.loadGraphicEqString(profile2);
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        eq.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ArbitraryEq Reconfiguring");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Disable
+    eq.setEnabled(false);
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        eq.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ArbitraryEq Disabling");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    std::cout << "PASS: ArbitraryResponseEq transitions verified smooth & bounded." << std::endl;
+}
+
+static void testViperDdcTransitions() {
+    std::cout << "Testing ViperDdc enable/disable and profile crossfading..." << std::endl;
+    ViperDdc ddc;
+    ddc.setSampleRate(48000.0);
+    ddc.setEnabled(false);
+
+    const int blockSize = 256;
+    const int channels = 2;
+    std::vector<float> prevBlock;
+    int currentFrame = 0;
+    const float maxDelta = 0.08f;
+
+    // Disabled
+    for (int b = 0; b < 10; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        ddc.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ViperDdc Disabled");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // VDC profile 1: +3 dB peaking biquad at 440 Hz
+    std::string vdc1 = "SR_48000\n1.009754, -1.949473, 0.942957, -1.949473, 0.952711\n";
+    ddc.loadVdcString(vdc1);
+    ddc.setEnabled(true);
+
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        ddc.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ViperDdc Enabling");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Switch to profile 2: -3 dB peaking biquad at 440 Hz
+    std::string vdc2 = "SR_48000\n0.990340, -1.930641, 0.943508, -1.930641, 0.933848\n";
+    ddc.loadVdcString(vdc2);
+
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        ddc.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ViperDdc Profile Switch");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Disable
+    ddc.setEnabled(false);
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        ddc.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ViperDdc Disabling");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    std::cout << "PASS: ViperDdc transitions verified smooth & bounded." << std::endl;
+}
+
+static void testLiveProgTransitions() {
+    std::cout << "Testing LiveProg enable/disable and program reloads..." << std::endl;
+    LiveProg prog;
+    prog.setSampleRate(48000.0);
+    prog.setEnabled(false);
+
+    const int blockSize = 256;
+    const int channels = 2;
+    std::vector<float> prevBlock;
+    int currentFrame = 0;
+    const float maxDelta = 0.08f;
+
+    // Disabled
+    for (int b = 0; b < 10; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        prog.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "LiveProg Disabled");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Program 1: Simple gain boost (spl0 = spl0 * 1.4)
+    std::string code1 = "@sample\nspl0 = spl0 * 1.4;\nspl1 = spl1 * 1.4;\n";
+    prog.loadCode(code1);
+    prog.setEnabled(true);
+
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        prog.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "LiveProg Enabling");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Program 2: Simple attenuation (spl0 = spl0 * 0.6)
+    std::string code2 = "@sample\nspl0 = spl0 * 0.6;\nspl1 = spl1 * 0.6;\n";
+    prog.loadCode(code2);
+
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        prog.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "LiveProg Program Reload");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Reset while running
+    prog.reset();
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        prog.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "LiveProg Reset");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Disable
+    prog.setEnabled(false);
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        prog.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "LiveProg Disabling");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    std::cout << "PASS: LiveProg transitions verified smooth & bounded." << std::endl;
+}
+
+static void testDvcBitPerfectTransitions() {
+    std::cout << "Testing DVC / Direct Volume smooth ramping and Bit-Perfect..." << std::endl;
+    auto engine = std::make_unique<AudioDspEngine>();
+    engine->setSampleRate(48000.0);
+
+    // Initial state: DVC enabled, volume 1.0 (0 dB)
+    auto snap = std::make_shared<DspParamSnapshot>();
+    snap->sampleRate = 48000.0;
+    snap->activeStages = 0;
+    snap->directVolume.enabled = true;
+    snap->directVolume.gainLinear = 1.0;
+    engine->publishParams(snap);
+
+    const int blockSize = 256;
+    const int channels = 2;
+    std::vector<float> prevBlock;
+    int currentFrame = 0;
+    const float maxDelta = 0.08f;
+
+    for (int b = 0; b < 10; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        engine->processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "DVC Nominal");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Ramp volume down to 0 before switching routing (simulating Bit-Perfect bypass switch)
+    snap = std::make_shared<DspParamSnapshot>(*snap);
+    snap->directVolume.gainLinear = 0.0;
+    engine->publishParams(snap);
+
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        engine->processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "DVC Fade Down");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Verify signal is silenced (faded down) smoothly
+    float peakAtSilence = 0.0f;
+    for (float s : prevBlock) {
+        peakAtSilence = std::max(peakAtSilence, std::abs(s));
+    }
+    if (peakAtSilence > 0.05f) {
+        std::cerr << "FAIL: DVC did not fade down completely! peak = " << peakAtSilence << std::endl;
+        std::exit(1);
+    }
+
+    // Fade DVC back up smoothly
+    snap = std::make_shared<DspParamSnapshot>(*snap);
+    snap->directVolume.gainLinear = 1.0;
+    engine->publishParams(snap);
+
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        engine->processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "DVC Fade Up");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Now test Bit-Perfect bypass bit-transparency
+    snap = std::make_shared<DspParamSnapshot>(*snap);
+    snap->bitPerfect.enabled = true;
+    engine->publishParams(snap);
+
+    auto testSine = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+    auto processed = testSine;
+    engine->processInterleaved(processed.data(), blockSize, channels);
+    for (size_t i = 0; i < testSine.size(); ++i) {
+        if (std::abs(testSine[i] - processed[i]) > 1e-6f) {
+            std::cerr << "FAIL: Bit-Perfect mode is not bit-identical to input! diff = "
+                      << std::abs(testSine[i] - processed[i]) << std::endl;
+            std::exit(1);
+        }
+    }
+
+    std::cout << "PASS: DVC and Bit-Perfect transitions verified smooth & bit-transparent." << std::endl;
+}
+
 int main() {
     std::cout << "Running DSP effects C++ unit tests..." << std::endl;
     testConvolutionReverbUnityGain();
@@ -299,6 +678,11 @@ int main() {
     testStereoWidthBassMono();
     testDynamicEqBoostMode();
     testDynamicBass();
+    testHarmonicSaturationTransitions();
+    testArbitraryEqTransitions();
+    testViperDdcTransitions();
+    testLiveProgTransitions();
+    testDvcBitPerfectTransitions();
     std::cout << "All DSP effects C++ tests passed successfully!" << std::endl;
     return 0;
 }

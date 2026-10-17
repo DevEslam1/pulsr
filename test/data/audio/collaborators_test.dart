@@ -2,12 +2,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/data/audio/collaborators/playback_volume_controller.dart';
 import 'package:pulsr/data/audio/collaborators/playback_state_coordinator.dart';
 import 'package:pulsr/data/audio/collaborators/playback_preload_orchestrator.dart';
 import 'package:pulsr/data/audio/smart_preload_scheduler.dart';
 import 'package:pulsr/data/audio/stream_pre_resolver.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/domain/models/ytm_track.dart';
 
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/audio/collaborators/stream_resolution_pipeline.dart';
@@ -332,33 +334,44 @@ void main() {
     });
   });
 
-  group('StreamResolutionPipeline LRU Eviction Tests', () {
-    test('Evicts oldest-inserted entry first when exceeding maxCacheEntries',
-        () {
-      final pipeline = StreamResolutionPipeline(
-        ytmService: MockYtmService(),
+  group('StreamResolutionPipeline Resolution Tests', () {
+    test('Delegates every resolve to the shared YtmService URL cache',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final ytmService = MockYtmService();
+      final pipeline = StreamResolutionPipeline(ytmService: ytmService);
+      final song = _createMockSong(
+        1,
+        remoteId: 'abcdefghijk',
+        source: SongSource.youtube,
       );
-      final futureDate = DateTime.now().add(const Duration(hours: 1));
 
-      // Insert entries up to maxCacheEntries (128)
-      for (var i = 0; i < StreamResolutionPipeline.maxCacheEntries; i++) {
-        pipeline.streamCache['video_$i:high'] =
-            CachedStreamUrl('https://stream.url/$i', futureDate);
-      }
-      expect(pipeline.streamCache.length, equals(128));
-      expect(pipeline.streamCache.containsKey('video_0:high'), isTrue);
+      when(() => ytmService.resolveStream(
+            any(),
+            quality: any(named: 'quality'),
+            forceRefresh: any(named: 'forceRefresh'),
+          )).thenAnswer((_) async => YtmStream(
+            videoId: 'abcdefghijk',
+            url: 'https://stream.url/audio',
+            mimeType: 'audio/webm',
+            container: 'webm',
+            bitrateKbps: 256,
+            duration: const Duration(minutes: 3),
+            title: 'Track',
+            artist: 'Artist',
+          ));
 
-      // Insert 129th entry and prune
-      pipeline.streamCache['video_128:high'] =
-          CachedStreamUrl('https://stream.url/128', futureDate);
-      pipeline.pruneCache();
+      final first = await pipeline.resolveStreamUrl(song);
+      final second = await pipeline.resolveStreamUrl(song);
 
-      expect(pipeline.streamCache.length, equals(128));
-      // Oldest inserted entry 'video_0:high' must be evicted first
-      expect(pipeline.streamCache.containsKey('video_0:high'), isFalse);
-      // Newer entries must remain
-      expect(pipeline.streamCache.containsKey('video_1:high'), isTrue);
-      expect(pipeline.streamCache.containsKey('video_128:high'), isTrue);
+      expect(first.url, 'https://stream.url/audio');
+      expect(first.quality, 'high');
+      expect(second.url, first.url);
+      verify(() => ytmService.resolveStream(
+            any(),
+            quality: any(named: 'quality'),
+            forceRefresh: any(named: 'forceRefresh'),
+          )).called(2);
     });
   });
 }

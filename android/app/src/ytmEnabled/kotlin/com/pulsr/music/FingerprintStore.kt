@@ -56,6 +56,8 @@ internal object FingerprintStore {
                     "Mozilla/5.0 (Linux; Android $osVersion; $deviceModel) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36"
                 InnertubeClient.ClientType.WEB_REMIX, InnertubeClient.ClientType.WEB_EMBEDDED_PLAYER ->
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+                InnertubeClient.ClientType.VISIONOS ->
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
                 InnertubeClient.ClientType.ANDROID_TESTSUITE ->
                     "com.google.android.youtube/$ver (Linux; U; Android 9; gzip)"
             }

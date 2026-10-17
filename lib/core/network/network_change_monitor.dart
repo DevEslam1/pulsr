@@ -10,9 +10,9 @@ import 'package:flutter/foundation.dart';
 /// googlevideo stream URLs are minted for the resolving egress IP. When the
 /// user toggles a VPN mid-playback the cached URL keeps the *old* IP and the
 /// edge answers 403. The player already retries once with a fresh resolve,
-/// but the in-memory URL caches ([YtmUrlCache], `AudioHandler._streamCache`)
-/// and the native DNS TTL cache still serve the old-IP answer unless they are
-/// explicitly dropped on a path change. This monitor is that trigger.
+/// but the shared URL cache ([YtmUrlCache]) and the native DNS TTL cache still
+/// serve the old-IP answer unless they are explicitly dropped on a path
+/// change. This monitor is that trigger.
 class NetworkChangeMonitor {
   NetworkChangeMonitor({Connectivity? connectivity})
       : _connectivity = connectivity ?? Connectivity();

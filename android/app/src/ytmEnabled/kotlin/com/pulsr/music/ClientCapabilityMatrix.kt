@@ -28,6 +28,18 @@ internal object ClientCapabilityMatrix {
     )
 
     private val defaultCapabilities: Map<InnertubeClient.ClientType, ClientCapability> = mapOf(
+        InnertubeClient.ClientType.VISIONOS to ClientCapability(
+            clientType = InnertubeClient.ClientType.VISIONOS,
+            clientNameId = "101",
+            defaultClientVersion = "1.02",
+            requiresPoToken = false,
+            requiresLogin = false,
+            supportsStreamResolve = true,
+            supportsSearch = false,
+            supportsBrowse = false,
+            requiresJsSignature = false,
+            priority = 12
+        ),
         InnertubeClient.ClientType.ANDROID_VR to ClientCapability(
             clientType = InnertubeClient.ClientType.ANDROID_VR,
             clientNameId = "28",

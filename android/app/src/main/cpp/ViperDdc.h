@@ -34,6 +34,11 @@ public:
     void setSampleRate(double sampleRate);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const {
+        return (!enabled_ && smoothedEnabledMix_ >= 1e-4f) ||
+               (enabled_ && smoothedEnabledMix_ < 0.9999f) ||
+               (sectionCrossfadeProgress_ < 1.0f && !crossfadeSections_.empty());
+    }
     void applyParams(const ViperDdcParamSet& params);
     void reset();
 
@@ -60,12 +65,15 @@ public:
 private:
     double sampleRate_ = 48000.0;
     bool enabled_ = false;
+    float smoothedEnabledMix_ = 0.0f;
     std::string profileName_;
     std::string loadedContent_;
 
     std::vector<Section> sections441_;
     std::vector<Section> sections480_;
     std::vector<Section> activeSections_;
+    std::vector<Section> crossfadeSections_;
+    float sectionCrossfadeProgress_ = 1.0f;
 
     // Identity of the last published prepared sets, for change detection.
     std::shared_ptr<const std::vector<ViperDdcSection>> prepared441_;

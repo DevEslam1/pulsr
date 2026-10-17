@@ -795,7 +795,7 @@ void runLiveProgElseAndExpressionsTest() {
 
     bool ok = prog.loadCode(script);
     assert(ok);
-    prog.setEnabled(true);
+    prog.setEnabled(true, /*immediate=*/true);
 
     // Test then-branch
     prog.setSlider(1, 1.0);
@@ -1010,7 +1010,7 @@ void runLiveProgTernaryTest() {
 
     bool ok = prog.loadCode(script);
     assert(ok);
-    prog.setEnabled(true);
+    prog.setEnabled(true, /*immediate=*/true);
 
     // True branch
     prog.setSlider(1, 1.0);

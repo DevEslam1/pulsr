@@ -20,13 +20,18 @@ public:
     void setSampleRate(double sampleRate, bool resynthesize = true);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const {
+        return (!enabled_ && smoothedEnabledMix_ >= 1e-4f) ||
+               (enabled_ && smoothedEnabledMix_ < 0.9999f) ||
+               (filterCrossfadeProgress_ < 1.0f);
+    }
     // Linear-phase mode uses a symmetric FIR with an (FIR_TAPS-1)/2 ≈ FIR_TAPS/2
     // group delay; integer transport reports round up so compensation never
     // underestimates it. Minimum-phase mode (the AutoEQ import default) front-
     // loads its energy at n=0 and is effectively zero-latency, so it reports 0.
     int getLatencyFrames() const {
-        if (!enabled_ || !hasResponse_) return 0;
-        return linearPhase_ ? (FIR_TAPS / 2) : 0;
+        if ((!enabled_ && smoothedEnabledMix_ < 1e-4f) || !hasResponse_) return 0;
+        return (linearPhase_ || oldLinearPhase_) ? (FIR_TAPS / 2) : 0;
     }
     void applyParams(const ArbitraryEqParamSet& params);
     void reset();
@@ -63,6 +68,10 @@ private:
     std::vector<std::pair<double, double>> nodes_; // {freqHz, gainDb}
 
     std::vector<float> firFilter_; // FIR_TAPS length
+    std::vector<float> oldFirFilter_; // FIR_TAPS length for crossfade
+    float filterCrossfadeProgress_ = 1.0f;
+    float smoothedEnabledMix_ = 0.0f;
+    bool oldLinearPhase_ = false;
 
     // Reusable FFT scratch so synthesis never allocates on the audio thread.
     std::vector<FftUtil::Complex> spectrumScratch_;
@@ -71,6 +80,11 @@ private:
     float historyL_[FIR_TAPS * 2] = {};
     float historyR_[FIR_TAPS * 2] = {};
     int historyIdx_ = 0;  // Circular buffer write position
+
+    static constexpr int PHASE_DELAY_TAPS = FIR_TAPS / 2;
+    float phaseDelayL_[PHASE_DELAY_TAPS] = {};
+    float phaseDelayR_[PHASE_DELAY_TAPS] = {};
+    int phaseDelayIdx_ = 0;
 
     std::shared_ptr<const std::vector<std::pair<double, double>>> preparedNodesRef_;
     double firSynthesizedRate_ = 0.0;

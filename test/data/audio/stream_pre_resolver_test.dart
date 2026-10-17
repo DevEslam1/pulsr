@@ -1,4 +1,5 @@
 // test/data/audio/stream_pre_resolver_test.dart
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
@@ -42,6 +43,10 @@ void main() {
       clock = FakeClock(DateTime.fromMillisecondsSinceEpoch(1000000));
       urlCache = YtmUrlCache.withClock(clock);
       resolvedVideoIds = [];
+      // Keep the tests hermetic: the real pool would issue DNS lookups for
+      // every pre-resolved googlevideo host.
+      PreconnectedSocketPool().debugLookupOverride = (_) async {};
+      PreconnectedSocketPool().clear();
 
       preResolver = StreamPreResolver(
         resolveUrl: (videoId, {quality = 'high'}) async {
@@ -64,6 +69,8 @@ void main() {
 
     tearDown(() {
       preResolver.dispose();
+      PreconnectedSocketPool().debugLookupOverride = null;
+      PreconnectedSocketPool().clear();
     });
 
     test('fires on track start and pre-resolves next queue item into URL cache',
@@ -89,6 +96,10 @@ void main() {
       expect(urlCache.contains('vid2'), isTrue);
       expect(urlCache.getUrl('vid2'),
           equals('https://googlevideo.com/stream_vid2.m4a'));
+      // The pre-resolve also warms DNS for the edge host before playback asks
+      // the platform player to open it.
+      expect(
+          PreconnectedSocketPool().isPreconnected('googlevideo.com'), isTrue);
     });
 
     test(
@@ -314,6 +325,50 @@ void main() {
       multiPreResolver.dispose();
     });
 
+    test(
+        'window size provider overrides the static pre-resolve window per plan',
+        () async {
+      final providerPreResolver = StreamPreResolver(
+        resolveUrl: (videoId, {quality = 'high'}) async {
+          resolvedVideoIds.add(videoId);
+          return YtmStream(
+            videoId: videoId,
+            url: 'https://googlevideo.com/stream_$videoId.m4a',
+            mimeType: 'audio/mp4',
+            container: 'm4a',
+            bitrateKbps: 256,
+            duration: const Duration(seconds: 200),
+            title: 'Track $videoId',
+            artist: 'Artist',
+          );
+        },
+        urlCache: urlCache,
+        windowSizeProvider: () => 3,
+        debounceDuration: const Duration(milliseconds: 10),
+      );
+
+      final queue = [
+        createSong(1, 'Track 1', remoteId: 'p1'),
+        createSong(2, 'Track 2', remoteId: 'p2'),
+        createSong(3, 'Track 3', remoteId: 'p3'),
+        createSong(4, 'Track 4', remoteId: 'p4'),
+        createSong(5, 'Track 5', remoteId: 'p5'),
+      ];
+
+      providerPreResolver.onTrackStarted(
+        queue: queue,
+        currentIndex: 0,
+        isShuffle: false,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(resolvedVideoIds, containsAll(['p2', 'p3']));
+      expect(urlCache.contains('p2'), isTrue);
+      expect(urlCache.contains('p3'), isTrue);
+      providerPreResolver.dispose();
+    });
+
     test('refreshes URL expiring within 10 minutes', () async {
       // Put a track expiring in 5 minutes relative to clock
       final fiveMinExpiry = clock.now().add(const Duration(minutes: 5));
@@ -338,6 +393,81 @@ void main() {
 
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(resolvedVideoIds, contains('exp1'));
+    });
+  });
+
+  group('PreconnectedSocketPool — DNS warm-up', () {
+    tearDown(() {
+      PreconnectedSocketPool().debugLookupOverride = null;
+      PreconnectedSocketPool().clear();
+    });
+
+    test('warms the host and reports it preconnected', () async {
+      final lookedUp = <String>[];
+      final pool = PreconnectedSocketPool();
+      pool.clear();
+      pool.debugLookupOverride = (host) async => lookedUp.add(host);
+
+      await pool.preconnect(
+          Uri.parse('https://rr1---sn-x.googlevideo.com/videoplayback?x=1'));
+
+      expect(lookedUp, equals(['rr1---sn-x.googlevideo.com']));
+      expect(pool.isPreconnected('rr1---sn-x.googlevideo.com'), isTrue);
+    });
+
+    test('deduplicates concurrent lookups for the same host', () async {
+      var calls = 0;
+      final gate = Completer<void>();
+      final pool = PreconnectedSocketPool();
+      pool.clear();
+      pool.debugLookupOverride = (_) {
+        calls++;
+        return gate.future;
+      };
+
+      final first = pool.preconnect(Uri.parse('https://a.googlevideo.com/x'));
+      final second = pool.preconnect(Uri.parse('https://a.googlevideo.com/y'));
+      gate.complete();
+      await Future.wait([first, second]);
+
+      expect(calls, 1);
+      expect(pool.isPreconnected('a.googlevideo.com'), isTrue);
+    });
+
+    test('a failed lookup stays cold and never throws', () async {
+      final pool = PreconnectedSocketPool();
+      pool.clear();
+      pool.debugLookupOverride = (_) async => throw Exception('no dns');
+
+      await pool.preconnect(Uri.parse('https://dead.googlevideo.com/x'));
+
+      expect(pool.isPreconnected('dead.googlevideo.com'), isFalse);
+    });
+
+    test('skips re-lookup while the host is still warm', () async {
+      var calls = 0;
+      final pool = PreconnectedSocketPool();
+      pool.clear();
+      pool.debugLookupOverride = (_) async {
+        calls++;
+      };
+
+      await pool.preconnect(Uri.parse('https://warm.googlevideo.com/a'));
+      await pool.preconnect(Uri.parse('https://warm.googlevideo.com/b'));
+
+      expect(calls, 1);
+    });
+
+    test('clear() drops warmed hosts', () async {
+      final pool = PreconnectedSocketPool();
+      pool.clear();
+      pool.debugLookupOverride = (_) async {};
+
+      await pool.preconnect(Uri.parse('https://x.googlevideo.com/a'));
+      expect(pool.isPreconnected('x.googlevideo.com'), isTrue);
+
+      pool.clear();
+      expect(pool.isPreconnected('x.googlevideo.com'), isFalse);
     });
   });
 }

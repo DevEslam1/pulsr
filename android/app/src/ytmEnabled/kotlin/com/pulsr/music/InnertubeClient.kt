@@ -128,6 +128,14 @@ internal class InnertubeClient(
             "com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)",
             false,
             "https://www.youtube.com",
+        ),
+        VISIONOS(
+            "VISIONOS",
+            "1.02",
+            "101",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+            false,
+            "https://www.youtube.com",
         );
 
         /**
@@ -293,10 +301,8 @@ internal class InnertubeClient(
             android.os.SystemClock.elapsedRealtime() >= resolveDeadlineMs
 
         // FIX #13 & #16: Shared egress bot/block circuit breaker check
-        val nowMs = android.os.SystemClock.elapsedRealtime()
-        val breakerUntil = globalBlockCooldownUntilMs.get()
-        if (nowMs < breakerUntil && consecutiveEgressBlocks.get() >= 1) {
-            val remainingSec = ((breakerUntil - nowMs) / 1000L).coerceAtLeast(1)
+        if (egressBlockBreaker.isActive()) {
+            val remainingSec = (egressBlockBreaker.remainingMs() / 1000L).coerceAtLeast(1)
             val signal = globalBlockSignal.get()
             Log.w(TAG, "[$traceId] Fast-failing: egress bot/block breaker active ($signal) for another ${remainingSec}s")
             throw InnertubeException(
@@ -431,8 +437,7 @@ internal class InnertubeClient(
                                 if (winningSignal == YtmBlockSignal.IpBlocked ||
                                     winningSignal == YtmBlockSignal.BotChallenge ||
                                     winningSignal == YtmBlockSignal.PoTokenInvalid) {
-                                    consecutiveEgressBlocks.incrementAndGet()
-                                    globalBlockCooldownUntilMs.set(android.os.SystemClock.elapsedRealtime() + 15_000L)
+                                    egressBlockBreaker.onBlock()
                                 }
                             }
                         }
@@ -639,10 +644,7 @@ internal class InnertubeClient(
                             if (winningSignal == YtmBlockSignal.IpBlocked ||
                                 winningSignal == YtmBlockSignal.BotChallenge ||
                                 winningSignal == YtmBlockSignal.PoTokenInvalid) {
-                                consecutiveEgressBlocks.incrementAndGet()
-                                globalBlockCooldownUntilMs.set(
-                                    android.os.SystemClock.elapsedRealtime() + 15_000L
-                                )
+                                egressBlockBreaker.onBlock()
                             }
                         }
                     }
@@ -672,8 +674,7 @@ internal class InnertubeClient(
                 when (bootstrapped) {
                     is AttemptResult.Success -> {
                         winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
-                        consecutiveEgressBlocks.set(0)
-                        globalBlockCooldownUntilMs.set(0L)
+                        egressBlockBreaker.onSuccess()
                         globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                         return bootstrapped.payload
                     }
@@ -733,8 +734,7 @@ internal class InnertubeClient(
                     if (webRes is AttemptResult.Success) {
                         shortCircuit.set(null) // clear short-circuit on recovery
                         winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
-                        consecutiveEgressBlocks.set(0)
-                        globalBlockCooldownUntilMs.set(0L)
+                        egressBlockBreaker.onSuccess()
                         globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                         return webRes.payload
                     }
@@ -760,8 +760,7 @@ internal class InnertubeClient(
                     if (androidRes is AttemptResult.Success) {
                         shortCircuit.set(null) // clear short-circuit on recovery
                         winnerStore.recordWinningClient(trackType, ClientType.ANDROID_MUSIC)
-                        consecutiveEgressBlocks.set(0)
-                        globalBlockCooldownUntilMs.set(0L)
+                        egressBlockBreaker.onSuccess()
                         globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                         return androidRes.payload
                     }
@@ -814,8 +813,7 @@ internal class InnertubeClient(
                             // FIX #5: Cleanly cancel all in-flight calls on success
                             cancelAll()
                             winnerStore.recordWinningClient(trackType, client)
-                            consecutiveEgressBlocks.set(0)
-                            globalBlockCooldownUntilMs.set(0L)
+                            egressBlockBreaker.onSuccess()
                             globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                             return res.payload
                         }
@@ -889,8 +887,7 @@ internal class InnertubeClient(
                         // FIX #5: Cleanly cancel all in-flight calls on success
                         cancelAll()
                         winnerStore.recordWinningClient(trackType, client)
-                        consecutiveEgressBlocks.set(0)
-                        globalBlockCooldownUntilMs.set(0L)
+                        egressBlockBreaker.onSuccess()
                         globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                         return res.payload
                     }
@@ -970,8 +967,7 @@ internal class InnertubeClient(
             when (res) {
                 is AttemptResult.Success -> {
                     winnerStore.recordWinningClient(trackType, client)
-                    consecutiveEgressBlocks.set(0)
-                    globalBlockCooldownUntilMs.set(0L)
+                    egressBlockBreaker.onSuccess()
                     globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                     return res.payload
                 }
@@ -1043,6 +1039,7 @@ internal class InnertubeClient(
                         val deciphered = try {
                             decipherCache.decipherSignature(sig)
                         } catch (_: Exception) {
+                            PlayerJavaScript.init(context)
                             PlayerJavaScript.decipherSignature(sig)
                                 ?: throw UndecipherableSignatureException("rhino_failed")
                         }
@@ -1622,6 +1619,12 @@ internal class InnertubeClient(
                     put("platform", "MOBILE")
                     put("clientFormFactor", "SMALL_FORM_FACTOR")
                 }
+                ClientType.VISIONOS -> {
+                    put("deviceMake", "Apple")
+                    put("deviceModel", "RealityDevice17,1")
+                    put("osName", "visionOS")
+                    put("osVersion", "26.5.23O471")
+                }
                 ClientType.WEB_EMBEDDED_PLAYER -> {
                     put("platform", "DESKTOP")
                 }
@@ -1673,8 +1676,7 @@ internal class InnertubeClient(
         private val lastBotRefreshTriggerMs = AtomicLong(0L)
         private val lastDataSyncBootstrapMs = AtomicLong(0L)
 
-        private val globalBlockCooldownUntilMs = AtomicLong(0L)
-        private val consecutiveEgressBlocks = AtomicInteger(0)
+        private val egressBlockBreaker = EgressBlockBreaker()
         private val globalBlockSignal = AtomicReference(YtmBlockSignal.BotChallenge)
 
         private val threadCounter = AtomicInteger(0)

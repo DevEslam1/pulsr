@@ -77,6 +77,23 @@ class PulsrToast {
     VoidCallback? onDismiss,
     double? bottomOffset,
   }) {
+    // A failure cascade (network drop, bot block) fires the *same* message
+    // once per retry/skip, and each event used to tear the banner down and
+    // re-insert it — one visible "banner show" plus a heavy haptic and error
+    // cue per event. An identical message that is still on screen is the same
+    // banner: keep it mounted and extend its auto-dismiss window so it stays
+    // up while the errors keep flowing and lingers a full duration after the
+    // last one.
+    final activeState = _activeWidgetState;
+    if (_activeEntry != null &&
+        activeState != null &&
+        activeState.mounted &&
+        !activeState.isDismissing &&
+        activeState.widget.message == message) {
+      activeState.refresh();
+      return;
+    }
+
     if (_activeEntry != null) {
       try {
         _activeEntry?.remove();
@@ -236,6 +253,20 @@ class _ToastWidgetState extends State<_ToastWidget>
     _autoDismissTimer = Timer(widget.duration, () {
       if (mounted) dismiss();
     });
+  }
+
+  /// True once [dismiss] has started the exit animation, so [PulsrToast.show]
+  /// never "extends" a toast that is already animating away.
+  bool get isDismissing => _isDismissing;
+
+  /// Restarts the auto-dismiss countdown without re-animating or replaying the
+  /// haptic/sound cue. Called when an identical message arrives while this
+  /// toast is still visible.
+  void refresh() {
+    if (_isDismissing) return;
+    _autoDismissTimer?.cancel();
+    _autoDismissTimer = null;
+    _startAutoDismissTimer();
   }
 
   void dismiss() {

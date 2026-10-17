@@ -26,12 +26,19 @@ internal class ResolutionStrategy(
         private const val TAG = "ResolutionStrategy"
 
         // Optimized default stream chain for audio streaming.
+        // VISIONOS leads the chain: it needs neither a poToken nor JS
+        // deciphering (both s and n are pre-applied server-side, formats carry
+        // plain URLs), and it accepts the session visitorData that keeps the
+        // player request out of the BotChallenge path. Its one known gap —
+        // "made for kids" videos are not offered — is covered by the rest of
+        // the chain.
         // The tail holds no-login last resorts for IP-flagged waves where every
         // regular client answers LOGIN_REQUIRED: ANDROID_TESTSUITE (bare test
         // client, no auth/token checks) and TVHTML5_SIMPLY_EMBEDDED_PLAYER
         // (third-party embed context). They only run after the main clients
         // fail, so the happy path is unchanged.
         val DEFAULT_STREAM_CHAIN = listOf(
+            InnertubeClient.ClientType.VISIONOS,
             InnertubeClient.ClientType.ANDROID_VR,
             InnertubeClient.ClientType.IOS_MUSIC,
             InnertubeClient.ClientType.WEB_REMIX,
@@ -79,6 +86,7 @@ internal class ResolutionStrategy(
                     // fails with LOGIN_REQUIRED/BOT_CHALLENGE while ANDROID_VR/IOS_MUSIC (no PoToken)
                     // still succeed. Prioritize no-PoToken clients on VPN.
                     listOf(
+                        InnertubeClient.ClientType.VISIONOS,
                         InnertubeClient.ClientType.ANDROID_VR,
                         InnertubeClient.ClientType.IOS_MUSIC,
                         InnertubeClient.ClientType.WEB_REMIX,

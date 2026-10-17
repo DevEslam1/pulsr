@@ -52,6 +52,8 @@ double interpolateGain(const std::vector<std::pair<double, double>>& nodes, doub
 ArbitraryResponseEq::ArbitraryResponseEq() {
     firFilter_.assign(FIR_TAPS, 0.0f);
     firFilter_[0] = 1.0f; // Passthrough impulse
+    oldFirFilter_.assign(FIR_TAPS, 0.0f);
+    oldFirFilter_[0] = 1.0f;
     spectrumScratch_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     nodes_.reserve(MAX_NODES);
     setSampleRate(48000.0);
@@ -74,6 +76,12 @@ void ArbitraryResponseEq::reset() {
     std::memset(historyL_, 0, sizeof(historyL_));
     std::memset(historyR_, 0, sizeof(historyR_));
     historyIdx_ = 0;
+    std::memset(phaseDelayL_, 0, sizeof(phaseDelayL_));
+    std::memset(phaseDelayR_, 0, sizeof(phaseDelayR_));
+    phaseDelayIdx_ = 0;
+    smoothedEnabledMix_ = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
+    filterCrossfadeProgress_ = 1.0f;
+    oldLinearPhase_ = linearPhase_;
 }
 
 bool ArbitraryResponseEq::parseGraphicEq(
@@ -136,12 +144,20 @@ bool ArbitraryResponseEq::loadGraphicEqString(const std::string& eqString, bool 
         return false;
     }
 
+    if (hasResponse_) {
+        std::copy(firFilter_.begin(), firFilter_.end(), oldFirFilter_.begin());
+        filterCrossfadeProgress_ = 0.0f;
+        oldLinearPhase_ = linearPhase_;
+    } else {
+        filterCrossfadeProgress_ = 1.0f;
+        oldLinearPhase_ = linearPhase;
+    }
+
     loadedString_ = eqString;
     linearPhase_ = linearPhase;
     nodes_.assign(parsed.begin(), parsed.end());
     hasResponse_ = !nodes_.empty();
     synthesizeFir();
-    reset();
     return hasResponse_;
 }
 
@@ -154,13 +170,23 @@ void ArbitraryResponseEq::applyPreparedNodes(
         // Linear- and minimum-phase now produce genuinely different kernels, so a
         // bare flag update (as before) would leave the old kernel in place.
         if (linearPhase != linearPhase_ && hasResponse_) {
+            std::copy(firFilter_.begin(), firFilter_.end(), oldFirFilter_.begin());
+            filterCrossfadeProgress_ = 0.0f;
+            oldLinearPhase_ = linearPhase_;
             linearPhase_ = linearPhase;
             synthesizeFir();
-            reset();
         } else {
             linearPhase_ = linearPhase;
         }
         return;
+    }
+    if (hasResponse_) {
+        std::copy(firFilter_.begin(), firFilter_.end(), oldFirFilter_.begin());
+        filterCrossfadeProgress_ = 0.0f;
+        oldLinearPhase_ = linearPhase_;
+    } else {
+        filterCrossfadeProgress_ = 1.0f;
+        oldLinearPhase_ = linearPhase;
     }
     preparedNodesRef_ = nodes;
     linearPhase_ = linearPhase;
@@ -169,7 +195,6 @@ void ArbitraryResponseEq::applyPreparedNodes(
     nodes_.assign(nodes->begin(), nodes->end());
     hasResponse_ = !nodes_.empty();
     synthesizeFir();
-    reset();
 }
 
 void ArbitraryResponseEq::synthesizeFir() {
@@ -431,10 +456,26 @@ inline void convolveFirStereo(
 } // namespace
 
 void ArbitraryResponseEq::process(float* L, float* R, int frames) {
-    if (!enabled_ || !hasResponse_ || !L || !R || frames <= 0) return;
+    const float targetEnabledMix = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!L || !R || frames <= 0) return;
+
+    // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
+    const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startEnabledMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetEnabledMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetEnabledMix) < 1e-4f) {
+        smoothedEnabledMix_ = targetEnabledMix;
+    }
+    const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
+    float currentEnabledMix = startEnabledMix;
+
+    const float crossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
 
     const int taps = FIR_TAPS;
     const float* h = firFilter_.data();
+    const float* oldH = oldFirFilter_.data();
 
     for (int i = 0; i < frames; ++i) {
         float inL = L[i];
@@ -455,19 +496,95 @@ void ArbitraryResponseEq::process(float* L, float* R, int frames) {
         float outR = 0.0f;
         convolveFirStereo(h, ptrL, ptrR, outL, outR);
 
+        if (filterCrossfadeProgress_ < 1.0f) {
+            float oldOutL = 0.0f;
+            float oldOutR = 0.0f;
+            convolveFirStereo(oldH, ptrL, ptrR, oldOutL, oldOutR);
+
+            // Phase group-delay alignment:
+            // When morphing between min-phase (0 latency) and linear-phase (512 latency),
+            // delay the minimum-phase signal by 512 samples so both signals align in time,
+            // preventing destructive phase comb filtering during the crossfade.
+            if (oldLinearPhase_ != linearPhase_) {
+                if (!oldLinearPhase_ && linearPhase_) {
+                    const float dL = phaseDelayL_[phaseDelayIdx_];
+                    const float dR = phaseDelayR_[phaseDelayIdx_];
+                    phaseDelayL_[phaseDelayIdx_] = oldOutL;
+                    phaseDelayR_[phaseDelayIdx_] = oldOutR;
+                    oldOutL = dL;
+                    oldOutR = dR;
+                } else if (oldLinearPhase_ && !linearPhase_) {
+                    const float dL = phaseDelayL_[phaseDelayIdx_];
+                    const float dR = phaseDelayR_[phaseDelayIdx_];
+                    phaseDelayL_[phaseDelayIdx_] = outL;
+                    phaseDelayR_[phaseDelayIdx_] = outR;
+                    outL = dL;
+                    outR = dR;
+                }
+                phaseDelayIdx_ = (phaseDelayIdx_ + 1) % PHASE_DELAY_TAPS;
+            }
+
+            const float cfAngle = filterCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
+            const float oldW = std::cos(cfAngle);
+            const float newW = std::sin(cfAngle);
+            outL = oldW * oldOutL + newW * outL;
+            outR = oldW * oldOutR + newW * outR;
+            filterCrossfadeProgress_ = std::min(1.0f, filterCrossfadeProgress_ + crossfadeStep);
+            if (filterCrossfadeProgress_ >= 1.0f) {
+                oldLinearPhase_ = linearPhase_;
+                std::memset(phaseDelayL_, 0, sizeof(phaseDelayL_));
+                std::memset(phaseDelayR_, 0, sizeof(phaseDelayR_));
+                phaseDelayIdx_ = 0;
+            }
+        }
+
         historyIdx_ = historyIdx_ + 1;
         if (historyIdx_ >= taps) historyIdx_ = 0;
 
-        L[i] = outL;
-        R[i] = outR;
+        if (!std::isfinite(outL)) outL = 0.0f;
+        if (!std::isfinite(outR)) outR = 0.0f;
+
+        // Equal-power crossfading for wet/dry enable/disable
+        float dryW, wetW;
+        if (currentEnabledMix >= 0.9999f) {
+            dryW = 0.0f;
+            wetW = 1.0f;
+        } else if (currentEnabledMix <= 0.0001f) {
+            dryW = 1.0f;
+            wetW = 0.0f;
+        } else {
+            const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+            dryW = std::cos(angle);
+            wetW = std::sin(angle);
+        }
+
+        L[i] = dryW * inL + wetW * outL;
+        R[i] = dryW * inR + wetW * outR;
+        currentEnabledMix += mixStep;
     }
 }
 
 void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int channels) {
-    if (!enabled_ || !hasResponse_ || !buffer || frames <= 0 || channels < 2) return;
+    const float targetEnabledMix = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!buffer || frames <= 0 || channels < 2) return;
+
+    // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
+    const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startEnabledMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetEnabledMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetEnabledMix) < 1e-4f) {
+        smoothedEnabledMix_ = targetEnabledMix;
+    }
+    const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
+    float currentEnabledMix = startEnabledMix;
+
+    const float crossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
 
     const int taps = FIR_TAPS;
     const float* h = firFilter_.data();
+    const float* oldH = oldFirFilter_.data();
 
     for (int i = 0; i < frames; ++i) {
         float inL = buffer[i * channels];
@@ -488,10 +605,70 @@ void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int chan
         float outR = 0.0f;
         convolveFirStereo(h, ptrL, ptrR, outL, outR);
 
+        if (filterCrossfadeProgress_ < 1.0f) {
+            float oldOutL = 0.0f;
+            float oldOutR = 0.0f;
+            convolveFirStereo(oldH, ptrL, ptrR, oldOutL, oldOutR);
+
+            // Phase group-delay alignment:
+            // When morphing between min-phase (0 latency) and linear-phase (512 latency),
+            // delay the minimum-phase signal by 512 samples so both signals align in time,
+            // preventing destructive phase comb filtering during the crossfade.
+            if (oldLinearPhase_ != linearPhase_) {
+                if (!oldLinearPhase_ && linearPhase_) {
+                    const float dL = phaseDelayL_[phaseDelayIdx_];
+                    const float dR = phaseDelayR_[phaseDelayIdx_];
+                    phaseDelayL_[phaseDelayIdx_] = oldOutL;
+                    phaseDelayR_[phaseDelayIdx_] = oldOutR;
+                    oldOutL = dL;
+                    oldOutR = dR;
+                } else if (oldLinearPhase_ && !linearPhase_) {
+                    const float dL = phaseDelayL_[phaseDelayIdx_];
+                    const float dR = phaseDelayR_[phaseDelayIdx_];
+                    phaseDelayL_[phaseDelayIdx_] = outL;
+                    phaseDelayR_[phaseDelayIdx_] = outR;
+                    outL = dL;
+                    outR = dR;
+                }
+                phaseDelayIdx_ = (phaseDelayIdx_ + 1) % PHASE_DELAY_TAPS;
+            }
+
+            const float cfAngle = filterCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
+            const float oldW = std::cos(cfAngle);
+            const float newW = std::sin(cfAngle);
+            outL = oldW * oldOutL + newW * outL;
+            outR = oldW * oldOutR + newW * outR;
+            filterCrossfadeProgress_ = std::min(1.0f, filterCrossfadeProgress_ + crossfadeStep);
+            if (filterCrossfadeProgress_ >= 1.0f) {
+                oldLinearPhase_ = linearPhase_;
+                std::memset(phaseDelayL_, 0, sizeof(phaseDelayL_));
+                std::memset(phaseDelayR_, 0, sizeof(phaseDelayR_));
+                phaseDelayIdx_ = 0;
+            }
+        }
+
         historyIdx_ = historyIdx_ + 1;
         if (historyIdx_ >= taps) historyIdx_ = 0;
 
-        buffer[i * channels] = outL;
-        buffer[i * channels + 1] = outR;
+        if (!std::isfinite(outL)) outL = 0.0f;
+        if (!std::isfinite(outR)) outR = 0.0f;
+
+        // Equal-power crossfading for wet/dry enable/disable
+        float dryW, wetW;
+        if (currentEnabledMix >= 0.9999f) {
+            dryW = 0.0f;
+            wetW = 1.0f;
+        } else if (currentEnabledMix <= 0.0001f) {
+            dryW = 1.0f;
+            wetW = 0.0f;
+        } else {
+            const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+            dryW = std::cos(angle);
+            wetW = std::sin(angle);
+        }
+
+        buffer[i * channels] = dryW * inL + wetW * outL;
+        buffer[i * channels + 1] = dryW * inR + wetW * outR;
+        currentEnabledMix += mixStep;
     }
 }

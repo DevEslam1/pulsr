@@ -201,7 +201,9 @@ struct ParseDepthGuard {
 LiveProg::LiveProg() {
     initBytecode_.reserve(MAX_BYTECODE);
     sampleBytecode_.reserve(MAX_BYTECODE);
+    prevSampleBytecode_.reserve(MAX_BYTECODE);
     memory_.reserve(MAX_MEMORY);
+    prevMemory_.reserve(MAX_MEMORY);
     idxSpl0_ = getOrRegisterVar("spl0");
     idxSpl1_ = getOrRegisterVar("spl1");
     idxSrate_ = getOrRegisterVar("srate");
@@ -230,6 +232,18 @@ int LiveProg::getOrRegisterVar(const std::string& name) {
 }
 
 void LiveProg::reset() {
+    if (isCompiled_ && (enabled_ || smoothedEnabledMix_ >= 1e-4f) && !sampleBytecode_.empty()) {
+        prevSampleBytecode_ = sampleBytecode_;
+        prevMemory_ = memory_;
+        prevIdxSpl0_ = idxSpl0_;
+        prevIdxSpl1_ = idxSpl1_;
+        programCrossfadeProgress_ = 0.0f;
+    } else {
+        prevSampleBytecode_.clear();
+        prevMemory_.clear();
+        programCrossfadeProgress_ = 1.0f;
+    }
+    smoothedEnabledMix_ = (enabled_ && isCompiled_ && !sampleBytecode_.empty()) ? 1.0f : 0.0f;
     for (size_t i = 0; i < memory_.size(); ++i) {
         if (static_cast<int>(i) != idxSrate_) {
             memory_[i] = 0.0;
@@ -239,7 +253,7 @@ void LiveProg::reset() {
         memory_[idxSrate_] = sampleRate_;
     }
     if (!initBytecode_.empty()) {
-        executeBytecode(initBytecode_);
+        executeBytecode(initBytecode_, memory_);
     }
 }
 
@@ -312,6 +326,18 @@ void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>
     if (!program) return;
     activeProgram_ = program;
 
+    if (isCompiled_ && (enabled_ || smoothedEnabledMix_ >= 1e-4f) && !sampleBytecode_.empty()) {
+        prevSampleBytecode_ = sampleBytecode_;
+        prevMemory_ = memory_;
+        prevIdxSpl0_ = idxSpl0_;
+        prevIdxSpl1_ = idxSpl1_;
+        programCrossfadeProgress_ = 0.0f;
+    } else {
+        prevSampleBytecode_.clear();
+        prevMemory_.clear();
+        programCrossfadeProgress_ = 1.0f;
+    }
+
     initBytecode_.clear();
     for (const auto& i : program->initBytecode) {
         initBytecode_.push_back(
@@ -349,23 +375,56 @@ void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>
     }
 
     isCompiled_ = !sampleBytecode_.empty();
-    reset();
+    for (size_t i = 0; i < memory_.size(); ++i) {
+        if (static_cast<int>(i) != idxSrate_) {
+            memory_[i] = 0.0;
+        }
+    }
+    if (idxSrate_ >= 0 && idxSrate_ < static_cast<int>(memory_.size())) {
+        memory_[idxSrate_] = sampleRate_;
+    }
+    if (!initBytecode_.empty()) {
+        executeBytecode(initBytecode_, memory_);
+    }
 }
 
 bool LiveProg::loadCode(const std::string& scriptCode) {
     loadedCode_ = scriptCode;
-    initBytecode_.clear();
-    sampleBytecode_.clear();
-    isCompiled_ = false;
     lastError_.clear();
 
-    if (scriptCode.empty()) return true;
+    if (scriptCode.empty()) {
+        initBytecode_.clear();
+        sampleBytecode_.clear();
+        isCompiled_ = false;
+        activeProgram_.reset();
+        reset();
+        return true;
+    }
+
+    // Save previous program and execution state for seamless crossfading
+    std::vector<Instruction> oldSampleBytecode;
+    std::vector<double> oldMemory;
+    int oldSpl0 = -1, oldSpl1 = -1;
+    bool hadActive = isCompiled_ && (enabled_ || smoothedEnabledMix_ >= 1e-4f) && !sampleBytecode_.empty();
+    if (hadActive) {
+        oldSampleBytecode = sampleBytecode_;
+        oldMemory = memory_;
+        oldSpl0 = idxSpl0_;
+        oldSpl1 = idxSpl1_;
+    }
 
     bool ok = compileScript(scriptCode);
     if (ok) {
-        isCompiled_ = true;
-        activeProgram_ = buildProgram();
-        reset();
+        auto newProg = buildProgram();
+        activeProgram_ = newProg;
+        applyPreparedProgram(newProg);
+        if (hadActive) {
+            prevSampleBytecode_ = std::move(oldSampleBytecode);
+            prevMemory_ = std::move(oldMemory);
+            prevIdxSpl0_ = oldSpl0;
+            prevIdxSpl1_ = oldSpl1;
+            programCrossfadeProgress_ = 0.0f;
+        }
     }
     return ok;
 }
@@ -390,6 +449,15 @@ bool LiveProg::compileScript(const std::string& code) {
             sampleText = code.substr(pSample + 7, end - (pSample + 7));
         }
     }
+
+    // Keep varMap_ and register variables into a temporary copy if needed
+    auto savedVarMap = varMap_;
+    auto savedMemorySize = memory_.size();
+
+    std::vector<Instruction> newInitBytecode;
+    std::vector<Instruction> newSampleBytecode;
+    newInitBytecode.reserve(MAX_BYTECODE);
+    newSampleBytecode.reserve(MAX_BYTECODE);
 
     auto parseBlock = [this](const std::string& text, std::vector<Instruction>& outProgram) -> bool {
         Lexer lexer(text);
@@ -634,24 +702,37 @@ bool LiveProg::compileScript(const std::string& code) {
     };
 
     if (!initText.empty()) {
-        if (!parseBlock(initText, initBytecode_)) return false;
+        if (!parseBlock(initText, newInitBytecode)) {
+            varMap_ = savedVarMap;
+            memory_.resize(savedMemorySize);
+            return false;
+        }
     }
     if (!sampleText.empty()) {
-        if (!parseBlock(sampleText, sampleBytecode_)) return false;
+        if (!parseBlock(sampleText, newSampleBytecode)) {
+            varMap_ = savedVarMap;
+            memory_.resize(savedMemorySize);
+            return false;
+        }
     }
 
     // Bound the program so a hostile/huge script cannot make the audio-thread
     // program copy exceed the pre-reserved bytecode capacity.
-    if (static_cast<int>(initBytecode_.size()) > MAX_BYTECODE ||
-        static_cast<int>(sampleBytecode_.size()) > MAX_BYTECODE) {
+    if (static_cast<int>(newInitBytecode.size()) > MAX_BYTECODE ||
+        static_cast<int>(newSampleBytecode.size()) > MAX_BYTECODE) {
         lastError_ = "Script too large";
+        varMap_ = savedVarMap;
+        memory_.resize(savedMemorySize);
         return false;
     }
+
+    initBytecode_ = std::move(newInitBytecode);
+    sampleBytecode_ = std::move(newSampleBytecode);
 
     return true;
 }
 
-void LiveProg::executeBytecode(const std::vector<Instruction>& program) {
+void LiveProg::executeBytecode(const std::vector<Instruction>& program, std::vector<double>& memory) {
     double stack[128];
     int sp = 0;
 
@@ -665,15 +746,15 @@ void LiveProg::executeBytecode(const std::vector<Instruction>& program) {
                 if (sp < 127) stack[sp++] = instr.immValue;
                 break;
             case OpCode::LoadVar:
-                if (sp < 127 && instr.varIndex >= 0 && instr.varIndex < static_cast<int>(memory_.size())) {
-                    stack[sp++] = memory_[instr.varIndex];
+                if (sp < 127 && instr.varIndex >= 0 && instr.varIndex < static_cast<int>(memory.size())) {
+                    stack[sp++] = memory[instr.varIndex];
                 } else if (sp < 127) {
                     stack[sp++] = 0.0;
                 }
                 break;
             case OpCode::StoreVar:
-                if (sp > 0 && instr.varIndex >= 0 && instr.varIndex < static_cast<int>(memory_.size())) {
-                    memory_[instr.varIndex] = stack[--sp];
+                if (sp > 0 && instr.varIndex >= 0 && instr.varIndex < static_cast<int>(memory.size())) {
+                    memory[instr.varIndex] = stack[--sp];
                 }
                 break;
             case OpCode::Add:
@@ -764,47 +845,175 @@ void LiveProg::executeBytecode(const std::vector<Instruction>& program) {
 }
 
 void LiveProg::process(float* L, float* R, int frames) {
-    if (!enabled_ || !isCompiled_ || sampleBytecode_.empty() || !L || !R || frames <= 0) return;
-    // FIX M-17: guard the unchecked memory_[idxSpl0_]/[idxSpl1_] accesses below
-    // against a malformed prepared program (indices are block-constant).
+    const float targetEnabledMix = (enabled_ && isCompiled_ && !sampleBytecode_.empty()) ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!L || !R || frames <= 0) return;
+
     const int mem = static_cast<int>(memory_.size());
     if (idxSpl0_ < 0 || idxSpl0_ >= mem || idxSpl1_ < 0 || idxSpl1_ >= mem) return;
 
+    // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
+    const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startEnabledMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetEnabledMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetEnabledMix) < 1e-4f) {
+        smoothedEnabledMix_ = targetEnabledMix;
+    }
+    const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
+    float currentEnabledMix = startEnabledMix;
+
+    const float crossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+
+    const int prevMem = static_cast<int>(prevMemory_.size());
+    const bool canRunPrev = (programCrossfadeProgress_ < 1.0f &&
+                             !prevSampleBytecode_.empty() &&
+                             prevIdxSpl0_ >= 0 && prevIdxSpl0_ < prevMem &&
+                             prevIdxSpl1_ >= 0 && prevIdxSpl1_ < prevMem);
+
     for (int i = 0; i < frames; ++i) {
-        memory_[idxSpl0_] = static_cast<double>(L[i]);
-        memory_[idxSpl1_] = static_cast<double>(R[i]);
+        const float inL = L[i];
+        const float inR = R[i];
 
-        executeBytecode(sampleBytecode_);
+        memory_[idxSpl0_] = static_cast<double>(inL);
+        memory_[idxSpl1_] = static_cast<double>(inR);
+        executeBytecode(sampleBytecode_, memory_);
 
-        // Sanitize the script's output: a bad script (or tan/exp/pow overflow)
-        // must never inject NaN/Inf into the DAC stream, and a runaway gain is
-        // bounded to a generous range so it cannot blow up the whole mix.
-        double l = memory_[idxSpl0_];
-        double r = memory_[idxSpl1_];
-        if (!std::isfinite(l)) l = 0.0;
-        if (!std::isfinite(r)) r = 0.0;
-        L[i] = static_cast<float>(std::clamp(l, -4.0, 4.0));
-        R[i] = static_cast<float>(std::clamp(r, -4.0, 4.0));
+        double curL = memory_[idxSpl0_];
+        double curR = memory_[idxSpl1_];
+        if (!std::isfinite(curL)) curL = 0.0;
+        if (!std::isfinite(curR)) curR = 0.0;
+        float wetL = static_cast<float>(std::clamp(curL, -4.0, 4.0));
+        float wetR = static_cast<float>(std::clamp(curR, -4.0, 4.0));
+
+        if (canRunPrev) {
+            prevMemory_[prevIdxSpl0_] = static_cast<double>(inL);
+            prevMemory_[prevIdxSpl1_] = static_cast<double>(inR);
+            executeBytecode(prevSampleBytecode_, prevMemory_);
+
+            double oldL = prevMemory_[prevIdxSpl0_];
+            double oldR = prevMemory_[prevIdxSpl1_];
+            if (!std::isfinite(oldL)) oldL = 0.0;
+            if (!std::isfinite(oldR)) oldR = 0.0;
+            float oldWetL = static_cast<float>(std::clamp(oldL, -4.0, 4.0));
+            float oldWetR = static_cast<float>(std::clamp(oldR, -4.0, 4.0));
+
+            const float cfAngle = programCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
+            const float oldW = std::cos(cfAngle);
+            const float newW = std::sin(cfAngle);
+
+            wetL = oldW * oldWetL + newW * wetL;
+            wetR = oldW * oldWetR + newW * wetR;
+            programCrossfadeProgress_ = std::min(1.0f, programCrossfadeProgress_ + crossfadeStep);
+            if (programCrossfadeProgress_ >= 1.0f) {
+                prevSampleBytecode_.clear();
+                prevMemory_.clear();
+            }
+        }
+
+        // Equal-power crossfading for wet/dry enable/disable
+        float dryW, wetW;
+        if (currentEnabledMix >= 0.9999f) {
+            dryW = 0.0f;
+            wetW = 1.0f;
+        } else if (currentEnabledMix <= 0.0001f) {
+            dryW = 1.0f;
+            wetW = 0.0f;
+        } else {
+            const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+            dryW = std::cos(angle);
+            wetW = std::sin(angle);
+        }
+
+        L[i] = dryW * inL + wetW * wetL;
+        R[i] = dryW * inR + wetW * wetR;
+        currentEnabledMix += mixStep;
     }
 }
 
 void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
-    if (!enabled_ || !isCompiled_ || sampleBytecode_.empty() || !buffer || frames <= 0 || channels < 2) return;
-    // FIX M-17: guard the unchecked memory_[idxSpl0_]/[idxSpl1_] accesses below.
+    const float targetEnabledMix = (enabled_ && isCompiled_ && !sampleBytecode_.empty()) ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!buffer || frames <= 0 || channels < 2) return;
+
     const int mem = static_cast<int>(memory_.size());
     if (idxSpl0_ < 0 || idxSpl0_ >= mem || idxSpl1_ < 0 || idxSpl1_ >= mem) return;
 
+    // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
+    const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startEnabledMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetEnabledMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetEnabledMix) < 1e-4f) {
+        smoothedEnabledMix_ = targetEnabledMix;
+    }
+    const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
+    float currentEnabledMix = startEnabledMix;
+
+    const float crossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+
+    const int prevMem = static_cast<int>(prevMemory_.size());
+    const bool canRunPrev = (programCrossfadeProgress_ < 1.0f &&
+                             !prevSampleBytecode_.empty() &&
+                             prevIdxSpl0_ >= 0 && prevIdxSpl0_ < prevMem &&
+                             prevIdxSpl1_ >= 0 && prevIdxSpl1_ < prevMem);
+
     for (int i = 0; i < frames; ++i) {
-        memory_[idxSpl0_] = static_cast<double>(buffer[i * channels]);
-        memory_[idxSpl1_] = static_cast<double>(buffer[i * channels + 1]);
+        const float inL = buffer[i * channels];
+        const float inR = buffer[i * channels + 1];
 
-        executeBytecode(sampleBytecode_);
+        memory_[idxSpl0_] = static_cast<double>(inL);
+        memory_[idxSpl1_] = static_cast<double>(inR);
+        executeBytecode(sampleBytecode_, memory_);
 
-        double l = memory_[idxSpl0_];
-        double r = memory_[idxSpl1_];
-        if (!std::isfinite(l)) l = 0.0;
-        if (!std::isfinite(r)) r = 0.0;
-        buffer[i * channels] = static_cast<float>(std::clamp(l, -4.0, 4.0));
-        buffer[i * channels + 1] = static_cast<float>(std::clamp(r, -4.0, 4.0));
+        double curL = memory_[idxSpl0_];
+        double curR = memory_[idxSpl1_];
+        if (!std::isfinite(curL)) curL = 0.0;
+        if (!std::isfinite(curR)) curR = 0.0;
+        float wetL = static_cast<float>(std::clamp(curL, -4.0, 4.0));
+        float wetR = static_cast<float>(std::clamp(curR, -4.0, 4.0));
+
+        if (canRunPrev) {
+            prevMemory_[prevIdxSpl0_] = static_cast<double>(inL);
+            prevMemory_[prevIdxSpl1_] = static_cast<double>(inR);
+            executeBytecode(prevSampleBytecode_, prevMemory_);
+
+            double oldL = prevMemory_[prevIdxSpl0_];
+            double oldR = prevMemory_[prevIdxSpl1_];
+            if (!std::isfinite(oldL)) oldL = 0.0;
+            if (!std::isfinite(oldR)) oldR = 0.0;
+            float oldWetL = static_cast<float>(std::clamp(oldL, -4.0, 4.0));
+            float oldWetR = static_cast<float>(std::clamp(oldR, -4.0, 4.0));
+
+            const float cfAngle = programCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
+            const float oldW = std::cos(cfAngle);
+            const float newW = std::sin(cfAngle);
+
+            wetL = oldW * oldWetL + newW * wetL;
+            wetR = oldW * oldWetR + newW * wetR;
+            programCrossfadeProgress_ = std::min(1.0f, programCrossfadeProgress_ + crossfadeStep);
+            if (programCrossfadeProgress_ >= 1.0f) {
+                prevSampleBytecode_.clear();
+                prevMemory_.clear();
+            }
+        }
+
+        // Equal-power crossfading for wet/dry enable/disable
+        float dryW, wetW;
+        if (currentEnabledMix >= 0.9999f) {
+            dryW = 0.0f;
+            wetW = 1.0f;
+        } else if (currentEnabledMix <= 0.0001f) {
+            dryW = 1.0f;
+            wetW = 0.0f;
+        } else {
+            const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+            dryW = std::cos(angle);
+            wetW = std::sin(angle);
+        }
+
+        buffer[i * channels] = dryW * inL + wetW * wetL;
+        buffer[i * channels + 1] = dryW * inR + wetW * wetR;
+        currentEnabledMix += mixStep;
     }
 }
