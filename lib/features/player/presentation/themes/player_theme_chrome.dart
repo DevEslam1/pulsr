@@ -20,6 +20,7 @@ import '../../../../core/services/sound_feedback_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/db/app_database.dart';
@@ -31,7 +32,6 @@ import '../../../sheets/song_info_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
-import '../widgets/advanced_playback_bar.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_quality_sheet.dart';
 import '../widgets/equalizer_sheet.dart';
@@ -194,7 +194,7 @@ class PlayerSwitcherItem extends StatelessWidget {
       label: semanticsLabel,
       excludeSemantics: true,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 40, minHeight: 32),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 26),
         child: InkWell(
           onTap: onTap,
           borderRadius: AppRadii.r20All,
@@ -210,7 +210,7 @@ class PlayerSwitcherItem extends StatelessWidget {
               children: [
                 Icon(
                   icon,
-                  size: isTablet ? 16 : 14,
+                  size: isTablet ? 15.0 : 13.5,
                   color: isSelected ? activeColor : p.textSecondary,
                 ),
                 const SizedBox(width: AppSpacing.xxs),
@@ -220,8 +220,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize:
-                          isTablet ? AppFontSize.bodySmall : AppFontSize.label,
+                      fontSize: isTablet ? 13.0 : 11.8,
                       fontWeight:
                           isSelected ? FontWeight.w800 : FontWeight.w600,
                       color: isSelected ? p.textPrimary : p.textSecondary,
@@ -233,7 +232,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                   const SizedBox(width: AppSpacing.xxs),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 4.5, vertical: AppSpacing.s2),
+                        horizontal: 4.5, vertical: 1.5),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? activeColor
@@ -243,7 +242,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                     child: Text(
                       '$badgeCount',
                       style: TextStyle(
-                        fontSize: AppFontSize.tiny,
+                        fontSize: isTablet ? 10.5 : 9.5,
                         fontWeight: FontWeight.w800,
                         color: isSelected ? p.onAccent : p.textSecondary,
                       ),
@@ -529,7 +528,7 @@ class PlayerViewSwitcher extends StatelessWidget {
                   glow: c.state.customThemeGlow,
                   active: c.state.themeColorSource == ThemeColorSource.custom,
                 ));
-    final barRadius = custom.active ? custom.radius : 24.0;
+    final barRadius = custom.active ? custom.radius : 20.0;
     final showGlow = custom.active && custom.glow;
 
     return Center(
@@ -1039,6 +1038,8 @@ class PlayerTopBar extends StatelessWidget {
   final VoidCallback? onDismiss;
   final VoidCallback? onMore;
   final Widget? centerWidget;
+  final bool showDismiss;
+  final bool showMore;
 
   const PlayerTopBar({
     super.key,
@@ -1052,6 +1053,8 @@ class PlayerTopBar extends StatelessWidget {
     this.onDismiss,
     this.onMore,
     this.centerWidget,
+    this.showDismiss = true,
+    this.showMore = true,
   });
 
   @override
@@ -1098,21 +1101,24 @@ class PlayerTopBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          circleButton(
-            icon: Icons.keyboard_arrow_down_rounded,
-            semanticLabel: context.l10n.close,
-            iconSize: isTablet ? 26 : 24,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              if (onDismiss != null) {
-                onDismiss!();
-              } else if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/');
-              }
-            },
-          ),
+          if (showDismiss)
+            circleButton(
+              icon: Icons.keyboard_arrow_down_rounded,
+              semanticLabel: context.l10n.close,
+              iconSize: isTablet ? 26 : 24,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                if (onDismiss != null) {
+                  onDismiss!();
+                } else if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/');
+                }
+              },
+            )
+          else if (showMore)
+            const SizedBox(width: 48, height: 48),
           Expanded(
             child: centerWidget != null
                 ? Center(child: centerWidget!)
@@ -1175,19 +1181,22 @@ class PlayerTopBar extends StatelessWidget {
                     ),
                   ),
           ),
-          circleButton(
-            icon: Icons.more_horiz_rounded,
-            semanticLabel: context.l10n.songInfo,
-            iconSize: isTablet ? 24 : 22,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              if (onMore != null) {
-                onMore!();
-              } else if (song != null) {
-                SongInfoSheet.show(context, song: song);
-              }
-            },
-          ),
+          if (showMore)
+            circleButton(
+              icon: Icons.more_horiz_rounded,
+              semanticLabel: context.l10n.songInfo,
+              iconSize: isTablet ? 24 : 22,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                if (onMore != null) {
+                  onMore!();
+                } else if (song != null) {
+                  SongInfoSheet.show(context, song: song);
+                }
+              },
+            )
+          else if (showDismiss)
+            const SizedBox(width: 48, height: 48),
         ],
       ),
     );
@@ -1446,8 +1455,10 @@ class PlayerControlsColumn extends StatelessWidget {
       mode = context
           .select<SettingsCubit, ExperienceMode>((c) => c.state.experienceMode);
     } catch (_) {}
-    final hasAdvancedContent = showAdvancedBar &&
-        (state.bookmarkPosition != null || mode == ExperienceMode.professional);
+    final showAbControls = showAdvancedBar &&
+        (mode == ExperienceMode.professional ||
+            state.abPointA != null ||
+            state.abPointB != null);
 
     final double spacingTrackToSeek = metrics?.spacingTrackToSeek ??
         ((isTablet
@@ -1506,12 +1517,9 @@ class PlayerControlsColumn extends StatelessWidget {
           waveformHeight: resolvedWaveformHeight,
           onSeek: (pos) => cubit.seek(pos),
         ),
-        if (hasAdvancedContent) ...[
+        if (state.bookmarkPosition != null) ...[
           SizedBox(height: spacingSeekToAdvanced),
-          AdvancedPlaybackBar(
-            activeColor: props.activeColor,
-            height: metrics?.dockBarHeight,
-          ),
+          _buildBookmarkPrompt(context, cubit, state.bookmarkPosition!),
           SizedBox(height: spacingAdvancedToControls),
         ] else ...[
           SizedBox(height: spacingSeekToControls),
@@ -1524,6 +1532,13 @@ class PlayerControlsColumn extends StatelessWidget {
           hasPrevious: state.hasPreviousNeighbour,
           hasNext: state.hasNextNeighbour,
           abLoopActive: abLoopActive,
+          showAbControls: showAbControls,
+          abPointA: state.abPointA,
+          abPointB: state.abPointB,
+          onSetAbPointA: () => cubit.setAbPointA(),
+          onSetAbPointB: () => cubit.setAbPointB(),
+          onToggleAbLoop: () => cubit.toggleAbLoop(),
+          onClearAbLoop: () => cubit.clearAbLoop(),
           primaryColor: props.activeColor,
           mainButtonSize: resolvedMainButtonSize,
           sideButtonSize: resolvedSideButtonSize,
@@ -1541,6 +1556,39 @@ class PlayerControlsColumn extends StatelessWidget {
         dock,
         if (!dense) SizedBox(height: spacingBelowDock),
       ],
+    );
+  }
+
+  Widget _buildBookmarkPrompt(
+      BuildContext context, PlayerCubit cubit, Duration pos) {
+    final l10n = context.l10n;
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+      child: Material(
+        color: p.warning.withValues(alpha: 0.15),
+        borderRadius: AppRadii.r12All,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.bookmark, color: p.warning),
+          title: Text(l10n.resumeFromPrompt(Formatters.formatDuration(pos))),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                  onPressed: cubit.seekToBookmark, child: Text(l10n.resume)),
+              IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
+                  tooltip: l10n.close,
+                  onPressed: cubit.dismissBookmark,
+                  icon: const Icon(Icons.close, size: 18)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

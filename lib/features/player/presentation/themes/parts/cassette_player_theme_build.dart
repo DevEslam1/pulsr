@@ -176,26 +176,26 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
                     children: [
                       Expanded(
                         flex: 5,
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(
-                                top: metrics.switcherTopPad,
-                                bottom: metrics.switcherBottomPad,
-                              ),
-                              child: viewSwitcher,
-                            ),
-                            Expanded(
-                              child: centerDisplay,
-                            ),
-                          ],
+                        child: Center(
+                          child: centerDisplay,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         flex: 6,
                         child: SingleChildScrollView(
-                          child: controlsColumn,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: metrics.switcherBottomPad,
+                                ),
+                                child: viewSwitcher,
+                              ),
+                              controlsColumn,
+                            ],
+                          ),
                         ),
                       ),
                     ],

@@ -7,6 +7,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
+import '../../../../core/utils/formatters.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -33,6 +34,15 @@ class PlayerControls extends StatefulWidget {
   final bool hasNext;
   final bool abLoopActive;
 
+  /// AB loop inline affordances flanking Back (A) and Next (B) buttons.
+  final bool showAbControls;
+  final Duration? abPointA;
+  final Duration? abPointB;
+  final VoidCallback? onSetAbPointA;
+  final VoidCallback? onSetAbPointB;
+  final VoidCallback? onToggleAbLoop;
+  final VoidCallback? onClearAbLoop;
+
   const PlayerControls({
     super.key,
     required this.isPlaying,
@@ -50,6 +60,13 @@ class PlayerControls extends StatefulWidget {
     this.hasPrevious = true,
     this.hasNext = true,
     this.abLoopActive = false,
+    this.showAbControls = false,
+    this.abPointA,
+    this.abPointB,
+    this.onSetAbPointA,
+    this.onSetAbPointB,
+    this.onToggleAbLoop,
+    this.onClearAbLoop,
   });
 
   final double? sideButtonSize;
@@ -111,8 +128,11 @@ class _PlayerControlsState extends State<PlayerControls> {
     final resolvedSideSize = widget.sideButtonSize ??
         (widget.mainButtonSize * 0.72).clamp(38.0, 52.0);
     final prevNextIconSize = (resolvedSideSize * 0.54).clamp(20.0, 30.0);
-    final buttonSpacing = (widget.mainButtonSize * 0.22).clamp(8.0, 18.0);
+    final buttonSpacing = widget.showAbControls
+        ? (widget.mainButtonSize * 0.12).clamp(4.0, 10.0)
+        : (widget.mainButtonSize * 0.22).clamp(8.0, 18.0);
     final shuffleRepeatIconSize = (resolvedSideSize * 0.48).clamp(18.0, 24.0);
+    final abButtonSize = (resolvedSideSize * 0.78).clamp(32.0, 42.0);
 
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -143,6 +163,45 @@ class _PlayerControlsState extends State<PlayerControls> {
                   iconSize: shuffleRepeatIconSize,
                 ),
               ),
+
+              if (widget.showAbControls) ...[
+                SizedBox(width: buttonSpacing),
+                // Point A Button (next to Back/Previous)
+                Semantics(
+                  label: widget.abPointA != null
+                      ? 'Loop point A ${Formatters.formatDuration(widget.abPointA!)}'
+                      : 'Set loop point A',
+                  button: true,
+                  child: _AbPointButton(
+                    label: 'A',
+                    point: widget.abPointA,
+                    isActive: widget.abPointA != null,
+                    isLoopActive: widget.abLoopActive,
+                    activeColor: widget.primaryColor,
+                    inactiveColor: p.textSecondary,
+                    onPressed: () {
+                      PulsrHaptics.selection();
+                      widget.onSetAbPointA?.call();
+                    },
+                    onLongPress: () {
+                      if (widget.abPointA != null || widget.abPointB != null) {
+                        PulsrHaptics.confirm();
+                        widget.onClearAbLoop?.call();
+                        PulsrToast.show(
+                          context,
+                          message: l10n.clearAbLoop,
+                          icon: Icons.clear_rounded,
+                          duration: const Duration(milliseconds: 1200),
+                        );
+                      }
+                    },
+                    tooltip: widget.abPointA != null
+                        ? 'Point A: ${Formatters.formatDuration(widget.abPointA!)} (${l10n.clearAbLoop})'
+                        : 'Set loop point A',
+                    buttonSize: abButtonSize,
+                  ),
+                ),
+              ],
 
               SizedBox(width: buttonSpacing),
 
@@ -392,6 +451,45 @@ class _PlayerControlsState extends State<PlayerControls> {
                 ),
               ),
 
+              if (widget.showAbControls) ...[
+                SizedBox(width: buttonSpacing),
+                // Point B Button (next to Next)
+                Semantics(
+                  label: widget.abPointB != null
+                      ? 'Loop point B ${Formatters.formatDuration(widget.abPointB!)}'
+                      : 'Set loop point B',
+                  button: true,
+                  child: _AbPointButton(
+                    label: 'B',
+                    point: widget.abPointB,
+                    isActive: widget.abPointB != null,
+                    isLoopActive: widget.abLoopActive,
+                    activeColor: widget.primaryColor,
+                    inactiveColor: p.textSecondary,
+                    onPressed: () {
+                      PulsrHaptics.selection();
+                      widget.onSetAbPointB?.call();
+                    },
+                    onLongPress: () {
+                      if (widget.abPointA != null || widget.abPointB != null) {
+                        PulsrHaptics.confirm();
+                        widget.onClearAbLoop?.call();
+                        PulsrToast.show(
+                          context,
+                          message: l10n.clearAbLoop,
+                          icon: Icons.clear_rounded,
+                          duration: const Duration(milliseconds: 1200),
+                        );
+                      }
+                    },
+                    tooltip: widget.abPointB != null
+                        ? 'Point B: ${Formatters.formatDuration(widget.abPointB!)} (${l10n.clearAbLoop})'
+                        : 'Set loop point B',
+                    buttonSize: abButtonSize,
+                  ),
+                ),
+              ],
+
               SizedBox(width: buttonSpacing),
 
               // Repeat Button with active indicator
@@ -519,3 +617,117 @@ class _ControlButton extends StatelessWidget {
     );
   }
 }
+
+class _AbPointButton extends StatelessWidget {
+  final String label;
+  final Duration? point;
+  final bool isActive;
+  final bool isLoopActive;
+  final Color activeColor;
+  final Color inactiveColor;
+  final VoidCallback? onPressed;
+  final VoidCallback? onLongPress;
+  final String tooltip;
+  final double buttonSize;
+
+  const _AbPointButton({
+    required this.label,
+    this.point,
+    required this.isActive,
+    this.isLoopActive = false,
+    required this.activeColor,
+    required this.inactiveColor,
+    this.onPressed,
+    this.onLongPress,
+    required this.tooltip,
+    this.buttonSize = 34.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final Color effectiveColor = isLoopActive
+        ? context.palette.success
+        : (isActive ? activeColor : inactiveColor);
+
+    return Tooltip(
+      message: tooltip,
+      excludeFromSemantics: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          onLongPress: onLongPress,
+          borderRadius: AppRadii.r20All,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xxs, vertical: AppSpacing.xs),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: context.motionMs(200),
+                  width: buttonSize,
+                  height: buttonSize,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isActive
+                        ? effectiveColor.withValues(alpha: 0.16)
+                        : (p.isDark ? Colors.white : Colors.black)
+                            .withValues(alpha: 0.05),
+                    border: Border.all(
+                      color: isActive
+                          ? effectiveColor.withValues(alpha: 0.50)
+                          : (p.isDark ? Colors.white : Colors.black)
+                              .withValues(alpha: 0.12),
+                      width: isActive ? 1.4 : 1.0,
+                    ),
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: effectiveColor.withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              spreadRadius: 0.5,
+                            )
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: (buttonSize * 0.44).clamp(11.0, 15.0),
+                      fontWeight: FontWeight.w800,
+                      color: effectiveColor,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s2),
+                AnimatedContainer(
+                  duration: context.motionMs(200),
+                  width: isActive ? 4 : 0,
+                  height: isActive ? 4 : 0,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: effectiveColor,
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: effectiveColor.withValues(alpha: 0.6),
+                              blurRadius: 4,
+                              spreadRadius: 0.5,
+                            )
+                          ]
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

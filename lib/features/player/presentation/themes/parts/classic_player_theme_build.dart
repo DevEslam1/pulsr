@@ -132,15 +132,15 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
               final switcherBottomPad =
                   (isTablet ? 12.0 : 8.0) * metrics.heightRatio;
               final landscapeArtSize =
-                  (constraints.maxHeight - 68).clamp(180.0, 560.0);
+                  (constraints.maxHeight - 24).clamp(180.0, 560.0);
 
               final viewSwitcher = PlayerViewSwitcher(
                 state: state,
                 cubit: cubit,
                 activeColor: activeColor,
                 isTablet: isTablet,
-                barWidth: isLandscape ? 280.0 : metrics.pillBarWidth,
-                barHeight: isLandscape ? 38.0 : metrics.pillBarHeight,
+                barWidth: isLandscape ? 286.0 : metrics.pillBarWidth,
+                barHeight: isLandscape ? 36.0 : metrics.pillBarHeight,
                 trackIcon: Icons.music_note_rounded,
                 surfaceFillAlpha: 0.06,
                 borderAlpha: 0.12,
@@ -365,55 +365,54 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
 
               // Landscape / Tablet Two-Pane Mode
               if (isLandscape) {
-                return Column(
-                  children: [
-                    PlayerTopBar(
-                      props: props,
-                      isTablet: isTablet,
-                      verticalPadding: AppSpacing.xxs,
-                      centerWidget: viewSwitcher,
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.lg,
-                            vertical: AppSpacing.xxs),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Left Pane: Artwork
-                            Expanded(
-                              flex: 5,
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxHeight: landscapeArtSize,
-                                    maxWidth: landscapeArtSize,
-                                  ),
-                                  child: centerDisplay,
-                                ),
-                              ),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.xxs),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Left Pane: Artwork
+                      Expanded(
+                        flex: 5,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: landscapeArtSize,
+                              maxWidth: landscapeArtSize,
                             ),
-                            const SizedBox(width: AppSpacing.s28),
-                            // Right Pane: Controls
-                            Expanded(
-                              flex: 6,
-                              child: Center(
-                                key: const ValueKey('track_controls_pane'),
-                                child: ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 540),
-                                  child: SingleChildScrollView(
-                                    child: controlsColumn,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                            child: centerDisplay,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: AppSpacing.s28),
+                      // Right Pane: View Switcher (lyrics bar) + Controls
+                      Expanded(
+                        flex: 6,
+                        child: Center(
+                          key: const ValueKey('track_controls_pane'),
+                          child: ConstrainedBox(
+                            constraints:
+                                const BoxConstraints(maxWidth: 540),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.xs,
+                                    ),
+                                    child: viewSwitcher,
+                                  ),
+                                  controlsColumn,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 );
               }
 
@@ -490,10 +489,10 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                     child: LayoutBuilder(
                       builder: (context, artConstraints) {
                         final double availableWidth =
-                            artConstraints.maxWidth - (isTablet ? 64.0 : 32.0);
+                            artConstraints.maxWidth - (isTablet ? 32.0 : 8.0);
                         final double availableHeight =
-                            artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
-                        final double maxAllowed = isTablet ? 560.0 : 420.0;
+                            artConstraints.maxHeight - (isTablet ? 20.0 : 4.0);
+                        final double maxAllowed = isTablet ? 600.0 : 480.0;
                         final double rawSize =
                             math.min(availableWidth, availableHeight);
                         final double dynamicArtSize =

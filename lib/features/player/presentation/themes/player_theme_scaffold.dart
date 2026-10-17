@@ -1,15 +1,19 @@
 // lib/features/player/presentation/themes/player_theme_scaffold.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/db/app_database.dart';
+import '../../cubit/player_cubit.dart';
+import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/song_info_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
-import '../widgets/advanced_playback_bar.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import '../widgets/player_controls.dart';
@@ -142,6 +146,14 @@ class PlayerThemeMetrics {
                 : (isCompactHeight ? 8.0 : 10.0 * heightRatio)));
 
     final double switcherTopPad = isTablet
+        ? 4.0 * heightRatio
+        : (isLandscape
+            ? 1.0
+            : (isShortHeight
+                ? 1.0
+                : (isCompactHeight ? 2.0 : 2.0 * heightRatio)));
+
+    final double switcherBottomPad = isTablet
         ? 6.0 * heightRatio
         : (isLandscape
             ? 2.0
@@ -149,23 +161,15 @@ class PlayerThemeMetrics {
                 ? 2.0
                 : (isCompactHeight ? 3.0 : 4.0 * heightRatio)));
 
-    final double switcherBottomPad = isTablet
-        ? 10.0 * heightRatio
-        : (isLandscape
-            ? 4.0
-            : (isShortHeight
-                ? 4.0
-                : (isCompactHeight ? 6.0 : 6.0 * heightRatio)));
-
     final double pillBarWidth = math.min(
-      maxW - (isTablet ? 64 : 28),
-      isTablet ? 440.0 : 336.0,
+      maxW - (isTablet ? 80 : 36),
+      isTablet ? 380.0 : 296.0,
     );
     final double pillBarHeight = isTablet
-        ? 50.0 * heightRatio.clamp(0.85, 1.15)
+        ? 44.0 * heightRatio.clamp(0.85, 1.10)
         : (isShortHeight
-            ? 38.0
-            : (isCompactHeight ? 40.0 : 44.0 * heightRatio.clamp(0.85, 1.15)));
+            ? 34.0
+            : (isCompactHeight ? 36.0 : 38.0 * heightRatio.clamp(0.85, 1.10)));
 
     final double mainButtonSize = isTablet
         ? 72.0
@@ -260,7 +264,7 @@ class PlayerThemeMetrics {
     required bool isTablet,
     double? maxAllowedOverride,
   }) {
-    final double maxAllowed = maxAllowedOverride ?? (isTablet ? 560.0 : 420.0);
+    final double maxAllowed = maxAllowedOverride ?? (isTablet ? 600.0 : 480.0);
     final double raw = math.min(availableWidth, availableHeight);
     if (raw <= 0) return 0.0;
     return math.min(raw, maxAllowed);
@@ -377,6 +381,7 @@ class PlayerThemeScaffold extends StatelessWidget {
   final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
       viewSwitcher;
   final EdgeInsetsGeometry padding;
+  final bool hideTopBarInLandscape;
 
   const PlayerThemeScaffold({
     super.key,
@@ -396,6 +401,7 @@ class PlayerThemeScaffold extends StatelessWidget {
     this.bottomDock,
     this.viewSwitcher,
     this.padding = const EdgeInsets.symmetric(horizontal: 20),
+    this.hideTopBarInLandscape = false,
   });
 
   @override
@@ -488,11 +494,25 @@ class PlayerThemeScaffold extends StatelessWidget {
                         onSeek: (pos) => cubit.seek(pos),
                       );
 
+                ExperienceMode mode = ExperienceMode.normal;
+                try {
+                  mode = context.select<SettingsCubit, ExperienceMode>(
+                      (c) => c.state.experienceMode);
+                } catch (_) {}
+                final showAbControls = mode == ExperienceMode.professional ||
+                    state.abPointA != null ||
+                    state.abPointB != null;
+
                 final Widget resolvedControls = controls != null
                     ? controls!(context, metrics)
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (state.bookmarkPosition != null) ...[
+                            _buildBookmarkPrompt(
+                                context, cubit, state.bookmarkPosition!),
+                            const SizedBox(height: 8),
+                          ],
                           PlayerControls(
                             isPlaying: state.isPlaying,
                             isBuffering: state.isBuffering,
@@ -501,6 +521,13 @@ class PlayerThemeScaffold extends StatelessWidget {
                             hasPrevious: state.hasPreviousNeighbour,
                             hasNext: state.hasNextNeighbour,
                             abLoopActive: state.abLoopEnabled,
+                            showAbControls: showAbControls,
+                            abPointA: state.abPointA,
+                            abPointB: state.abPointB,
+                            onSetAbPointA: () => cubit.setAbPointA(),
+                            onSetAbPointB: () => cubit.setAbPointB(),
+                            onToggleAbLoop: () => cubit.toggleAbLoop(),
+                            onClearAbLoop: () => cubit.clearAbLoop(),
                             primaryColor: activeColor,
                             mainButtonSize: metrics.mainButtonSize,
                             sideButtonSize: metrics.sideButtonSize,
@@ -509,11 +536,6 @@ class PlayerThemeScaffold extends StatelessWidget {
                             onPrevious: () => cubit.previous(),
                             onToggleShuffle: () => cubit.toggleShuffle(),
                             onToggleRepeat: () => cubit.toggleRepeat(),
-                          ),
-                          const SizedBox(height: 8),
-                          AdvancedPlaybackBar(
-                            activeColor: activeColor,
-                            height: metrics.dockBarHeight,
                           ),
                         ],
                       );
@@ -549,15 +571,16 @@ class PlayerThemeScaffold extends StatelessWidget {
                       children: [
                         Expanded(
                           flex: 5,
-                          child: Column(
-                            children: [
-                              resolvedTopBar,
-                              SizedBox(height: metrics.switcherTopPad),
-                              resolvedSwitcher,
-                              SizedBox(height: metrics.switcherBottomPad),
-                              Expanded(child: resolvedCenter),
-                            ],
-                          ),
+                          child: hideTopBarInLandscape
+                              ? Center(child: resolvedCenter)
+                              : Column(
+                                  children: [
+                                    resolvedTopBar,
+                                    Expanded(
+                                      child: Center(child: resolvedCenter),
+                                    ),
+                                  ],
+                                ),
                         ),
                         const SizedBox(width: 24),
                         Expanded(
@@ -568,6 +591,12 @@ class PlayerThemeScaffold extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: metrics.switcherBottomPad,
+                                    ),
+                                    child: resolvedSwitcher,
+                                  ),
                                   if (trackInfo != null)
                                     trackInfo!(context, metrics),
                                   SizedBox(height: metrics.spacingTrackToSeek),
@@ -654,6 +683,39 @@ class PlayerThemeScaffold extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBookmarkPrompt(
+      BuildContext context, PlayerCubit cubit, Duration pos) {
+    final l10n = context.l10n;
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+      child: Material(
+        color: p.warning.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.bookmark, color: p.warning),
+          title: Text(l10n.resumeFromPrompt(Formatters.formatDuration(pos))),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                  onPressed: cubit.seekToBookmark, child: Text(l10n.resume)),
+              IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
+                  tooltip: l10n.close,
+                  onPressed: cubit.dismissBookmark,
+                  icon: const Icon(Icons.close, size: 18)),
+            ],
+          ),
+        ),
       ),
     );
   }

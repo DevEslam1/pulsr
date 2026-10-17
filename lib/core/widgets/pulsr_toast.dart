@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -313,6 +314,9 @@ class _ToastWidgetState extends State<_ToastWidget>
 
     final bottomSafeArea = MediaQuery.maybePaddingOf(context)?.bottom ?? 0.0;
     final keyboardInset = MediaQuery.maybeViewInsetsOf(context)?.bottom ?? 0.0;
+    final isLandscape =
+        MediaQuery.maybeOrientationOf(context) == Orientation.landscape;
+    final isTablet = Adaptive.isTablet(context);
 
     // 1. If software keyboard is active, position above it
     if (keyboardInset > 0) {
@@ -321,21 +325,30 @@ class _ToastWidgetState extends State<_ToastWidget>
 
     // 2. If a dialog or bottom sheet modal is open, bottom dock is slid away
     if (PulsrModalTracker.isModalOpen.value) {
-      return bottomSafeArea + 16.0;
+      return bottomSafeArea + 14.0;
     }
 
     // 3. If Now Playing full-screen route is active, bottom dock is not visible
     if (PulsrDockTracker.isNowPlayingOpen.value) {
-      return bottomSafeArea + 16.0;
+      return bottomSafeArea + 14.0;
     }
 
-    // 4. Use live height reported by PulsrDockTracker
+    // 4. In landscape phone mode, the dock is always a single compact bar (or hidden)
+    if (isLandscape && !isTablet) {
+      final liveDockHeight = PulsrDockTracker.dockHeight.value;
+      // In phone landscape, dock height is at most ~64dp. Cap it so stale portrait metrics can't shoot it up
+      final effectiveDock =
+          liveDockHeight > 0 ? math.min(liveDockHeight, 68.0) : 64.0;
+      return effectiveDock + bottomSafeArea + 8.0;
+    }
+
+    // 5. Use live height reported by PulsrDockTracker
     final liveDockHeight = PulsrDockTracker.dockHeight.value;
     if (liveDockHeight > 0) {
       return liveDockHeight + bottomSafeArea + 12.0;
     }
 
-    // 5. Fallback inspection if dock has not reported yet
+    // 6. Fallback inspection if dock has not reported yet
     bool hasSong = false;
     try {
       if (getIt.isRegistered<PlayerCubit>()) {
@@ -343,7 +356,6 @@ class _ToastWidgetState extends State<_ToastWidget>
       }
     } catch (_) {}
 
-    final isTablet = Adaptive.isTablet(context);
     final fallbackHeight =
         hasSong ? (isTablet ? 166.0 : 158.0) : (isTablet ? 82.0 : 74.0);
     return fallbackHeight + bottomSafeArea + 12.0;
@@ -363,8 +375,16 @@ class _ToastWidgetState extends State<_ToastWidget>
                 : Icons.info_outline_rounded));
 
     final isTablet = Adaptive.isTablet(context);
-    final double maxDockWidth = isTablet ? 640.0 : 540.0;
-    final snackbarRadius = isTablet ? AppRadii.r26All : AppRadii.r20All;
+    final isLandscape =
+        MediaQuery.maybeOrientationOf(context) == Orientation.landscape;
+    final isCompactLandscape = isLandscape && !isTablet;
+
+    final double maxDockWidth = isTablet
+        ? 480.0
+        : (isCompactLandscape ? 380.0 : 420.0);
+    final snackbarRadius = isTablet
+        ? AppRadii.r24All
+        : (isCompactLandscape ? AppRadii.r16All : AppRadii.r20All);
 
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -488,22 +508,24 @@ class _ToastWidgetState extends State<_ToastWidget>
                                       width: 1.2,
                                     ),
                                   ),
-                                  padding: const EdgeInsetsDirectional.fromSTEB(
-                                    14,
-                                    11,
-                                    12,
-                                    11,
+                                  padding: EdgeInsetsDirectional.fromSTEB(
+                                    isCompactLandscape ? 10 : 12,
+                                    isCompactLandscape ? 7 : 9,
+                                    isCompactLandscape ? 8 : 10,
+                                    isCompactLandscape ? 7 : 9,
                                   ),
                                   child: Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       // Leading Status Badge
                                       Container(
-                                        width: 36,
-                                        height: 36,
+                                        width: isCompactLandscape ? 30 : 32,
+                                        height: isCompactLandscape ? 30 : 32,
                                         decoration: BoxDecoration(
                                           color: statusColor.withValues(
                                               alpha: p.isDark ? 0.18 : 0.12),
-                                          borderRadius: AppRadii.r12All,
+                                          borderRadius: BorderRadius.circular(
+                                              isCompactLandscape ? 9 : 10),
                                           border: Border.all(
                                             color: statusColor.withValues(
                                                 alpha: 0.24),
@@ -514,14 +536,14 @@ class _ToastWidgetState extends State<_ToastWidget>
                                           child: Icon(
                                             effectiveIcon,
                                             color: statusColor,
-                                            size: 20,
+                                            size: isCompactLandscape ? 16 : 18,
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                      const SizedBox(width: 10),
 
                                       // Text Content
-                                      Expanded(
+                                      Flexible(
                                         child: Column(
                                           mainAxisSize: MainAxisSize.min,
                                           crossAxisAlignment:
@@ -535,11 +557,12 @@ class _ToastWidgetState extends State<_ToastWidget>
                                                 style: TextStyle(
                                                   color: p.textPrimary,
                                                   fontWeight: FontWeight.w700,
-                                                  fontSize:
-                                                      AppFontSize.bodySmall,
+                                                  fontSize: isCompactLandscape
+                                                      ? 12.0
+                                                      : AppFontSize.bodySmall,
                                                 ),
                                               ),
-                                              const SizedBox(height: 2),
+                                              const SizedBox(height: 1),
                                             ],
                                             Text(
                                               widget.message,
@@ -550,8 +573,10 @@ class _ToastWidgetState extends State<_ToastWidget>
                                                     ? p.textSecondary
                                                     : p.textPrimary,
                                                 fontWeight: FontWeight.w600,
-                                                fontSize: AppFontSize.bodySmall,
-                                                height: 1.25,
+                                                fontSize: isCompactLandscape
+                                                    ? 12.0
+                                                    : AppFontSize.bodySmall,
+                                                height: 1.22,
                                               ),
                                             ),
                                           ],
@@ -569,9 +594,11 @@ class _ToastWidgetState extends State<_ToastWidget>
                                             dismiss();
                                           },
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 6,
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal:
+                                                  isCompactLandscape ? 9 : 11,
+                                              vertical:
+                                                  isCompactLandscape ? 4 : 5,
                                             ),
                                             decoration: BoxDecoration(
                                               color: statusColor.withValues(
@@ -591,7 +618,9 @@ class _ToastWidgetState extends State<_ToastWidget>
                                                     null) ...[
                                                   Icon(
                                                     widget.action!.icon,
-                                                    size: 14,
+                                                    size: isCompactLandscape
+                                                        ? 12
+                                                        : 14,
                                                     color: statusColor,
                                                   ),
                                                   const SizedBox(width: 4),
@@ -601,8 +630,9 @@ class _ToastWidgetState extends State<_ToastWidget>
                                                   style: TextStyle(
                                                     color: statusColor,
                                                     fontWeight: FontWeight.w700,
-                                                    fontSize:
-                                                        AppFontSize.bodySmall,
+                                                    fontSize: isCompactLandscape
+                                                        ? 11.5
+                                                        : AppFontSize.bodySmall,
                                                   ),
                                                 ),
                                               ],
@@ -612,7 +642,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                       ],
 
                                       // Close Button
-                                      const SizedBox(width: 6),
+                                      const SizedBox(width: 4),
                                       GestureDetector(
                                         behavior: HitTestBehavior.opaque,
                                         onTap: () {
@@ -623,7 +653,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                           padding: const EdgeInsets.all(4),
                                           child: Icon(
                                             Icons.close_rounded,
-                                            size: 18,
+                                            size: isCompactLandscape ? 16 : 18,
                                             color: p.textTertiary,
                                           ),
                                         ),

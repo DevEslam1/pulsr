@@ -168,7 +168,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
         widget.layoutMode ?? PulsrLayoutDelegate.of(context).layoutMode;
     if (effectiveLayoutMode == ShellLayoutMode.bottomNavWide) {
       _maybeUpdateDock(
-        height: keyboardInset > 0 ? 0.0 : 56.0,
+        height: keyboardInset > 0 ? 0.0 : 64.0,
         miniPlayer: keyboardInset > 0 ? false : hasSong,
       );
       return;
@@ -192,6 +192,8 @@ class StackedBottomDockState extends State<StackedBottomDock> {
   bool? _lastKnownHasSong;
   int? _lastKnownSongId;
   double? _lastKnownKeyboardInset;
+  Orientation? _lastKnownOrientation;
+  Size? _lastKnownSize;
   Timer? _dockSyncDebounceTimer;
 
   @visibleForTesting
@@ -206,13 +208,19 @@ class StackedBottomDockState extends State<StackedBottomDock> {
       final songId = currentSong?.id;
       final hasSong = currentSong != null;
       final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+      final orientation = MediaQuery.orientationOf(context);
+      final size = MediaQuery.sizeOf(context);
       if (_lastKnownSongId != songId ||
           _lastKnownHasSong != hasSong ||
-          _lastKnownKeyboardInset != keyboardInset) {
+          _lastKnownKeyboardInset != keyboardInset ||
+          _lastKnownOrientation != orientation ||
+          _lastKnownSize != size) {
         final isFirstSync = _lastKnownHasSong == null;
         _lastKnownSongId = songId;
         _lastKnownHasSong = hasSong;
         _lastKnownKeyboardInset = keyboardInset;
+        _lastKnownOrientation = orientation;
+        _lastKnownSize = size;
         _dockSyncDebounceTimer?.cancel();
         _dockSyncDebounceTimer = null;
         if (isFirstSync) {
