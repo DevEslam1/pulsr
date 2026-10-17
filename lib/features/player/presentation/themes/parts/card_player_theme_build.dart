@@ -104,7 +104,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                 props: props,
                 isTablet: isTablet,
                 barWidth: metrics.pillBarWidth,
-                barHeight: metrics.pillBarHeight,
+                barHeight: metrics.dockBarHeight,
                 disableBlur: true,
               );
 
@@ -247,9 +247,11 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                 isLandscape: isLandscape,
                 isInSplitView: isInSplitView,
                 heightRatio: metrics.heightRatio,
+                metrics: metrics,
                 trackHeader: PlayerTrackHeader(
                   props: props,
                   isTablet: isTablet,
+                  metrics: metrics,
                   horizontalPadding: 0,
                   tabletHorizontalPadding: 0,
                   verticalPadding: 0,
@@ -319,6 +321,57 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                         child: SingleChildScrollView(
                           child: bottomGlassCard,
                         ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // Portrait Mode: Fallback to scrolling on very short screens
+              final isVeryShort = constraints.maxHeight < 560;
+              final isTrackView =
+                  !state.isLyricsVisible && !state.isQueueVisible;
+
+              if (isVeryShort && isTrackView) {
+                final double scrollArtSize =
+                    (constraints.maxHeight * 0.42).clamp(180.0, 300.0);
+
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    children: [
+                      const PlayerPlayHandle(),
+                      PlayerTopBar(
+                        props: props,
+                        isTablet: isTablet,
+                        titleColor: textTitleColor,
+                        subtitleColor: textSubtitleColor,
+                      ),
+                      Padding(
+                        padding: EdgeInsets.only(
+                          top: metrics.switcherTopPad,
+                          bottom: metrics.switcherBottomPad,
+                        ),
+                        child: viewSwitcher,
+                      ),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: scrollArtSize,
+                            maxHeight: scrollArtSize,
+                          ),
+                          child: centerDisplay,
+                        ),
+                      ),
+                      if (showVisualizer) visualizer,
+                      SizedBox(
+                          height:
+                              (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xxs),
+                        child: bottomGlassCard,
                       ),
                     ],
                   ),

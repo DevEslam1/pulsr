@@ -44,12 +44,15 @@ class PlayerControls extends StatefulWidget {
     required this.onToggleShuffle,
     required this.onToggleRepeat,
     this.mainButtonSize = 64.0,
+    this.sideButtonSize,
     required this.primaryColor,
     this.isBuffering = false,
     this.hasPrevious = true,
     this.hasNext = true,
     this.abLoopActive = false,
   });
+
+  final double? sideButtonSize;
 
   @override
   State<PlayerControls> createState() => _PlayerControlsState();
@@ -105,6 +108,12 @@ class _PlayerControlsState extends State<PlayerControls> {
             ? l10n.repeatAll
             : l10n.repeatOff;
 
+    final resolvedSideSize = widget.sideButtonSize ??
+        (widget.mainButtonSize * 0.72).clamp(38.0, 52.0);
+    final prevNextIconSize = (resolvedSideSize * 0.54).clamp(20.0, 30.0);
+    final buttonSpacing = (widget.mainButtonSize * 0.22).clamp(8.0, 18.0);
+    final shuffleRepeatIconSize = (resolvedSideSize * 0.48).clamp(18.0, 24.0);
+
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Padding(
@@ -131,11 +140,11 @@ class _PlayerControlsState extends State<PlayerControls> {
                     widget.onToggleShuffle();
                   },
                   icon: Icons.shuffle_rounded,
-                  iconSize: 22,
+                  iconSize: shuffleRepeatIconSize,
                 ),
               ),
 
-              const SizedBox(width: AppSpacing.md),
+              SizedBox(width: buttonSpacing),
 
               // Previous Button
               Semantics(
@@ -167,10 +176,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                             : null,
                         borderRadius: BorderRadius.circular(30),
                         child: Container(
-                          width:
-                              (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
-                          height:
-                              (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          width: resolvedSideSize,
+                          height: resolvedSideSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: widget.hasPrevious
@@ -199,8 +206,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                               color: widget.hasPrevious
                                   ? p.textPrimary
                                   : p.textTertiary.withValues(alpha: 0.3),
-                              size: (widget.mainButtonSize * 0.44)
-                                  .clamp(24.0, 32.0),
+                              size: prevNextIconSize,
                             ),
                           ),
                         ),
@@ -210,7 +216,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 ),
               ),
 
-              const SizedBox(width: AppSpacing.s18),
+              SizedBox(width: buttonSpacing),
 
               // Main Play / Pause Button
               Semantics(
@@ -314,7 +320,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 ),
               ),
 
-              const SizedBox(width: AppSpacing.s18),
+              SizedBox(width: buttonSpacing),
 
               // Next Button
               Semantics(
@@ -346,10 +352,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                             : null,
                         borderRadius: BorderRadius.circular(30),
                         child: Container(
-                          width:
-                              (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
-                          height:
-                              (widget.mainButtonSize * 0.72).clamp(42.0, 52.0),
+                          width: resolvedSideSize,
+                          height: resolvedSideSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: widget.hasNext
@@ -378,8 +382,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                               color: widget.hasNext
                                   ? p.textPrimary
                                   : p.textTertiary.withValues(alpha: 0.3),
-                              size: (widget.mainButtonSize * 0.44)
-                                  .clamp(24.0, 32.0),
+                              size: prevNextIconSize,
                             ),
                           ),
                         ),
@@ -389,7 +392,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 ),
               ),
 
-              const SizedBox(width: AppSpacing.md),
+              SizedBox(width: buttonSpacing),
 
               // Repeat Button with active indicator
               Semantics(
@@ -428,7 +431,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                   icon: widget.repeatMode == PlayerRepeatMode.one
                       ? Icons.repeat_one_rounded
                       : Icons.repeat_rounded,
-                  iconSize: 22,
+                  iconSize: shuffleRepeatIconSize,
                 ),
               ),
             ],

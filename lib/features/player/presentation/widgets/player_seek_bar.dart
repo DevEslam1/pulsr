@@ -42,6 +42,9 @@ class PlayerSeekBar extends StatefulWidget {
   /// next track is visible without opening the queue.
   final bool showUpNext;
 
+  /// Dynamic waveform height to adapt across different screen heights.
+  final double? waveformHeight;
+
   /// Test seam: when set, waveform decoding uses this loader instead of
   /// [WaveformService.instance].
   @visibleForTesting
@@ -60,6 +63,7 @@ class PlayerSeekBar extends StatefulWidget {
     this.loopPointA,
     this.loopPointB,
     this.showUpNext = true,
+    this.waveformHeight,
   });
 
   @override
@@ -220,6 +224,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   samples: samples,
                   enabled: !isBuffering,
                   activeColor: widget.activeColor,
+                  height: widget.waveformHeight ?? 44.0,
                   semanticLabel: widget.semanticLabel,
                   loopPointA: widget.loopPointA,
                   loopPointB: widget.loopPointB,
@@ -285,9 +290,14 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         ? '${nextTrackInfo.artist} - ${nextTrackInfo.title}'
         : nextTrackInfo.title;
 
+    final isCompact =
+        widget.waveformHeight != null && widget.waveformHeight! < 38.0;
+
     return Padding(
-      padding: const EdgeInsetsDirectional.only(
-          start: AppSpacing.lg, end: AppSpacing.lg, top: AppSpacing.xxs),
+      padding: EdgeInsetsDirectional.only(
+          start: AppSpacing.lg,
+          end: AppSpacing.lg,
+          top: isCompact ? 2.0 : AppSpacing.xxs),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
@@ -295,8 +305,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           cubit.toggleQueueVisibility();
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+          padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: isCompact ? 2.0 : AppSpacing.xxs),
           decoration: BoxDecoration(
             color: AppColors.highlightSoft,
             borderRadius: AppRadii.r12All,

@@ -179,4 +179,82 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('Adaptive sheet constraints and short-height metrics', () {
+    testWidgets(
+        'Sheet constraints clamp both width and height relative to display',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 700);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              final maxH = Adaptive.sheetMaxHeight(context);
+              final constraints = Adaptive.sheetConstraints(context);
+
+              expect(maxH, lessThan(700));
+              expect(maxH, greaterThan(400));
+              expect(constraints.maxHeight, equals(maxH));
+              expect(constraints.maxWidth, equals(620.0));
+
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+    });
+
+    testWidgets(
+        'PlayerThemeMetrics scales controls down on short screens to preserve artwork',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              final shortMetrics = PlayerThemeMetrics.calculate(
+                context,
+                const BoxConstraints(maxWidth: 390, maxHeight: 660),
+              );
+              final tallMetrics = PlayerThemeMetrics.calculate(
+                context,
+                const BoxConstraints(maxWidth: 390, maxHeight: 890),
+              );
+
+              expect(shortMetrics.isShortHeight, isTrue);
+              expect(tallMetrics.isShortHeight, isFalse);
+
+              // Buttons scale adaptively
+              expect(shortMetrics.mainButtonSize,
+                  lessThan(tallMetrics.mainButtonSize));
+              expect(shortMetrics.sideButtonSize,
+                  lessThan(tallMetrics.sideButtonSize));
+              expect(shortMetrics.waveformHeight,
+                  lessThan(tallMetrics.waveformHeight));
+              expect(shortMetrics.dockBarHeight,
+                  lessThanOrEqualTo(tallMetrics.dockBarHeight));
+
+              // Spacings scale adaptively
+              expect(shortMetrics.spacingSeekToControls,
+                  lessThan(tallMetrics.spacingSeekToControls));
+              expect(shortMetrics.spacingControlsToDock,
+                  lessThan(tallMetrics.spacingControlsToDock));
+              expect(shortMetrics.trackHeaderVerticalPadding,
+                  lessThan(tallMetrics.trackHeaderVerticalPadding));
+
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+    });
+  });
 }

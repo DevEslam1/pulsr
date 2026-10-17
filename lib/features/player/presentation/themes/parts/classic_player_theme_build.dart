@@ -150,7 +150,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 props: props,
                 isTablet: isTablet,
                 barWidth: metrics.pillBarWidth,
-                barHeight: metrics.pillBarHeight,
+                barHeight: metrics.dockBarHeight,
                 dockIconStyle: PlayerDockIconStyle.classic,
               );
 
@@ -309,12 +309,15 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 isLandscape: isLandscape,
                 isInSplitView: isInSplitView,
                 heightRatio: isLandscape ? 0.85 : metrics.heightRatio,
+                metrics: metrics,
                 trackHeader: PlayerTrackHeader(
                   props: props,
                   isTablet: isTablet,
+                  metrics: metrics,
                   badgeGap: isLandscape ? AppSpacing.xxs : AppSpacing.s8,
                   titleArtistGap: isLandscape ? 2.0 : AppSpacing.xs,
-                  verticalPadding: isLandscape ? 0.0 : AppSpacing.s6,
+                  verticalPadding:
+                      isLandscape ? 0.0 : metrics.trackHeaderVerticalPadding,
                 ),
                 classicSizing: true,
                 scaleMainButtonByHeight: true,
@@ -414,7 +417,55 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 );
               }
 
-              // Portrait Mode
+              // Portrait Mode: Fallback to scrolling on very short screens to preserve hero artwork
+              final isVeryShort = constraints.maxHeight < 560;
+              final isTrackView =
+                  !state.isLyricsVisible && !state.isQueueVisible;
+
+              if (isVeryShort && isTrackView) {
+                final double scrollArtSize =
+                    (constraints.maxHeight * 0.42).clamp(180.0, 300.0);
+
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    children: [
+                      const PlayerPlayHandle(
+                        padding: EdgeInsets.only(
+                            top: AppSpacing.s8, bottom: AppSpacing.xs),
+                      ),
+                      PlayerTopBar(
+                        props: props,
+                        isTablet: isTablet,
+                        verticalPadding: AppSpacing.xs,
+                      ),
+                      const SizedBox(height: AppSpacing.s2),
+                      Padding(
+                        padding: EdgeInsets.only(
+                          top: switcherTopPad,
+                          bottom: switcherBottomPad,
+                        ),
+                        child: viewSwitcher,
+                      ),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: scrollArtSize,
+                            maxHeight: scrollArtSize,
+                          ),
+                          child: centerDisplay,
+                        ),
+                      ),
+                      if (showVisualizer) visualizer,
+                      SizedBox(
+                          height:
+                              (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
+                      controlsColumn,
+                    ],
+                  ),
+                );
+              }
+
               return Column(
                 children: [
                   const PlayerPlayHandle(

@@ -200,10 +200,15 @@ class PulsrBottomSheetContainer extends StatelessWidget {
       );
     }
 
+    final sheetMaxH = Adaptive.sheetMaxHeight(context);
+
     return Align(
         alignment: Alignment.bottomCenter,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxSheetWidth),
+          constraints: BoxConstraints(
+            maxWidth: maxSheetWidth,
+            maxHeight: sheetMaxH,
+          ),
           child: Container(
             decoration: BoxDecoration(
               color: GpuBudget.isGpuSaverActive

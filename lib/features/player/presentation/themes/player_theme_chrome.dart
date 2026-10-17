@@ -45,6 +45,7 @@ import '../../../../domain/models/audio_output_info.dart';
 import '../../../party/presentation/party_sheet.dart';
 import '../widgets/canvas_backdrop.dart';
 import 'player_theme.dart';
+import 'player_theme_scaffold.dart' show PlayerThemeMetrics;
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -190,7 +191,7 @@ class PlayerSwitcherItem extends StatelessWidget {
       label: semanticsLabel,
       excludeSemantics: true,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        constraints: const BoxConstraints(minWidth: 40, minHeight: 32),
         child: InkWell(
           onTap: onTap,
           borderRadius: AppRadii.r20All,
@@ -1121,13 +1122,17 @@ class PlayerTrackHeader extends StatelessWidget {
   final bool isTablet;
   final double horizontalPadding;
   final double tabletHorizontalPadding;
-  final double verticalPadding;
+  final double? verticalPadding;
   final Color? titleColor;
   final Color? subtitleColor;
   final Widget? extraBadge;
   final double badgeGap;
   final double titleArtistGap;
   final bool showQualityBadge;
+  final double? titleFontSize;
+  final double? subtitleFontSize;
+  final double? actionButtonSize;
+  final PlayerThemeMetrics? metrics;
 
   const PlayerTrackHeader({
     super.key,
@@ -1135,13 +1140,17 @@ class PlayerTrackHeader extends StatelessWidget {
     required this.isTablet,
     this.horizontalPadding = 16,
     this.tabletHorizontalPadding = 28,
-    this.verticalPadding = AppSpacing.s6,
+    this.verticalPadding,
     this.titleColor,
     this.subtitleColor,
     this.extraBadge,
     this.badgeGap = AppSpacing.s8,
     this.titleArtistGap = AppSpacing.xs,
     this.showQualityBadge = true,
+    this.titleFontSize,
+    this.subtitleFontSize,
+    this.actionButtonSize,
+    this.metrics,
   });
 
   @override
@@ -1155,6 +1164,20 @@ class PlayerTrackHeader extends StatelessWidget {
         (song.source == SongSource.youtube ||
             (song.remoteId != null && song.remoteId!.isNotEmpty));
 
+    final double effectiveVerticalPadding =
+        verticalPadding ?? metrics?.trackHeaderVerticalPadding ?? AppSpacing.s6;
+    final double resolvedTitleFontSize = titleFontSize ??
+        metrics?.titleFontSize ??
+        (isTablet ? AppFontSize.headline : AppFontSize.title);
+    final double resolvedSubtitleFontSize = subtitleFontSize ??
+        metrics?.artistFontSize ??
+        (isTablet ? AppFontSize.callout : AppFontSize.bodySmall);
+    final double resolvedActionButtonSize = actionButtonSize ??
+        metrics?.actionButtonSize ??
+        (isTablet ? 48.0 : 44.0);
+    final double iconSize =
+        isTablet ? 24.0 : (resolvedActionButtonSize < 42.0 ? 18.0 : 20.0);
+
     final qualityBadge = song == null
         ? null
         : AudioQualityBadge(
@@ -1167,7 +1190,7 @@ class PlayerTrackHeader extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: isTablet ? tabletHorizontalPadding : horizontalPadding,
-        vertical: verticalPadding,
+        vertical: effectiveVerticalPadding,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1176,8 +1199,8 @@ class PlayerTrackHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: 48,
-                height: 48,
+                width: resolvedActionButtonSize,
+                height: resolvedActionButtonSize,
                 child: Material(
                   color: AppColors.specularAt(0.06),
                   shape: const CircleBorder(),
@@ -1188,7 +1211,7 @@ class PlayerTrackHeader extends StatelessWidget {
                             song: song,
                             activeColor: props.activeColor,
                             iconColor: resolvedSubtitle,
-                            iconSize: isTablet ? 24 : 22,
+                            iconSize: iconSize,
                           ),
                         )
                       : InkWell(
@@ -1202,7 +1225,7 @@ class PlayerTrackHeader extends StatelessWidget {
                             child: Icon(
                               Icons.info_outline_rounded,
                               semanticLabel: context.l10n.songInfo,
-                              size: isTablet ? 24 : 22,
+                              size: iconSize,
                               color: resolvedSubtitle,
                             ),
                           ),
@@ -1220,9 +1243,7 @@ class PlayerTrackHeader extends StatelessWidget {
                         text: song?.title ?? context.l10n.noTrackSelected,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: isTablet
-                              ? AppFontSize.headline
-                              : AppFontSize.title,
+                          fontSize: resolvedTitleFontSize,
                           fontWeight: FontWeight.w900,
                           color: resolvedTitle,
                           height: 1.22,
@@ -1234,9 +1255,7 @@ class PlayerTrackHeader extends StatelessWidget {
                         text: song?.artist ?? context.l10n.unknownArtist,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: isTablet
-                              ? AppFontSize.callout
-                              : AppFontSize.bodySmall,
+                          fontSize: resolvedSubtitleFontSize,
                           fontWeight: FontWeight.w600,
                           color: resolvedSubtitle,
                         ),
@@ -1246,8 +1265,8 @@ class PlayerTrackHeader extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                width: 48,
-                height: 48,
+                width: resolvedActionButtonSize,
+                height: resolvedActionButtonSize,
                 child: Material(
                   color: AppColors.specularAt(0.06),
                   shape: const CircleBorder(),
@@ -1259,7 +1278,7 @@ class PlayerTrackHeader extends StatelessWidget {
                         : context.l10n.like,
                     favoriteColor: p.favorite,
                     inactiveColor: resolvedSubtitle,
-                    iconSize: isTablet ? 24 : 22,
+                    iconSize: iconSize,
                     onTap: () {
                       if (song != null) {
                         props.cubit.toggleFavorite(song.id);
@@ -1310,12 +1329,14 @@ class PlayerControlsColumn extends StatelessWidget {
   final Widget dock;
   final Widget? trackHeader;
   final double? mainButtonSize;
+  final double? sideButtonSize;
   final bool classicSizing;
   final bool scaleMainButtonByHeight;
   final bool dense;
   final bool showAdvancedBar;
   final bool abLoopActive;
   final double heightRatio;
+  final PlayerThemeMetrics? metrics;
 
   const PlayerControlsColumn({
     super.key,
@@ -1326,12 +1347,14 @@ class PlayerControlsColumn extends StatelessWidget {
     required this.dock,
     this.trackHeader,
     this.mainButtonSize,
+    this.sideButtonSize,
     this.classicSizing = false,
     this.scaleMainButtonByHeight = false,
     this.dense = false,
     this.showAdvancedBar = true,
     this.abLoopActive = false,
     this.heightRatio = 1.0,
+    this.metrics,
   });
 
   @override
@@ -1347,34 +1370,46 @@ class PlayerControlsColumn extends StatelessWidget {
     final hasAdvancedContent = showAdvancedBar &&
         (state.bookmarkPosition != null || mode == ExperienceMode.professional);
 
-    final double spacingTrackToSeek = (isTablet
-            ? (classicSizing ? 18.0 : 14.0)
-            : (isLandscape ? 4.0 : (classicSizing ? 14.0 : 12.0))) *
-        heightRatio;
-    final double spacingSeekToControls = (isTablet
-            ? (classicSizing ? 22.0 : 18.0)
-            : (isLandscape ? 6.0 : (classicSizing ? 18.0 : 16.0))) *
-        heightRatio;
-    final double spacingSeekToAdvanced =
-        (isTablet ? 12.0 : (isLandscape ? 4.0 : 10.0)) * heightRatio;
+    final double spacingTrackToSeek = metrics?.spacingTrackToSeek ??
+        ((isTablet
+                ? (classicSizing ? 18.0 : 14.0)
+                : (isLandscape ? 4.0 : (classicSizing ? 14.0 : 12.0))) *
+            heightRatio);
+    final double spacingSeekToControls = metrics?.spacingSeekToControls ??
+        ((isTablet
+                ? (classicSizing ? 22.0 : 18.0)
+                : (isLandscape ? 6.0 : (classicSizing ? 18.0 : 16.0))) *
+            heightRatio);
+    final double spacingSeekToAdvanced = metrics?.spacingSeekToAdvanced ??
+        ((isTablet ? 12.0 : (isLandscape ? 4.0 : 10.0)) * heightRatio);
     final double spacingAdvancedToControls =
-        (isTablet ? 14.0 : (isLandscape ? 4.0 : 12.0)) * heightRatio;
-    final double spacingControlsToDock = (isTablet
-            ? (classicSizing ? 20.0 : 16.0)
-            : (isLandscape ? 6.0 : (classicSizing ? 16.0 : 14.0))) *
-        heightRatio;
-    final double spacingBelowDock = (isTablet
-            ? (classicSizing ? 16.0 : 12.0)
-            : (isLandscape ? 6.0 : (classicSizing ? 12.0 : 10.0))) *
-        heightRatio;
+        metrics?.spacingAdvancedToControls ??
+            ((isTablet ? 14.0 : (isLandscape ? 4.0 : 12.0)) * heightRatio);
+    final double spacingControlsToDock = metrics?.spacingControlsToDock ??
+        ((isTablet
+                ? (classicSizing ? 20.0 : 16.0)
+                : (isLandscape ? 6.0 : (classicSizing ? 16.0 : 14.0))) *
+            heightRatio);
+    final double spacingBelowDock = metrics?.spacingBelowDock ??
+        ((isTablet
+                ? (classicSizing ? 16.0 : 12.0)
+                : (isLandscape ? 6.0 : (classicSizing ? 12.0 : 10.0))) *
+            heightRatio);
 
     final double resolvedMainButtonSize = mainButtonSize ??
-        (isTablet
+        metrics?.mainButtonSize ??
+        ((isTablet
                 ? (classicSizing ? 74.0 : 72.0)
                 : (isLandscape
                     ? (classicSizing ? 58.0 : 56.0)
                     : (classicSizing ? 66.0 : 64.0))) *
-            (scaleMainButtonByHeight ? heightRatio.clamp(0.85, 1.10) : 1.0);
+            (scaleMainButtonByHeight ? heightRatio.clamp(0.85, 1.10) : 1.0));
+
+    final double? resolvedSideButtonSize =
+        sideButtonSize ?? metrics?.sideButtonSize;
+    final double? resolvedWaveformHeight = metrics?.waveformHeight;
+    final bool resolvedShowUpNext =
+        !isInSplitView && (metrics?.showUpNext ?? true);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1388,7 +1423,8 @@ class PlayerControlsColumn extends StatelessWidget {
           filePath: state.currentSong?.path,
           loopPointA: state.abPointA,
           loopPointB: state.abPointB,
-          showUpNext: !isInSplitView,
+          showUpNext: resolvedShowUpNext,
+          waveformHeight: resolvedWaveformHeight,
           onSeek: (pos) => cubit.seek(pos),
         ),
         if (hasAdvancedContent) ...[
@@ -1408,6 +1444,7 @@ class PlayerControlsColumn extends StatelessWidget {
           abLoopActive: abLoopActive,
           primaryColor: props.activeColor,
           mainButtonSize: resolvedMainButtonSize,
+          sideButtonSize: resolvedSideButtonSize,
           onPlayPause: () => cubit.togglePlayPause(),
           onNext: () => cubit.next(),
           onPrevious: () => cubit.previous(),

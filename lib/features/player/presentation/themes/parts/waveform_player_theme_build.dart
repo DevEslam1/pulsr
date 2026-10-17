@@ -55,7 +55,7 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
               props: widget.props,
               isTablet: isTablet,
               barWidth: metrics.pillBarWidth,
-              barHeight: metrics.pillBarHeight,
+              barHeight: metrics.dockBarHeight,
             );
 
             final waveformHeroStage = GestureDetector(
@@ -152,9 +152,11 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
               isLandscape: isLandscape,
               isInSplitView: isInSplitView,
               heightRatio: metrics.heightRatio,
+              metrics: metrics,
               trackHeader: PlayerTrackHeader(
                 props: widget.props,
                 isTablet: isTablet,
+                metrics: metrics,
                 extraBadge: extraBadge,
               ),
               scaleMainButtonByHeight: true,

@@ -25,28 +25,56 @@ class PlayerThemeMetrics {
   final bool isTablet;
   final bool isLandscape;
   final double heightRatio;
+  final bool isShortHeight;
+  final bool isVeryShortHeight;
+  final bool isCompactHeight;
   final double spacingTrackToSeek;
   final double spacingSeekToControls;
+  final double spacingSeekToAdvanced;
+  final double spacingAdvancedToControls;
   final double spacingControlsToDock;
   final double spacingBelowDock;
   final double switcherTopPad;
   final double switcherBottomPad;
   final double pillBarWidth;
   final double pillBarHeight;
+  final double mainButtonSize;
+  final double sideButtonSize;
+  final double waveformHeight;
+  final bool showUpNext;
+  final double trackHeaderVerticalPadding;
+  final double titleFontSize;
+  final double artistFontSize;
+  final double actionButtonSize;
+  final double dockBarHeight;
 
   const PlayerThemeMetrics({
     required this.constraints,
     required this.isTablet,
     required this.isLandscape,
     required this.heightRatio,
+    this.isShortHeight = false,
+    this.isVeryShortHeight = false,
+    this.isCompactHeight = false,
     required this.spacingTrackToSeek,
     required this.spacingSeekToControls,
+    this.spacingSeekToAdvanced = 8.0,
+    this.spacingAdvancedToControls = 8.0,
     required this.spacingControlsToDock,
     required this.spacingBelowDock,
     required this.switcherTopPad,
     required this.switcherBottomPad,
     required this.pillBarWidth,
     required this.pillBarHeight,
+    this.mainButtonSize = 64.0,
+    this.sideButtonSize = 44.0,
+    this.waveformHeight = 44.0,
+    this.showUpNext = true,
+    this.trackHeaderVerticalPadding = 6.0,
+    this.titleFontSize = 19.5,
+    this.artistFontSize = 13.5,
+    this.actionButtonSize = 44.0,
+    this.dockBarHeight = 44.0,
   });
 
   factory PlayerThemeMetrics.calculate(
@@ -56,36 +84,172 @@ class PlayerThemeMetrics {
     final isTablet = context.isTablet;
     final isLandscape = (context.isLandscape || context.isTwoPane) &&
         (constraints.maxWidth > constraints.maxHeight);
+    final double maxH = constraints.maxHeight;
+    final double maxW = constraints.maxWidth;
 
-    final double heightRatio =
-        (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
-    final double spacingTrackToSeek = (isTablet ? 16.0 : 12.0) * heightRatio;
-    final double spacingSeekToControls = (isTablet ? 20.0 : 16.0) * heightRatio;
-    final double spacingControlsToDock = (isTablet ? 18.0 : 14.0) * heightRatio;
-    final double spacingBelowDock = (isTablet ? 14.0 : 10.0) * heightRatio;
-    final double switcherTopPad = (isTablet ? 6.0 : 4.0) * heightRatio;
-    final double switcherBottomPad = (isTablet ? 10.0 : 6.0) * heightRatio;
+    final double heightRatio = (maxH / 720.0).clamp(0.55, 1.25);
+
+    final bool isShortHeight = maxH < 680.0;
+    final bool isVeryShortHeight = maxH < 580.0;
+    final bool isCompactHeight = maxH < 760.0;
+
+    final double spacingTrackToSeek = isTablet
+        ? 16.0 * heightRatio
+        : (isLandscape
+            ? 4.0
+            : (isShortHeight
+                ? 6.0
+                : (isCompactHeight ? 9.0 : 12.0 * heightRatio)));
+
+    final double spacingSeekToControls = isTablet
+        ? 20.0 * heightRatio
+        : (isLandscape
+            ? 6.0
+            : (isShortHeight
+                ? 8.0
+                : (isCompactHeight ? 11.0 : 16.0 * heightRatio)));
+
+    final double spacingSeekToAdvanced = isTablet
+        ? 12.0 * heightRatio
+        : (isLandscape
+            ? 4.0
+            : (isShortHeight
+                ? 4.0
+                : (isCompactHeight ? 6.0 : 10.0 * heightRatio)));
+
+    final double spacingAdvancedToControls = isTablet
+        ? 14.0 * heightRatio
+        : (isLandscape
+            ? 4.0
+            : (isShortHeight
+                ? 4.0
+                : (isCompactHeight ? 6.0 : 12.0 * heightRatio)));
+
+    final double spacingControlsToDock = isTablet
+        ? 18.0 * heightRatio
+        : (isLandscape
+            ? 6.0
+            : (isShortHeight
+                ? 8.0
+                : (isCompactHeight ? 11.0 : 14.0 * heightRatio)));
+
+    final double spacingBelowDock = isTablet
+        ? 14.0 * heightRatio
+        : (isLandscape
+            ? 6.0
+            : (isShortHeight
+                ? 6.0
+                : (isCompactHeight ? 8.0 : 10.0 * heightRatio)));
+
+    final double switcherTopPad = isTablet
+        ? 6.0 * heightRatio
+        : (isLandscape
+            ? 2.0
+            : (isShortHeight
+                ? 2.0
+                : (isCompactHeight ? 3.0 : 4.0 * heightRatio)));
+
+    final double switcherBottomPad = isTablet
+        ? 10.0 * heightRatio
+        : (isLandscape
+            ? 4.0
+            : (isShortHeight
+                ? 4.0
+                : (isCompactHeight ? 6.0 : 6.0 * heightRatio)));
 
     final double pillBarWidth = math.min(
-      constraints.maxWidth - (isTablet ? 64 : 28),
+      maxW - (isTablet ? 64 : 28),
       isTablet ? 440.0 : 336.0,
     );
-    final double pillBarHeight =
-        (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+    final double pillBarHeight = isTablet
+        ? 50.0 * heightRatio.clamp(0.85, 1.15)
+        : (isShortHeight
+            ? 38.0
+            : (isCompactHeight ? 40.0 : 44.0 * heightRatio.clamp(0.85, 1.15)));
+
+    final double mainButtonSize = isTablet
+        ? 72.0
+        : (isLandscape
+            ? 54.0
+            : (isVeryShortHeight
+                ? 52.0
+                : (isShortHeight
+                    ? 56.0
+                    : (isCompactHeight
+                        ? 62.0
+                        : 66.0 * heightRatio.clamp(0.95, 1.15)))));
+
+    final double sideButtonSize = isTablet
+        ? 48.0
+        : (isLandscape
+            ? 36.0
+            : (isShortHeight ? 38.0 : (isCompactHeight ? 42.0 : 48.0)));
+
+    final double waveformHeight = isTablet
+        ? 48.0
+        : (isLandscape
+            ? 28.0
+            : (isVeryShortHeight
+                ? 28.0
+                : (isShortHeight ? 32.0 : (isCompactHeight ? 36.0 : 44.0))));
+
+    final bool showUpNext = !isLandscape && maxH >= 640.0;
+
+    final double trackHeaderVerticalPadding = isTablet
+        ? 8.0
+        : (isLandscape
+            ? 0.0
+            : (isShortHeight ? 2.0 : (isCompactHeight ? 4.0 : 6.0)));
+
+    final double titleFontSize = isTablet
+        ? 22.0
+        : (isVeryShortHeight
+            ? 16.0
+            : (isShortHeight ? 17.0 : (isCompactHeight ? 18.0 : 19.5)));
+
+    final double artistFontSize = isTablet
+        ? 14.5
+        : (isVeryShortHeight
+            ? 11.5
+            : (isShortHeight ? 12.0 : (isCompactHeight ? 13.0 : 14.0)));
+
+    final double actionButtonSize = isTablet
+        ? 48.0
+        : (isShortHeight ? 38.0 : (isCompactHeight ? 42.0 : 46.0));
+
+    final double dockBarHeight = isTablet
+        ? 48.0
+        : (isLandscape
+            ? 36.0
+            : (isShortHeight ? 38.0 : (isCompactHeight ? 40.0 : 44.0)));
 
     return PlayerThemeMetrics(
       constraints: constraints,
       isTablet: isTablet,
       isLandscape: isLandscape,
       heightRatio: heightRatio,
+      isShortHeight: isShortHeight,
+      isVeryShortHeight: isVeryShortHeight,
+      isCompactHeight: isCompactHeight,
       spacingTrackToSeek: spacingTrackToSeek,
       spacingSeekToControls: spacingSeekToControls,
+      spacingSeekToAdvanced: spacingSeekToAdvanced,
+      spacingAdvancedToControls: spacingAdvancedToControls,
       spacingControlsToDock: spacingControlsToDock,
       spacingBelowDock: spacingBelowDock,
       switcherTopPad: switcherTopPad,
       switcherBottomPad: switcherBottomPad,
       pillBarWidth: pillBarWidth,
       pillBarHeight: pillBarHeight,
+      mainButtonSize: mainButtonSize,
+      sideButtonSize: sideButtonSize,
+      waveformHeight: waveformHeight,
+      showUpNext: showUpNext,
+      trackHeaderVerticalPadding: trackHeaderVerticalPadding,
+      titleFontSize: titleFontSize,
+      artistFontSize: artistFontSize,
+      actionButtonSize: actionButtonSize,
+      dockBarHeight: dockBarHeight,
     );
   }
 
@@ -275,7 +439,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                         props: props,
                         isTablet: metrics.isTablet,
                         barWidth: metrics.pillBarWidth,
-                        barHeight: metrics.pillBarHeight,
+                        barHeight: metrics.dockBarHeight,
                         dockIconStyle: dockIconStyle,
                       );
 
@@ -319,6 +483,8 @@ class PlayerThemeScaffold extends StatelessWidget {
                         filePath: song?.path,
                         loopPointA: state.abPointA,
                         loopPointB: state.abPointB,
+                        showUpNext: metrics.showUpNext,
+                        waveformHeight: metrics.waveformHeight,
                         onSeek: (pos) => cubit.seek(pos),
                       );
 
@@ -336,9 +502,8 @@ class PlayerThemeScaffold extends StatelessWidget {
                             hasNext: state.hasNextNeighbour,
                             abLoopActive: state.abLoopEnabled,
                             primaryColor: activeColor,
-                            mainButtonSize: metrics.isTablet
-                                ? 72
-                                : (metrics.isLandscape ? 56 : 64),
+                            mainButtonSize: metrics.mainButtonSize,
+                            sideButtonSize: metrics.sideButtonSize,
                             onPlayPause: () => cubit.togglePlayPause(),
                             onNext: () => cubit.next(),
                             onPrevious: () => cubit.previous(),
@@ -417,6 +582,45 @@ class PlayerThemeScaffold extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  );
+                }
+
+                // Portrait Mode: Fallback to scrolling on very short screens
+                if (constraints.maxHeight < 560 &&
+                    !state.isLyricsVisible &&
+                    !state.isQueueVisible) {
+                  final double scrollSize =
+                      (constraints.maxHeight * 0.40).clamp(180.0, 300.0);
+                  return SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Padding(
+                      padding: padding,
+                      child: Column(
+                        children: [
+                          resolvedTopBar,
+                          SizedBox(height: metrics.switcherTopPad),
+                          resolvedSwitcher,
+                          SizedBox(height: metrics.switcherBottomPad),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: scrollSize,
+                              maxHeight: scrollSize,
+                            ),
+                            child: resolvedCenter,
+                          ),
+                          if (trackInfo != null) ...[
+                            trackInfo!(context, metrics),
+                            SizedBox(height: metrics.spacingTrackToSeek),
+                          ],
+                          resolvedSeekBar,
+                          SizedBox(height: metrics.spacingSeekToControls),
+                          resolvedControls,
+                          SizedBox(height: metrics.spacingControlsToDock),
+                          resolvedDock,
+                          SizedBox(height: metrics.spacingBelowDock),
+                        ],
+                      ),
                     ),
                   );
                 }

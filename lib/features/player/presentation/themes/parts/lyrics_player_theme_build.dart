@@ -91,7 +91,7 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                 props: props,
                 isTablet: isTablet,
                 barWidth: metrics.pillBarWidth,
-                barHeight: metrics.pillBarHeight,
+                barHeight: metrics.dockBarHeight,
               );
 
               final artworkDisplay = GestureDetector(
@@ -249,9 +249,11 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                 isLandscape: isLandscape,
                 isInSplitView: isInSplitView,
                 heightRatio: metrics.heightRatio,
+                metrics: metrics,
                 trackHeader: PlayerTrackHeader(
                   props: props,
                   isTablet: isTablet,
+                  metrics: metrics,
                   extraBadge: extraBadge,
                 ),
                 scaleMainButtonByHeight: true,

@@ -53,7 +53,7 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
               props: props,
               isTablet: isTablet,
               barWidth: metrics.pillBarWidth,
-              barHeight: metrics.pillBarHeight,
+              barHeight: metrics.dockBarHeight,
             );
 
             final showVisualizer = visualizerStyle != VisualizerStyle.off &&
@@ -205,7 +205,12 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
               isLandscape: isLandscape,
               isInSplitView: isInSplitView,
               heightRatio: metrics.heightRatio,
-              trackHeader: PlayerTrackHeader(props: props, isTablet: isTablet),
+              metrics: metrics,
+              trackHeader: PlayerTrackHeader(
+                props: props,
+                isTablet: isTablet,
+                metrics: metrics,
+              ),
               scaleMainButtonByHeight: true,
               dock: bottomDock,
             );
@@ -255,6 +260,44 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                         child: controlsColumn,
                       ),
                     ),
+                  ],
+                ),
+              );
+            }
+
+            // Portrait Mode: Fallback to scrolling on very short screens
+            final isVeryShort = constraints.maxHeight < 560;
+            final isTrackView = !state.isLyricsVisible && !state.isQueueVisible;
+
+            if (isVeryShort && isTrackView) {
+              final double scrollSize =
+                  (constraints.maxHeight * 0.40).clamp(180.0, 300.0);
+
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
+                    const PlayerPlayHandle(),
+                    PlayerTopBar(props: props, isTablet: isTablet),
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: metrics.switcherTopPad,
+                        bottom: metrics.switcherBottomPad,
+                      ),
+                      child: viewSwitcher,
+                    ),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: scrollSize,
+                          maxHeight: scrollSize,
+                        ),
+                        child: centerDisplay,
+                      ),
+                    ),
+                    SizedBox(
+                        height: (isTablet ? 8.0 : 6.0) * metrics.heightRatio),
+                    controlsColumn,
                   ],
                 ),
               );

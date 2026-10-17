@@ -66,7 +66,7 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
               props: widget.props,
               isTablet: isTablet,
               barWidth: metrics.pillBarWidth,
-              barHeight: metrics.pillBarHeight,
+              barHeight: metrics.dockBarHeight,
             );
 
             final cassetteStage = GestureDetector(
@@ -141,8 +141,12 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
               isLandscape: isLandscape,
               isInSplitView: isInSplitView,
               heightRatio: metrics.heightRatio,
-              trackHeader:
-                  PlayerTrackHeader(props: widget.props, isTablet: isTablet),
+              metrics: metrics,
+              trackHeader: PlayerTrackHeader(
+                props: widget.props,
+                isTablet: isTablet,
+                metrics: metrics,
+              ),
               scaleMainButtonByHeight: true,
               dock: bottomDock,
             );
@@ -193,6 +197,50 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
                         child: SingleChildScrollView(
                           child: controlsColumn,
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // Portrait Mode: Fallback to scrolling on very short screens
+            final isVeryShort = constraints.maxHeight < 560;
+            final isTrackView = !state.isLyricsVisible && !state.isQueueVisible;
+
+            if (isVeryShort && isTrackView) {
+              final double scrollH =
+                  (constraints.maxHeight * 0.35).clamp(160.0, 260.0);
+
+              return SafeArea(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    children: [
+                      const PlayerPlayHandle(),
+                      PlayerTopBar(props: widget.props, isTablet: isTablet),
+                      Padding(
+                        padding: EdgeInsets.only(
+                          top: metrics.switcherTopPad,
+                          bottom: metrics.switcherBottomPad,
+                        ),
+                        child: viewSwitcher,
+                      ),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: 440.0,
+                            maxHeight: scrollH,
+                          ),
+                          child: centerDisplay,
+                        ),
+                      ),
+                      SizedBox(
+                          height:
+                              (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                        child: controlsColumn,
                       ),
                     ],
                   ),

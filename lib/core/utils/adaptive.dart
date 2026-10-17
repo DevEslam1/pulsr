@@ -145,9 +145,19 @@ abstract class Adaptive {
   static BoxConstraints contentConstraints(BuildContext context) =>
       const BoxConstraints(maxWidth: maxContentWidth);
 
-  /// Max-width constraint for bottom sheets / dialogs on tablets & desktops.
+  /// Canonical maximum height for bottom sheets to avoid status-bar collisions across all devices.
+  static double sheetMaxHeight(BuildContext context) {
+    final h = heightOf(context);
+    final isLand = isLandscape(context);
+    return h * (isLand ? 0.94 : 0.88);
+  }
+
+  /// Max width and height constraints for bottom sheets across phone, tablet & desktop.
   static BoxConstraints sheetConstraints(BuildContext context) =>
-      const BoxConstraints(maxWidth: maxSheetWidth);
+      BoxConstraints(
+        maxWidth: maxSheetWidth,
+        maxHeight: sheetMaxHeight(context),
+      );
 }
 
 extension AdaptiveContextX on BuildContext {
