@@ -516,7 +516,16 @@ object PoTokenManager {
 
     /**
      * Invalidation on BotChallenge or PoTokenInvalid:
-     * Drops all tokens, visitorData, and generator so next call mints a completely fresh set.
+     * Drops all tokens and the generator so next call mints a completely fresh set.
+     *
+     * [visitorData] deliberately survives: it is the request *identity*, not the
+     * attestation. Identity-required clients (VISIONOS) are answered with
+     * LOGIN_REQUIRED ("Sign in to confirm you're not a bot") whenever a request
+     * arrives without one, so clearing it opened a visitor-less window across the
+     * multi-second re-mint — exactly when the login flow's invalidation lands — and
+     * every attempt on such a client during that window latched a false
+     * BotChallenge. The expiry zeroing forces the next refresh to fetch a fresh
+     * identity and only fall back to this one if the mint itself fails.
      *
      * [dataSyncId] survives on purpose: it identifies the signed-in account, not the
      * attestation. Clearing it on every bot challenge left account-bound poTokens
@@ -531,7 +540,6 @@ object PoTokenManager {
         standbyVisitorData = ""
         expiryInstant = 0L
         sessionVisitorData = ""
-        visitorData = ""
         streamingPoToken = ""
         integrityToken = ""
         webViewBrokenUntilElapsed = 0L

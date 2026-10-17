@@ -301,21 +301,41 @@ class SettingsHeroCard extends StatelessWidget {
                                     ),
                                   ],
                                 );
-                          final stacked = constraints.maxWidth < 420 ||
+                          final stacked = (user != null && constraints.maxWidth < 320) ||
+                              (user == null && constraints.maxWidth < 270) ||
                               MediaQuery.textScalerOf(context).scale(14) > 18;
-                          return stacked
+                          final body = stacked
                               ? Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                       identity,
                                       const SizedBox(height: 12),
-                                      action
+                                      Align(
+                                        alignment:
+                                            AlignmentDirectional.centerEnd,
+                                        child: action,
+                                      ),
                                     ])
                               : Row(children: [
                                   Expanded(child: identity),
                                   const SizedBox(width: 8),
                                   action
                                 ]);
+
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: AppRadii.r12All,
+                              onTap: user == null
+                                  ? () => AuthSheet.show(context)
+                                  : null,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: AppSpacing.xxs),
+                                child: body,
+                              ),
+                            ),
+                          );
                         }),
                         if (state.syncError != null) ...[
                           const SizedBox(height: AppSpacing.s10),

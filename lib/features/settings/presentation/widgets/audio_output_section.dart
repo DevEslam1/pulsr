@@ -625,25 +625,30 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 : null,
           ),
           settingsCardDivider(p),
-          if (onShowDspPreference != null) ...[
-            SettingsNavTile(
-              Icons.settings_input_composite_rounded,
-              context.l10n.dspEnginePreference,
-              isAndroid
-                  ? switch (state.dspPreference) {
-                      'oem' => context.l10n.dspEngineOem,
-                      'auto' => context.l10n.dspEngineAuto,
-                      _ => context.l10n.dspEngineNative,
+          SettingsNavTile(
+            Icons.settings_input_composite_rounded,
+            context.l10n.dspEnginePreference,
+            isAndroid
+                ? switch (state.dspPreference) {
+                    'oem' => context.l10n.dspEngineOem,
+                    'auto' => context.l10n.dspEngineAuto,
+                    _ => context.l10n.dspEngineNative,
+                  }
+                : unsupported,
+            disabledReason: isAndroid ? null : unsupported,
+            onTap: isAndroid
+                ? () {
+                    HapticFeedback.lightImpact();
+                    if (onShowDspPreference != null) {
+                      onShowDspPreference!(context, cubit, state.dspPreference);
+                    } else {
+                      showDspPreferencePickerSheet(
+                          context, cubit, state.dspPreference);
                     }
-                  : unsupported,
-              disabledReason: isAndroid ? null : unsupported,
-              onTap: isAndroid
-                  ? () =>
-                      onShowDspPreference!(context, cubit, state.dspPreference)
-                  : null,
-            ),
-            settingsCardDivider(p),
-          ],
+                  }
+                : null,
+          ),
+          settingsCardDivider(p),
           const BatteryOptimizationCard(),
         ],
       ],

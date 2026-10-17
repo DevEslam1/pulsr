@@ -24,10 +24,29 @@ class AuthSheet extends StatefulWidget {
   const AuthSheet({super.key});
 
   static Future<void> show(BuildContext context) {
+    AuthCubit? authCubit;
+    try {
+      authCubit = context.read<AuthCubit>();
+    } catch (_) {
+      try {
+        if (getIt.isRegistered<AuthCubit>()) {
+          authCubit = getIt<AuthCubit>();
+        }
+      } catch (_) {}
+    }
+
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
-      builder: (ctx) => const AuthSheet(),
+      builder: (ctx) {
+        if (authCubit != null) {
+          return BlocProvider<AuthCubit>.value(
+            value: authCubit,
+            child: const AuthSheet(),
+          );
+        }
+        return const AuthSheet();
+      },
     );
   }
 

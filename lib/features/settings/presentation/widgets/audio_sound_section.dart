@@ -33,6 +33,7 @@ import 'settings_conflict_card.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
+import 'settings_playback_pickers.dart';
 import 'studio_bridge_footer.dart';
 import 'usb_dac_section.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';

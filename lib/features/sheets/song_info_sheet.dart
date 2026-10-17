@@ -29,6 +29,7 @@ import '../../domain/models/audio_quality_info.dart';
 import '../../domain/models/eq_preset.dart';
 import '../player/cubit/player_cubit.dart';
 import '../player/presentation/widgets/audio_quality_badge.dart';
+import '../party/presentation/party_sheet.dart';
 import '../../core/widgets/pulsr_bottom_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -443,6 +444,32 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r14All,
+                    ),
+                    side: BorderSide(color: p.hairline),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    PartySheet.show(context);
+                  },
+                  icon: Icon(Icons.group_rounded, size: 20, color: p.accent),
+                  label: Text(
+                    'Listen Together (Party Mode)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               if (PlatformCapabilities.hasTagEditor)

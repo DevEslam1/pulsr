@@ -49,6 +49,65 @@ class SabrHardeningTest {
         )
     }
 
+    // ---- InnertubeClient.classifyEmptyFormatSignal ---------------------------
+
+    @Test
+    fun `discarded-n response is a signature failure, never SABR or VideoGone`() {
+        // applyNTransformIfNeeded discards URLs whose n cannot be transformed;
+        // the resulting "urls=0, ciphers=0" shape must not read as SABR-enforced.
+        assertEquals(
+            YtmBlockSignal.SignatureDecipherFailed,
+            InnertubeClient.classifyEmptyFormatSignal(
+                hasStreamingData = true, totalFormats = 3, totalUrls = 0,
+                cipheredCount = 0, nDiscardedCount = 3,
+            ),
+        )
+    }
+
+    @Test
+    fun `structural SABR response classifies as SabrEnforced`() {
+        assertEquals(
+            YtmBlockSignal.SabrEnforced,
+            InnertubeClient.classifyEmptyFormatSignal(
+                hasStreamingData = true, totalFormats = 3, totalUrls = 0,
+                cipheredCount = 0, nDiscardedCount = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun `ciphered-only response classifies as SignatureDecipherFailed`() {
+        assertEquals(
+            YtmBlockSignal.SignatureDecipherFailed,
+            InnertubeClient.classifyEmptyFormatSignal(
+                hasStreamingData = true, totalFormats = 3, totalUrls = 0,
+                cipheredCount = 3, nDiscardedCount = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun `video-only formats classify as VideoGone`() {
+        assertEquals(
+            YtmBlockSignal.VideoGone,
+            InnertubeClient.classifyEmptyFormatSignal(
+                hasStreamingData = true, totalFormats = 2, totalUrls = 2,
+                cipheredCount = 0, nDiscardedCount = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun `response without formats classifies as PoTokenInvalid`() {
+        assertEquals(
+            YtmBlockSignal.PoTokenInvalid,
+            InnertubeClient.classifyEmptyFormatSignal(
+                hasStreamingData = false, totalFormats = 0, totalUrls = 0,
+                cipheredCount = 0, nDiscardedCount = 0,
+            ),
+        )
+    }
+
     // ---- YtmBlockSignal.parse: SABR substring precedence --------------------
 
     @Test

@@ -1,5 +1,6 @@
 // lib/features/settings/presentation/widgets/settings_picker_sheets.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/settings_cubit.dart';
@@ -443,6 +444,208 @@ void showQualityPickerSheet(
                         }
                         Navigator.pop(ctx);
                       },
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+void showDspPreferencePickerSheet(
+  BuildContext context,
+  SettingsCubit cubit,
+  String currentPreference,
+) {
+  final p = context.palette;
+  final primaryColor = Theme.of(context).colorScheme.primary;
+  final cardColor =
+      Theme.of(context).cardTheme.color ?? p.surfaceContainer;
+  final outlineColor = Theme.of(context).colorScheme.outline;
+  final textPrimary = p.textPrimary;
+  final textSecondary = p.textSecondary;
+
+  final options = [
+    (
+      key: 'native',
+      title: context.l10n.dspEngineNative,
+      subtitle:
+          'Custom 64-bit real-time DSP with parametric EQ, limiter, convolution reverb, and Bit-Perfect audio.',
+      icon: Icons.tune_rounded,
+      badge: 'RECOMMENDED',
+    ),
+    (
+      key: 'oem',
+      title: context.l10n.dspEngineOem,
+      subtitle:
+          'Vendor hardware sound effects (Dolby Atmos, Dirac, Xiaomi Sound, etc.) via Android system effects.',
+      icon: Icons.speaker_group_rounded,
+      badge: 'SYSTEM',
+    ),
+    (
+      key: 'auto',
+      title: context.l10n.dspEngineAuto,
+      subtitle:
+          'Uses Native Studio DSP by default, falling back to system AudioFX when native engine is unavailable.',
+      icon: Icons.auto_mode_rounded,
+      badge: 'AUTO',
+    ),
+  ];
+
+  PulsrSheetHelper.showPulsrSheet(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ctx.l10n.dspEnginePreference,
+                      style: const TextStyle(
+                        fontSize: AppFontSize.title,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      ctx.l10n.dspEnginePreferenceSubtitle,
+                      style: TextStyle(
+                        fontSize: AppFontSize.label,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ...options.map((opt) {
+                final isSelected = opt.key == currentPreference;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r16All,
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: InkWell(
+                      borderRadius: AppRadii.r16All,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        cubit.setDspPreference(opt.key);
+                        Navigator.pop(ctx);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.s14),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.s10),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? primaryColor.withValues(alpha: 0.18)
+                                    : p.surface,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                opt.icon,
+                                color:
+                                    isSelected ? primaryColor : textSecondary,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          opt.title,
+                                          style: TextStyle(
+                                            fontSize: AppFontSize.bodyLarge,
+                                            fontWeight: isSelected
+                                                ? FontWeight.w800
+                                                : FontWeight.w600,
+                                            color: isSelected
+                                                ? primaryColor
+                                                : textPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      if (opt.badge.isNotEmpty) ...[
+                                        const SizedBox(width: AppSpacing.xs),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 5, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? primaryColor
+                                                    .withValues(alpha: 0.18)
+                                                : p.surface,
+                                            borderRadius: AppRadii.r6All,
+                                          ),
+                                          child: Text(
+                                            opt.badge,
+                                            style: TextStyle(
+                                              fontSize: AppFontSize.tiny,
+                                              fontWeight: FontWeight.w800,
+                                              color: isSelected
+                                                  ? primaryColor
+                                                  : textSecondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppSpacing.xxs),
+                                  Text(
+                                    opt.subtitle,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.label,
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: primaryColor,
+                                size: 22,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 );

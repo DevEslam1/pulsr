@@ -42,6 +42,9 @@ import '../widgets/quran_mode_button.dart';
 import '../widgets/speed_picker_sheet.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../../../domain/models/audio_output_info.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../data/party/listen_together_service.dart';
+import '../../../../data/party/party_models.dart';
 import '../../../party/presentation/party_sheet.dart';
 import '../widgets/canvas_backdrop.dart';
 import 'player_theme.dart';
@@ -862,7 +865,17 @@ class PlayerBottomActionDock extends StatelessWidget {
                       ),
                     ),
 
-                    // 5. Quran Mode
+                    // 5. Listen Together / Party
+                    Expanded(
+                      child: _PartyDockButton(
+                        activeColor: AppColors.accentCyan,
+                        inactiveColor: p.textSecondary,
+                        isTablet: isTablet,
+                        style: dockIconStyle,
+                      ),
+                    ),
+
+                    // 6. Quran Mode
                     Expanded(
                       child: QuranModeDockButton(
                         activeColor: props.activeColor,
@@ -871,7 +884,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       ),
                     ),
 
-                    // 6. Add to Playlist
+                    // 7. Add to Playlist
                     Expanded(
                       child: PlayerDockIconButton(
                         icon: Icons.playlist_add_rounded,
@@ -904,6 +917,82 @@ class PlayerBottomActionDock extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Reactive dock icon button for Listen Together / Party mode that reflects
+/// live room connection state and member count.
+class _PartyDockButton extends StatelessWidget {
+  final Color activeColor;
+  final Color inactiveColor;
+  final bool isTablet;
+  final PlayerDockIconStyle style;
+
+  const _PartyDockButton({
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.isTablet,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    ListenTogetherService? partyService;
+    try {
+      if (getIt.isRegistered<ListenTogetherService>()) {
+        partyService = getIt<ListenTogetherService>();
+      }
+    } catch (_) {}
+
+    if (partyService == null) {
+      return PlayerDockIconButton(
+        icon: Icons.group_rounded,
+        tooltip: 'Listen Together',
+        isActive: false,
+        activeColor: activeColor,
+        inactiveColor: inactiveColor,
+        isTablet: isTablet,
+        style: style,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          PartySheet.show(context);
+        },
+      );
+    }
+
+    return ValueListenableBuilder<PartyConnectionState>(
+      valueListenable: partyService.connectionState,
+      builder: (context, connState, _) {
+        return ValueListenableBuilder<PartySnapshot?>(
+          valueListenable: partyService!.partySnapshot,
+          builder: (context, snapshot, _) {
+            final isLive = connState == PartyConnectionState.live;
+            final isConnecting = connState == PartyConnectionState.connecting;
+            final count = snapshot?.members.length ?? 0;
+            final badge = isLive
+                ? (count > 1 ? '$count' : 'LIVE')
+                : (isConnecting ? '...' : null);
+
+            return PlayerDockIconButton(
+              icon: Icons.group_rounded,
+              tooltip: isLive
+                  ? 'Listen Together ($count connected)'
+                  : 'Listen Together',
+              isActive: isLive || isConnecting,
+              badgeText: badge,
+              activeColor: activeColor,
+              inactiveColor: inactiveColor,
+              isTablet: isTablet,
+              style: style,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                PartySheet.show(context);
+              },
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -1086,16 +1175,6 @@ class PlayerTopBar extends StatelessWidget {
                     ),
                   ),
           ),
-          circleButton(
-            icon: Icons.group_rounded,
-            semanticLabel: 'Listen Together',
-            iconSize: isTablet ? 24 : 22,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              PartySheet.show(context);
-            },
-          ),
-          const SizedBox(width: AppSpacing.xs),
           circleButton(
             icon: Icons.more_horiz_rounded,
             semanticLabel: context.l10n.songInfo,
@@ -1429,7 +1508,10 @@ class PlayerControlsColumn extends StatelessWidget {
         ),
         if (hasAdvancedContent) ...[
           SizedBox(height: spacingSeekToAdvanced),
-          const AdvancedPlaybackBar(),
+          AdvancedPlaybackBar(
+            activeColor: props.activeColor,
+            height: metrics?.dockBarHeight,
+          ),
           SizedBox(height: spacingAdvancedToControls),
         ] else ...[
           SizedBox(height: spacingSeekToControls),

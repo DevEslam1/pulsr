@@ -89,7 +89,7 @@ mixin SettingsCategoryWidgetsSection
                 DeviceAdaptiveOutputSection(
                   state: state,
                   onShowDspPreference: (sheetContext, cubit, pref) {
-                    // Reuse existing dsp preference picker
+                    showDspPreferencePickerSheet(sheetContext, cubit, pref);
                   },
                 ),
               ],

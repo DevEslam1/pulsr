@@ -511,7 +511,10 @@ class PlayerThemeScaffold extends StatelessWidget {
                             onToggleRepeat: () => cubit.toggleRepeat(),
                           ),
                           const SizedBox(height: 8),
-                          const AdvancedPlaybackBar(),
+                          AdvancedPlaybackBar(
+                            activeColor: activeColor,
+                            height: metrics.dockBarHeight,
+                          ),
                         ],
                       );
 

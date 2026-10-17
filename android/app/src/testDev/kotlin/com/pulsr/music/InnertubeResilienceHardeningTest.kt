@@ -363,18 +363,20 @@ class InnertubeResilienceHardeningTest {
     }
 
     @Test
-    fun testNTransformGuardsEmptyOrNullString() {
-        // FIX #4: Empty or null transformed n must return original url
-        fun applyNTransform(url: String, transformed: String?): String {
+    fun testNTransformDiscardsUntransformableUrl() {
+        // applyNTransformIfNeeded returns null when the transform is unavailable
+        // or an identity: googlevideo answers every fetch of an untransformed-n
+        // URL with 403, so the format must be discarded rather than kept.
+        fun applyNTransform(url: String, transformed: String?): String? {
             val n = "originalN123"
-            if (transformed.isNullOrEmpty() || transformed == n) return url
+            if (transformed.isNullOrEmpty() || transformed == n) return null
             return url.replace("n=$n", "n=$transformed")
         }
 
         val original = "https://googlevideo.com/videoplayback?expire=123&n=originalN123"
-        assertEquals(original, applyNTransform(original, ""))
-        assertEquals(original, applyNTransform(original, null))
-        assertEquals(original, applyNTransform(original, "originalN123"))
+        assertNull(applyNTransform(original, ""))
+        assertNull(applyNTransform(original, null))
+        assertNull(applyNTransform(original, "originalN123"))
 
         val expected = "https://googlevideo.com/videoplayback?expire=123&n=decipheredN"
         assertEquals(expected, applyNTransform(original, "decipheredN"))

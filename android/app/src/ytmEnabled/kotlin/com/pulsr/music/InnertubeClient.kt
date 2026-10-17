@@ -363,6 +363,17 @@ internal class InnertubeClient(
             // FIX #2: Allow bypass during PoToken recovery
             if (!ignoreShortCircuit && (shortCircuit.get() != null || deadlineExceeded())) return AttemptResult.ShortCircuited
 
+            // A VISIONOS request without an identity is answered with LOGIN_REQUIRED
+            // ("Sign in to confirm you're not a bot") — verified against the live
+            // API. During a re-mint window (login invalidation, bot recovery) the
+            // attempt would burn its turn and latch a false BotChallenge onto the
+            // chain, so treat "no visitorData yet" as unavailability and fall
+            // through to the next client instead.
+            if (client == ClientType.VISIONOS && PoTokenManager.visitorData.isEmpty()) {
+                Log.d(TAG, "[$traceId] Skipping ${client.name} for $videoId: no visitorData identity available yet")
+                return AttemptResult.ShortCircuited
+            }
+
             // FIX #7: Keep default safe and wrap fingerprint store in try block
             var actualRequestUa = client.userAgent
 
@@ -467,14 +478,16 @@ internal class InnertubeClient(
                 var totalFormats = 0
                 var totalUrls = 0
                 var cipheredCount = 0
+                var nDiscardedCount = 0
                 val audioFormats = mutableListOf<Pair<JSONObject, String>>()
 
                 for (array in formatArrays) {
                     for (i in 0 until array.length()) {
                         val format = array.optJSONObject(i) ?: continue
                         totalFormats++
-                        if (format.optString("signatureCipher").isNotEmpty() ||
-                            format.optString("cipher").isNotEmpty()) {
+                        val hasCipher = format.optString("signatureCipher").isNotEmpty() ||
+                            format.optString("cipher").isNotEmpty()
+                        if (hasCipher) {
                             cipheredCount++
                         }
                         val url = extractUrlFromFormat(format)
@@ -484,30 +497,28 @@ internal class InnertubeClient(
                             if (mime.startsWith("audio/")) {
                                 audioFormats.add(format to url)
                             }
+                        } else if (!hasCipher && N_QUERY_PARAM.containsMatchIn(format.optString("url"))) {
+                            // Direct-URL format whose n could not be transformed;
+                            // applyNTransformIfNeeded discarded the burned URL.
+                            nDiscardedCount++
                         }
                     }
                 }
 
                 if (audioFormats.isEmpty()) {
-                    val hadFormatArrays = totalFormats > 0
-                    val hadCiphered = cipheredCount > 0
-                    val emptySignal = when {
-                        YtmBlockSignal.detectSabrStructural(
-                            hasStreamingData = streamingData != null,
-                            formatCount = totalFormats,
-                            urlCount = totalUrls,
-                            cipherCount = cipheredCount,
-                        ) -> {
-                            SabrDemotionStore.markSabrEnforced(client)
-                            Log.w(TAG, "[$traceId] ${client.name} SABR-enforced (formats=$totalFormats, urls=0) -> demoted")
-                            YtmBlockSignal.SabrEnforced
-                        }
-                        hadCiphered -> YtmBlockSignal.SignatureDecipherFailed
-                        hadFormatArrays -> YtmBlockSignal.VideoGone
-                        else -> YtmBlockSignal.PoTokenInvalid
+                    val emptySignal = classifyEmptyFormatSignal(
+                        hasStreamingData = streamingData != null,
+                        totalFormats = totalFormats,
+                        totalUrls = totalUrls,
+                        cipheredCount = cipheredCount,
+                        nDiscardedCount = nDiscardedCount,
+                    )
+                    if (emptySignal == YtmBlockSignal.SabrEnforced) {
+                        SabrDemotionStore.markSabrEnforced(client)
+                        Log.w(TAG, "[$traceId] ${client.name} SABR-enforced (formats=$totalFormats, urls=0) -> demoted")
                     }
                     updateBestSignal(emptySignal)
-                    Log.w(TAG, "[$traceId] Client ${client.name} returned no usable audio formats (hadCiphered=$hadCiphered) -> $emptySignal")
+                    Log.w(TAG, "[$traceId] Client ${client.name} returned no usable audio formats (hadCiphered=${cipheredCount > 0}, nDiscarded=$nDiscardedCount) -> $emptySignal")
                     val isClientSpecific = emptySignal == YtmBlockSignal.SabrEnforced || emptySignal == YtmBlockSignal.SignatureDecipherFailed
                     return AttemptResult.Failure(emptySignal, isClientSpecific = isClientSpecific)
                 }
@@ -1034,7 +1045,7 @@ internal class InnertubeClient(
                 }
 
                 if (rawUrl != null) {
-                    var resolved = if (sig != null) {
+                    val resolved = if (sig != null) {
                         val decipherCache = JsDecipherCache.getInstance(context)
                         val deciphered = try {
                             decipherCache.decipherSignature(sig)
@@ -1048,8 +1059,7 @@ internal class InnertubeClient(
                     } else {
                         rawUrl
                     }
-                    resolved = applyNTransformIfNeeded(resolved)
-                    resolved
+                    applyNTransformIfNeeded(resolved)
                 } else {
                     null
                 }
@@ -1065,8 +1075,13 @@ internal class InnertubeClient(
      * FIX #9 / B-02: Surgically replaces only the 'n' parameter in the query string with boundary anchoring,
      * preserving parameter order, other parameters, and percent-encoding.
      * Routes through cached rules as fast path and PlayerJavaScript (Rhino engine) as primary resolver.
+     *
+     * Returns null when the URL carries an `n` parameter that could not be
+     * transformed: googlevideo answers every fetch of an untransformed-`n` URL
+     * with 403, so such a URL is unusable and must be discarded rather than
+     * handed to the player as a guaranteed-burned URL.
      */
-    private fun applyNTransformIfNeeded(url: String): String {
+    private fun applyNTransformIfNeeded(url: String): String? {
         return try {
             val uri = Uri.parse(url)
             val n = uri.getQueryParameter("n") ?: return url
@@ -1101,10 +1116,11 @@ internal class InnertubeClient(
             if (!deobfuscated.isNullOrEmpty()) {
                 return deobfuscated
             }
-            url
+            Log.w(TAG, "Discarding URL: its n parameter could not be transformed (untransformed n URLs are answered with 403)")
+            null
         } catch (t: Throwable) {
             Log.w(TAG, "n-transform failed: ${t.message}")
-            url
+            if (N_QUERY_PARAM.containsMatchIn(url)) null else url
         }
     }
 
@@ -1672,6 +1688,38 @@ internal class InnertubeClient(
         // 8-15s tap-to-sound; the Dart caller also has a 15s hard timeout.
         const val RESOLVE_DEADLINE_MS = 5000L
         private const val DATASYNC_BOOTSTRAP_INTERVAL_MS = 300_000L
+
+        // Presence check for an `n` query parameter in a raw URL (used when Uri
+        // parsing itself failed and the parameter set cannot be inspected).
+        private val N_QUERY_PARAM = Regex("""[?&]n=""")
+
+        /**
+         * Classifies a client response whose formats yielded no usable URL.
+         *
+         * Ordering is load-bearing: URLs discarded for an untransformable `n`
+         * ([nDiscardedCount]) are a client-specific JS transform failure and must
+         * be classified before the structural SABR check — a discarded-n response
+         * also presents as "formats > 0, urls = 0, ciphers = 0" and would
+         * otherwise be misread as SABR-enforced and demoted.
+         */
+        internal fun classifyEmptyFormatSignal(
+            hasStreamingData: Boolean,
+            totalFormats: Int,
+            totalUrls: Int,
+            cipheredCount: Int,
+            nDiscardedCount: Int,
+        ): YtmBlockSignal = when {
+            nDiscardedCount > 0 -> YtmBlockSignal.SignatureDecipherFailed
+            YtmBlockSignal.detectSabrStructural(
+                hasStreamingData = hasStreamingData,
+                formatCount = totalFormats,
+                urlCount = totalUrls,
+                cipherCount = cipheredCount,
+            ) -> YtmBlockSignal.SabrEnforced
+            cipheredCount > 0 -> YtmBlockSignal.SignatureDecipherFailed
+            totalFormats > 0 -> YtmBlockSignal.VideoGone
+            else -> YtmBlockSignal.PoTokenInvalid
+        }
 
         private val lastBotRefreshTriggerMs = AtomicLong(0L)
         private val lastDataSyncBootstrapMs = AtomicLong(0L)

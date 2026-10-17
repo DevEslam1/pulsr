@@ -437,7 +437,8 @@ internal object PlayerJavaScript {
 
     /**
      * Returns [url] with its throttling `n` parameter transformed. Null when the
-     * transform is unavailable, so the caller can keep the original URL.
+     * transform is unavailable — an untransformed-`n` URL is answered with 403 by
+     * googlevideo, so callers must discard the URL rather than keep it.
      */
     fun deobfuscateN(url: String): String? = synchronized(lock) {
         try {
