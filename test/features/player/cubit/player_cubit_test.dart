@@ -816,7 +816,7 @@ void main() {
 
     test('gapless toggle is forwarded to the audio handler', () async {
       final mockScannerService = MockMediaScannerService();
-      SharedPreferences.setMockInitialValues({'setting_gapless': true});
+      SharedPreferences.setMockInitialValues({});
       final settingsCubit = SettingsCubit(scannerService: mockScannerService);
 
       final cubit = PlayerCubit(
@@ -826,10 +826,14 @@ void main() {
         dependencies: PlayerDependencies(settingsCubit: settingsCubit),
       );
 
-      // Persisted toggle is pushed on construction…
-      expect(testAudioHandler.gaplessEnabled, isTrue);
+      // Default toggle (disabled) is pushed on construction…
+      expect(testAudioHandler.gaplessEnabled, isFalse);
 
       // …and re-pushed when the user flips it in Settings.
+      await settingsCubit.setGapless(true);
+      await pumpEventQueue();
+      expect(testAudioHandler.gaplessEnabled, isTrue);
+
       await settingsCubit.setGapless(false);
       await pumpEventQueue();
       expect(testAudioHandler.gaplessEnabled, isFalse);

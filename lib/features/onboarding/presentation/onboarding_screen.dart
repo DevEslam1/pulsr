@@ -68,7 +68,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ScaffoldMessenger.of(context)
           ..clearSnackBars()
           ..showSnackBar(
-            SnackBar(content: Text(context.l10n.somethingWentWrong)),
+            SnackBar(
+              content: Text(context.l10n.somethingWentWrong),
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: context.l10n.skipAction,
+                onPressed: _completeOnboarding,
+              ),
+            ),
           );
       }
     } finally {
@@ -223,9 +230,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _completeOnboarding() async {
-    SoundFeedbackService.playSuccess(mirrorHaptics: true);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onboarding_completed', true);
+    try {
+      SoundFeedbackService.playSuccess(mirrorHaptics: true);
+    } catch (e, st) {
+      ErrorLogger.log('SoundFeedbackService failed',
+          error: e, stackTrace: st, category: 'Onboarding');
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('onboarding_completed', true);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to save onboarding_completed pref',
+          error: e, stackTrace: st, category: 'Onboarding');
+    }
     if (mounted) {
       context.go('/');
     }

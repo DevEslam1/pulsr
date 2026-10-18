@@ -124,38 +124,51 @@ class MediaScannerService {
   }
 
   Future<bool> checkPermission() async {
-    if (Platform.isAndroid) {
-      final audio = await Permission.audio.status;
-      if (audio.isGranted || audio.isLimited) return true;
-      final storage = await Permission.storage.status;
-      return storage.isGranted || storage.isLimited;
-    } else if (Platform.isIOS) {
-      final status = await Permission.mediaLibrary.status;
-      return status.isGranted || status.isLimited;
+    try {
+      if (Platform.isAndroid) {
+        final audio = await Permission.audio.status;
+        if (audio.isGranted || audio.isLimited) return true;
+        final storage = await Permission.storage.status;
+        return storage.isGranted || storage.isLimited;
+      } else if (Platform.isIOS) {
+        final status = await Permission.mediaLibrary.status;
+        return status.isGranted || status.isLimited;
+      }
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to check media permissions',
+          error: e, stackTrace: st, category: 'scanner');
+      return false;
     }
-    return true;
   }
 
   Future<bool> requestPermission() async {
-    if (Platform.isAndroid) {
-      final audioStatus = await Permission.audio.request();
-      if (audioStatus.isGranted || audioStatus.isLimited) return true;
-      // On Android 13+ Permission.storage (READ_EXTERNAL_STORAGE, maxSdk 32)
-      // is always denied — requesting it after audio denial only produces a
-      // second instant-deny dialog. Only touch it when it can still succeed:
-      // pre-13 devices on first run, or upgrades where it was already granted.
-      final storageCurrent = await Permission.storage.status;
-      if (storageCurrent.isGranted || storageCurrent.isLimited) return true;
-      if (storageCurrent.isPermanentlyDenied) return false;
-      if (audioStatus.isPermanentlyDenied) return false;
-      final storageStatus = await Permission.storage.request();
-      return storageStatus.isGranted || storageStatus.isLimited;
-    } else if (Platform.isIOS) {
-      final status = await Permission.mediaLibrary.request();
-      return status.isGranted || status.isLimited;
+    try {
+      if (Platform.isAndroid) {
+        final audioStatus = await Permission.audio.request();
+        if (audioStatus.isGranted || audioStatus.isLimited) return true;
+        // On Android 13+ Permission.storage (READ_EXTERNAL_STORAGE, maxSdk 32)
+        // is always denied — requesting it after audio denial only produces a
+        // second instant-deny dialog. Only touch it when it can still succeed:
+        // pre-13 devices on first run, or upgrades where it was already granted.
+        final storageCurrent = await Permission.storage.status;
+        if (storageCurrent.isGranted || storageCurrent.isLimited) return true;
+        if (storageCurrent.isPermanentlyDenied) return false;
+        if (audioStatus.isPermanentlyDenied) return false;
+        final storageStatus = await Permission.storage.request();
+        return storageStatus.isGranted || storageStatus.isLimited;
+      } else if (Platform.isIOS) {
+        final status = await Permission.mediaLibrary.request();
+        return status.isGranted || status.isLimited;
+      }
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to request media permissions',
+          error: e, stackTrace: st, category: 'scanner');
+      return false;
     }
-    return true;
   }
+
 
   static const List<String> systemIgnoredPathPatterns = [
     // WhatsApp

@@ -64,7 +64,7 @@ abstract class SettingsState with _$SettingsState {
   const SettingsState._();
 
   const factory SettingsState({
-    @Default(true) bool gaplessPlayback,
+    @Default(false) bool gaplessPlayback,
     @Default(0.0) double crossfadeSeconds,
     @Default(30) int minDurationSec,
     @Default(true) bool autoHideSystemMedia,

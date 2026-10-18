@@ -122,6 +122,7 @@ void main() {
 
   group('Gapless / Crossfade mutual exclusion', () {
     test('crossfade auto-disables gapless and persists both', () async {
+      await cubit.setGapless(true);
       expect(cubit.state.gaplessPlayback, isTrue);
       await cubit.setCrossfade(4.0);
       expect(cubit.state.crossfadeSeconds, 4.0);

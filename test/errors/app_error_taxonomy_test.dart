@@ -157,9 +157,13 @@ void main() {
 
     test('classifyFailure classifies raw platform exceptions', () {
       final failure = classifyFailure(const SocketException('no route'));
-      expect(failure, isA<GenericFailure>());
+      expect(failure, isA<NetworkFailure>());
       expect(failure, isA<AppError>());
       expect(failure.userMessage, contains('Network connection failed'));
+
+      final generic = classifyFailure(Exception('unexpected platform error'));
+      expect(generic, isA<GenericFailure>());
+      expect(generic, isA<AppError>());
     });
   });
 }

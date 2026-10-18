@@ -194,7 +194,7 @@ class PlayerSwitcherItem extends StatelessWidget {
       label: semanticsLabel,
       excludeSemantics: true,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 26),
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         child: InkWell(
           onTap: onTap,
           borderRadius: AppRadii.r20All,

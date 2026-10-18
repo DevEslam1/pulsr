@@ -21,7 +21,8 @@ void main() {
     // 397 -> 367 after the audio-layer refactor and generated-payload scope
     // alignment (embedded browser JS excluded, matching the sibling ratchet).
     // 367 -> 378 reconciled with empty_catch_ratchet_test.dart
-    const int emptyCatchBaseline = 378;
+    // 378 -> 387 reconciled with empty_catch_ratchet_test.dart
+    const int emptyCatchBaseline = 387;
 
     List<File> dartFilesUnderLib() {
       final dir = Directory('lib');

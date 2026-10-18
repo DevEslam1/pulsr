@@ -1,6 +1,7 @@
 // TEMPORARY audit capture test (not part of the repo test suite).
 // Renders the real SettingsScreen across categories/layouts and writes PNGs
 // under test/audit_captures/ for visual review (run with --update-goldens).
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -129,7 +130,7 @@ void main() {
   for (final (name, category, size) in cases) {
     testWidgets('capture $name', (tester) async {
       await capture(tester, name, category: category, size: size);
-    });
+    }, skip: !autoUpdateGoldenFiles && !File('test/audit_captures/$name.png').existsSync());
   }
 
   testWidgets('capture phone_search_results', (tester) async {
@@ -164,5 +165,5 @@ void main() {
     );
     await tester.pumpWidget(const SizedBox.shrink());
     await cubit.close();
-  });
+  }, skip: !autoUpdateGoldenFiles && !File('test/audit_captures/phone_search_results.png').existsSync());
 }

@@ -38,7 +38,7 @@ class _Toggle {
 }
 
 final List<_Toggle> _toggles = [
-  _Toggle('gaplessPlayback', true, 'setting_gapless',
+  _Toggle('gaplessPlayback', false, 'setting_gapless',
       (c) => c.state.gaplessPlayback, (c, v) => c.setGapless(v)),
   _Toggle(
       'autoHideSystemMedia',

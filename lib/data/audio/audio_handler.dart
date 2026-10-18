@@ -520,12 +520,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   int _gaplessLoadGeneration = 0;
 
   /// User-facing gapless toggle (persisted as `setting_gapless`). Gapless is
-  /// the default engine but is mutually exclusive with crossfade.
+  /// disabled by default and is mutually exclusive with crossfade.
   @override
-  bool _gaplessEnabled = true;
+  bool _gaplessEnabled = false;
   bool get isGaplessEnabled => _gaplessEnabled;
 
-  /// Gapless is the default engine. Enabling crossfade (duration > 0) switches
+  /// Gapless is mutually exclusive with crossfade. Enabling crossfade (duration > 0) switches
   /// to the overlapping dual-player engine, which cannot also produce a seamless
   /// join, so the two are mutually exclusive by construction. An explicit
   /// gapless OFF also falls back to per-track playback when crossfade is 0.

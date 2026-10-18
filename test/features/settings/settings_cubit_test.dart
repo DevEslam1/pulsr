@@ -27,7 +27,7 @@ void main() {
     test('initial state defaults are correct', () {
       final cubit = SettingsCubit(scannerService: mockScannerService);
 
-      expect(cubit.state.gaplessPlayback, true);
+      expect(cubit.state.gaplessPlayback, false);
       expect(cubit.state.crossfadeSeconds, 0.0);
       expect(cubit.state.minDurationSec, 30);
       expect(cubit.state.dynamicThemingEnabled, true);

@@ -1602,7 +1602,7 @@ extension SettingsStatePatterns on SettingsState {
 
 class _SettingsState extends SettingsState {
   const _SettingsState(
-      {this.gaplessPlayback = true,
+      {this.gaplessPlayback = false,
       this.crossfadeSeconds = 0.0,
       this.minDurationSec = 30,
       this.autoHideSystemMedia = true,

@@ -14,7 +14,8 @@ class QuranRepositoryImpl implements QuranRepository {
 
   final SharedPreferences? _prefsOverride;
 
-  QuranRepositoryImpl([SharedPreferences? prefs]) : _prefsOverride = prefs;
+  @factoryMethod
+  QuranRepositoryImpl() : _prefsOverride = null;
 
   QuranRepositoryImpl.withPrefs(this._prefsOverride);
 

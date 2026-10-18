@@ -52,17 +52,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         },
         _getState().activeQueueSlot,
       );
-      final encoded = await compute(jsonEncode, data);
+      final encoded = jsonEncode(data);
       await prefs.setString(PrefsKeys.queueSlots, encoded);
     } catch (e, st) {
       ErrorLogger.log('Failed to persist queue slots',
           error: e, stackTrace: st, category: 'PlayerQueueController');
-      if (!_isClosed() && _getState().errorMessage == null) {
-        final s = _getState();
-        _emit(s.copyWith(
-          playback: s.playback.copyWith(errorMessage: 'Failed to save queue'),
-        ));
-      }
     }
   }
 
@@ -75,7 +69,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       final raw = prefs.getString(PrefsKeys.queueSlots);
       if (raw == null) return;
       final data =
-          QueueSlotCodec.decodeDocument(await compute(jsonDecode, raw));
+          QueueSlotCodec.decodeDocument(jsonDecode(raw));
       if (data == null) return;
       for (final key in data.keys) {
         final slotIndex = QueueSlotCodec.slotIndexForKey(key);

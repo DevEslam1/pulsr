@@ -81,3 +81,37 @@
 
 # Preserve the measured app AudioTrack field used by the output diagnostics.
 -keepclassmembers class androidx.media3.exoplayer.audio.DefaultAudioSink { android.media.AudioTrack audioTrack; }
+
+# Play Core (Deferred Components) - suppress warnings for unbundled optional classes
+-dontwarn com.google.android.play.core.**
+
+
+# Permission Handler ProGuard Rules
+-keep class com.baseflow.permissionhandler.** { *; }
+-dontwarn com.baseflow.permissionhandler.**
+
+# Flutter Secure Storage ProGuard Rules
+-keep class com.it_nomads.fluttersecurestorage.** { *; }
+-dontwarn com.it_nomads.fluttersecurestorage.**
+
+# Flutter InAppWebView ProGuard Rules
+-keep class com.pichillilorenzo.flutter_inappwebview.** { *; }
+-keep class com.pichillilorenzo.flutter_inappwebview_android.** { *; }
+-dontwarn com.pichillilorenzo.flutter_inappwebview.**
+-dontwarn com.pichillilorenzo.flutter_inappwebview_android.**
+
+# Shared Preferences ProGuard Rules
+-keep class io.flutter.plugins.sharedpreferences.** { *; }
+-dontwarn io.flutter.plugins.sharedpreferences.**
+
+# Additional Flutter Plugins
+-keep class com.mr.flutter.plugin.filepicker.** { *; }
+-dontwarn com.mr.flutter.plugin.filepicker.**
+-keep class io.flutter.plugins.imagepicker.** { *; }
+-dontwarn io.flutter.plugins.imagepicker.**
+-keep class dev.fluttercommunity.plus.** { *; }
+-dontwarn dev.fluttercommunity.plus.**
+-keep class io.flutter.plugins.videoplayer.** { *; }
+-dontwarn io.flutter.plugins.videoplayer.**
+-keep class io.material.plugins.dynamic_color.** { *; }
+-dontwarn io.material.plugins.dynamic_color.**

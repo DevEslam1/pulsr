@@ -19,7 +19,6 @@ import '../../../../domain/usecases/get_songs_usecase.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../sheets/song_info_sheet.dart';
 import 'empty_library.dart';
-import 'home_playback_helper.dart';
 import 'section_error.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -189,12 +188,9 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                     groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                     child: SongTile(
                       song: song,
-                      onTap: () => playSongWithLibraryFallback(
-                        context: context,
-                        playerCubit: playerCubit,
-                        song: song,
-                        sectionSongs: songs,
-                        getSongsUseCase: widget.getSongsUseCase,
+                      onTap: () => playerCubit.playSong(
+                        song,
+                        queue: songs,
                       ),
                       onMorePressed: () =>
                           SongInfoSheet.show(context, song: song),
@@ -253,12 +249,9 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                     groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                     child: SongTile(
                       song: songs[index],
-                      onTap: () => playSongWithLibraryFallback(
-                        context: context,
-                        playerCubit: playerCubit,
-                        song: songs[index],
-                        sectionSongs: songs,
-                        getSongsUseCase: widget.getSongsUseCase,
+                      onTap: () => playerCubit.playSong(
+                        songs[index],
+                        queue: songs,
                       ),
                       onMorePressed: () =>
                           SongInfoSheet.show(context, song: songs[index]),

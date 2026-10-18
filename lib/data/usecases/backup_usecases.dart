@@ -73,7 +73,7 @@ class ExportBackupUseCase {
     // 3. Settings (gapless, crossfade, theme, EQ, etc.)
     final prefs = await SharedPreferences.getInstance();
     final settingsMap = {
-      'gaplessPlayback': prefs.getBool('setting_gapless') ?? true,
+      'gaplessPlayback': prefs.getBool('setting_gapless') ?? false,
       'crossfadeSeconds': prefs.getDouble('setting_crossfade') ?? 0.0,
       'minDurationSec': prefs.getInt('setting_min_duration') ?? 30,
       'dynamicThemingEnabled': prefs.getBool('setting_dynamic_theme') ?? true,

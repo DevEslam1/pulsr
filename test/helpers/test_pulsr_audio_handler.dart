@@ -119,7 +119,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     currentCrossfadeDuration = d;
   }
 
-  bool gaplessEnabled = true;
+  bool gaplessEnabled = false;
   @override
   bool get isGaplessEnabled => gaplessEnabled;
 

@@ -17,7 +17,6 @@ import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/get_songs_usecase.dart';
 import '../../../player/cubit/player_cubit.dart';
 import 'home_card_metrics.dart';
-import 'home_playback_helper.dart';
 import 'section_error.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -243,12 +242,9 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                             end: AppSpacing.s14),
                         child: InkWell(
                           borderRadius: AppRadii.r20All,
-                          onTap: () => playSongWithLibraryFallback(
-                            context: context,
-                            playerCubit: playerCubit,
-                            song: song,
-                            sectionSongs: songs,
-                            getSongsUseCase: widget.getSongsUseCase,
+                          onTap: () => playerCubit.playSong(
+                            song,
+                            queue: songs,
                           ),
                           child: SizedBox(
                             width: size,

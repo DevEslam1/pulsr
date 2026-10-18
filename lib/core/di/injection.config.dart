@@ -106,7 +106,6 @@ import 'package:pulsr/features/widgets/widget_service.dart' as _i42;
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart'
     as _i873;
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart' as _i171;
-import 'package:shared_preferences/shared_preferences.dart' as _i460;
 
 extension GetItInjectableX on _i174.GetIt {
 // initializes the registration of main-scope dependencies inside of GetIt
@@ -233,7 +232,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i171.YtmSearchCubit>(
         () => _i171.YtmSearchCubit(service: gh<_i391.YtmService>()));
     gh.lazySingleton<_i880.QuranRepository>(
-        () => _i992.QuranRepositoryImpl(gh<_i460.SharedPreferences>()));
+        () => _i992.QuranRepositoryImpl());
     gh.lazySingleton<_i621.LrclibService>(
         () => _i621.LrclibService(client: gh<_i497.HttpClient>()));
     gh.singleton<_i483.MediaScannerService>(
