@@ -133,20 +133,44 @@ BluetoothQualityPlan resolveBluetoothQualityPlan({
   final ditherBitDepth = sanitizeDitherBitDepth(codecBitDepth ?? trackBitDepth);
 
   // Item 3: only align when the user asked for Hi-Res, the track rate is known,
-  // the codec advertises a *different* rate that it can actually switch to.
+  // and the codec operates at a *different* rate that can be aligned.
+  //
+  // Two cases are handled:
+  //  a) Codec advertises a list of selectable rates → align if the track rate
+  //     appears in that list (the original behaviour).
+  //  b) Codec is a known-capable HIGH-tier codec (LDAC / aptX HD / aptX
+  //     Adaptive / LC3) but its OEM stack returns an *empty* selectable-rates
+  //     list → still attempt alignment.  Some Android OEM stacks that support
+  //     LDAC at 96 kHz / 44.1 kHz / 48 kHz neglect to populate the
+  //     BluetoothCodecConfig.getSampleRate bitmask, causing the empty list.
+  //     In that case we try the alignment and let the platform silently ignore
+  //     it if the codec cannot honour it, which is always safe.
   int? alignRate;
+  bool usedHighTierFallback = false;
   if (bluetoothHiResEnabled &&
       trackSampleRate > 0 &&
       codecSampleRateHz != null &&
-      trackSampleRate != codecSampleRateHz &&
-      codecSelectableSampleRates.contains(trackSampleRate)) {
-    alignRate = trackSampleRate;
+      trackSampleRate != codecSampleRateHz) {
+    final bool inAdvertisedList =
+        codecSelectableSampleRates.contains(trackSampleRate);
+    final bool highTierFallback = !inAdvertisedList &&
+        codecSelectableSampleRates.isEmpty &&
+        tier == BluetoothCodecTier.high &&
+        !leAudio; // LE Audio (LC3) is not controlled via A2DP codec APIs
+    if (inAdvertisedList || highTierFallback) {
+      alignRate = trackSampleRate;
+      usedHighTierFallback = highTierFallback;
+    }
   }
 
   final reason = !bluetoothHiResEnabled
       ? 'bt-hires-off'
       : alignRate != null
-          ? 'bt-hires-align-rate'
+          ? (usedHighTierFallback
+              // LDAC/aptX-HD: OEM stack returned empty selectable-rates list;
+              // alignment attempted as best-effort.
+              ? 'bt-hires-high-tier-fallback'
+              : 'bt-hires-align-rate')
           : leAudio
               ? 'bt-hires-le-audio'
               : tier == BluetoothCodecTier.high

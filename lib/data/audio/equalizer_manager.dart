@@ -43,8 +43,16 @@ part 'equalizer_restore_ops.dart';
 ///
 /// Q = 2^(b/2) / (2^b - 1), where b is the local spacing in octaves — the
 /// classic constant-Q graphic-EQ relation (b=1 -> 1.414, b=1/3 -> ~4.3,
-/// b=1/6 -> ~8.7). Edge bands use their single neighbour; interior bands use
-/// the average of both neighbours. Result is clamped to a sane filter range.
+/// b=1/6 -> ~8.7).
+///
+/// Interior bands: b = 0.5 × octaves(freq[i-1], freq[i+1])
+///   = average of left and right one-sided spacings.
+/// Edge bands: b = octaves(freq[0], freq[1])  (or symmetric for the last band)
+///   = the full one-sided spacing to the single neighbour, which is
+///   numerically identical to the interior formula for uniformly-spaced bands
+///   (b = 0.5 × 2 × spacing = spacing). Using half the spacing here would make
+///   edge filters narrower than interior filters at the same band density —
+///   incorrect. Result is clamped to a sane filter range.
 List<double> graphicEqQs(List<double> freqs) {
   final n = freqs.length;
   if (n == 0) return const <double>[];
@@ -63,16 +71,19 @@ List<double> graphicEqQs(List<double> freqs) {
   for (var i = 0; i < n; i++) {
     final double b;
     if (i == 0) {
+      // Full spacing to the right neighbour — correct for the edge band.
       b = octaves(freqs[0], freqs[1]);
     } else if (i == n - 1) {
       b = octaves(freqs[n - 2], freqs[n - 1]);
     } else {
+      // Average of left and right one-sided spacings.
       b = 0.5 * octaves(freqs[i - 1], freqs[i + 1]);
     }
     qs.add(qForOctaves(b));
   }
   return qs;
 }
+
 
 /// Numeric DSP-parameter sanitation lives in `dsp_param_ranges.dart`:
 /// [DspParamRanges] is the single source of truth for every parameter's valid

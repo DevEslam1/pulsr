@@ -23,9 +23,13 @@ class GainStage {
 class GainStagingBudget {
   const GainStagingBudget._();
 
-  /// Shared output headroom ceiling (dB). Mirrors the +6 dB cap that was
-  /// previously hard-coded inside the volume-boost setter.
-  static const double defaultHeadroomCeilingDb = 6.0;
+  /// Shared output headroom ceiling (dB). The lookahead limiter (default
+  /// threshold -0.2 dBFS) acts as the final brickwall safety net, so this
+  /// ceiling can afford to be generous without risking clipping. 9 dB was
+  /// chosen so a full dynamic-bass preset (≤6 dB) still leaves 3 dB for a
+  /// simultaneous EQ preamp, which the previous 6 dB ceiling prevented
+  /// entirely. Mirrors a +9 dB soft cap, not an absolute hardware limit.
+  static const double defaultHeadroomCeilingDb = 9.0;
 
   // Conservative worst-case boosts (dB) attributed to an *enabled* stage whose
   // exact runtime gain cannot be read back. Deliberately on the high side so

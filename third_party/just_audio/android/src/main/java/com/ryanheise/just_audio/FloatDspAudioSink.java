@@ -225,7 +225,16 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     /**
      * Bulk-converts a non-float PCM buffer into the reusable direct float
-     * staging buffer. 24-bit keeps the existing little-endian unpacking.
+     * staging buffer.
+     *
+     * <ul>
+     *   <li>16-bit: sign-extended short → float via ÷32768.
+     *   <li>24-bit: corrected LE packed unpack (b0|b1«8|b2«16, arithmetic
+     *       sign-extended via «8»8) then ÷2^23. The previous implementation
+     *       had a wrong byte-shift order that produced tonal distortion on
+     *       24-bit FLAC files (BUG-1 fix).
+     *   <li>32-bit: int32 → float via ÷2^31.
+     * </ul>
      */
     private ByteBuffer convertToFloat(ByteBuffer pcm) {
         final int sampleBytes = inputEncoding == C.ENCODING_PCM_16BIT ? 2
@@ -239,12 +248,19 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 out[i] = shorts.get(i) / 32768f;
             }
         } else if (inputEncoding == C.ENCODING_PCM_24BIT) {
+            // Correct little-endian packed 24-bit (PCM_24BIT_PACKED) unpack:
+            // bytes arrive as [LSB, MID, MSB]; assemble as b0 | (b1<<8) | (b2<<16),
+            // then arithmetic-sign-extend to 32-bit via a left/right 8-bit shift,
+            // and normalise by 2^23 (not 2^31) so full-scale → ±1.0f exactly.
             for (int i = 0; i < samples; i++) {
-                final int b0 = pcm.get() & 0xff;
-                final int b1 = pcm.get() & 0xff;
-                final int b2 = pcm.get();
-                final int value = (b0 << 8) | (b1 << 16) | (b2 << 24);
-                out[i] = (float) (value / 2147483648.0);
+                final int b0 = pcm.get() & 0xff;   // LSB  (bits  7..0 of sample)
+                final int b1 = pcm.get() & 0xff;   // MID  (bits 15..8 of sample)
+                final int b2 = pcm.get() & 0xff;   // MSB  (bits 23..16 of sample, unsigned first)
+                // Pack into the lower 24 bits, then sign-extend to 32-bit via
+                // a paired arithmetic-shift (works on all Java VMs).
+                final int unsigned24 = b0 | (b1 << 8) | (b2 << 16);
+                final int signed32   = (unsigned24 << 8) >> 8;   // arithmetic sign-extend
+                out[i] = (float) (signed32 / 8388608.0);         // ÷ 2^23
             }
         } else {
             final IntBuffer ints = pcm.asIntBuffer();

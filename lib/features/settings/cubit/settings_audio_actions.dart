@@ -920,11 +920,17 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
   }
 
-  /// Target stream buffer capacity for the AAudio path (20-1000 ms).
+  /// Target stream buffer capacity for the AAudio path (8-1000 ms).
   /// Re-pushed to running players so it applies without toggling output.
+  ///
+  /// Practical guidance:
+  ///  - USB-C / wired DAC: 8–20 ms for lowest seek latency.
+  ///  - Bluetooth A2DP:    150–300 ms to absorb codec/stack jitter.
   Future<void> setAaudioTargetBufferMs(int ms) async {
     markDirty('aaudioTargetBufferMs');
-    final clamped = ms.clamp(20, 1000);
+    // Minimum 8 ms: achievable on USB-C DACs at 48 kHz (≈384 frames).
+    // Maximum 1000 ms: generous headroom for worst-case BT stacks.
+    final clamped = ms.clamp(8, 1000);
     safeEmit(state.copyWith(aaudioTargetBufferMs: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.aaudioTargetBufferMs, clamped);

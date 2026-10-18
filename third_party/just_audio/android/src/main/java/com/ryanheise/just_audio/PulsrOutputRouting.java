@@ -31,9 +31,19 @@ public final class PulsrOutputRouting {
             return field;
         } catch (ReflectiveOperationException e) {
             if (!reflectionWarningLogged) {
-                android.util.Log.w("PulsrOutputRouting",
-                    "Media3 DefaultAudioSink.audioTrack reflection unavailable; telemetry will degrade gracefully", e);
                 reflectionWarningLogged = true;
+                // Warn once at WARN level (expected after Media3 internal refactors).
+                android.util.Log.w("PulsrOutputRouting",
+                    "Media3 DefaultAudioSink.audioTrack reflection unavailable; "
+                    + "output-device telemetry will return [0,0,0] until the app is "
+                    + "updated. Check for a Media3 version bump: " + e.getMessage());
+                // ERROR-level log so crash dashboards (Sentry logcat integration,
+                // Firebase Crashlytics) surface this as a distinct issue rather than
+                // a silent quality regression.
+                android.util.Log.e("PulsrOutputRouting",
+                    "TELEMETRY_DEGRADED: DefaultAudioSink field lookup failed. "
+                    + "Route snapshot and isPlaying() will report zeros. "
+                    + "Cause: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             }
             return null;
         }
