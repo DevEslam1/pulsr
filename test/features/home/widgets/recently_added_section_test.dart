@@ -155,6 +155,52 @@ void main() {
           .called(1);
     });
 
+    testWidgets('queues the full recently-added list, not just the window',
+        (tester) async {
+      stubRecentlyAdded(Right<AppFailure, List<SongsTableData>>(_songs(50)));
+      when(() => getSongs.getRecentlyAdded(limit: any(named: 'limit')))
+          .thenAnswer((_) async =>
+              Right<AppFailure, List<SongsTableData>>(_songs(120)));
+
+      await tester.pumpWidget(
+        wrap(RecentlyAddedSection(getSongsUseCase: getSongs)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(SongTile).first);
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => playerCubit.playSong(
+            any(),
+            queue: captureAny(named: 'queue'),
+          )).captured;
+      final queue = captured.single as List<SongsTableData>;
+      expect(queue.length, 120);
+    });
+
+    testWidgets('falls back to the visible window when the full fetch fails',
+        (tester) async {
+      stubRecentlyAdded(Right<AppFailure, List<SongsTableData>>(_songs(50)));
+      when(() => getSongs.getRecentlyAdded(limit: any(named: 'limit')))
+          .thenAnswer((_) async => const Left<AppFailure,
+              List<SongsTableData>>(DatabaseFailure('boom')));
+
+      await tester.pumpWidget(
+        wrap(RecentlyAddedSection(getSongsUseCase: getSongs)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(SongTile).first);
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => playerCubit.playSong(
+            any(),
+            queue: captureAny(named: 'queue'),
+          )).captured;
+      final queue = captured.single as List<SongsTableData>;
+      expect(queue.length, 50);
+    });
+
     testWidgets('renders the empty library state for an empty stream',
         (tester) async {
       stubRecentlyAdded(const Right<AppFailure, List<SongsTableData>>([]));
@@ -203,7 +249,7 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('loads more when the compact load-more button is tapped',
+    testWidgets('auto-loads the next page when scrolled near the end',
         (tester) async {
       stubRecentlyAdded(Right<AppFailure, List<SongsTableData>>(_songs(50)));
 
@@ -212,20 +258,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final l10n = lookupAppLocalizations(const Locale('en'));
-      expect(find.text('${l10n.loadMore} (+50)'), findsOneWidget);
+      // No load-more button exists anymore.
+      expect(find.byType(OutlinedButton), findsNothing);
 
-      await tester.ensureVisible(find.byType(OutlinedButton));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(OutlinedButton));
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 6));
+      for (var i = 0; i < 8; i++) {
+        await tester.drag(
+            find.byType(SingleChildScrollView), const Offset(0, -600));
+        await tester.pump();
+      }
 
       verify(() => getSongs.watchRecentlyAdded(limit: 100))
           .called(greaterThan(0));
     });
 
-    testWidgets('loads more from the tablet grid load-more button',
+    testWidgets('auto-loads from the tablet grid without a button',
         (tester) async {
       stubRecentlyAdded(Right<AppFailure, List<SongsTableData>>(_songs(50)));
 
@@ -238,12 +284,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(PulsrStaticGrid), findsOneWidget);
+      expect(find.byType(OutlinedButton), findsNothing);
 
-      await tester.ensureVisible(find.byType(OutlinedButton));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(OutlinedButton));
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 6));
+      for (var i = 0; i < 8; i++) {
+        await tester.drag(
+            find.byType(SingleChildScrollView), const Offset(0, -600));
+        await tester.pump();
+      }
 
       verify(() => getSongs.watchRecentlyAdded(limit: 100))
           .called(greaterThan(0));

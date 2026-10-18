@@ -41,6 +41,11 @@ class GetSongsUseCase {
     return _repository.watchRecentlyPlayed(limit: validatedLimit);
   }
 
+  Future<Result<List<SongsTableData>>> getRecentlyPlayed({int limit = 20}) {
+    final validatedLimit = limit.clamp(1, 500);
+    return _repository.getRecentlyPlayed(limit: validatedLimit);
+  }
+
   Future<Result<void>> clearRecentlyPlayed() {
     return _repository.clearRecentlyPlayed();
   }
@@ -48,6 +53,11 @@ class GetSongsUseCase {
   Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int? limit = 20}) {
     final validatedLimit = (limit != null && limit < 0) ? 0 : limit;
     return _repository.watchRecentlyAdded(limit: validatedLimit);
+  }
+
+  Future<Result<List<SongsTableData>>> getRecentlyAdded({int? limit = 20}) {
+    final validatedLimit = (limit != null && limit < 0) ? 0 : limit;
+    return _repository.getRecentlyAdded(limit: validatedLimit);
   }
 
   Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30}) {

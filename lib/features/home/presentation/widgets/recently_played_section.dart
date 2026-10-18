@@ -38,6 +38,11 @@ class RecentlyPlayedSection extends StatefulWidget {
 
 class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
   static const int _pageSize = 50;
+
+  /// Upper bound for the queue built on tap. Matches the player's max queue
+  /// size, so playback continues through the section instead of falling off
+  /// into radio autoplay after the visible window.
+  static const int _queueLimit = 500;
   int _currentLimit = _pageSize;
   final ScrollController _scrollController = ScrollController();
 
@@ -100,6 +105,28 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
         setState(() => _isLoadingMore = false);
       }
     });
+  }
+
+  /// The carousel is windowed (50 by 50), but playback should continue
+  /// through the whole recents list in the same order. Fetch the full list
+  /// for the queue and fall back to the visible window if that fails.
+  Future<void> _playFromSection(
+    PlayerCubit playerCubit,
+    SongsTableData song,
+    List<SongsTableData> visibleSongs,
+  ) async {
+    var queue = visibleSongs;
+    try {
+      final result =
+          await widget.getSongsUseCase.getRecentlyPlayed(limit: _queueLimit);
+      final full = result.fold<List<SongsTableData>?>((_) => null, (r) => r);
+      if (full != null && full.isNotEmpty) {
+        queue = full;
+      }
+    } catch (_) {
+      // Keep the already-loaded window as the queue.
+    }
+    await playerCubit.playSong(song, queue: queue);
   }
 
   Widget _buildSkeleton(BuildContext context) {
@@ -242,9 +269,10 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                             end: AppSpacing.s14),
                         child: InkWell(
                           borderRadius: AppRadii.r20All,
-                          onTap: () => playerCubit.playSong(
+                          onTap: () => _playFromSection(
+                            playerCubit,
                             song,
-                            queue: songs,
+                            songs,
                           ),
                           child: SizedBox(
                             width: size,

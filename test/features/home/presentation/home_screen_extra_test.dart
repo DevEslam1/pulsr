@@ -139,7 +139,7 @@ void main() {
     expect(first.title, 'High');
 
     // Focus Flow reads the top-played source, not the title-ordered page.
-    verify(() => getSongs.watchTopPlayed(limit: 50)).called(1);
+    verify(() => getSongs.watchTopPlayed(limit: 200)).called(1);
     verifyNever(() => getSongs.getAllSongs(
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),

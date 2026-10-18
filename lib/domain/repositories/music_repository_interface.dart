@@ -92,6 +92,7 @@ abstract class IMusicRepository {
   Future<Result<void>> clearRecentlyPlayed();
 
   Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int? limit});
+  Future<Result<List<SongsTableData>>> getRecentlyAdded({int? limit = 20});
   Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30});
 
   Future<Result<bool>> toggleFavorite(int songId);

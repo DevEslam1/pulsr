@@ -107,7 +107,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
   static const Duration _quickActionCacheTtl = Duration(seconds: 60);
   static const int _dailyDriveLimit = 200;
-  static const int _focusFlowLimit = 50;
+
+  /// Focus Flow: a broad top-played window (200 rows) so playback is not
+  /// confined to the first 50 titles, same rationale as Daily Drive.
+  static const int _focusFlowLimit = 200;
 
   bool _cacheFresh(Stopwatch? stopwatch) =>
       stopwatch != null &&

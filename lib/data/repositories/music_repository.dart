@@ -731,7 +731,10 @@ class MusicRepository implements IMusicRepository {
                 (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([
               (t) => OrderingTerm(
-                  expression: t.lastPlayed, mode: OrderingMode.desc)
+                  expression: t.lastPlayed, mode: OrderingMode.desc),
+              // Deterministic tie-breaker so the stream and the one-shot
+              // [getRecentlyPlayed] snapshot agree on the order.
+              (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
             ])
             ..limit(limit))
           .watch()
@@ -757,7 +760,10 @@ class MusicRepository implements IMusicRepository {
                 (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([
               (t) => OrderingTerm(
-                  expression: t.lastPlayed, mode: OrderingMode.desc)
+                  expression: t.lastPlayed, mode: OrderingMode.desc),
+              // Must stay in sync with [watchRecentlyPlayed] so a queue built
+              // from this one-shot snapshot matches the displayed order.
+              (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
             ])
             ..limit(limit))
           .get();
@@ -788,8 +794,12 @@ class MusicRepository implements IMusicRepository {
             t.source.equals(SongSource.local) &
             t.path.like('ytmusic://%').not() &
             (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        // `dateAdded` collides for bulk-scanned files (same second), so `id`
+        // breaks ties deterministically and keeps the stream and the one-shot
+        // [getRecentlyAdded] in the same order.
         ..orderBy([
-          (t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
+          (t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc),
+          (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
         ]);
       if (limit != null) {
         query.limit(limit);
@@ -802,6 +812,32 @@ class MusicRepository implements IMusicRepository {
     } catch (e) {
       return Stream.value(
           Left(DatabaseFailure('Failed to watch recently added', e)));
+    }
+  }
+
+  @override
+  Future<Result<List<SongsTableData>>> getRecentlyAdded(
+      {int? limit = 20}) async {
+    try {
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        // Must stay in sync with [watchRecentlyAdded] so a queue built from
+        // this one-shot snapshot matches the displayed section order.
+        ..orderBy([
+          (t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc),
+          (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+        ]);
+      if (limit != null) {
+        query.limit(limit);
+      }
+      final songs = await query.get();
+      return Right(songs);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch recently added songs', e));
     }
   }
 

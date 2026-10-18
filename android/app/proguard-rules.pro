@@ -104,6 +104,17 @@
 -keep class io.flutter.plugins.sharedpreferences.** { *; }
 -dontwarn io.flutter.plugins.sharedpreferences.**
 
+# shared_preferences_android 2.5.0+ uses Pigeon JNI bindings that look up Kotlin
+# runtime classes by hardcoded name. R8 renaming them breaks every prefs call in
+# release builds (NoSuchMethodError), causing lost onboarding/settings state.
+# See flutter/flutter#194649.
+-keep class kotlin.Unit { *; }
+-keep class kotlin.Result { *; }
+-keep class kotlin.Result$Failure { *; }
+-keep class kotlin.coroutines.Continuation { *; }
+-keep class kotlin.coroutines.intrinsics.CoroutineSingletons { *; }
+-keep class kotlin.coroutines.intrinsics.IntrinsicsKt { *; }
+
 # Additional Flutter Plugins
 -keep class com.mr.flutter.plugin.filepicker.** { *; }
 -dontwarn com.mr.flutter.plugin.filepicker.**

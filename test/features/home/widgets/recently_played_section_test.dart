@@ -189,6 +189,52 @@ void main() {
           .called(1);
     });
 
+    testWidgets('queues the full recents list, not just the loaded window',
+        (tester) async {
+      stubRecentlyPlayed(Right<AppFailure, List<SongsTableData>>(_songs(50)));
+      when(() => getSongs.getRecentlyPlayed(limit: any(named: 'limit')))
+          .thenAnswer((_) async =>
+              Right<AppFailure, List<SongsTableData>>(_songs(120)));
+
+      await tester.pumpWidget(
+        wrap(RecentlyPlayedSection(getSongsUseCase: getSongs, isTablet: false)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Recent 1'));
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => playerCubit.playSong(
+            any(),
+            queue: captureAny(named: 'queue'),
+          )).captured;
+      final queue = captured.single as List<SongsTableData>;
+      expect(queue.length, 120);
+    });
+
+    testWidgets('falls back to the visible window when the full fetch fails',
+        (tester) async {
+      stubRecentlyPlayed(Right<AppFailure, List<SongsTableData>>(_songs(50)));
+      when(() => getSongs.getRecentlyPlayed(limit: any(named: 'limit')))
+          .thenAnswer((_) async => const Left<AppFailure,
+              List<SongsTableData>>(DatabaseFailure('boom')));
+
+      await tester.pumpWidget(
+        wrap(RecentlyPlayedSection(getSongsUseCase: getSongs, isTablet: false)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Recent 1'));
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => playerCubit.playSong(
+            any(),
+            queue: captureAny(named: 'queue'),
+          )).captured;
+      final queue = captured.single as List<SongsTableData>;
+      expect(queue.length, 50);
+    });
+
     testWidgets('renders SectionError for a failed stream', (tester) async {
       stubRecentlyPlayedError();
 

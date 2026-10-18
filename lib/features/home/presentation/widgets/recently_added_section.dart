@@ -20,9 +20,7 @@ import '../../../player/cubit/player_cubit.dart';
 import '../../../sheets/song_info_sheet.dart';
 import 'empty_library.dart';
 import 'section_error.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
 
 class RecentlyAddedSection extends StatefulWidget {
   final GetSongsUseCase getSongsUseCase;
@@ -38,17 +36,54 @@ class RecentlyAddedSection extends StatefulWidget {
 
 class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
   static const int _pageSize = 50;
+
+  /// Upper bound for the queue built on tap. Matches the player's max queue
+  /// size, so playback continues through the section instead of falling off
+  /// into radio autoplay after the visible window.
+  static const int _queueLimit = 500;
+
+  /// How close (in logical pixels) the end of the loaded list must get to the
+  /// viewport bottom before the next page is fetched automatically.
+  static const double _autoLoadExtent = 400;
+
   int _currentLimit = _pageSize;
   bool _isLoadingMore = false;
+
+  /// Set from the latest emission: only when the window was filled may more
+  /// rows exist, so scroll events cannot grow the limit forever.
+  bool _hasMore = false;
   Timer? _loadMoreTimeoutTimer;
+  ScrollPosition? _outerPosition;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The section is rendered inside the home page's outer scroll view (it is
+    // not itself scrollable), so listen to that position to auto-load the
+    // next page as the user reaches the end of the list.
+    final position = Scrollable.maybeOf(context)?.position;
+    if (!identical(position, _outerPosition)) {
+      _outerPosition?.removeListener(_maybeAutoLoad);
+      _outerPosition = position;
+      _outerPosition?.addListener(_maybeAutoLoad);
+    }
+  }
+
+  @override
+  void dispose() {
+    _outerPosition?.removeListener(_maybeAutoLoad);
+    _loadMoreTimeoutTimer?.cancel();
+    super.dispose();
+  }
 
   void _loadMore() {
-    if (_isLoadingMore) return;
+    if (_isLoadingMore || !_hasMore) return;
     _loadMoreTimeoutTimer?.cancel();
     setState(() {
       _isLoadingMore = true;
       _currentLimit += _pageSize;
     });
+    // Safety net in case the stream never emits for the new limit.
     _loadMoreTimeoutTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && _isLoadingMore) {
         setState(() => _isLoadingMore = false);
@@ -56,15 +91,71 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
     });
   }
 
-  @override
-  void dispose() {
+  /// Replaces the old manual load-more button: once the end of the loaded
+  /// list gets within [_autoLoadExtent] of the viewport bottom, fetch the
+  /// next page.
+  void _maybeAutoLoad() {
+    if (!mounted || _isLoadingMore || !_hasMore) return;
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize || !box.attached) return;
+    final bottom = box.localToGlobal(Offset(0, box.size.height)).dy;
+    final viewportBottom = MediaQuery.sizeOf(context).height;
+    if (bottom <= viewportBottom + _autoLoadExtent) {
+      _loadMore();
+    }
+  }
+
+  /// The section is windowed (50 rows at a time), but playback should
+  /// continue through the whole list in the same order. Fetch the full list
+  /// for the queue and fall back to the visible window if that fails.
+  Future<void> _playFromSection(
+    PlayerCubit playerCubit,
+    SongsTableData song,
+    List<SongsTableData> visibleSongs,
+  ) async {
+    var queue = visibleSongs;
+    try {
+      final result =
+          await widget.getSongsUseCase.getRecentlyAdded(limit: _queueLimit);
+      final full = result.fold<List<SongsTableData>?>((_) => null, (r) => r);
+      if (full != null && full.isNotEmpty) {
+        queue = full;
+      }
+    } catch (_) {
+      // Keep the already-loaded window as the queue.
+    }
+    await playerCubit.playSong(song, queue: queue);
+  }
+
+  void _clearLoadingMore() {
     _loadMoreTimeoutTimer?.cancel();
-    super.dispose();
+    if (!_isLoadingMore) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isLoadingMore) {
+        setState(() => _isLoadingMore = false);
+      }
+    });
+  }
+
+  Widget _buildAutoLoadIndicator(BuildContext context) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
     final playerCubit = context.read<PlayerCubit>();
     final columns = PulsrAdaptiveGrid.songColumns(context);
 
@@ -74,14 +165,8 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
           .distinct(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          if (_isLoadingMore) {
-            _loadMoreTimeoutTimer?.cancel();
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && _isLoadingMore) {
-                setState(() => _isLoadingMore = false);
-              }
-            });
-          }
+          _hasMore = false;
+          _clearLoadingMore();
           return SectionError(onRetry: () => setState(() {}));
         }
         final songs =
@@ -102,31 +187,28 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
         }
 
         if (songs.isEmpty) {
-          if (_isLoadingMore) {
-            _loadMoreTimeoutTimer?.cancel();
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && _isLoadingMore) {
-                setState(() => _isLoadingMore = false);
-              }
-            });
-          }
+          _hasMore = false;
+          _clearLoadingMore();
           return const EmptyLibrary();
         }
 
         final hasMore = songs.length >= _currentLimit;
-        // As soon as the active stream emits, clear the guard so "Load more"
-        // does not remain stuck when reaching the end of the collection.
+        _hasMore = hasMore;
+        // As soon as the active stream emits, clear the guard so a pending
+        // auto-load does not remain stuck when reaching the end of the
+        // collection.
         if (_isLoadingMore &&
             snapshot.connectionState != ConnectionState.waiting) {
-          _loadMoreTimeoutTimer?.cancel();
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _isLoadingMore) {
-              setState(() => _isLoadingMore = false);
-            }
-          });
+          _clearLoadingMore();
+        }
+        // Content shorter than the viewport (e.g. a tablet in landscape)
+        // keeps filling itself until the viewport is covered or the
+        // collection ends.
+        if (hasMore) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAutoLoad());
         }
         final loading = _isLoadingMore;
-        final totalItemCount = songs.length + (hasMore ? 1 : 0);
+        final totalItemCount = songs.length + (loading ? 1 : 0);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,33 +235,7 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                 itemCount: totalItemCount,
                 itemBuilder: (context, index) {
                   if (index >= songs.length) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.sm),
-                        child: OutlinedButton.icon(
-                          onPressed: loading ? null : _loadMore,
-                          icon: loading
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(p.accent),
-                                  ),
-                                )
-                              : const Icon(Icons.expand_more_rounded, size: 18),
-                          label: Text(
-                            context.l10n.browseSeeAll,
-                            style: TextStyle(
-                              color: p.accent,
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
+                    return _buildAutoLoadIndicator(context);
                   }
 
                   final song = songs[index];
@@ -188,9 +244,10 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                     groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                     child: SongTile(
                       song: song,
-                      onTap: () => playerCubit.playSong(
+                      onTap: () => _playFromSection(
+                        playerCubit,
                         song,
-                        queue: songs,
+                        songs,
                       ),
                       onMorePressed: () =>
                           SongInfoSheet.show(context, song: song),
@@ -201,57 +258,17 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
             else
               for (int index = 0; index < totalItemCount; index++)
                 if (index >= songs.length)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context),
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: Center(
-                      child: OutlinedButton.icon(
-                        onPressed: loading ? null : _loadMore,
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                              color: p.accent.withValues(alpha: 0.3)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: AppRadii.r20All,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.s10,
-                          ),
-                        ),
-                        icon: loading
-                            ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(p.accent),
-                                ),
-                              )
-                            : Icon(Icons.expand_more_rounded,
-                                size: 18, color: p.accent),
-                        label: Text(
-                          '${context.l10n.loadMore} (+50)',
-                          style: TextStyle(
-                            color: p.accent,
-                            fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
+                  _buildAutoLoadIndicator(context)
                 else
                   StaggeredReveal(
                     index: index,
                     groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                     child: SongTile(
                       song: songs[index],
-                      onTap: () => playerCubit.playSong(
+                      onTap: () => _playFromSection(
+                        playerCubit,
                         songs[index],
-                        queue: songs,
+                        songs,
                       ),
                       onMorePressed: () =>
                           SongInfoSheet.show(context, song: songs[index]),
