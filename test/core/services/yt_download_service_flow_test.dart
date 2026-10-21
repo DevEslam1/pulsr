@@ -19,6 +19,7 @@ import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
+import 'package:pulsr/core/services/yt_download_transfer_math.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
@@ -533,7 +534,10 @@ void main() {
       final dest = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
       File('${dest.path}.part').writeAsBytesSync(_m4aBody(70000));
       File('${dest.path}.part.stamp').writeAsStringSync(
-          YtDownloadService.resumeStampFor(Uri.parse(stream.url)));
+          YtDownloadService.resumeStampFor(
+              videoId: videoId,
+              container: stream.container,
+              expectedBytes: YtDownloadTransferMath.estimateBytes(stream)));
 
       final rest = _m4aBody(70000);
       server = (request) async {
@@ -579,7 +583,10 @@ void main() {
       final dest = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
       File('${dest.path}.part').writeAsBytesSync(_m4aBody(70000));
       File('${dest.path}.part.stamp').writeAsStringSync(
-          YtDownloadService.resumeStampFor(Uri.parse(stream.url)));
+          YtDownloadService.resumeStampFor(
+              videoId: videoId,
+              container: stream.container,
+              expectedBytes: YtDownloadTransferMath.estimateBytes(stream)));
 
       final fullBody = _m4aBody(140000);
       server = (request) async {
@@ -636,7 +643,11 @@ void main() {
 
       final dest = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
       File('${dest.path}.part').writeAsBytesSync(_m4aBody(70000));
-      File('${dest.path}.part.stamp').writeAsStringSync('12345');
+      File('${dest.path}.part.stamp').writeAsStringSync(
+          YtDownloadService.resumeStampFor(
+              videoId: 'vidStampOther',
+              container: stream.container,
+              expectedBytes: YtDownloadTransferMath.estimateBytes(stream)));
 
       final fullBody = _m4aBody(140000);
       server = (request) async {

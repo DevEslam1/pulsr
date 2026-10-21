@@ -8,8 +8,6 @@ import 'package:pulsr/core/services/yt_download_transfer_math.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 
 const _url1 = 'https://rr1---sn-x.googlevideo.com/videoplayback?id=abc';
-const _url2 =
-    'https://rr2---sn-y.googlevideo.com/videoplayback?id=zzz&mime=audio%2Fwebm';
 
 YtmStream _stream({
   int bitrateKbps = 256,
@@ -73,11 +71,40 @@ void main() {
   });
 
   group('resume stamps (F6)', () {
-    test('is deterministic and URL-derived', () {
-      expect(YtDownloadTransferMath.resumeStampFor(Uri.parse(_url1)),
-          YtDownloadTransferMath.resumeStampFor(Uri.parse(_url1)));
-      expect(YtDownloadTransferMath.resumeStampFor(Uri.parse(_url1)),
-          isNot(YtDownloadTransferMath.resumeStampFor(Uri.parse(_url2))));
+    test('identity is container + expected body size, not the URL', () {
+      final stamp = YtDownloadTransferMath.resumeStampFor(
+          container: 'm4a', expectedBytes: 1000);
+      expect(
+          stamp,
+          YtDownloadTransferMath.resumeStampFor(
+              container: ' M4A ', expectedBytes: 1000));
+      expect(
+          stamp,
+          isNot(YtDownloadTransferMath.resumeStampFor(
+              container: 'webm', expectedBytes: 1000)));
+      expect(
+          stamp,
+          isNot(YtDownloadTransferMath.resumeStampFor(
+              container: 'm4a', expectedBytes: 1001)));
+    });
+
+    test('same container and size for different videos never resumes', () {
+      final first = YtDownloadTransferMath.resumeStampFor(
+          container: 'm4a', expectedBytes: 1000, videoId: 'video-one');
+      final second = YtDownloadTransferMath.resumeStampFor(
+          container: 'm4a', expectedBytes: 1000, videoId: 'video-two');
+
+      expect(first, isNot(second));
+      expect(YtDownloadTransferMath.resumeStampMatches(second, first), isFalse);
+      expect(YtDownloadTransferMath.resumeStampMatches('  $first \n', first),
+          isTrue);
+    });
+
+    test('an unknown size still yields a stable container-scoped stamp', () {
+      expect(YtDownloadTransferMath.resumeStampFor(container: 'm4a'),
+          YtDownloadTransferMath.resumeStampFor(container: 'm4a'));
+      expect(YtDownloadTransferMath.resumeStampFor(container: 'm4a'),
+          isNot(YtDownloadTransferMath.resumeStampFor(container: 'webm')));
     });
 
     test('requires an exact trimmed match', () {

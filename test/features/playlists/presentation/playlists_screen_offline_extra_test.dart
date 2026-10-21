@@ -145,7 +145,14 @@ void main() {
     when(() => ytm.getPlaylistTracks(any(), limit: any(named: 'limit')))
         .thenAnswer((_) async => const <YtmTrack>[]);
     download = _Download();
-    when(() => download.downloadAll(any())).thenReturn(1);
+    when(() => download.downloadAllDetailed(any())).thenAnswer((_) async => (
+          queued: 1,
+          skippedLocal: 0,
+          alreadyActive: 0,
+          capped: 0,
+          failed: 0,
+          firstError: null
+        ));
 
     getIt.registerSingleton<GetSongsUseCase>(getSongs);
     getIt.registerSingleton<PlaylistSuggestionsService>(suggestions);
@@ -268,7 +275,7 @@ void main() {
     invokeCardDownload(tester);
     await tester.pumpAndSettle();
 
-    verify(() => download.downloadAll(any())).called(1);
+    verify(() => download.downloadAllDetailed(any())).called(1);
   });
 
   testWidgets('an empty custom playlist download warns instead of queueing',
@@ -291,7 +298,7 @@ void main() {
     invokeCardDownload(tester);
     await tester.pumpAndSettle();
 
-    verifyNever(() => download.downloadAll(any()));
+    verifyNever(() => download.downloadAllDetailed(any()));
   });
 
   testWidgets('a populated custom playlist download queues its tracks',
@@ -313,7 +320,7 @@ void main() {
     invokeCardDownload(tester);
     await tester.pumpAndSettle();
 
-    verify(() => download.downloadAll(any())).called(1);
+    verify(() => download.downloadAllDetailed(any())).called(1);
   });
 
   testWidgets('the added-playlists error card renders the failure',

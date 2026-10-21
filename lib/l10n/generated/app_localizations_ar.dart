@@ -8290,4 +8290,48 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get quranRepeatOff => 'التكرار: متوقف';
+
+  @override
+  String batchCappedTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم تخطي $count مسارات (حد الدفعة)',
+      one: 'تم تخطي مسار واحد (حد الدفعة)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String batchFailedTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'فشل $count مسارات',
+      one: 'فشل مسار واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String batchFailedTracksWithError(int count, String error) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'فشل $count مسارات ($error)',
+      one: 'فشل مسار واحد ($error)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String batchSkippedLocalTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم تخطي $count مسارات محلية',
+      one: 'تم تخطي مسار محلي واحد',
+    );
+    return '$_temp0';
+  }
 }

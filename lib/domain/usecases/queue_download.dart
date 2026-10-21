@@ -11,6 +11,6 @@ class QueueDownloadUseCase {
 
   QueueDownloadUseCase(this._repository);
 
-  Future<Either<AppFailure, String>> call(DownloadTask task) =>
+  Future<Either<AppFailure, QueueDownloadResult>> call(DownloadTask task) =>
       _repository.queueDownload(task);
 }

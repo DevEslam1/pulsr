@@ -377,7 +377,8 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
   bool _isOnlineFavorite(SongsTableData s) => isOnlineFavorite(s);
 
-  void _downloadFavorites(BuildContext context, List<SongsTableData> songs) {
+  Future<void> _downloadFavorites(
+      BuildContext context, List<SongsTableData> songs) async {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.noFavToDownload)),
@@ -395,12 +396,22 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       );
       return;
     }
-    final queuedCount = downloadCubit.downloadAll(songs);
+    final report = await downloadCubit.downloadAllDetailed(songs);
+    if (!context.mounted) return;
+    final queuedCount = report.queued;
+    final extras = describeBatchOutcomeExtras(
+      context.l10n,
+      capped: report.capped,
+      failed: report.failed,
+      firstError: report.firstError,
+      skippedLocal: report.skippedLocal,
+    );
 
     if (queuedCount > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.l10n.queuedForDownload(queuedCount)),
+          content:
+              Text('${context.l10n.queuedForDownload(queuedCount)}$extras'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -410,9 +421,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            hasOnlineTracks
-                ? context.l10n.browseAllOnlineLikedDownloaded
-                : context.l10n.browseAllSongsOffline,
+            '${hasOnlineTracks ? context.l10n.browseAllOnlineLikedDownloaded : context.l10n.browseAllSongsOffline}$extras',
           ),
           behavior: SnackBarBehavior.floating,
         ),

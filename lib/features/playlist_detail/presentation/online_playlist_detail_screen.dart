@@ -218,29 +218,27 @@ class _OnlinePlaylistDetailScreenState
     context.read<PlayerCubit>().playSong(songs.first, queue: songs);
   }
 
-  void _downloadAll() {
+  Future<void> _downloadAll() async {
     if (_tracks.isEmpty) return;
+    final l10n = context.l10n;
     final songs = _tracks.map((t) => t.toSongData()).toList();
     final downloadCubit = getIt<YtmDownloadCubit>();
-    final report = downloadCubit.downloadAllDetailed(songs);
+    final report = await downloadCubit.downloadAllDetailed(songs);
 
-    final parts = <String>[];
-    if (report.queued > 0) {
-      parts.add(context.l10n.queuedFromTitle(report.queued, _title));
-    } else {
-      parts.add(context.l10n.allDownloaded(_title));
-    }
-    if (report.capped > 0) {
-      parts.add(
-          '${report.capped} beyond the batch limit left out — re-run Download All for the rest.');
-    }
-    if (report.skippedLocal > 0) {
-      parts.add('${report.skippedLocal} already on device — skipped.');
-    }
+    final summary = report.queued > 0
+        ? l10n.queuedFromTitle(report.queued, _title)
+        : l10n.allDownloaded(_title);
+    final extras = describeBatchOutcomeExtras(
+      l10n,
+      capped: report.capped,
+      skippedLocal: report.skippedLocal,
+      failed: report.failed,
+      firstError: report.firstError,
+    );
     if (mounted) {
       PulsrToast.show(
         context,
-        message: parts.join(' '),
+        message: '$summary$extras',
         duration: const Duration(seconds: 4),
       );
     }

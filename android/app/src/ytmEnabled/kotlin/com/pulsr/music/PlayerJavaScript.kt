@@ -20,18 +20,20 @@ internal object PlayerJavaScript {
 
     // Pinned modern base.js URL as safety anchor
     private const val PINNED_PLAYER_URL =
-        "https://www.youtube.com/s/player/0229cd64/player_ias.vflset/en_US/base.js"
+        "https://www.youtube.com/s/player/67288f35/player_ias.vflset/en_US/base.js"
 
     // High-reliability offline fallback decipher rules matching modern player_ias.vflset builds.
     private val DEFAULT_FALLBACK_STEPS = listOf(
+        "swap:62",
+        "splice:2",
+        "swap:54",
         "reverse",
-        "splice:1",
-        "swap:53",
-        "splice:3",
-        "swap:18",
-        "swap:61"
+        "splice:2",
+        "reverse",
+        "swap:1",
+        "splice:2"
     )
-    private const val DEFAULT_STS = 20739
+    private const val DEFAULT_STS = 20744
 
     @Volatile
     private var playerUrl: String = ""
@@ -44,6 +46,9 @@ internal object PlayerJavaScript {
 
     @Volatile
     private var cachedSteps: List<String>? = null
+
+    @Volatile
+    private var cachedStepsExtracted: Boolean = false
 
     @Volatile
     private var cachedSts: Int? = null
@@ -96,10 +101,26 @@ internal object PlayerJavaScript {
             return
         }
         if (absolute != playerUrl) {
+            val oldHash = playerHashFromUrl(playerUrl)
+            val newHash = playerHashFromUrl(absolute)
             playerUrl = absolute
+            if (oldHash != null && oldHash != newHash) {
+                synchronized(lock) {
+                    cachedSteps = null
+                    cachedStepsExtracted = false
+                    cachedJs = null
+                    cachedSts = null
+                    appContext?.let { ctx ->
+                        runCatching { JsDecipherCache.getInstance(ctx).clearRules("default") }
+                    }
+                }
+            }
             logD(TAG, "Player JS URL set from assets: $absolute")
         }
     }
+
+    private fun playerHashFromUrl(url: String): String? =
+        Regex("""/s/player/([a-zA-Z0-9_-]+)/""").find(url)?.groupValues?.get(1)
 
     /**
      * Proactively fetches the YouTube player base.js URL and warms up decipher rules.
@@ -155,6 +176,13 @@ internal object PlayerJavaScript {
                     return "https://www.youtube.com$path"
                 }
             }
+            val widgetVersion = Regex("""/s/player/([a-zA-Z0-9_-]+)/www-widgetapi\.vflset/""")
+                .find(iframeHtml)?.groupValues?.get(1)
+            if (!widgetVersion.isNullOrEmpty()) {
+                val path = "/s/player/$widgetVersion/player_ias.vflset/en_US/base.js"
+                logD(TAG, "Derived player JS path from widget API version: $path")
+                return "https://www.youtube.com$path"
+            }
             fetchPlayerUrlFromWatchPage()
         } catch (t: Throwable) {
             logW(TAG, "fetchPlayerUrlFromIframeApi failed: ${t.message}")
@@ -197,9 +225,9 @@ internal object PlayerJavaScript {
 
     /** Deobfuscates a `signatureCipher` `s` value. */
     fun decipherSignature(signature: String): String? = synchronized(lock) {
-        // Fast path: if steps are already cached in memory, transform directly
+        // Fast path: only extracted (not fallback) rules are trusted for direct use.
         cachedSteps?.let { steps ->
-            if (steps.isNotEmpty()) {
+            if (cachedStepsExtracted && steps.isNotEmpty()) {
                 return JsDecipherCache().applyTransforms(signature, steps)
             }
         }
@@ -208,6 +236,14 @@ internal object PlayerJavaScript {
             val fetched = try { fetchPlayerUrlFromIframeApi() } catch (_: Throwable) { null }
             playerUrl = if (!fetched.isNullOrEmpty()) fetched else PINNED_PLAYER_URL
             logI(TAG, "Player JS URL initialized: $playerUrl")
+        }
+
+        // Prefer the parser for the current player format over NewPipe 0.26.5's
+        // older heuristics. NewPipe is still used as a fallback when extraction
+        // fails, so a future player format can still resolve through its engine.
+        val nativeSteps = parseAndCacheSteps()
+        if (cachedStepsExtracted && nativeSteps.isNotEmpty()) {
+            return JsDecipherCache().applyTransforms(signature, nativeSteps)
         }
 
         try {
@@ -258,20 +294,23 @@ internal object PlayerJavaScript {
             }
         }
 
-        val resolvedSteps = if (!steps.isNullOrEmpty()) {
-            logI(TAG, "Decipher rules extracted successfully (${steps.size} steps): $steps")
-            steps
+        val extracted = steps
+        val resolvedSteps = if (!extracted.isNullOrEmpty()) {
+            logI(TAG, "Decipher rules extracted successfully (${extracted.size} steps): $extracted")
+            extracted
         } else {
             logW(TAG, "Could not extract decipher rules from JS. Using default fallback steps: $DEFAULT_FALLBACK_STEPS")
             DEFAULT_FALLBACK_STEPS
         }
 
         cachedSteps = resolvedSteps
+        cachedStepsExtracted = !extracted.isNullOrEmpty()
 
-        // Persist to JsDecipherCache so InnertubeClient can hit it on the fast path
-        appContext?.let { ctx ->
-            runCatching {
-                JsDecipherCache.getInstance(ctx).putRules("default", resolvedSteps)
+        if (!extracted.isNullOrEmpty()) {
+            appContext?.let { ctx ->
+                runCatching {
+                    JsDecipherCache.getInstance(ctx).putRules("default", resolvedSteps)
+                }
             }
         }
 
@@ -291,8 +330,14 @@ internal object PlayerJavaScript {
             // 1. Locate string table Nu
             val sigIdx = js.indexOf("signatureCipher")
             if (sigIdx == -1) return null
-            val splitCall = js.indexOf(".split(\";\")", sigIdx)
+            val splitMarker = ".split(\""
+            val splitCall = js.indexOf(splitMarker, sigIdx)
             if (splitCall == -1) return null
+            val separatorStart = splitCall + splitMarker.length
+            val separatorEnd = js.indexOf("\")", separatorStart)
+            if (separatorEnd == -1) return null
+            val separator = js.substring(separatorStart, separatorEnd)
+            if (separator.isEmpty()) return null
             val quoteEnd = splitCall - 1
             val prefix = js.substring(0, sigIdx)
             val assignRegex = Regex("""[;\n]\s*([a-zA-Z0-9$]+)\s*=\s*\"""")
@@ -303,7 +348,7 @@ internal object PlayerJavaScript {
             val quoteStart = lastAssign.range.last + 1
             if (quoteStart >= quoteEnd) return null
             val nuRaw = js.substring(quoteStart, quoteEnd)
-            val nu = nuRaw.split(";")
+            val nu = nuRaw.split(separator)
 
             // 2. Locate signature call: e.g. .s){var ... l=P1(19,1204,qE(61,7141,k.s))
             val callRegex = Regex("""\.s\)\{var\s+[^=]+=\s*[^,]+,\s*[^=]+=\s*[^,]+,\s*([a-zA-Z0-9$]+)\s*=\s*([a-zA-Z0-9$]+)\((\d+),(\d+)""")
@@ -318,13 +363,22 @@ internal object PlayerJavaScript {
                 """${Regex.escape(funcName)}\s*=\s*function\s*\([^)]*\)\s*\{(.*?return\s+[a-zA-Z0-9$]+[^}]*)\}""",
                 RegexOption.DOT_MATCHES_ALL
             )
-            val defMatch = defRegex.find(js) ?: return null
-            val funcBody = defMatch.groupValues[1]
-
-            // 4. Find helper object and calls inside funcBody
             val nuEsc = Regex.escape(nuVar)
-            val stepCallsRegex = Regex("""([a-zA-Z0-9$]+)\[$nuEsc\[(?:C\^(\d+)|(\d+))\]\]\(\s*[a-zA-Z0-9$]+(?:\s*,\s*(?:C\^(\d+)|(\d+)))?\s*\)""")
-            val stepMatches = stepCallsRegex.findAll(funcBody).toList()
+            var stepMatches: List<MatchResult> = emptyList()
+            for (defMatch in defRegex.findAll(js)) {
+                val funcBody = defMatch.groupValues[1]
+                val eVar = Regex("""\bvar\s+([a-zA-Z0-9$]+)\s*=\s*[a-zA-Z0-9$]+\s*\^\s*[a-zA-Z0-9$]+""")
+                    .find(funcBody)?.groupValues?.get(1) ?: continue
+                val cVar = Regex.escape(eVar)
+                val stepCallsRegex = Regex(
+                    """([a-zA-Z0-9$]+)\[$nuEsc\[(?:$cVar\^(\d+)|(\d+))\]\]\(\s*[a-zA-Z0-9$]+(?:\s*,\s*(?:$cVar\^(\d+)|(\d+)))?\s*\)"""
+                )
+                val matches = stepCallsRegex.findAll(funcBody).toList()
+                if (matches.isNotEmpty()) {
+                    stepMatches = matches
+                    break
+                }
+            }
             if (stepMatches.isEmpty()) return null
 
             var helperObjName: String? = null
@@ -332,7 +386,11 @@ internal object PlayerJavaScript {
             val rawSteps = mutableListOf<RawStep>()
             for (m in stepMatches) {
                 val obj = m.groupValues[1]
-                helperObjName = obj
+                if (helperObjName == null) {
+                    helperObjName = obj
+                } else if (helperObjName != obj) {
+                    return null
+                }
                 val cIdx = m.groupValues[2]
                 val directIdx = m.groupValues[3]
                 val idx = if (cIdx.isNotEmpty()) (cVal xor cIdx.toInt()) else directIdx.toInt()
@@ -362,7 +420,7 @@ internal object PlayerJavaScript {
             val steps = mutableListOf<String>()
             for ((opName, arg) in rawSteps) {
                 val methRegex = Regex("""${Regex.escape(opName)}\s*:\s*function\s*\([^\)]*\)\s*\{([^}]+)\}""")
-                val methMatch = methRegex.find(objBody) ?: continue
+                val methMatch = methRegex.find(objBody) ?: return null
                 val code = methMatch.groupValues[1]
                 when {
                     (revIdx != -1 && code.contains("$nuVar[$revIdx]")) || code.contains("reverse()") -> {
@@ -374,9 +432,10 @@ internal object PlayerJavaScript {
                     code.contains("[0]") -> {
                         steps.add("swap:${arg ?: 0}")
                     }
+                    else -> return null
                 }
             }
-            if (steps.isNotEmpty()) steps else null
+            if (steps.size == rawSteps.size) steps else null
         } catch (t: Throwable) {
             logW(TAG, "extractModernDecipherSteps failed: ${t.message}")
             null
@@ -498,6 +557,7 @@ internal object PlayerJavaScript {
     fun clearCaches() {
         synchronized(lock) {
             cachedSteps = null
+            cachedStepsExtracted = false
             cachedJs = null
             cachedSts = null
             try {

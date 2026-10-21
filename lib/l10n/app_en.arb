@@ -5380,5 +5380,13 @@
   "quranRepeatRange": "Repeat Range",
   "@quranRepeatRange": {"description": "Toggle to repeat a range of Ayahs"},
   "quranRepeatOff": "Repeat: Off",
-  "@quranRepeatOff": {"description": "Repeat mode off"}
+  "@quranRepeatOff": {"description": "Repeat mode off"},
+  "batchCappedTracks": "{count, plural, =1{1 track skipped (batch limit)} other{{count} tracks skipped (batch limit)}}",
+  "@batchCappedTracks": {"description": "Batch download toast suffix for tracks not queued because of the per-batch cap", "placeholders": {"count": {"type": "int"}}},
+  "batchFailedTracks": "{count, plural, =1{1 track failed} other{{count} tracks failed}}",
+  "@batchFailedTracks": {"description": "Batch download toast suffix for failed tracks", "placeholders": {"count": {"type": "int"}}},
+  "batchFailedTracksWithError": "{count, plural, =1{1 track failed ({error})} other{{count} tracks failed ({error})}}",
+  "@batchFailedTracksWithError": {"description": "Batch download toast suffix for failed tracks with the first error", "placeholders": {"count": {"type": "int"}, "error": {"type": "String"}}},
+  "batchSkippedLocalTracks": "{count, plural, =1{1 local track skipped} other{{count} local tracks skipped}}",
+  "@batchSkippedLocalTracks": {"description": "Batch download toast suffix for local tracks that were already available", "placeholders": {"count": {"type": "int"}}}
 }

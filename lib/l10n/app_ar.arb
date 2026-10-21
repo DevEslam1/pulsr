@@ -4482,5 +4482,13 @@
   "quranClearBookmark": "مسح علامة القرآن",
   "quranRepeatAyah": "تكرار الآية",
   "quranRepeatRange": "تكرار النطاق",
-  "quranRepeatOff": "التكرار: متوقف"
+  "quranRepeatOff": "التكرار: متوقف",
+  "batchCappedTracks": "{count, plural, =1{تم تخطي مسار واحد (حد الدفعة)} other{تم تخطي {count} مسارات (حد الدفعة)}}",
+  "@batchCappedTracks": {"description": "لاحقة إشعار تنزيل الدفعة للمسارات غير المضافة بسبب حد الدفعة", "placeholders": {"count": {"type": "int"}}},
+  "batchFailedTracks": "{count, plural, =1{فشل مسار واحد} other{فشل {count} مسارات}}",
+  "@batchFailedTracks": {"description": "لاحقة إشعار تنزيل الدفعة للمسارات الفاشلة", "placeholders": {"count": {"type": "int"}}},
+  "batchFailedTracksWithError": "{count, plural, =1{فشل مسار واحد ({error})} other{فشل {count} مسارات ({error})}}",
+  "@batchFailedTracksWithError": {"description": "لاحقة إشعار تنزيل الدفعة للمسارات الفاشلة مع أول خطأ", "placeholders": {"count": {"type": "int"}, "error": {"type": "String"}}},
+  "batchSkippedLocalTracks": "{count, plural, =1{تم تخطي مسار محلي واحد} other{تم تخطي {count} مسارات محلية}}",
+  "@batchSkippedLocalTracks": {"description": "لاحقة إشعار تنزيل الدفعة للمسارات المحلية المتاحة", "placeholders": {"count": {"type": "int"}}}
 }

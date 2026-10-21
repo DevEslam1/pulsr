@@ -21,6 +21,7 @@ import '../../core/di/injection.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/download_repository_interface.dart';
 import '../db/app_database.dart';
+import '../services/library_maintenance_service.dart';
 
 @Singleton(as: IDownloadRepository)
 class DownloadRepositoryImpl implements IDownloadRepository {
@@ -30,6 +31,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   final YtDownloadService _ytDownloadService;
   final AppDatabase? _db;
+
+  late final LibraryMaintenanceService _libraryMaintenance =
+      LibraryMaintenanceService(
+    database: () => _effectiveDb,
+    channel: _downloadChannel,
+  );
 
   AppDatabase? get _effectiveDb =>
       _db ?? (getIt.isRegistered<AppDatabase>() ? getIt<AppDatabase>() : null);
@@ -49,6 +56,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   Timer? _saveDebounce;
   final Map<String, int> _lastProgressEmitMs = {};
+  final Map<String, int> _lastProgressPersistMs = {};
+  static const int _progressCheckpointMs = 5000;
 
   StorageStats? _cachedStorageStats;
   DateTime? _storageStatsCacheTime;
@@ -116,7 +125,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 
   @override
-  Future<Either<AppFailure, String>> queueDownload(DownloadTask task) async {
+  Future<Either<AppFailure, QueueDownloadResult>> queueDownload(
+      DownloadTask task) async {
     final videoId = task.videoId;
     // FIX-A15: Validate task.videoId with RegExp(r'^[A-Za-z0-9_-]{11}$') before proceeding
     if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId)) {
@@ -137,14 +147,22 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     if (existing != null &&
         (existing.status == DownloadStatus.downloading ||
             existing.status == DownloadStatus.queued)) {
-      return Right(existing.id);
+      return Right(QueueDownloadResult(
+        taskId: existing.id,
+        admission: DownloadAdmission.alreadyActive,
+      ));
     }
     if (existing != null && existing.status == DownloadStatus.complete) {
       // Check if file still exists on disk — off main thread via async check
       if (existing.filePath != null) {
         try {
           final exists = await File(existing.filePath!).exists();
-          if (exists) return Right(existing.id);
+          if (exists) {
+            return Right(QueueDownloadResult(
+              taskId: existing.id,
+              admission: DownloadAdmission.alreadyComplete,
+            ));
+          }
         } catch (_) {}
       }
       // File missing → allow re-download (treat as failed)
@@ -170,6 +188,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     );
 
     _pausedVideoIds.remove(videoId);
+    if (existing != null && existing.status == DownloadStatus.paused) {
+      // Re-admitting a paused task is a resume: clear the service-side paused
+      // marker and the notification's Resume action, otherwise the job stays
+      // flagged paused in the service and the notification is never refreshed.
+      _ytDownloadService.clearPaused(videoId);
+      _notifyNativePaused(videoId, false);
+    }
     _updateTask(queuedTask, allowInsert: true);
 
     if (!_activeVideoIds.contains(videoId) && !_queue.contains(videoId)) {
@@ -183,7 +208,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // three concurrent downloads killed the notification for the other two, and
     // with it the foreground guarantee that keeps them running.
     _processQueue();
-    return Right(task.id);
+    return Right(QueueDownloadResult(
+      taskId: task.id,
+      admission: DownloadAdmission.queued,
+    ));
   }
 
   @override
@@ -273,7 +301,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   @override
   Future<Either<AppFailure, Unit>> deleteDownload(String videoId) async {
-    final task = _tasks[videoId];
+    var task = _tasks[videoId];
     _pausedVideoIds.remove(videoId);
     _queue.remove(videoId);
     // A deleted task must not keep the foreground service alive through its
@@ -289,6 +317,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           await completer.future.timeout(const Duration(seconds: 5));
         } catch (_) {}
       }
+      // Re-read: the job may have completed during the wait, and only the
+      // completed row knows the local id/file path that must be removed.
+      task = _tasks[videoId] ?? task;
       final filePath = task?.filePath;
       if (filePath != null) {
         try {
@@ -311,6 +342,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     _tasks.remove(videoId);
+    // A late progress tick or a queued flush must not keep the deleted task's
+    // bookkeeping alive.
+    _throttleFlushTimers.remove(videoId)?.cancel();
+    _pendingThrottledTasks.remove(videoId);
+    _lastProgressEmitMs.remove(videoId);
+    _lastProgressPersistMs.remove(videoId);
 
     // Scratch files: the service owns the cache directory and the naming, so it
     // does the targeted delete. The orphan sweep is a second pass for genuine
@@ -323,22 +360,17 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           protectedVideoIds: _tasks.keys.toSet());
     } catch (_) {}
 
-    final filePath = task?.filePath;
-    if (filePath != null) {
-      try {
-        final f = File(filePath);
-        if (await f.exists()) {
-          await f.delete();
-        }
-      } catch (_) {}
-      // Clean up partial chunks and resume stamps if present
-      for (final suffix in const ['.part', '.parts', '.part.stamp']) {
-        try {
-          final part = File('$filePath$suffix');
-          if (await part.exists()) await part.delete();
-        } catch (_) {}
-      }
-    }
+    // Delete the library row and file this download produced. Leaving the row
+    // behind was the "ghost track" bug: it stayed in the library until a full
+    // scan, and `downloadAllDetailed` then refused to re-download an
+    // `isDownloaded` row whose file was gone.
+    await _libraryMaintenance.removeDownloadedArtifacts(
+      localSongId: task?.localSongId,
+      filePath: task?.filePath,
+      contentUri: task?.contentUri ??
+          _ytDownloadService.getDownloadedContentUri(videoId),
+    );
+    _ytDownloadService.forgetDownloadedPath(videoId);
 
     _cachedStorageStats = null; // Invalidate storage cache
     // No stopDownloadForeground here: deleting one entry says nothing about the
@@ -377,18 +409,11 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         final db = _effectiveDb;
 
         final sizes = await Future.wait(completedTasks.map((t) async {
-          // 1. Direct fileSize if present and non-zero
+          // 1. Direct fileSize if present and non-zero. Trust the recorded size:
+          // completion and boot reconciliation both author it, and re-stat'ing
+          // every completed file here was a full-library disk walk per refresh.
           if (t.fileSize != null && t.fileSize! > 0) {
-            if (t.filePath != null) {
-              try {
-                if (await File(t.filePath!).exists()) return t.fileSize!;
-              } catch (e, st) {
-                ErrorLogger.log('Failed checking file existence for download',
-                    error: e, stackTrace: st, category: 'Download');
-              }
-            } else {
-              return t.fileSize!;
-            }
+            return t.fileSize!;
           }
 
           // 2. Direct filePath if present
@@ -556,49 +581,56 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final completedTasks = _tasks.values
         .where((t) => t.status == DownloadStatus.complete)
         .toList();
-    final db = _effectiveDb;
     for (final task in completedTasks) {
-      try {
-        var filePath = task.filePath;
-        var fileSize = task.fileSize;
+      await _reconcileCompletedTask(task);
+    }
+  }
 
-        if ((filePath == null || fileSize == null) &&
-            task.localSongId != null &&
-            db != null) {
-          final song = await (db.select(db.songsTable)
-                ..where((s) => s.id.equals(task.localSongId!)))
-              .getSingleOrNull();
-          if (song != null) {
-            filePath = song.path;
-            fileSize = song.fileSize;
-          }
+  /// Reconciles a single completed [task] against disk, marking a deleted file
+  /// as failed. Used right after a completion so one track does not trigger a
+  /// stat of the entire download history.
+  Future<void> _reconcileCompletedTask(DownloadTask task) async {
+    final db = _effectiveDb;
+    try {
+      var filePath = task.filePath;
+      var fileSize = task.fileSize;
+
+      if ((filePath == null || fileSize == null) &&
+          task.localSongId != null &&
+          db != null) {
+        final song = await (db.select(db.songsTable)
+              ..where((s) => s.id.equals(task.localSongId!)))
+            .getSingleOrNull();
+        if (song != null) {
+          filePath = song.path;
+          fileSize = song.fileSize;
         }
+      }
 
-        if (filePath != null) {
-          final f = File(filePath);
-          if (!await f.exists()) {
+      if (filePath != null) {
+        final f = File(filePath);
+        if (!await f.exists()) {
+          final updated = task.copyWith(
+            status: DownloadStatus.failed,
+            error: 'File deleted',
+          );
+          _updateTask(updated);
+        } else {
+          if (fileSize == null || fileSize <= 0) {
+            fileSize = await f.length();
+          }
+          if (task.filePath != filePath || task.fileSize != fileSize) {
             final updated = task.copyWith(
-              status: DownloadStatus.failed,
-              error: 'File deleted',
+              filePath: filePath,
+              fileSize: fileSize,
             );
             _updateTask(updated);
-          } else {
-            if (fileSize == null || fileSize <= 0) {
-              fileSize = await f.length();
-            }
-            if (task.filePath != filePath || task.fileSize != fileSize) {
-              final updated = task.copyWith(
-                filePath: filePath,
-                fileSize: fileSize,
-              );
-              _updateTask(updated);
-            }
           }
         }
-      } catch (e, st) {
-        ErrorLogger.log('Failed reconciling completed download file',
-            error: e, stackTrace: st, category: 'Download');
       }
+    } catch (e, st) {
+      ErrorLogger.log('Failed reconciling completed download file',
+          error: e, stackTrace: st, category: 'Download');
     }
   }
 
@@ -643,7 +675,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         _lastProgressEmitMs[videoId] = DateTime.now().millisecondsSinceEpoch;
         if (!_streamController.isClosed) _streamController.add(pending);
       });
-      _schedulePersist();
+      // Progress is not persisted on every tick, but a crash mid-download must
+      // not roll the row back to 0%. A 5s checkpoint bounds both losses.
+      _checkpointProgress(videoId, now);
       return;
     }
     _throttleFlushTimers.remove(videoId)?.cancel();
@@ -655,8 +689,20 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
     if (isTerminal) {
       _lastProgressEmitMs.remove(videoId);
+      _lastProgressPersistMs.remove(videoId);
     }
-    _schedulePersist(immediateOnTerminal: isTerminal);
+    if (isIntermediateProgress) {
+      _checkpointProgress(videoId, now);
+    } else {
+      _schedulePersist(immediateOnTerminal: isTerminal);
+    }
+  }
+
+  void _checkpointProgress(String videoId, int now) {
+    final last = _lastProgressPersistMs[videoId] ?? 0;
+    if (now - last < _progressCheckpointMs) return;
+    _lastProgressPersistMs[videoId] = now;
+    _schedulePersist();
   }
 
   Future<void> dispose() async {
@@ -671,6 +717,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
     _throttleFlushTimers.clear();
     _pendingThrottledTasks.clear();
+    _lastProgressEmitMs.clear();
+    _lastProgressPersistMs.clear();
     // FIX-A07: Guard _streamController.close() with if (!_streamController.isClosed)
     if (!_streamController.isClosed) await _streamController.close();
   }
@@ -688,10 +736,36 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     });
   }
 
+  /// Preferences are not a database: an unbounded history of completed tasks
+  /// was re-encoded on every terminal event and re-decoded on every boot.
+  ///
+  /// Terminal rows are pruned by age, not by "newest N": dropping the newest-N
+  /// tail used to discard metadata for files that are still on disk and made
+  /// those downloads look lost after a restart. Non-terminal rows are always
+  /// kept (they are the resume/recovery state).
+  static const Duration _persistedTerminalRetention = Duration(days: 30);
+  static const int _maxPersistedTasks = 2000;
+
   Future<void> _persistNow() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final rawList = _tasks.values.map((t) => t.toJson()).toList();
+      final cutoff = DateTime.now().subtract(_persistedTerminalRetention);
+      final live = <DownloadTask>[];
+      final terminal = <DownloadTask>[];
+      for (final task in _tasks.values) {
+        if (task.status.isTerminal) {
+          if (task.createdAt.isAfter(cutoff)) terminal.add(task);
+        } else {
+          live.add(task);
+        }
+      }
+      terminal.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final room = max(0, _maxPersistedTasks - live.length);
+      final tasks = [
+        ...live,
+        ...terminal.take(room),
+      ];
+      final rawList = tasks.map((t) => t.toJson()).toList();
       await prefs.setString(_prefKey, jsonEncode(rawList));
     } catch (_) {}
   }
@@ -818,16 +892,43 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         }
       }
       result ??= const Left(DownloadFailure('Download cancelled'));
+      // A successful result means tagging/saving/indexing already completed in
+      // the service, regardless of what the user did in the meantime.
+      final completedId = result.getRight().toNullable();
 
-      if (_pausedVideoIds.contains(videoId)) {
+      if (_pausedVideoIds.contains(videoId) && completedId == null) {
         _activeVideoIds.remove(videoId);
         _activeCompleters.remove(videoId);
         if (!completer.isCompleted) completer.complete();
         _processQueue();
         return;
       }
-      // If task was deleted while downloading, don't resurrect
+      if (completedId != null && _pausedVideoIds.contains(videoId)) {
+        // Pause lost the race against the save/index tail. Marking the task
+        // paused here would make the next resume fetch a second copy of a file
+        // that is already in the library.
+        _pausedVideoIds.remove(videoId);
+        _ytDownloadService.clearPaused(videoId);
+        _notifyNativePaused(videoId, false);
+      }
+
+      // If the task was deleted while downloading, don't resurrect it. When the
+      // service still finished the save+index (delete landed mid-tagging), the
+      // library row and file it just produced must be removed too, otherwise
+      // they linger untracked until a full scan.
       if (!_tasks.containsKey(videoId)) {
+        if (completedId != null) {
+          try {
+            await _libraryMaintenance.removeDownloadedArtifacts(
+              localSongId: completedId,
+              contentUri: _ytDownloadService.getDownloadedContentUri(videoId),
+            );
+            _ytDownloadService.forgetDownloadedPath(videoId);
+          } catch (e, st) {
+            ErrorLogger.log('Failed cleaning download deleted mid-save',
+                error: e, stackTrace: st, category: 'Download');
+          }
+        }
         _activeVideoIds.remove(videoId);
         _activeCompleters.remove(videoId);
         if (!completer.isCompleted) completer.complete();
@@ -901,9 +1002,14 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             localSongId: newId,
             filePath: resolvedPath,
             fileSize: resolvedSize,
+            contentUri: _ytDownloadService.getDownloadedContentUri(videoId),
           ));
-          // FIX-A06: Reconcile completed files after each successful download
-          unawaited(_reconcileCompletedFiles());
+          // Reconcile just this task: a full sweep of every completed download
+          // after each completion re-stat'ed the entire history on every track.
+          final completed = _tasks[videoId];
+          if (completed != null) {
+            unawaited(_reconcileCompletedTask(completed));
+          }
         },
       );
     } catch (e) {

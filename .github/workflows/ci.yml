@@ -206,6 +206,10 @@ jobs:
       - name: Run Android Kotlin Unit Tests
         run: cd android && ./gradlew :app:testDevDebugUnitTest --no-daemon
 
+      - name: Compile YTM Kotlin Plugin Gate
+        run: cd android && ./gradlew :app:compileYtmDebugKotlin --no-daemon
+
+
       - name: Run Android Native DSP Host Tests
         run: cd android && ./gradlew :app:testNative --no-daemon
 

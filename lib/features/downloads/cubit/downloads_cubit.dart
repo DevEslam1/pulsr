@@ -315,7 +315,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     }
   }
 
-  Future<void> queueDownload(DownloadTask task) async {
+  /// Returns the repository's admission result. Callers that own only a tile
+  /// can ignore it, but batch/row callers (YtmDownloadCubit) need the failure
+  /// and whether the track was newly queued versus already active/complete.
+  Future<Either<AppFailure, QueueDownloadResult>> queueDownload(
+      DownloadTask task) async {
     final result = await _queueDownloadUseCase(task);
     if (result.isRight()) {
       // A fresh queue for this video supersedes any delete tombstone, so the
@@ -325,6 +329,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       });
     }
     _applyActionResult(result);
+    return result;
   }
 
   Future<void> pauseDownload(String videoId) async {
@@ -332,9 +337,10 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     _applyActionResult(result);
   }
 
-  Future<void> resumeDownload(String videoId) async {
+  Future<Either<AppFailure, Unit>> resumeDownload(String videoId) async {
     final result = await _resumeDownloadUseCase(videoId);
     _applyActionResult(result);
+    return result;
   }
 
   Future<void> retryDownload(String videoId) async {

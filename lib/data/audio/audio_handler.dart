@@ -1897,18 +1897,21 @@ class PulsrAudioHandler extends BaseAudioHandler
                 }
                 return;
               }
-              // When a track completes naturally and the player stops or finishes,
-              // auto-advance to the next song in the queue.
               if (state.processingState == ProcessingState.completed &&
                   !_crossfadeManager.isCrossfading) {
-                notifySleepTrackCompleted();
-                final nextIdx = _getNextIndex(peek: true);
-                if (nextIdx == null &&
-                    !_activePlayer.hasNext &&
-                    _activePlayer.loopMode == LoopMode.off) {
-                  unawaited(_sleepTimerManager.onQueueCompleted());
-                  if (_songs.isNotEmpty) {
-                    if (_gaplessMode && _gaplessLoaded) {
+                if (_gaplessMode && _gaplessLoaded) {
+                  // In gapless mode the ConcatenatingAudioSource advances
+                  // itself, so a `completed` event can fire mid-queue while the
+                  // native concat has already moved on to the next item. Only
+                  // the LAST item reports the end of the queue: advancing here
+                  // as well double-skipped the successor (the "next song never
+                  // plays" bug). Mid-queue boundaries are already handled by
+                  // the currentIndexStream listener.
+                  if (!_activePlayer.hasNext &&
+                      _activePlayer.loopMode == LoopMode.off) {
+                    notifySleepTrackCompleted();
+                    unawaited(_sleepTimerManager.onQueueCompleted());
+                    if (_songs.isNotEmpty) {
                       unawaited(() async {
                         try {
                           await _activePlayer.seek(Duration.zero, index: 0);
@@ -1926,16 +1929,28 @@ class PulsrAudioHandler extends BaseAudioHandler
                           _broadcastState(_activePlayer.playbackEvent);
                         } catch (_) {}
                       }());
-                    } else {
-                      unawaited(
-                          _loadSongPaused(0, initialPosition: Duration.zero));
                     }
                   }
                 } else {
-                  unawaited(skipToNext().catchError((Object e, StackTrace st) {
-                    ErrorLogger.log('Auto-advance skipToNext failed',
-                        error: e, stackTrace: st, category: 'AudioHandler');
-                  }));
+                  // Non-gapless playback holds one source per track, so the
+                  // completed event needs a manual advance (or end-of-queue
+                  // reset to the first track, paused).
+                  notifySleepTrackCompleted();
+                  final nextIdx = _getNextIndex(peek: true);
+                  if (nextIdx == null &&
+                      !_activePlayer.hasNext &&
+                      _activePlayer.loopMode == LoopMode.off) {
+                    unawaited(_sleepTimerManager.onQueueCompleted());
+                    if (_songs.isNotEmpty) {
+                      unawaited(
+                          _loadSongPaused(0, initialPosition: Duration.zero));
+                    }
+                  } else {
+                    unawaited(skipToNext().catchError((Object e, StackTrace st) {
+                      ErrorLogger.log('Auto-advance skipToNext failed',
+                          error: e, stackTrace: st, category: 'AudioHandler');
+                    }));
+                  }
                 }
               }
             }

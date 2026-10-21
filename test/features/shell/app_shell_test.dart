@@ -1,16 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/bloc/base_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/shell/presentation/app_shell.dart';
+import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
+class MockYtmDownloadCubit extends Mock implements YtmDownloadCubit {}
 
 class FakeNavigationShell extends StatefulWidget
     implements StatefulNavigationShell {
@@ -61,8 +67,9 @@ void main() {
   Widget buildWidget({
     int currentIndex = 0,
     void Function(int, {bool initialLocation})? onGoBranch,
+    YtmDownloadCubit? downloadCubit,
   }) {
-    return BlocProvider<PlayerCubit>.value(
+    final app = BlocProvider<PlayerCubit>.value(
       value: mockPlayerCubit,
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -79,6 +86,11 @@ void main() {
           ),
         ),
       ),
+    );
+    if (downloadCubit == null) return app;
+    return BlocProvider<YtmDownloadCubit>.value(
+      value: downloadCubit,
+      child: app,
     );
   }
 
@@ -152,5 +164,24 @@ void main() {
     expect(state.backPressStopwatch.elapsedMilliseconds, equals(0));
 
     await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('download failure effects are shown as toasts', (tester) async {
+    final effects = StreamController<UiEffect>.broadcast();
+    final downloadCubit = MockYtmDownloadCubit();
+    when(() => downloadCubit.state).thenReturn(const YtmDownloadState());
+    when(() => downloadCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => downloadCubit.effects).thenAnswer((_) => effects.stream);
+    addTearDown(effects.close);
+
+    await tester.pumpWidget(buildWidget(downloadCubit: downloadCubit));
+    await tester.pumpAndSettle();
+
+    effects.add(const ShowToastEffect('Wi-Fi Only Mode is active.'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Wi-Fi Only Mode is active.'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }

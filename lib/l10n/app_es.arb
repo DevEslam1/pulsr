@@ -4482,5 +4482,13 @@
   "quranClearBookmark": "Borrar marcador del Corán",
   "quranRepeatAyah": "Repetir Aya",
   "quranRepeatRange": "Repetir rango",
-  "quranRepeatOff": "Repetir: Apagado"
+  "quranRepeatOff": "Repetir: Apagado",
+  "batchCappedTracks": "{count, plural, =1{1 pista omitida (límite del lote)} other{{count} pistas omitidas (límite del lote)}}",
+  "@batchCappedTracks": {"description": "Sufijo del aviso de descarga por lotes para pistas no encoladas por el límite", "placeholders": {"count": {"type": "int"}}},
+  "batchFailedTracks": "{count, plural, =1{1 pista falló} other{{count} pistas fallaron}}",
+  "@batchFailedTracks": {"description": "Sufijo del aviso de descarga por lotes para pistas fallidas", "placeholders": {"count": {"type": "int"}}},
+  "batchFailedTracksWithError": "{count, plural, =1{1 pista falló ({error})} other{{count} pistas fallaron ({error})}}",
+  "@batchFailedTracksWithError": {"description": "Sufijo del aviso de descarga por lotes para pistas fallidas con el primer error", "placeholders": {"count": {"type": "int"}, "error": {"type": "String"}}},
+  "batchSkippedLocalTracks": "{count, plural, =1{1 pista local omitida} other{{count} pistas locales omitidas}}",
+  "@batchSkippedLocalTracks": {"description": "Sufijo del aviso de descarga por lotes para pistas locales ya disponibles", "placeholders": {"count": {"type": "int"}}}
 }

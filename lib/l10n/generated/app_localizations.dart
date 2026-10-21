@@ -14873,6 +14873,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Repeat: Off'**
   String get quranRepeatOff;
+
+  /// Batch download toast suffix for tracks not queued because of the per-batch cap
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 track skipped (batch limit)} other{{count} tracks skipped (batch limit)}}'**
+  String batchCappedTracks(int count);
+
+  /// Batch download toast suffix for failed tracks
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 track failed} other{{count} tracks failed}}'**
+  String batchFailedTracks(int count);
+
+  /// Batch download toast suffix for failed tracks with the first error
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 track failed ({error})} other{{count} tracks failed ({error})}}'**
+  String batchFailedTracksWithError(int count, String error);
+
+  /// Batch download toast suffix for local tracks that were already available
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 local track skipped} other{{count} local tracks skipped}}'**
+  String batchSkippedLocalTracks(int count);
 }
 
 class _AppLocalizationsDelegate

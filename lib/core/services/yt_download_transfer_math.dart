@@ -35,9 +35,26 @@ class YtDownloadTransferMath {
   static int requiredPreflightBytes(YtmStream stream) =>
       estimateBytes(stream) * 2 + (10 * 1024 * 1024);
 
-  /// Stamp value written beside a sequential `.part` so a resume can tell
-  /// whether those bytes came from the URL it is about to re-request (F6).
-  static String resumeStampFor(Uri uri) => uri.toString().hashCode.toString();
+  /// Stamp value written beside a partial so a resume can tell whether those
+  /// bytes belong to the body it is about to request (F6).
+  ///
+  /// Identity is the video id, container, and expected body size, not the URL.
+  /// YouTube re-mints googlevideo URLs for the same body (403 recovery, URL
+  /// expiry), and a URL-derived stamp discarded every resumed byte in exactly
+  /// the case resume exists for. A different quality or format changes the
+  /// container and/or size; a different video shares neither the scratch path
+  /// nor the video-id segment, so genuinely different bytes are always refused.
+  static String resumeStampFor({
+    required String container,
+    int? expectedBytes,
+    String? videoId,
+  }) {
+    final size = expectedBytes != null && expectedBytes > 0
+        ? expectedBytes.toString()
+        : 'unknown';
+    final id = videoId?.trim() ?? '';
+    return 'v2|$id|${container.trim().toLowerCase()}|$size';
+  }
 
   /// Whether a `.part` carrying [stampContents] may be resumed against
   /// [urlStamp]. Anything else — a different URL, a missing stamp, or a stamp

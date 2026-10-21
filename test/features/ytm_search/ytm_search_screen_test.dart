@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
@@ -97,7 +98,9 @@ void main() {
     downloadsController = StreamController<DownloadsState>.broadcast();
     when(() => downloadsCubit.stream)
         .thenAnswer((_) => downloadsController.stream);
-    when(() => downloadsCubit.queueDownload(any())).thenAnswer((_) async {});
+    when(() => downloadsCubit.queueDownload(any())).thenAnswer((_) async =>
+        const Right(QueueDownloadResult(
+            taskId: 'song-id', admission: DownloadAdmission.queued)));
     when(() => downloadsCubit.cancelDownload(any())).thenAnswer((_) async {});
 
     downloadCubit = YtmDownloadCubit(

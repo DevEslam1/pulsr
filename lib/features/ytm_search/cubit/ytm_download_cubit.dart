@@ -8,14 +8,20 @@ import '../../../core/bloc/base_cubit.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/yt_download_service.dart';
 import '../../../core/utils/error_logger.dart';
+
+export '../../../core/utils/batch_download_l10n.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/download_task.dart';
 import '../../../domain/models/ytm_track.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
 import '../../downloads/cubit/downloads_cubit.dart';
 import '../../downloads/cubit/downloads_state.dart';
 import '../../player/cubit/player_cubit.dart';
 
 enum YtDownloadStatus { idle, queued, running, paused, done, failed, canceled }
+
+/// How a single song fared at admission time, before any bytes move.
+enum _AdmitOutcome { queued, alreadyActive, alreadyLocal, failed }
 
 class YtDownloadItem {
   final YtDownloadStatus status;
@@ -228,20 +234,98 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   }
 
   Future<void> download(SongsTableData song) async {
+    final result = await _admit(song);
+    if (result.outcome == _AdmitOutcome.failed &&
+        result.error != null &&
+        !isClosed) {
+      // The row itself flips to failed below; the toast tells the user why
+      // even if the row is scrolled off (e.g. Wi-Fi-only mode blocking it).
+      emitEffect(ShowToastEffect(result.error!));
+    }
+  }
+
+  /// Single admission path shared by [download] and [downloadAllDetailed].
+  ///
+  /// Ordering matters: dedupe against the library happens before the row is
+  /// optimistically flipped to queued, and a paused row resumes through
+  /// [DownloadsCubit.resumeDownload] (not a fresh queue) so the service's
+  /// paused marker is cleared — the old `download()` queued a brand-new task
+  /// over the paused one and left the notification's Resume action stale.
+  Future<({_AdmitOutcome outcome, String? error})> _admit(
+      SongsTableData song) async {
     final videoId = song.remoteId;
-    if (videoId == null || videoId.isEmpty) return;
+    if (videoId == null || videoId.isEmpty) {
+      return (outcome: _AdmitOutcome.alreadyLocal, error: null);
+    }
 
     final current = state.itemFor(videoId);
     if (current.status == YtDownloadStatus.queued ||
         current.status == YtDownloadStatus.running) {
-      return;
+      return (outcome: _AdmitOutcome.alreadyActive, error: null);
+    }
+
+    if (current.status == YtDownloadStatus.paused) {
+      final resumed = await _downloads.resumeDownload(videoId);
+      if (isClosed) return (outcome: _AdmitOutcome.alreadyActive, error: null);
+      if (resumed.isRight()) {
+        return (outcome: _AdmitOutcome.queued, error: null);
+      }
+      final message =
+          resumed.getLeft().toNullable()?.message ?? 'Download failed';
+      _set(videoId,
+          YtDownloadItem(status: YtDownloadStatus.failed, error: message));
+      return (outcome: _AdmitOutcome.failed, error: message);
+    }
+
+    // Already a local library track (a completed earlier download, or a file
+    // that was installed outside this UI): re-fetching it would create a
+    // duplicate file and a duplicate row.
+    if (await _alreadyInLibrary(videoId)) {
+      if (!isClosed) {
+        _set(videoId,
+            const YtDownloadItem(status: YtDownloadStatus.done, progress: 1));
+      }
+      return (outcome: _AdmitOutcome.alreadyLocal, error: null);
     }
 
     _reconciledVideoIds.remove(videoId);
     _set(videoId,
         const YtDownloadItem(status: YtDownloadStatus.queued, progress: 0));
 
-    await _downloads.queueDownload(_taskFor(song, videoId));
+    final result = await _downloads.queueDownload(_taskFor(song, videoId));
+    if (isClosed) return (outcome: _AdmitOutcome.queued, error: null);
+    if (result.isRight()) {
+      final admission = result.toNullable()!.admission;
+      switch (admission) {
+        case DownloadAdmission.queued:
+          return (outcome: _AdmitOutcome.queued, error: null);
+        case DownloadAdmission.alreadyActive:
+          return (outcome: _AdmitOutcome.alreadyActive, error: null);
+        case DownloadAdmission.alreadyComplete:
+          _set(videoId,
+              const YtDownloadItem(status: YtDownloadStatus.done, progress: 1));
+          return (outcome: _AdmitOutcome.alreadyLocal, error: null);
+      }
+    }
+
+    final message = result.getLeft().toNullable()?.message ?? 'Download failed';
+    _set(videoId,
+        YtDownloadItem(status: YtDownloadStatus.failed, error: message));
+    return (outcome: _AdmitOutcome.failed, error: message);
+  }
+
+  /// Whether an active local row already exists for [videoId]. Fails open: a
+  /// lookup error must not block a download the user asked for.
+  Future<bool> _alreadyInLibrary(String videoId) async {
+    if (!getIt.isRegistered<IMusicRepository>()) return false;
+    try {
+      final result = await getIt<IMusicRepository>().getSongByRemoteId(videoId);
+      return result.isRight() && result.getOrElse((_) => null) != null;
+    } catch (e, st) {
+      ErrorLogger.log('Download library dedupe lookup failed for $videoId',
+          error: e, stackTrace: st, category: 'YtmDownloadCubit');
+      return false;
+    }
   }
 
   DownloadTask _taskFor(SongsTableData song, String videoId) => DownloadTask(
@@ -260,63 +344,83 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     _set(videoId, const YtDownloadItem(status: YtDownloadStatus.canceled));
   }
 
-  /// Queues multiple songs for download in batch.
-  /// Starts are staggered (~500ms apart) so N simultaneous resolves don't trip
-  /// YouTube's 429/bot throttles — the "first few succeed, rest fail" pattern.
-  /// Returns the number of songs newly queued.
+  /// Queues multiple songs for download in batch and reports what actually
+  /// happened to each track.
   ///
-  /// Staggered starts are generation-guarded: starting a new batch or closing
-  /// the cubit cancels pending delayed starts from the previous batch instead
-  /// of firing them into a dead/changed queue. See [downloadAllDetailed] for
-  /// the honest skipped/capped counts the UI surfaces.
-  int _batchGeneration = 0;
-
-  /// Cancels pending staggered starts from the current batch (already-queued
-  /// downloads keep running).
-  void cancelPendingBatch() => _batchGeneration++;
-
-  int downloadAll(Iterable<SongsTableData> songs, {int maxBatch = 50}) =>
-      downloadAllDetailed(songs, maxBatch: maxBatch).queued;
-
-  ({int queued, int skippedLocal, int alreadyActive, int capped})
-      downloadAllDetailed(Iterable<SongsTableData> songs, {int maxBatch = 50}) {
-    final generation = ++_batchGeneration;
+  /// Admissions are awaited one at a time but transfers are not: the
+  /// repository/service schedulers still cap concurrent transfers (and their
+  /// resolves), so the old ~500ms admission stagger was never what protected
+  /// YouTube from a 429 burst. Awaiting buy us honesty — [queued] counts tasks
+  /// that were genuinely admitted, and a policy block surfaces as
+  /// `failed: N, firstError: ...` instead of a success toast over zero
+  /// downloads.
+  ///
+  /// The returned record has:
+  /// - [queued]: newly admitted downloads,
+  /// - [alreadyActive]: already queued/running in this session,
+  /// - [skippedLocal]: already on device (or a local row exists),
+  /// - [capped]: beyond [maxBatch], left for a follow-up run,
+  /// - [failed]: admission refused (network policy, storage, invalid id),
+  ///   with [firstError] carrying the first refusal message.
+  Future<
+          ({
+            int queued,
+            int skippedLocal,
+            int alreadyActive,
+            int capped,
+            int failed,
+            String? firstError,
+          })>
+      downloadAllDetailed(Iterable<SongsTableData> songs,
+          {int maxBatch = 50}) async {
     var queuedCount = 0;
     var skippedLocal = 0;
     var alreadyActive = 0;
     var capped = 0;
+    var failed = 0;
+    String? firstError;
     for (final song in songs) {
+      if (isClosed) break;
       final videoId = song.remoteId;
       if (videoId == null || videoId.isEmpty) continue;
 
-      // Skip tracks that are already local on disk or already marked downloaded
-      if (song.source == SongSource.local || song.isDownloaded) {
+      // Skip tracks already local on disk or already marked downloaded — but a
+      // row whose file was deleted (`isMissing`) is a tombstone and must be
+      // allowed to download again. The old check skipped those forever, so a
+      // deleted download could never be re-fetched.
+      if ((song.source == SongSource.local || song.isDownloaded) &&
+          !song.isMissing) {
         skippedLocal++;
         continue;
       }
 
+      // Count already-running rows before the batch cap: they occupy a slot
+      // already and must be reported as active, not as capped.
       final current = state.itemFor(videoId);
       if (current.status == YtDownloadStatus.queued ||
           current.status == YtDownloadStatus.running) {
         alreadyActive++;
         continue;
       }
-
-      if (queuedCount >= maxBatch) {
+      // A paused row is resumed, not admitted, so the cap does not apply.
+      if (current.status != YtDownloadStatus.paused &&
+          queuedCount + failed >= maxBatch) {
         capped++;
         continue;
       }
 
-      final index = queuedCount;
-      queuedCount++;
-      if (index == 0) {
-        download(song);
-      } else {
-        // Staggered start; unawaited by design (fire-and-forget batch) but
-        // generation-guarded so a superseded batch never fires.
-        Future.delayed(Duration(milliseconds: 500 * index), () {
-          if (!isClosed && generation == _batchGeneration) download(song);
-        });
+      final result = await _admit(song);
+      if (isClosed) break;
+      switch (result.outcome) {
+        case _AdmitOutcome.queued:
+          queuedCount++;
+        case _AdmitOutcome.alreadyActive:
+          alreadyActive++;
+        case _AdmitOutcome.alreadyLocal:
+          skippedLocal++;
+        case _AdmitOutcome.failed:
+          failed++;
+          firstError ??= result.error;
       }
     }
     return (
@@ -324,8 +428,14 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       skippedLocal: skippedLocal,
       alreadyActive: alreadyActive,
       capped: capped,
+      failed: failed,
+      firstError: firstError,
     );
   }
+
+  Future<int> downloadAll(Iterable<SongsTableData> songs,
+          {int maxBatch = 50}) async =>
+      (await downloadAllDetailed(songs, maxBatch: maxBatch)).queued;
 
   Future<void> retryDownload(SongsTableData song) async {
     final videoId = song.remoteId;
@@ -369,7 +479,6 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
 
   @override
   Future<void> close() async {
-    _batchGeneration++;
     await _sub?.cancel();
     _sub = null;
     _lastEmitTimeByVideoId.clear();

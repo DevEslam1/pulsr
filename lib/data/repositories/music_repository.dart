@@ -20,6 +20,7 @@ import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../core/utils/input_sanitizer.dart';
 import '../db/app_database.dart';
+import '../services/library_maintenance_service.dart';
 
 @Singleton(as: IMusicRepository)
 class MusicRepository implements IMusicRepository {
@@ -2480,8 +2481,7 @@ class MusicRepository implements IMusicRepository {
               stackTrace: st,
               category: 'MusicRepository');
           try {
-            await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId)))
-                .write(const SongsTableCompanion(isMissing: Value(true)));
+            await LibraryMaintenanceService.tombstoneSong(_db, oldId);
           } catch (_) {}
         }
 

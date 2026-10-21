@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -41,7 +42,9 @@ void main() {
     mockDownloads = MockDownloadsCubit();
     controller = StreamController<DownloadsState>.broadcast();
     when(() => mockDownloads.stream).thenAnswer((_) => controller.stream);
-    when(() => mockDownloads.queueDownload(any())).thenAnswer((_) async {});
+    when(() => mockDownloads.queueDownload(any())).thenAnswer((_) async =>
+        const Right(QueueDownloadResult(
+            taskId: 'song-id', admission: DownloadAdmission.queued)));
     when(() => mockDownloads.cancelDownload(any())).thenAnswer((_) async {});
     when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
         .thenAnswer((_) async {});
@@ -127,6 +130,19 @@ void main() {
     await cubit.close();
   });
 
+  test('download() treats a complete admission as already local', () async {
+    when(() => mockDownloads.queueDownload(any())).thenAnswer((_) async =>
+        const Right(QueueDownloadResult(
+            taskId: 'testVid1', admission: DownloadAdmission.alreadyComplete)));
+    final cubit = build();
+
+    await cubit.download(testSong);
+
+    expect(cubit.state.itemFor('testVid1').status, YtDownloadStatus.done);
+    verify(() => mockDownloads.queueDownload(any())).called(1);
+    await cubit.close();
+  });
+
   test('download() does not re-submit while already queued or running',
       () async {
     final cubit = build();
@@ -178,7 +194,7 @@ void main() {
       isMissing: false,
       isDownloaded: true,
     );
-    final count = cubit.downloadAll([testSong, localSong], maxBatch: 10);
+    final count = await cubit.downloadAll([testSong, localSong], maxBatch: 10);
     expect(count, 1);
     await Future.delayed(const Duration(milliseconds: 10));
     verify(() => mockDownloads.queueDownload(any())).called(1);

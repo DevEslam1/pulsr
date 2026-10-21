@@ -2,6 +2,7 @@ package com.pulsr.music
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -52,6 +53,56 @@ class PlayerJavaScriptTest {
         val transformed = cache.applyTransforms("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", steps!!)
         assertNotNull(transformed)
         assertTrue(transformed.isNotEmpty())
+    }
+
+    @Test
+    fun testCurrentBraceDelimitedDecipherStepsExtraction() {
+        val table = MutableList(66) { "x$it" }
+        table[2] = ""
+        table[3] = "length"
+        table[10] = "signatureCipher"
+        table[21] = "splice"
+        table[22] = "rZ"
+        table[34] = "Jk"
+        table[57] = "join"
+        table[58] = "reverse"
+        table[65] = "QD"
+
+        val sampleJs = """
+            var x=0;aa="${table.joinToString("{")}".split("{");
+            zN={QD:function(a,b){a[aa[21]](0,b)},rZ:function(a){a[aa[58]]()},Jk:function(a,b){var c=a[0];a[0]=a[b%a[aa[3]]];a[b%a[aa[3]]]=c}};
+            Ww=function(a,b,c,d){var e=b^a;if(!(a<<2&7)){var f=op(e^7297,e^752,c);d[aa[e^7383]](aa[e^7404],f);var h=[]}(a-8|33)>=a&&(a-6^21)<a&&(f=c[aa[e^7062]](aa[2]),zN[aa[e^7080]](f,e^7092),zN[aa[e^7115]](f,2),zN[aa[e^7080]](f,e^7100),zN[aa[e^7068]](f,e^7089),zN[aa[e^7115]](f,2),zN[aa[e^7068]](f,e^7064),zN[aa[e^7080]](f,1),zN[aa[e^7115]](f,2),h=f[aa[e^7091]](aa[2]));return h};
+            if(k.s){var m=l,n=h.sp,p=Ww(23,7069,mr(19,7308,h.s));}
+            var meta = {signatureTimestamp:20744};
+        """.trimIndent()
+
+        val steps = PlayerJavaScript.extractModernDecipherSteps(sampleJs)
+        assertNotNull("Brace-delimited modern decipher steps should be extracted", steps)
+        assertEquals(
+            listOf("swap:62", "splice:2", "swap:54", "reverse", "splice:2", "reverse", "swap:1", "splice:2"),
+            steps
+        )
+    }
+
+    @Test
+    fun testModernDecipherStepsRejectsIncompleteHelperMapping() {
+        val table = MutableList(66) { "x$it" }
+        table[2] = ""
+        table[3] = "length"
+        table[10] = "signatureCipher"
+        table[21] = "splice"
+        table[33] = "Jk"
+        table[58] = "reverse"
+        table[62] = "Jk"
+
+        val sampleJs = """
+            var x=0;aa="${table.joinToString("{")}".split("{");
+            zN={QD:function(a,b){a[aa[21]](0,b)},rZ:function(a){a[aa[58]]()}};
+            Ww=function(a,b,c,d){var e=b^a;f=c[aa[e^7062]](aa[2]);zN[aa[e^7080]](f,e^7092);zN[aa[e^7115]](f,2);return h};
+            if(k.s){var m=l,n=h.sp,p=Ww(23,7069,mr(19,7308,h.s));}
+        """.trimIndent()
+
+        assertNull(PlayerJavaScript.extractModernDecipherSteps(sampleJs))
     }
 
     @Test

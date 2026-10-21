@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/router/app_router.dart';
@@ -20,6 +21,7 @@ import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
+import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import 'nav_destinations.dart';
 import 'widgets/landscape_sidebar.dart';
 import 'widgets/player_shortcut_scope.dart';
@@ -44,6 +46,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _lastNavMs = 0;
   int _lastPopMs = 0;
   final Stopwatch _backPressStopwatch = Stopwatch();
+  StreamSubscription<UiEffect>? _downloadEffectsSub;
 
   @visibleForTesting
   Stopwatch get backPressStopwatch => _backPressStopwatch;
@@ -65,6 +68,18 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     PulsrModalTracker.isModalOpen.addListener(_onModalStateChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _restoreLastShellTab());
     DockStyleController.load();
+    _downloadEffectsSub =
+        context.read<YtmDownloadCubit?>()?.effects.listen(_showDownloadEffect);
+  }
+
+  void _showDownloadEffect(UiEffect effect) {
+    if (!mounted || effect is! ShowToastEffect) return;
+    PulsrToast.show(
+      context,
+      message: effect.message,
+      icon: Icons.error_outline_rounded,
+      isError: true,
+    );
   }
 
   /// Re-opens the branch that was active when the app was last closed.
@@ -142,6 +157,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _backPressStopwatch
       ..stop()
       ..reset();
+    _downloadEffectsSub?.cancel();
     PulsrModalTracker.isModalOpen.removeListener(_onModalStateChanged);
     WidgetsBinding.instance.removeObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

@@ -26,6 +26,25 @@ enum DownloadStatus {
   bool get canRetry => this == DownloadStatus.failed;
 }
 
+/// How a [DownloadTask] was handled by the repository's admission path.
+///
+/// `Right(...)` alone cannot distinguish "new download admitted" from "this
+/// track was already queued/downloading" or "it is already complete on disk",
+/// so batch reporting used to count those as newly queued.
+enum DownloadAdmission { queued, alreadyActive, alreadyComplete }
+
+class QueueDownloadResult {
+  const QueueDownloadResult({
+    required this.taskId,
+    required this.admission,
+  });
+
+  final String taskId;
+  final DownloadAdmission admission;
+
+  bool get wasQueued => admission == DownloadAdmission.queued;
+}
+
 class DownloadTask {
   final String id;
   final String videoId;
@@ -54,6 +73,10 @@ class DownloadTask {
   /// Byte size of the downloaded audio file once complete.
   final int? fileSize;
 
+  /// MediaStore content URI returned when the file was saved. Used to delete
+  /// the provider row directly instead of resolving it by path.
+  final String? contentUri;
+
   const DownloadTask({
     required this.id,
     required this.videoId,
@@ -72,6 +95,7 @@ class DownloadTask {
     this.sourceSongId,
     this.localSongId,
     this.fileSize,
+    this.contentUri,
   });
 
   DownloadTask copyWith({
@@ -92,6 +116,7 @@ class DownloadTask {
     int? sourceSongId,
     int? localSongId,
     int? fileSize,
+    String? contentUri,
     bool clearError = false, // FIX-A09: support clearing error via copyWith
     bool clearSpeedKbps = false,
     bool clearEtaSeconds = false,
@@ -116,6 +141,7 @@ class DownloadTask {
       sourceSongId: sourceSongId ?? this.sourceSongId,
       localSongId: localSongId ?? this.localSongId,
       fileSize: fileSize ?? this.fileSize,
+      contentUri: contentUri ?? this.contentUri,
     );
   }
 
@@ -138,6 +164,7 @@ class DownloadTask {
       'sourceSongId': sourceSongId,
       'localSongId': localSongId,
       'fileSize': fileSize,
+      'contentUri': contentUri,
     };
   }
 
@@ -165,6 +192,7 @@ class DownloadTask {
       sourceSongId: (json['sourceSongId'] as num?)?.toInt(),
       localSongId: (json['localSongId'] as num?)?.toInt(),
       fileSize: (json['fileSize'] as num?)?.toInt(),
+      contentUri: json['contentUri'] as String?,
     );
   }
 
@@ -181,11 +209,12 @@ class DownloadTask {
           error == other.error &&
           sourceSongId == other.sourceSongId &&
           localSongId == other.localSongId &&
-          fileSize == other.fileSize;
+          fileSize == other.fileSize &&
+          contentUri == other.contentUri;
 
   @override
   int get hashCode => Object.hash(id, videoId, status, progress, filePath,
-      error, sourceSongId, localSongId, fileSize);
+      error, sourceSongId, localSongId, fileSize, contentUri);
 }
 
 class StorageStats {

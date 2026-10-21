@@ -51,7 +51,7 @@ void main() {
         videoId: videoId,
         title: title ?? 'Song $videoId',
         artist: 'Artist',
-        createdAt: DateTime(2026, 1, 1),
+        createdAt: DateTime.now(),
       );
 
   test('rejects a malformed video id', () async {
@@ -71,7 +71,8 @@ void main() {
 
     expect(first.isRight(), isTrue);
     expect(second.isRight(), isTrue);
-    expect(first.getOrElse((_) => ''), second.getOrElse((_) => ''));
+    expect(first.toNullable()!.taskId, second.toNullable()!.taskId);
+    expect(second.toNullable()!.admission, DownloadAdmission.alreadyActive);
     verify(() => service.download(any(), onProgress: any(named: 'onProgress')))
         .called(1);
     completer.complete(const Left(DownloadFailure('done')));
@@ -130,6 +131,8 @@ void main() {
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.tagging));
       return const Right(501);
     });
+    when(() => service.getDownloadedContentUri('abcdefghijk'))
+        .thenReturn('content://media/external/audio/media/501');
 
     final events = <DownloadTask>[];
     final sub = repo.observeDownloads().listen(events.add);
@@ -142,6 +145,7 @@ void main() {
         orElse: () => throw StateError('no completion emitted'));
     expect(last.localSongId, 501);
     expect(last.sourceSongId, isNull); // caller did not provide one
+    expect(last.contentUri, 'content://media/external/audio/media/501');
 
     await sub.cancel();
   });

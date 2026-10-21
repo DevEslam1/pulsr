@@ -97,10 +97,13 @@ void main() {
   });
 
   group('resume stamps', () {
-    test('resumeStampFor is deterministic and URL-derived', () {
-      final a = YtDownloadService.resumeStampFor(Uri.parse('https://x/a'));
-      final b = YtDownloadService.resumeStampFor(Uri.parse('https://x/a'));
-      final c = YtDownloadService.resumeStampFor(Uri.parse('https://x/b'));
+    test('resumeStampFor is deterministic and body-derived', () {
+      final a = YtDownloadService.resumeStampFor(
+          container: 'm4a', expectedBytes: 100);
+      final b = YtDownloadService.resumeStampFor(
+          container: 'm4a', expectedBytes: 100);
+      final c = YtDownloadService.resumeStampFor(
+          container: 'webm', expectedBytes: 100);
       expect(a, b);
       expect(a, isNot(c));
     });

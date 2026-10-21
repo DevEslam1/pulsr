@@ -4,8 +4,10 @@ import '../../core/errors/failures.dart';
 import '../models/download_task.dart';
 
 abstract class IDownloadRepository {
-  /// Queues a new audio download task. Returns the task id on success.
-  Future<Either<AppFailure, String>> queueDownload(DownloadTask task);
+  /// Queues a new audio download task. The result reports whether this call
+  /// admitted a new task, found an active one, or found it already complete.
+  Future<Either<AppFailure, QueueDownloadResult>> queueDownload(
+      DownloadTask task);
 
   /// Pauses an active or queued download.
   Future<Either<AppFailure, Unit>> pauseDownload(String videoId);

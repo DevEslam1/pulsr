@@ -83,8 +83,14 @@ void main() {
         .thenAnswer((_) async => const Right<AppFailure, void>(null));
     when(() => playlists.deletePlaylist(any()))
         .thenAnswer((_) async => const Right<AppFailure, void>(null));
-    when(() => download.downloadAllDetailed(any()))
-        .thenReturn((queued: 1, skippedLocal: 1, alreadyActive: 0, capped: 1));
+    when(() => download.downloadAllDetailed(any())).thenAnswer((_) async => (
+          queued: 1,
+          skippedLocal: 1,
+          alreadyActive: 0,
+          capped: 1,
+          failed: 0,
+          firstError: null
+        ));
   });
 
   tearDown(() async {
@@ -181,8 +187,8 @@ void main() {
     await tester.tap(find.text('Download All'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('beyond the batch limit'), findsWidgets);
-    expect(find.textContaining('already on device'), findsWidgets);
+    expect(find.textContaining('skipped (batch limit)'), findsWidgets);
+    expect(find.textContaining('local track skipped'), findsWidgets);
   });
 
   testWidgets('save-to-pulsr creates a local playlist', (tester) async {

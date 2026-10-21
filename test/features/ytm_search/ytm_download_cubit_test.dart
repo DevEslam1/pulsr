@@ -3,12 +3,14 @@
 // NOTE: the core download-state transitions are already covered by
 // `test/features/ytm_download_cubit_test.dart` (the pre-move location). This
 // file adds coverage for the paths that one does not exercise: batch detail
-// counters, retry, batch cancellation, task-status mapping, reconciliation
+// counters, admission failures, retry, task-status mapping, reconciliation
 // de-duplication, throttling, and [YtDownloadItem] JSON round-tripping.
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/download_task.dart';
@@ -79,7 +81,9 @@ void main() {
     mockDownloads = MockDownloadsCubit();
     controller = StreamController<DownloadsState>.broadcast();
     when(() => mockDownloads.stream).thenAnswer((_) => controller.stream);
-    when(() => mockDownloads.queueDownload(any())).thenAnswer((_) async {});
+    when(() => mockDownloads.queueDownload(any())).thenAnswer((_) async =>
+        const Right(QueueDownloadResult(
+            taskId: 'song-id', admission: DownloadAdmission.queued)));
     when(() => mockDownloads.cancelDownload(any())).thenAnswer((_) async {});
     when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
         .thenAnswer((_) async {});
@@ -219,7 +223,7 @@ void main() {
       }));
       await Future.delayed(Duration.zero);
 
-      final result = cubit.downloadAllDetailed([
+      final result = await cubit.downloadAllDetailed([
         remoteSong('new00000001', id: -1),
         localSong,
         remoteSong('act00000001', id: -2),
@@ -235,32 +239,27 @@ void main() {
 
     test('downloadAll returns only the queued count', () async {
       final cubit = build();
-      final count = cubit.downloadAll([remoteSong('only0000001', id: -1)]);
+      final count =
+          await cubit.downloadAll([remoteSong('only0000001', id: -1)]);
       expect(count, 1);
       await Future.delayed(const Duration(milliseconds: 10));
       verify(() => mockDownloads.queueDownload(any())).called(1);
       await cubit.close();
     });
 
-    test('cancelPendingBatch stops staggered starts from a superseded batch',
+    test('reports admission failures instead of counting them as queued',
         () async {
+      when(() => mockDownloads.queueDownload(any()))
+          .thenAnswer((_) async => const Left(DownloadFailure('storage full')));
       final cubit = build();
-      final songs = [
-        remoteSong('b0000000001', id: -1),
-        remoteSong('b0000000002', id: -2),
-      ];
-      cubit.downloadAllDetailed(songs, maxBatch: 5);
-      await Future.delayed(const Duration(milliseconds: 10));
-      // Only the first (un-staggered) start should have fired so far.
-      verify(() => mockDownloads.queueDownload(any())).called(1);
+      final result =
+          await cubit.downloadAllDetailed([remoteSong('fail0000001', id: -1)]);
 
-      cubit.cancelPendingBatch();
-      await Future.delayed(const Duration(milliseconds: 700));
-      // No new call was added by the cancelled staggered start. The single
-      // already-verified call above is the only interaction.
-      verifyNever(() => mockDownloads.queueDownload(any(
-          that: isA<DownloadTask>()
-              .having((t) => t.videoId, 'videoId', 'b0000000002'))));
+      expect(result.queued, 0);
+      expect(result.failed, 1);
+      expect(result.firstError, 'storage full');
+      expect(
+          cubit.state.itemFor('fail0000001').status, YtDownloadStatus.failed);
       await cubit.close();
     });
   });

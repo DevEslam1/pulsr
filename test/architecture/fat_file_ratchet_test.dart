@@ -28,7 +28,7 @@ void main() {
       // lower the cap, never raise it. (Re-pinned after the null-safety fix in
       // ytm_account_service and the bounded-failure-map guard in ytm_service.)
       'lib/core/services/ytm_account_service.dart': 141050,
-      'lib/core/services/yt_download_service.dart': 77837,
+      'lib/core/services/yt_download_service.dart': 76773,
       'lib/core/services/ytm_service.dart': 78291,
       'lib/features/playlists/presentation/playlists_screen.dart': 91411,
     };

@@ -46,11 +46,15 @@ void main() {
 
   group('Download UseCases', () {
     test('QueueDownloadUseCase delegates to repository', () async {
-      when(() => mockRepo.queueDownload(testTask))
-          .thenAnswer((_) async => const Right('test_id_1'));
+      when(() => mockRepo.queueDownload(testTask)).thenAnswer((_) async =>
+          const Right(QueueDownloadResult(
+              taskId: 'test_id_1', admission: DownloadAdmission.queued)));
 
       final result = await queueUseCase(testTask);
-      expect(result, const Right('test_id_1'));
+      expect(
+          result,
+          const Right(QueueDownloadResult(
+              taskId: 'test_id_1', admission: DownloadAdmission.queued)));
       verify(() => mockRepo.queueDownload(testTask)).called(1);
     });
 

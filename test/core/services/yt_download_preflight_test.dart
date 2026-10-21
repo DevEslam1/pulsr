@@ -7,8 +7,6 @@ import 'package:pulsr/core/services/yt_download_service.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 
 const _url1 = 'https://rr1---sn-x.googlevideo.com/videoplayback?id=abc';
-const _url2 =
-    'https://rr2---sn-y.googlevideo.com/videoplayback?id=zzz&mime=audio%2Fwebm';
 
 YtmStream _stream({
   int bitrateKbps = 256,
@@ -55,17 +53,26 @@ void main() {
   });
 
   group('sequential resume stamp (F6)', () {
-    test('a part written for the same url is resumable', () {
-      final stamp = YtDownloadService.resumeStampFor(Uri.parse(_url1));
+    test('a part written for the same body is resumable', () {
+      final stamp =
+          YtDownloadService.resumeStampFor(container: 'm4a', expectedBytes: 5);
       expect(YtDownloadService.resumeStampMatches(stamp, stamp), isTrue);
       expect(YtDownloadService.resumeStampMatches('  $stamp\n', stamp), isTrue);
     });
 
-    test('a part written for a different url is NOT resumable', () {
-      final stamp = YtDownloadService.resumeStampFor(Uri.parse(_url1));
-      final other = YtDownloadService.resumeStampFor(Uri.parse(_url2));
+    test('a part written for a different body is NOT resumable', () {
+      final stamp =
+          YtDownloadService.resumeStampFor(container: 'm4a', expectedBytes: 5);
+      final other =
+          YtDownloadService.resumeStampFor(container: 'webm', expectedBytes: 5);
       expect(other, isNot(equals(stamp)));
       expect(YtDownloadService.resumeStampMatches(other, stamp), isFalse);
+      expect(
+          YtDownloadService.resumeStampMatches(
+              YtDownloadService.resumeStampFor(
+                  container: 'm4a', expectedBytes: 6),
+              stamp),
+          isFalse);
     });
 
     test('a missing or empty stamp is not resumable', () {

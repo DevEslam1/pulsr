@@ -110,7 +110,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     setState(() => _songsStream = null);
   }
 
-  void _downloadPlaylist(BuildContext context, List<SongsTableData> songs) {
+  Future<void> _downloadPlaylist(
+      BuildContext context, List<SongsTableData> songs) async {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.cannotDownloadEmpty)),
@@ -120,12 +121,22 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
 
     final downloadCubit =
         context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
-    final queuedCount = downloadCubit.downloadAll(songs);
+    final report = await downloadCubit.downloadAllDetailed(songs);
+    if (!context.mounted) return;
+    final queuedCount = report.queued;
+    final extras = describeBatchOutcomeExtras(
+      context.l10n,
+      capped: report.capped,
+      failed: report.failed,
+      firstError: report.firstError,
+      skippedLocal: report.skippedLocal,
+    );
 
     if (queuedCount > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.l10n.queuedForDownload(queuedCount)),
+          content:
+              Text('${context.l10n.queuedForDownload(queuedCount)}$extras'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -135,9 +146,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            hasOnlineTracks
-                ? context.l10n.browseAllOnlineTracksDownloaded
-                : context.l10n.browseAllTracksOfflineLocal,
+            '${hasOnlineTracks ? context.l10n.browseAllOnlineTracksDownloaded : context.l10n.browseAllTracksOfflineLocal}$extras',
           ),
           behavior: SnackBarBehavior.floating,
         ),

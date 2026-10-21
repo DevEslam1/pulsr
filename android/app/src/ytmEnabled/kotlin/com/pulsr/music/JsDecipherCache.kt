@@ -47,7 +47,7 @@ internal class JsDecipherCache(
 
     companion object {
         private const val TAG = "JsDecipherCache"
-        private const val PREFS_NAME = "pulsr_ytm_decipher_cache"
+        private const val PREFS_NAME = "pulsr_ytm_decipher_cache_v2"
         private const val KEY_PREFIX_RULES = "rules_"
         private const val KEY_PREFIX_TIME = "time_"
         private const val KEY_PREFIX_N_RULES = "n_rules_"

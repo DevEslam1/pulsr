@@ -8411,4 +8411,48 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get quranRepeatOff => 'Repetir: Apagado';
+
+  @override
+  String batchCappedTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pistas omitidas (límite del lote)',
+      one: '1 pista omitida (límite del lote)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String batchFailedTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pistas fallaron',
+      one: '1 pista falló',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String batchFailedTracksWithError(int count, String error) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pistas fallaron ($error)',
+      one: '1 pista falló ($error)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String batchSkippedLocalTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pistas locales omitidas',
+      one: '1 pista local omitida',
+    );
+    return '$_temp0';
+  }
 }

@@ -50,7 +50,7 @@ void main() {
     test('does not split on Expires-date commas', () {
       final out = YtmAccountService.mergeSetCookieInto(
         'A=1',
-        'B=2; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/; Secure',
+        'B=2; Expires=Wed, 21 Oct 2037 07:28:00 GMT; Path=/; Secure',
       );
       expect(out, contains('A=1'));
       expect(out, contains('B=2'));
@@ -63,7 +63,7 @@ void main() {
     test('does not split on old dashed Expires dates either', () {
       final out = YtmAccountService.mergeSetCookieInto(
         '',
-        'F=5; expires=Wed, 21-Oct-2026 07:28:00 GMT; Secure',
+        'F=5; expires=Wed, 21-Oct-2037 07:28:00 GMT; Secure',
       );
       expect(out, 'F=5');
     });

@@ -289,8 +289,9 @@ void main() {
     _stubCommon(repo, events: controller.stream);
     when(() => repo.deleteDownload(any()))
         .thenAnswer((_) async => const Right(unit));
-    when(() => repo.queueDownload(any()))
-        .thenAnswer((_) async => const Right('v7'));
+    when(() => repo.queueDownload(any())).thenAnswer((_) async => const Right(
+        QueueDownloadResult(
+            taskId: 'v7', admission: DownloadAdmission.queued)));
 
     final cubit = _build(repo);
     await pumpEventQueue();
@@ -317,8 +318,8 @@ void main() {
         .thenAnswer((_) async => const Left(DatabaseFailure('resume failed')));
     when(() => repo.retryDownload(any()))
         .thenAnswer((_) async => const Right(unit));
-    when(() => repo.queueDownload(any()))
-        .thenAnswer((_) async => const Right('q'));
+    when(() => repo.queueDownload(any())).thenAnswer((_) async => const Right(
+        QueueDownloadResult(taskId: 'q', admission: DownloadAdmission.queued)));
 
     final cubit = _build(repo);
     await pumpEventQueue();

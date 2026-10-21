@@ -144,7 +144,14 @@ void main() {
     when(() => ytm.getPlaylistTracks(any(), limit: any(named: 'limit')))
         .thenAnswer((_) async => const <YtmTrack>[]);
     final download = _Download();
-    when(() => download.downloadAll(any())).thenReturn(0);
+    when(() => download.downloadAllDetailed(any())).thenAnswer((_) async => (
+          queued: 0,
+          skippedLocal: 0,
+          alreadyActive: 0,
+          capped: 0,
+          failed: 0,
+          firstError: null
+        ));
 
     getIt.registerSingleton<GetSongsUseCase>(getSongs);
     getIt.registerSingleton<PlaylistSuggestionsService>(suggestions);

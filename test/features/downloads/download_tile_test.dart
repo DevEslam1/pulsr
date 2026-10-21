@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/domain/models/download_task.dart';
@@ -64,10 +65,13 @@ void main() {
         .thenAnswer((_) => const Stream<DownloadsState>.empty());
     when(() => cubit.cancelDownload(any())).thenAnswer((_) async {});
     when(() => cubit.pauseDownload(any())).thenAnswer((_) async {});
-    when(() => cubit.resumeDownload(any())).thenAnswer((_) async {});
+    when(() => cubit.resumeDownload(any()))
+        .thenAnswer((_) async => const Right(unit));
     when(() => cubit.retryDownload(any())).thenAnswer((_) async {});
     when(() => cubit.deleteDownload(any())).thenAnswer((_) async {});
-    when(() => cubit.queueDownload(any())).thenAnswer((_) async {});
+    when(() => cubit.queueDownload(any())).thenAnswer((_) async => const Right(
+        QueueDownloadResult(
+            taskId: 'song-id', admission: DownloadAdmission.queued)));
   });
 
   Future<void> pumpTile(WidgetTester tester, DownloadTask task) async {

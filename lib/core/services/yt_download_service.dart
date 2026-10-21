@@ -21,16 +21,17 @@ import '../../data/scanner/media_scanner_service.dart';
 import '../../data/services/download_service.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../constants/channels.dart';
-import '../constants/embedded_browser_ua.dart';
 import '../di/injection.dart';
 import '../errors/failures.dart';
 import '../errors/ytm_error_classifier.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 import '../widgets/cached_artwork.dart';
+import 'yt_download_artifact_store.dart';
 import 'yt_download_file_naming.dart';
 import 'yt_download_quality_policy.dart';
 import 'yt_download_transfer_math.dart';
+import 'yt_download_transfer_policy.dart';
 import 'ytm_service.dart';
 import 'ytm_url_cache.dart';
 
@@ -87,6 +88,8 @@ class _RangeIgnored implements Exception {
   String toString() => 'Server ignored the Range header';
 }
 
+enum _ForegroundPhase { idle, starting, running, stopping }
+
 /// Hardened YouTube Download Service.
 ///
 /// Features:
@@ -100,9 +103,41 @@ class YtDownloadService {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
   static const _tagChannel = MethodChannel(PulsrChannels.tagEditor);
   int _maxConcurrentDownloads = 3;
+
+  /// Completed-download paths by video id. Bounded: nothing ever removed an
+  /// entry, so it grew for the whole process lifetime.
   final Map<String, String> _downloadedFilePaths = {};
+  final Map<String, String> _downloadedContentUris = {};
+  static const int _maxDownloadedPaths = 128;
 
   String? getDownloadedPath(String videoId) => _downloadedFilePaths[videoId];
+
+  /// MediaStore URI captured when [videoId] was saved, used to delete the row
+  /// by URI instead of resolving it by path later.
+  String? getDownloadedContentUri(String videoId) =>
+      _downloadedContentUris[videoId];
+
+  /// Drops the cached path for [videoId] after its file/row was removed, so a
+  /// later completion cannot resurrect a stale path.
+  void forgetDownloadedPath(String videoId) {
+    _downloadedFilePaths.remove(videoId);
+    _downloadedContentUris.remove(videoId);
+  }
+
+  void _rememberDownloadedPath(String videoId, String path,
+      {String? contentUri}) {
+    _downloadedFilePaths.remove(videoId);
+    _downloadedFilePaths[videoId] = path;
+    _downloadedContentUris.remove(videoId);
+    if (contentUri != null && contentUri.isNotEmpty) {
+      _downloadedContentUris[videoId] = contentUri;
+    }
+    while (_downloadedFilePaths.length > _maxDownloadedPaths) {
+      final evicted = _downloadedFilePaths.keys.first;
+      _downloadedFilePaths.remove(evicted);
+      _downloadedContentUris.remove(evicted);
+    }
+  }
 
   /// Kept in step with [DownloadSettings.maxConcurrent] by
   /// [DownloadRepositoryImpl]; the class used to hard-code 3 independently of
@@ -130,12 +165,14 @@ class YtDownloadService {
     _qualityPolicy.setPending(videoId, quality);
   }
 
-  /// True while the native download foreground service is running. Reference
-  /// counted by [_activeDownloads] + [_queue] rather than by call site: the
-  /// search-screen path went through [download] without ever starting it, so a
-  /// download begun from there was an ordinary background task Android was free
-  /// to kill the moment the app left the foreground.
-  bool _foregroundServiceRunning = false;
+  /// Foreground-service lifecycle. A start is asynchronous, so "running" must
+  /// only be claimed after the platform confirms it, and an idle stop that
+  /// arrives while a start is in flight has to be deferred instead of racing
+  /// the service into existence.
+  _ForegroundPhase _foregroundPhase = _ForegroundPhase.idle;
+  int _foregroundStartsInFlight = 0;
+  bool _foregroundStopRequested = false;
+
   bool _processing =
       false; // FIX-A03: Guard against re-entrant calls in _processQueue
   /// FIX-A05/C05: track resolved stream duration.
@@ -223,11 +260,17 @@ class YtDownloadService {
   static int requiredPreflightBytes(YtmStream stream) =>
       YtDownloadTransferMath.requiredPreflightBytes(stream);
 
-  /// Stamp value written beside a sequential `.part` so a resume can tell
-  /// whether those bytes came from the URL it is about to re-request (F6).
+  /// Stamp value written beside a partial so a resume can tell whether those
+  /// bytes belong to the body it is about to request (F6). Body identity, not
+  /// the URL: see [YtDownloadTransferMath.resumeStampFor].
   @visibleForTesting
-  static String resumeStampFor(Uri uri) =>
-      YtDownloadTransferMath.resumeStampFor(uri);
+  static String resumeStampFor({
+    required String container,
+    int? expectedBytes,
+    String? videoId,
+  }) =>
+      YtDownloadTransferMath.resumeStampFor(
+          container: container, expectedBytes: expectedBytes, videoId: videoId);
 
   /// Whether a `.part` carrying [stampContents] may be resumed against
   /// [urlStamp].
@@ -275,7 +318,6 @@ class YtDownloadService {
     }
 
     _canceledVideoIds.remove(videoId);
-    final requestedQuality = quality ?? _qualityPolicy.takePending(videoId);
 
     final completer = Completer<Result<int>>();
     // Chain onto an existing job for the same video rather than starting a
@@ -293,6 +335,12 @@ class YtDownloadService {
           .then(completer.complete, onError: completer.completeError);
       return completer.future;
     }
+
+    // Consume the picker override only now that this call actually creates a
+    // job. Taking it before the dedupe check swallowed the quality the user
+    // picked whenever a double-tap chained onto the first tap's job, so the
+    // eventual retry ran at the default quality.
+    final requestedQuality = quality ?? _qualityPolicy.takePending(videoId);
 
     final task = _QueuedDownload(
       song: song,
@@ -318,6 +366,10 @@ class YtDownloadService {
   /// search screen simply stopped when the user switched apps — the very moment
   /// a user expects a download to keep going.
   void _startForegroundService(String videoId, String title) {
+    _foregroundStartsInFlight++;
+    if (_foregroundPhase != _ForegroundPhase.running) {
+      _foregroundPhase = _ForegroundPhase.starting;
+    }
     _downloadChannel.invokeMethod('startDownloadForeground', {
       'videoId': videoId,
       'title': title,
@@ -327,25 +379,65 @@ class YtDownloadService {
       // (Android 12+ background-start refusal, Doze) left Dart believing the
       // download was protected and it never retried — while every later
       // progress publish went to a service that was not there.
-      if (ok == true) _foregroundServiceRunning = true;
+      _foregroundStartsInFlight--;
+      if (ok == true) {
+        _foregroundPhase = _ForegroundPhase.running;
+      } else if (_foregroundStartsInFlight == 0 &&
+          _foregroundPhase == _ForegroundPhase.starting) {
+        _foregroundPhase = _ForegroundPhase.idle;
+      }
+      _drainDeferredForegroundStop();
     }).catchError((_) {
-      _foregroundServiceRunning = false;
+      _foregroundStartsInFlight--;
+      // A second start may have confirmed while this one failed; keep running.
+      if (_foregroundStartsInFlight == 0 &&
+          _foregroundPhase == _ForegroundPhase.starting) {
+        _foregroundPhase = _ForegroundPhase.idle;
+      }
+      _drainDeferredForegroundStop();
       return null;
     });
   }
 
+  void _drainDeferredForegroundStop() {
+    if (!_foregroundStopRequested || _foregroundStartsInFlight > 0) return;
+    _foregroundStopRequested = false;
+    _stopForegroundServiceIfIdle();
+  }
+
   /// Tears the notification down once, when nothing is left to download.
   void _stopForegroundServiceIfIdle() {
-    if (!_foregroundServiceRunning) return;
     if (_activeDownloads.isNotEmpty || _queue.isNotEmpty) return;
     // A paused download is not idle: the notification must stay up so the user
     // can resume it (C-7).
     _pruneExpiredPausedMarkers();
     if (_pausedVideoIds.isNotEmpty) return;
-    _foregroundServiceRunning = false;
-    _downloadChannel
-        .invokeMethod('stopDownloadForeground')
-        .catchError((_) => null);
+
+    switch (_foregroundPhase) {
+      case _ForegroundPhase.idle:
+        return;
+      case _ForegroundPhase.starting:
+        // The service may exist the moment the platform answers; stop it then
+        // instead of leaking it for a queue that is already empty.
+        _foregroundStopRequested = true;
+        return;
+      case _ForegroundPhase.stopping:
+        return;
+      case _ForegroundPhase.running:
+        break;
+    }
+
+    _foregroundPhase = _ForegroundPhase.stopping;
+    _downloadChannel.invokeMethod('stopDownloadForeground').then((_) {
+      if (_foregroundPhase == _ForegroundPhase.stopping) {
+        _foregroundPhase = _ForegroundPhase.idle;
+      }
+    }).catchError((_) {
+      if (_foregroundPhase == _ForegroundPhase.stopping) {
+        _foregroundPhase = _ForegroundPhase.idle;
+      }
+      return null;
+    });
   }
 
   /// F8: every publish is a `startService(ACTION_UPDATE)` on the platform
@@ -359,7 +451,9 @@ class YtDownloadService {
 
   void _publishForegroundProgress(
       String videoId, String title, double? fraction) {
-    if (!_foregroundServiceRunning || fraction == null) return;
+    if (_foregroundPhase != _ForegroundPhase.running || fraction == null) {
+      return;
+    }
     final now = DateTime.now().millisecondsSinceEpoch;
     final last = _lastForegroundPublishMs[videoId] ?? 0;
     final isTerminal = fraction >= 1.0;
@@ -660,17 +754,23 @@ class YtDownloadService {
       // characters let a CJK or emoji title exceed the filesystem's byte limit
       // and MediaStore refused the insert with an opaque failure.
       final displayName = sanitizeFilename(song.artist, song.title, ext);
-      final finalPath =
-          await _downloadChannel.invokeMethod<String>('saveToMusic', {
+      final saved =
+          await _downloadChannel.invokeMethod<Object?>('saveToMusic', {
         'sourcePath': temp.path,
         'displayName': displayName,
         'title': song.title,
         'mimeType': mimeType,
       });
+      // New platform builds return {path, contentUri}; older ones returned the
+      // path directly, so accept both while the Kotlin side rolls forward.
+      final finalPath = saved is Map
+          ? saved['path']?.toString()
+          : (saved is String ? saved : null);
+      final contentUri = saved is Map ? saved['contentUri']?.toString() : null;
       if (finalPath == null || finalPath.isEmpty) {
         return const Left(DownloadFailure('MediaStore did not return a path'));
       }
-      _downloadedFilePaths[videoId] = finalPath;
+      _rememberDownloadedPath(videoId, finalPath, contentUri: contentUri);
 
       // If container does not support embedded tags or embedding failed, save sidecar .lrc
       if ((!embeddedLyrics || !DownloadService.carriesTags(ext)) &&
@@ -873,6 +973,7 @@ class YtDownloadService {
           userAgent: currentStream.userAgent,
           cookies: currentStream.cookies,
           expectedBytes: estimateBytes(currentStream),
+          container: currentStream.container,
         );
         return currentStream;
       } catch (e) {
@@ -956,86 +1057,6 @@ class YtDownloadService {
     }
   }
 
-  /// googlevideo URLs are minted for a specific client's User-Agent; sending
-  /// the Dart default ("Dart/x.y") trips YouTube's bot heuristics with 403s.
-  void _applyStreamHeaders(
-    HttpClientRequest req,
-    String? userAgent, {
-    String? cookies,
-    String? range,
-  }) {
-    final ua = userAgent?.trim();
-    if (ua != null && ua.isNotEmpty) {
-      req.headers.set(HttpHeaders.userAgentHeader, ua);
-    } else {
-      req.headers.set(HttpHeaders.userAgentHeader, EmbeddedBrowserUa.desktop);
-    }
-    if (cookies != null && cookies.isNotEmpty && _cookiesBelongOn(req.uri)) {
-      req.headers.set(HttpHeaders.cookieHeader, cookies);
-    }
-    req.headers.set(HttpHeaders.refererHeader, 'https://music.youtube.com/');
-    if (range != null) {
-      req.headers.set(HttpHeaders.rangeHeader, range);
-    }
-  }
-
-  /// Whether the youtube.com session jar has any business on [uri].
-  ///
-  /// A googlevideo edge node authenticates the request from the signature in the
-  /// URL, and a real browser never sends it cookies. The playback path already
-  /// withholds them; the download path did not, so every chunk of every download
-  /// shipped the live Google session (SAPISID/SID/HSID) to the CDN and looked
-  /// unlike the web player it claims to be.
-  static bool _cookiesBelongOn(Uri uri) {
-    try {
-      final host = uri.host.toLowerCase();
-      if (host == 'googlevideo.com' || host.endsWith('.googlevideo.com')) {
-        return false;
-      }
-      if (host.endsWith('.c.youtube.com')) return false;
-      if (uri.path.contains('/videoplayback')) return false;
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  static const int _minChunkThreshold = 512 * 1024; // 512 KB min per chunk
-
-  /// Dynamically computes optimal concurrent chunk count adapted to measured
-  /// throughput from [AdaptiveBufferEngine] and total file size.
-  int _computeOptimalChunks(int totalBytes) {
-    if (totalBytes < _minChunkThreshold * 2) return 1;
-
-    double throughputMbps = 10.0;
-    try {
-      if (getIt.isRegistered<AdaptiveBufferEngine>()) {
-        throughputMbps = getIt<AdaptiveBufferEngine>().averageNetworkSpeedMbps;
-      }
-    } catch (_) {}
-
-    // Adapt chunk count to throughput and file size:
-    // Low bandwidth (<2Mbps) uses 2 chunks.
-    // High bandwidth (>=15Mbps) and larger files (>=8MB) scale up to 8 chunks.
-    // Otherwise standard 4 chunks.
-    int targetChunks;
-    if (throughputMbps < 2.0) {
-      targetChunks = 2;
-    } else if (throughputMbps >= 15.0 && totalBytes >= 8 * 1024 * 1024) {
-      targetChunks = 8;
-    } else {
-      targetChunks = 4;
-    }
-
-    // Ensure each chunk meets the minimum chunk size threshold
-    while (
-        targetChunks > 1 && (totalBytes / targetChunks) < _minChunkThreshold) {
-      targetChunks ~/= 2;
-    }
-
-    return targetChunks.clamp(1, 8);
-  }
-
   Future<void> _downloadFileResilient(
     String url,
     File dest,
@@ -1044,6 +1065,7 @@ class YtDownloadService {
     String? userAgent,
     String? cookies,
     int? expectedBytes,
+    String? container,
   }) async {
     final uri = Uri.parse(url);
     int total = -1;
@@ -1058,7 +1080,7 @@ class YtDownloadService {
     // classify.
     try {
       final probeReq = await _http.openUrl('GET', uri);
-      _applyStreamHeaders(probeReq, userAgent,
+      YtDownloadTransferPolicy.applyHeaders(probeReq, userAgent,
           cookies: cookies, range: 'bytes=0-0');
       final probeResp =
           await probeReq.close().timeout(const Duration(seconds: 20));
@@ -1089,14 +1111,18 @@ class YtDownloadService {
           '[YtDownloadService] Range probe failed ($e); using a single request');
     }
 
-    if (rangesSupported && total >= _minChunkThreshold) {
+    if (rangesSupported &&
+        total >= YtDownloadTransferPolicy.minChunkThreshold) {
       await _downloadParallel(uri, dest, total, task, onProgress,
-          userAgent: userAgent, cookies: cookies);
+          userAgent: userAgent, cookies: cookies, container: container);
       return;
     }
 
     await _downloadSequential(uri, dest, task, onProgress,
-        userAgent: userAgent, cookies: cookies, expectedBytes: expectedBytes);
+        userAgent: userAgent,
+        cookies: cookies,
+        expectedBytes: expectedBytes,
+        container: container);
   }
 
   Future<void> _downloadParallel(
@@ -1107,32 +1133,49 @@ class YtDownloadService {
     void Function(YtDownloadProgress)? onProgress, {
     String? userAgent,
     String? cookies,
+    String? container,
   }) async {
-    if (total < _minChunkThreshold) {
+    if (total < YtDownloadTransferPolicy.minChunkThreshold) {
       await _downloadSequential(uri, dest, task, onProgress,
-          userAgent: userAgent, cookies: cookies, expectedBytes: total);
+          userAgent: userAgent,
+          cookies: cookies,
+          expectedBytes: total,
+          container: container);
       return;
     }
 
     final stopwatch = Stopwatch()..start();
-    final concurrentChunks = _computeOptimalChunks(total);
+    double throughputMbps = 10.0;
+    try {
+      if (getIt.isRegistered<AdaptiveBufferEngine>()) {
+        throughputMbps = getIt<AdaptiveBufferEngine>().averageNetworkSpeedMbps;
+      }
+    } catch (_) {}
+    final concurrentChunks = YtDownloadTransferPolicy.optimalChunkCount(
+      total,
+      throughputMbps: throughputMbps,
+    );
     final chunkSize = (total / concurrentChunks).ceil();
     final tempParts = <File>[];
     final dir = dest.parent;
     final stamp = File('${dest.path}.parts');
 
     // Parts left behind by an earlier attempt are reusable only if they were
-    // written for a body of exactly this size: `total` fixes every chunk
-    // boundary, and a retry that re-resolves to a different format (webm where
-    // the first attempt got m4a) carries different bytes at the same offsets.
-    // Without this stamp, resuming across that switch would merge two formats
-    // into one file and the size check would happily pass.
-    final expectedStamp = '$total|${uri.toString().hashCode}|$concurrentChunks';
+    // written for a body of exactly this size and container: `total` fixes
+    // every chunk boundary, and a retry that re-resolves to a different format
+    // (webm where the first attempt got m4a) carries different bytes at the
+    // same offsets. Identity is not the URL, so a 403 re-resolution of the
+    // same body still resumes. The legacy `'$total'` stamp is deliberately not
+    // accepted: it cannot prove the container matches.
+    final expectedStamp = resumeStampFor(
+        container: container ?? 'bin',
+        expectedBytes: total,
+        videoId: task.song.remoteId);
     var resumable = false;
     try {
       if (await stamp.exists()) {
         final existing = (await stamp.readAsString()).trim();
-        resumable = existing == expectedStamp || existing == '$total';
+        resumable = existing == expectedStamp;
       }
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
@@ -1203,7 +1246,7 @@ class YtDownloadService {
             }
 
             final req = await _http.getUrl(uri);
-            _applyStreamHeaders(req, userAgent,
+            YtDownloadTransferPolicy.applyHeaders(req, userAgent,
                 cookies: cookies, range: 'bytes=${start + have}-$end');
             final resp = await req.close().timeout(_stallTimeout);
 
@@ -1445,7 +1488,10 @@ class YtDownloadService {
       debugPrint(
           '[YtDownloadService] Server ignored Range mid-transfer; retrying as a single request');
       await _downloadSequential(uri, dest, task, onProgress,
-          userAgent: userAgent, cookies: cookies, expectedBytes: total);
+          userAgent: userAgent,
+          cookies: cookies,
+          expectedBytes: total,
+          container: container);
     }
   }
 
@@ -1478,18 +1524,21 @@ class YtDownloadService {
     String? userAgent,
     String? cookies,
     int? expectedBytes,
+    String? container,
     bool allowResume = true,
     int retryCount = 0, // FIX-A01: Add retryCount parameter (max 1)
   }) async {
     final stopwatch = Stopwatch()..start();
     final partFile = File('${dest.path}.part');
-    // F6: a `.part` is only resumable against the URL that wrote it. The
-    // parallel path pins its chunks with a `.parts` stamp precisely so a
-    // re-resolve that changed container cannot be merged in; this path had no
-    // such guard, so a stale partial could be appended with bytes from a
-    // different format at the same offsets and still satisfy the size check.
+    // F6: a `.part` is only resumable against the same body that wrote it. The
+    // stamp identifies container + expected size rather than the URL, so a
+    // re-resolved (freshly signed) URL for the same body resumes, while a
+    // quality/format change does not.
     final stampFile = File('${dest.path}.part.stamp');
-    final urlStamp = resumeStampFor(uri);
+    final resumeStamp = YtDownloadTransferMath.resumeStampFor(
+        container: container ?? 'bin',
+        expectedBytes: expectedBytes,
+        videoId: task.song.remoteId);
     int resumeOffset = 0;
     try {
       if (await partFile.exists()) {
@@ -1498,13 +1547,13 @@ class YtDownloadService {
         try {
           if (await stampFile.exists()) {
             stampMatches =
-                resumeStampMatches(await stampFile.readAsString(), urlStamp);
+                resumeStampMatches(await stampFile.readAsString(), resumeStamp);
           }
         } catch (_) {
           // Best-effort: failure intentionally ignored on this non-critical path.
         }
         if (resumeOffset > 0 && !stampMatches) {
-          // Written for a different URL, or by a build without the stamp:
+          // Written for a different body, or by a build without the stamp:
           // nothing in it is known to line up, so start over.
           try {
             await partFile.delete();
@@ -1524,7 +1573,7 @@ class YtDownloadService {
         }
       }
       try {
-        await stampFile.writeAsString(urlStamp, flush: true);
+        await stampFile.writeAsString(resumeStamp, flush: true);
       } catch (_) {
         // Best-effort: failure intentionally ignored on this non-critical path.
       }
@@ -1534,10 +1583,11 @@ class YtDownloadService {
 
     final request = await _http.openUrl('GET', uri);
     if (resumeOffset > 0) {
-      _applyStreamHeaders(request, userAgent,
+      YtDownloadTransferPolicy.applyHeaders(request, userAgent,
           cookies: cookies, range: 'bytes=$resumeOffset-');
     } else {
-      _applyStreamHeaders(request, userAgent, cookies: cookies);
+      YtDownloadTransferPolicy.applyHeaders(request, userAgent,
+          cookies: cookies);
     }
     final response = await request.close().timeout(_stallTimeout);
 
@@ -1576,6 +1626,7 @@ class YtDownloadService {
             userAgent: userAgent,
             cookies: cookies,
             expectedBytes: expectedBytes,
+            container: container,
             allowResume: false,
             retryCount: retryCount + 1); // FIX-A01
       }
@@ -1726,92 +1777,36 @@ class YtDownloadService {
     }
   }
 
-  /// Sweeps this service's stale temporaries — `ytdl_*` bodies, their `.partN`
-  /// chunks, `.parts` stamps and `ytdl_art_*` covers — out of the cache
-  /// directory.
-  ///
-  /// Two things it no longer does. It matched any `name.contains('.part')`,
-  /// which in a directory shared with every other plugin meant deleting other
-  /// people's partial writes. And it protected nothing belonging to a download
-  /// running right now: a slow transfer whose `.part0` had not been appended to
-  /// for ten minutes, or a queued track whose parts were written by an earlier
-  /// attempt, had them deleted from underneath it.
+  /// Sweeps stale download scratch files while preserving active, queued and
+  /// explicitly protected ids.
   Future<void> cleanOrphanPartFiles({
     Set<String>? activePartNames,
     Set<String>? protectedVideoIds,
   }) async {
     try {
-      final dir = await getTemporaryDirectory();
-      if (!await dir.exists()) return;
-
-      // `activePartNames` only ever matched an exact basename, so a caller had to
-      // know the container extension to name the file — `ytdl_<id>.m4a.part`, its
-      // `.part0..3` chunk siblings and the `.parts` stamp. Callers guessed
-      // `ytdl_<id>.part`, which matches nothing, so a paused download's partial
-      // was swept and its resume restarted from zero. Ids are what a caller
-      // actually holds, and they cover every artifact of that download at once.
-      final busy = <String>{
-        ..._activeDownloads.keys,
-        ..._queue.map((t) => t.song.remoteId).whereType<String>(),
-        ...?protectedVideoIds,
-      };
-
-      await for (final entity in dir.list()) {
-        if (entity is! File) continue;
-        final name = p.basename(entity.path);
-        if (!name.startsWith('ytdl_')) continue;
-        if (activePartNames != null && activePartNames.contains(name)) continue;
-        if (busy.any((id) =>
-            name.startsWith('ytdl_$id.') || name.startsWith('ytdl_art_$id.'))) {
-          continue;
-        }
-        try {
-          final stat = await entity.stat();
-          if (DateTime.now().difference(stat.modified) >
-              const Duration(minutes: 10)) {
-            await entity.delete();
-          }
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
-        }
-      }
+      await YtDownloadArtifactStore.sweepOrphans(
+        await getTemporaryDirectory(),
+        busyVideoIds: {
+          ..._activeDownloads.keys,
+          ..._queue.map((t) => t.song.remoteId).whereType<String>(),
+          ...?protectedVideoIds,
+        },
+        activePartNames: activePartNames,
+      );
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }
   }
 
-  /// Removes every scratch file this service may have written for [videoId].
-  ///
-  /// The orphan sweep above only touches files older than ten minutes, so it is
-  /// useless right after a delete — the partial of the download the user just
-  /// removed is seconds old. This is the immediate counterpart, and it lives
-  /// here because the layout is this class's private knowledge: the cache dir
-  /// from [getTemporaryDirectory], `ytdl_<id>.<ext>` plus its `.part`,
-  /// `.part0..3` and `.parts` siblings, and the `ytdl_art_<id>.<ext>` cover.
-  /// The repository used to do this itself against [Directory.systemTemp] — a
-  /// different directory entirely on Android — and matched with
-  /// `path.contains('ytdl_$videoId')`, which has no boundary, so deleting the
-  /// download `abc` would also delete the artifacts of `abcdef`.
+  /// Removes every scratch file for [videoId].
   Future<void> deleteArtifactsFor(String videoId) async {
     if (videoId.isEmpty) return;
     // A live download owns its partial; deleting under it would leave the writer
     // appending to an unlinked handle and commit a truncated file.
     if (_activeDownloads.containsKey(videoId)) return;
     try {
-      final dir = await getTemporaryDirectory();
-      if (!await dir.exists()) return;
-      final audio = 'ytdl_$videoId.';
-      final art = 'ytdl_art_$videoId.';
-      await for (final entity in dir.list()) {
-        if (entity is! File) continue;
-        final name = p.basename(entity.path);
-        if (!name.startsWith(audio) && !name.startsWith(art)) continue;
-        try {
-          await entity.delete();
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
-        }
-      }
+      await YtDownloadArtifactStore.deleteFor(
+          await getTemporaryDirectory(), videoId);
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }

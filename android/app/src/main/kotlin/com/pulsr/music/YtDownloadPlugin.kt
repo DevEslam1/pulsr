@@ -1,8 +1,10 @@
 package com.pulsr.music
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.media.MediaScannerConnection
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -23,6 +25,8 @@ import java.io.FileOutputStream
  * Modeled on RingtonePlugin's MediaStore insert.
  */
 class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
+    private data class SavedAudio(val path: String, val contentUri: String?)
+
     private lateinit var channel: MethodChannel
     private var context: Context? = null
     private val saveExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
@@ -138,10 +142,13 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 // platform thread — which is where `result` must be invoked.
                 saveExecutor.execute {
                     try {
-                        val finalPath = saveToMediaStore(currentContext, source, displayName, title, mimeType)
+                        val saved = saveToMediaStore(currentContext, source, displayName, title, mimeType)
                         mainHandler.post {
-                            if (finalPath != null) {
-                                result.success(finalPath)
+                            if (saved != null) {
+                                result.success(mapOf(
+                                    "path" to saved.path,
+                                    "contentUri" to saved.contentUri,
+                                ))
                             } else {
                                 result.error("SAVE_FAILED", "MediaStore did not return a path", null)
                             }
@@ -149,6 +156,24 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     } catch (e: Exception) {
                         mainHandler.post {
                             result.error("SAVE_FAILED", e.localizedMessage ?: "Unknown error", e.stackTraceToString())
+                        }
+                    }
+                }
+            }
+            "deleteFromMusic" -> {
+                val path = call.argument<String>("path")
+                val contentUri = call.argument<String>("contentUri")
+                if (path.isNullOrEmpty() && contentUri.isNullOrEmpty()) {
+                    result.error("INVALID_ARGUMENT", "path or contentUri is required", null)
+                    return
+                }
+                saveExecutor.execute {
+                    try {
+                        val deleted = deleteFromMusic(currentContext, path, contentUri)
+                        mainHandler.post { result.success(deleted) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("DELETE_FAILED", e.localizedMessage ?: "Unknown error", null)
                         }
                     }
                 }
@@ -262,13 +287,61 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
+    /**
+     * Deletes the MediaStore row and the file behind a completed download.
+     *
+     * Prefers the content URI captured at save time (stable across renamed
+     * files and scoped-storage DATA quirks) and falls back to resolving the row
+     * by path. The direct file delete remains the last resort for pre-Q rows
+     * or files MediaStore never indexed.
+     */
+    internal fun deleteFromMusic(context: Context, path: String?, contentUri: String?): Boolean {
+        var deleted = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = context.contentResolver
+            val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            if (!contentUri.isNullOrEmpty()) {
+                try {
+                    deleted = resolver.delete(Uri.parse(contentUri), null, null) > 0
+                } catch (_: Exception) {
+                }
+            }
+            if (!deleted && !path.isNullOrEmpty()) {
+                try {
+                    @Suppress("DEPRECATION")
+                    resolver.query(
+                        collection,
+                        arrayOf(MediaStore.Audio.Media._ID),
+                        "${MediaStore.Audio.Media.DATA} = ?",
+                        arrayOf(path),
+                        null,
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
+                            deleted = resolver.delete(uri, null, null) > 0
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+        if (!path.isNullOrEmpty()) {
+            try {
+                val file = File(path)
+                if (file.exists()) deleted = file.delete() || deleted
+            } catch (_: Exception) {
+            }
+        }
+        return deleted
+    }
+
     private fun saveToMediaStore(
         context: Context,
         source: File,
         displayName: String,
         title: String,
         mimeType: String,
-    ): String? {
+    ): SavedAudio? {
         val resolver = context.contentResolver
 
         val lowerMime = mimeType.trim().lowercase()
@@ -342,10 +415,10 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
                     path = File(musicDir, cleanDisplayName).absolutePath
                 }
-                if (path != null) {
-                    MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf(resolvedMimeType), null)
-                }
-                return path
+                val finalPath = path
+                    ?: File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), cleanDisplayName).absolutePath
+                MediaScannerConnection.scanFile(context, arrayOf(finalPath), arrayOf(resolvedMimeType), null)
+                return SavedAudio(finalPath, uri.toString())
             } finally {
                 if (!success) {
                     try {
@@ -402,12 +475,12 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 android.util.Log.w("YtDownloadPlugin", "MediaStore insert returned null; keeping file at ${dest.absolutePath}")
             }
             MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), arrayOf(resolvedMimeType), null)
-            return dest.absolutePath
+            return SavedAudio(dest.absolutePath, insertedUri?.toString())
         } catch (e: Exception) {
             android.util.Log.w("YtDownloadPlugin", "MediaStore insert threw; falling back to scanner and preserving file at ${dest.absolutePath}", e)
             try { insertedUri?.let { resolver.delete(it, null, null) } } catch (_: Exception) {}
             MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), arrayOf(resolvedMimeType), null)
-            return dest.absolutePath
+            return SavedAudio(dest.absolutePath, null)
         }
     }
 }

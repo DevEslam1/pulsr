@@ -959,14 +959,22 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
         final downloadCubit = getIt<YtmDownloadCubit>();
-        final queuedCount = downloadCubit.downloadAll(songs);
+        final report = await downloadCubit.downloadAllDetailed(songs);
+        final queuedCount = report.queued;
+        final extras = describeBatchOutcomeExtras(
+          l10n,
+          capped: report.capped,
+          failed: report.failed,
+          firstError: report.firstError,
+          skippedLocal: report.skippedLocal,
+        );
         if (context.mounted) {
           PulsrToast.show(
             context,
             message: queuedCount > 0
-                ? '${l10n.browseQueued} $queuedCount ${l10n.browseTracksFrom} "${playlist.title}" ${l10n.browseForDownload} ${l10n.browseActiveDownloadsSuffix}'
-                : '${l10n.browseAllTracksFrom} "${playlist.title}" ${l10n.browseAlreadyDownloadedOffline}',
-            isSuccess: queuedCount > 0,
+                ? '${l10n.browseQueued} $queuedCount ${l10n.browseTracksFrom} "${playlist.title}" ${l10n.browseForDownload} ${l10n.browseActiveDownloadsSuffix}$extras'
+                : '${l10n.browseAllTracksFrom} "${playlist.title}" ${l10n.browseAlreadyDownloadedOffline}$extras',
+            isSuccess: queuedCount > 0 && report.failed == 0,
           );
         }
       } else {
@@ -981,10 +989,10 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     }
   }
 
-  void _downloadCustomPlaylist(
+  Future<void> _downloadCustomPlaylist(
     BuildContext context,
     OnlinePlaylistEntry entry,
-  ) {
+  ) async {
     if (entry.tracks.isEmpty) {
       PulsrToast.show(context, message: context.l10n.emptyPlaylist);
       return;
@@ -992,20 +1000,29 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     final songs = entry.tracks.map((t) => t.toSongData()).toList();
     final downloadCubit =
         context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
-    final queuedCount = downloadCubit.downloadAll(songs);
+    final report = await downloadCubit.downloadAllDetailed(songs);
+    if (!context.mounted) return;
+    final queuedCount = report.queued;
+    final extras = describeBatchOutcomeExtras(
+      context.l10n,
+      capped: report.capped,
+      failed: report.failed,
+      firstError: report.firstError,
+      skippedLocal: report.skippedLocal,
+    );
     PulsrToast.show(
       context,
       message: queuedCount > 0
-          ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseTracksFrom} "${entry.title}" ${context.l10n.browseForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
-          : '${context.l10n.browseAllTracksFrom} "${entry.title}" ${context.l10n.browseAlreadyDownloadedOffline}',
-      isSuccess: queuedCount > 0,
+          ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseTracksFrom} "${entry.title}" ${context.l10n.browseForDownload} ${context.l10n.browseActiveDownloadsSuffix}$extras'
+          : '${context.l10n.browseAllTracksFrom} "${entry.title}" ${context.l10n.browseAlreadyDownloadedOffline}$extras',
+      isSuccess: queuedCount > 0 && report.failed == 0,
     );
   }
 
-  void _downloadLikedSongs(
+  Future<void> _downloadLikedSongs(
     BuildContext context,
     List<YtmTrack> likedTracks,
-  ) {
+  ) async {
     if (likedTracks.isEmpty) {
       PulsrToast.show(context, message: context.l10n.noLikedToDownload);
       return;
@@ -1013,13 +1030,22 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     final songs = likedTracks.map((t) => t.toSongData()).toList();
     final downloadCubit =
         context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
-    final queuedCount = downloadCubit.downloadAll(songs);
+    final report = await downloadCubit.downloadAllDetailed(songs);
+    if (!context.mounted) return;
+    final queuedCount = report.queued;
+    final extras = describeBatchOutcomeExtras(
+      context.l10n,
+      capped: report.capped,
+      failed: report.failed,
+      firstError: report.firstError,
+      skippedLocal: report.skippedLocal,
+    );
     PulsrToast.show(
       context,
       message: queuedCount > 0
-          ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseLikedSongsForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
-          : context.l10n.browseAllLikedSongsDownloadedOffline,
-      isSuccess: queuedCount > 0,
+          ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseLikedSongsForDownload} ${context.l10n.browseActiveDownloadsSuffix}$extras'
+          : '${context.l10n.browseAllLikedSongsDownloadedOffline}$extras',
+      isSuccess: queuedCount > 0 && report.failed == 0,
     );
   }
 

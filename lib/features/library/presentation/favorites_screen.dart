@@ -59,7 +59,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }).toList();
   }
 
-  void _downloadFavorites(BuildContext context, List<SongsTableData> songs) {
+  Future<void> _downloadFavorites(
+      BuildContext context, List<SongsTableData> songs) async {
     if (songs.isEmpty) return;
     final downloadCubit = context.read<YtmDownloadCubit?>() ??
         (getIt.isRegistered<YtmDownloadCubit>()
@@ -71,14 +72,23 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       );
       return;
     }
-    final queuedCount = downloadCubit.downloadAll(songs);
+    final report = await downloadCubit.downloadAllDetailed(songs);
+    if (!context.mounted) return;
+    final queuedCount = report.queued;
+    final extras = describeBatchOutcomeExtras(
+      context.l10n,
+      capped: report.capped,
+      failed: report.failed,
+      firstError: report.firstError,
+      skippedLocal: report.skippedLocal,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           queuedCount > 0
-              ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseTracksForDownload}'
-              : context.l10n.browseAllTracksAlreadyDownloaded,
+              ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseTracksForDownload}$extras'
+              : '${context.l10n.browseAllTracksAlreadyDownloaded}$extras',
         ),
         behavior: SnackBarBehavior.floating,
       ),
