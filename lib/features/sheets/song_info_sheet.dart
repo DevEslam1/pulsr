@@ -451,7 +451,8 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 48),
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                     shape: RoundedRectangleBorder(
                       borderRadius: AppRadii.r14All,
                     ),
@@ -855,6 +856,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
   late final PerSongVolumeStore _volStore;
   late final BpmOverrideStore _bpmStore;
   List<HeadphoneProfile> _headphoneProfiles = const [];
+  Map<String, String> _eqLabelByLower = const {};
   late double _currentSliderVol;
 
   @override
@@ -875,6 +877,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
     } catch (_) {
       _headphoneProfiles = const [];
     }
+    _rebuildEqLabelMap();
     _currentSliderVol = _volStore.getGainDbForTrack(widget.song.id.toString());
     Future.wait([
       _ratingStore.ready,
@@ -891,6 +894,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
           } else {
             _headphoneProfiles = HeadphoneProfilesRepository().profiles;
           }
+          _rebuildEqLabelMap();
           _currentSliderVol =
               _volStore.getGainDbForTrack(widget.song.id.toString());
         });
@@ -905,16 +909,39 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
     });
   }
 
-  String? _eqDropdownValue(String? stored) {
-    if (stored == null || stored.isEmpty) return null;
-    final lower = stored.toLowerCase();
-    for (final d in EqPreset.defaultPresets) {
-      if (d.name.toLowerCase() == lower) return d.name;
+  /// Canonical-name lookup, built once per profile load instead of scanning
+  /// hundreds of AutoEq profiles on every rebuild.
+  void _rebuildEqLabelMap() {
+    final labels = <String, String>{};
+    for (final preset in EqPreset.defaultPresets) {
+      labels[preset.name.toLowerCase()] = preset.name;
     }
     for (final hp in _headphoneProfiles) {
-      if (hp.name.toLowerCase() == lower) return hp.name;
+      labels.putIfAbsent(hp.name.toLowerCase(), () => hp.name);
     }
-    return null;
+    _eqLabelByLower = labels;
+  }
+
+  Future<void> _showEqPresetPicker(
+    BuildContext context,
+    PlayerCubit? playerCubit,
+    String? currentEq,
+  ) async {
+    final selection = await PulsrSheetHelper.showPulsrSheet<_EqPresetOption>(
+      context: context,
+      builder: (_) => _EqPresetPickerSheet(
+        currentValue: currentEq,
+        presetNames:
+            EqPreset.defaultPresets.map((p) => p.name).toList(growable: false),
+        autoEqNames:
+            _headphoneProfiles.map((p) => p.name).toList(growable: false),
+      ),
+    );
+    if (selection == null || !mounted) return;
+    final trackKey = widget.song.id.toString();
+    await _eqStore.setPresetForTrack(trackKey, selection.value);
+    playerCubit?.setSongEqOverride(widget.song.id, selection.value);
+    if (mounted) setState(() {});
   }
 
   Future<void> _showBpmDialog(
@@ -987,20 +1014,9 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
     final currentRating = _ratingStore.getRating(trackKey);
     final currentEq = _eqStore.getPresetForTrack(trackKey);
     final currentBpm = _bpmStore.getBpmForTrack(trackKey);
-
-    final seenPresetNames = <String>{};
-    final eqOptions = <({String? value, String label})>[
-      (value: null, label: context.l10n.defaultGlobalEq),
-    ];
-    for (final preset in EqPreset.defaultPresets) {
-      seenPresetNames.add(preset.name.toLowerCase());
-      eqOptions.add((value: preset.name, label: preset.name));
-    }
-    for (final hp in _headphoneProfiles) {
-      if (seenPresetNames.add(hp.name.toLowerCase())) {
-        eqOptions.add((value: hp.name, label: '${hp.name} • AutoEQ'));
-      }
-    }
+    final currentEqLabel = currentEq == null
+        ? context.l10n.defaultGlobalEq
+        : (_eqLabelByLower[currentEq.toLowerCase()] ?? currentEq);
 
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.s10, bottom: AppSpacing.sm),
@@ -1081,45 +1097,34 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
               ),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
-                child: DropdownButton<String?>(
-                  isExpanded: true,
-                  value: _eqDropdownValue(currentEq),
-                  underline: const SizedBox(),
-                  dropdownColor: p.surfaceContainer,
-                  icon: Icon(Icons.arrow_drop_down, color: p.accent),
-                  style: TextStyle(
-                    color: currentEq != null ? p.accent : p.textPrimary,
-                    fontSize: AppFontSize.label,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  selectedItemBuilder: (context) {
-                    return eqOptions.map((opt) {
-                      return Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: Text(
-                          opt.label,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          textAlign: TextAlign.end,
+                child: InkWell(
+                  onTap: () =>
+                      _showEqPresetPicker(context, playerCubit, currentEq),
+                  borderRadius: AppRadii.r8All,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppSpacing.s6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            currentEqLabel,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              color:
+                                  currentEq != null ? p.accent : p.textPrimary,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      );
-                    }).toList();
-                  },
-                  items: eqOptions.map((opt) {
-                    return DropdownMenuItem<String?>(
-                      value: opt.value,
-                      child: Text(
-                        opt.label,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (newPreset) async {
-                    await _eqStore.setPresetForTrack(trackKey, newPreset);
-                    playerCubit?.setSongEqOverride(widget.song.id, newPreset);
-                    if (mounted) setState(() {});
-                  },
+                        Icon(Icons.arrow_drop_down, color: p.accent),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1128,51 +1133,14 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
           Divider(color: p.hairline, height: 1),
           const SizedBox(height: AppSpacing.xs),
 
-          // Per-Track Volume Offset
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                context.l10n.trackVolumeOffset,
-                style: TextStyle(
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w700,
-                  color: p.textSecondary,
-                ),
-              ),
-              Text(
-                _currentSliderVol.abs() < 0.1
-                    ? '0.0 dB'
-                    : '${_currentSliderVol > 0 ? '+' : ''}${_currentSliderVol.toStringAsFixed(1)} dB',
-                style: TextStyle(
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w700,
-                  color: _currentSliderVol.abs() < 0.1
-                      ? p.textSecondary
-                      : p.accent,
-                ),
-              ),
-            ],
-          ),
-          PulsrSlider(
-            value: _currentSliderVol.clamp(-12.0, 6.0),
-            min: -12.0,
-            max: 6.0,
-            divisions: 36,
-            semanticLabel: context.l10n.trackVolumeOffset,
-            onChanged: (val) {
-              setState(() {
-                _currentSliderVol = val;
-              });
-            },
-            onChangeEnd: (val) async {
-              final clamped = val.abs() < 0.2 ? 0.0 : val;
-              setState(() {
-                _currentSliderVol = clamped;
-              });
-              await _volStore.setGainDbForTrack(trackKey, clamped);
-              playerCubit?.setSongVolumeOverride(widget.song.id, clamped);
-            },
+          // Per-Track Volume Offset (isolated so drags don't rebuild the
+          // whole overrides section).
+          _TrackVolumeOffsetRow(
+            songId: widget.song.id,
+            trackKey: trackKey,
+            initialValue: _currentSliderVol,
+            volumeStore: _volStore,
+            playerCubit: playerCubit,
           ),
           const SizedBox(height: AppSpacing.xs),
           Divider(color: p.hairline, height: 1),
@@ -1219,6 +1187,280 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TrackVolumeOffsetRow extends StatefulWidget {
+  const _TrackVolumeOffsetRow({
+    required this.songId,
+    required this.trackKey,
+    required this.initialValue,
+    required this.volumeStore,
+    required this.playerCubit,
+  });
+
+  final int songId;
+  final String trackKey;
+  final double initialValue;
+  final PerSongVolumeStore volumeStore;
+  final PlayerCubit? playerCubit;
+
+  @override
+  State<_TrackVolumeOffsetRow> createState() => _TrackVolumeOffsetRowState();
+}
+
+class _TrackVolumeOffsetRowState extends State<_TrackVolumeOffsetRow> {
+  late double _value = widget.initialValue.clamp(-12.0, 6.0);
+
+  @override
+  void didUpdateWidget(covariant _TrackVolumeOffsetRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialValue != widget.initialValue) {
+      _value = widget.initialValue.clamp(-12.0, 6.0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              context.l10n.trackVolumeOffset,
+              style: TextStyle(
+                fontSize: AppFontSize.label,
+                fontWeight: FontWeight.w700,
+                color: p.textSecondary,
+              ),
+            ),
+            Text(
+              _value.abs() < 0.1
+                  ? '0.0 dB'
+                  : '${_value > 0 ? '+' : ''}${_value.toStringAsFixed(1)} dB',
+              style: TextStyle(
+                fontSize: AppFontSize.label,
+                fontWeight: FontWeight.w700,
+                color: _value.abs() < 0.1 ? p.textSecondary : p.accent,
+              ),
+            ),
+          ],
+        ),
+        PulsrSlider(
+          value: _value,
+          min: -12.0,
+          max: 6.0,
+          divisions: 36,
+          semanticLabel: context.l10n.trackVolumeOffset,
+          onChanged: (val) {
+            setState(() {
+              _value = val;
+            });
+          },
+          onChangeEnd: (val) async {
+            final clamped = val.abs() < 0.2 ? 0.0 : val;
+            setState(() {
+              _value = clamped;
+            });
+            await widget.volumeStore
+                .setGainDbForTrack(widget.trackKey, clamped);
+            widget.playerCubit?.setSongVolumeOverride(widget.songId, clamped);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _EqPresetOption {
+  const _EqPresetOption(this.value, this.label, {this.isAutoEq = false});
+
+  final String? value;
+  final String label;
+  final bool isAutoEq;
+}
+
+class _EqPresetPickerSheet extends StatefulWidget {
+  const _EqPresetPickerSheet({
+    required this.currentValue,
+    required this.presetNames,
+    required this.autoEqNames,
+  });
+
+  final String? currentValue;
+  final List<String> presetNames;
+  final List<String> autoEqNames;
+
+  @override
+  State<_EqPresetPickerSheet> createState() => _EqPresetPickerSheetState();
+}
+
+class _EqPresetPickerSheetState extends State<_EqPresetPickerSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  late final List<_EqPresetOption> _allOptions;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final seen = <String>{};
+    final options = <_EqPresetOption>[];
+    for (final name in widget.presetNames) {
+      if (seen.add(name.toLowerCase())) {
+        options.add(_EqPresetOption(name, name));
+      }
+    }
+    for (final name in widget.autoEqNames) {
+      if (seen.add(name.toLowerCase())) {
+        options.add(_EqPresetOption(name, name, isAutoEq: true));
+      }
+    }
+    _allOptions = options;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final l10n = context.l10n;
+    final allOptions = <_EqPresetOption>[
+      _EqPresetOption(null, l10n.defaultGlobalEq),
+      ..._allOptions,
+    ];
+    final query = _query.trim().toLowerCase();
+    final visible = query.isEmpty
+        ? allOptions
+        : allOptions
+            .where((option) => option.label.toLowerCase().contains(query))
+            .toList();
+    final media = MediaQuery.of(context);
+    final listHeight = ((media.size.height - media.viewInsets.bottom) * 0.55)
+        .clamp(180.0, 460.0);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.s10, AppSpacing.s20, 0),
+          child: Text(
+            l10n.trackEqOverride,
+            style: TextStyle(
+              fontSize: AppFontSize.title,
+              fontWeight: FontWeight.w800,
+              color: p.textPrimary,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xs),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (value) {
+              setState(() {
+                _query = value;
+              });
+            },
+            style: TextStyle(color: p.textPrimary),
+            decoration: InputDecoration(
+              hintText: l10n.search,
+              hintStyle: TextStyle(color: p.textTertiary),
+              prefixIcon:
+                  Icon(Icons.search_rounded, size: 20, color: p.textTertiary),
+              filled: true,
+              fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+              border: OutlineInputBorder(
+                borderRadius: AppRadii.r12All,
+                borderSide: BorderSide(color: p.hairline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: AppRadii.r12All,
+                borderSide: BorderSide(color: p.hairline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: AppRadii.r12All,
+                borderSide: BorderSide(color: p.accent, width: 1.5),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: listHeight,
+          child: visible.isEmpty
+              ? Center(
+                  child: Text(
+                    l10n.noResultsFor(_query),
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.bodySmall,
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final option = visible[index];
+                    final selected = option.value == widget.currentValue;
+                    return InkWell(
+                      onTap: () => Navigator.of(context).pop(option),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s20,
+                          vertical: AppSpacing.s14,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                option.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: selected ? p.accent : p.textPrimary,
+                                  fontSize: AppFontSize.bodySmall,
+                                  fontWeight: selected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (option.isAutoEq) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Text(
+                                'AutoEQ',
+                                style: TextStyle(
+                                  color: p.textTertiary,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                            if (selected) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Icon(Icons.check_rounded,
+                                  size: 18, color: p.accent),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+      ],
     );
   }
 }

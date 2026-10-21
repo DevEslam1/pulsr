@@ -50,7 +50,7 @@ class PulsrSlider extends StatefulWidget {
     this.inactiveColor,
     this.thumbColor,
     this.isWavy = true,
-    this.animateWave = true,
+    this.animateWave = false,
   });
 
   @override

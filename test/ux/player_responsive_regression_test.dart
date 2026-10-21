@@ -99,6 +99,7 @@ void main() {
   });
 
   for (final size in [
+    const Size(320, 520),
     const Size(320, 568),
     const Size(390, 844),
     const Size(844, 390),

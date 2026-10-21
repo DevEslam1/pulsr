@@ -54,11 +54,29 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
   CanvasArtwork? get canvas => _canvas;
   bool _isRendered = false;
   int? _resolvedSongId;
+  bool _canvasEnabled = true;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _resolveAndLoad(widget.song);
+    _canvasEnabled = _readCanvasEnabled();
+    if (_canvasEnabled) {
+      _resolveAndLoad(widget.song);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled = _readCanvasEnabled();
+    if (enabled == _canvasEnabled) return;
+    _canvasEnabled = enabled;
+    if (enabled) {
+      _resolveAndLoad(widget.song);
+    } else {
+      _stopCanvas();
+    }
   }
 
   @override
@@ -66,10 +84,37 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
     super.didUpdateWidget(oldWidget);
 
     if (widget.song?.id != oldWidget.song?.id) {
-      _resolveAndLoad(widget.song);
+      if (_canvasEnabled) {
+        _resolveAndLoad(widget.song);
+      } else {
+        _resolvedSongId = widget.song?.id;
+        _loadGeneration++;
+      }
     } else if (widget.isPlaying != oldWidget.isPlaying) {
       _syncPlayState();
     }
+  }
+
+  /// Canvas video resolution is expensive (network + decoder), so it must not
+  /// run while the user has Canvas disabled — the video would decode behind an
+  /// invisible opacity layer for the whole session.
+  bool _readCanvasEnabled() {
+    try {
+      return context.read<SettingsCubit>().state.canvasEnabled;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  void _stopCanvas() {
+    _loadGeneration++;
+    _resolvedSongId = widget.song?.id;
+    _disposeController();
+    if (!mounted) return;
+    setState(() {
+      _canvas = null;
+      _isRendered = false;
+    });
   }
 
   void _syncPlayState() {
@@ -85,10 +130,11 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
 
   Future<void> _resolveAndLoad(SongsTableData? song) async {
     final songId = song?.id;
+    final generation = ++_loadGeneration;
     _resolvedSongId = songId;
 
     await _disposeController();
-    if (!mounted) return;
+    if (!mounted || generation != _loadGeneration) return;
 
     setState(() {
       _canvas = null;
@@ -101,15 +147,23 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
     CanvasArtwork? artwork = _repository.cached(song);
     artwork ??= await _repository.canvasFor(song);
 
-    if (!mounted || _resolvedSongId != songId) return;
+    if (!mounted ||
+        generation != _loadGeneration ||
+        _resolvedSongId != songId) {
+      return;
+    }
 
     if (artwork != null) {
       setState(() => _canvas = artwork);
-      await _initializeController(artwork, songId);
+      await _initializeController(artwork, songId, generation);
     }
   }
 
-  Future<void> _initializeController(CanvasArtwork canvas, int? songId) async {
+  Future<void> _initializeController(
+    CanvasArtwork canvas,
+    int? songId,
+    int generation,
+  ) async {
     try {
       VideoPlayerController controller;
       final local = canvas.localFilePath;
@@ -125,7 +179,9 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
       await controller
           .setVolume(0.0); // Never emit sound to avoid interrupting music
 
-      if (!mounted || _resolvedSongId != songId) {
+      if (!mounted ||
+          generation != _loadGeneration ||
+          _resolvedSongId != songId) {
         await controller.dispose();
         return;
       }
@@ -136,7 +192,7 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
         await controller.play();
       }
 
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() => _isRendered = true);
       }
     } catch (e, st) {
@@ -191,29 +247,48 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
           // Underlying fallback artwork / placeholder
           if (widget.fallbackArtwork != null) widget.fallbackArtwork!,
 
-          // 400ms smooth fade-in video layer with ambient blur
+          // 400ms smooth fade-in video layer with ambient blur.
+          // The video is rasterised at 1/6 resolution and scaled back up before
+          // compositing, cutting the per-frame blur cost by ~36x while still
+          // reading as a soft ambient wash.
           if (_controller != null && _controller!.value.isInitialized)
             AnimatedOpacity(
               opacity: showVideo ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeInOut,
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(
-                  sigmaX: widget.blurSigma,
-                  sigmaY: widget.blurSigma,
-                ),
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  clipBehavior: Clip.hardEdge,
-                  child: SizedBox(
-                    width: _controller!.value.size.width > 0
-                        ? _controller!.value.size.width
-                        : 720,
-                    height: _controller!.value.size.height > 0
-                        ? _controller!.value.size.height
-                        : 1280,
-                    child: VideoPlayer(_controller!),
-                  ),
+              child: ClipRect(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const downscale = 6.0;
+                    final smallWidth = constraints.maxWidth / downscale;
+                    final smallHeight = constraints.maxHeight / downscale;
+                    return Transform.scale(
+                      scale: downscale,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: widget.blurSigma / downscale,
+                          sigmaY: widget.blurSigma / downscale,
+                        ),
+                        child: SizedBox(
+                          width: smallWidth,
+                          height: smallHeight,
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            clipBehavior: Clip.hardEdge,
+                            child: SizedBox(
+                              width: _controller!.value.size.width > 0
+                                  ? _controller!.value.size.width
+                                  : 720,
+                              height: _controller!.value.size.height > 0
+                                  ? _controller!.value.size.height
+                                  : 1280,
+                              child: VideoPlayer(_controller!),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

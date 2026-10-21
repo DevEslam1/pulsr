@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/pulsr_slider.dart';
 import 'package:pulsr/data/audio/playback_bookmark_store.dart';
+import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/sheets/song_info_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -102,6 +103,23 @@ void main() {
     expect(find.byType(SnackBar), findsOneWidget);
 
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('opens the lazy EQ preset picker and commits an override',
+      (tester) async {
+    final cubit = baseCubit();
+    await pumpSheet(tester, cubit);
+
+    await tester.ensureVisible(find.text('Default (Global EQ)'));
+    await tester.tap(find.text('Default (Global EQ)'));
+    await tester.pumpAndSettle();
+
+    final preset = EqPreset.defaultPresets.first;
+    await tester.tap(find.text(preset.name).first);
+    await tester.pumpAndSettle();
+
+    verify(() => cubit.setSongEqOverride(testSong.id, preset.name)).called(1);
+    expect(find.text(preset.name), findsOneWidget);
   });
 
   testWidgets('grants the playback tools: save DSP snapshot and bookmarks',

@@ -368,7 +368,7 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                   return sidebarBody;
                 }
                 return BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                   child: sidebarBody,
                 );
               },

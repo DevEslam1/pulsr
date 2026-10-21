@@ -2,11 +2,9 @@ part of '../vinyl_player_theme.dart';
 
 class _VinylGroovesPainter extends CustomPainter {
   final Color activeColor;
-  final double rotationPhase;
 
   _VinylGroovesPainter({
     required this.activeColor,
-    this.rotationPhase = 0.0,
   });
 
   @override
@@ -27,25 +25,7 @@ class _VinylGroovesPainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, basePaint);
 
-    // 2. Bilateral specular reflection (counter-rotating to stay anchored to virtual light source)
-    final sheenPaint = Paint()
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        transform: GradientRotation(-rotationPhase * 2 * math.pi),
-        colors: [
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.08),
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.08),
-          AppColors.specularAt(0.0),
-        ],
-        stops: const [0.0, 0.22, 0.44, 0.50, 0.72, 0.94],
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..blendMode = BlendMode.screen;
-    canvas.drawCircle(center, radius - 4, sheenPaint);
-
-    // 3. Concentric microgrooves in bands
+    // 2. Concentric microgrooves in bands
     final labelRadius = radius * 0.36;
     final leadInRadius = radius - 6;
 
@@ -86,8 +66,50 @@ class _VinylGroovesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _VinylGroovesPainter oldDelegate) =>
-      oldDelegate.activeColor != activeColor ||
-      oldDelegate.rotationPhase != rotationPhase;
+      oldDelegate.activeColor != activeColor;
+}
+
+/// Specular reflection anchored to the virtual light source. It is painted
+/// once above the spinning record instead of per animation tick, and clipped
+/// to the vinyl annulus so the centre label stays untouched.
+class _VinylSheenPainter extends CustomPainter {
+  final double labelRatio;
+
+  _VinylSheenPainter({this.labelRatio = 0.44});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final outer = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: radius - 4));
+    final inner = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: radius * labelRatio));
+
+    canvas.save();
+    canvas.clipPath(Path.combine(PathOperation.difference, outer, inner));
+
+    final sheenPaint = Paint()
+      ..shader = SweepGradient(
+        center: Alignment.center,
+        colors: [
+          AppColors.specularAt(0.0),
+          AppColors.specularAt(0.08),
+          AppColors.specularAt(0.0),
+          AppColors.specularAt(0.0),
+          AppColors.specularAt(0.08),
+          AppColors.specularAt(0.0),
+        ],
+        stops: const [0.0, 0.22, 0.44, 0.50, 0.72, 0.94],
+      ).createShader(Rect.fromCircle(center: center, radius: radius))
+      ..blendMode = BlendMode.screen;
+    canvas.drawCircle(center, radius - 4, sheenPaint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _VinylSheenPainter oldDelegate) =>
+      oldDelegate.labelRatio != labelRatio;
 }
 
 class _PlatterStrobePainter extends CustomPainter {

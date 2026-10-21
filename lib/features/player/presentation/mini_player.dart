@@ -28,6 +28,7 @@ import '../../../core/utils/pulsr_haptics.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'themes/player_theme.dart';
 import 'widgets/tablet_player_bar.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
@@ -70,14 +71,8 @@ class MiniPlayerState extends State<MiniPlayer> {
 
   /// The Hero tag used by the full-screen artwork for the active theme, so the
   /// mini -> full shared-element transition actually runs (tags must match).
-  String _fullArtworkHeroTag(PlayerThemeMode mode) {
-    switch (mode) {
-      case PlayerThemeMode.minimal:
-        return 'now_playing_art_minimal';
-      default:
-        return 'now_playing_art_full';
-    }
-  }
+  String _fullArtworkHeroTag(PlayerThemeMode mode) =>
+      nowPlayingArtHeroTag(mode);
 
   /// Honors the user's configured mini-player swipe actions
   /// (next / prev / volume / none) for the directions the carousel does not
@@ -995,7 +990,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                             return miniPlayerContainer;
                           }
                           return BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                             child: miniPlayerContainer,
                           );
                         },

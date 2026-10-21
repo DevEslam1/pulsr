@@ -43,7 +43,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
     with TickerProviderStateMixin {
   late final AnimationController _rotationController;
   late final AnimationController _tonearmController;
-  late final Animation<double> _tonearmAnimation;
+  late final CurvedAnimation _tonearmAnimation;
 
   @override
   void initState() {
@@ -100,6 +100,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
 
   @override
   void dispose() {
+    _tonearmAnimation.dispose();
     _rotationController.dispose();
     _tonearmController.dispose();
     super.dispose();

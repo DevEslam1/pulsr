@@ -1,6 +1,5 @@
 // lib/core/widgets/pulsr_bottom_sheet.dart
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
@@ -320,13 +319,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                     ),
                   );
 
-                  if (GpuBudget.isGpuSaverActive) {
-                    return sheetContent;
-                  }
-                  return BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                    child: sheetContent,
-                  );
+                  return sheetContent;
                 },
               ),
             ),

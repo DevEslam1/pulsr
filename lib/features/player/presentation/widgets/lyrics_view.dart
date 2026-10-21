@@ -690,18 +690,6 @@ class _LyricsViewState extends State<LyricsView> {
                 },
               ),
             ),
-          )
-        else
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.0,
-              child: IgnorePointer(
-                child: LyricView(
-                  controller: _lyricController,
-                  style: style,
-                ),
-              ),
-            ),
           ),
         if (_useAdvancedView)
           Positioned.fill(

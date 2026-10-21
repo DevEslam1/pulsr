@@ -189,7 +189,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                     child: AspectRatio(
                       aspectRatio: 1.0,
                       child: Hero(
-                        tag: 'now_playing_art_full',
+                        tag: props.heroTag,
                         child: AnimatedContainer(
                           duration: context.motionMs(320),
                           curve: context.motionCurve(Curves.easeOutCubic),
@@ -367,8 +367,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
               if (isLandscape) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: AppSpacing.xxs),
+                      horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -392,8 +391,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                         child: Center(
                           key: const ValueKey('track_controls_pane'),
                           child: ConstrainedBox(
-                            constraints:
-                                const BoxConstraints(maxWidth: 540),
+                            constraints: const BoxConstraints(maxWidth: 540),
                             child: SingleChildScrollView(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,

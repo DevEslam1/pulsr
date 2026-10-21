@@ -34,11 +34,14 @@ class ThemeRegistry {
 
   /// Builds the widget corresponding to the given [mode] and [props].
   static Widget build(PlayerThemeMode mode, PlayerThemeProps props) {
+    final themedProps = props.heroTag == nowPlayingArtHeroTag(mode)
+        ? props
+        : props.copyWith(heroTag: nowPlayingArtHeroTag(mode));
     final builder = _builders[mode];
     if (builder != null) {
-      return builder(props);
+      return builder(themedProps);
     }
-    return ClassicPlayerTheme(props: props);
+    return ClassicPlayerTheme(props: themedProps);
   }
 
   /// Renders a theme at scaled proportion for use in theme picker grids and previews.

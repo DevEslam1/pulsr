@@ -71,6 +71,19 @@ void main() {
       );
     });
 
+    test('ThemeRegistry assigns a unique artwork hero tag per theme', () {
+      final tags = PlayerThemeMode.values
+          .map(nowPlayingArtHeroTag)
+          .toList(growable: false);
+      expect(tags.toSet(), hasLength(PlayerThemeMode.values.length));
+
+      final built = ThemeRegistry.build(PlayerThemeMode.minimal, dummyProps);
+      expect(
+        (built as MinimalPlayerTheme).props.heroTag,
+        nowPlayingArtHeroTag(PlayerThemeMode.minimal),
+      );
+    });
+
     test('ThemeRegistry allows registration of overrides and safe reset', () {
       ThemeRegistry.register(
         PlayerThemeMode.classic,

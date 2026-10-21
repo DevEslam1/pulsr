@@ -118,6 +118,80 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
               final pivotOffset = Offset(w * 0.81, h * 0.19);
               final armLength = w * 0.46;
 
+              // The disc content never changes while spinning, so build it once
+              // and let the compositor rotate a cached layer instead of
+              // repainting grooves and artwork on every animation tick.
+              final vinylDisc = RepaintBoundary(
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF0C0D11),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.scrimAt(0.5),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: CustomPaint(
+                    painter: _VinylGroovesPainter(activeColor: activeColor),
+                    child: Center(
+                      // Center Album Artwork
+                      child: Container(
+                        width: vinylSize * 0.44,
+                        height: vinylSize * 0.44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.specularAt(0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            if (song != null)
+                              CachedArtwork(
+                                id: song.id,
+                                albumId: song.albumId,
+                                remoteUrl:
+                                    song.remoteArtworkUrl ?? song.artworkUri,
+                                type: ArtworkType.AUDIO,
+                                size: vinylSize * 0.44,
+                                borderRadius: 999,
+                                highQuality: true,
+                                fallbackIcon: Icons.music_note_rounded,
+                              ),
+                            // Center Spindle Hole
+                            Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    Colors.grey.shade400,
+                                    Colors.grey.shade800,
+                                    AppColors.darkSurface,
+                                  ],
+                                  stops: const [0.0, 0.6, 1.0],
+                                ),
+                                border: Border.all(
+                                  color: Colors.white30,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+
               return Semantics(
                 button: true,
                 label: state.isPlaying ? context.l10n.pause : context.l10n.play,
@@ -253,92 +327,35 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                             },
                             child: AnimatedBuilder(
                               animation: widget.rotationController,
-                              builder: (context, _) {
+                              child: vinylDisc,
+                              builder: (context, child) {
                                 final totalPhase =
                                     (widget.rotationController.value +
                                             _scrubTurns) %
                                         1.0;
                                 return Transform.rotate(
                                   angle: totalPhase * 2 * math.pi,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: const Color(0xFF0C0D11),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppColors.scrimAt(0.5),
-                                          blurRadius: 16,
-                                          offset: const Offset(0, 6),
-                                        ),
-                                      ],
-                                    ),
-                                    child: CustomPaint(
-                                      painter: _VinylGroovesPainter(
-                                        activeColor: activeColor,
-                                        rotationPhase: totalPhase,
-                                      ),
-                                      child: Center(
-                                        // Center Album Artwork
-                                        child: Container(
-                                          width: vinylSize * 0.44,
-                                          height: vinylSize * 0.44,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: AppColors.specularAt(0.3),
-                                              width: 1.5,
-                                            ),
-                                          ),
-                                          clipBehavior: Clip.antiAlias,
-                                          child: Stack(
-                                            alignment: Alignment.center,
-                                            children: [
-                                              if (song != null)
-                                                CachedArtwork(
-                                                  id: song.id,
-                                                  albumId: song.albumId,
-                                                  remoteUrl:
-                                                      song.remoteArtworkUrl ??
-                                                          song.artworkUri,
-                                                  type: ArtworkType.AUDIO,
-                                                  size: vinylSize * 0.44,
-                                                  borderRadius: 999,
-                                                  highQuality: true,
-                                                  fallbackIcon:
-                                                      Icons.music_note_rounded,
-                                                ),
-                                              // Center Spindle Hole
-                                              Container(
-                                                width: 18,
-                                                height: 18,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  gradient: RadialGradient(
-                                                    colors: [
-                                                      Colors.grey.shade400,
-                                                      Colors.grey.shade800,
-                                                      AppColors.darkSurface,
-                                                    ],
-                                                    stops: const [
-                                                      0.0,
-                                                      0.6,
-                                                      1.0
-                                                    ],
-                                                  ),
-                                                  border: Border.all(
-                                                    color: Colors.white30,
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  child: child,
                                 );
                               },
+                            ),
+                          ),
+                        ),
+
+                        // 3b. Anchored specular sheen (does not spin with the
+                        // record; painted once instead of every frame).
+                        PositionedDirectional(
+                          start: vinylLeft,
+                          top: vinylTop,
+                          width: vinylSize,
+                          height: vinylSize,
+                          child: IgnorePointer(
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                painter: _VinylSheenPainter(
+                                  labelRatio: 0.44,
+                                ),
+                              ),
                             ),
                           ),
                         ),

@@ -98,7 +98,7 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
               child: Center(
                 key: const ValueKey('cassette_view'),
                 child: Hero(
-                  tag: 'now_playing_art_full',
+                  tag: widget.props.heroTag,
                   child: _CassetteBody(
                     props: widget.props,
                     activeColor: activeColor,

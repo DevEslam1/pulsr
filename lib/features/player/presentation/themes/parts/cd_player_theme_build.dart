@@ -57,7 +57,7 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
             final cdStage = Center(
               key: const ValueKey('cd_stage_view'),
               child: Hero(
-                tag: 'now_playing_art_full',
+                tag: widget.props.heroTag,
                 child: _CdTurntableStage(
                   props: widget.props,
                   isTablet: isTablet,

@@ -7,8 +7,11 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/presentation/widgets/canvas_backdrop.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
+import 'package:pulsr/services/canvas/canvas_repository.dart';
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
+
+class MockCanvasRepository extends Mock implements CanvasRepository {}
 
 void main() {
   late MockSettingsCubit mockSettingsCubit;
@@ -98,6 +101,46 @@ void main() {
       );
 
       expect(find.byKey(fallbackKey), findsOneWidget);
+    });
+
+    testWidgets('does not resolve canvas while Canvas is disabled',
+        (tester) async {
+      const disabled = SettingsState(canvasEnabled: false);
+      when(() => mockSettingsCubit.state).thenReturn(disabled);
+      when(() => mockSettingsCubit.stream)
+          .thenAnswer((_) => Stream.value(disabled));
+
+      final repository = MockCanvasRepository();
+      final dummySong = SongsTableData(
+        id: 2,
+        title: 'Disabled Canvas',
+        artist: 'Unknown Artist',
+        album: 'Unknown Album',
+        path: '/storage/music/song.mp3',
+        source: 'local',
+        isDownloaded: false,
+        durationMs: 180000,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      registerFallbackValue(dummySong);
+      when(() => repository.cached(any())).thenReturn(null);
+
+      await tester.pumpWidget(
+        buildTestableWidget(
+          CanvasBackdrop(
+            song: dummySong,
+            isPlaying: true,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      verifyNever(() => repository.cached(any()));
+      verifyNever(() => repository.canvasFor(any()));
     });
   });
 }

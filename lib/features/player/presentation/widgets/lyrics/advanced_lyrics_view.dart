@@ -18,7 +18,7 @@ import 'package:pulsr/domain/models/lyrics_line.dart';
 /// - Duet alignment (start vs end alignment per line).
 /// - Translation & Romanization sub-line display.
 /// - Dynamic auto-scrolling with `Scrollable.ensureVisible(alignment: 0.35)`.
-/// - Depth-of-field edge fade ShaderMask and distance-based blur.
+/// - Distance-based opacity and depth-of-field blur.
 class AdvancedLyricsView extends StatefulWidget {
   final List<LyricsLine> lyrics;
   final Duration currentPosition;
@@ -153,57 +153,41 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
         _lastUserScrollTime = DateTime.now();
         return false;
       },
-      child: ShaderMask(
-        shaderCallback: (Rect bounds) {
-          return const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              Colors.black,
-              Colors.black,
-              Colors.transparent,
-            ],
-            stops: [0.0, 0.12, 0.88, 1.0],
-          ).createShader(bounds);
-        },
-        blendMode: BlendMode.dstIn,
-        child: ListView.builder(
-          controller: _scrollController,
-          padding: EdgeInsets.symmetric(
-            vertical: math.max(AppSpacing.xxl, viewportHeight * 0.32),
-            horizontal: AppSpacing.lg,
-          ),
-          itemCount: widget.lyrics.length,
-          itemBuilder: (context, index) {
-            final line = widget.lyrics[index];
-            final isActive = index == activeIdx;
-            final isPast = index < activeIdx;
-            final distance = activeIdx >= 0 ? (index - activeIdx).abs() : 0;
-
-            return KeyedSubtree(
-              key: _keyForIndex(index),
-              child: _LyricLineWidget(
-                line: line,
-                positionMs: posMs,
-                isActive: isActive,
-                isPast: isPast,
-                distance: distance,
-                activeColor: widget.activeColor,
-                palette: p,
-                showTranslation: widget.showTranslation,
-                replaceOriginalWithTranslation:
-                    widget.replaceOriginalWithTranslation,
-                onTap: () {
-                  widget.onLineTapped?.call(line.timestamp);
-                },
-                onLongPress: () {
-                  widget.onLineLongPressed?.call(index);
-                },
-              ),
-            );
-          },
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: EdgeInsets.symmetric(
+          vertical: math.max(AppSpacing.xxl, viewportHeight * 0.32),
+          horizontal: AppSpacing.lg,
         ),
+        itemCount: widget.lyrics.length,
+        itemBuilder: (context, index) {
+          final line = widget.lyrics[index];
+          final isActive = index == activeIdx;
+          final isPast = index < activeIdx;
+          final distance = activeIdx >= 0 ? (index - activeIdx).abs() : 0;
+
+          return KeyedSubtree(
+            key: _keyForIndex(index),
+            child: _LyricLineWidget(
+              line: line,
+              positionMs: posMs,
+              isActive: isActive,
+              isPast: isPast,
+              distance: distance,
+              activeColor: widget.activeColor,
+              palette: p,
+              showTranslation: widget.showTranslation,
+              replaceOriginalWithTranslation:
+                  widget.replaceOriginalWithTranslation,
+              onTap: () {
+                widget.onLineTapped?.call(line.timestamp);
+              },
+              onLongPress: () {
+                widget.onLineLongPressed?.call(index);
+              },
+            ),
+          );
+        },
       ),
     );
   }

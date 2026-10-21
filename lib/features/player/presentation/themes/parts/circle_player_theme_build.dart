@@ -87,7 +87,7 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
               child: Center(
                 key: const ValueKey('circle_artwork_view'),
                 child: Hero(
-                  tag: 'now_playing_art_full',
+                  tag: widget.props.heroTag,
                   child: _CircleArtwork(
                     props: widget.props,
                     activeColor: activeColor,

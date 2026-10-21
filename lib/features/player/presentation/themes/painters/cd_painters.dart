@@ -3,11 +3,9 @@ part of '../cd_player_theme.dart';
 /// Custom painter for the realistic iridescent Compact Disc (CD) surface.
 class _CdDiscPainter extends CustomPainter {
   final Color activeColor;
-  final double rotationPhase;
 
   _CdDiscPainter({
     required this.activeColor,
-    this.rotationPhase = 0.0,
   });
 
   @override
@@ -29,11 +27,11 @@ class _CdDiscPainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, basePaint);
 
-    // 2. Prismatic Rainbow Diffraction Sheen (Spins with rotation)
+    // 2. Prismatic Rainbow Diffraction Sheen (spins with the disc via the
+    // compositor transform, so it is drawn once in disc-local space)
     final rainbowPaint = Paint()
       ..shader = SweepGradient(
         center: Alignment.center,
-        transform: GradientRotation(rotationPhase * 2 * math.pi),
         colors: [
           Colors.cyanAccent.withValues(alpha: 0.18),
           Colors.blueAccent.withValues(alpha: 0.22),
@@ -66,29 +64,7 @@ class _CdDiscPainter extends CustomPainter {
       ..blendMode = BlendMode.screen;
     canvas.drawCircle(center, radius - 2, rainbowPaint);
 
-    // 3. Bilateral Radial Specular Flare (Counter-rotating to stay anchored to virtual light)
-    final flarePaint = Paint()
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        transform: GradientRotation(-rotationPhase * 2 * math.pi),
-        colors: [
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.16),
-          AppColors.specularAt(0.35),
-          AppColors.specularAt(0.16),
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.16),
-          AppColors.specularAt(0.35),
-          AppColors.specularAt(0.16),
-          AppColors.specularAt(0.0),
-        ],
-        stops: const [0.0, 0.12, 0.25, 0.38, 0.50, 0.50, 0.62, 0.75, 0.88, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..blendMode = BlendMode.screen;
-    canvas.drawCircle(center, radius - 3, flarePaint);
-
-    // 4. Fine Concentric Optical Tracks (Micro-pits data density)
+    // 3. Fine Concentric Optical Tracks (Micro-pits data density)
     final labelRadius = radius * 0.44;
     final leadOutRadius = radius - 5;
 
@@ -154,8 +130,54 @@ class _CdDiscPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CdDiscPainter oldDelegate) =>
-      oldDelegate.activeColor != activeColor ||
-      oldDelegate.rotationPhase != rotationPhase;
+      oldDelegate.activeColor != activeColor;
+}
+
+/// Bilateral specular flare anchored to the virtual light source. Painted once
+/// above the spinning disc and clipped to the outer annulus so the artwork
+/// label keeps its original appearance.
+class _CdFlarePainter extends CustomPainter {
+  final double labelRatio;
+
+  _CdFlarePainter({this.labelRatio = 0.44});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final outer = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: radius - 3));
+    final inner = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: radius * labelRatio));
+
+    canvas.save();
+    canvas.clipPath(Path.combine(PathOperation.difference, outer, inner));
+
+    final flarePaint = Paint()
+      ..shader = SweepGradient(
+        center: Alignment.center,
+        colors: [
+          AppColors.specularAt(0.0),
+          AppColors.specularAt(0.16),
+          AppColors.specularAt(0.35),
+          AppColors.specularAt(0.16),
+          AppColors.specularAt(0.0),
+          AppColors.specularAt(0.0),
+          AppColors.specularAt(0.16),
+          AppColors.specularAt(0.35),
+          AppColors.specularAt(0.16),
+          AppColors.specularAt(0.0),
+        ],
+        stops: const [0.0, 0.12, 0.25, 0.38, 0.50, 0.50, 0.62, 0.75, 0.88, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius))
+      ..blendMode = BlendMode.screen;
+    canvas.drawCircle(center, radius - 3, flarePaint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _CdFlarePainter oldDelegate) =>
+      oldDelegate.labelRatio != labelRatio;
 }
 
 /// Custom painter for the modern, sleek tonearm stick assembly.

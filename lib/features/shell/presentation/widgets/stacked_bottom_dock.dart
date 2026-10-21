@@ -50,13 +50,8 @@ class _ModalGate extends StatelessWidget {
           duration: context.motion(PulsrDurations.layout),
           curve: context.motionCurve(Curves.easeInOutCubic),
           offset: shouldHide ? const Offset(0, 1.4) : Offset.zero,
-          child: AnimatedOpacity(
-            duration: context.motion(PulsrDurations.state),
-            curve: context.motionCurve(Curves.easeOut),
-            opacity: shouldHide ? 0.0 : 1.0,
-            child: RepaintBoundary(
-              child: IgnorePointer(ignoring: shouldHide, child: child),
-            ),
+          child: RepaintBoundary(
+            child: IgnorePointer(ignoring: shouldHide, child: child),
           ),
         );
       },

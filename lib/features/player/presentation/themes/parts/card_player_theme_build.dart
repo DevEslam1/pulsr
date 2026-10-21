@@ -144,7 +144,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                     child: AspectRatio(
                       aspectRatio: 1.0,
                       child: Hero(
-                        tag: 'now_playing_art_full',
+                        tag: props.heroTag,
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: AppRadii.circular(

@@ -74,19 +74,23 @@ Widget playerOverlayTransitionBuilder(
   Widget child,
   Animation<double> animation,
 ) {
-  final curved = CurvedAnimation(
-    parent: animation,
-    curve: context.motionCurve(Curves.easeOutCubic),
-  );
+  // CurveTween instead of CurvedAnimation: this builder runs for every
+  // overlay switch, and a CurvedAnimation would register listeners on the
+  // switcher's controller that are never removed.
+  final curve = CurveTween(curve: context.motionCurve(Curves.easeOutCubic));
   return FadeTransition(
-    opacity: curved,
+    opacity: animation.drive(curve),
     child: ScaleTransition(
-      scale: Tween<double>(begin: 0.95, end: 1.0).animate(curved),
+      scale: animation.drive(
+        Tween<double>(begin: 0.95, end: 1.0).chain(curve),
+      ),
       child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0.0, 0.03),
-          end: Offset.zero,
-        ).animate(curved),
+        position: animation.drive(
+          Tween<Offset>(
+            begin: const Offset(0.0, 0.03),
+            end: Offset.zero,
+          ).chain(curve),
+        ),
         child: child,
       ),
     ),
@@ -299,9 +303,8 @@ class PlayerAnimatedFavoriteButton extends StatelessWidget {
                 final curve =
                     isHeart ? Curves.easeOutBack : Curves.easeOutCubic;
                 return ScaleTransition(
-                  scale: CurvedAnimation(
-                    parent: anim,
-                    curve: context.motionCurve(curve),
+                  scale: anim.drive(
+                    CurveTween(curve: context.motionCurve(curve)),
                   ),
                   child: child,
                 );
@@ -574,10 +577,10 @@ class PlayerViewSwitcher extends StatelessWidget {
                       duration: context.motionMs(250),
                       curve: context.motionCurve(Curves.easeOutCubic),
                       alignment: isTrack
-                          ? const Alignment(-1.0, 0.0)
+                          ? const AlignmentDirectional(-1.0, 0.0)
                           : isLyrics
-                              ? const Alignment(0.0, 0.0)
-                              : const Alignment(1.0, 0.0),
+                              ? const AlignmentDirectional(0.0, 0.0)
+                              : const AlignmentDirectional(1.0, 0.0),
                       child: FractionallySizedBox(
                         widthFactor: 1 / 3,
                         heightFactor: 1.0,
@@ -652,7 +655,7 @@ class PlayerViewSwitcher extends StatelessWidget {
                 return pillContainer;
               }
               return BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                 child: pillContainer,
               );
             },
@@ -909,7 +912,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                 return dockContainer;
               }
               return BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                 child: dockContainer,
               );
             },

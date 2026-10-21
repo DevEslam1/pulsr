@@ -337,18 +337,21 @@ class _PlayerControlsState extends State<PlayerControls> {
                         child: AnimatedSwitcher(
                           duration: context.motionMs(260),
                           transitionBuilder: (child, anim) {
-                            final curved = CurvedAnimation(
-                              parent: anim,
+                            final curve = CurveTween(
                               curve: Curves.easeOutBack,
                             );
                             return FadeTransition(
                               opacity: anim,
                               child: ScaleTransition(
-                                scale: Tween<double>(begin: 0.80, end: 1.0)
-                                    .animate(curved),
+                                scale: anim.drive(
+                                  Tween<double>(begin: 0.80, end: 1.0)
+                                      .chain(curve),
+                                ),
                                 child: RotationTransition(
-                                  turns: Tween<double>(begin: -0.06, end: 0.0)
-                                      .animate(curved),
+                                  turns: anim.drive(
+                                    Tween<double>(begin: -0.06, end: 0.0)
+                                        .chain(curve),
+                                  ),
                                   child: child,
                                 ),
                               ),
@@ -730,4 +733,3 @@ class _AbPointButton extends StatelessWidget {
     );
   }
 }
-

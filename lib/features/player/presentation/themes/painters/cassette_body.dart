@@ -355,29 +355,31 @@ class _CassetteBody extends StatelessWidget {
           // Rotating White Spool Hub with Teeth
           RotationTransition(
             turns: spoolController,
-            child: Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFF0F1F5),
-                border: Border.all(color: const Color(0xFFB0B4C4), width: 3),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black45,
-                    blurRadius: 6,
+            child: RepaintBoundary(
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFF0F1F5),
+                  border: Border.all(color: const Color(0xFFB0B4C4), width: 3),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black45,
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0C0E14),
+                      shape: BoxShape.circle,
+                    ),
+                    child: CustomPaint(painter: _SpoolTeethPainter()),
                   ),
-                ],
-              ),
-              child: Center(
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0C0E14),
-                    shape: BoxShape.circle,
-                  ),
-                  child: CustomPaint(painter: _SpoolTeethPainter()),
                 ),
               ),
             ),
@@ -501,13 +503,16 @@ class _CassetteTapeCounter extends StatelessWidget {
                 duration: context.motionMs(200),
                 transitionBuilder: (child, animation) {
                   return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.0, -1.0),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                      parent: animation,
-                      curve: context.motionCurve(Curves.easeOutCubic),
-                    )),
+                    position: animation.drive(
+                      Tween<Offset>(
+                        begin: const Offset(0.0, -1.0),
+                        end: Offset.zero,
+                      ).chain(
+                        CurveTween(
+                          curve: context.motionCurve(Curves.easeOutCubic),
+                        ),
+                      ),
+                    ),
                     child: child,
                   );
                 },

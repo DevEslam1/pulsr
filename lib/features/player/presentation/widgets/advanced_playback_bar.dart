@@ -134,8 +134,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
                             boxShadow: [
                               if (showGlow)
                                 BoxShadow(
-                                  color: resolvedActiveColor
-                                      .withValues(alpha: 0.28),
+                                  color: resolvedActiveColor.withValues(
+                                      alpha: 0.28),
                                   blurRadius: 20,
                                   spreadRadius: 1,
                                 ),
@@ -285,12 +285,12 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
-                                        color: resolvedActiveColor
-                                            .withValues(alpha: 0.12),
+                                        color: resolvedActiveColor.withValues(
+                                            alpha: 0.12),
                                         borderRadius: AppRadii.r12All,
                                         border: Border.all(
-                                          color: resolvedActiveColor
-                                              .withValues(alpha: 0.25),
+                                          color: resolvedActiveColor.withValues(
+                                              alpha: 0.25),
                                           width: 0.8,
                                         ),
                                       ),
@@ -341,8 +341,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: state.trackDelayMs != 0
-                                            ? resolvedActiveColor
-                                                .withValues(alpha: 0.20)
+                                            ? resolvedActiveColor.withValues(
+                                                alpha: 0.20)
                                             : Colors.transparent,
                                         border: state.trackDelayMs != 0
                                             ? Border.all(
@@ -398,7 +398,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                           return dockContainer;
                         }
                         return BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                           child: dockContainer,
                         );
                       },
@@ -426,9 +426,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isActive
-            ? activeColor.withValues(alpha: 0.20)
-            : Colors.transparent,
+        color:
+            isActive ? activeColor.withValues(alpha: 0.20) : Colors.transparent,
         border: isActive
             ? Border.all(
                 color: activeColor.withValues(alpha: 0.45),

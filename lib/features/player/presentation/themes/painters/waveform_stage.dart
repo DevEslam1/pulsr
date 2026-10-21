@@ -11,6 +11,7 @@ class _WaveformHeroStage extends StatelessWidget {
   final bool isTablet;
   final AnimationController waveController;
   final int? audioSessionId;
+  final String heroTag;
 
   const _WaveformHeroStage({
     super.key,
@@ -21,6 +22,7 @@ class _WaveformHeroStage extends StatelessWidget {
     required this.isTablet,
     required this.waveController,
     this.audioSessionId,
+    required this.heroTag,
   });
 
   @override
@@ -121,7 +123,7 @@ class _WaveformHeroStage extends StatelessWidget {
               child: _TiltableArtworkSquircle(
                 size: artSize,
                 child: Hero(
-                  tag: 'now_playing_art_full',
+                  tag: heroTag,
                   child: Container(
                     width: artSize,
                     height: artSize,
@@ -198,13 +200,22 @@ class _TiltableArtworkSquircle extends StatefulWidget {
 class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
     with SingleTickerProviderStateMixin {
   late final AnimationController _returnController;
-  late Animation<Offset> _returnAnimation;
+  Animation<Offset>? _returnAnimation;
   Offset _tilt = Offset.zero;
 
   @override
   void initState() {
     super.initState();
-    _returnController = AnimationController(vsync: this);
+    _returnController = AnimationController(vsync: this)
+      ..addListener(_onReturnTick);
+  }
+
+  void _onReturnTick() {
+    final animation = _returnAnimation;
+    if (!mounted || animation == null) return;
+    setState(() {
+      _tilt = animation.value;
+    });
   }
 
   @override
@@ -227,23 +238,13 @@ class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
 
   void _snapBack() {
     if (!mounted || _tilt == Offset.zero) return;
-    final duration = context.motionMs(400);
-    _returnController.duration = duration;
-    _returnAnimation = Tween<Offset>(
-      begin: _tilt,
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _returnController,
-      curve: context.motionCurve(Curves.easeOutBack),
-    ));
+    _returnController.duration = context.motionMs(400);
+    _returnAnimation = _returnController.drive(
+      Tween<Offset>(begin: _tilt, end: Offset.zero).chain(
+        CurveTween(curve: context.motionCurve(Curves.easeOutBack)),
+      ),
+    );
     _returnController.forward(from: 0.0);
-    _returnAnimation.addListener(() {
-      if (mounted) {
-        setState(() {
-          _tilt = _returnAnimation.value;
-        });
-      }
-    });
   }
 
   @override

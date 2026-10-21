@@ -12,6 +12,7 @@ import 'package:pulsr/domain/models/lyrics_line.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/lyrics_editor_sheet.dart';
+import 'package:pulsr/features/player/presentation/widgets/lyrics/advanced_lyrics_view.dart';
 import 'package:pulsr/features/player/presentation/widgets/lyrics_view.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
@@ -186,7 +187,7 @@ void main() {
         currentPosition: Duration.zero,
       ));
       await tester.pump();
-      expect(find.byType(LyricView), findsOneWidget);
+      expect(find.byType(AdvancedLyricsView), findsOneWidget);
     });
 
     testWidgets('reads the position from the cubit when none is passed',

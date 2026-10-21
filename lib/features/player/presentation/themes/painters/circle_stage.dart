@@ -166,101 +166,103 @@ class _CircleArtworkState extends State<_CircleArtwork> {
                 // 4. Center Rotating Album Core
                 RotationTransition(
                   turns: rotationController,
-                  child: Container(
-                    width: dialSize * 0.68,
-                    height: dialSize * 0.68,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF101218),
-                      border: Border.all(
-                        color: AppColors.specularAt(0.28),
-                        width: 2.5,
+                  child: RepaintBoundary(
+                    child: Container(
+                      width: dialSize * 0.68,
+                      height: dialSize * 0.68,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF101218),
+                        border: Border.all(
+                          color: AppColors.specularAt(0.28),
+                          width: 2.5,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black87,
+                            blurRadius: 16,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black87,
-                          blurRadius: 16,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Micro-Grooves on inner disc
-                        CustomPaint(
-                          size: Size(dialSize * 0.68, dialSize * 0.68),
-                          painter: _InnerGroovesPainter(),
-                        ),
-
-                        // Album Artwork Label
-                        Container(
-                          width: dialSize * 0.50,
-                          height: dialSize * 0.50,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white24,
-                              width: 1.5,
-                            ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Micro-Grooves on inner disc
+                          CustomPaint(
+                            size: Size(dialSize * 0.68, dialSize * 0.68),
+                            painter: _InnerGroovesPainter(),
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: currentSong != null
-                              ? CachedArtwork(
-                                  id: currentSong.id,
-                                  albumId: currentSong.albumId,
-                                  remoteUrl: currentSong.remoteArtworkUrl ??
-                                      currentSong.artworkUri,
-                                  type: ArtworkType.AUDIO,
-                                  size: dialSize * 0.50,
-                                  borderRadius: 999,
-                                  highQuality: true,
-                                )
-                              : Icon(
-                                  Icons.album_rounded,
-                                  size: dialSize * 0.22,
-                                  color: Colors.white54,
+
+                          // Album Artwork Label
+                          Container(
+                            width: dialSize * 0.50,
+                            height: dialSize * 0.50,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white24,
+                                width: 1.5,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: currentSong != null
+                                ? CachedArtwork(
+                                    id: currentSong.id,
+                                    albumId: currentSong.albumId,
+                                    remoteUrl: currentSong.remoteArtworkUrl ??
+                                        currentSong.artworkUri,
+                                    type: ArtworkType.AUDIO,
+                                    size: dialSize * 0.50,
+                                    borderRadius: 999,
+                                    highQuality: true,
+                                  )
+                                : Icon(
+                                    Icons.album_rounded,
+                                    size: dialSize * 0.22,
+                                    color: Colors.white54,
+                                  ),
+                          ),
+
+                          // Luxury Brushed Spindle Cap
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  Colors.grey.shade300,
+                                  Colors.grey.shade700,
+                                  const Color(0xFF161820),
+                                ],
+                                stops: const [0.0, 0.6, 1.0],
+                              ),
+                              border: Border.all(
+                                color: Colors.white38,
+                                width: 1.2,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black54,
+                                  blurRadius: 4,
                                 ),
-                        ),
-
-                        // Luxury Brushed Spindle Cap
-                        Container(
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                Colors.grey.shade300,
-                                Colors.grey.shade700,
-                                const Color(0xFF161820),
                               ],
-                              stops: const [0.0, 0.6, 1.0],
                             ),
-                            border: Border.all(
-                              color: Colors.white38,
-                              width: 1.2,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black54,
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: activeColor,
+                            child: Center(
+                              child: Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: activeColor,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

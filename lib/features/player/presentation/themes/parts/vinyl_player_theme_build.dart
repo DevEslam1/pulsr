@@ -57,7 +57,7 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
             final turntableStage = Center(
               key: const ValueKey('turntable_view'),
               child: Hero(
-                tag: 'now_playing_art_full',
+                tag: widget.props.heroTag,
                 child: _VinylTurntableDeck(
                   props: widget.props,
                   isTablet: isTablet,

@@ -210,7 +210,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                           return navContainer;
                         }
                         return BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                           child: navContainer,
                         );
                       },

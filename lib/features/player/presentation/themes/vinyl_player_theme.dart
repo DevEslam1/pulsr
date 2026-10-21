@@ -41,7 +41,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     with TickerProviderStateMixin {
   late final AnimationController _rotationController;
   late final AnimationController _tonearmController;
-  late final Animation<double> _tonearmAnimation;
+  late final CurvedAnimation _tonearmAnimation;
 
   @override
   void initState() {
@@ -98,6 +98,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
   @override
   void dispose() {
+    _tonearmAnimation.dispose();
     _rotationController.dispose();
     _tonearmController.dispose();
     super.dispose();

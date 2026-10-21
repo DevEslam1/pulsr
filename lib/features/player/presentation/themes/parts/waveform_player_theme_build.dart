@@ -93,6 +93,7 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
                 isTablet: isTablet,
                 waveController: _waveController,
                 audioSessionId: state.audioSessionId,
+                heroTag: widget.props.heroTag,
               ),
             );
 
@@ -205,6 +206,47 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
                           ],
                         ),
                       ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Portrait Mode: Fallback to scrolling on very short screens
+            final isVeryShort = constraints.maxHeight < 560;
+            final isTrackView = !state.isLyricsVisible && !state.isQueueVisible;
+
+            if (isVeryShort && isTrackView) {
+              final double scrollSize =
+                  (constraints.maxHeight * 0.40).clamp(180.0, 300.0);
+
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
+                    const PlayerPlayHandle(),
+                    PlayerTopBar(props: widget.props, isTablet: isTablet),
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: metrics.switcherTopPad,
+                        bottom: metrics.switcherBottomPad,
+                      ),
+                      child: viewSwitcher,
+                    ),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: scrollSize,
+                          maxHeight: scrollSize,
+                        ),
+                        child: centerDisplay,
+                      ),
+                    ),
+                    SizedBox(
+                        height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                      child: controlsColumn,
                     ),
                   ],
                 ),

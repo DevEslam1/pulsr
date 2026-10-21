@@ -1,5 +1,4 @@
 // lib/core/widgets/pulsr_adaptive_sheet.dart
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
@@ -137,7 +136,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
             ? p.surface.withValues(alpha: 0.94)
             : p.surface.withValues(alpha: 0.97));
 
-    Widget content = Column(
+    final Widget content = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -219,13 +218,6 @@ class PulsrAdaptiveSheet extends StatelessWidget {
         ),
       ],
     );
-
-    if (!GpuBudget.isGpuSaverActive) {
-      content = BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: content,
-      );
-    }
 
     return Container(
       decoration: BoxDecoration(

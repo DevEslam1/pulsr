@@ -30,8 +30,10 @@ class StaggeredReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!context.motionEnabled) return child;
-    // Cap staggering delay to first 8 items (30ms per item) to keep lists responsive.
+    // Only the first screenful plays the entrance. Animating every row that a
+    // fling mounts creates a burst of opacity/slide tickers and drops frames
+    // in long libraries, so later rows are mounted fully visible.
+    if (!context.motionEnabled || index >= 16) return child;
     final delay = index < 8 ? (index * 30).ms : 0.ms;
     final anim = child
         .animate(
