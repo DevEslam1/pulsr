@@ -44,6 +44,7 @@ class FakeNativeAudioPlayer extends AudioPlayerPlatform {
   int? currentIndex = 0;
   int sourceCount = 0;
   LoopModeMessage loopMode = LoopModeMessage.off;
+  ProcessingStateMessage processingState = ProcessingStateMessage.idle;
   bool disposed = false;
 
   @override
@@ -61,6 +62,7 @@ class FakeNativeAudioPlayer extends AudioPlayerPlatform {
     int? androidAudioSessionId,
   }) {
     if (_events.isClosed) return;
+    this.processingState = processingState;
     currentIndex = index ?? currentIndex;
     position = updatePosition ?? position;
     buffered = bufferedPosition ?? buffered;
@@ -77,8 +79,9 @@ class FakeNativeAudioPlayer extends AudioPlayerPlatform {
   }
 
   void emitCompleted() {
-    playing = false;
-    _data.add(PlayerDataMessage(playing: false));
+    // Real just_audio keeps `playing == true` at a natural completion; only the
+    // playback event's processingState turns `completed`. Pause/stop re-emit
+    // the event with playing=false, which must not be confused with this.
     emitPlayback(processingState: ProcessingStateMessage.completed);
   }
 
@@ -120,7 +123,9 @@ class FakeNativeAudioPlayer extends AudioPlayerPlatform {
   Future<PauseResponse> pause(PauseRequest request) async {
     playing = false;
     _data.add(PlayerDataMessage(playing: false));
-    emitPlayback();
+    // Real just_audio re-emits the current playback event on pause, so a pause
+    // issued at a completed boundary reports `completed` again.
+    emitPlayback(processingState: processingState);
     return PauseResponse();
   }
 

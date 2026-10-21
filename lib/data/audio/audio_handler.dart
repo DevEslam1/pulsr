@@ -1897,7 +1897,16 @@ class PulsrAudioHandler extends BaseAudioHandler
                 }
                 return;
               }
+              // A natural completion keeps `playing == true` in just_audio;
+              // only the playback state turns `completed`. Pause/stop re-emit
+              // the current event as `completed` with `playing == false`, and
+              // those must NOT trigger auto-advance: playSongAt pauses as part
+              // of its teardown, which would otherwise re-enter this branch,
+              // spawn a second skipToNext and let the stale first invocation
+              // stop() the player out from under the successor (track shown,
+              // parked paused at 0:00).
               if (state.processingState == ProcessingState.completed &&
+                  state.playing &&
                   !_crossfadeManager.isCrossfading) {
                 if (_gaplessMode && _gaplessLoaded) {
                   // In gapless mode the ConcatenatingAudioSource advances

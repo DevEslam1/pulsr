@@ -57,6 +57,31 @@ void main() {
     expect(handler!.mediaItem.value?.title, 'Track 2');
   });
 
+  test('non-gapless: completed while playing keeps the successor playing',
+      () async {
+    handler = await buildTestHandler(repository: repo, ytmService: ytm);
+    handler!.setGaplessEnabled(false);
+    handler!.setCrossfadeDuration(Duration.zero);
+    await handler!.loadQueue(
+      [localSong(1), localSong(2), localSong(3)],
+      autoPlay: true,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+
+    final active = platform.players.values.first;
+    active.duration = const Duration(minutes: 3, seconds: 20);
+    // Real just_audio keeps `playing == true` at completion; only the playback
+    // event reports processingState.completed.
+    active.emitPlaying(true);
+    active.emitPlayback(processingState: ProcessingStateMessage.completed);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+
+    expect(handler!.mediaItem.value?.title, 'Track 2');
+    expect(handler!.playbackState.value.playing, isTrue);
+    expect(platform.players.values.any((p) => p.playing), isTrue,
+        reason: 'auto-advance must not park the next track paused');
+  });
+
   test('non-gapless: completed on the last track resets paused', () async {
     handler = await buildTestHandler(repository: repo, ytmService: ytm);
     handler!.setGaplessEnabled(false);

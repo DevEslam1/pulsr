@@ -1395,6 +1395,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       try {
         await _activePlayer.pause().timeout(const Duration(milliseconds: 800));
       } catch (_) {}
+      // A pause emits a state event; if it re-entered the auto-advance path (or
+      // a user skip won meanwhile) a newer invocation now owns the player.
+      // Never tear down a player another load is about to use: stopping here
+      // disposed the platform mid-load and parked the successor paused.
+      if (await _isGenerationCancelled(generation)) return;
       try {
         await _activePlayer.stop().timeout(const Duration(milliseconds: 800));
       } catch (_) {}
