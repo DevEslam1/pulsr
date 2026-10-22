@@ -2176,7 +2176,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 if (isWide) ...[
                                   const SizedBox(width: AppSpacing.xxs),
                                   Text(
-                                    'Auto Preamp',
+                                    context.l10n.eqAutoPreamp,
                                     style: TextStyle(
                                       fontSize: AppFontSize.caption,
                                       color: _autoPreampEnabled

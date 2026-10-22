@@ -1,4 +1,5 @@
 // lib/features/player/presentation/widgets/karaoke_mode_screen.dart
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +42,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   int? _lastScore;
   int _totalTaps = 0;
   int _scoreAccumulator = 0;
+  PlayerCubit? _playerCubit;
+  double? _initialPitch;
 
   @override
   void initState() {
@@ -68,6 +71,13 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    try {
+      _playerCubit ??= context.read<PlayerCubit>();
+      _initialPitch ??= _playerCubit!.state.playbackPitch;
+    } catch (e, st) {
+      ErrorLogger.log('Karaoke pitch state unavailable',
+          error: e, stackTrace: st, category: 'Karaoke');
+    }
     final orientation = MediaQuery.orientationOf(context);
     if (orientation == Orientation.landscape) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -88,6 +98,19 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     WidgetsBinding.instance.removeObserver(this);
     // Restore the app's edge-to-edge chrome cleanly when leaving karaoke mode
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    final initialPitch = _initialPitch;
+    final cubit = _playerCubit;
+    if (initialPitch != null && cubit != null) {
+      try {
+        unawaited(cubit.setPlaybackPitch(initialPitch).catchError((e, st) {
+          ErrorLogger.log('Failed to restore karaoke pitch',
+              error: e, stackTrace: st, category: 'Karaoke');
+        }));
+      } catch (e, st) {
+        ErrorLogger.log('Failed to restore karaoke pitch',
+            error: e, stackTrace: st, category: 'Karaoke');
+      }
+    }
     super.dispose();
   }
 

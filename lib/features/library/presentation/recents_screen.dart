@@ -200,6 +200,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                               // Search bar
                               PulsrSearchField(
                                 controller: _searchController,
+                                debounceDuration: Duration.zero,
                                 hintText:
                                     '${context.l10n.search} ${allRecents.length} ${context.l10n.browseRecentSongs}...',
                                 // BUG-09: actually debounce keystrokes instead of

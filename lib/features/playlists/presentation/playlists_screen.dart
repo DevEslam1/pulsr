@@ -954,8 +954,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     try {
       final ytmService = getIt<YtmService>();
       final tracks = await ytmService
-          .getPlaylistTracks(playlist.playlistId, limit: 200)
-          .timeout(const Duration(seconds: 45));
+          .getPlaylistTracks(
+            playlist.playlistId,
+            limit: kYtmMaxPlaylistTracks,
+          )
+          .timeout(const Duration(seconds: 120));
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
         final downloadCubit = getIt<YtmDownloadCubit>();
@@ -997,7 +1000,25 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       PulsrToast.show(context, message: context.l10n.emptyPlaylist);
       return;
     }
-    final songs = entry.tracks.map((t) => t.toSongData()).toList();
+    final l10n = context.l10n;
+    PulsrToast.show(
+      context,
+      message:
+          '${l10n.browseFetching} "${entry.title}" ${l10n.browseForDownload}…',
+    );
+    // The cached entry keeps only a preview window of tracks (SharedPreferences
+    // is not a database), so re-fetch the playlist before queueing to make
+    // "download" cover every track.
+    var tracks = entry.tracks;
+    try {
+      final fullTracks = await getIt<YtmService>()
+          .getPlaylistTracks(entry.id, limit: kYtmMaxPlaylistTracks)
+          .timeout(const Duration(seconds: 120));
+      if (fullTracks.isNotEmpty) tracks = fullTracks;
+    } catch (_) {}
+    if (!context.mounted) return;
+
+    final songs = tracks.map((t) => t.toSongData()).toList();
     final downloadCubit =
         context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
     final report = await downloadCubit.downloadAllDetailed(songs);

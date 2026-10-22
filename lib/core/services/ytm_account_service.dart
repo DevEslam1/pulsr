@@ -28,6 +28,10 @@ import '../utils/ytm_rate_limiter.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
     hide AndroidOptions;
 
+/// YouTube caps a playlist at 5,000 items. Callers that need the complete list
+/// (e.g. "download all") pass this as `maxTracks`.
+const int kYtmMaxPlaylistTracks = 5000;
+
 class YtmAccountPlaylist {
   final String playlistId;
   final String title;
@@ -1666,9 +1670,10 @@ class YtmAccountService {
             final allTracks = List<YtmTrack>.from(tracks);
             var currentJson = json;
 
-            // Follow continuation pages up to maxTracks
+            // Follow continuation pages up to maxTracks. The page cap mirrors
+            // fetchLikedSongs so a full 5,000-item playlist is reachable.
             var pageCount = 0;
-            const maxPages = 30;
+            const maxPages = 100;
             var consecutiveEmpty = 0;
             while (allTracks.length < maxTracks && pageCount < maxPages) {
               pageCount++;

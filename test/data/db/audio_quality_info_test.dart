@@ -3,6 +3,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_quality_info.dart';
+import 'package:pulsr/domain/models/ytm_audio_quality.dart';
 
 SongsTableData _song({
   int id = 1,
@@ -86,17 +87,68 @@ void main() {
     });
 
     test(
-        'a YouTube stream without metadata does not invent its codec or bitrate',
-        () {
+        'a YouTube stream without metadata shows its source instead of '
+        'inventing a codec or bitrate', () {
       final info = AudioQualityInfo.fromSong(_song(
         source: SongSource.youtube,
         path: 'ytmusic://abc',
       ));
-      expect(info.format, 'Unknown');
+      expect(info.format, 'YTM');
+      expect(info.shortBadgeLabel, 'YTM • STREAM');
       expect(info.bitrateKbps, isNull);
       expect(info.sampleRate, 'Unknown');
       expect(info.bitDepth, 'Unknown');
       expect(info.tierLabel, 'Stream quality unverified');
+    });
+
+    test(
+        'a YouTube stream without resolved metadata uses the selected '
+        'streaming tier on the badge', () {
+      final song = _song(
+        source: SongSource.youtube,
+        path: 'ytmusic://abc',
+      );
+
+      final high = AudioQualityInfo.fromSong(
+        song,
+        streamingQuality: YtmAudioQuality.high,
+      );
+      expect(high.format, 'YTM');
+      expect(high.bitrateKbps, isNull);
+      expect(high.shortBadgeLabel, 'YTM • HIGH');
+      expect(high.tier, AudioQualityTier.highQuality);
+      expect(high.tierLabel, 'High Quality Stream');
+
+      final medium = AudioQualityInfo.fromSong(
+        song,
+        streamingQuality: YtmAudioQuality.medium,
+      );
+      expect(medium.shortBadgeLabel, 'YTM • MEDIUM');
+      expect(medium.tier, AudioQualityTier.standardQuality);
+      expect(medium.tierLabel, 'Medium Quality Stream');
+
+      final low = AudioQualityInfo.fromSong(
+        song,
+        streamingQuality: YtmAudioQuality.low,
+      );
+      expect(low.shortBadgeLabel, 'YTM • LOW');
+      expect(low.tier, AudioQualityTier.compact);
+      expect(low.tierLabel, 'Data Saver Stream');
+    });
+
+    test('resolved stream metadata wins over the selected quality tier', () {
+      final info = AudioQualityInfo.fromSong(
+        _song(
+          source: SongSource.youtube,
+          path: 'ytmusic://abc',
+          codec: 'OPUS',
+          bitrateKbps: 256,
+        ),
+        streamingQuality: YtmAudioQuality.low,
+      );
+      expect(info.format, 'OPUS');
+      expect(info.shortBadgeLabel, 'OPUS • 256k');
+      expect(info.tier, AudioQualityTier.highQuality);
     });
 
     test('a YouTube stream with a low explicit bitrate is compact', () {

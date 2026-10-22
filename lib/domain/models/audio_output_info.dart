@@ -143,6 +143,9 @@ class AudioOutputInfo {
   final int bitDepth;
   final bool isBitPerfectActive;
   final bool isBitPerfectSupported;
+
+  /// Native routed media to USB without claiming exclusive mixer attributes.
+  final bool isDirectRouteFallback;
   final List<int> supportedSampleRates;
   final List<AudioDeviceEntry> availableDevices;
   final int targetSampleRate;
@@ -195,6 +198,7 @@ class AudioOutputInfo {
     required this.bitDepth,
     required this.isBitPerfectActive,
     this.isBitPerfectSupported = false,
+    this.isDirectRouteFallback = false,
     this.supportedSampleRates = const <int>[],
     this.availableDevices = const [],
     this.targetSampleRate = 0,
@@ -252,6 +256,8 @@ class AudioOutputInfo {
       bitDepth: (map['bitDepth'] as num?)?.toInt() ?? 0,
       isBitPerfectActive: (map['isBitPerfectActive'] as bool?) ?? false,
       isBitPerfectSupported: (map['isBitPerfectSupported'] as bool?) ?? false,
+      isDirectRouteFallback:
+          (map['isDirectRouteFallback'] as bool?) ?? false,
       supportedSampleRates: rates.isNotEmpty ? rates : const <int>[],
       availableDevices: devices,
       targetSampleRate: (map['targetSampleRate'] as num?)?.toInt() ?? 0,
@@ -322,6 +328,7 @@ class AudioOutputInfo {
       'bitDepth': bitDepth,
       'isBitPerfectActive': isBitPerfectActive,
       'isBitPerfectSupported': isBitPerfectSupported,
+      'isDirectRouteFallback': isDirectRouteFallback,
       'supportedSampleRates': supportedSampleRates,
       'availableDevices': availableDevices.map((d) => d.toMap()).toList(),
       'targetSampleRate': targetSampleRate,
@@ -361,6 +368,7 @@ class AudioOutputInfo {
     int? bitDepth,
     bool? isBitPerfectActive,
     bool? isBitPerfectSupported,
+    bool? isDirectRouteFallback,
     List<int>? supportedSampleRates,
     List<AudioDeviceEntry>? availableDevices,
     int? targetSampleRate,
@@ -399,6 +407,8 @@ class AudioOutputInfo {
       isBitPerfectActive: isBitPerfectActive ?? this.isBitPerfectActive,
       isBitPerfectSupported:
           isBitPerfectSupported ?? this.isBitPerfectSupported,
+      isDirectRouteFallback:
+          isDirectRouteFallback ?? this.isDirectRouteFallback,
       supportedSampleRates: supportedSampleRates ?? this.supportedSampleRates,
       availableDevices: availableDevices ?? this.availableDevices,
       targetSampleRate: targetSampleRate ?? this.targetSampleRate,
@@ -447,6 +457,7 @@ class AudioOutputInfo {
           bitDepth == other.bitDepth &&
           isBitPerfectActive == other.isBitPerfectActive &&
           isBitPerfectSupported == other.isBitPerfectSupported &&
+          isDirectRouteFallback == other.isDirectRouteFallback &&
           _listEquals(supportedSampleRates, other.supportedSampleRates) &&
           _listEquals(availableDevices, other.availableDevices) &&
           targetSampleRate == other.targetSampleRate &&
@@ -485,6 +496,7 @@ class AudioOutputInfo {
         bitDepth,
         isBitPerfectActive,
         isBitPerfectSupported,
+        isDirectRouteFallback,
         Object.hashAll(supportedSampleRates),
         Object.hashAll(availableDevices),
         targetSampleRate,

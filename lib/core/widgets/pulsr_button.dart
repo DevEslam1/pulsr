@@ -139,6 +139,20 @@ class PulsrButton extends StatelessWidget {
         break;
     }
 
+    final labelWidget = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontFamily: 'Manrope',
+        fontSize: _fontSize,
+        fontWeight: FontWeight.w700,
+        letterSpacing: AppTracking.title,
+        color: fg,
+        height: 1.1,
+      ),
+    );
+
     final Widget content = Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -157,23 +171,15 @@ class PulsrButton extends StatelessWidget {
           Icon(icon, size: _iconSize, color: fg),
           const SizedBox(width: AppSpacing.xs),
         ],
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Manrope',
-            fontSize: _fontSize,
-            fontWeight: FontWeight.w700,
-            letterSpacing: AppTracking.title,
-            color: fg,
-            height: 1.1,
-          ),
-        ),
+        if (expand) Flexible(child: labelWidget) else labelWidget,
       ],
     );
 
     final buttonWidget = Container(
-      height: _height,
-      padding: _padding,
+      constraints: BoxConstraints(minHeight: _height),
+      padding: _padding.add(
+        const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+      ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: AppRadii.r12All,

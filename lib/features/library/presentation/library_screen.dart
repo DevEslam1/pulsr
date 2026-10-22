@@ -488,8 +488,6 @@ class _LibraryScreenState extends State<LibraryScreen>
     }
   }
 
-  static const double _songRowExtent = 58.0;
-
   @override
   void _scrollToLetter(String letter, List<SongsTableData> songs) {
     final index = libraryRailLetterIndex(letter, songs);
@@ -503,9 +501,6 @@ class _LibraryScreenState extends State<LibraryScreen>
       // Grid rows are fixed mainAxisExtent 72 + 4 spacing.
       final row = index ~/ trackCols;
       target = topPadding + row * 76.0;
-    } else if (songs.length > 500) {
-      // Fixed itemExtent path: exact offset, no proportional estimate.
-      target = topPadding + index * _songRowExtent;
     } else {
       final maxScroll = _songsScrollController.position.maxScrollExtent;
       target =

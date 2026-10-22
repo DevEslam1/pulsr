@@ -57,7 +57,7 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
     }
   }
 
-  Future<void> setProxySettings({
+  Future<bool> setProxySettings({
     required bool enabled,
     required AppProxyType type,
     required String host,
@@ -73,9 +73,10 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
           validateProxyHostAndPort(host: trimmedHost, port: port);
       if (validationError != null) {
         safeEmit(state.copyWith(errorMessage: validationError));
-        return;
+        return false;
       }
     }
+    var success = true;
 
     final pass = password ?? '';
     _proxyPasswordGen++;
@@ -135,12 +136,14 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
               'Failed to save proxy password securely. It was not changed.',
         ));
       }
+      success = false;
     }
     await prefs.remove(SettingsCubit._keyProxyPassword);
     await prefs.setString(
         SettingsCubit._keyProxyBypassHosts, newConfig.bypassHosts);
 
     await _syncProxySettings(newConfig);
+    return success;
   }
 
   /// Persists the pool with credentials split out: the prefs JSON is

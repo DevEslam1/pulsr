@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import '../utils/l10n_extensions.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 /// {@category DesignSystem}
@@ -130,8 +131,9 @@ class _PulsrSliderState extends State<PulsrSlider>
     super.dispose();
   }
 
-  double _calculateValue(double dx, double width) {
-    final ratio = (dx / width).clamp(0.0, 1.0);
+  double _calculateValue(double dx, double width, TextDirection direction) {
+    final effectiveDx = direction == TextDirection.rtl ? width - dx : dx;
+    final ratio = (effectiveDx / width).clamp(0.0, 1.0);
     if (widget.divisions == null || widget.divisions! <= 0) {
       return (ratio * (widget.max - widget.min)) + widget.min;
     }
@@ -147,34 +149,36 @@ class _PulsrSliderState extends State<PulsrSlider>
   bool _tapSeekPending = false;
   double _tapSeekValue = 0.0;
 
-  void _onDragStart(double dx, double width) {
+  void _onDragStart(double dx, double width, TextDirection direction) {
     setState(() => _isDragging = true);
     _expandController.forward();
     HapticFeedback.lightImpact();
-    final val = _calculateValue(dx, width);
+    final val = _calculateValue(dx, width, direction);
     widget.onChangeStart?.call(val);
     widget.onChanged(val);
   }
 
-  void _onDragUpdate(double dx, double width) {
+  void _onDragUpdate(double dx, double width, TextDirection direction) {
     _tapSeekPending = false;
-    final val = _calculateValue(dx, width);
+    final val = _calculateValue(dx, width, direction);
     widget.onChanged(val);
   }
 
-  void _onDragEnd(double dx, double width) {
+  void _onDragEnd(double dx, double width, TextDirection direction) {
     setState(() => _isDragging = false);
     _expandController.reverse();
-    final val = _tapSeekPending ? _tapSeekValue : _calculateValue(dx, width);
+    final val = _tapSeekPending
+        ? _tapSeekValue
+        : _calculateValue(dx, width, direction);
     _tapSeekPending = false;
     _lastDivisionTick = null;
     widget.onChangeEnd?.call(val);
   }
 
-  void _onTapDown(double dx, double width) {
+  void _onTapDown(double dx, double width, TextDirection direction) {
     _tapSeekPending = true;
-    _tapSeekValue = _calculateValue(dx, width);
-    _onDragStart(dx, width);
+    _tapSeekValue = _calculateValue(dx, width, direction);
+    _onDragStart(dx, width, direction);
   }
 
   bool _isFocused = false;
@@ -196,6 +200,8 @@ class _PulsrSliderState extends State<PulsrSlider>
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final direction = Directionality.of(context);
+    final l10n = context.l10n;
     final range = widget.max - widget.min;
     final t = range <= 0
         ? 0.0
@@ -227,8 +233,8 @@ class _PulsrSliderState extends State<PulsrSlider>
         label: widget.semanticLabel,
         slider: true,
         value: '${(t * 100).round()}%',
-        increasedValue: 'Increase',
-        decreasedValue: 'Decrease',
+        increasedValue: l10n.increase,
+        decreasedValue: l10n.decrease,
         onIncrease: () => _stepValue(1),
         onDecrease: () => _stepValue(-1),
         child: Container(
@@ -249,8 +255,10 @@ class _PulsrSliderState extends State<PulsrSlider>
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTapDown: (d) => _onTapDown(d.localPosition.dx, width),
-                onTapUp: (d) => _onDragEnd(d.localPosition.dx, width),
+                onTapDown: (d) =>
+                    _onTapDown(d.localPosition.dx, width, direction),
+                onTapUp: (d) =>
+                    _onDragEnd(d.localPosition.dx, width, direction),
                 onTapCancel: () {
                   _tapSeekPending = false;
                   _lastDivisionTick = null;
@@ -259,12 +267,12 @@ class _PulsrSliderState extends State<PulsrSlider>
                 },
                 onHorizontalDragStart: (d) {
                   _tapSeekPending = false;
-                  _onDragStart(d.localPosition.dx, width);
+                  _onDragStart(d.localPosition.dx, width, direction);
                 },
                 onHorizontalDragUpdate: (d) =>
-                    _onDragUpdate(d.localPosition.dx, width),
+                    _onDragUpdate(d.localPosition.dx, width, direction),
                 onHorizontalDragEnd: (d) =>
-                    _onDragEnd(d.localPosition.dx, width),
+                    _onDragEnd(d.localPosition.dx, width, direction),
                 onHorizontalDragCancel: () {
                   _tapSeekPending = false;
                   _lastDivisionTick = null;
@@ -294,6 +302,7 @@ class _PulsrSliderState extends State<PulsrSlider>
                           thumbColor: widget.thumbColor ??
                               (p.isDark ? Colors.white : p.accent),
                           glowColor: p.glow,
+                          isRtl: direction == TextDirection.rtl,
                         ),
                         size: Size.infinite,
                       );
@@ -323,6 +332,7 @@ class _PulsrSliderPainter extends CustomPainter {
   final Color activeColor;
   final Color thumbColor;
   final Color glowColor;
+  final bool isRtl;
 
   _PulsrSliderPainter({
     required this.t,
@@ -333,10 +343,16 @@ class _PulsrSliderPainter extends CustomPainter {
     required this.activeColor,
     required this.thumbColor,
     required this.glowColor,
+    required this.isRtl,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(size.width, 0);
+      canvas.scale(-1, 1);
+    }
     final trackHeight = 4.5 + (3.5 * expandFactor);
     final thumbRadius = 7.0 + (3.0 * expandFactor);
     final centerY = size.height / 2;
@@ -437,6 +453,7 @@ class _PulsrSliderPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.8;
     canvas.drawCircle(Offset(thumbX, centerY), thumbRadius, ringPaint);
+    if (isRtl) canvas.restore();
   }
 
   @override
@@ -448,5 +465,6 @@ class _PulsrSliderPainter extends CustomPainter {
       old.activeColor != activeColor ||
       old.inactiveColor != inactiveColor ||
       old.thumbColor != thumbColor ||
-      old.glowColor != glowColor;
+      old.glowColor != glowColor ||
+      old.isRtl != isRtl;
 }

@@ -152,6 +152,21 @@ class _PulsrCardState extends State<PulsrCard> {
         ? Padding(padding: widget.padding!, child: widget.child)
         : widget.child;
 
+    final isTappable = widget.onTap != null || widget.onLongPress != null;
+
+    if (isTappable) {
+      content = Material(
+        color: Colors.transparent,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
+          borderRadius: radius,
+          child: content,
+        ),
+      );
+    }
+
     if (widget.variant == PulsrCardVariant.glass && context.motionEnabled) {
       content = ClipRRect(
         borderRadius: radius,
@@ -175,21 +190,6 @@ class _PulsrCardState extends State<PulsrCard> {
       clipBehavior: widget.clipBehavior,
       child: content,
     );
-
-    final isTappable = widget.onTap != null || widget.onLongPress != null;
-
-    if (isTappable) {
-      card = Material(
-        color: Colors.transparent,
-        borderRadius: radius,
-        child: InkWell(
-          onTap: widget.onTap,
-          onLongPress: widget.onLongPress,
-          borderRadius: radius,
-          child: card,
-        ),
-      );
-    }
 
     if (widget.enableHoverScale && isTappable) {
       card = MouseRegion(

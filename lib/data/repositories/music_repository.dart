@@ -721,6 +721,84 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<int>> ensureSongPersisted(SongsTableData song) async {
+    try {
+      final resolvedId = await _db.transaction<int?>(() async {
+        final byId = await (_db.select(_db.songsTable)
+              ..where((t) => t.id.equals(song.id))
+              ..limit(1))
+            .getSingleOrNull();
+        if (byId != null) return byId.id;
+
+        // A downloaded track keeps its remote id on the scanned local row, so
+        // prefer that over inserting a second sentinel row for the same video.
+        final remoteId = song.remoteId;
+        if (remoteId != null && remoteId.isNotEmpty) {
+          final byRemoteId = await (_db.select(_db.songsTable)
+                ..where((t) =>
+                    t.remoteId.equals(remoteId) & t.isMissing.equals(false))
+                ..orderBy([
+                  (t) => OrderingTerm(
+                      expression: t.dateAdded, mode: OrderingMode.desc)
+                ])
+                ..limit(1))
+              .getSingleOrNull();
+          if (byRemoteId != null) return byRemoteId.id;
+        }
+
+        final isOnline = song.source == SongSource.youtube ||
+            song.path.startsWith('ytmusic://');
+        if (!isOnline) {
+          // Stale local object (e.g. a rescan replaced its row): find the
+          // current row instead of failing the playlist write.
+          if (song.path.isNotEmpty) {
+            final byPath = await (_db.select(_db.songsTable)
+                  ..where((t) =>
+                      t.path.lower().equals(song.path.toLowerCase()) &
+                      (song.cueStartMs == null
+                          ? t.cueStartMs.isNull()
+                          : t.cueStartMs.equals(song.cueStartMs!)))
+                  ..limit(1))
+                .getSingleOrNull();
+            if (byPath != null) return byPath.id;
+          }
+          return null;
+        }
+
+        // YouTube search results exist only in memory until something (favorite,
+        // download, playlist) persists them. playlist_entries.song_id is an FK,
+        // so the row must exist before the membership insert.
+        final id = await _resolveFreeSongId(song.id);
+        await _db.into(_db.songsTable).insert(
+              SongsTableCompanion(
+                id: Value(id),
+                title: Value(song.title),
+                artist: Value(song.artist),
+                album: Value(song.album),
+                durationMs: Value(song.durationMs),
+                path: Value(song.path),
+                source: const Value(SongSource.youtube),
+                remoteId: Value(remoteId),
+                remoteArtworkUrl: Value(song.remoteArtworkUrl),
+                isFavorite: const Value(false),
+                isMissing: const Value(false),
+                dateAdded: Value(DateTime.now().millisecondsSinceEpoch),
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
+        return id;
+      });
+      if (resolvedId == null) {
+        return const Left(
+            DatabaseFailure('This song is no longer in your library'));
+      }
+      return Right(resolvedId);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to add song to playlist', e));
+    }
+  }
+
+  @override
   Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20}) {
     try {
       return (_db.select(_db.songsTable)

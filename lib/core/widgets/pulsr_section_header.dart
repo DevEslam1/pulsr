@@ -70,20 +70,27 @@ class PulsrSectionHeader extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      overline != null ? title : title.toUpperCase(),
-                      style: overline != null
-                          ? TextStyle(
-                              fontFamily: 'Manrope',
-                              fontSize: AppFontSize.bodyLarge,
-                              fontWeight: FontWeight.w800,
-                              color: p.textPrimary,
-                            )
-                          : Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: p.textTertiary,
-                                letterSpacing: AppTracking.wide,
-                                fontWeight: FontWeight.w700,
-                              ),
+                    Flexible(
+                      child: Text(
+                        overline != null ? title : title.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: overline != null
+                            ? TextStyle(
+                                fontFamily: 'Manrope',
+                                fontSize: AppFontSize.bodyLarge,
+                                fontWeight: FontWeight.w800,
+                                color: p.textPrimary,
+                              )
+                            : Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: p.textTertiary,
+                                  letterSpacing: AppTracking.wide,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
                     ),
                     if (count != null) ...[
                       const SizedBox(width: AppSpacing.xs),
@@ -115,21 +122,26 @@ class PulsrSectionHeader extends StatelessWidget {
           if (trailing != null)
             trailing!
           else if (actionLabel != null && onAction != null)
-            TextButton(
-              onPressed: onAction,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: TextButton(
+                onPressed: onAction,
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                 minimumSize: const Size(44, 44),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: Text(
-                actionLabel!,
-                style: TextStyle(
-                  fontFamily: 'Manrope',
-                  color: p.accent,
-                  fontWeight: FontWeight.w700,
-                  fontSize: AppFontSize.label,
-                  letterSpacing: AppTracking.label,
+                child: Text(
+                  actionLabel!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Manrope',
+                    color: p.accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppFontSize.label,
+                    letterSpacing: AppTracking.label,
+                  ),
                 ),
               ),
             ),

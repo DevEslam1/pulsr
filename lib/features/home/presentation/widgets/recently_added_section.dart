@@ -54,6 +54,17 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
   bool _hasMore = false;
   Timer? _loadMoreTimeoutTimer;
   ScrollPosition? _outerPosition;
+  Stream<Result<List<SongsTableData>>>? _songsStream;
+  int? _streamLimit;
+
+  @override
+  void didUpdateWidget(covariant RecentlyAddedSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.getSongsUseCase, widget.getSongsUseCase)) {
+      _songsStream = null;
+      _streamLimit = null;
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -159,10 +170,15 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
     final playerCubit = context.read<PlayerCubit>();
     final columns = PulsrAdaptiveGrid.songColumns(context);
 
-    return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: widget.getSongsUseCase
+    if (_songsStream == null || _streamLimit != _currentLimit) {
+      _streamLimit = _currentLimit;
+      _songsStream = widget.getSongsUseCase
           .watchRecentlyAdded(limit: _currentLimit)
-          .distinct(),
+          .distinct();
+    }
+
+    return StreamBuilder<Result<List<SongsTableData>>>(
+      stream: _songsStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           _hasMore = false;

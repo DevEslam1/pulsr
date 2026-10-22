@@ -580,12 +580,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildPlaybackFeatureIcon(Icons.equalizer_rounded,
-                        context.l10n.browseTenBandGraphicEq, p.accent),
-                    _buildPlaybackFeatureIcon(Icons.tune_rounded,
-                        context.l10n.browseCrossfade, p.accent),
-                    _buildPlaybackFeatureIcon(
-                        Icons.timer_rounded, context.l10n.sleepTimer, p.accent),
+                    Expanded(
+                      child: _buildPlaybackFeatureIcon(
+                          Icons.equalizer_rounded,
+                          context.l10n.browseTenBandGraphicEq,
+                          p.accent),
+                    ),
+                    Expanded(
+                      child: _buildPlaybackFeatureIcon(
+                          Icons.tune_rounded,
+                          context.l10n.browseCrossfade,
+                          p.accent),
+                    ),
+                    Expanded(
+                      child: _buildPlaybackFeatureIcon(
+                          Icons.timer_rounded,
+                          context.l10n.sleepTimer,
+                          p.accent),
+                    ),
                   ],
                 ),
               )
@@ -1009,6 +1021,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: AppSpacing.xs),
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: p.textPrimary,
             fontSize: AppFontSize.label,

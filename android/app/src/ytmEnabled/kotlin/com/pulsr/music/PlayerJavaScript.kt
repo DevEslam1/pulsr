@@ -22,18 +22,10 @@ internal object PlayerJavaScript {
     private const val PINNED_PLAYER_URL =
         "https://www.youtube.com/s/player/67288f35/player_ias.vflset/en_US/base.js"
 
-    // High-reliability offline fallback decipher rules matching modern player_ias.vflset builds.
-    private val DEFAULT_FALLBACK_STEPS = listOf(
-        "swap:62",
-        "splice:2",
-        "swap:54",
-        "reverse",
-        "splice:2",
-        "reverse",
-        "swap:1",
-        "splice:2"
-    )
-    private const val DEFAULT_STS = 20744
+    private const val DESKTOP_UA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+
+    private const val FETCH_RETRY_COOLDOWN_MS = 60_000L
 
     @Volatile
     private var playerUrl: String = ""
@@ -52,6 +44,9 @@ internal object PlayerJavaScript {
 
     @Volatile
     private var cachedSts: Int? = null
+
+    @Volatile
+    private var nextFetchAttemptAt: Long = 0L
 
     private val lock = Any()
     private val warmUpInProgress = AtomicBoolean(false)
@@ -90,33 +85,78 @@ internal object PlayerJavaScript {
 
     /** Best-effort record of the player URL from a `/player` response `assets.js`. */
     fun rememberPlayerUrlFromAssets(assetsJs: String?) {
-        if (assetsJs.isNullOrBlank()) return
+        val normalized = normalizePlayerUrl(assetsJs)
+        if (normalized == null) {
+            if (!assetsJs.isNullOrBlank()) {
+                logD(TAG, "Ignoring non-desktop player JS asset: $assetsJs")
+            }
+            return
+        }
+        if (adoptPlayerUrl(normalized)) {
+            logD(TAG, "Player JS URL set from assets: $normalized")
+        }
+    }
+
+    /** Swaps the active player build and drops everything derived from the old one. */
+    private fun adoptPlayerUrl(url: String): Boolean {
+        synchronized(lock) {
+            if (url == playerUrl) return false
+            val previousUrl = playerUrl
+            playerUrl = url
+            cachedSteps = null
+            cachedStepsExtracted = false
+            cachedJs = null
+            cachedSts = null
+            nextFetchAttemptAt = 0L
+            appContext?.let { ctx ->
+                val cache = JsDecipherCache.getInstance(ctx)
+                runCatching { cache.clearRules("default") }
+                playerHashFromUrl(previousUrl)?.let { hash ->
+                    runCatching { cache.clearRules(hash) }
+                }
+            }
+            runCatching { YoutubeJavaScriptPlayerManager.clearAllCaches() }
+            return true
+        }
+    }
+
+    /**
+     * Normalizes an `assets.js` path to the desktop `player_ias.vflset` build.
+     *
+     * Modern responses usually advertise `player_es6.vflset`, whose syntax the
+     * step parser historically missed and whose Rhino/NewPipe heuristics also
+     * miss. Both variants share the player hash, so the desktop build is
+     * equivalent for deciphering and is the one this parser supports. Mobile
+     * (`player_plasma.vflset`) assets are mapped the same way; anything that is
+     * not a player base.js is rejected instead of poisoning the cached URL.
+     */
+    internal fun normalizePlayerUrl(assetsJs: String?): String? {
+        if (assetsJs.isNullOrBlank()) return null
         val absolute = when {
             assetsJs.startsWith("http") -> assetsJs
+            assetsJs.startsWith("//") -> "https:$assetsJs"
             assetsJs.startsWith("/") -> "https://www.youtube.com$assetsJs"
             else -> "https://www.youtube.com/$assetsJs"
         }
-        // Guard: Do not overwrite desktop player_ias.vflset with mobile/plasma player
-        if (playerUrl.contains("player_ias.vflset") && !absolute.contains("player_ias.vflset")) {
-            return
-        }
-        if (absolute != playerUrl) {
-            val oldHash = playerHashFromUrl(playerUrl)
-            val newHash = playerHashFromUrl(absolute)
-            playerUrl = absolute
-            if (oldHash != null && oldHash != newHash) {
-                synchronized(lock) {
-                    cachedSteps = null
-                    cachedStepsExtracted = false
-                    cachedJs = null
-                    cachedSts = null
-                    appContext?.let { ctx ->
-                        runCatching { JsDecipherCache.getInstance(ctx).clearRules("default") }
-                    }
-                }
-            }
-            logD(TAG, "Player JS URL set from assets: $absolute")
-        }
+        val path = absolute.substringBefore('?').substringBefore('#')
+        if (!path.contains("/s/player/") || !path.endsWith("/base.js")) return null
+        val desktop = absolute
+            .replace("/player_es6.vflset/", "/player_ias.vflset/")
+            .replace("/player_plasma.vflset/", "/player_ias.vflset/")
+        return desktop.takeIf { it.substringBefore('?').contains("/player_ias.vflset/") }
+    }
+
+    private fun rulesKeyFor(url: String): String = playerHashFromUrl(url) ?: "default"
+
+    /** Exposed so callers can address cached rules by the active player build. */
+    fun currentPlayerHash(): String? = playerHashFromUrl(playerUrl)
+
+    private fun ensurePlayerUrl() {
+        if (playerUrl.isNotEmpty()) return
+        val fetched = try { fetchPlayerUrlFromIframeApi() } catch (_: Throwable) { null }
+        val resolved = if (!fetched.isNullOrEmpty()) fetched else PINNED_PLAYER_URL
+        adoptPlayerUrl(resolved)
+        logI(TAG, "Player JS URL initialized: $resolved")
     }
 
     private fun playerHashFromUrl(url: String): String? =
@@ -132,8 +172,8 @@ internal object PlayerJavaScript {
             val fetchedUrl = fetchPlayerUrlFromIframeApi()
             if (!fetchedUrl.isNullOrEmpty()) {
                 rememberPlayerUrlFromAssets(fetchedUrl)
-            } else if (playerUrl.isEmpty()) {
-                playerUrl = PINNED_PLAYER_URL
+            } else {
+                ensurePlayerUrl()
             }
 
             // Proactively parse and cache steps into memory and JsDecipherCache
@@ -169,19 +209,22 @@ internal object PlayerJavaScript {
                 Regex("""(/s/player/[a-zA-Z0-9_-]+/(?:player_ias\.vflset/[^\"'\s/]+|base)\.js)""")
             )
             for (pattern in srcPatterns) {
-                val match = pattern.find(iframeHtml)
-                if (match != null) {
-                    val path = match.groupValues[1].replace("player_es6.vflset", "player_ias.vflset")
-                    logD(TAG, "Player JS path from iframe_api: $path")
-                    return "https://www.youtube.com$path"
-                }
+                val match = pattern.find(iframeHtml) ?: continue
+                val candidate = normalizePlayerUrl("https://www.youtube.com${match.groupValues[1]}")
+                    ?: continue
+                logD(TAG, "Player JS path from iframe_api: $candidate")
+                return candidate
             }
             val widgetVersion = Regex("""/s/player/([a-zA-Z0-9_-]+)/www-widgetapi\.vflset/""")
                 .find(iframeHtml)?.groupValues?.get(1)
             if (!widgetVersion.isNullOrEmpty()) {
-                val path = "/s/player/$widgetVersion/player_ias.vflset/en_US/base.js"
-                logD(TAG, "Derived player JS path from widget API version: $path")
-                return "https://www.youtube.com$path"
+                val candidate = normalizePlayerUrl(
+                    "https://www.youtube.com/s/player/$widgetVersion/player_ias.vflset/en_US/base.js"
+                )
+                if (candidate != null) {
+                    logD(TAG, "Derived player JS path from widget API version: $candidate")
+                    return candidate
+                }
             }
             fetchPlayerUrlFromWatchPage()
         } catch (t: Throwable) {
@@ -209,12 +252,11 @@ internal object PlayerJavaScript {
                 Regex("""src=[\"'](/s/player/[^\"']+/base\.js)[\"']""")
             )
             for (regex in patterns) {
-                val m = regex.find(html)
-                if (m != null) {
-                    val path = m.groupValues[1].replace("player_es6.vflset", "player_ias.vflset")
-                    logD(TAG, "Player JS path from watch page: $path")
-                    return "https://www.youtube.com$path"
-                }
+                val m = regex.find(html) ?: continue
+                val candidate = normalizePlayerUrl("https://www.youtube.com${m.groupValues[1]}")
+                    ?: continue
+                logD(TAG, "Player JS path from watch page: $candidate")
+                return candidate
             }
             PINNED_PLAYER_URL
         } catch (t: Throwable) {
@@ -223,7 +265,10 @@ internal object PlayerJavaScript {
         }
     }
 
-    /** Deobfuscates a `signatureCipher` `s` value. */
+    /**
+     * Deobfuscates a `signatureCipher` `s` value. Returns null when no rule set
+     * can be extracted — callers must discard the ciphered format in that case.
+     */
     fun decipherSignature(signature: String): String? = synchronized(lock) {
         // Fast path: only extracted (not fallback) rules are trusted for direct use.
         cachedSteps?.let { steps ->
@@ -232,11 +277,7 @@ internal object PlayerJavaScript {
             }
         }
 
-        if (playerUrl.isEmpty()) {
-            val fetched = try { fetchPlayerUrlFromIframeApi() } catch (_: Throwable) { null }
-            playerUrl = if (!fetched.isNullOrEmpty()) fetched else PINNED_PLAYER_URL
-            logI(TAG, "Player JS URL initialized: $playerUrl")
-        }
+        ensurePlayerUrl()
 
         // Prefer the parser for the current player format over NewPipe 0.26.5's
         // older heuristics. NewPipe is still used as a fallback when extraction
@@ -254,26 +295,34 @@ internal object PlayerJavaScript {
             }
         } catch (t: Throwable) {
             val msg = t.message ?: ""
-            logW(TAG, "NewPipe signature decipher failed: $msg. Falling back to native deobfuscator...")
+            logW(TAG, "NewPipe signature decipher failed: $msg")
         }
 
-        fallbackDecipher(signature)
+        // Applying guessed steps produces a signature googlevideo answers with
+        // 403; that is routinely misclassified as an IP block and can trip the
+        // global breaker for unrelated songs. Discarding the format instead lets
+        // the caller fall through to the next client.
+        logW(TAG, "Signature decipher unavailable: no extractable rules for $playerUrl")
+        null
     }
 
     private fun parseAndCacheSteps(): List<String> {
-        cachedSteps?.let { return it }
+        cachedSteps?.let { steps ->
+            if (cachedStepsExtracted) return steps
+            // A JS body that yielded no rules fails deterministically; retry only
+            // when the file could not be fetched at all, and not before cooldown.
+            if (cachedJs != null || System.currentTimeMillis() < nextFetchAttemptAt) return steps
+        }
 
         val targetUrl = playerUrl.ifEmpty { PINNED_PLAYER_URL }
         val js = cachedJs ?: try {
             val conn = java.net.URL(targetUrl).openConnection()
             conn.connectTimeout = 8000
             conn.readTimeout = 8000
-            conn.setRequestProperty(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-            )
+            conn.setRequestProperty("User-Agent", DESKTOP_UA)
             conn.getInputStream().bufferedReader().use { it.readText() }.also { cachedJs = it }
         } catch (e: Throwable) {
+            nextFetchAttemptAt = System.currentTimeMillis() + FETCH_RETRY_COOLDOWN_MS
             logW(TAG, "Could not fetch base.js for parsing: ${e.message}")
             null
         }
@@ -294,35 +343,24 @@ internal object PlayerJavaScript {
             }
         }
 
-        val extracted = steps
-        val resolvedSteps = if (!extracted.isNullOrEmpty()) {
-            logI(TAG, "Decipher rules extracted successfully (${extracted.size} steps): $extracted")
-            extracted
+        val extracted = steps?.takeIf { it.isNotEmpty() }
+        if (extracted == null) {
+            logW(TAG, "Could not extract decipher rules from $targetUrl; ciphered formats will be discarded until the player build changes")
         } else {
-            logW(TAG, "Could not extract decipher rules from JS. Using default fallback steps: $DEFAULT_FALLBACK_STEPS")
-            DEFAULT_FALLBACK_STEPS
-        }
-
-        cachedSteps = resolvedSteps
-        cachedStepsExtracted = !extracted.isNullOrEmpty()
-
-        if (!extracted.isNullOrEmpty()) {
+            logI(TAG, "Decipher rules extracted successfully (${extracted.size} steps): $extracted")
             appContext?.let { ctx ->
                 runCatching {
-                    JsDecipherCache.getInstance(ctx).putRules("default", resolvedSteps)
+                    val cache = JsDecipherCache.getInstance(ctx)
+                    val rulesKey = rulesKeyFor(targetUrl)
+                    cache.putRules(rulesKey, extracted)
+                    cachedSts?.let { cache.putNTransform(rulesKey, emptyList(), it) }
                 }
             }
         }
 
-        return resolvedSteps
-    }
-
-    private fun fallbackDecipher(signature: String): String {
-        val steps = cachedSteps ?: synchronized(lock) {
-            cachedSteps ?: parseAndCacheSteps()
-        }
-        val activeSteps = if (!steps.isNullOrEmpty()) steps else DEFAULT_FALLBACK_STEPS
-        return JsDecipherCache().applyTransforms(signature, activeSteps)
+        cachedSteps = extracted ?: emptyList()
+        cachedStepsExtracted = extracted != null
+        return extracted ?: emptyList()
     }
 
     internal fun extractModernDecipherSteps(js: String): List<String>? {
@@ -350,8 +388,10 @@ internal object PlayerJavaScript {
             val nuRaw = js.substring(quoteStart, quoteEnd)
             val nu = nuRaw.split(separator)
 
-            // 2. Locate signature call: e.g. .s){var ... l=P1(19,1204,qE(61,7141,k.s))
-            val callRegex = Regex("""\.s\)\{var\s+[^=]+=\s*[^,]+,\s*[^=]+=\s*[^,]+,\s*([a-zA-Z0-9$]+)\s*=\s*([a-zA-Z0-9$]+)\((\d+),(\d+)""")
+            // 2. Locate the signature call that feeds the decipher function:
+            //    player_ias: .s){var m=l,n=h.sp,p=Gl(16,1453,...)
+            //    player_es6: .s){var f=c,h=k.sp;let l=Gh(19,2484,...)
+            val callRegex = Regex("""\.s\)\{[^}]{0,220}?\b([a-zA-Z0-9$]+)\s*=\s*([a-zA-Z0-9$]+)\((\d+),(\d+),""")
             val callMatch = callRegex.find(js) ?: return null
             val funcName = callMatch.groupValues[2]
             val nVal = callMatch.groupValues[3].toInt()
@@ -501,6 +541,7 @@ internal object PlayerJavaScript {
      */
     fun deobfuscateN(url: String): String? = synchronized(lock) {
         try {
+            ensurePlayerUrl()
             val deobfuscated: String? = YoutubeJavaScriptPlayerManager
                 .getUrlWithThrottlingParameterDeobfuscated(playerUrl, url)
             if (deobfuscated.isNullOrEmpty()) return@synchronized null
@@ -528,8 +569,9 @@ internal object PlayerJavaScript {
     /** `signatureTimestamp` (STS) for the current base.js, or null. */
     fun signatureTimestamp(): Int? = synchronized(lock) {
         cachedSts?.let { return it }
+        ensurePlayerUrl()
         try {
-            val sts = YoutubeJavaScriptPlayerManager.getSignatureTimestamp(playerUrl)
+            val sts: Int? = YoutubeJavaScriptPlayerManager.getSignatureTimestamp(playerUrl)
             if (sts != null && sts > 0) {
                 cachedSts = sts
                 return sts
@@ -550,7 +592,7 @@ internal object PlayerJavaScript {
                 return parsed
             }
         }
-        return DEFAULT_STS
+        null
     }
 
     /** Drops NewPipe's static player-JS caches (call on network/egress change). */

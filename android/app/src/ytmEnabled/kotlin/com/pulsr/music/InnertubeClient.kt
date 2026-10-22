@@ -1047,8 +1047,12 @@ internal class InnertubeClient(
                 if (rawUrl != null) {
                     val resolved = if (sig != null) {
                         val decipherCache = JsDecipherCache.getInstance(context)
+                        // Rules are keyed by player build: replaying rules from a
+                        // previous build signs the URL with a stale transform and
+                        // googlevideo rejects it with 403.
+                        val rulesKey = PlayerJavaScript.currentPlayerHash() ?: "default"
                         val deciphered = try {
-                            decipherCache.decipherSignature(sig)
+                            decipherCache.decipherSignature(sig, rulesKey)
                         } catch (_: Exception) {
                             PlayerJavaScript.init(context)
                             PlayerJavaScript.decipherSignature(sig)
@@ -1531,7 +1535,8 @@ internal class InnertubeClient(
         }
 
         val playbackContext = JSONObject()
-        val sts = runCatching { JsDecipherCache.getInstance(context).getSignatureTimestamp() }.getOrNull()
+        val stsKey = PlayerJavaScript.currentPlayerHash() ?: "default"
+        val sts = runCatching { JsDecipherCache.getInstance(context).getSignatureTimestamp(stsKey) }.getOrNull()
             ?: runCatching { PlayerJavaScript.signatureTimestamp() }.getOrNull()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")

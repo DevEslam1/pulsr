@@ -27,7 +27,6 @@ class PulsrChip extends StatelessWidget {
   final PulsrChipVariant variant;
   final VoidCallback? onDeleted;
   final Color? activeColor;
-  final double height;
 
   const PulsrChip({
     super.key,
@@ -38,7 +37,6 @@ class PulsrChip extends StatelessWidget {
     this.variant = PulsrChipVariant.filter,
     this.onDeleted,
     this.activeColor,
-    this.height = 36.0,
   });
 
   @override
@@ -69,11 +67,10 @@ class PulsrChip extends StatelessWidget {
         child: AnimatedContainer(
           duration: context.motion(PulsrMotion.fast),
           curve: Curves.easeOutCubic,
-          height: height,
-          constraints: const BoxConstraints(minWidth: 44),
-          padding: EdgeInsets.symmetric(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 36),
+          padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
-            vertical: (height - 20) / 2,
+            vertical: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
             color: bgColor,
@@ -102,25 +99,38 @@ class PulsrChip extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.xs),
               ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'Manrope',
-                  fontSize: AppFontSize.label,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  letterSpacing: AppTracking.label,
-                  color: textColor,
-                  height: 1.1,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Manrope',
+                    fontSize: AppFontSize.label,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    letterSpacing: AppTracking.label,
+                    color: textColor,
+                    height: 1.1,
+                  ),
                 ),
               ),
               if (onDeleted != null) ...[
                 const SizedBox(width: AppSpacing.xs),
-                GestureDetector(
-                  onTap: onDeleted,
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 14.0,
-                    color: textColor.withValues(alpha: 0.7),
+                Semantics(
+                  button: true,
+                  label: MaterialLocalizations.of(context).deleteButtonTooltip,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onDeleted,
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 16.0,
+                        color: textColor.withValues(alpha: 0.7),
+                      ),
+                    ),
                   ),
                 ),
               ],

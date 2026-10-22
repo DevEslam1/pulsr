@@ -158,7 +158,6 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   PlayerSeekBar(
-                    position: widget.state.position,
                     duration: widget.state.duration,
                     activeColor: widget.activeColor,
                     showUpNext: false,

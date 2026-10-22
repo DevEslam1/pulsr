@@ -94,6 +94,9 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
       }
       _currentQuery = _controller.text;
       _controller.addListener(_onControllerChanged);
+    } else if (_ownsController &&
+        oldWidget.initialValue != widget.initialValue) {
+      _controller.text = widget.initialValue ?? '';
     }
   }
 
@@ -162,7 +165,11 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
         focusNode: widget.focusNode,
         autofocus: widget.autofocus,
         onChanged: _handleChanged,
-        onSubmitted: widget.onSubmitted,
+        onSubmitted: (value) {
+          _debounceTimer?.cancel();
+          widget.onChanged?.call(value);
+          widget.onSubmitted?.call(value);
+        },
         style: TextStyle(
           color: p.textPrimary,
           fontSize: AppFontSize.body,

@@ -85,24 +85,49 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
     private val methodChannel = MethodChannel(messenger, METHOD_CHANNEL)
     private val eventChannel = EventChannel(messenger, EVENT_CHANNEL)
-    private var eventSink: EventChannel.EventSink? = null
+    @Volatile private var eventSink: EventChannel.EventSink? = null
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val routeHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private var lastStreamSnapshot = intArrayOf(0, 0, 0)
+    private val probeThread = android.os.HandlerThread("PulsrAudioProbe").apply { start() }
+    private val probeHandler = android.os.Handler(probeThread.looper)
+    private var lastRouteSignature: String? = null
     private val routePoll = object : Runnable {
         override fun run() {
             if (eventSink == null) return
             val current = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
-            if (!current.contentEquals(lastStreamSnapshot)) {
-                lastStreamSnapshot = current
+            val deviceSignature = try {
+                audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                    ?.map { "${it.id}:${it.type}" }
+                    ?.sorted()
+                    ?.joinToString(",")
+            } catch (_: Throwable) { null } ?: ""
+            val direct = if (UsbExclusivePlugin.directStreamingActive) 1 else 0
+            val signature = "${current[0]}:${current[1]}:${current[2]}|$direct|$deviceSignature"
+            if (signature != lastRouteSignature) {
+                lastRouteSignature = signature
                 notifyDeviceChange()
             }
-            routeHandler.postDelayed(this, 1000)
+            probeHandler.postDelayed(this, 1000)
+        }
+    }
+    private val notifyRunnable = object : Runnable {
+        override fun run() {
+            val sink = eventSink ?: return
+            val info = try { getAudioOutputDetails(forceRefresh = true) } catch (_: Throwable) {
+                return
+            }
+            mainHandler.post {
+                try {
+                    sink.success(info)
+                } catch (_: Throwable) {}
+            }
         }
     }
 
     private var bitPerfectRequested: Boolean = false
     @Volatile private var directRouteFallbackActive: Boolean = false
     private var mixerAttributesApplied: Boolean = false
+    private var bitPerfectUsbDeviceId: Int? = null
     private val mediaAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -229,14 +254,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     private fun notifyDeviceChange() {
         invalidateOutputDetailsCache()
-        val info = try { getAudioOutputDetails(forceRefresh = true) } catch (e: Exception) { return }
-        // Don't emit if no Dart listener yet; latest info will be sent on onListen
-        val sink = eventSink ?: return
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            try {
-                sink.success(info)
-            } catch (_: Exception) {}
-        }
+        // Build/probe off the main thread and coalesce bursts. The sink check
+        // stays inside the runnable so a late onListen still gets the latest.
+        probeHandler.removeCallbacks(notifyRunnable)
+        probeHandler.post(notifyRunnable)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -250,14 +271,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             "setBitPerfectMode" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 val success = applyBitPerfectMode(enabled)
-                if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
+                bitPerfectRequested = enabled && success && !directRouteFallbackActive
                 notifyDeviceChange()
                 result.success(success)
             }
             "setBitPerfectModeDetailed" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 val success = applyBitPerfectMode(enabled)
-                if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
+                bitPerfectRequested = enabled && success && !directRouteFallbackActive
                 notifyDeviceChange()
                 result.success(mapOf("success" to success, "reason" to lastBitPerfectReason))
             }
@@ -351,6 +372,15 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 val deviceId = call.argument<Int>("deviceId")
                 val previousId = selectedDeviceId
                 val routeGeneration = ++routeRequestGeneration
+                val target = deviceId?.let { id ->
+                    audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                        ?.firstOrNull { it.id == id }
+                }
+                if (target != null && !isUsbOutputType(target.type) &&
+                    (bitPerfectRequested || directRouteFallbackActive || mixerAttributesApplied)) {
+                    applyBitPerfectMode(false)
+                    notifyDeviceChange()
+                }
                 val response = applyPreferredOutputDevice(deviceId)
                 if (response["success"] != true || deviceId == null ||
                     !com.ryanheise.just_audio.PulsrOutputRouting.isPlaying()) {
@@ -361,6 +391,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             }
             "clearOutputDevice" -> {
                 ++routeRequestGeneration
+                if (bitPerfectRequested || directRouteFallbackActive || mixerAttributesApplied) {
+                    applyBitPerfectMode(false)
+                }
                 val cleared = com.ryanheise.just_audio.PulsrOutputRouting.select(null)
                 if (cleared) {
                     selectedDeviceId = null
@@ -420,21 +453,23 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         eventSink = events
-        routeHandler.removeCallbacks(routePoll)
-        routeHandler.post(routePoll)
+        probeHandler.removeCallbacks(routePoll)
+        probeHandler.post(routePoll)
         notifyDeviceChange()
     }
 
     override fun onCancel(arguments: Any?) {
         eventSink = null
-        routeHandler.removeCallbacks(routePoll)
+        probeHandler.removeCallbacks(routePoll)
     }
 
      fun dispose() {
         try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
         try { eventChannel.setStreamHandler(null) } catch (_: Exception) {}
         eventSink = null
-        routeHandler.removeCallbacks(routePoll)
+        probeHandler.removeCallbacks(routePoll)
+        probeHandler.removeCallbacks(notifyRunnable)
+        probeThread.quitSafely()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioManager != null && audioDeviceCallback != null) {
             try { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) } catch (_: Exception) {}
             audioDeviceCallback = null
@@ -920,14 +955,25 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val device = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             .firstOrNull { it.id == deviceId } ?: return fail("device_not_found", false)
 
+        val previous = selectedDeviceId?.let { id ->
+            am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).firstOrNull { it.id == id }
+        }
         val applied = com.ryanheise.just_audio.PulsrOutputRouting.select(device)
 
-        selectedDeviceId = if (applied) deviceId else null
-        preferredRouteApplied = applied
+        if (!applied) {
+            val restored = com.ryanheise.just_audio.PulsrOutputRouting.select(previous)
+            selectedDeviceId = if (restored) previous?.id else null
+            preferredRouteApplied = restored && previous != null
+            notifyDeviceChange()
+            return fail("route_unavailable_for_current_engine", true)
+        }
+
+        selectedDeviceId = deviceId
+        preferredRouteApplied = true
         notifyDeviceChange()
         return mapOf(
-            "success" to applied,
-            "error" to if (applied) null else "route_unavailable_for_current_engine",
+            "success" to true,
+            "error" to null,
             "requiresSystemPicker" to false,
             "deviceId" to deviceId,
         )
@@ -950,20 +996,23 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             } else if (attempt < maxAttempts) {
                 verifyRequestedRoute(deviceId, previousId, response, result, attempt + 1, generation)
             } else {
-                val previous = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                    ?.firstOrNull { it.id == previousId }
-                com.ryanheise.just_audio.PulsrOutputRouting.select(previous)
-                selectedDeviceId = previous?.id
-                preferredRouteApplied = previous != null
+                val outputs = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                val previous = outputs?.firstOrNull { it.id == previousId }
+                val restored = com.ryanheise.just_audio.PulsrOutputRouting.select(previous)
+                selectedDeviceId = if (restored) previous?.id else null
+                preferredRouteApplied = restored && previous != null
                 notifyDeviceChange()
+                val targetStillAvailable = outputs?.any { it.id == deviceId } == true
                 result.success(mapOf("success" to false, "error" to "route_not_applied",
-                    "requiresSystemPicker" to false))
+                    "requiresSystemPicker" to targetStillAvailable))
             }
         }, 200)
     }
 
     private fun clearPreferredMediaDevice() {
         com.ryanheise.just_audio.PulsrOutputRouting.select(null)
+        selectedDeviceId = null
+        preferredRouteApplied = false
     }
 
     /**
@@ -989,24 +1038,65 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         return false
     }
 
-    /** Read the app stream's device. Connection and preference are not route confirmation. */
+    /** Measured app-stream device. Connection and preference are not route confirmation. */
     private fun pickActiveOutputDevice(devices: Array<AudioDeviceInfo>): AudioDeviceInfo? {
         val routedId = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()[0]
         return devices.firstOrNull { it.id == routedId }
     }
 
     /**
+     * Ask the platform which device it would use for media before an AudioTrack
+     * exists. This is a route prediction, not a measured stream, so callers must
+     * not treat it as proof that audio is flowing.
+     */
+    @Suppress("DEPRECATION")
+    private fun pickPlatformRouteHint(devices: Array<AudioDeviceInfo>): AudioDeviceInfo? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                val routed = audioManager?.getAudioDevicesForAttributes(mediaAttributes)
+                routed?.firstOrNull()?.let { hint ->
+                    devices.firstOrNull { it.id == hint.id }?.let { return it }
+                }
+            } catch (_: Throwable) {}
+        }
+        try {
+            if (audioManager?.isBluetoothA2dpOn == true) {
+                devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
+                    ?.let { return it }
+            }
+            if (audioManager?.isWiredHeadsetOn == true) {
+                devices.firstOrNull { isWiredOutputType(it.type) }?.let { return it }
+            }
+        } catch (_: Throwable) {}
+        return null
+    }
+
+    /**
+     * Current route for display and control decisions. Measured wins; an
+     * accepted app request comes next; then the platform's pre-playback hint.
+     * Anything still unknown stays unknown instead of becoming "USB because a
+     * DAC is plugged in".
+     */
+    private fun resolveCurrentRouteDevice(devices: Array<AudioDeviceInfo>): AudioDeviceInfo? {
+        pickActiveOutputDevice(devices)?.let { return it }
+        if (preferredRouteApplied) {
+            selectedDeviceId?.let { id ->
+                devices.firstOrNull { it.id == id }?.let { return it }
+            }
+        }
+        return pickPlatformRouteHint(devices)
+    }
+
+    /**
      * Pick the USB sink exclusive mode should target. The active route wins,
-     * then the app-selected device, then the first USB output as a last resort —
-     * with two DACs attached, configuring the first one while the stream plays
-     * on the other would claim exclusive output that is not actually in use.
+     * then the app-selected device, then the first USB output as a capability
+     * target only — never as a claim about the current route.
      */
     private fun pickUsbOutputDevice(devices: Array<AudioDeviceInfo>): AudioDeviceInfo? {
         val active = pickActiveOutputDevice(devices)
         if (active != null && isUsbOutputType(active.type)) return active
-        val selectedId = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()[0]
-        if (selectedId != 0) {
-            devices.firstOrNull { it.id == selectedId && isUsbOutputType(it.type) }
+        selectedDeviceId?.let { id ->
+            devices.firstOrNull { it.id == id && isUsbOutputType(it.type) }
                 ?.let { return it }
         }
         return devices.firstOrNull { isUsbOutputType(it.type) }
@@ -1101,97 +1191,94 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     private fun applyBitPerfectMode(enabled: Boolean): Boolean {
         lastBitPerfectReason = null
+        bitPerfectRequested = false
         if (audioManager == null) {
             lastBitPerfectReason = "audio_manager_unavailable"
             return false
         }
-        // Bluetooth explicitly not supported — transcoded
         val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        val usbDevice = pickUsbOutputDevice(devices)
+        val route = resolveCurrentRouteDevice(devices)
+        val usbDevice = route?.takeIf { isUsbOutputType(it.type) }
+        val trackedUsb = bitPerfectUsbDeviceId?.let { id ->
+            devices.firstOrNull { it.id == id }
+        }
 
-        // Only the active route matters: a paired headset while a DAC is plugged
-        // in must not block exclusive mode, and vice versa.
-        if (enabled && usbDevice == null) {
+        if (!enabled) {
+            val clearTarget = trackedUsb ?: usbDevice
+            if (mixerAttributesApplied && clearTarget != null && Build.VERSION.SDK_INT >= 34) {
+                try {
+                    var clearM = cachedClearMixerMethod
+                    if (clearM == null) {
+                        clearM = AudioManager::class.java.getMethod("clearPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
+                        cachedClearMixerMethod = clearM
+                    }
+                    clearM.invoke(audioManager, mediaAttributes, clearTarget)
+                } catch (_: Throwable) {}
+            }
+            mixerAttributesApplied = false
+            bitPerfectRequested = false
+            directRouteFallbackActive = false
+            bitPerfectUsbDeviceId = null
+            return true
+        }
+
+        // Only the active route may be made exclusive. A DAC that is merely
+        // attached must not steal the route from Bluetooth or the speaker.
+        if (usbDevice == null) {
             directRouteFallbackActive = false
             lastBitPerfectReason =
                 if (isBluetoothActive(devices)) "bluetooth_transcoded" else "exclusive_requires_usb_dac"
             return false
         }
 
-        if (usbDevice != null) {
-            if (!enabled) {
-                if (mixerAttributesApplied && Build.VERSION.SDK_INT >= 34) {
-                    try {
-                        var clearM = cachedClearMixerMethod
-                        if (clearM == null) {
-                            clearM = AudioManager::class.java.getMethod("clearPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
-                            cachedClearMixerMethod = clearM
-                        }
-                        clearM.invoke(audioManager, mediaAttributes, usbDevice)
-                    } catch (_: Throwable) {}
-                    mixerAttributesApplied = false
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                var getSupported = cachedGetSupportedMixerMethod
+                if (getSupported == null) {
+                    getSupported = AudioManager::class.java.getMethod("getSupportedMixerAttributes", AudioDeviceInfo::class.java)
+                    cachedGetSupportedMixerMethod = getSupported
                 }
-                bitPerfectRequested = false
-                directRouteFallbackActive = false
-                lastBitPerfectReason = null
-                return true
-            }
-
-            // enabled == true
-            if (Build.VERSION.SDK_INT >= 34) {
-                try {
-                    var getSupported = cachedGetSupportedMixerMethod
-                    if (getSupported == null) {
-                        getSupported = AudioManager::class.java.getMethod("getSupportedMixerAttributes", AudioDeviceInfo::class.java)
-                        cachedGetSupportedMixerMethod = getSupported
-                    }
-                    val supportedAttributes = getSupported.invoke(audioManager, usbDevice) as? List<*> ?: emptyList<Any>()
-                    if (supportedAttributes.isNotEmpty()) {
-                        val selectedAttr = selectMixerAttributes(
-                            supportedAttributes,
-                            strictTargetFormat = (targetSampleRate > 0 || targetBitDepth > 0)
-                        )
-                        if (selectedAttr != null) {
-                            val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
-                            var setM = cachedSetMixerMethod
-                            if (setM == null) {
-                                setM = AudioManager::class.java.getMethod(
-                                    "setPreferredMixerAttributes",
-                                    AudioAttributes::class.java,
-                                    AudioDeviceInfo::class.java,
-                                    mixerAttrClass
-                                )
-                                cachedSetMixerMethod = setM
-                            }
-                            val ok = (setM.invoke(audioManager, mediaAttributes, usbDevice, selectedAttr) as? Boolean) ?: false
-                            if (ok) {
-                                mixerAttributesApplied = true
-                                bitPerfectRequested = true
-                                directRouteFallbackActive = false
-                                lastBitPerfectReason = null
-                                return true
-                            }
+                val supportedAttributes = getSupported.invoke(audioManager, usbDevice) as? List<*> ?: emptyList<Any>()
+                if (supportedAttributes.isNotEmpty()) {
+                    val selectedAttr = selectMixerAttributes(
+                        supportedAttributes,
+                        strictTargetFormat = (targetSampleRate > 0 || targetBitDepth > 0)
+                    )
+                    if (selectedAttr != null) {
+                        val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
+                        var setM = cachedSetMixerMethod
+                        if (setM == null) {
+                            setM = AudioManager::class.java.getMethod(
+                                "setPreferredMixerAttributes",
+                                AudioAttributes::class.java,
+                                AudioDeviceInfo::class.java,
+                                mixerAttrClass
+                            )
+                            cachedSetMixerMethod = setM
+                        }
+                        val ok = (setM.invoke(audioManager, mediaAttributes, usbDevice, selectedAttr) as? Boolean) ?: false
+                        if (ok) {
+                            mixerAttributesApplied = true
+                            bitPerfectRequested = true
+                            directRouteFallbackActive = false
+                            bitPerfectUsbDeviceId = usbDevice.id
+                            return true
                         }
                     }
-                } catch (e: Throwable) {
-                    Log.w(TAG, "AudioMixerAttributes negotiation fallback: ${e.message}")
                 }
+            } catch (e: Throwable) {
+                Log.w(TAG, "AudioMixerAttributes negotiation fallback: ${e.message}")
             }
-
-            // Direct route fallback for USB DAC when AudioMixerAttributes negotiation is unavailable:
-            // Route to USB device via PulsrOutputRouting, but DO NOT claim bitPerfectRequested.
-            com.ryanheise.just_audio.PulsrOutputRouting.select(usbDevice)
-            mixerAttributesApplied = false
-            bitPerfectRequested = false
-            directRouteFallbackActive = true
-            lastBitPerfectReason = "mixer_attributes_unavailable_fallback_route_only"
-            return true
         }
 
-        // Nothing to disable when no USB DAC is attached.
+        // Direct route fallback for USB DAC when AudioMixerAttributes negotiation is unavailable:
+        // Route to USB device via PulsrOutputRouting, but DO NOT claim bitPerfectRequested.
+        com.ryanheise.just_audio.PulsrOutputRouting.select(usbDevice)
+        mixerAttributesApplied = false
         bitPerfectRequested = false
-        directRouteFallbackActive = false
-        lastBitPerfectReason = null
+        directRouteFallbackActive = true
+        bitPerfectUsbDeviceId = usbDevice.id
+        lastBitPerfectReason = "mixer_attributes_unavailable_fallback_route_only"
         return true
     }
 
@@ -1370,55 +1457,48 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
         val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
         val usbDevice = pickUsbOutputDevice(devices)
-
         val activeDevice = pickActiveOutputDevice(devices)
+        val routeDevice = resolveCurrentRouteDevice(devices)
+        val routeUsbDevice = routeDevice?.takeIf { isUsbOutputType(it.type) }
+        val mixerTarget = routeUsbDevice ?: usbDevice
 
-        val isUsb = (activeDevice != null && isUsbOutputType(activeDevice.type)) || (activeDevice == null && usbDevice != null)
+        val isUsb = routeUsbDevice != null
         val deviceName =
-            if (activeDevice != null) getCleanDeviceName(activeDevice)
-            else if (usbDevice != null) getCleanDeviceName(usbDevice)
+            if (routeDevice != null) getCleanDeviceName(routeDevice)
             else "Output route unverified"
 
-        val sampleRates = activeDevice?.sampleRates?.toList()?.filter { it > 0 } ?: emptyList()
+        val sampleRates = routeDevice?.sampleRates?.toList()?.filter { it > 0 } ?: emptyList()
 
-        var bitDepth = 16
         var isDirectSupported = false
         var isOffloadSupported = false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && activeDevice != null) {
-            for (encoding in activeDevice.encodings) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && routeDevice != null) {
+            for (encoding in routeDevice.encodings) {
                 when (encoding) {
-                    AudioFormat.ENCODING_PCM_FLOAT -> {
-                        bitDepth = maxOf(bitDepth, 32)
-                        isDirectSupported = true
-                    }
-                    AudioFormat.ENCODING_PCM_24BIT_PACKED -> {
-                        bitDepth = maxOf(bitDepth, 24)
-                        isDirectSupported = true
-                    }
-                    AudioFormat.ENCODING_PCM_32BIT -> bitDepth = maxOf(bitDepth, 32)
+                    AudioFormat.ENCODING_PCM_FLOAT -> isDirectSupported = true
+                    AudioFormat.ENCODING_PCM_24BIT_PACKED -> isDirectSupported = true
+                    AudioFormat.ENCODING_PCM_32BIT -> Unit
                 }
             }
             // Offload supported on Q+ if not Bluetooth (classic or LE)
             isOffloadSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                !isBluetoothOutputType(activeDevice.type)
+                !isBluetoothOutputType(routeDevice.type)
             // More precise direct check
-            isDirectSupported = isDirectSupportedForDevice(activeDevice) || isDirectSupported
+            isDirectSupported = isDirectSupportedForDevice(routeDevice) || isDirectSupported
         }
 
         var isBitPerfectActive = false
         // The one format we can actually read back: the mixer attributes the
         // platform accepted for an exclusive USB stream.
         var activeMixerRate = 0
-        var activeMixerBitDepth = 0
         var activeMixerEncoding = 0
-        if (Build.VERSION.SDK_INT >= 34 && isUsb && usbDevice != null) {
+        if (Build.VERSION.SDK_INT >= 34 && isUsb && mixerTarget != null) {
             try {
                 var getM = cachedGetMixerMethod
                 if (getM == null) {
                     getM = AudioManager::class.java.getMethod("getPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
                     cachedGetMixerMethod = getM
                 }
-                val currentAttr = getM.invoke(audioManager, mediaAttributes, usbDevice)
+                val currentAttr = getM.invoke(audioManager, mediaAttributes, mixerTarget)
                 if (currentAttr != null) {
                     val behavior = getMixerBehaviorCached(currentAttr)
                     if (behavior == 1) {
@@ -1426,7 +1506,6 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                         val fmt = mixerAttrFormat(currentAttr)
                         if (fmt != null) {
                             activeMixerRate = fmt.sampleRate
-                            activeMixerBitDepth = encodingBitDepth(fmt.encoding)
                             activeMixerEncoding = fmt.encoding
                         }
                     }
@@ -1461,17 +1540,17 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             ))
         }
 
-        val isBluetooth = activeDevice != null && isBluetoothOutputType(activeDevice.type)
+        val isBluetooth = routeDevice != null && isBluetoothOutputType(routeDevice.type)
         val activeType = when {
-            activeDevice == null -> "unknown"
-            isUsbOutputType(activeDevice.type) -> "usb"
-            isWiredOutputType(activeDevice.type) -> "wired"
-            isBleOutputType(activeDevice.type) -> "ble"
-            isBluetoothOutputType(activeDevice.type) -> "bluetooth"
-            activeDevice.type == AudioDeviceInfo.TYPE_HEARING_AID -> "hearing_aid"
-            activeDevice.type == AudioDeviceInfo.TYPE_HDMI ||
-                activeDevice.type == AudioDeviceInfo.TYPE_HDMI_ARC ||
-                activeDevice.type == AudioDeviceInfo.TYPE_HDMI_EARC -> "hdmi"
+            routeDevice == null -> "unknown"
+            isUsbOutputType(routeDevice.type) -> "usb"
+            isWiredOutputType(routeDevice.type) -> "wired"
+            isBleOutputType(routeDevice.type) -> "ble"
+            isBluetoothOutputType(routeDevice.type) -> "bluetooth"
+            routeDevice.type == AudioDeviceInfo.TYPE_HEARING_AID -> "hearing_aid"
+            routeDevice.type == AudioDeviceInfo.TYPE_HDMI ||
+                routeDevice.type == AudioDeviceInfo.TYPE_HDMI_ARC ||
+                routeDevice.type == AudioDeviceInfo.TYPE_HDMI_EARC -> "hdmi"
             else -> "builtin"
         }
         // Exclusive output only exists through AudioMixerAttributes (API 34), and
@@ -1483,9 +1562,6 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // writes the PCM directly to the DAC while muting the HAL. It is the only
         // bit-perfect route on DACs/OS builds that do not advertise
         // MIXER_BEHAVIOR_BIT_PERFECT, so it counts as supported/active too.
-        val mixerSupported = isUsb && !isBluetooth && isBitPerfectSupportedOnPlatform()
-        val directStreamingSupported =
-            isUsb && !isBluetooth && UsbExclusivePlugin.directStreamingSupported
         val finalIsBitPerfectSupported = isUsb && !isBluetooth
         val stream = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
         val mixerActive = isUsb && !isBluetooth && isBitPerfectActive &&
@@ -1499,6 +1575,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             isBluetooth -> "bluetooth_transcoded"
             directRouteFallbackActive -> "mixer_attributes_unavailable_fallback_route_only"
             lastBitPerfectReason != null -> lastBitPerfectReason
+            !isUsb -> "exclusive_requires_usb_dac"
             usbDevice == null -> "exclusive_requires_usb_dac"
             Build.VERSION.SDK_INT < 34 -> "requires_android_14_for_usb"
             !finalIsBitPerfectSupported -> "no_supported_mixer_attributes"
@@ -1543,7 +1620,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // control surface, so there is nothing to read or set.
         val a2dpAnyPresent = devices.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
         val bleAnyPresent = devices.any { isBleOutputType(it.type) }
-        result["isLeAudio"] = activeDevice != null && isBleOutputType(activeDevice.type)
+        result["isLeAudio"] = routeDevice != null && isBleOutputType(routeDevice.type)
         result["bleAudioPresent"] = bleAnyPresent
         if (a2dpAnyPresent && isBluetooth) {
             val btCodec = try { getBluetoothCodecInfo() } catch (_: Exception) { emptyMap<String, Any?>() }
@@ -1577,8 +1654,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     /** True when the media route lands on a Bluetooth sink — classic or LE. */
     private fun isBluetoothActive(devices: Array<AudioDeviceInfo>): Boolean {
-        val active = pickActiveOutputDevice(devices) ?: return false
-        return isBluetoothOutputType(active.type)
+        val route = resolveCurrentRouteDevice(devices) ?: return false
+        return isBluetoothOutputType(route.type)
     }
 
     private fun getCleanDeviceName(device: AudioDeviceInfo): String {

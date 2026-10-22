@@ -23,7 +23,8 @@ class DetailScaffold extends StatelessWidget {
   final String? titleText;
   final List<Widget>? actions;
   final Widget hero;
-  final Widget body;
+  final Widget? body;
+  final Widget? sliverBody;
   final Widget? bottomNavigationBar;
   final Widget? floatingActionButton;
   final bool landscapeSplit;
@@ -38,7 +39,8 @@ class DetailScaffold extends StatelessWidget {
     this.titleText,
     this.actions,
     required this.hero,
-    required this.body,
+    this.body,
+    this.sliverBody,
     this.bottomNavigationBar,
     this.floatingActionButton,
     this.landscapeSplit = true,
@@ -49,6 +51,8 @@ class DetailScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(body != null || sliverBody != null,
+        'DetailScaffold requires either body or sliverBody');
     final p = context.palette;
     final isLandscape = PulsrBreakpoint.isLandscape(context);
     final isTablet = Adaptive.isTablet(context);
@@ -63,13 +67,25 @@ class DetailScaffold extends StatelessWidget {
 
     if (shouldSplit) {
       final hinge = context.foldableHinge;
-      Widget rightPane = SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics()),
-        padding:
-            EdgeInsets.only(bottom: PulsrLayoutMetrics.scrollBottom(context)),
-        child: body,
-      );
+      Widget rightPane = sliverBody != null
+          ? CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics()),
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                      bottom: PulsrLayoutMetrics.scrollBottom(context)),
+                  sliver: sliverBody,
+                ),
+              ],
+            )
+          : SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics()),
+              padding: EdgeInsets.only(
+                  bottom: PulsrLayoutMetrics.scrollBottom(context)),
+              child: body,
+            );
 
       if (onRefresh != null) {
         rightPane = RefreshIndicator(
@@ -122,16 +138,29 @@ class DetailScaffold extends StatelessWidget {
       );
     } else {
       // Portrait / single column stacked
-      Widget scrollableContent = ListView(
-        padding:
-            EdgeInsets.only(bottom: PulsrLayoutMetrics.scrollBottom(context)),
-        physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics()),
-        children: [
-          hero,
-          body,
-        ],
-      );
+      Widget scrollableContent = sliverBody != null
+          ? CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics()),
+              slivers: [
+                SliverToBoxAdapter(child: hero),
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                      bottom: PulsrLayoutMetrics.scrollBottom(context)),
+                  sliver: sliverBody,
+                ),
+              ],
+            )
+          : ListView(
+              padding: EdgeInsets.only(
+                  bottom: PulsrLayoutMetrics.scrollBottom(context)),
+              physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics()),
+              children: [
+                hero,
+                body!,
+              ],
+            );
 
       if (onRefresh != null) {
         scrollableContent = RefreshIndicator(

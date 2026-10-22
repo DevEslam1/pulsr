@@ -289,9 +289,6 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     controller: _songsScrollController,
-                    itemExtent: songs.length > 500
-                        ? _LibraryScreenState._songRowExtent
-                        : null,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
                     padding: EdgeInsetsDirectional.only(

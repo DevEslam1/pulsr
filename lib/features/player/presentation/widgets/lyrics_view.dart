@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_lyric/flutter_lyric.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -15,7 +16,6 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
-import 'karaoke_mode_screen.dart';
 import 'lyrics_editor_sheet.dart';
 import '../themes/player_theme.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
@@ -67,6 +67,8 @@ class _LyricsViewState extends State<LyricsView> {
   bool _isTranslating = false;
   int _translationMode = 0; // 0: off, 1: translated, 2: romanized
   List<LyricsLine>? _translatedLyrics;
+  final ValueNotifier<Duration> _advancedPosition =
+      ValueNotifier(Duration.zero);
 
   bool get _hasWordSync => widget.lyrics.any((l) => l.words.isNotEmpty);
   bool get _useAdvancedView => _hasWordSync || _translationMode > 0;
@@ -163,13 +165,18 @@ class _LyricsViewState extends State<LyricsView> {
     }
   }
 
+  Duration _effectivePosition(Duration position) {
+    final manualOffset = Duration(milliseconds: _manualOffsetMs);
+    final effective = position - _audibleOffset - manualOffset;
+    return effective.isNegative ? Duration.zero : effective;
+  }
+
   void _updateProgress(Duration position) {
     if (!mounted || !_isSynced || widget.lyrics.isEmpty) return;
-    final manualOffset = Duration(milliseconds: _manualOffsetMs);
-    final effective = (position - _audibleOffset - manualOffset);
+    final effective = _effectivePosition(position);
+    _advancedPosition.value = effective;
     try {
-      _lyricController
-          .setProgress(effective.isNegative ? Duration.zero : effective);
+      _lyricController.setProgress(effective);
     } catch (e, st) {
       ErrorLogger.log('Failed to set lyrics progress',
           error: e, stackTrace: st, category: 'Lyrics');
@@ -331,6 +338,8 @@ class _LyricsViewState extends State<LyricsView> {
             (widget.lyrics.length != oldWidget.lyrics.length ||
                 !listEquals(widget.lyrics, oldWidget.lyrics)));
     if (lyricsChanged) {
+      _translatedLyrics = null;
+      _translationMode = 0;
       _syncLyricsToController();
     }
 
@@ -350,6 +359,7 @@ class _LyricsViewState extends State<LyricsView> {
 
   @override
   void dispose() {
+    _advancedPosition.dispose();
     _lyricController.dispose();
     super.dispose();
   }
@@ -404,11 +414,7 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   void _openKaraoke() {
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const KaraokeModeScreen(),
-      ),
-    );
+    context.push('/karaoke');
   }
 
   Future<void> _openEditor() async {
@@ -564,10 +570,10 @@ class _LyricsViewState extends State<LyricsView> {
                     size: 20,
                   ),
             tooltip: _translationMode == 0
-                ? 'Translate lyrics'
+                ? context.l10n.lyricsTranslate
                 : (_translationMode == 1
-                    ? 'Romanize lyrics'
-                    : 'Original lyrics'),
+                    ? context.l10n.lyricsRomanize
+                    : context.l10n.lyricsOriginal),
             visualDensity: VisualDensity.compact,
             constraints: const BoxConstraints(
               minWidth: AppSpacing.minTouchTarget,
@@ -578,7 +584,7 @@ class _LyricsViewState extends State<LyricsView> {
         if (hasSong && hasLyrics)
           _headerIconButton(
             Icons.share_rounded,
-            'Share lyrics card',
+            context.l10n.lyricsShareCard,
             () => _openShareCard(),
           ),
         _headerIconButton(Icons.fullscreen_rounded, context.l10n.dspKaraokeMode,
@@ -662,14 +668,6 @@ class _LyricsViewState extends State<LyricsView> {
     );
 
     final effectiveLyrics = _displayLyrics;
-    final Duration currentPos = widget.currentPosition ??
-        (() {
-          try {
-            return context.read<PlayerCubit>().state.position;
-          } catch (_) {
-            return Duration.zero;
-          }
-        })();
 
     return Stack(
       children: [
@@ -693,22 +691,30 @@ class _LyricsViewState extends State<LyricsView> {
           ),
         if (_useAdvancedView)
           Positioned.fill(
-            child: AdvancedLyricsView(
-              lyrics: effectiveLyrics,
-              currentPosition: currentPos,
-              activeColor: activeCol,
-              showTranslation: _translationMode > 0,
-              onLineTapped: (seekPos) {
-                if (widget.onLineTapped != null) {
-                  widget.onLineTapped!(seekPos);
-                } else {
-                  try {
-                    context.read<PlayerCubit>().seek(seekPos);
-                  } catch (_) {}
-                }
-                _updateProgress(seekPos);
-              },
-              onLineLongPressed: (idx) => _openShareCard(initialIndex: idx),
+            child: ValueListenableBuilder<Duration>(
+              valueListenable: _advancedPosition,
+              builder: (context, position, _) => AdvancedLyricsView(
+                lyrics: effectiveLyrics,
+                currentPosition: position,
+                activeColor: activeCol,
+                showTranslation: _translationMode > 0,
+                onLineTapped: (seekPos) {
+                  final target = seekPos +
+                      _audibleOffset +
+                      Duration(milliseconds: _manualOffsetMs);
+                  final effectiveSeek =
+                      target.isNegative ? Duration.zero : target;
+                  if (widget.onLineTapped != null) {
+                    widget.onLineTapped!(effectiveSeek);
+                  } else {
+                    try {
+                      context.read<PlayerCubit>().seek(effectiveSeek);
+                    } catch (_) {}
+                  }
+                  _updateProgress(effectiveSeek);
+                },
+                onLineLongPressed: (idx) => _openShareCard(initialIndex: idx),
+              ),
             ),
           ),
       ],

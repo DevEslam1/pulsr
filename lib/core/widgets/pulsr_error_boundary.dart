@@ -46,6 +46,15 @@ class PulsrErrorBoundary extends StatefulWidget {
 class _PulsrErrorBoundaryState extends State<PulsrErrorBoundary> {
   Object? _error;
 
+  @override
+  void didUpdateWidget(covariant PulsrErrorBoundary oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.child != widget.child ||
+        oldWidget.builder != widget.builder) {
+      _error = null;
+    }
+  }
+
   void _retry() {
     setState(() {
       _error = null;

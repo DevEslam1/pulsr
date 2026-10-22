@@ -68,6 +68,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
         context: context,
         isDismissible: isDismissible,
         enableDrag: enableDrag,
+        wrapWithContainer: false,
         builder: (ctx) => PulsrAdaptiveSheet(
           isDialog: false,
           title: title,

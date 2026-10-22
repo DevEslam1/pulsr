@@ -1081,22 +1081,37 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           safeEmit(state.copyWith(systemEffectsStatus: status));
         } catch (_) {}
         if (loadedState.bitPerfectOutput) {
-          final applied = await _hiResAudioService.setBitPerfectMode(true);
-          if (!applied) {
-            // Same fallback as the manual toggle: DACs without platform
-            // exclusive mixer attributes can still run Pulsr's direct USB sink.
-            final direct = await _tryStartDirectUsbStreaming();
-            if (direct) {
-              _bitPerfectViaDirectStream = true;
-            } else {
-              await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
-              await prefs.setBool(PrefsKeys.strictBitPerfect, false);
-              loadedState = loadedState.copyWith(
-                bitPerfectOutput: false,
-                strictBitPerfect: false,
-              );
-              safeEmit(state.copyWith(
-                  bitPerfectOutput: false, strictBitPerfect: false));
+          // Resolve the current route before touching exclusive output. A
+          // merely attached DAC must not steal a Bluetooth/speaker session;
+          // on an unknown route the saved preference stays off.
+          await refreshOutputDevice();
+          if (state.currentOutputDevice?.isUsbDac != true) {
+            await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+            await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+            loadedState = loadedState.copyWith(
+              bitPerfectOutput: false,
+              strictBitPerfect: false,
+            );
+            safeEmit(state.copyWith(
+                bitPerfectOutput: false, strictBitPerfect: false));
+          } else {
+            final applied = await _hiResAudioService.setBitPerfectMode(true);
+            if (!applied) {
+              // Same fallback as the manual toggle: DACs without platform
+              // exclusive mixer attributes can still run Pulsr's direct USB sink.
+              final direct = await _tryStartDirectUsbStreaming();
+              if (direct) {
+                _bitPerfectViaDirectStream = true;
+              } else {
+                await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+                await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+                loadedState = loadedState.copyWith(
+                  bitPerfectOutput: false,
+                  strictBitPerfect: false,
+                );
+                safeEmit(state.copyWith(
+                    bitPerfectOutput: false, strictBitPerfect: false));
+              }
             }
           }
         }

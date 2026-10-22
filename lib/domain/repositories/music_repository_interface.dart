@@ -87,6 +87,15 @@ abstract class IMusicRepository {
   Future<Result<List<SongsTableData>>> getFavorites();
   Future<Result<int>> importOnlineTracksAsFavorites(List<YtmTrack> tracks);
 
+  /// Returns a `songs.id` that is guaranteed to exist, so FK-constrained
+  /// children (playlists, queue) can reference [song].
+  ///
+  /// An in-memory YouTube result has no row yet, and a stale local object may
+  /// point at an id a rescan has since replaced. Existing rows are matched by
+  /// id, then remote id, then path; a YouTube track with no row is persisted
+  /// (without marking it favorite). Fails when no row can be established.
+  Future<Result<int>> ensureSongPersisted(SongsTableData song);
+
   Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20});
   Future<Result<List<SongsTableData>>> getRecentlyPlayed({int limit = 20});
   Future<Result<void>> clearRecentlyPlayed();

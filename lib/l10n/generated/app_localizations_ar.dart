@@ -188,6 +188,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get eqEngineSubtitle => 'تصفية بارامترية biquad مباشرة';
 
   @override
+  String get eqAutoPreamp => 'مضخم تلقائي';
+
+  @override
   String get truePeakLimiterTitle => 'محدد الذروة الحقيقية';
 
   @override
@@ -500,6 +503,43 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get apply => 'تطبيق';
+
+  @override
+  String get increase => 'زيادة';
+
+  @override
+  String get decrease => 'تقليل';
+
+  @override
+  String get sheetDragHandle => 'مقبض سحب الورقة';
+
+  @override
+  String get sheetDragDownToDismiss => 'اسحب لأسفل للإغلاق';
+
+  @override
+  String get vinylDisc => 'قرص فينيل';
+
+  @override
+  String get swipeAgainOrTapToConfirm => 'اسحب مرة أخرى أو اضغط للتأكيد';
+
+  @override
+  String get settingsUiSoundEffects => 'مؤثرات صوتية للواجهة';
+
+  @override
+  String get settingsUiSoundEffectsSubtitle =>
+      'تشغيل ردود صوتية خفيفة عند التفاعل';
+
+  @override
+  String get lyricsTranslate => 'ترجمة الكلمات';
+
+  @override
+  String get lyricsRomanize => 'كتابة الكلمات بالحروف اللاتينية';
+
+  @override
+  String get lyricsOriginal => 'الكلمات الأصلية';
+
+  @override
+  String get lyricsShareCard => 'مشاركة بطاقة الكلمات';
 
   @override
   String get noSongsFound => 'لم يتم العثور على أغانٍ';
@@ -6966,6 +7006,13 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get headphoneSafetyStandard =>
       'المعيار الصوتي WHO-ITU H.870 / EN 62368-1';
+
+  @override
+  String get headphoneSafetyToggleTitle => 'تخفيف الأمان التلقائي';
+
+  @override
+  String get headphoneSafetyToggleDesc =>
+      'عند وصول الجرعة الأسبوعية إلى 100%، يتم تفعيل محدد أمان استباقي بسلاسة لتقييد ذروة الإخراج عند -6 dBFS.';
 
   @override
   String get weeklySoundAllowance => 'الحصة الصوتية الأسبوعية';

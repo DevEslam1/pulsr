@@ -77,6 +77,17 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
   // rows exist, so scroll notifications cannot grow the limit forever.
   bool _hasMore = false;
   Timer? _loadMoreTimeoutTimer;
+  Stream<Result<List<SongsTableData>>>? _songsStream;
+  int? _streamLimit;
+
+  @override
+  void didUpdateWidget(covariant RecentlyPlayedSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.getSongsUseCase, widget.getSongsUseCase)) {
+      _songsStream = null;
+      _streamLimit = null;
+    }
+  }
 
   void _loadMore() {
     if (_isLoadingMore || !_hasMore) return;
@@ -176,10 +187,15 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
     final p = context.palette;
     final playerCubit = context.read<PlayerCubit>();
 
-    return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: widget.getSongsUseCase
+    if (_songsStream == null || _streamLimit != _currentLimit) {
+      _streamLimit = _currentLimit;
+      _songsStream = widget.getSongsUseCase
           .watchRecentlyPlayed(limit: _currentLimit)
-          .distinct(),
+          .distinct();
+    }
+
+    return StreamBuilder<Result<List<SongsTableData>>>(
+      stream: _songsStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           _clearLoadingMore();

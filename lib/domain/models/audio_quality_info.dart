@@ -94,21 +94,48 @@ class AudioQualityInfo {
           (song.bitrateKbps != null && song.bitrateKbps! > 0
               ? song.bitrateKbps!
               : defaultKbps);
-      final rawCodec = explicitFormat ?? song.codec;
-      final format = rawCodec == null
-          ? 'Unknown'
-          : rawCodec.toUpperCase().contains('OPUS') ||
-                  rawCodec.toUpperCase().contains('WEBM')
+      final rawCodec = (explicitFormat ?? song.codec)?.trim();
+      final normalizedCodec =
+          rawCodec == null || rawCodec.isEmpty ? null : rawCodec.toUpperCase();
+      final format = normalizedCodec == null
+          ? 'YTM'
+          : normalizedCodec.contains('OPUS') || normalizedCodec.contains('WEBM')
               ? 'OPUS'
-              : rawCodec.toUpperCase();
-      final tier = kbps >= 160
-          ? AudioQualityTier.highQuality
+              : normalizedCodec;
+      final selectedQuality = switch (streamingQuality) {
+        YtmAudioQuality.high => 'High',
+        YtmAudioQuality.medium => 'Medium',
+        YtmAudioQuality.low => 'Low',
+        null => null,
+      };
+      final tier = kbps > 0
+          ? (kbps >= 160
+              ? AudioQualityTier.highQuality
+              : kbps >= 128
+                  ? AudioQualityTier.standardQuality
+                  : AudioQualityTier.compact)
+          : switch (streamingQuality) {
+              YtmAudioQuality.high => AudioQualityTier.highQuality,
+              YtmAudioQuality.medium => AudioQualityTier.standardQuality,
+              YtmAudioQuality.low => AudioQualityTier.compact,
+              null => AudioQualityTier.standardQuality,
+            };
+      final verifiedTierLabel = kbps >= 160
+          ? 'High Quality Stream'
           : kbps >= 128
-              ? AudioQualityTier.standardQuality
-              : AudioQualityTier.compact;
+              ? 'Medium Quality Stream'
+              : 'Data Saver Stream';
+      final selectedTierLabel = switch (streamingQuality) {
+        YtmAudioQuality.high => 'High Quality Stream',
+        YtmAudioQuality.medium => 'Medium Quality Stream',
+        YtmAudioQuality.low => 'Data Saver Stream',
+        null => 'Stream quality unverified',
+      };
       return AudioQualityInfo(
         format: format,
-        codecName: 'YouTube Music Stream ($format)',
+        codecName: normalizedCodec == null
+            ? 'YouTube Music Stream'
+            : 'YouTube Music Stream ($format)',
         bitrateKbps: kbps > 0 ? kbps : null,
         sampleRate: song.sampleRate != null && song.sampleRate! > 0
             ? '${(song.sampleRate! / 1000).toStringAsFixed(1)} kHz'
@@ -118,18 +145,19 @@ class AudioQualityInfo {
             : 'Unknown',
         channels: 'Not verified',
         tier: tier,
-        tierLabel: kbps <= 0
-            ? 'Stream quality unverified'
-            : kbps >= 160
-                ? 'High Quality Stream'
-                : kbps >= 128
-                    ? 'Medium Quality Stream'
-                    : 'Data Saver Stream',
-        shortBadgeLabel:
-            kbps > 0 ? '$format • ${kbps}k' : '$format • rate unknown',
+        tierLabel: kbps > 0 ? verifiedTierLabel : selectedTierLabel,
+        shortBadgeLabel: kbps > 0
+            ? '$format • ${kbps}k'
+            : selectedQuality != null
+                ? '$format • ${selectedQuality.toUpperCase()}'
+                : '$format • STREAM',
         description: kbps > 0
             ? 'Online YouTube Music audio stream ($kbps kbps $format)'
-            : 'Online stream • actual bitrate is unverified',
+            : selectedQuality != null
+                ? 'Online YouTube Music stream selected at '
+                    '${selectedQuality.toLowerCase()} quality; the exact '
+                    'codec and bitrate are not verified.'
+                : 'Online stream • actual bitrate is unverified',
         badgeColor: AppColors.qualityBadgeRose,
         icon: Icons.wifi_tethering_rounded,
       );

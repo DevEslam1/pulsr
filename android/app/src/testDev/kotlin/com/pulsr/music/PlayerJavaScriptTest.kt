@@ -106,6 +106,61 @@ class PlayerJavaScriptTest {
     }
 
     @Test
+    fun testEs6PlayerDecipherStepsExtraction() {
+        // Mirrors the real player_es6.vflset call shape:
+        //   if(k.s){var f=c,h=k.sp;let l=Gh(19,2484,Kh(...))}
+        // The earlier parser required `var x=..., y=..., z=` and missed this
+        // `let` form, so every es6 asset URL failed with "Signature
+        // deciphering unavailable".
+        val table = MutableList(84) { "x$it" }
+        table[2] = ""
+        table[3] = "length"
+        table[6] = "OE"
+        table[23] = "set"
+        table[26] = "VJ"
+        table[27] = "splice"
+        table[32] = "reverse"
+        table[40] = "signatureCipher"
+        table[49] = "dD"
+
+        val sampleJs = """
+            var x=0;w="${table.joinToString(";")}".split(";");
+            pU={OE:function(a,b){var c=a[0];a[0]=a[b%a[w[3]]];a[b%a[w[3]]]=c},VJ:function(a){a[w[32]]()},dD:function(a,b){a[w[27]](0,b)}};
+            Gh=function(a,b,c){var d=b^a;if(!(a<<2&7)){var f=Se(1,2,c)}(a-2&5)==1&&(f=c[w[3]](w[2]),pU[w[d^2465]](f,d^2470),pU[w[d^2493]](f,d^2455),pU[w[d^2465]](f,d^2450),pU[w[d^2465]](f,d^2478),pU[w[d^2493]](f,d^2493),pU[w[d^2454]](f,d^2468),pU[w[d^2493]](f,d^2530),pU[w[d^2454]](f,d^2468),h=f[w[4]](w[2]));return h};
+            if(k.s){var f=c,h=k.sp;let l=Gh(19,2484,Kh(40,791,k.s));f[w[23]](h,Nh(1,20,l))}
+            var meta = {signatureTimestamp:20744};
+        """.trimIndent()
+
+        val steps = PlayerJavaScript.extractModernDecipherSteps(sampleJs)
+        assertNotNull("ES6 decipher steps should be extracted", steps)
+        assertEquals(
+            listOf("swap:1", "reverse", "swap:53", "swap:9", "reverse", "splice:3", "reverse", "splice:3"),
+            steps
+        )
+    }
+
+    @Test
+    fun testPlayerUrlNormalizationPrefersDesktopIasBuild() {
+        assertEquals(
+            "https://www.youtube.com/s/player/cbcfbf2f/player_ias.vflset/en_US/base.js",
+            PlayerJavaScript.normalizePlayerUrl("/s/player/cbcfbf2f/player_es6.vflset/en_US/base.js")
+        )
+        assertEquals(
+            "https://www.youtube.com/s/player/cbcfbf2f/player_ias.vflset/en_US/base.js",
+            PlayerJavaScript.normalizePlayerUrl(
+                "https://www.youtube.com/s/player/cbcfbf2f/player_plasma.vflset/en_US/base.js"
+            )
+        )
+        assertEquals(
+            "https://www.youtube.com/s/player/cbcfbf2f/player_ias.vflset/en_US/base.js",
+            PlayerJavaScript.normalizePlayerUrl("//www.youtube.com/s/player/cbcfbf2f/player_ias.vflset/en_US/base.js")
+        )
+        assertNull(PlayerJavaScript.normalizePlayerUrl("/s/player/cbcfbf2f/player_ias.vflset/en_US/desktop_polymer.js"))
+        assertNull(PlayerJavaScript.normalizePlayerUrl("https://www.youtube.com/s/desktop/abc/jsbin/desktop_polymer.vflset/desktop_polymer.js"))
+        assertNull(PlayerJavaScript.normalizePlayerUrl(null))
+    }
+
+    @Test
     fun testLegacyDecipherStepsExtraction() {
         val legacyJs = """
             var a = "abc";
@@ -127,13 +182,5 @@ class PlayerJavaScriptTest {
         val steps = PlayerJavaScript.extractLegacyDecipherSteps(legacyJs)
         assertNotNull("Legacy decipher steps should be extracted", steps)
         assertEquals(listOf("reverse", "swap:2", "splice:1"), steps)
-    }
-
-    @Test
-    fun testFallbackDecipherProducesValidDecipheredSignature() {
-        val rawSig = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        val deciphered = PlayerJavaScript.decipherSignature(rawSig)
-        assertNotNull("decipherSignature should never return null", deciphered)
-        assertTrue("Deciphered signature should be non-empty", deciphered!!.isNotEmpty())
     }
 }

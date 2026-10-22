@@ -575,16 +575,19 @@ mixin SettingsSearchResults
       _SearchItem(
         categoryId: 'look',
         category: lookCat,
-        title: 'UI Sound Effects',
-        subtitle: 'Play subtle audio feedback for interactions',
+        title: context.l10n.settingsUiSoundEffects,
+        subtitle: context.l10n.settingsUiSoundEffectsSubtitle,
         icon: Icons.volume_up_rounded,
         keywords: ['sound', 'audio', 'feedback', 'effects', 'click', 'haptic'],
-        trailing: Switch.adaptive(
-          value: SoundFeedbackService.enabled,
-          onChanged: (val) => SoundFeedbackService.setEnabled(val),
+        trailing: ValueListenableBuilder<bool>(
+          valueListenable: SoundFeedbackService.enabledNotifier,
+          builder: (context, enabled, _) => Switch.adaptive(
+            value: enabled,
+            onChanged: SoundFeedbackService.setEnabled,
+          ),
         ),
-        onTap: () =>
-            SoundFeedbackService.setEnabled(!SoundFeedbackService.enabled),
+        onTap: () => SoundFeedbackService.setEnabled(
+            !SoundFeedbackService.enabledNotifier.value),
       ),
       _SearchItem(
         categoryId: 'look',

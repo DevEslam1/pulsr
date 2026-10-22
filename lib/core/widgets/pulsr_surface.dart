@@ -88,6 +88,22 @@ class PulsrSurface extends StatelessWidget {
     final effectiveRadius =
         borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
 
+    final isInteractive = onTap != null || onLongPress != null;
+
+    Widget glassChild = child;
+    if (isInteractive && !enableScale) {
+      glassChild = Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: effectiveRadius,
+          customBorder: shape,
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: glassChild,
+        ),
+      );
+    }
+
     Widget content = GlassContainer(
       tier: tier,
       borderRadius: effectiveRadius,
@@ -96,10 +112,8 @@ class PulsrSurface extends StatelessWidget {
       padding: padding,
       color: color,
       boxShadow: boxShadow,
-      child: child,
+      child: glassChild,
     );
-
-    final isInteractive = onTap != null || onLongPress != null;
 
     if (isInteractive) {
       if (enableScale) {
@@ -109,17 +123,6 @@ class PulsrSurface extends StatelessWidget {
           enableHaptics: enableHaptics,
           hapticStyle: hapticStyle,
           child: content,
-        );
-      } else {
-        content = Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: effectiveRadius,
-            customBorder: shape,
-            onTap: onTap,
-            onLongPress: onLongPress,
-            child: content,
-          ),
         );
       }
 

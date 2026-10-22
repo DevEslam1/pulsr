@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
+import '../utils/l10n_extensions.dart';
 import 'glass_container.dart';
 import 'pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -70,10 +71,12 @@ class PulsrDialogHelper {
     required String title,
     required String message,
     IconData? icon = Icons.help_outline_rounded,
-    String confirmLabel = 'Confirm',
-    String cancelLabel = 'Cancel',
+    String? confirmLabel,
+    String? cancelLabel,
     bool isDestructive = false,
   }) {
+    final confirm = confirmLabel ?? context.l10n.confirm;
+    final cancel = cancelLabel ?? context.l10n.cancel;
     return showPulsrDialog<bool>(
       context,
       icon: icon != null
@@ -107,13 +110,13 @@ class PulsrDialogHelper {
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           ),
-          child: Text(cancelLabel,
+          child: Text(cancel,
               style: const TextStyle(fontWeight: FontWeight.w600)),
         ),
         FilledButton(
           onPressed: () {
             if (isDestructive) {
-              if (confirmLabel.toLowerCase().contains('delete') ||
+              if (confirm.toLowerCase().contains('delete') ||
                   title.toLowerCase().contains('delete')) {
                 HapticFeedback.heavyImpact();
               } else {
@@ -135,7 +138,7 @@ class PulsrDialogHelper {
             ),
           ),
           child: Text(
-            confirmLabel,
+            confirm,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
@@ -151,8 +154,8 @@ class PulsrDialogHelper {
     String? initialText,
     String? hintText,
     IconData? icon = Icons.edit_rounded,
-    String confirmLabel = 'Save',
-    String cancelLabel = 'Cancel',
+    String? confirmLabel,
+    String? cancelLabel,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return showCustomDialog<String>(
@@ -163,8 +166,8 @@ class PulsrDialogHelper {
         initialText: initialText,
         hintText: hintText,
         icon: icon,
-        confirmLabel: confirmLabel,
-        cancelLabel: cancelLabel,
+        confirmLabel: confirmLabel ?? context.l10n.save,
+        cancelLabel: cancelLabel ?? context.l10n.cancel,
         keyboardType: keyboardType,
       ),
     );
@@ -417,20 +420,22 @@ class PulsrDialog extends StatelessWidget {
 
               // Dialog Content
               if (content != null)
-                Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.lg,
-                    title != null ? 14 : 24,
-                    AppSpacing.lg,
-                    AppSpacing.md,
-                  ),
-                  child: DefaultTextStyle.merge(
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.body,
-                      height: 1.45,
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.lg,
+                      title != null ? 14 : 24,
+                      AppSpacing.lg,
+                      AppSpacing.md,
                     ),
-                    child: content!,
+                    child: DefaultTextStyle.merge(
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.body,
+                        height: 1.45,
+                      ),
+                      child: content!,
+                    ),
                   ),
                 ),
 

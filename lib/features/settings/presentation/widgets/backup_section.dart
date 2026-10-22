@@ -125,10 +125,11 @@ class _BackupSectionState extends State<BackupSection> {
       return;
     }
 
-    final bytes = await result.readAsBytes();
-    final resolvedContent = utf8.decode(bytes);
     Map<String, dynamic> data;
+    late String resolvedContent;
     try {
+      final bytes = await result.readAsBytes();
+      resolvedContent = utf8.decode(bytes);
       data = jsonDecode(resolvedContent) as Map<String, dynamic>;
     } catch (e) {
       if (context.mounted) {

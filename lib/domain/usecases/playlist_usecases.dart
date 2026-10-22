@@ -44,6 +44,10 @@ class PlaylistUseCases {
     return _repository.deletePlaylist(playlistId);
   }
 
+  Future<Result<int>> ensureSongPersisted(SongsTableData song) {
+    return _repository.ensureSongPersisted(song);
+  }
+
   Future<Result<void>> addSongToPlaylist(int playlistId, int songId) {
     return _repository.addSongToPlaylist(playlistId, songId);
   }

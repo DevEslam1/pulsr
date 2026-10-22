@@ -184,6 +184,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eqEngineSubtitle => 'Direct biquad parametric filtering';
 
   @override
+  String get eqAutoPreamp => 'Auto Preamp';
+
+  @override
   String get truePeakLimiterTitle => 'True Peak Limiter';
 
   @override
@@ -497,6 +500,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get apply => 'Apply';
+
+  @override
+  String get increase => 'Increase';
+
+  @override
+  String get decrease => 'Decrease';
+
+  @override
+  String get sheetDragHandle => 'Sheet drag handle';
+
+  @override
+  String get sheetDragDownToDismiss => 'Drag down to dismiss';
+
+  @override
+  String get vinylDisc => 'Vinyl disc';
+
+  @override
+  String get swipeAgainOrTapToConfirm => 'Swipe again or tap to confirm';
+
+  @override
+  String get settingsUiSoundEffects => 'UI Sound Effects';
+
+  @override
+  String get settingsUiSoundEffectsSubtitle =>
+      'Play subtle audio feedback for interactions';
+
+  @override
+  String get lyricsTranslate => 'Translate lyrics';
+
+  @override
+  String get lyricsRomanize => 'Romanize lyrics';
+
+  @override
+  String get lyricsOriginal => 'Original lyrics';
+
+  @override
+  String get lyricsShareCard => 'Share lyrics card';
 
   @override
   String get noSongsFound => 'No Songs Found';
@@ -7020,6 +7060,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get headphoneSafetyStandard =>
       'WHO-ITU H.870 / EN 62368-1 Acoustic Standard';
+
+  @override
+  String get headphoneSafetyToggleTitle => 'Automatic Safety Attenuation';
+
+  @override
+  String get headphoneSafetyToggleDesc =>
+      'When weekly dose reaches 100%, smoothly engage a lookahead safety limiter to clamp output peak to -6 dBFS.';
 
   @override
   String get weeklySoundAllowance => 'Weekly Sound Allowance';

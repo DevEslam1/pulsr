@@ -9,6 +9,7 @@ class PulsrIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onPressed;
   final String? tooltip;
+  final String? semanticLabel;
   final Color? iconColor;
   final Color? backgroundColor;
   final double size;
@@ -21,6 +22,7 @@ class PulsrIconButton extends StatelessWidget {
     required this.icon,
     this.onPressed,
     this.tooltip,
+    this.semanticLabel,
     this.iconColor,
     this.backgroundColor,
     this.size = 44.0,
@@ -89,7 +91,7 @@ class PulsrIconButton extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
-      label: tooltip,
+      label: semanticLabel ?? tooltip,
       child: button,
     );
   }

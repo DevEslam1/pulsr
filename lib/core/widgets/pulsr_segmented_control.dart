@@ -269,6 +269,7 @@ class PulsrSegmentedControl extends StatelessWidget {
     final width = painter.width +
         AppSpacing.sm * 2 +
         (withIcons ? 16 + AppSpacing.s6 : 0);
+    painter.dispose();
     return math.max(1, (width * 100).round() + 1);
   }
 

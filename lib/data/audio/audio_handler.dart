@@ -665,6 +665,9 @@ class PulsrAudioHandler extends BaseAudioHandler
               sampleRate: Value(codec == 'OPUS' ? 48000 : 44100),
             );
             _songs[songIndex] = updated;
+            if (mediaItem.value?.id == updated.id.toString()) {
+              mediaItem.add(_songToMediaItem(updated));
+            }
           }
         }
       },
@@ -767,16 +770,44 @@ class PulsrAudioHandler extends BaseAudioHandler
         type == 'ble';
   }
 
+  Future<AudioOutputInfo?> _getOutputInfo() async {
+    if (!getIt.isRegistered<HiResAudioService>()) return null;
+    return getIt<HiResAudioService>().getAudioOutputInfo();
+  }
+
+  Set<String> _outputDeviceIds(AudioOutputInfo info) {
+    return info.availableDevices.isNotEmpty
+        ? info.availableDevices.map((d) => '${d.id}:${d.type}').toSet()
+        : <String>{'${info.deviceName}:${info.activeDeviceType}'};
+  }
+
+  /// The "before reconnect" snapshot. Captured after the noisy pause so the
+  /// unplugged headset is absent and only a real reconnect looks like a gain.
+  Future<void> _captureOutputDeviceBaseline() async {
+    final info = await _getOutputInfo();
+    if (info == null) return;
+    _lastKnownOutputDeviceIds = _outputDeviceIds(info);
+  }
+
   /// One-shot auto-resume after a becoming-noisy pause.
   /// Fires only when the user opted in, the pause was noisy-triggered, the
   /// timeout has not elapsed, the player is still paused, and the new route
   /// gained a headset-like output (BT / wired / USB / HDMI).
   Future<void> _maybeAutoResumeOnReconnect() async {
-    if (!_pausedForNoisy) return;
     try {
+      final info = await _getOutputInfo();
+      if (info == null) return;
+      final currentDeviceIds = _outputDeviceIds(info);
+
+      if (!_pausedForNoisy) {
+        _lastKnownOutputDeviceIds = currentDeviceIds;
+        return;
+      }
+
       final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
       if (!(prefs.getBool(PrefsKeys.autoResumeOnReconnect) ?? false)) {
         _pausedForNoisy = false;
+        _lastKnownOutputDeviceIds = currentDeviceIds;
         return;
       }
       final timeoutSec = prefs.getInt(PrefsKeys.autoResumeTimeoutSec) ?? 90;
@@ -784,34 +815,20 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (pausedAt == null ||
           DateTime.now().difference(pausedAt).inSeconds > timeoutSec) {
         _pausedForNoisy = false;
+        _lastKnownOutputDeviceIds = currentDeviceIds;
         return;
       }
       if (_activePlayer.playing || _songs.isEmpty) {
         _pausedForNoisy = false;
+        _lastKnownOutputDeviceIds = currentDeviceIds;
         return;
       }
-      AudioOutputInfo? info;
-      if (getIt.isRegistered<HiResAudioService>()) {
-        info = await getIt<HiResAudioService>().getAudioOutputInfo();
-      }
-      if (info == null) return;
-
-      final currentDeviceIds = info.availableDevices.isNotEmpty
-          ? info.availableDevices.map((d) => '${d.id}:${d.type}').toSet()
-          : <String>{'${info.deviceName}:${info.activeDeviceType}'};
 
       final gainedDevices =
           currentDeviceIds.difference(_lastKnownOutputDeviceIds);
       _lastKnownOutputDeviceIds = currentDeviceIds;
 
-      final isHeadset = _isHeadsetLikeDevice(info);
-      if (!isHeadset) return;
-
-      // Ensure we actually gained a new device connection (reconnect event)
-      // rather than an unplug event that left speaker/earpiece active.
-      if (gainedDevices.isEmpty && _lastKnownOutputDeviceIds.length <= 1) {
-        return;
-      }
+      if (!_isHeadsetLikeDevice(info) || gainedDevices.isEmpty) return;
 
       _pausedForNoisy = false;
       await play();
@@ -2420,6 +2437,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           await pause();
           _noisyPauseTime = now;
           _pausedForNoisy = true;
+          await _captureOutputDeviceBaseline();
         }),
       );
 

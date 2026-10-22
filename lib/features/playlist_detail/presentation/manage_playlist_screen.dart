@@ -592,12 +592,12 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
       return;
     }
 
-    Navigator.of(context).pop(true);
     PulsrToast.show(
       context,
       message:
           '${context.l10n.browsePlaylistUpdated} (+${toAdd.length}, -${toRemove.length})',
       icon: Icons.check_circle_rounded,
     );
+    Navigator.of(context).pop(true);
   }
 }

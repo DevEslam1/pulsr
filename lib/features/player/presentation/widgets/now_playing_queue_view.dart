@@ -327,12 +327,9 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                             bottom: AppSpacing.lg, top: AppSpacing.xxs),
                         itemCount: queue.length,
                         onReorderItem: (oldIndex, newIndex) {
-                          // Flutter's ReorderableListView passes newIndex +1
-                          // when an item is dragged downward. Correct it before
-                          // calling the cubit so songs land in the right slot.
-                          final adjustedNew =
-                              (oldIndex < newIndex) ? newIndex - 1 : newIndex;
-                          cubit.reorderQueue(oldIndex, adjustedNew);
+                          // onReorderItem already adjusts newIndex for the
+                          // removed item (Flutter 3.41+).
+                          cubit.reorderQueue(oldIndex, newIndex);
                         },
                         itemBuilder: (context, index) {
                           final song = queue[index];

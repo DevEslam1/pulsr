@@ -34,27 +34,26 @@ class PulsrHighlightedText extends StatelessWidget {
     }
 
     final spans = <TextSpan>[];
-    int start = 0;
-    final lowerText = text.toLowerCase();
-    final lowerQuery = query.toLowerCase();
+    var start = 0;
+    final matches = RegExp(
+      RegExp.escape(query),
+      caseSensitive: false,
+      unicode: true,
+    ).allMatches(text);
 
-    while (true) {
-      final index = lowerText.indexOf(lowerQuery, start);
-      if (index == -1) {
-        if (start < text.length) {
-          spans.add(TextSpan(text: text.substring(start), style: baseStyle));
-        }
-        break;
-      }
-      if (index > start) {
+    for (final match in matches) {
+      if (match.start > start) {
         spans.add(
-            TextSpan(text: text.substring(start, index), style: baseStyle));
+            TextSpan(text: text.substring(start, match.start), style: baseStyle));
       }
       spans.add(TextSpan(
-        text: text.substring(index, index + query.length),
+        text: text.substring(match.start, match.end),
         style: matchStyle,
       ));
-      start = index + query.length;
+      start = match.end;
+    }
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start), style: baseStyle));
     }
 
     return Text.rich(

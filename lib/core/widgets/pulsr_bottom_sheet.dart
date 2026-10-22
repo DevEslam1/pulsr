@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
+import '../utils/l10n_extensions.dart';
 import '../performance/gpu_budget.dart';
 import 'pulsr_dialog.dart';
 import 'pulsr_modal_tracker.dart';
@@ -253,8 +254,8 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                             const SizedBox(height: AppSpacing.s10),
                             Center(
                               child: Semantics(
-                                label: 'Sheet drag handle',
-                                hint: 'Drag down to dismiss',
+                                label: context.l10n.sheetDragHandle,
+                                hint: context.l10n.sheetDragDownToDismiss,
                                 child: Container(
                                   width: AppSpacing.s38,
                                   height: 4.5,

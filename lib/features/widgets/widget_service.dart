@@ -93,6 +93,7 @@ class WidgetService {
 
   /// Whether an artwork resolve is currently in-flight (to avoid stacking).
   bool _artworkResolveInFlight = false;
+  int _artworkGeneration = 0;
   final Queue<SongsTableData> _pendingArtworkQueue = Queue<SongsTableData>();
 
   void _drainPendingArtwork() {
@@ -105,7 +106,8 @@ class WidgetService {
       return;
     }
     _artworkResolveInFlight = true;
-    unawaited(_resolveArtworkAsync(next).whenComplete(() {
+    final generation = _artworkGeneration;
+    unawaited(_resolveArtworkAsync(next, generation).whenComplete(() {
       _artworkResolveInFlight = false;
       _drainPendingArtwork();
     }));
@@ -195,6 +197,7 @@ class WidgetService {
         await HomeWidget.saveWidgetData<String>('queueCover', '');
         await HomeWidget.saveWidgetData<String>('artwork', '');
         await HomeWidget.saveWidgetData<bool>('artworkFailed', false);
+        _artworkGeneration++;
         _pendingArtworkQueue.clear();
         _lastSavedArtworkSongId = null;
       }
@@ -214,7 +217,8 @@ class WidgetService {
 
   /// Non-blocking artwork resolve: fires in background, updates widget
   /// once complete.
-  Future<void> _resolveArtworkAsync(SongsTableData song) async {
+  Future<void> _resolveArtworkAsync(
+      SongsTableData song, int generation) async {
     try {
       final artPath = await _resolveArtworkPath(song).timeout(
         const Duration(seconds: 8),
@@ -224,6 +228,7 @@ class WidgetService {
           return null;
         },
       );
+      if (generation != _artworkGeneration) return;
       if (artPath != null && artPath.isNotEmpty) {
         // Generation check: skip updating UI if newer songs are queued.
         if (_pendingArtworkQueue.isNotEmpty &&

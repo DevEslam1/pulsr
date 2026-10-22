@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../motion/pulsr_motion.dart';
+import '../utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -76,7 +77,8 @@ class PulsrDismissible extends StatefulWidget {
     EdgeInsetsGeometry? margin,
     BorderRadiusGeometry? borderRadius,
   }) {
-    final effectiveLabel = isConfirming ? 'Confirm $label' : label;
+    final effectiveLabel =
+        isConfirming ? '${context.l10n.confirm} $label' : label;
     final effectiveIcon =
         isConfirming ? Icons.check_circle_outline_rounded : icon;
 
@@ -296,8 +298,8 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
           : widget.endToStartLabel;
 
       final message = label != null && label.isNotEmpty
-          ? 'Swipe again or tap to confirm: $label'
-          : 'Swipe again or tap to confirm';
+          ? '${context.l10n.swipeAgainOrTapToConfirm}: $label'
+          : context.l10n.swipeAgainOrTapToConfirm;
 
       final messenger = ScaffoldMessenger.of(context);
       messenger.hideCurrentSnackBar();

@@ -68,6 +68,8 @@ class _OnlinePlaylistDetailScreenState
   String? _artworkUrl;
   List<YtmTrack> _tracks = [];
   bool _isLoading = false;
+  bool _isDownloading = false;
+  bool _isSaving = false;
   String? _errorMessage;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -219,33 +221,56 @@ class _OnlinePlaylistDetailScreenState
   }
 
   Future<void> _downloadAll() async {
-    if (_tracks.isEmpty) return;
-    final l10n = context.l10n;
-    final songs = _tracks.map((t) => t.toSongData()).toList();
-    final downloadCubit = getIt<YtmDownloadCubit>();
-    final report = await downloadCubit.downloadAllDetailed(songs);
+    if (_tracks.isEmpty || _isDownloading) return;
+    setState(() => _isDownloading = true);
+    try {
+      final l10n = context.l10n;
+      // The visible list is capped for rendering; fetch the complete playlist
+      // so "download all" queues every track, not just the preview window.
+      var tracks = _tracks;
+      try {
+        final fullTracks = await getIt<YtmService>()
+            .getPlaylistTracks(
+              widget.args.playlistId,
+              limit: kYtmMaxPlaylistTracks,
+            )
+            .timeout(const Duration(seconds: 120));
+        if (fullTracks.isNotEmpty) tracks = fullTracks;
+      } catch (e) {
+        debugPrint(
+            '[ONLINE_PLAYLIST] Full track fetch for download failed: $e');
+      }
+      if (_disposed || !mounted) return;
 
-    final summary = report.queued > 0
-        ? l10n.queuedFromTitle(report.queued, _title)
-        : l10n.allDownloaded(_title);
-    final extras = describeBatchOutcomeExtras(
-      l10n,
-      capped: report.capped,
-      skippedLocal: report.skippedLocal,
-      failed: report.failed,
-      firstError: report.firstError,
-    );
-    if (mounted) {
-      PulsrToast.show(
-        context,
-        message: '$summary$extras',
-        duration: const Duration(seconds: 4),
+      final songs = tracks.map((t) => t.toSongData()).toList();
+      final downloadCubit = getIt<YtmDownloadCubit>();
+      final report = await downloadCubit.downloadAllDetailed(songs);
+
+      final summary = report.queued > 0
+          ? l10n.queuedFromTitle(report.queued, _title)
+          : l10n.allDownloaded(_title);
+      final extras = describeBatchOutcomeExtras(
+        l10n,
+        capped: report.capped,
+        skippedLocal: report.skippedLocal,
+        failed: report.failed,
+        firstError: report.firstError,
       );
+      if (mounted) {
+        PulsrToast.show(
+          context,
+          message: '$summary$extras',
+          duration: const Duration(seconds: 4),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
     }
   }
 
   Future<void> _saveToLocalPlaylists() async {
-    if (_tracks.isEmpty) return;
+    if (_tracks.isEmpty || _isSaving) return;
+    setState(() => _isSaving = true);
     // Captured before async gaps (no context-across-gap).
     final saveFailedText = context.l10n.saveFailed;
     final loc = context.l10n;
@@ -307,6 +332,8 @@ class _OnlinePlaylistDetailScreenState
           isError: true,
         );
       }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -424,7 +451,7 @@ class _OnlinePlaylistDetailScreenState
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _downloadAll,
+                      onPressed: _isDownloading ? null : _downloadAll,
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: Text(context.l10n.downloadAll,
                           style: TextStyle(
@@ -443,7 +470,7 @@ class _OnlinePlaylistDetailScreenState
                   const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _saveToLocalPlaylists,
+                      onPressed: _isSaving ? null : _saveToLocalPlaylists,
                       icon: const Icon(Icons.playlist_add_rounded, size: 18),
                       label: Text(context.l10n.saveToPulsr,
                           style: TextStyle(

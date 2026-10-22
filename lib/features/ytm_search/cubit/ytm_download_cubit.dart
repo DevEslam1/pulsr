@@ -359,9 +359,12 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   /// - [queued]: newly admitted downloads,
   /// - [alreadyActive]: already queued/running in this session,
   /// - [skippedLocal]: already on device (or a local row exists),
-  /// - [capped]: beyond [maxBatch], left for a follow-up run,
+  /// - [capped]: beyond an explicit [maxBatch]; zero when [maxBatch] is null,
   /// - [failed]: admission refused (network policy, storage, invalid id),
   ///   with [firstError] carrying the first refusal message.
+  ///
+  /// [maxBatch] is optional on purpose: a playlist download must queue the
+  /// whole playlist, not silently drop everything past an arbitrary cutoff.
   Future<
           ({
             int queued,
@@ -372,7 +375,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
             String? firstError,
           })>
       downloadAllDetailed(Iterable<SongsTableData> songs,
-          {int maxBatch = 50}) async {
+          {int? maxBatch}) async {
     var queuedCount = 0;
     var skippedLocal = 0;
     var alreadyActive = 0;
@@ -403,7 +406,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
         continue;
       }
       // A paused row is resumed, not admitted, so the cap does not apply.
-      if (current.status != YtDownloadStatus.paused &&
+      if (maxBatch != null &&
+          current.status != YtDownloadStatus.paused &&
           queuedCount + failed >= maxBatch) {
         capped++;
         continue;
@@ -434,7 +438,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   }
 
   Future<int> downloadAll(Iterable<SongsTableData> songs,
-          {int maxBatch = 50}) async =>
+          {int? maxBatch}) async =>
       (await downloadAllDetailed(songs, maxBatch: maxBatch)).queued;
 
   Future<void> retryDownload(SongsTableData song) async {

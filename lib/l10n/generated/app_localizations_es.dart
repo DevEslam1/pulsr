@@ -185,6 +185,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get eqEngineSubtitle => 'Filtrado paramétrico biquad directo';
 
   @override
+  String get eqAutoPreamp => 'Preamplificador automático';
+
+  @override
   String get truePeakLimiterTitle => 'Limitador de pico real';
 
   @override
@@ -502,6 +505,44 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get apply => 'Aplicar';
+
+  @override
+  String get increase => 'Aumentar';
+
+  @override
+  String get decrease => 'Disminuir';
+
+  @override
+  String get sheetDragHandle => 'Control de arrastre de la hoja';
+
+  @override
+  String get sheetDragDownToDismiss => 'Arrastra hacia abajo para cerrar';
+
+  @override
+  String get vinylDisc => 'Disco de vinilo';
+
+  @override
+  String get swipeAgainOrTapToConfirm =>
+      'Desliza de nuevo o toca para confirmar';
+
+  @override
+  String get settingsUiSoundEffects => 'Efectos de sonido de la interfaz';
+
+  @override
+  String get settingsUiSoundEffectsSubtitle =>
+      'Reproducir una respuesta sonora sutil al interactuar';
+
+  @override
+  String get lyricsTranslate => 'Traducir letra';
+
+  @override
+  String get lyricsRomanize => 'Romanizar letra';
+
+  @override
+  String get lyricsOriginal => 'Letra original';
+
+  @override
+  String get lyricsShareCard => 'Compartir tarjeta de letra';
 
   @override
   String get noSongsFound => 'No se encontraron canciones';
@@ -7059,6 +7100,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get headphoneSafetyStandard =>
       'Estándar acústico WHO-ITU H.870 / EN 62368-1';
+
+  @override
+  String get headphoneSafetyToggleTitle => 'Atenuación de seguridad automática';
+
+  @override
+  String get headphoneSafetyToggleDesc =>
+      'Cuando la dosis semanal alcanza el 100%, active suavemente un limitador de seguridad anticipado para limitar el pico de salida a -6 dBFS.';
 
   @override
   String get weeklySoundAllowance => 'Asignación semanal de sonido';

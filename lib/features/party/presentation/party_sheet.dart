@@ -71,9 +71,11 @@ class _PartySheetState extends State<PartySheet> {
         nickname: nick.isNotEmpty ? nick : null,
       );
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _isCreating = false);
@@ -97,9 +99,11 @@ class _PartySheetState extends State<PartySheet> {
         nickname: nick.isNotEmpty ? nick : null,
       );
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _isJoining = false);
@@ -541,13 +545,17 @@ class _PartySheetState extends State<PartySheet> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            member.displayName,
-                            style: TextStyle(
-                              fontSize: AppFontSize.body,
-                              fontWeight:
-                                  isMe ? FontWeight.w800 : FontWeight.w600,
-                              color: p.textPrimary,
+                          Flexible(
+                            child: Text(
+                              member.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppFontSize.body,
+                                fontWeight:
+                                    isMe ? FontWeight.w800 : FontWeight.w600,
+                                color: p.textPrimary,
+                              ),
                             ),
                           ),
                           if (isMe) ...[

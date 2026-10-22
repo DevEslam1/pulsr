@@ -400,6 +400,12 @@ abstract class AppLocalizations {
   /// **'Direct biquad parametric filtering'**
   String get eqEngineSubtitle;
 
+  /// No description provided for @eqAutoPreamp.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Preamp'**
+  String get eqAutoPreamp;
+
   /// No description provided for @truePeakLimiterTitle.
   ///
   /// In en, this message translates to:
@@ -1017,6 +1023,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Apply'**
   String get apply;
+
+  /// No description provided for @increase.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase'**
+  String get increase;
+
+  /// No description provided for @decrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease'**
+  String get decrease;
+
+  /// No description provided for @sheetDragHandle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheet drag handle'**
+  String get sheetDragHandle;
+
+  /// No description provided for @sheetDragDownToDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag down to dismiss'**
+  String get sheetDragDownToDismiss;
+
+  /// No description provided for @vinylDisc.
+  ///
+  /// In en, this message translates to:
+  /// **'Vinyl disc'**
+  String get vinylDisc;
+
+  /// No description provided for @swipeAgainOrTapToConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe again or tap to confirm'**
+  String get swipeAgainOrTapToConfirm;
+
+  /// No description provided for @settingsUiSoundEffects.
+  ///
+  /// In en, this message translates to:
+  /// **'UI Sound Effects'**
+  String get settingsUiSoundEffects;
+
+  /// No description provided for @settingsUiSoundEffectsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Play subtle audio feedback for interactions'**
+  String get settingsUiSoundEffectsSubtitle;
+
+  /// No description provided for @lyricsTranslate.
+  ///
+  /// In en, this message translates to:
+  /// **'Translate lyrics'**
+  String get lyricsTranslate;
+
+  /// No description provided for @lyricsRomanize.
+  ///
+  /// In en, this message translates to:
+  /// **'Romanize lyrics'**
+  String get lyricsRomanize;
+
+  /// No description provided for @lyricsOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original lyrics'**
+  String get lyricsOriginal;
+
+  /// No description provided for @lyricsShareCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Share lyrics card'**
+  String get lyricsShareCard;
 
   /// No description provided for @noSongsFound.
   ///
@@ -12647,6 +12725,18 @@ abstract class AppLocalizations {
   /// **'WHO-ITU H.870 / EN 62368-1 Acoustic Standard'**
   String get headphoneSafetyStandard;
 
+  /// No description provided for @headphoneSafetyToggleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic Safety Attenuation'**
+  String get headphoneSafetyToggleTitle;
+
+  /// No description provided for @headphoneSafetyToggleDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When weekly dose reaches 100%, smoothly engage a lookahead safety limiter to clamp output peak to -6 dBFS.'**
+  String get headphoneSafetyToggleDesc;
+
   /// No description provided for @weeklySoundAllowance.
   ///
   /// In en, this message translates to:
@@ -14930,6 +15020,4 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   throw FlutterError(
       'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
       'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
-}
+      'on GitHub with a reproducible samp

@@ -47,7 +47,7 @@ class PulsrPressable extends StatefulWidget {
 class _PulsrPressableState extends State<PulsrPressable>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _scaleAnimation;
+  late Animation<double> _scaleAnimation;
   bool _focused = false;
 
   @override
@@ -58,6 +58,10 @@ class _PulsrPressableState extends State<PulsrPressable>
       duration: widget.duration,
       reverseDuration: const Duration(milliseconds: 180),
     );
+    _configureScaleAnimation();
+  }
+
+  void _configureScaleAnimation() {
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: widget.pressedScale,
@@ -66,6 +70,17 @@ class _PulsrPressableState extends State<PulsrPressable>
       curve: Curves.easeInOutQuad,
       reverseCurve: Curves.easeOutBack,
     ));
+  }
+
+  @override
+  void didUpdateWidget(covariant PulsrPressable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.duration != widget.duration) {
+      _controller.duration = widget.duration;
+    }
+    if (oldWidget.pressedScale != widget.pressedScale) {
+      _configureScaleAnimation();
+    }
   }
 
   @override

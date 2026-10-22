@@ -13,6 +13,7 @@ import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
+import '../cubit/proxy_endpoint_validator.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import '../../../core/utils/input_sanitizer.dart';
@@ -172,34 +173,62 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     if (form != null && !form.validate()) return;
 
     final port = int.tryParse(_portController.text.trim()) ?? 8080;
+    final host = _hostController.text.trim();
+    if (_enabled) {
+      final validationError =
+          validateProxyHostAndPort(host: host, port: port);
+      if (validationError != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(validationError),
+            backgroundColor: context.palette.error,
+          ),
+        );
+        return;
+      }
+    }
     final cubit = context.read<SettingsCubit>();
 
-    await cubit.setProxySettings(
-      enabled: _enabled,
-      type: _type,
-      host: _hostController.text.trim(),
-      port: port,
-      username: _usernameController.text.trim(),
-      password: _passwordController.text,
-      bypassHosts: _bypassController.text.trim(),
-    );
+    var saved = false;
+    try {
+      saved = await cubit.setProxySettings(
+        enabled: _enabled,
+        type: _type,
+        host: host,
+        port: port,
+        username: _usernameController.text.trim(),
+        password: _passwordController.text,
+        bypassHosts: _bypassController.text.trim(),
+      );
+    } catch (_) {
+      saved = false;
+    }
 
-    if (mounted) {
+    if (!mounted) return;
+    if (!saved) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_rounded,
-                  color: context.palette.success, size: 20),
-              const SizedBox(width: AppSpacing.s10),
-              Text(context.l10n.proxySaved),
-            ],
-          ),
-          backgroundColor: context.palette.surfaceContainerHigh,
-          behavior: SnackBarBehavior.floating,
+          content: Text(cubit.state.errorMessage ?? context.l10n.saveFailed),
+          backgroundColor: context.palette.error,
         ),
       );
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle_rounded,
+                color: context.palette.success, size: 20),
+            const SizedBox(width: AppSpacing.s10),
+            Text(context.l10n.proxySaved),
+          ],
+        ),
+        backgroundColor: context.palette.surfaceContainerHigh,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _runTest() async {

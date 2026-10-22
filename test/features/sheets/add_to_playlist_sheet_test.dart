@@ -41,6 +41,10 @@ void main() {
 
   setUp(() {
     mockPlaylistUseCases = MockPlaylistUseCases();
+    registerFallbackValue(dummySong);
+    when(() => mockPlaylistUseCases.ensureSongPersisted(any())).thenAnswer(
+        (invocation) async =>
+            Right((invocation.positionalArguments.first as SongsTableData).id));
   });
 
   testWidgets(

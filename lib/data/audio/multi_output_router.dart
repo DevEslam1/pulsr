@@ -26,27 +26,39 @@ class MultiOutputRouter {
   Stream<MultiOutputMode> get changes => _changeSubject.stream;
 
   Future<bool> setMode(MultiOutputMode next) async {
-    mode = next;
-    if (!_changeSubject.isClosed) _changeSubject.add(next);
     if (next == MultiOutputMode.systemDefault) {
+      mode = next;
       lastRouteSupported = true;
       lastError = null;
+      if (!_changeSubject.isClosed) _changeSubject.add(next);
       return true;
     }
+
+    final previous = mode;
     try {
       final result =
           await _channel.invokeMethod<String>('setMultiOutputRoute', {
         'mode': next.name,
       }).timeout(const Duration(seconds: 3));
-      lastRouteSupported = result != 'unsupported';
-      lastError = lastRouteSupported ? null : 'unsupported';
-      return lastRouteSupported;
+      if (result == 'unsupported') {
+        mode = previous;
+        lastRouteSupported = false;
+        lastError = 'unsupported';
+        return false;
+      }
+      mode = next;
+      lastRouteSupported = true;
+      lastError = null;
+      if (!_changeSubject.isClosed) _changeSubject.add(next);
+      return true;
     } on MissingPluginException catch (e) {
+      mode = previous;
       lastRouteSupported = false;
       lastError = e.toString();
       return false;
     } catch (e) {
-      // Timeout / platform errors: keep playback alive on system default.
+      // Timeout / platform errors: keep playback alive on the last known route.
+      mode = previous;
       lastRouteSupported = false;
       lastError = e.toString();
       return false;

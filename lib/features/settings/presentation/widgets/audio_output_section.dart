@@ -271,9 +271,10 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
-                      context.l10n.settingsOutputDeviceConfigHint(
-                          (dev?.sampleRate ?? 44100) ~/ 1000,
-                          dev?.bitDepth ?? 16),
+                      dev != null && dev.sampleRate > 0 && dev.bitDepth > 0
+                          ? context.l10n.settingsOutputDeviceConfigHint(
+                              dev.sampleRate ~/ 1000, dev.bitDepth)
+                          : context.l10n.settingsTapToManage,
                       style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.caption,

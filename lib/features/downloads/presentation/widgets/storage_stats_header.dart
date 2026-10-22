@@ -36,29 +36,40 @@ class StorageStatsHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(Icons.pie_chart_outline_rounded,
-                      size: 20, color: p.accent),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    l10n.storageUsed,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: AppFontSize.body,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(Icons.pie_chart_outline_rounded,
+                        size: 20, color: p.accent),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        l10n.storageUsed,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: AppFontSize.body,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              Text(
-                '$usedStr / ${l10n.storageFree}: $freeStr',
-                style: TextStyle(
-                  color: p.textSecondary,
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w500,
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: Text(
+                  '$usedStr / ${l10n.storageFree}: $freeStr',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],

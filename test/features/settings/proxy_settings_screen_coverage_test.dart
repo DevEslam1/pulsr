@@ -37,7 +37,7 @@ void main() {
           username: any(named: 'username'),
           password: any(named: 'password'),
           bypassHosts: any(named: 'bypassHosts'),
-        )).thenAnswer((_) async {});
+        )).thenAnswer((_) async => true);
     when(() => cubit.importProxiesFromText(any())).thenAnswer((_) async => 2);
     when(() => cubit.clearProxyList()).thenAnswer((_) async {});
     when(() => cubit.testAllProxies()).thenAnswer((_) async {});

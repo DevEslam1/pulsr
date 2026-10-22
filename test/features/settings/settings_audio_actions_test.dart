@@ -209,6 +209,7 @@ void main() {
       final cubit = makeCubit();
       addTearDown(cubit.close);
 
+      await cubit.preferencesReady;
       await cubit.setBitPerfectOutput(true);
       // The stubbed native layer refuses; the preference must not claim ON.
       expect(cubit.state.bitPerfectOutput, false);

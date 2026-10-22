@@ -68,7 +68,9 @@ class GlassContainer extends StatelessWidget {
     this.enableBlur = true,
     this.specularHighlight = false,
     this.tintFactor,
-  }) : isLiquid = tier == GlassTier.liquid;
+  })  : assert(border == null || shape == null,
+            'Provide either border or shape, not both'),
+        isLiquid = tier == GlassTier.liquid;
 
   /// Factory constructor configured for iOS 26/27 refractive Liquid Glass.
   /// Uses a higher blur sigma (24.0), specular top hairline, and squircle curvature.
@@ -86,7 +88,9 @@ class GlassContainer extends StatelessWidget {
     this.enableBlur = true,
     this.specularHighlight = true,
     this.tintFactor,
-  })  : tier = GlassTier.liquid,
+  })  : assert(border == null || shape == null,
+            'Provide either border or shape, not both'),
+        tier = GlassTier.liquid,
         isLiquid = true;
 
   /// Solid non-blurred surface tier avoiding backdrop filter passes entirely.
@@ -101,7 +105,9 @@ class GlassContainer extends StatelessWidget {
     this.color,
     this.boxShadow,
     this.tintFactor,
-  })  : tier = GlassTier.solid,
+  })  : assert(border == null || shape == null,
+            'Provide either border or shape, not both'),
+        tier = GlassTier.solid,
         blur = 0.0,
         enableBlur = false,
         specularHighlight = false,
@@ -121,7 +127,9 @@ class GlassContainer extends StatelessWidget {
     this.enableBlur = true,
     this.specularHighlight = false,
     this.tintFactor,
-  })  : tier = GlassTier.standard,
+  })  : assert(border == null || shape == null,
+            'Provide either border or shape, not both'),
+        tier = GlassTier.standard,
         blur = preset.blur,
         opacity = preset.opacity,
         isLiquid = preset == GlassPreset.dock;

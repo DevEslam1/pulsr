@@ -369,13 +369,18 @@ class HiResAudioService {
           category: 'HiResAudio');
       return false;
     }
-    final devRates = _cachedOutputInfo?.supportedSampleRates;
+    final cached = _cachedOutputInfo;
+    final supportedRates = cached == null
+        ? const <int>[]
+        : supportedSampleRateOptions(
+            deviceSampleRates: cached.supportedSampleRates,
+            directFormats: cached.directFormats,
+          );
     if (sampleRate > 0 &&
-        devRates != null &&
-        devRates.isNotEmpty &&
-        !devRates.contains(sampleRate)) {
+        supportedRates.isNotEmpty &&
+        !supportedRates.contains(sampleRate)) {
       ErrorLogger.log(
-        'Rejected sample rate $sampleRate not supported by current device ($devRates)',
+        'Rejected sample rate $sampleRate not supported by current device ($supportedRates)',
         category: 'HiResAudio',
       );
       return false;

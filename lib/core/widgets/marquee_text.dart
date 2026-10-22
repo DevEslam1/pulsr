@@ -37,6 +37,7 @@ class _MarqueeTextState extends State<MarqueeText> {
   bool _isScrolling = false;
   bool _isHovered = false;
   int _scrollGeneration = 0;
+  double _currentMaxScroll = 0;
 
   double get _effectiveVelocity => widget.scrollSpeed ?? widget.velocity;
 
@@ -49,7 +50,12 @@ class _MarqueeTextState extends State<MarqueeText> {
   @override
   void didUpdateWidget(covariant MarqueeText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text) {
+    if (oldWidget.text != widget.text ||
+        oldWidget.style != widget.style ||
+        oldWidget.textAlign != widget.textAlign ||
+        oldWidget.blankSpace != widget.blankSpace ||
+        oldWidget.velocity != widget.velocity ||
+        oldWidget.scrollSpeed != widget.scrollSpeed) {
       _stopScrolling();
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(0.0);
@@ -181,6 +187,7 @@ class _MarqueeTextState extends State<MarqueeText> {
             availableWidth <= 0 ||
             !availableWidth.isFinite) {
           _stopScrolling();
+          _currentMaxScroll = 0;
           return Tooltip(
             message: widget.text,
             child: Text(
@@ -196,9 +203,16 @@ class _MarqueeTextState extends State<MarqueeText> {
         // Text overflows -> animate marquee
         final maxScroll = textWidth - availableWidth + widget.blankSpace;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && context.motionEnabled && !_isScrolling) {
-            _startScrolling(maxScroll);
+          if (!mounted || !context.motionEnabled) return;
+          if (_isScrolling &&
+              (_currentMaxScroll - maxScroll).abs() > 0.5) {
+            _stopScrolling();
+            if (_scrollController.hasClients) {
+              _scrollController.jumpTo(0.0);
+            }
           }
+          _currentMaxScroll = maxScroll;
+          if (!_isScrolling) _startScrolling(maxScroll);
         });
 
         Widget marquee = SizedBox(

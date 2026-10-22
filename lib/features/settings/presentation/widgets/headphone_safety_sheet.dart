@@ -1,7 +1,9 @@
 // lib/features/settings/presentation/widgets/headphone_safety_sheet.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -41,6 +43,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
   void initState() {
     super.initState();
     _refreshState();
+    unawaited(_loadSafetyPreference());
     _pollTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (mounted) _pollTelemetry();
     });
@@ -71,6 +74,28 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
     }
   }
 
+  Future<void> _loadSafetyPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedSafety = prefs.getBool(PrefsKeys.headphoneSafetyEnabled);
+      if (!mounted || savedSafety == null) return;
+      setState(() => _safetyEnabled = savedSafety);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read headphone safety preference',
+          error: e, stackTrace: st, category: 'HeadphoneSafetySheet');
+    }
+  }
+
+  Future<void> _persistSafetyEnabled(bool enabled) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(PrefsKeys.headphoneSafetyEnabled, enabled);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist headphone safety preference',
+          error: e, stackTrace: st, category: 'HeadphoneSafetySheet');
+    }
+  }
+
   Future<void> _pollTelemetry() async {
     try {
       final dose = await _channel.getWeeklyDose();
@@ -98,7 +123,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
       );
       if (!mounted) return;
       setState(() => _safetyEnabled = enabled);
-      await _refreshState();
+      unawaited(_persistSafetyEnabled(enabled));
     } catch (e, st) {
       ErrorLogger.log('Headphone safety was not applied',
           error: e, stackTrace: st, category: 'HeadphoneSafetySheet');
@@ -276,12 +301,12 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
             // Protection Switch Tile
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text(
-                "Automatic Safety Attenuation",
-                style: TextStyle(fontWeight: FontWeight.w600),
+              title: Text(
+                context.l10n.headphoneSafetyToggleTitle,
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
-                "When weekly dose reaches 100%, smoothly engage lookahead safety limiter to clamp output peak to -6 dBFS.",
+                context.l10n.headphoneSafetyToggleDesc,
                 style: TextStyle(
                     color: p.textSecondary, fontSize: AppFontSize.caption),
               ),

@@ -72,6 +72,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   double? _lastHapticCheckMs;
   ({int startIndex, int visibleCount})? _dragFrozenWindow;
   double _zoomScale = 1.0;
+  double _zoomStartScale = 1.0;
   int _lastScaleMs = 0;
   bool _dragStarted = false;
 
@@ -233,6 +234,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             setState(() => _zoomScale = 1.0);
                           }
                         },
+                        onScaleStart: (_) {
+                          _zoomStartScale = _zoomScale;
+                          _lastScaleMs = 0;
+                        },
                         onScaleUpdate: (details) {
                           if (details.scale != 1.0) {
                             final now = DateTime.now().millisecondsSinceEpoch;
@@ -243,9 +248,11 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                 // it so an extreme pinch cannot overflow.
                                 final clampedScale =
                                     details.scale.clamp(0.1, 10.0);
-                                _zoomScale = (_zoomScale * clampedScale).clamp(
-                                    PlayerConstants.waveformMinZoom,
-                                    PlayerConstants.waveformMaxZoom);
+                                _zoomScale =
+                                    (_zoomStartScale * clampedScale).clamp(
+                                  PlayerConstants.waveformMinZoom,
+                                  PlayerConstants.waveformMaxZoom,
+                                );
                                 // BUG-08: if a scrub is in progress, re-freeze the
                                 // window at the new zoom so coordinate mapping stays
                                 // accurate.

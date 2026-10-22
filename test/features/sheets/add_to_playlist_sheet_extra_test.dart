@@ -61,14 +61,20 @@ void main() {
   setUpAll(() {
     registerFallbackValue(<int>[]);
     registerFallbackValue('');
+    registerFallbackValue(dummySong);
   });
 
   setUp(() {
     useCases = MockPlaylistUseCases();
+    when(() => useCases.ensureSongPersisted(any())).thenAnswer((invocation) async {
+      final song = invocation.positionalArguments.first as SongsTableData;
+      return Right(song.id);
+    });
   });
 
   Future<void> pumpSheet(
     WidgetTester tester, {
+    SongsTableData song = dummySong,
     List<SongsTableData>? songs,
   }) async {
     tester.view.physicalSize = const Size(800, 1400);
@@ -87,7 +93,7 @@ void main() {
                   MaterialPageRoute(
                     builder: (_) => Scaffold(
                       body: AddToPlaylistSheet(
-                        song: dummySong,
+                        song: song,
                         songs: songs,
                         playlistUseCases: useCases,
                       ),
@@ -228,5 +234,72 @@ void main() {
 
     verify(() => useCases.addSongsToPlaylist(1, [101, 102])).called(1);
     verifyNever(() => useCases.addSongToPlaylist(any(), any()));
+  });
+
+  testWidgets('persists an online song and adds its resolved row id',
+      (tester) async {
+    const onlineSong = SongsTableData(
+      id: -42,
+      title: 'Streamed Song',
+      artist: 'YouTube',
+      album: '',
+      path: 'ytmusic://vid42',
+      durationMs: 200000,
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      dateAdded: 0,
+      lastPositionMs: 0,
+      source: SongSource.youtube,
+      remoteId: 'vid42',
+    );
+    when(() => useCases.watchPlaylists())
+        .thenAnswer((_) => Stream.value(Right([playlist])));
+    when(() => useCases.ensureSongPersisted(onlineSong))
+        .thenAnswer((_) async => const Right(777));
+    when(() => useCases.addSongToPlaylist(1, 777))
+        .thenAnswer((_) async => const Right(null));
+
+    await pumpSheet(tester, song: onlineSong);
+    await tester.tap(find.text('My Favorites'));
+    await tester.pumpAndSettle();
+
+    verify(() => useCases.ensureSongPersisted(onlineSong)).called(1);
+    verify(() => useCases.addSongToPlaylist(1, 777)).called(1);
+  });
+
+  testWidgets('unpersistable song surfaces the failure and skips the insert',
+      (tester) async {
+    when(() => useCases.watchPlaylists())
+        .thenAnswer((_) => Stream.value(Right([playlist])));
+    when(() => useCases.ensureSongPersisted(any()))
+        .thenAnswer((_) async => const Left(DatabaseFailure('song gone')));
+
+    await pumpSheet(tester);
+    await tester.tap(find.text('My Favorites'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('song gone'), findsOneWidget);
+    verifyNever(() => useCases.addSongToPlaylist(any(), any()));
+    expect(find.text('My Favorites'), findsOneWidget);
+  });
+
+  testWidgets('batch mode persists every song before adding', (tester) async {
+    when(() => useCases.watchPlaylists())
+        .thenAnswer((_) => Stream.value(Right([playlist])));
+    when(() => useCases.ensureSongPersisted(any())).thenAnswer(
+        (invocation) async {
+      final song = invocation.positionalArguments.first as SongsTableData;
+      return Right(song.id == 102 ? 202 : song.id);
+    });
+    when(() => useCases.addSongsToPlaylist(1, any()))
+        .thenAnswer((_) async => const Right(null));
+    await pumpSheet(tester, songs: [dummySong, dummySong2]);
+
+    await tester.tap(find.text('My Favorites'));
+    await tester.pumpAndSettle();
+
+    verify(() => useCases.addSongsToPlaylist(1, [101, 202])).called(1);
   });
 }

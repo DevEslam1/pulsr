@@ -20,6 +20,7 @@ Map<String, Object?> _output({
   int sampleRate = 48000,
   int bitDepth = 24,
   List<int> rates = const [44100, 48000, 96000],
+  List<Map<String, Object?>> directFormats = const [],
 }) =>
     <String, Object?>{
       'deviceName': name,
@@ -28,6 +29,7 @@ Map<String, Object?> _output({
       'bitDepth': bitDepth,
       'isBitPerfectActive': false,
       'supportedSampleRates': rates,
+      'directFormats': directFormats,
     };
 
 void main() {
@@ -209,6 +211,29 @@ void main() {
             call.method == 'setTargetOutputFormat' ? true : _output());
     expect(await service.setTargetOutputFormat(sampleRate: 48000, bitDepth: 24),
         isTrue);
+  });
+
+  test('setTargetOutputFormat accepts a rate reported by direct formats',
+      () async {
+    responder = (call) => call.method == 'getAudioOutputInfo'
+        ? _output(
+            rates: const [],
+            directFormats: const [
+              {'encoding': '24', 'sampleRate': 192000, 'supported': true},
+            ],
+          )
+        : <String, Object?>{'success': true};
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      calls.add(call);
+      if (call.method == 'setTargetOutputFormat') return true;
+      return responder(call);
+    });
+
+    await service.getAudioOutputInfo();
+    expect(
+      await service.setTargetOutputFormat(sampleRate: 192000, bitDepth: 24),
+      isTrue,
+    );
   });
 
   test('Bluetooth helpers forward to the native codec controls', () async {

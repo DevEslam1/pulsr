@@ -51,42 +51,46 @@ class _CastSectionState extends State<CastSection> {
 
   Future<void> _init() async {
     setState(() => _scanning = true);
-    final sdk = await _service.isSessionAvailable();
-    if (!mounted) return;
-    setState(() {
-      _sdk = sdk;
-      if (sdk) {
-        _routes = _service.routes;
-        _session = _service.sessionStatus;
-      } else {
-        _devices = _service.devices;
-      }
-    });
+    try {
+      final sdk = await _service.isSessionAvailable();
+      if (!mounted) return;
+      setState(() {
+        _sdk = sdk;
+        if (sdk) {
+          _routes = _service.routes;
+          _session = _service.sessionStatus;
+        } else {
+          _devices = _service.devices;
+        }
+      });
 
-    if (sdk) {
-      _routeSub = _service.routesStream.listen((r) {
-        if (mounted) {
-          setState(() {
-            _routes = r;
-            _scanning = false;
-          });
-        }
-      });
-      _sessionSub = _service.sessionStream.listen((s) {
-        if (mounted) setState(() => _session = s);
-      });
-      await _service.startSessionDiscovery();
-    } else {
-      _deviceSub = _service.devicesStream.listen((d) {
-        if (mounted) {
-          setState(() {
-            _devices = d;
-            _scanning = false;
-          });
-        }
-      });
-      final supported = await _service.isSupported();
-      if (supported) await _service.startDiscovery();
+      if (sdk) {
+        _routeSub = _service.routesStream.listen((r) {
+          if (mounted) {
+            setState(() {
+              _routes = r;
+              _scanning = false;
+            });
+          }
+        });
+        _sessionSub = _service.sessionStream.listen((s) {
+          if (mounted) setState(() => _session = s);
+        });
+        await _service.startSessionDiscovery();
+      } else {
+        _deviceSub = _service.devicesStream.listen((d) {
+          if (mounted) {
+            setState(() {
+              _devices = d;
+              _scanning = false;
+            });
+          }
+        });
+        final supported = await _service.isSupported();
+        if (supported) await _service.startDiscovery();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _scanning = false);
     }
 
     // Safety timeout for the scanning spinner
@@ -100,12 +104,16 @@ class _CastSectionState extends State<CastSection> {
   Future<void> _rescan() async {
     if (_busy) return;
     setState(() => _scanning = true);
-    if (_sdk) {
-      await _service.stopSessionDiscovery();
-      await _service.startSessionDiscovery();
-    } else {
-      await _service.stopDiscovery();
-      await _service.startDiscovery();
+    try {
+      if (_sdk) {
+        await _service.stopSessionDiscovery();
+        await _service.startSessionDiscovery();
+      } else {
+        await _service.stopDiscovery();
+        await _service.startDiscovery();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _scanning = false);
     }
     Future.delayed(const Duration(seconds: 10), () {
       if (mounted && _scanning) {

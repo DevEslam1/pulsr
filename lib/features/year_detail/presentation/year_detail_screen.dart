@@ -163,22 +163,23 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                       subtitle: context.l10n.browseNoTracksInYear,
                     ),
                   )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (int i = 0; i < songs.length; i++)
-                        SongTile(
-                          song: songs[i],
-                          index: i,
-                          subtitleOverride:
-                              '${songs[i].artist} • ${songs[i].album}',
-                          onTap: () => context
-                              .read<PlayerCubit>()
-                              .playSong(songs[i], queue: songs),
-                          onMorePressed: () =>
-                              SongInfoSheet.show(context, song: songs[i]),
-                        ),
-                    ],
+                : null,
+            sliverBody: songs.isEmpty
+                ? null
+                : SliverList.builder(
+                    addAutomaticKeepAlives: false,
+                    itemCount: songs.length,
+                    itemBuilder: (context, i) => SongTile(
+                      song: songs[i],
+                      index: i,
+                      subtitleOverride:
+                          '${songs[i].artist} • ${songs[i].album}',
+                      onTap: () => context
+                          .read<PlayerCubit>()
+                          .playSong(songs[i], queue: songs),
+                      onMorePressed: () =>
+                          SongInfoSheet.show(context, song: songs[i]),
+                    ),
                   ),
           );
         }

@@ -934,7 +934,7 @@ class AudioQualitySheet extends StatelessWidget {
     // filter, so a hi-res tier the device cannot honour is never advertised.
     final supportedRates = HiResAudioService.supportedSampleRateOptions(
       deviceSampleRates: outputDevice?.supportedSampleRates ?? const [],
-      directFormats: const [],
+      directFormats: outputDevice?.directFormats ?? const [],
     );
     final options = <(int, String, String)>[
       (0, 'Auto', 'System managed'),
@@ -991,7 +991,7 @@ class AudioQualitySheet extends StatelessWidget {
                     title: opt.$2,
                     subtitle: opt.$3,
                     isSelected: isSelected,
-                    isEnabled: opt.$1 == 0 && !isBitPerfectActive,
+                    isEnabled: !isBitPerfectActive,
                     activeColor: activeColor,
                     palette: p,
                     onTap: () {
@@ -1079,7 +1079,7 @@ class AudioQualitySheet extends StatelessWidget {
                     title: opt.$2,
                     subtitle: opt.$3,
                     isSelected: isSelected,
-                    isEnabled: opt.$1 == 0 && !isBitPerfectActive,
+                    isEnabled: !isBitPerfectActive,
                     activeColor: activeColor,
                     palette: p,
                     onTap: () {

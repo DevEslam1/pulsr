@@ -66,14 +66,21 @@ class _YtmAccountDisconnectDialogState
   Future<void> _disconnect() async {
     if (_busy) return;
     final disconnectedText = context.l10n.ytmDisconnected;
+    final failureText = context.l10n.somethingWentWrong;
     setState(() => _busy = true);
     try {
       await widget.account.logout();
-    } finally {
       if (mounted) Navigator.pop(context);
       if (widget.hostContext.mounted) {
         ScaffoldMessenger.of(widget.hostContext).showSnackBar(
           SnackBar(content: Text(disconnectedText)),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+      if (widget.hostContext.mounted) {
+        ScaffoldMessenger.of(widget.hostContext).showSnackBar(
+          SnackBar(content: Text(failureText)),
         );
       }
     }

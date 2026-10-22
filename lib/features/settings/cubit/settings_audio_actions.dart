@@ -27,6 +27,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     if (!PlatformCapabilities.isAndroid) return false;
     // AAudio Direct bypasses the ExoPlayer DSP chain the USB tee lives in.
     if (state.aaudioOutputEnabled) return false;
+    // The direct sink writes to the USB device it opens; never start it while
+    // the media route is on Bluetooth, the speaker, or an unknown route.
+    if (state.currentOutputDevice?.isUsbDac != true) {
+      _lastDirectUsbFailure = 'The current output is not a USB DAC.';
+      return false;
+    }
     try {
       final usb = UsbExclusiveService();
       var status = usb.lastStatus;
@@ -491,27 +497,59 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// complete the route change, and return `true` so the caller does not also
   /// show a "switch unavailable" snackbar.
   Future<bool> selectOutputDevice(int deviceId) async {
+    final wasDirect = _bitPerfectViaDirectStream;
+    final wasBitPerfect = state.bitPerfectOutput || wasDirect;
+
+    // The direct sink owns the USB endpoint and mutes the HAL. Stop it before
+    // changing routes, otherwise the HAL stays silent or the sink keeps
+    // writing to the old DAC.
+    if (wasDirect) {
+      await _stopDirectUsbStreaming();
+      _bitPerfectViaDirectStream = false;
+    }
+
     final res = await _hiResAudioService.selectOutputDevice(deviceId);
     if (res.requiresSystemPicker) {
       // Retail ROM: direct routing is restricted. Hand off to the system
       // media-output panel which the user can operate without special
       // permissions. Return true so the sheet does not show an error snackbar.
+      if (wasBitPerfect) await _setBitPerfectOutput(false);
       await _hiResAudioService.openOutputSwitcher();
       await refreshOutputDevice();
       return true;
     }
     if (!res.success) {
+      if (wasBitPerfect) {
+        await refreshOutputDevice();
+        if (state.currentOutputDevice?.isUsbDac == true) {
+          await _setBitPerfectOutput(true);
+        } else {
+          await _setBitPerfectOutput(false);
+        }
+      }
       safeEmit(state.copyWith(
           errorMessage:
               'Could not switch the playback output (${res.error ?? "unavailable"}).'));
+      await refreshOutputDevice();
+      return false;
     }
+
     await refreshOutputDevice();
+    if (wasBitPerfect) {
+      final routeIsUsb = state.currentOutputDevice?.isUsbDac == true;
+      // Re-establish exclusive/direct output on the new USB route; turn the
+      // saved preference off when the route is no longer a DAC.
+      await _setBitPerfectOutput(routeIsUsb);
+    }
     return res.success;
   }
 
   Future<bool> openOutputSwitcher() => _hiResAudioService.openOutputSwitcher();
 
   Future<void> clearOutputDevice() async {
+    if (state.bitPerfectOutput || _bitPerfectViaDirectStream) {
+      await _setBitPerfectOutput(false);
+    }
     await _hiResAudioService.clearOutputDevice();
     await refreshOutputDevice();
   }

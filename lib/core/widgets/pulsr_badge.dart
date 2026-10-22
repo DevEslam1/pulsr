@@ -57,7 +57,7 @@ class PulsrBadge extends StatelessWidget {
     }
 
     if (dot) {
-      return Container(
+      final dotWidget = Container(
         width: 8.0,
         height: 8.0,
         decoration: BoxDecoration(
@@ -65,6 +65,10 @@ class PulsrBadge extends StatelessWidget {
           shape: BoxShape.circle,
         ),
       );
+      if (label == null || label!.isEmpty) {
+        return ExcludeSemantics(child: dotWidget);
+      }
+      return Semantics(label: label, child: dotWidget);
     }
 
     return Container(

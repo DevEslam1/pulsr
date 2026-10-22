@@ -63,6 +63,28 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
 
   Stream<Result<List<PlaylistsTableData>>>? _playlistsStream;
 
+  /// Resolves every song to a persisted `songs.id`. Online search results have
+  /// no row yet and stale local objects may point at an id a rescan replaced;
+  /// both would trip the playlist_entries foreign key otherwise. Returns null
+  /// after surfacing the failure.
+  Future<List<int>?> _resolvePersistedSongIds() async {
+    final ids = <int>[];
+    for (final song in _allSongs) {
+      final result = await _useCases.ensureSongPersisted(song);
+      final failure = result.fold<AppFailure?>((f) => f, (_) => null);
+      if (failure != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(failure.message)),
+          );
+        }
+        return null;
+      }
+      ids.add(result.getOrElse((_) => song.id));
+    }
+    return ids;
+  }
+
   void _showNewPlaylistDialog(BuildContext context) async {
     if (_isMutating) return;
     final name = await PulsrDialogHelper.showInputDialog(
@@ -77,6 +99,9 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
     if (name != null && name.isNotEmpty && context.mounted) {
       setState(() => _isMutating = true);
       try {
+        // Resolve before creating so a failure cannot leave an empty playlist.
+        final songIds = await _resolvePersistedSongIds();
+        if (songIds == null || !context.mounted) return;
         final result = await _useCases.createPlaylist(name);
         if (!context.mounted) return;
         final createdId = result.fold((failure) {
@@ -91,10 +116,9 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
         try {
           // Await the insert inside the try so `_isMutating` is not cleared before
           // the write completes (the previous async `fold` callback was dropped).
-          final insertResult = _allSongs.length == 1
-              ? await _useCases.addSongToPlaylist(createdId, widget.song.id)
-              : await _useCases.addSongsToPlaylist(
-                  createdId, _allSongs.map((s) => s.id).toList());
+          final insertResult = songIds.length == 1
+              ? await _useCases.addSongToPlaylist(createdId, songIds.single)
+              : await _useCases.addSongsToPlaylist(createdId, songIds);
           if (!context.mounted) return;
           final insertFailure =
               insertResult.fold<String?>((f) => f.message, (_) => null);
@@ -131,10 +155,11 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
     _activePlaylistMutations.add(playlist.id);
     setState(() => _isMutating = true);
     try {
-      final insertResult = _allSongs.length == 1
-          ? await _useCases.addSongToPlaylist(playlist.id, widget.song.id)
-          : await _useCases.addSongsToPlaylist(
-              playlist.id, _allSongs.map((s) => s.id).toList());
+      final songIds = await _resolvePersistedSongIds();
+      if (songIds == null) return;
+      final insertResult = songIds.length == 1
+          ? await _useCases.addSongToPlaylist(playlist.id, songIds.single)
+          : await _useCases.addSongsToPlaylist(playlist.id, songIds);
       if (!context.mounted) return;
       final insertFailure =
           insertResult.fold<String?>((f) => f.message, (_) => null);

@@ -114,7 +114,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
               ),
               actions: [
                 TextButton.icon(
-                  onPressed: state.isSubmitting
+                  onPressed: state.isSubmitting || _limitError != null
                       ? null
                       : () async {
                           final success = await cubit.savePlaylist();

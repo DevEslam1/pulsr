@@ -140,7 +140,16 @@ class _TagEditorViewState extends State<_TagEditorView> {
       metadataSearchService: getIt<MetadataSearchService>(),
     );
     try {
-      await _awaitInitialLoad(cubit);
+      final loaded = await _awaitInitialLoad(cubit);
+      if (!loaded) {
+        if (!mounted) return;
+        messenger?.clearSnackBars();
+        messenger?.showSnackBar(SnackBar(
+          content: Text(l10n.tagsSaveError),
+          backgroundColor: errorColor,
+        ));
+        return;
+      }
       await cubit.saveTags();
       if (!mounted) return;
       final state = cubit.state;
@@ -169,16 +178,17 @@ class _TagEditorViewState extends State<_TagEditorView> {
 
   /// Waits for the single-track editor's initial tag read to settle. Saving
   /// while the read is in flight is ignored by the cubit.
-  Future<void> _awaitInitialLoad(TagEditorCubit cubit) async {
-    for (var i = 0; i < 100; i++) {
-      if (cubit.isClosed) return;
+  Future<bool> _awaitInitialLoad(TagEditorCubit cubit) async {
+    for (var i = 0; i < 40; i++) {
+      if (cubit.isClosed) return false;
       final status = cubit.state.status;
       if (status != TagEditorStatus.loading &&
           status != TagEditorStatus.initial) {
-        return;
+        return true;
       }
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
+    return false;
   }
 
   @override

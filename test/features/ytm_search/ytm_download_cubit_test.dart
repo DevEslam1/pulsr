@@ -237,6 +237,21 @@ void main() {
       await cubit.close();
     });
 
+    test('queues an entire playlist when no batch cap is given', () async {
+      final cubit = build();
+      final songs = [
+        for (var i = 0; i < 60; i++)
+          remoteSong('bulk${i.toString().padLeft(8, '0')}', id: -(i + 1)),
+      ];
+
+      final result = await cubit.downloadAllDetailed(songs);
+
+      expect(result.queued, 60);
+      expect(result.capped, 0);
+      verify(() => mockDownloads.queueDownload(any())).called(60);
+      await cubit.close();
+    });
+
     test('downloadAll returns only the queued count', () async {
       final cubit = build();
       final count =

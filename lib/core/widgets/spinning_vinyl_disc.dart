@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../constants/app_colors.dart';
 import '../motion/pulsr_motion.dart';
+import '../utils/l10n_extensions.dart';
 import '../widgets/cached_artwork.dart';
 
 /// {@category DesignSystem}
@@ -197,7 +198,7 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
     }
     return Semantics(
       button: true,
-      label: 'Vinyl disc',
+      label: context.l10n.vinylDisc,
       child: content,
     );
   }

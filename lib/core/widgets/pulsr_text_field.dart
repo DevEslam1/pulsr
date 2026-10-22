@@ -43,7 +43,8 @@ class PulsrTextField extends StatelessWidget {
     this.maxLines = 1,
     this.readOnly = false,
     this.onTap,
-  });
+  }) : assert(!obscure || maxLines == 1,
+            'obscure fields must use maxLines == 1');
 
   @override
   Widget build(BuildContext context) {

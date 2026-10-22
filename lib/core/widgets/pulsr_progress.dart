@@ -88,7 +88,7 @@ class PulsrProgressBar extends StatelessWidget {
       child: SizedBox(
         height: height,
         child: LinearProgressIndicator(
-          value: value,
+          value: value?.clamp(0.0, 1.0),
           valueColor: AlwaysStoppedAnimation<Color>(activeColor),
           backgroundColor: trackColor,
         ),
