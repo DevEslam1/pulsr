@@ -206,7 +206,7 @@ extension EqualizerPresetOps on EqualizerManager {
 
     try {
       if (PlatformCapabilities.isAndroid) {
-        if ((eqString != null && eqString.isNotEmpty) ||
+        if (eqString != null ||
             (linearPhase != null && targetString.isNotEmpty)) {
           final loaded = await _effectsChannel.loadArbitraryEq(
             eqString: targetString,

@@ -463,7 +463,16 @@ class AudioQualitySheet extends StatelessWidget {
                           context,
                           icon: Icons.tune_rounded,
                           label: context.l10n.dspSourceSampleRateDepth,
-                          value: '${info.bitDepth} / ${info.sampleRate}',
+                          value: (info.sampleRate != 'Unknown' &&
+                                  info.sampleRate.isNotEmpty)
+                              ? ((info.bitDepth.isNotEmpty &&
+                                      info.bitDepth != 'Unknown')
+                                  ? '${info.sampleRate} / ${info.bitDepth}'
+                                  : info.sampleRate)
+                              : ((info.bitDepth.isNotEmpty &&
+                                      info.bitDepth != 'Unknown')
+                                  ? info.bitDepth
+                                  : context.l10n.dspUnknown),
                           subValue: info.channels,
                           p: p,
                         ),
@@ -613,10 +622,25 @@ class AudioQualitySheet extends StatelessWidget {
       );
     }
 
+    final hasExplicitCurrent = devices.any((d) => d.isCurrent);
+    final hasExplicitPreferred = devices.any((d) => d.isPreferred);
+    final fallbackTarget = !hasExplicitCurrent && !hasExplicitPreferred
+        ? devices.where((d) =>
+            outputDevice?.deviceName != null &&
+            outputDevice!.deviceName.isNotEmpty &&
+            outputDevice.deviceName != 'Default Audio Output' &&
+            outputDevice.deviceName != 'Output route unverified' &&
+            d.name.trim().toLowerCase() ==
+                outputDevice.deviceName.trim().toLowerCase()).firstOrNull ??
+          devices.firstOrNull
+        : null;
+
     return Column(
       children: [
         ...devices.map((dev) {
-          final isSelected = dev.isCurrent;
+          final isSelected = dev.isCurrent ||
+              (!hasExplicitCurrent && dev.isPreferred) ||
+              (fallbackTarget != null && dev.id == fallbackTarget.id);
           final devIcon = _getDeviceIcon(dev.type);
 
           return Padding(
@@ -694,11 +718,11 @@ class AudioQualitySheet extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                dev.isCurrent
-                                    ? 'Active route • ${_outputStreamDescription(outputDevice)}'
-                                    : dev.isPreferred
+                                isSelected
+                                    ? (dev.isPreferred && !dev.isCurrent
                                         ? 'Requested route • waiting for playback confirmation'
-                                        : '${dev.typeName} • available output',
+                                        : 'Active route • ${_outputStreamDescription(outputDevice)}')
+                                    : '${dev.typeName} • available output',
                                 style: TextStyle(
                                   color: p.textSecondary,
                                   fontSize: AppFontSize.caption,
@@ -1396,7 +1420,11 @@ class AudioQualitySheet extends StatelessWidget {
 
     final String sourceLabel = isDsd
         ? 'DSD Stream (${info.format})'
-        : '${info.format} (${info.sampleRate} / ${info.bitDepth})';
+        : (info.bitDepth.isNotEmpty && info.bitDepth != 'Unknown'
+            ? '${info.format} (${info.sampleRate} / ${info.bitDepth})'
+            : (info.sampleRate != 'Unknown' && info.sampleRate.isNotEmpty
+                ? '${info.format} (${info.sampleRate})'
+                : info.format));
     // Derive the DSP stage list from the live state instead of hardcoding it,
     // so the signal chain never claims processing that is switched off.
     var eqOn = false;

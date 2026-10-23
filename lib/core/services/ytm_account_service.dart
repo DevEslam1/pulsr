@@ -92,6 +92,7 @@ enum SessionValidationResult {
 @lazySingleton
 class YtmAccountService {
   String? _cachedLikedSongsBrowseId;
+  bool _isFetchingLikedSongs = false;
 
   /// Session cookies are full Google auth credentials — stored in
   /// Keystore/Keychain-backed secure storage, never as plaintext prefs. (BUG-023)
@@ -209,6 +210,7 @@ class YtmAccountService {
   String? get cookies => _cookies;
   String? get accountName => _accountName;
   String? get accountAvatar => _accountAvatar;
+  bool get isFetchingLikedSongs => _isFetchingLikedSongs;
 
   /// Raw datasyncId of the authenticated account — null until the first authenticated
   /// Innertube response is harvested. Used externally to gate account-bound poToken minting.
@@ -1262,269 +1264,298 @@ class YtmAccountService {
         if (e is YtmException && e.isAuth) rethrow;
         debugPrint(
             '[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
+        if (e is YtmException && (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
+          break;
+        }
       }
     }
     return [];
   }
 
-  /// Fetches private Liked Music playlist (`VLLM`, `FEmusic_liked_videos`, `LM`).
+  /// Fetches private Liked Music playlist (VLLM, FEmusic_liked_videos, LM).
   Future<List<YtmTrack>> fetchLikedSongs({int maxTracks = 200}) async {
     if (!isLoggedIn) {
       throw const YtmException('YTM_AUTH', 'Not signed in to YouTube Music');
     }
-
-    // Refresh cookies from native CookieManager if needed
-    final rawNative = await getNativeCookiesFromDomains();
-    final nativeCookies =
-        rawNative == null ? null : normalizeCookieHeader(rawNative);
-    if (nativeCookies != null &&
-        nativeCookies.isNotEmpty &&
-        looksLikeSignedInCookies(nativeCookies)) {
-      _cookies = nativeCookies;
-      unawaited(_persistCookies(nativeCookies));
+    if (_isFetchingLikedSongs) {
+      debugPrint('[YTM_ACCOUNT] Re-entrant fetchLikedSongs call aborted');
+      return [];
     }
+    _isFetchingLikedSongs = true;
 
-    final headers = _buildHeaders();
-    final orderedBrowseIds = {
-      if (_cachedLikedSongsBrowseId != null) _cachedLikedSongsBrowseId!,
-      'VLLM',
-      'FEmusic_liked_videos',
-      'FEmusic_liked_tracks',
-      'LM',
-      'VLSE',
-    }.toList();
+    try {
+      // Refresh cookies from native CookieManager if needed
+      final rawNative = await getNativeCookiesFromDomains();
+      final nativeCookies =
+          rawNative == null ? null : normalizeCookieHeader(rawNative);
+      if (nativeCookies != null &&
+          nativeCookies.isNotEmpty &&
+          looksLikeSignedInCookies(nativeCookies)) {
+        _cookies = nativeCookies;
+        unawaited(_persistCookies(nativeCookies));
+      }
 
-    for (final bId in orderedBrowseIds) {
-      try {
-        final body = jsonEncode({
-          'context': _buildClientContext('WEB_REMIX'),
-          'browseId': bId,
-        });
+      final headers = _buildHeaders();
+      final orderedBrowseIds = {
+        if (_cachedLikedSongsBrowseId != null) _cachedLikedSongsBrowseId!,
+        'VLLM',
+        'FEmusic_liked_videos',
+        'FEmusic_liked_tracks',
+        'LM',
+        'VLSE',
+      }.toList();
 
-        final response = await _postWithRetry(
-          Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
-          headers: headers,
-          body: body,
-        );
+      for (final bId in orderedBrowseIds) {
+        try {
+          final body = jsonEncode({
+            'context': _buildClientContext('WEB_REMIX'),
+            'browseId': bId,
+          });
 
-        debugPrint(
-            '[YTM_ACCOUNT] Liked songs query $bId: HTTP ${response.statusCode}, body length=${response.body.length}');
+          final response = await _postWithRetry(
+            Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+            headers: headers,
+            body: body,
+          );
 
-        if (response.statusCode == 200) {
-          var json = jsonDecode(response.body) as Map<String, dynamic>;
-          if (_isUnauthenticatedResponse(json)) {
-            debugPrint(
-                '[YTM_ACCOUNT] Liked songs returned unauthenticated on $bId, trying next candidate');
-            continue;
-          }
-
-          _harvestSessionState(json);
-          final tracks = _parsePlaylistTracks(json);
           debugPrint(
-              '[YTM_ACCOUNT] Liked songs query $bId parsed ${tracks.length} tracks'
-              ' (top-level keys: ${json.keys.take(8).join(', ')})');
+              '[YTM_ACCOUNT] Liked songs query $bId: HTTP ${response.statusCode}, body length=${response.body.length}');
 
-          if (tracks.isEmpty) {
-            debugPrint('[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks '
-                '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
-            // YouTube Music frequently delivers the liked-songs list only via
-            // continuation — the initial browse response is a header shell.
-            final initToken = _extractPlaylistContinuationToken(json);
-            if (initToken != null && initToken.isNotEmpty) {
+          if (response.statusCode == 200) {
+            var json = jsonDecode(response.body) as Map<String, dynamic>;
+            if (_isUnauthenticatedResponse(json)) {
               debugPrint(
-                  '[YTM_ACCOUNT] Initial browse had 0 tracks but continuation found, fetching...');
-              final contBody = jsonEncode({
-                'context': _buildClientContext('WEB_REMIX'),
-                'continuation': initToken,
-              });
-              final contRes = await _postWithRetry(
-                Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
-                headers: headers,
-                body: contBody,
-              );
-              if (contRes.statusCode == 200) {
-                final contJson =
-                    jsonDecode(contRes.body) as Map<String, dynamic>;
-                final contTracks = _parsePlaylistTracks(contJson);
-                debugPrint(
-                    '[YTM_ACCOUNT] Browse initial continuation parsed ${contTracks.length} tracks');
-                if (contTracks.isNotEmpty) {
-                  tracks.addAll(contTracks);
-                  // Continue pagination from the continuation response,
-                  // not the header shell (its token is already consumed).
-                  json = contJson;
-                } else {
-                  debugPrint(
-                      '[YTM_ACCOUNT] Continuation body returned 0 tracks '
-                      '(${contRes.body.length} B, keys: ${contJson.keys.take(8).join(', ')})');
-                }
-              }
+                  '[YTM_ACCOUNT] Liked songs returned unauthenticated on $bId, trying next candidate');
+              continue;
             }
-          }
 
-          if (tracks.isNotEmpty) {
-            _cachedLikedSongsBrowseId = bId;
-            final allTracks = List<YtmTrack>.from(tracks);
-            // NOTE: when the initial browse was a header shell, `tracks`
-            // already contains the first continuation page. `currentJson`
-            // must continue from the last continuation response, otherwise
-            // pagination replays the consumed token and stalls on duplicates.
-            // `json` is reassigned below when that path is taken.
-            var currentJson = json;
+            _harvestSessionState(json);
+            final tracks = _parsePlaylistTracks(json);
+            debugPrint(
+                '[YTM_ACCOUNT] Liked songs query $bId parsed ${tracks.length} tracks'
+                ' (top-level keys: ${json.keys.take(8).join(', ')})');
 
-            final seenVideoIds = tracks.map((t) => t.videoId).toSet();
-
-            // Fetch continuation pages until maxTracks is satisfied.
-            var pageCount = 0;
-            const maxPages = 100;
-            var consecutiveEmptyPages = 0;
-            while (allTracks.length < maxTracks && pageCount < maxPages) {
-              pageCount++;
-              try {
-                final ctoken = _extractPlaylistContinuationToken(currentJson);
-                if (ctoken == null || ctoken.isEmpty) break;
-
+            if (tracks.isEmpty) {
+              debugPrint('[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks '
+                  '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
+              // YouTube Music frequently delivers the liked-songs list only via
+              // continuation — the initial browse response is a header shell.
+              final initToken = _extractPlaylistContinuationToken(json);
+              if (initToken != null && initToken.isNotEmpty) {
+                debugPrint(
+                    '[YTM_ACCOUNT] Initial browse had 0 tracks but continuation found, fetching...');
                 final contBody = jsonEncode({
                   'context': _buildClientContext('WEB_REMIX'),
-                  'continuation': ctoken,
+                  'continuation': initToken,
                 });
-
-                final contResponse = await _postWithRetry(
+                final contRes = await _postWithRetry(
                   Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
                   headers: headers,
                   body: contBody,
                 );
-
-                if (contResponse.statusCode == 200) {
-                  currentJson =
-                      jsonDecode(contResponse.body) as Map<String, dynamic>;
-                  final contTracks = _parsePlaylistTracks(currentJson);
-                  final newTracks = contTracks
-                      .where((t) => seenVideoIds.add(t.videoId))
-                      .toList();
-                  if (newTracks.isEmpty) {
-                    consecutiveEmptyPages++;
-                    if (consecutiveEmptyPages >= 3) break;
-                    continue;
+                if (contRes.statusCode == 200) {
+                  final contJson =
+                      jsonDecode(contRes.body) as Map<String, dynamic>;
+                  final contTracks = _parsePlaylistTracks(contJson);
+                  debugPrint(
+                      '[YTM_ACCOUNT] Browse initial continuation parsed ${contTracks.length} tracks');
+                  if (contTracks.isNotEmpty) {
+                    tracks.addAll(contTracks);
+                    // Continue pagination from the continuation response,
+                    // not the header shell (its token is already consumed).
+                    json = contJson;
+                  } else {
+                    debugPrint(
+                        '[YTM_ACCOUNT] Continuation body returned 0 tracks '
+                        '(${contRes.body.length} B, keys: ${contJson.keys.take(8).join(', ')})');
                   }
-                  consecutiveEmptyPages = 0;
-                  allTracks.addAll(newTracks);
-                } else {
-                  break;
                 }
-              } catch (e) {
-                debugPrint(
-                    '[YTM_ACCOUNT] Liked songs continuation error on page $pageCount: $e');
-                break;
               }
             }
-            if (pageCount >= maxPages) {
-              debugPrint(
-                  '[YTM_ACCOUNT] Hit max continuation pages ($maxPages)');
+
+            if (tracks.isNotEmpty) {
+              _cachedLikedSongsBrowseId = bId;
+              final allTracks = List<YtmTrack>.from(tracks);
+              // NOTE: when the initial browse was a header shell, `tracks`
+              // already contains the first continuation page. `currentJson`
+              // must continue from the last continuation response, otherwise
+              // pagination replays the consumed token and stalls on duplicates.
+              // `json` is reassigned below when that path is taken.
+              var currentJson = json;
+
+              final seenVideoIds = tracks.map((t) => t.videoId).toSet();
+
+              // Fetch continuation pages until maxTracks is satisfied.
+              var pageCount = 0;
+              const maxPages = 100;
+              var consecutiveEmptyPages = 0;
+              while (allTracks.length < maxTracks && pageCount < maxPages) {
+                pageCount++;
+                try {
+                  final ctoken = _extractPlaylistContinuationToken(currentJson);
+                  if (ctoken == null || ctoken.isEmpty) break;
+
+                  final contBody = jsonEncode({
+                    'context': _buildClientContext('WEB_REMIX'),
+                    'continuation': ctoken,
+                  });
+
+                  final contResponse = await _postWithRetry(
+                    Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+                    headers: headers,
+                    body: contBody,
+                  );
+
+                  if (contResponse.statusCode == 200) {
+                    currentJson =
+                        jsonDecode(contResponse.body) as Map<String, dynamic>;
+                    final contTracks = _parsePlaylistTracks(currentJson);
+                    final newTracks = contTracks
+                        .where((t) => seenVideoIds.add(t.videoId))
+                        .toList();
+                    if (newTracks.isEmpty) {
+                      consecutiveEmptyPages++;
+                      if (consecutiveEmptyPages >= 3) break;
+                      continue;
+                    }
+                    consecutiveEmptyPages = 0;
+                    allTracks.addAll(newTracks);
+                  } else {
+                    break;
+                  }
+                } catch (e) {
+                  debugPrint(
+                      '[YTM_ACCOUNT] Liked songs continuation error on page $pageCount: $e');
+                  break;
+                }
+              }
+              if (pageCount >= maxPages) {
+                debugPrint(
+                    '[YTM_ACCOUNT] Hit max continuation pages ($maxPages)');
+              }
+
+              return allTracks.take(maxTracks).toList();
             }
-
-            return allTracks.take(maxTracks).toList();
+          }
+        } catch (e) {
+          if (e is YtmException && e.isAuth) rethrow;
+          debugPrint('[YTM_ACCOUNT] Liked songs fetch failed for $bId: $e');
+          if (e is YtmException &&
+              (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
+            break;
           }
         }
-      } catch (e) {
-        if (e is YtmException && e.isAuth) rethrow;
-        debugPrint('[YTM_ACCOUNT] Liked songs fetch failed for $bId: $e');
       }
-    }
 
-    // Try /next with playlistId: 'LM' / 'VLLM' (YouTube Music Queue / Liked playlist endpoint)
-    final nextPlaylistIds = ['LM', 'VLLM', 'FEmusic_liked_videos'];
-    for (final pId in nextPlaylistIds) {
-      try {
-        final body = jsonEncode({
-          'context': _buildClientContext('WEB_REMIX'),
-          'playlistId': pId,
-          'enablePersistentPlaylistPanel': true,
-          'isAudioOnly': true,
-        });
-        final response = await _postWithRetry(
-          Uri.parse(
-              'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
-          headers: headers,
-          body: body,
-        );
-        debugPrint(
-            '[YTM_ACCOUNT] Next endpoint query $pId: HTTP ${response.statusCode}, length=${response.body.length}');
-        if (response.statusCode == 200) {
-          final json = jsonDecode(response.body) as Map<String, dynamic>;
-          final tracks = _parseInnertubePlaylistTracks(json);
-          debugPrint(
-              '[YTM_ACCOUNT] Next endpoint query $pId parsed ${tracks.length} tracks');
-          if (tracks.isNotEmpty) {
-            return tracks.take(maxTracks).toList();
-          } else {
-            debugPrint('[YTM_ACCOUNT] Next endpoint $pId parsed nothing '
-                '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
-          }
-        }
-      } catch (e) {
-        debugPrint('[YTM_ACCOUNT] Next endpoint query error for $pId: $e');
-      }
-    }
+      final breaker =
+          getIt.isRegistered<YtmService>() ? getIt<YtmService>().breaker : null;
+      final isBlocked = breaker != null &&
+          (!breaker.shouldAllow(YtmBlockSignal.botChallenge) ||
+              !breaker.shouldAllow(YtmBlockSignal.rateLimited) ||
+              !breaker.shouldAllow(YtmBlockSignal.ipBlocked));
 
-    // Fallback: discover Liked Songs playlist directly from user's account library
-    try {
-      final playlists = await fetchAccountPlaylists();
-      debugPrint(
-          '[YTM_ACCOUNT] Discovered ${playlists.length} account playlists for liked songs resolution');
-      for (final p in playlists) {
-        final lowerTitle = p.title.toLowerCase();
-        final isLiked = p.playlistId.contains('LM') ||
-            lowerTitle.contains('like') ||
-            lowerTitle.contains('aimé') ||
-            lowerTitle.contains('favori') ||
-            lowerTitle.contains('j\'aime') ||
-            lowerTitle.contains('liebling');
-        if (isLiked) {
-          debugPrint(
-              '[YTM_ACCOUNT] Found Liked Music playlist in account: ${p.playlistId} (${p.title})');
-          final candidateIds = [p.playlistId, 'VL${p.cleanPlaylistId}'];
-          for (final cId in candidateIds) {
+      if (!isBlocked) {
+        // Try /next with playlistId: 'LM' / 'VLLM' (YouTube Music Queue / Liked playlist endpoint)
+        final nextPlaylistIds = ['LM', 'VLLM', 'FEmusic_liked_videos'];
+        for (final pId in nextPlaylistIds) {
+          try {
             final body = jsonEncode({
               'context': _buildClientContext('WEB_REMIX'),
-              'browseId': cId,
+              'playlistId': pId,
+              'enablePersistentPlaylistPanel': true,
+              'isAudioOnly': true,
             });
-            final res = await _postWithRetry(
-              Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+            final response = await _postWithRetry(
+              Uri.parse(
+                  'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
               headers: headers,
               body: body,
             );
-            if (res.statusCode == 200) {
-              final json = jsonDecode(res.body) as Map<String, dynamic>;
+            debugPrint(
+                '[YTM_ACCOUNT] Next endpoint query $pId: HTTP ${response.statusCode}, length=${response.body.length}');
+            if (response.statusCode == 200) {
+              final json = jsonDecode(response.body) as Map<String, dynamic>;
               final tracks = _parseInnertubePlaylistTracks(json);
+              debugPrint(
+                  '[YTM_ACCOUNT] Next endpoint query $pId parsed ${tracks.length} tracks');
               if (tracks.isNotEmpty) {
                 return tracks.take(maxTracks).toList();
+              } else {
+                debugPrint('[YTM_ACCOUNT] Next endpoint $pId parsed nothing '
+                    '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
               }
+            }
+          } catch (e) {
+            debugPrint('[YTM_ACCOUNT] Next endpoint query error for $pId: $e');
+            if (e is YtmException &&
+                (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
+              break;
             }
           }
         }
-      }
-    } catch (e) {
-      debugPrint('[YTM_ACCOUNT] Account playlists liked resolution error: $e');
-    }
 
-    // Try Native Kotlin Innertube browse with full WebView cookie jar
-    try {
-      debugPrint(
-          '[YTM_ACCOUNT] Attempting Native Kotlin Innertube fallback for liked songs...');
-      final ytmService = getIt<YtmService>();
-      final nativeTracks =
-          await ytmService.getPlaylistTracks('VLLM', limit: maxTracks);
-      if (nativeTracks.isNotEmpty) {
-        debugPrint(
-            '[YTM_ACCOUNT] Native Kotlin fallback returned ${nativeTracks.length} liked songs');
-        return nativeTracks.take(maxTracks).toList();
-      }
-    } catch (e) {
-      debugPrint('[YTM_ACCOUNT] Native Kotlin fallback failed: $e');
-    }
+        // Fallback: discover Liked Songs playlist directly from user's account library
+        try {
+          final playlists = await fetchAccountPlaylists();
+          debugPrint(
+              '[YTM_ACCOUNT] Discovered ${playlists.length} account playlists for liked songs resolution');
+          for (final p in playlists) {
+            final lowerTitle = p.title.toLowerCase();
+            final isLiked = p.playlistId.contains('LM') ||
+                lowerTitle.contains('like') ||
+                lowerTitle.contains('aimé') ||
+                lowerTitle.contains('favori') ||
+                lowerTitle.contains('j\'aime') ||
+                lowerTitle.contains('liebling');
+            if (isLiked) {
+              debugPrint(
+                  '[YTM_ACCOUNT] Found Liked Music playlist in account: ${p.playlistId} (${p.title})');
+              final candidateIds = [p.playlistId, 'VL${p.cleanPlaylistId}'];
+              for (final cId in candidateIds) {
+                final body = jsonEncode({
+                  'context': _buildClientContext('WEB_REMIX'),
+                  'browseId': cId,
+                });
+                final res = await _postWithRetry(
+                  Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+                  headers: headers,
+                  body: body,
+                );
+                if (res.statusCode == 200) {
+                  final json = jsonDecode(res.body) as Map<String, dynamic>;
+                  final tracks = _parseInnertubePlaylistTracks(json);
+                  if (tracks.isNotEmpty) {
+                    return tracks.take(maxTracks).toList();
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[YTM_ACCOUNT] Account playlists liked resolution error: $e');
+        }
 
-    return [];
+        // Try Native Kotlin Innertube browse with full WebView cookie jar
+        try {
+          debugPrint(
+              '[YTM_ACCOUNT] Attempting Native Kotlin Innertube fallback for liked songs...');
+          final ytmService = getIt<YtmService>();
+          final nativeTracks =
+              await ytmService.getPlaylistTracks('VLLM', limit: maxTracks);
+          if (nativeTracks.isNotEmpty) {
+            debugPrint(
+                '[YTM_ACCOUNT] Native Kotlin fallback returned ${nativeTracks.length} liked songs');
+            return nativeTracks.take(maxTracks).toList();
+          }
+        } catch (e) {
+          debugPrint('[YTM_ACCOUNT] Native Kotlin fallback failed: $e');
+        }
+      }
+
+      return [];
+    } finally {
+      _isFetchingLikedSongs = false;
+    }
   }
 
   /// Fetches details and tracks for any YouTube / YouTube Music playlist by URL or ID.
@@ -2537,13 +2568,17 @@ class YtmAccountService {
                   .toList();
 
           final audioFormats = <({Map<String, dynamic> format, String url})>[];
+          var hasCipheredAudio = false;
           for (final f in adaptive) {
             final mime = f['mimeType'] as String? ?? '';
             final streamUrl = _extractUrlFromFormat(f);
-            if (mime.startsWith('audio/') &&
-                streamUrl != null &&
-                streamUrl.isNotEmpty) {
-              audioFormats.add((format: f, url: streamUrl));
+            final isCipher =
+                f.containsKey('signatureCipher') || f.containsKey('cipher');
+            if (mime.startsWith('audio/')) {
+              if (isCipher) hasCipheredAudio = true;
+              if (streamUrl != null && streamUrl.isNotEmpty) {
+                audioFormats.add((format: f, url: streamUrl));
+              }
             }
           }
 
@@ -2610,8 +2645,14 @@ class YtmAccountService {
             ).withResolvedExpiry();
           } else {
             debugPrint(
-                '[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})');
-            if (adaptive.isNotEmpty) {
+                '[YTM_ACCOUNT] Client $client returned status $status but no direct audio formats (adaptiveFormats: ${adaptive.length} total, ciphered: $hasCipheredAudio)');
+            if (hasCipheredAudio) {
+              if (acceptsSessionAuth) {
+                debugPrint(
+                    '[YTM_ACCOUNT] WEB_REMIX formats require native decipher; handing off to native tier');
+                return null;
+              }
+            } else if (adaptive.isNotEmpty) {
               _markSabrDemoted(client);
             }
           }

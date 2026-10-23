@@ -205,6 +205,14 @@ class AudioQualityInfo {
         : (ext == 'dsf' || ext == 'dff');
     final bool isLosslessFormat = isFlac || isWav || isAlac || isAiff || isDsd;
 
+    final bool isOpus = realCodec != null
+        ? (codecIs('opus') || codecIs('webm'))
+        : (ext == 'opus' ||
+            ext == 'webm' ||
+            ext == 'oga' ||
+            path.contains('.webm') ||
+            path.contains('.opus'));
+
     // MQA is carried inside a lossless container (usually FLAC). A confirmed
     // signature scan wins; otherwise fall back to a filename/tag heuristic so
     // the badge never silently presents MQA material as plain lossless.
@@ -322,12 +330,6 @@ class AudioQualityInfo {
             ext == 'webm' ||
             path.contains('.webm') ||
             path.contains('.opus'))) {
-      final isOpus = realCodec != null
-          ? (codecIs('opus') || codecIs('webm'))
-          : (ext == 'opus' ||
-              ext == 'webm' ||
-              path.contains('.webm') ||
-              path.contains('.opus'));
       formatLabel = isOpus ? 'OPUS' : 'OGG';
       codecName = isOpus ? 'Opus Interactive Audio' : 'Ogg Vorbis Audio';
       final kbps = calculatedBitrate ?? (isOpus ? 160 : 192);
@@ -408,15 +410,17 @@ class AudioQualityInfo {
           calculatedBitrate != null,
       sampleRate: realSampleRate != null && realSampleRate > 0
           ? sampleRate
-          // DSD carriers report a computed "2.8 MHz / 5.6 MHz" rate that must
-          // not be masked as Unknown when no PCM header rate exists.
-          : (isDsd ? sampleRate : 'Unknown'),
+          // DSD carriers and Opus report known standard/computed rates that must
+          // not be masked as Unknown when no explicit header rate exists.
+          : ((isDsd || isOpus) ? sampleRate : 'Unknown'),
       bitDepth: isDsd
           ? '1-bit DSD'
           : realBitDepth != null && realBitDepth > 0
               ? bitDepth
               : 'Unknown',
-      channels: 'Not verified',
+      channels: (isLosslessFormat || isOpus || path.isNotEmpty)
+          ? 'Stereo (2.0)'
+          : 'Not verified',
       tier: !isLosslessFormat && calculatedBitrate == null
           ? AudioQualityTier.standardQuality
           : tier,

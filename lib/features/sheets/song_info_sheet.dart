@@ -25,6 +25,8 @@ import '../../data/audio/per_song_eq_store.dart';
 import '../../data/audio/per_song_volume_store.dart';
 import '../../data/audio/song_rating_store.dart';
 import '../../data/db/app_database.dart';
+import '../../data/scanner/media_scanner_service.dart';
+import '../../domain/repositories/music_repository_interface.dart';
 import '../../domain/models/audio_quality_info.dart';
 import '../../domain/models/eq_preset.dart';
 import '../player/cubit/player_cubit.dart';
@@ -54,7 +56,51 @@ class SongInfoSheet extends StatefulWidget {
 }
 
 class _SongInfoSheetState extends State<SongInfoSheet> {
-  SongsTableData get song => widget.song;
+  late SongsTableData _song;
+  SongsTableData get song => _song;
+
+  @override
+  void initState() {
+    super.initState();
+    _song = widget.song;
+    _enrichIfMissingQuality();
+  }
+
+  @override
+  void didUpdateWidget(SongInfoSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.song.id != oldWidget.song.id || widget.song != oldWidget.song) {
+      _song = widget.song;
+      _enrichIfMissingQuality();
+    }
+  }
+
+  Future<void> _enrichIfMissingQuality() async {
+    if (_song.sampleRate == null || _song.sampleRate! <= 0) {
+      if (_song.path.isNotEmpty &&
+          !_song.path.startsWith('http') &&
+          !_song.path.startsWith('ytmusic://')) {
+        try {
+          if (getIt.isRegistered<MediaScannerService>()) {
+            await getIt<MediaScannerService>()
+                .enrichAudioQuality(_song.id, _song.path);
+          }
+          if (getIt.isRegistered<IMusicRepository>()) {
+            final res = await getIt<IMusicRepository>().getSongById(_song.id);
+            final updated = res.fold((_) => null, (s) => s);
+            if (mounted && updated != null && updated.sampleRate != null) {
+              setState(() {
+                _song = updated;
+              });
+            }
+          }
+        } catch (e, st) {
+          ErrorLogger.log('enrichAudioQuality failed in SongInfoSheet',
+              error: e, stackTrace: st, category: 'SongInfoSheet');
+        }
+      }
+    }
+  }
 
   /// Live listener waiting for the user to return from the system write-settings
   /// screen. Held as state so it is always disposed when the sheet unmounts;
@@ -374,8 +420,19 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                           context.l10n.bitrate,
                           '${quality.bitrateKbps} kbps (${quality.tierLabel})',
                           p),
-                    _buildInfoRow(context.l10n.sampleRate,
-                        '${quality.bitDepth} / ${quality.sampleRate}', p),
+                    _buildInfoRow(
+                      context.l10n.sampleRate,
+                      quality.sampleRate != 'Unknown'
+                          ? ((quality.bitDepth.isNotEmpty &&
+                                  quality.bitDepth != 'Unknown')
+                              ? '${quality.sampleRate} / ${quality.bitDepth}'
+                              : quality.sampleRate)
+                          : (quality.bitDepth.isNotEmpty &&
+                                  quality.bitDepth != 'Unknown'
+                              ? quality.bitDepth
+                              : context.l10n.dspUnknown),
+                      p,
+                    ),
                     _buildInfoRow(context.l10n.channels, quality.channels, p),
                   ],
                 ),

@@ -188,6 +188,7 @@ abstract class DspSlice with _$DspSlice {
     @Default(1.0) double stereoWidthHigh,
     @Default(160.0) double stereoWidthLowCrossoverHz,
     @Default(2500.0) double stereoWidthHighCrossoverHz,
+    @Default(false) bool isMultibandCompressorEnabled,
     @Default(160.0) double multibandCompressorF0,
     @Default(1000.0) double multibandCompressorF1,
     @Default(5000.0) double multibandCompressorF2,
@@ -196,6 +197,7 @@ abstract class DspSlice with _$DspSlice {
     @Default(false) bool isViperDdcEnabled,
     @Default('') String viperDdcProfileName,
     @Default(false) bool isArbitraryEqEnabled,
+    @Default(false) bool arbitraryEqLinearPhase,
     @Default('') String arbitraryEqString,
     @Default(false) bool isLiveProgEnabled,
     @Default('') String liveProgCode,
@@ -222,6 +224,7 @@ abstract class DspSlice with _$DspSlice {
       isStereoWidthEnabled ||
       isLoudnessContourEnabled ||
       isSubCrossoverEnabled ||
+      isMultibandCompressorEnabled ||
       isDynamicEqEnabled ||
       isViperDdcEnabled ||
       isArbitraryEqEnabled ||
@@ -240,6 +243,7 @@ abstract class DspSlice with _$DspSlice {
       isStereoWidthEnabled ||
       isLoudnessContourEnabled ||
       isSubCrossoverEnabled ||
+      isMultibandCompressorEnabled ||
       isDynamicEqEnabled ||
       isViperDdcEnabled ||
       isArbitraryEqEnabled ||
@@ -261,6 +265,7 @@ abstract class DspSlice with _$DspSlice {
     if (isStereoWidthEnabled) count++;
     if (isLoudnessContourEnabled) count++;
     if (isSubCrossoverEnabled) count++;
+    if (isMultibandCompressorEnabled) count++;
     if (isDynamicEqEnabled) count++;
     if (isViperDdcEnabled) count++;
     if (isArbitraryEqEnabled) count++;
@@ -393,6 +398,7 @@ abstract class PlayerState with _$PlayerState {
   double get stereoWidthHigh => dsp.stereoWidthHigh;
   double get stereoWidthLowCrossoverHz => dsp.stereoWidthLowCrossoverHz;
   double get stereoWidthHighCrossoverHz => dsp.stereoWidthHighCrossoverHz;
+  bool get isMultibandCompressorEnabled => dsp.isMultibandCompressorEnabled;
   double get multibandCompressorF0 => dsp.multibandCompressorF0;
   double get multibandCompressorF1 => dsp.multibandCompressorF1;
   double get multibandCompressorF2 => dsp.multibandCompressorF2;
@@ -401,6 +407,7 @@ abstract class PlayerState with _$PlayerState {
   bool get isViperDdcEnabled => dsp.isViperDdcEnabled;
   String get viperDdcProfileName => dsp.viperDdcProfileName;
   bool get isArbitraryEqEnabled => dsp.isArbitraryEqEnabled;
+  bool get arbitraryEqLinearPhase => dsp.arbitraryEqLinearPhase;
   String get arbitraryEqString => dsp.arbitraryEqString;
   String get liveProgCode => dsp.liveProgCode;
   bool get isLiveProgEnabled => dsp.isLiveProgEnabled;

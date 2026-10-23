@@ -77,36 +77,119 @@ private:
     double y1_ = 0.0, y2_ = 0.0;
 };
 
+// Cascaded 2-stage (4th-order) stereo biquad filter with unified coefficients.
+// Computes identical cascaded Butterworth stages across Left and Right channels
+// simultaneously with unified coefficient loads and vectorized execution.
+class BiquadStereoCascade {
+public:
+    BiquadStereoCascade() { reset(); }
+
+    void reset() {
+        s1_x1_L_ = s1_x2_L_ = s1_y1_L_ = s1_y2_L_ = 0.0;
+        s1_x1_R_ = s1_x2_R_ = s1_y1_R_ = s1_y2_R_ = 0.0;
+        s2_x1_L_ = s2_x2_L_ = s2_y1_L_ = s2_y2_L_ = 0.0;
+        s2_x1_R_ = s2_x2_R_ = s2_y1_R_ = s2_y2_R_ = 0.0;
+    }
+
+    void setLowPass(double sampleRate, double cutoffHz, double q = 0.7071067811865475) {
+        if (sampleRate <= 0.0 || cutoffHz <= 0.0) return;
+        const double w0 = 2.0 * M_PI * std::clamp(cutoffHz, 10.0, sampleRate * 0.499) / sampleRate;
+        const double cosw0 = std::cos(w0);
+        const double sinw0 = std::sin(w0);
+        const double alpha = sinw0 / (2.0 * std::max(q, 0.01));
+
+        const double a0 = 1.0 + alpha;
+        b0_ = ((1.0 - cosw0) / 2.0) / a0;
+        b1_ = (1.0 - cosw0) / a0;
+        b2_ = ((1.0 - cosw0) / 2.0) / a0;
+        a1_ = (-2.0 * cosw0) / a0;
+        a2_ = (1.0 - alpha) / a0;
+    }
+
+    void setHighPass(double sampleRate, double cutoffHz, double q = 0.7071067811865475) {
+        if (sampleRate <= 0.0 || cutoffHz <= 0.0) return;
+        const double w0 = 2.0 * M_PI * std::clamp(cutoffHz, 10.0, sampleRate * 0.499) / sampleRate;
+        const double cosw0 = std::cos(w0);
+        const double sinw0 = std::sin(w0);
+        const double alpha = sinw0 / (2.0 * std::max(q, 0.01));
+
+        const double a0 = 1.0 + alpha;
+        b0_ = ((1.0 + cosw0) / 2.0) / a0;
+        b1_ = -(1.0 + cosw0) / a0;
+        b2_ = ((1.0 + cosw0) / 2.0) / a0;
+        a1_ = (-2.0 * cosw0) / a0;
+        a2_ = (1.0 - alpha) / a0;
+    }
+
+    inline void process(double inL, double inR, double& outL, double& outR) {
+        if (!std::isfinite(inL) || !std::isfinite(inR)) {
+            reset();
+            outL = 0.0;
+            outR = 0.0;
+            return;
+        }
+
+        // Stage 1 (Stereo)
+        double midL = b0_ * inL + b1_ * s1_x1_L_ + b2_ * s1_x2_L_ - a1_ * s1_y1_L_ - a2_ * s1_y2_L_;
+        double midR = b0_ * inR + b1_ * s1_x1_R_ + b2_ * s1_x2_R_ - a1_ * s1_y1_R_ - a2_ * s1_y2_R_;
+        if (!std::isfinite(midL) || !std::isfinite(midR)) {
+            reset();
+            outL = 0.0;
+            outR = 0.0;
+            return;
+        }
+        s1_x2_L_ = s1_x1_L_; s1_x1_L_ = inL;
+        s1_y2_L_ = s1_y1_L_; s1_y1_L_ = midL;
+        s1_x2_R_ = s1_x1_R_; s1_x1_R_ = inR;
+        s1_y2_R_ = s1_y1_R_; s1_y1_R_ = midR;
+
+        // Stage 2 (Stereo)
+        outL = b0_ * midL + b1_ * s2_x1_L_ + b2_ * s2_x2_L_ - a1_ * s2_y1_L_ - a2_ * s2_y2_L_;
+        outR = b0_ * midR + b1_ * s2_x1_R_ + b2_ * s2_x2_R_ - a1_ * s2_y1_R_ - a2_ * s2_y2_R_;
+        if (!std::isfinite(outL) || !std::isfinite(outR)) {
+            reset();
+            outL = 0.0;
+            outR = 0.0;
+            return;
+        }
+        s2_x2_L_ = s2_x1_L_; s2_x1_L_ = midL;
+        s2_y2_L_ = s2_y1_L_; s2_y1_L_ = outL;
+        s2_x2_R_ = s2_x1_R_; s2_x1_R_ = midR;
+        s2_y2_R_ = s2_y1_R_; s2_y1_R_ = outR;
+
+        // Subnormal / denormal flush
+        if (std::abs(outL) < 1e-30 && std::abs(outR) < 1e-30 &&
+            std::abs(s1_y1_L_) < 1e-30 && std::abs(s1_y1_R_) < 1e-30) {
+            reset();
+        }
+    }
+
+private:
+    double b0_ = 1.0, b1_ = 0.0, b2_ = 0.0;
+    double a1_ = 0.0, a2_ = 0.0;
+    double s1_x1_L_ = 0.0, s1_x2_L_ = 0.0, s1_y1_L_ = 0.0, s1_y2_L_ = 0.0;
+    double s1_x1_R_ = 0.0, s1_x2_R_ = 0.0, s1_y1_R_ = 0.0, s1_y2_R_ = 0.0;
+    double s2_x1_L_ = 0.0, s2_x2_L_ = 0.0, s2_y1_L_ = 0.0, s2_y2_L_ = 0.0;
+    double s2_x1_R_ = 0.0, s2_x2_R_ = 0.0, s2_y1_R_ = 0.0, s2_y2_R_ = 0.0;
+};
+
 // Linkwitz-Riley 4th order filter pair (LP and HP with flat summing magnitude)
 class LinkwitzRiley4 {
 public:
     void reset() {
-        lp1_L.reset(); lp2_L.reset();
-        lp1_R.reset(); lp2_R.reset();
-        hp1_L.reset(); hp2_L.reset();
-        hp1_R.reset(); hp2_R.reset();
+        lp_.reset();
+        hp_.reset();
     }
 
     void configure(double sampleRate, double cutoffHz) {
         const double newCutoff = std::clamp(cutoffHz, 20.0, sampleRate * 0.48);
-        // Retuning a live crossover must clear the old filter state, otherwise
-        // the retained registers (belonging to the previous cutoff) produce a
-        // transient/instability. Skip the reset when nothing actually moved so
-        // repeated applyParams calls don't click.
         const bool changed =
             std::abs(newCutoff - cutoffHz_) > 0.01 || std::abs(sampleRate - sampleRate_) > 0.5;
         cutoffHz_ = newCutoff;
         sampleRate_ = sampleRate;
         const double q = 0.7071067811865475; // Butterworth Q
-        lp1_L.setLowPass(sampleRate_, cutoffHz_, q);
-        lp2_L.setLowPass(sampleRate_, cutoffHz_, q);
-        lp1_R.setLowPass(sampleRate_, cutoffHz_, q);
-        lp2_R.setLowPass(sampleRate_, cutoffHz_, q);
-
-        hp1_L.setHighPass(sampleRate_, cutoffHz_, q);
-        hp2_L.setHighPass(sampleRate_, cutoffHz_, q);
-        hp1_R.setHighPass(sampleRate_, cutoffHz_, q);
-        hp2_R.setHighPass(sampleRate_, cutoffHz_, q);
+        lp_.setLowPass(sampleRate_, cutoffHz_, q);
+        hp_.setHighPass(sampleRate_, cutoffHz_, q);
 
         if (changed) {
             reset();
@@ -114,15 +197,13 @@ public:
     }
 
     inline void process(double inL, double inR, double& outLpL, double& outLpR, double& outHpL, double& outHpR) {
-        outLpL = lp2_L.process(lp1_L.process(inL));
-        outLpR = lp2_R.process(lp1_R.process(inR));
-        outHpL = hp2_L.process(hp1_L.process(inL));
-        outHpR = hp2_R.process(hp1_R.process(inR));
+        lp_.process(inL, inR, outLpL, outLpR);
+        hp_.process(inL, inR, outHpL, outHpR);
     }
 
 private:
     double sampleRate_ = 48000.0;
     double cutoffHz_ = 1000.0;
-    Biquad lp1_L, lp2_L, lp1_R, lp2_R;
-    Biquad hp1_L, hp2_L, hp1_R, hp2_R;
+    BiquadStereoCascade lp_;
+    BiquadStereoCascade hp_;
 };

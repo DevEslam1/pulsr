@@ -83,7 +83,7 @@ void MultibandCompressor::reset() {
     allpassHighPath_.reset();
     smoothedEnabledMix_ = enabled_ ? 1.0f : 0.0f;
     for (int b = 0; b < NUM_BANDS; ++b) {
-        envelopeDb_[b] = 0.0;        // linear amplitude envelope, starts at silence
+        envelope_[b] = 0.0;          // linear amplitude envelope, starts at silence
         smoothedGainDb_[b] = 0.0;
         smoothedMakeupDb_[b] = 0.0;
         currentGainReductionDb_[b] = 0.0;
@@ -129,9 +129,9 @@ double MultibandCompressor::computeBandGain(int band, double envDb) {
 
     if (targetGainDb > 0.0) targetGainDb = 0.0; // compressor only cuts
 
-    // Ballistics: faster coefficient when entering compression (target < smoothed)
-    const double coeff = (targetGainDb < smoothedGainDb_[band]) ? attackCoeff_[band] : releaseCoeff_[band];
-    smoothedGainDb_[band] = coeff * smoothedGainDb_[band] + (1.0 - coeff) * targetGainDb;
+
+
+    smoothedGainDb_[band] = targetGainDb;
     currentGainReductionDb_[band] = smoothedGainDb_[band];
 
     return smoothedGainDb_[band] + smoothedMakeupDb_[band];
@@ -208,12 +208,15 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
                 const float sL = bandBufferL_[b][i];
                 const float sR = bandBufferR_[b][i];
 
-                // Level detector: instantaneous peak.
-                const double peak = std::max(std::abs(sL), std::abs(sR));
-                envelopeDb_[b] = peak;
+                // Level detector: peak envelope follower with attack/release ballistics
+                const double peak = std::max(std::abs(static_cast<double>(sL)), std::abs(static_cast<double>(sR)));
+                const double envCoeff = (peak > envelope_[b]) ? attackCoeff_[b] : releaseCoeff_[b];
+                envelope_[b] = envCoeff * envelope_[b] + (1.0 - envCoeff) * peak;
+                if (!std::isfinite(envelope_[b])) envelope_[b] = 0.0;
+                if (envelope_[b] < 1e-15) envelope_[b] = 0.0;
 
                 // Convert linear envelope to dB once per sample
-                const double envDb = (envelopeDb_[b] > 1e-6) ? (20.0 * std::log10(envelopeDb_[b])) : -120.0;
+                const double envDb = (envelope_[b] > 1e-6) ? (20.0 * std::log10(envelope_[b])) : -120.0;
                 const double gainDb = computeBandGain(b, envDb);
                 const float linearGain = static_cast<float>(std::pow(10.0, gainDb / 20.0));
 

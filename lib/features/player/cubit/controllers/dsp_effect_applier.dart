@@ -151,6 +151,22 @@ class DspRollbackPolicy {
           attempted.subCrossoverAntiPop != previous.subCrossoverAntiPop
               ? previous.subCrossoverAntiPop
               : current.subCrossoverAntiPop,
+      isMultibandCompressorEnabled: attempted.isMultibandCompressorEnabled !=
+              previous.isMultibandCompressorEnabled
+          ? previous.isMultibandCompressorEnabled
+          : current.isMultibandCompressorEnabled,
+      multibandCompressorF0: attempted.multibandCompressorF0 !=
+              previous.multibandCompressorF0
+          ? previous.multibandCompressorF0
+          : current.multibandCompressorF0,
+      multibandCompressorF1: attempted.multibandCompressorF1 !=
+              previous.multibandCompressorF1
+          ? previous.multibandCompressorF1
+          : current.multibandCompressorF1,
+      multibandCompressorF2: attempted.multibandCompressorF2 !=
+              previous.multibandCompressorF2
+          ? previous.multibandCompressorF2
+          : current.multibandCompressorF2,
       isDynamicEqEnabled:
           attempted.isDynamicEqEnabled != previous.isDynamicEqEnabled
               ? previous.isDynamicEqEnabled
@@ -170,6 +186,10 @@ class DspRollbackPolicy {
           attempted.isArbitraryEqEnabled != previous.isArbitraryEqEnabled
               ? previous.isArbitraryEqEnabled
               : current.isArbitraryEqEnabled,
+      arbitraryEqLinearPhase: attempted.arbitraryEqLinearPhase !=
+              previous.arbitraryEqLinearPhase
+          ? previous.arbitraryEqLinearPhase
+          : current.arbitraryEqLinearPhase,
       arbitraryEqString:
           attempted.arbitraryEqString != previous.arbitraryEqString
               ? previous.arbitraryEqString

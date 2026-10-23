@@ -81,9 +81,26 @@ class YtmCircuitBreaker {
     }
   }
 
-  void recordSuccess() {
+  void recordSuccess([YtmBlockSignal? signal]) {
     _totalSuccesses++;
-    _consecutiveFailures.clear();
+    if (signal != null) {
+      _consecutiveFailures.remove(signal);
+      _openUntil.remove(signal);
+    } else {
+      _consecutiveFailures.clear();
+      _openUntil.clear();
+    }
+  }
+
+  /// Explicitly reset the failure budget and open cooldown for [signal], or all signals if omitted.
+  void reset([YtmBlockSignal? signal]) {
+    if (signal != null) {
+      _consecutiveFailures.remove(signal);
+      _openUntil.remove(signal);
+    } else {
+      _consecutiveFailures.clear();
+      _openUntil.clear();
+    }
   }
 
   /// Snapshot for logs/diagnostics UI. Keys are signal names.

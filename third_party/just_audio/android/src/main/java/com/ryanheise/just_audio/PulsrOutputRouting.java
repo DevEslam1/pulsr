@@ -5,6 +5,7 @@ import android.media.AudioTrack;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -20,33 +21,70 @@ public final class PulsrOutputRouting {
     private static final Set<AAudioAudioSink> nativeSinks = new HashSet<>();
     private static AudioDeviceInfo preferred;
     private static Field audioTrackField;
+    private static Field audioOutputField;
+    private static Method getAudioTrackMethod;
+    private static boolean reflectionLookupDone = false;
     private static boolean reflectionWarningLogged = false;
 
-    private static Field getAudioTrackField() {
-        if (audioTrackField != null) return audioTrackField;
+    private static synchronized void ensureReflectionInitialized() {
+        if (reflectionLookupDone) return;
+        reflectionLookupDone = true;
+
         try {
-            Field field = DefaultAudioSink.class.getDeclaredField("audioTrack");
-            field.setAccessible(true);
-            audioTrackField = field;
-            return field;
-        } catch (ReflectiveOperationException e) {
-            if (!reflectionWarningLogged) {
-                reflectionWarningLogged = true;
-                // Warn once at WARN level (expected after Media3 internal refactors).
-                android.util.Log.w("PulsrOutputRouting",
-                    "Media3 DefaultAudioSink.audioTrack reflection unavailable; "
-                    + "output-device telemetry will return [0,0,0] until the app is "
-                    + "updated. Check for a Media3 version bump: " + e.getMessage());
-                // ERROR-level log so crash dashboards (Sentry logcat integration,
-                // Firebase Crashlytics) surface this as a distinct issue rather than
-                // a silent quality regression.
-                android.util.Log.e("PulsrOutputRouting",
-                    "TELEMETRY_DEGRADED: DefaultAudioSink field lookup failed. "
-                    + "Route snapshot and isPlaying() will report zeros. "
-                    + "Cause: " + e.getClass().getSimpleName() + ": " + e.getMessage());
-            }
-            return null;
+            audioTrackField = DefaultAudioSink.class.getDeclaredField("audioTrack");
+            audioTrackField.setAccessible(true);
+        } catch (NoSuchFieldException ignored) {}
+
+        try {
+            audioOutputField = DefaultAudioSink.class.getDeclaredField("audioOutput");
+            audioOutputField.setAccessible(true);
+        } catch (NoSuchFieldException ignored) {}
+
+        if (audioTrackField == null && audioOutputField == null && !reflectionWarningLogged) {
+            reflectionWarningLogged = true;
+            android.util.Log.w("PulsrOutputRouting",
+                "Media3 DefaultAudioSink reflection unavailable; output-device telemetry will return [0,0,0].");
+            android.util.Log.e("PulsrOutputRouting",
+                "TELEMETRY_DEGRADED: DefaultAudioSink fields (audioTrack/audioOutput) lookup failed.");
         }
+    }
+
+    private static AudioTrack getAudioTrackFromSink(DefaultAudioSink sink) {
+        if (sink == null) return null;
+        ensureReflectionInitialized();
+
+        if (audioTrackField != null) {
+            try {
+                Object obj = audioTrackField.get(sink);
+                if (obj instanceof AudioTrack) return (AudioTrack) obj;
+            } catch (Exception ignored) {}
+        }
+
+        if (audioOutputField != null) {
+            try {
+                Object audioOutput = audioOutputField.get(sink);
+                if (audioOutput != null) {
+                    if (getAudioTrackMethod == null) {
+                        try {
+                            getAudioTrackMethod = audioOutput.getClass().getMethod("getAudioTrack");
+                            getAudioTrackMethod.setAccessible(true);
+                        } catch (Exception ignored) {}
+                    }
+                    if (getAudioTrackMethod != null) {
+                        Object obj = getAudioTrackMethod.invoke(audioOutput);
+                        if (obj instanceof AudioTrack) return (AudioTrack) obj;
+                    }
+                    try {
+                        Field f = audioOutput.getClass().getDeclaredField("audioTrack");
+                        f.setAccessible(true);
+                        Object obj = f.get(audioOutput);
+                        if (obj instanceof AudioTrack) return (AudioTrack) obj;
+                    } catch (Exception ignored) {}
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return null;
     }
 
     private PulsrOutputRouting() {}
@@ -81,14 +119,10 @@ public final class PulsrOutputRouting {
         for (AAudioAudioSink sink : nativeSinks) {
             if (sink.isPlaying() && sink.measuredStream()[1] > 0) return true;
         }
-        try {
-            Field field = getAudioTrackField();
-            if (field == null) return false;
-            for (DefaultAudioSink sink : sinks) {
-                AudioTrack track = (AudioTrack) field.get(sink);
-                if (track != null && track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return true;
-            }
-        } catch (ReflectiveOperationException | RuntimeException ignored) {}
+        for (DefaultAudioSink sink : sinks) {
+            AudioTrack track = getAudioTrackFromSink(sink);
+            if (track != null && track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return true;
+        }
         return false;
     }
 
@@ -100,20 +134,14 @@ public final class PulsrOutputRouting {
             nativeFallback = measured;
             if (sink.isPlaying()) return measured;
         }
-        try {
-            Field field = getAudioTrackField();
-            if (field == null) return nativeFallback != null ? nativeFallback : new int[] {0, 0, 0};
-            AudioTrack fallback = null;
-            for (DefaultAudioSink sink : sinks) {
-                AudioTrack track = (AudioTrack) field.get(sink);
-                if (track == null || track.getState() != AudioTrack.STATE_INITIALIZED) continue;
-                fallback = track;
-                if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return snapshot(track);
-            }
-            if (fallback != null) return snapshot(fallback);
-        } catch (ReflectiveOperationException | RuntimeException unavailable) {
-            // Media3 internals may change. Unknown is safer than an invented format.
+        AudioTrack fallback = null;
+        for (DefaultAudioSink sink : sinks) {
+            AudioTrack track = getAudioTrackFromSink(sink);
+            if (track == null || track.getState() != AudioTrack.STATE_INITIALIZED) continue;
+            fallback = track;
+            if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return snapshot(track);
         }
+        if (fallback != null) return snapshot(fallback);
         return nativeFallback != null ? nativeFallback : new int[] {0, 0, 0};
     }
 

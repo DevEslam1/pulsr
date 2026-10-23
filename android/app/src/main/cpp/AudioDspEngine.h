@@ -308,6 +308,8 @@ private:
     // Real-time zero-allocation PRNG for TPDF dither
     uint32_t ditherPrngState1_ = 0x12345678;
     uint32_t ditherPrngState2_ = 0x87654321;
+    // Per-channel quantization error history for Lipshitz-Wannamaker E-weighted noise shaping
+    float ditherErrorHistory_[2][2] = {};
     double smoothedReplayGain_ = 1.0;
     double targetReplayGain_ = 1.0;
     // Direct Volume Control output gain, smoothed across a 20ms window.
@@ -390,6 +392,7 @@ public:
     void getTelemetry(double* outArray, int size);
     double getWeeklyDose();
     void resetWeeklyDose();
+    void setWeeklyDose(double dose);
     bool isSafetyAttenuationActive();
     double getAppliedSampleRate();
     void setPerformanceProfile(DspPerformanceProfile profile);

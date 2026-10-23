@@ -77,5 +77,23 @@ void main() {
       expect(info.sampleRate, '96.0 kHz');
       expect(info.bitDepth, '24-bit');
     });
+
+    test('Opus track with webm.oga extension reports 48.0 kHz real rate even without explicit header rate', () {
+      final info = AudioQualityInfo.fromSong(
+        _song(path: '/storage/emulated/0/Music/Track.webm.oga'),
+      );
+
+      expect(info.format, 'OPUS');
+      expect(info.sampleRate, '48.0 kHz');
+    });
+
+    test('Opus track with explicit header rate reports measured rate', () {
+      final info = AudioQualityInfo.fromSong(
+        _song(path: '/storage/emulated/0/Music/Track.webm.oga', sampleRate: 48000),
+      );
+
+      expect(info.format, 'OPUS');
+      expect(info.sampleRate, '48.0 kHz');
+    });
   });
 }

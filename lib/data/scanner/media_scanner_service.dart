@@ -603,12 +603,23 @@ class MediaScannerService {
       });
       if (tags == null) return;
 
-      final sampleRate = _asInt(tags['sampleRate']);
+      int? sampleRate = _asInt(tags['sampleRate']);
       final bitDepth = _asInt(tags['bitsPerSample']);
       // Header bitRate is in kbps for lossy, bps-ish for some lossless; jaudiotagger reports kbps here.
       final bitrateKbps = _asInt(tags['bitRate']);
-      final codec = (tags['format'] as String?)?.trim();
+      String? codec = (tags['format'] as String?)?.trim();
       final lraVal = (tags['loudnessRange'] as num?)?.toDouble();
+
+      final pathLower = path.toLowerCase();
+      final isOpus = pathLower.contains('.opus') ||
+          pathLower.contains('.webm') ||
+          pathLower.endsWith('.oga') ||
+          (codec != null && codec.toUpperCase().contains('OPUS'));
+      if (isOpus) {
+        sampleRate ??= 48000;
+        if (sampleRate <= 0) sampleRate = 48000;
+        codec ??= 'OPUS';
+      }
 
       await _repository.updateAudioQuality(
         songId: songId,
@@ -647,7 +658,12 @@ class MediaScannerService {
         final res = await _repository.getAllSongs();
         final songs = res.fold((_) => <SongsTableData>[], (s) => s);
         final pendingSongs = songs.where((song) {
-          if (song.codec != null && song.codec!.isNotEmpty) return false;
+          if (song.codec != null &&
+              song.codec!.isNotEmpty &&
+              song.sampleRate != null &&
+              song.sampleRate! > 0) {
+            return false;
+          }
           if (song.path.isEmpty ||
               song.path.startsWith('http') ||
               song.path.startsWith('ytmusic://')) {
@@ -676,11 +692,22 @@ class MediaScannerService {
               'includeArtwork': false,
             });
             if (tags != null) {
-              final sampleRate = _asInt(tags['sampleRate']);
+              int? sampleRate = _asInt(tags['sampleRate']);
               final bitDepth = _asInt(tags['bitsPerSample']);
               final bitrateKbps = _asInt(tags['bitRate']);
-              final codec = (tags['format'] as String?)?.trim();
+              String? codec = (tags['format'] as String?)?.trim();
               final lraVal = (tags['loudnessRange'] as num?)?.toDouble();
+
+              final pathLower = song.path.toLowerCase();
+              final isOpus = pathLower.contains('.opus') ||
+                  pathLower.contains('.webm') ||
+                  pathLower.endsWith('.oga') ||
+                  (codec != null && codec.toUpperCase().contains('OPUS'));
+              if (isOpus) {
+                sampleRate ??= 48000;
+                if (sampleRate <= 0) sampleRate = 48000;
+                codec ??= 'OPUS';
+              }
 
               updates.add((
                 songId: song.id,

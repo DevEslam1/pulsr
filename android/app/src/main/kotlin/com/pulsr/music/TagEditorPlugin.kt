@@ -3,7 +3,11 @@ package com.pulsr.music
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
+import android.os.Build
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -97,66 +101,92 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
                             return@execute
                         }
-                        val audioFile = AudioFileIO.read(file)
-                        val tag = audioFile.tag
-                        val header = audioFile.audioHeader
-
                         val tagMap = mutableMapOf<String, Any?>()
-                        if (tag != null) {
-                            tagMap["title"] = tag.getFirst(FieldKey.TITLE)
-                            tagMap["artist"] = tag.getFirst(FieldKey.ARTIST)
-                            tagMap["album"] = tag.getFirst(FieldKey.ALBUM)
-                            tagMap["albumArtist"] = tag.getFirst(FieldKey.ALBUM_ARTIST)
-                            tagMap["genre"] = tag.getFirst(FieldKey.GENRE)
-                            tagMap["year"] = tag.getFirst(FieldKey.YEAR)
-                            tagMap["trackNumber"] = tag.getFirst(FieldKey.TRACK)
-                            tagMap["discNumber"] = tag.getFirst(FieldKey.DISC_NO)
-                            tagMap["composer"] = tag.getFirst(FieldKey.COMPOSER)
-                            var lyrics = tag.getFirst(FieldKey.LYRICS)
-                            if (lyrics.isNullOrBlank()) {
-                                val vorbisTag: VorbisCommentTag? = when (tag) {
-                                    is FlacTag -> tag.vorbisCommentTag
-                                    is VorbisCommentTag -> tag
-                                    else -> null
-                                }
-                                if (vorbisTag != null) {
-                                    for (key in listOf("SYNCEDLYRICS", "UNSYNCEDLYRICS", "SYNCED LYRICS", "UNSYNCED LYRICS")) {
-                                        val v = vorbisTag.getFirst(key)
-                                        if (!v.isNullOrBlank()) {
-                                            lyrics = v
-                                            break
+                        try {
+                            val audioFile = AudioFileIO.read(file)
+                            val tag = audioFile.tag
+                            val header = audioFile.audioHeader
+
+                            if (tag != null) {
+                                tagMap["title"] = tag.getFirst(FieldKey.TITLE)
+                                tagMap["artist"] = tag.getFirst(FieldKey.ARTIST)
+                                tagMap["album"] = tag.getFirst(FieldKey.ALBUM)
+                                tagMap["albumArtist"] = tag.getFirst(FieldKey.ALBUM_ARTIST)
+                                tagMap["genre"] = tag.getFirst(FieldKey.GENRE)
+                                tagMap["year"] = tag.getFirst(FieldKey.YEAR)
+                                tagMap["trackNumber"] = tag.getFirst(FieldKey.TRACK)
+                                tagMap["discNumber"] = tag.getFirst(FieldKey.DISC_NO)
+                                tagMap["composer"] = tag.getFirst(FieldKey.COMPOSER)
+                                var lyrics = tag.getFirst(FieldKey.LYRICS)
+                                if (lyrics.isNullOrBlank()) {
+                                    val vorbisTag: VorbisCommentTag? = when (tag) {
+                                        is FlacTag -> tag.vorbisCommentTag
+                                        is VorbisCommentTag -> tag
+                                        else -> null
+                                    }
+                                    if (vorbisTag != null) {
+                                        for (key in listOf("SYNCEDLYRICS", "UNSYNCEDLYRICS", "SYNCED LYRICS", "UNSYNCED LYRICS")) {
+                                            val v = vorbisTag.getFirst(key)
+                                            if (!v.isNullOrBlank()) {
+                                                lyrics = v
+                                                break
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            tagMap["lyrics"] = lyrics
-                            tagMap["comment"] = tag.getFirst(FieldKey.COMMENT)
+                                tagMap["lyrics"] = lyrics
+                                tagMap["comment"] = tag.getFirst(FieldKey.COMMENT)
 
-                            if (includeArtwork) {
-                                val artwork = tag.firstArtwork
-                                if (artwork != null && artwork.binaryData != null) {
-                                    tagMap["hasArtwork"] = true
-                                    tagMap["artworkBytes"] = artwork.binaryData
-                                    tagMap["artworkMimeType"] = artwork.mimeType
+                                if (includeArtwork) {
+                                    val artwork = tag.firstArtwork
+                                    if (artwork != null && artwork.binaryData != null) {
+                                        tagMap["hasArtwork"] = true
+                                        tagMap["artworkBytes"] = artwork.binaryData
+                                        tagMap["artworkMimeType"] = artwork.mimeType
+                                    } else {
+                                        tagMap["hasArtwork"] = false
+                                    }
                                 } else {
-                                    tagMap["hasArtwork"] = false
+                                    tagMap["hasArtwork"] = tag.firstArtwork != null
                                 }
-                            } else {
-                                tagMap["hasArtwork"] = tag.firstArtwork != null
                             }
+
+                            if (header != null) {
+                                tagMap["bitRate"] = header.bitRate
+                                tagMap["sampleRate"] = header.sampleRate
+                                tagMap["format"] = header.format
+                                tagMap["channels"] = header.channels
+                                tagMap["trackLength"] = header.trackLength
+                                tagMap["isLossless"] = header.isLossless
+                                // Bit depth is only meaningful for PCM/lossless; lossy
+                                // formats report 0 here, which the Dart side treats as
+                                // "unknown" and falls back to codec defaults.
+                                tagMap["bitsPerSample"] = runCatching { header.bitsPerSample }.getOrDefault(0)
+                            }
+                        } catch (_: Exception) {
+                            // Jaudiotagger does not support WebM, Opus in some containers, etc.
                         }
 
-                        if (header != null) {
-                            tagMap["bitRate"] = header.bitRate
-                            tagMap["sampleRate"] = header.sampleRate
-                            tagMap["format"] = header.format
-                            tagMap["channels"] = header.channels
-                            tagMap["trackLength"] = header.trackLength
-                            tagMap["isLossless"] = header.isLossless
-                            // Bit depth is only meaningful for PCM/lossless; lossy
-                            // formats report 0 here, which the Dart side treats as
-                            // "unknown" and falls back to codec defaults.
-                            tagMap["bitsPerSample"] = runCatching { header.bitsPerSample }.getOrDefault(0)
+                        // Fallback & supplement using Android's native MediaMetadataRetriever and MediaExtractor
+                        supplementWithMediaRetriever(file, includeArtwork, tagMap)
+                        supplementWithMediaExtractor(file, tagMap)
+
+                        // For Opus or WebM files where sampleRate is still missing/0, default to Opus specification 48kHz
+                        val nameLower = file.name.lowercase()
+                        val formatStr = (tagMap["format"] as? String)?.lowercase() ?: ""
+                        val isOpus = nameLower.endsWith(".opus") || nameLower.contains(".webm") ||
+                                nameLower.endsWith(".oga") || formatStr.contains("opus")
+                        if (isOpus) {
+                            val sr = (tagMap["sampleRate"] as? String)?.toIntOrNull() ?: 0
+                            if (sr <= 0) {
+                                tagMap["sampleRate"] = "48000"
+                            }
+                            if (tagMap["format"] == null || formatStr.isEmpty()) {
+                                tagMap["format"] = "OPUS"
+                            }
+                            if (tagMap["channels"] == null) {
+                                tagMap["channels"] = "2"
+                            }
                         }
 
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -455,6 +485,145 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
             }
 
             else -> result.notImplemented()
+        }
+    }
+
+    private fun supplementWithMediaRetriever(
+        file: File,
+        includeArtwork: Boolean,
+        tagMap: MutableMap<String, Any?>
+    ) {
+        var retriever: MediaMetadataRetriever? = null
+        try {
+            retriever = MediaMetadataRetriever()
+            retriever.setDataSource(file.absolutePath)
+
+            fun putIfMissing(key: String, retrieverKey: Int) {
+                val current = tagMap[key]
+                if (current == null || (current is String && current.isBlank())) {
+                    val value = retriever.extractMetadata(retrieverKey)
+                    if (!value.isNullOrBlank()) tagMap[key] = value
+                }
+            }
+
+            putIfMissing("title", MediaMetadataRetriever.METADATA_KEY_TITLE)
+            putIfMissing("artist", MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            putIfMissing("album", MediaMetadataRetriever.METADATA_KEY_ALBUM)
+            putIfMissing("albumArtist", MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
+            putIfMissing("genre", MediaMetadataRetriever.METADATA_KEY_GENRE)
+            putIfMissing("year", MediaMetadataRetriever.METADATA_KEY_YEAR)
+            putIfMissing("trackNumber", MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)
+            putIfMissing("composer", MediaMetadataRetriever.METADATA_KEY_COMPOSER)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val curSr = (tagMap["sampleRate"] as? String)?.toIntOrNull() ?: 0
+                if (curSr <= 0) {
+                    val srStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)
+                    val sr = srStr?.toIntOrNull() ?: 0
+                    if (sr > 0) tagMap["sampleRate"] = sr.toString()
+                }
+            }
+
+            val curBr = (tagMap["bitRate"] as? String)?.toIntOrNull() ?: 0
+            if (curBr <= 0) {
+                val brStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
+                val br = brStr?.toIntOrNull() ?: 0
+                if (br > 0) tagMap["bitRate"] = (br / 1000).toString()
+            }
+
+            val curLen = tagMap["trackLength"] as? Int ?: 0
+            if (curLen <= 0) {
+                val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                val durMs = durStr?.toLongOrNull() ?: 0L
+                if (durMs > 0) tagMap["trackLength"] = (durMs / 1000).toInt()
+            }
+
+            val curMime = tagMap["format"] as? String
+            if (curMime.isNullOrBlank()) {
+                val mime = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                if (!mime.isNullOrBlank()) {
+                    tagMap["format"] = when {
+                        mime.contains("opus", ignoreCase = true) -> "OPUS"
+                        mime.contains("vorbis", ignoreCase = true) || mime.contains("ogg", ignoreCase = true) -> "OGG"
+                        mime.contains("mp4a", ignoreCase = true) || mime.contains("aac", ignoreCase = true) -> "AAC"
+                        mime.contains("mpeg", ignoreCase = true) || mime.contains("mp3", ignoreCase = true) -> "MP3"
+                        mime.contains("flac", ignoreCase = true) -> "FLAC"
+                        mime.contains("wav", ignoreCase = true) -> "WAV"
+                        else -> mime.removePrefix("audio/").uppercase()
+                    }
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val curBits = tagMap["bitsPerSample"] as? Int ?: 0
+                if (curBits <= 0) {
+                    val bitsStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITS_PER_SAMPLE)
+                    val bits = bitsStr?.toIntOrNull() ?: 0
+                    if (bits > 0) tagMap["bitsPerSample"] = bits
+                }
+            }
+
+            if (includeArtwork && tagMap["artworkBytes"] == null) {
+                val pic = retriever.embeddedPicture
+                if (pic != null && pic.isNotEmpty()) {
+                    tagMap["hasArtwork"] = true
+                    tagMap["artworkBytes"] = pic
+                }
+            }
+        } catch (_: Exception) {
+        } finally {
+            try {
+                retriever?.release()
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun supplementWithMediaExtractor(
+        file: File,
+        tagMap: MutableMap<String, Any?>
+    ) {
+        var extractor: MediaExtractor? = null
+        try {
+            extractor = MediaExtractor()
+            extractor.setDataSource(file.absolutePath)
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME)
+                if (mime?.startsWith("audio/") == true) {
+                    val curSr = (tagMap["sampleRate"] as? String)?.toIntOrNull() ?: 0
+                    if (curSr <= 0 && format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                        val sr = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                        if (sr > 0) tagMap["sampleRate"] = sr.toString()
+                    }
+                    if (tagMap["channels"] == null && format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                        val ch = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                        if (ch > 0) tagMap["channels"] = ch.toString()
+                    }
+                    val curBr = (tagMap["bitRate"] as? String)?.toIntOrNull() ?: 0
+                    if (curBr <= 0 && format.containsKey(MediaFormat.KEY_BIT_RATE)) {
+                        val br = format.getInteger(MediaFormat.KEY_BIT_RATE)
+                        if (br > 0) tagMap["bitRate"] = (br / 1000).toString()
+                    }
+                    val curFormat = tagMap["format"] as? String
+                    if (curFormat.isNullOrBlank()) {
+                        tagMap["format"] = when {
+                            mime.contains("opus", ignoreCase = true) -> "OPUS"
+                            mime.contains("vorbis", ignoreCase = true) || mime.contains("ogg", ignoreCase = true) -> "OGG"
+                            mime.contains("mp4a", ignoreCase = true) || mime.contains("aac", ignoreCase = true) -> "AAC"
+                            mime.contains("mpeg", ignoreCase = true) || mime.contains("mp3", ignoreCase = true) -> "MP3"
+                            mime.contains("flac", ignoreCase = true) -> "FLAC"
+                            mime.contains("wav", ignoreCase = true) -> "WAV"
+                            else -> mime.removePrefix("audio/").uppercase()
+                        }
+                    }
+                    break
+                }
+            }
+        } catch (_: Exception) {
+        } finally {
+            try {
+                extractor?.release()
+            } catch (_: Exception) {}
         }
     }
 }

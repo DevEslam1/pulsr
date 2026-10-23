@@ -441,6 +441,7 @@ class YtmService {
 
   /// Test-only: clears bot-cooldown state.
   void debugClearBotCooldown([String? videoId]) {
+    breaker.reset();
     if (videoId != null) {
       _videoFailures.remove(videoId);
       _videoCooldownUntil.remove(videoId);
@@ -1093,7 +1094,7 @@ class YtmService {
       final accountService = getIt.isRegistered<YtmAccountService>()
           ? getIt<YtmAccountService>()
           : null;
-      if (accountService != null) {
+      if (accountService != null && !accountService.isFetchingLikedSongs) {
         final tracks = await accountService.fetchPlaylistTracks(cleanInput,
             maxTracks: limit);
         if (tracks.isNotEmpty) {

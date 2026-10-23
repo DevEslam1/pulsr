@@ -86,15 +86,6 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   }
 
   Future<void> _applyMbc() async {
-    if (!widget.equalizerManager.isCompressorAdvancedParamsSupported) {
-      if (mounted) {
-        PulsrToast.show(
-          context,
-          message: context.l10n.compressorLimitDesc,
-        );
-      }
-      return;
-    }
     await widget.equalizerManager.setMultibandCompressor(
       _mbcEnabled,
       f0: _mbcF0,
@@ -424,14 +415,16 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     context.l10n.mbcBandHigh,
                   ];
                   final band = _mbcBands[i];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
+                  return Material(
+                    color: p.surfaceContainer,
+                    shape: RoundedRectangleBorder(
                       borderRadius: AppRadii.r14All,
-                      border: Border.all(color: p.hairline),
+                      side: BorderSide(color: p.hairline),
                     ),
-                    child: ExpansionTile(
+                    clipBehavior: Clip.antiAlias,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: ExpansionTile(
                       dense: true,
                       tilePadding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.s14, vertical: AppSpacing.s2),
@@ -518,6 +511,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                               _applyMbcBand(i, band.copyWith(kneeDb: val)),
                         ),
                       ],
+                    ),
                     ),
                   );
                 }),

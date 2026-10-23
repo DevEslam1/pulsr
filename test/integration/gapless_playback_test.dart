@@ -39,6 +39,8 @@ void main() {
               return false;
             case 'resetWeeklyDose':
               return true;
+            case 'verifyState':
+              return <String, dynamic>{'eqEnabled': true, 'preampDb': 0.0};
             default:
               return true;
           }

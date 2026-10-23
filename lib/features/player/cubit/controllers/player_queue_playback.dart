@@ -74,6 +74,21 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
     } catch (_) {}
 
+    if ((song.sampleRate == null || song.sampleRate! <= 0) &&
+        song.path.isNotEmpty &&
+        !song.path.startsWith('http') &&
+        !song.path.startsWith('ytmusic://')) {
+      try {
+        if (getIt.isRegistered<MediaScannerService>()) {
+          unawaited(getIt<MediaScannerService>()
+              .enrichAudioQuality(song.id, song.path));
+        }
+      } catch (e, st) {
+        ErrorLogger.log('enrichAudioQuality failed in playTrack',
+            error: e, stackTrace: st, category: 'PlayerQueuePlayback');
+      }
+    }
+
     final capturedGen = _mediaItemResolutionGuard.next();
     final capturedSwapGen = _localMatchSwapGuard.next();
     _mediaItemGuard.next();

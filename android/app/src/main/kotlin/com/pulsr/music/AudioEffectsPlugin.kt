@@ -435,6 +435,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeGetTelemetry(): DoubleArray?
     private external fun nativeGetWeeklyDose(): Double
     private external fun nativeResetWeeklyDose()
+    private external fun nativeSetWeeklyDose(dose: Double)
     private external fun nativeIsSafetyAttenuationActive(): Boolean
     private external fun nativeSetHeadphoneSafetyParams(enabled: Boolean, threshold: Double, ceilingDb: Double)
     private external fun nativeReset()
@@ -1129,6 +1130,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         // Prefetch OEM info off main thread
         Thread { try { getCachedOemInfo(appContext) } catch (_: Exception) {} }.start()
 
+        // Restore weekly sound dose (EN 62368-1 / WHO H.870) across process restarts
+        if (isNativeDspLoaded) {
+            try {
+                val safetyPrefs = appContext.getSharedPreferences("pulsr_safety_prefs", Context.MODE_PRIVATE)
+                val savedDose = safetyPrefs.getFloat("weekly_dose", 0.0f).toDouble()
+                val savedTime = safetyPrefs.getLong("weekly_dose_timestamp", 0L)
+                val elapsed = System.currentTimeMillis() - savedTime
+                if (savedDose > 0.0 && elapsed in 0 until (7L * 24 * 3600 * 1000)) {
+                    nativeSetWeeklyDose(savedDose)
+                    Log.i(TAG, "Restored weekly sound dose ($savedDose) from previous session")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to restore weekly dose: ${e.message}")
+            }
+        }
+
         // B-27: If the app was terminated while DVC was active, restore the original system volume
         try {
             val dvcPrefs = appContext.getSharedPreferences("pulsr_dvc_prefs", Context.MODE_PRIVATE)
@@ -1367,6 +1384,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun releaseNativeDsp() {
         if (!isNativeDspLoaded) return
+        try {
+            val currentDose = nativeGetWeeklyDose()
+            context?.getSharedPreferences("pulsr_safety_prefs", Context.MODE_PRIVATE)
+                ?.edit()
+                ?.putFloat("weekly_dose", currentDose.toFloat())
+                ?.putLong("weekly_dose_timestamp", System.currentTimeMillis())
+                ?.apply()
+        } catch (_: Exception) {}
         try {
             nativeSetEqEnabled(false)
             nativeSetCrossfeedEnabled(false)
@@ -2232,7 +2257,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "getWeeklyDose" -> {
                     if (isNativeDspLoaded) {
                         try {
-                            result.success(nativeGetWeeklyDose())
+                            val dose = nativeGetWeeklyDose()
+                            context?.getSharedPreferences("pulsr_safety_prefs", Context.MODE_PRIVATE)
+                                ?.edit()
+                                ?.putFloat("weekly_dose", dose.toFloat())
+                                ?.putLong("weekly_dose_timestamp", System.currentTimeMillis())
+                                ?.apply()
+                            result.success(dose)
                         } catch (e: Exception) {
                             result.success(0.0)
                         }
@@ -2245,6 +2276,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     if (isNativeDspLoaded) {
                         try {
                             nativeResetWeeklyDose()
+                            context?.getSharedPreferences("pulsr_safety_prefs", Context.MODE_PRIVATE)
+                                ?.edit()
+                                ?.putFloat("weekly_dose", 0.0f)
+                                ?.putLong("weekly_dose_timestamp", System.currentTimeMillis())
+                                ?.apply()
                             result.success(true)
                         } catch (e: Exception) {
                             result.success(false)

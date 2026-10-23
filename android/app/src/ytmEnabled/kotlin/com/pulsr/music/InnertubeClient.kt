@@ -1120,11 +1120,11 @@ internal class InnertubeClient(
             if (!deobfuscated.isNullOrEmpty()) {
                 return deobfuscated
             }
-            Log.w(TAG, "Discarding URL: its n parameter could not be transformed (untransformed n URLs are answered with 403)")
+            Log.w(TAG, "n-parameter deobfuscation unavailable; discarding URL to avoid 403 burning")
             null
         } catch (t: Throwable) {
-            Log.w(TAG, "n-transform failed: ${t.message}")
-            if (N_QUERY_PARAM.containsMatchIn(url)) null else url
+            Log.w(TAG, "n-transform failed: ${t.message}; discarding URL")
+            null
         }
     }
 

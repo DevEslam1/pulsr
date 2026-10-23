@@ -643,6 +643,12 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeResetWeeklyDose(
     DspEngineRegistry::instance().resetWeeklyDose();
 }
 
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetWeeklyDose(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble dose) {
+    DspEngineRegistry::instance().setWeeklyDose(static_cast<double>(dose));
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeIsSafetyAttenuationActive(
         JNIEnv* /* env */, jobject /* thiz */) {
@@ -1069,6 +1075,15 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
     std::string content(eqStr ? eqStr : "");
     if (eqStr) env->ReleaseStringUTFChars(jEqString, eqStr);
 
+    if (content.empty()) {
+        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+            snap.arbitraryEq.graphicEqString.clear();
+            snap.arbitraryEq.linearPhase = linearPhase;
+            snap.arbitraryEq.parsedNodes = nullptr;
+        });
+        return JNI_TRUE;
+    }
+
     // Parse off-thread and publish the parsed node list via the snapshot so the
     // audio-thread applyParams never parses/allocates (see DspParams.h).
     try {
@@ -1103,6 +1118,14 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadLiveProgCode(
     const char* codeStr = env->GetStringUTFChars(jCode, nullptr);
     std::string script(codeStr ? codeStr : "");
     if (codeStr) env->ReleaseStringUTFChars(jCode, codeStr);
+
+    if (script.empty()) {
+        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+            snap.liveProg.code.clear();
+            snap.liveProg.program = nullptr;
+        });
+        return env->NewStringUTF("OK");
+    }
 
     // Compile on a throwaway instance so the live bytecode is only rebuilt on
     // the audio thread from the prepared program; then package it off-thread.

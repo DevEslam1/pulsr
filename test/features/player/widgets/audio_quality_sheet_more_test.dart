@@ -240,6 +240,50 @@ void main() {
     verify(() => settings.openOutputSwitcher()).called(1);
   });
 
+  testWidgets(
+      'output routing section highlights the selected device when unverified',
+      (tester) async {
+    final player = stubPlayerCubit();
+    const speakerDevice = AudioDeviceEntry(
+      id: 10,
+      name: 'Phone Speaker',
+      type: 2,
+      typeName: 'Built-in Speaker',
+      isCurrent: false,
+    );
+    const ranchuDevice = AudioDeviceEntry(
+      id: 11,
+      name: 'ranchu',
+      type: 14,
+      typeName: 'Audio Output',
+      isCurrent: false,
+    );
+    final settings = stubSettingsCubit(
+      state: const SettingsState().copyWith(
+        currentOutputDevice: const AudioOutputInfo(
+          deviceName: 'Phone Speaker',
+          isUsbDac: false,
+          sampleRate: 48000,
+          bitDepth: 16,
+          isBitPerfectActive: false,
+          availableDevices: [speakerDevice, ranchuDevice],
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+
+    // Phone Speaker matches deviceName and should be selected (checked radio)
+    expect(find.byKey(const ValueKey('checked')), findsOneWidget);
+    expect(find.byKey(const ValueKey('unchecked')), findsOneWidget);
+    expect(find.textContaining('Active route'), findsOneWidget);
+  });
+
   testWidgets('streaming selector applies the medium quality', (tester) async {
     final player = stubPlayerCubit();
     final settings = stubSettingsCubit();

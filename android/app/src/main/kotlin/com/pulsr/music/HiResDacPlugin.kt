@@ -1055,8 +1055,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             try {
                 val routed = audioManager?.getAudioDevicesForAttributes(mediaAttributes)
                 routed?.firstOrNull()?.let { hint ->
-                    devices.firstOrNull { it.id == hint.id }?.let { return it }
-                }
+                    devices.firstOrNull {
+                        it.type == hint.type && (hint.address.isNullOrEmpty() || it.address == hint.address)
+                    } ?: devices.firstOrNull { it.type == hint.type }
+                }?.let { return it }
             } catch (_: Throwable) {}
         }
         try {
@@ -1068,7 +1070,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 devices.firstOrNull { isWiredOutputType(it.type) }?.let { return it }
             }
         } catch (_: Throwable) {}
-        return null
+        for (predicate in ROUTE_PRIORITY) {
+            devices.firstOrNull { predicate(it.type) }?.let { return it }
+        }
+        return devices.firstOrNull()
     }
 
     /**
@@ -1516,6 +1521,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val nativeSampleRate = getNativeSampleRate()
         val nativeFrames = getNativeFramesPerBuffer()
 
+        val currentDevice = activeDevice ?: routeDevice
         val availableList = mutableListOf<Map<String, Any?>>()
         for (device in devices) {
             val dRates = device.sampleRates.toList().filter { it > 0 }
@@ -1533,7 +1539,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 "name" to getCleanDeviceName(device),
                 "type" to device.type,
                 "typeName" to getDeviceTypeName(device.type),
-                "isCurrent" to (device.id == activeDevice?.id),
+                "isCurrent" to (currentDevice != null && device.id == currentDevice.id),
                 "isPreferred" to (preferredRouteApplied && device.id == selectedDeviceId),
                 "sampleRates" to dRates,
                 "maxBitDepth" to dBitDepth

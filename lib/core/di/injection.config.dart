@@ -231,8 +231,7 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i627.MusicRepository(gh<_i682.AppDatabase>()));
     gh.factory<_i171.YtmSearchCubit>(
         () => _i171.YtmSearchCubit(service: gh<_i391.YtmService>()));
-    gh.lazySingleton<_i880.QuranRepository>(
-        () => _i992.QuranRepositoryImpl());
+    gh.lazySingleton<_i880.QuranRepository>(() => _i992.QuranRepositoryImpl());
     gh.lazySingleton<_i621.LrclibService>(
         () => _i621.LrclibService(client: gh<_i497.HttpClient>()));
     gh.singleton<_i483.MediaScannerService>(

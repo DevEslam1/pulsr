@@ -660,7 +660,9 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       try {
-        await getIt<FileIntentHandler>().checkInitialUri();
+        final handler = await getIt.getAsync<FileIntentHandler>();
+        if (!mounted) return;
+        await handler.checkInitialUri();
       } catch (e, st) {
         if (!mounted) return;
         ErrorLogger.log('Failed to process initial audio intent on startup',

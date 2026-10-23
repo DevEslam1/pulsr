@@ -375,6 +375,8 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
     if (!params.graphicEqString.empty() &&
         (params.graphicEqString != loadedString_ || params.linearPhase != linearPhase_)) {
         loadGraphicEqString(params.graphicEqString, params.linearPhase);
+    } else if (params.graphicEqString.empty() && (hasResponse_ || preparedNodesRef_ != nullptr)) {
+        loadGraphicEqString("", params.linearPhase);
     }
 }
 

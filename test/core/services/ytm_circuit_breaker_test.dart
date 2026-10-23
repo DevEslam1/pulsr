@@ -74,5 +74,26 @@ void main() {
       breaker.recordFailure(signal);
       expect(breaker.shouldAllow(signal), isFalse);
     });
+
+    test('recordSuccess closes an open breaker window', () {
+      const signal = YtmBlockSignal.botChallenge;
+      breaker.recordFailure(signal);
+      expect(breaker.shouldAllow(signal), isFalse);
+      breaker.recordSuccess();
+      expect(breaker.shouldAllow(signal), isTrue);
+    });
+
+    test('reset clears a specific signal or all signals', () {
+      const signal = YtmBlockSignal.botChallenge;
+      breaker.recordFailure(signal);
+      expect(breaker.shouldAllow(signal), isFalse);
+      breaker.reset(signal);
+      expect(breaker.shouldAllow(signal), isTrue);
+
+      breaker.recordFailure(signal);
+      expect(breaker.shouldAllow(signal), isFalse);
+      breaker.reset();
+      expect(breaker.shouldAllow(signal), isTrue);
+    });
   });
 }

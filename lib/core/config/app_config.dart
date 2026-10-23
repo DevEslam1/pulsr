@@ -21,8 +21,21 @@ class AppConfig {
   /// Being a `const false` lets Dart tree-shake the guarded branches, but the
   /// generated DI config still imports every service, so this is not a
   /// guarantee that no YouTube code reaches the binary.
-  static const bool ytmEnabled =
-      bool.fromEnvironment('ENABLE_YTM', defaultValue: false);
+  static const bool ytmEnabled = bool.fromEnvironment('ENABLE_YTM',
+      defaultValue: bool.fromEnvironment('YTM',
+          defaultValue: bool.fromEnvironment('YTM_ENABLED',
+              defaultValue: bool.fromEnvironment('ytm',
+                  defaultValue: bool.fromEnvironment('-ytm',
+                      defaultValue: bool.fromEnvironment('--ytm',
+                          defaultValue: String.fromEnvironment('FLAVOR') == 'ytm' ||
+                              String.fromEnvironment('flavor') == 'ytm' ||
+                              String.fromEnvironment('ENABLE_YTM') == '1' ||
+                              String.fromEnvironment('YTM') == '1' ||
+                              String.fromEnvironment('ytm') == '1' ||
+                              String.fromEnvironment('-ytm') == 'true' ||
+                              String.fromEnvironment('-ytm') == '1' ||
+                              String.fromEnvironment('--ytm') == 'true' ||
+                              String.fromEnvironment('--ytm') == '1'))))));
 
   /// In-app voice search. There is no on-device speech recognizer wired up, so
   /// the mic affordance is hidden entirely unless this is explicitly enabled

@@ -286,6 +286,8 @@ void LiveProg::applyParams(const LiveProgParamSet& params) {
         // std::string assignment can heap-allocate. The compiled program is
         // the only thing the audio path needs.
         applyPreparedProgram(params.program);
+    } else if (!params.program && activeProgram_) {
+        applyPreparedProgram(nullptr);
     }
     // Sliders must be written AFTER applyPreparedProgram() (which calls reset()
     // and zeroes memory) so the first block sees the user's slider values.
@@ -323,7 +325,30 @@ std::shared_ptr<const LiveProgProgram> LiveProg::buildProgram() const {
 }
 
 void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>& program) {
-    if (!program) return;
+    if (!program) {
+        if (isCompiled_ && (enabled_ || smoothedEnabledMix_ >= 1e-4f) && !sampleBytecode_.empty()) {
+            prevSampleBytecode_ = sampleBytecode_;
+            prevMemory_ = memory_;
+            prevIdxSpl0_ = idxSpl0_;
+            prevIdxSpl1_ = idxSpl1_;
+            programCrossfadeProgress_ = 0.0f;
+        } else {
+            prevSampleBytecode_.clear();
+            prevMemory_.clear();
+            programCrossfadeProgress_ = 1.0f;
+        }
+        activeProgram_.reset();
+        initBytecode_.clear();
+        sampleBytecode_.clear();
+        idxSpl0_ = -1;
+        idxSpl1_ = -1;
+        idxSrate_ = -1;
+        for (int i = 0; i < 8; ++i) idxSliders_[i] = -1;
+        memory_.clear();
+        isCompiled_ = false;
+        reset();
+        return;
+    }
     activeProgram_ = program;
 
     if (isCompiled_ && (enabled_ || smoothedEnabledMix_ >= 1e-4f) && !sampleBytecode_.empty()) {

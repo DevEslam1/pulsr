@@ -691,13 +691,16 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                     height: 48,
                     decoration: BoxDecoration(
                       color: isActive
-                          ? p.favorite.withValues(alpha: 0.16)
-                          : p.surfaceContainer,
+                          ? p.favorite.withValues(alpha: 0.18)
+                          : p.surface.withValues(
+                              alpha: p.isDark ? 0.45 : 0.65),
                       borderRadius: AppRadii.r16All,
                       border: Border.all(
                         color: isActive
-                            ? p.favorite.withValues(alpha: 0.4)
-                            : p.hairline,
+                            ? p.favorite.withValues(alpha: 0.45)
+                            : (p.isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : p.hairline),
                         width: 1,
                       ),
                     ),

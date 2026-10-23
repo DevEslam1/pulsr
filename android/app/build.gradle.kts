@@ -174,6 +174,10 @@ dependencies {
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
 
+    val rhino = "org.mozilla:rhino:1.8.1"
+    "devImplementation"(rhino)
+    "ytmImplementation"(rhino)
+
     // Google Cast SDK. Scoped to the dev/ytm flavors only: the prod (Play Store)
     // "Pure" variant strips INTERNET and must not ship Cast or Play Services
     // routing. The matching code lives in sourceSets dev/ytm (src/ytmEnabled).

@@ -1,5 +1,6 @@
 // lib/core/widgets/pulsr_bottom_sheet.dart
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
@@ -220,19 +221,21 @@ class PulsrBottomSheetContainer extends StatelessWidget {
         ? Duration.zero
         : const Duration(milliseconds: 180);
 
-    final baseSurfaceColor = GpuBudget.isGpuSaverActive
-        ? p.surface
-        : (p.isDark
-            ? p.surface.withValues(alpha: 0.96)
-            : p.surface.withValues(alpha: 0.98));
-
-    final topBlendColor = Color.alphaBlend(
-      p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
-      baseSurfaceColor,
-    );
-
     final effectiveBorderRadius =
         isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius;
+
+    final navGradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        GpuBudget.isGpuSaverActive
+            ? p.surface
+            : p.surface.withValues(alpha: p.isDark ? 0.78 : 0.88),
+        GpuBudget.isGpuSaverActive
+            ? p.surfaceContainer
+            : p.surfaceContainer.withValues(alpha: p.isDark ? 0.72 : 0.84),
+      ],
+    );
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -248,25 +251,21 @@ class PulsrBottomSheetContainer extends StatelessWidget {
           child: RepaintBoundary(
             child: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [topBlendColor, baseSurfaceColor],
-                  stops: const [0.0, 0.35],
-                ),
                 borderRadius: effectiveBorderRadius,
-                border: Border.all(
-                  color: p.isDark
-                      ? Colors.white.withValues(alpha: 0.10)
-                      : p.hairline,
-                  width: 1.0,
-                ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.scrimAt(p.isDark ? 0.45 : 0.14),
-                    blurRadius: 22,
+                    color: Colors.black
+                        .withValues(alpha: p.isDark ? 0.40 : 0.12),
+                    blurRadius: 24,
                     spreadRadius: 0,
                     offset: const Offset(0, -4),
+                  ),
+                  BoxShadow(
+                    color: p.accent
+                        .withValues(alpha: p.isDark ? 0.08 : 0.04),
+                    blurRadius: 18,
+                    spreadRadius: -2,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -276,119 +275,119 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                   : EdgeInsets.zero,
               child: ClipRRect(
                 borderRadius: effectiveBorderRadius,
-                child: _PulsrBottomSheetScope(
-                  child: SafeArea(
-                    top: false,
-                    left: false,
-                    right: false,
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: Stack(
-                        children: [
-                          // Specular top edge highlight
-                          PositionedDirectional(
-                            top: 0,
-                            start: 24,
-                            end: 24,
-                            height: 1.2,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    AppColors.specularAt(0.0),
-                                    AppColors.specularAt(
-                                        p.isDark ? 0.38 : 0.65),
-                                    AppColors.specularAt(0.0),
-                                  ],
-                                  stops: const [0.0, 0.5, 1.0],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Top drag pill
-                              if (showDragHandle) ...[
-                                const SizedBox(height: AppSpacing.s10),
-                                Center(
-                                  child: Semantics(
-                                    label: context.l10n.sheetDragHandle,
-                                    hint: context.l10n.sheetDragDownToDismiss,
-                                    child: Container(
-                                      width: AppSpacing.s40,
-                                      height: 4.5,
-                                      decoration: BoxDecoration(
-                                        color: (p.isDark
-                                                ? Colors.white
-                                                : Colors.black)
-                                            .withValues(alpha: 0.22),
-                                        borderRadius: AppRadii.full,
+                child: Builder(
+                  builder: (context) {
+                    final sheetContent = Container(
+                      decoration: BoxDecoration(
+                        gradient: navGradient,
+                        borderRadius: effectiveBorderRadius,
+                        border: Border.all(
+                          color: p.isDark
+                              ? AppColors.specularStrong
+                              : AppColors.scrimAt(0.08),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: _PulsrBottomSheetScope(
+                        child: SafeArea(
+                          top: false,
+                          left: false,
+                          right: false,
+                          child: Material(
+                            type: MaterialType.transparency,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Top drag pill
+                                if (showDragHandle) ...[
+                                  const SizedBox(height: AppSpacing.s10),
+                                  Center(
+                                    child: Semantics(
+                                      label: context.l10n.sheetDragHandle,
+                                      hint: context.l10n.sheetDragDownToDismiss,
+                                      child: Container(
+                                        width: AppSpacing.s40,
+                                        height: 4.5,
+                                        decoration: BoxDecoration(
+                                          color: (p.isDark
+                                                  ? Colors.white
+                                                  : Colors.black)
+                                              .withValues(alpha: 0.22),
+                                          borderRadius: AppRadii.full,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: AppSpacing.s8),
-                              ],
+                                  const SizedBox(height: AppSpacing.s8),
+                                ],
 
-                              // Optional Header
-                              if (title != null) ...[
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.s20,
-                                      vertical: AppSpacing.s8),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            DefaultTextStyle.merge(
-                                              style: TextStyle(
-                                                color: p.textPrimary,
-                                                fontSize: AppFontSize.title,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing:
-                                                    AppTracking.title,
-                                              ),
-                                              child: title!,
-                                            ),
-                                            if (subtitle != null) ...[
-                                              const SizedBox(
-                                                  height: AppSpacing.s2),
+                                // Optional Header
+                                if (title != null) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.s20,
+                                        vertical: AppSpacing.s8),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
                                               DefaultTextStyle.merge(
                                                 style: TextStyle(
-                                                  color: p.textSecondary,
-                                                  fontSize: AppFontSize.label,
+                                                  color: p.textPrimary,
+                                                  fontSize: AppFontSize.title,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing:
+                                                      AppTracking.title,
                                                 ),
-                                                child: subtitle!,
+                                                child: title!,
                                               ),
+                                              if (subtitle != null) ...[
+                                                const SizedBox(
+                                                    height: AppSpacing.s2),
+                                                DefaultTextStyle.merge(
+                                                  style: TextStyle(
+                                                    color: p.textSecondary,
+                                                    fontSize: AppFontSize.label,
+                                                  ),
+                                                  child: subtitle!,
+                                                ),
+                                              ],
                                             ],
-                                          ],
+                                          ),
                                         ),
-                                      ),
-                                      if (trailing != null) trailing!,
-                                    ],
+                                        if (trailing != null) trailing!,
+                                      ],
+                                    ),
+                                  ),
+                                  Divider(color: p.hairline, height: 1),
+                                ],
+
+                                // Sheet Body
+                                Flexible(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: child,
                                   ),
                                 ),
-                                Divider(color: p.hairline, height: 1),
                               ],
-
-                              // Sheet Body
-                              Flexible(
-            child: Material(
-              color: Colors.transparent,
-              child: child,
-            ),
-          ),
-                            ],
+                            ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+
+                    if (GpuBudget.isGpuSaverActive) {
+                      return sheetContent;
+                    }
+                    return BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: sheetContent,
+                    );
+                  },
                 ),
               ),
             ),

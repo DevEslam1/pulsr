@@ -57,8 +57,8 @@ class OptimizedDspPipeline {
   /// 5. Multiband Compressor (4-band LR4 dynamics)
   /// 6. Stereo Balance / Mono Mix (panner, before the spatial stages)
   /// 7. Crossfeed (headphone acoustic cross-coupling / BS2B)
-  /// 8. Convolution Reverb (spatial room impulse response)
-  /// 9. Harmonic Saturation (multiband warmth option)
+  /// 8. Harmonic Saturation (multiband warmth option)
+  /// 9. Convolution Reverb (spatial room impulse response)
   /// 10. Live Programmable DSP (EEL script)
   /// 11. Stereo Width (M/S, after crossfeed/reverb, before the limiter)
   /// 12. Sub Crossover (bass redirection sum, after width, before the limiter)
@@ -77,8 +77,8 @@ class OptimizedDspPipeline {
     DspStage.multibandCompressor,
     DspStage.stereoPanner,
     DspStage.crossfeed,
-    DspStage.convolutionReverb,
     DspStage.harmonicSaturation,
+    DspStage.convolutionReverb,
     DspStage.liveProg,
     DspStage.stereoWidth,
     DspStage.subCrossover,

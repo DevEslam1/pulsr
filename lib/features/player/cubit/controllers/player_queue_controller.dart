@@ -17,6 +17,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../../../domain/models/radio_station.dart';
 import '../../../../domain/repositories/music_repository_interface.dart';
+import '../../../../data/scanner/media_scanner_service.dart';
 import '../player_state.dart';
 import '../queue_slot_codec.dart';
 import 'queue_slot_data.dart';

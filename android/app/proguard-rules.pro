@@ -80,7 +80,14 @@
 -keep class org.mozilla.javascript.** { *; }
 
 # Preserve the measured app AudioTrack field used by the output diagnostics.
--keepclassmembers class androidx.media3.exoplayer.audio.DefaultAudioSink { android.media.AudioTrack audioTrack; }
+-keepclassmembers class androidx.media3.exoplayer.audio.DefaultAudioSink {
+    android.media.AudioTrack audioTrack;
+    androidx.media3.exoplayer.audio.AudioOutput audioOutput;
+}
+-keepclassmembers class androidx.media3.exoplayer.audio.AudioTrackAudioOutput {
+    public android.media.AudioTrack getAudioTrack();
+    android.media.AudioTrack audioTrack;
+}
 
 # Play Core (Deferred Components) - suppress warnings for unbundled optional classes
 -dontwarn com.google.android.play.core.**
