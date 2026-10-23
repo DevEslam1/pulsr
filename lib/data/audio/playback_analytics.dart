@@ -14,6 +14,8 @@ class PlaybackAnalytics {
   final List<PlaybackHealthEvent> _recentEvents = [];
   int _bufferUnderrunCount = 0;
   int _underrunEpoch = 0;
+  DateTime? _lastUnderrunAt;
+  static const Duration _underrunDecay = Duration(minutes: 2);
 
   final void Function()? onIncreaseBufferSizeRequested;
   final void Function()? onReduceQualityRequested;
@@ -35,6 +37,15 @@ class PlaybackAnalytics {
   /// only step quality down if underruns persist after the buffer widened.
   void recordBufferUnderrun() {
     _addEvent(PlaybackHealthEvent.bufferUnderrun);
+    // Decay: stalls hours apart are unrelated and must not add up to a
+    // permanent buffer widening / quality step-down.
+    final now = DateTime.now();
+    final last = _lastUnderrunAt;
+    if (last != null && now.difference(last) > _underrunDecay) {
+      _bufferUnderrunCount = 0;
+      _underrunEpoch = 0;
+    }
+    _lastUnderrunAt = now;
     _bufferUnderrunCount++;
 
     if (_bufferUnderrunCount >= 3) {

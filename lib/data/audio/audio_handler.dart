@@ -1865,17 +1865,28 @@ class PulsrAudioHandler extends BaseAudioHandler
     void setupPlayerListeners(AudioPlayer player, bool isPlayerA) {
       bool isTargetActive() =>
           isPlayerA == _isPlayerAActive && identical(player, _activePlayer);
+      // Underruns are edge-triggered: a single stall emits many playback events
+      // (every bufferedPosition update) and must count as ONE underrun, or one
+      // hiccup would trip the widen-buffer / quality step-down thresholds.
+      var wasBuffering = false;
 
       _subscriptions.add(
         player.playbackEventStream.listen(
           (event) {
             if (_disposed) return;
             if (isTargetActive()) {
-              if (event.processingState == ProcessingState.buffering &&
-                  _activePlayer.playing) {
+              final isBuffering =
+                  event.processingState == ProcessingState.buffering;
+              // Ignore the initial fill at track start / seeks near the start:
+              // only a stall after playback has really begun is an underrun.
+              if (isBuffering &&
+                  !wasBuffering &&
+                  _activePlayer.playing &&
+                  _activePlayer.position > const Duration(seconds: 2)) {
                 _playbackAnalytics.recordBufferUnderrun();
                 unawaited(AudioSessionLog.instance.recordUnderrun());
               }
+              wasBuffering = isBuffering;
               _broadcastState(event);
             }
           },

@@ -146,7 +146,9 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       ),
       playback: state.playback.copyWith(
         currentSong: song,
-        duration: Duration(milliseconds: song.durationMs),
+        duration: (song.durationMs <= 0 && isSameSong)
+            ? state.duration
+            : Duration(milliseconds: song.durationMs),
         position: startPos,
         // BUG-3 FIX: do NOT optimistically set isPlaying=true before loadQueue
         // is called. There is an async gap between this emit and the loadQueue

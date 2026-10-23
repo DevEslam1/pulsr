@@ -135,7 +135,9 @@ class _SearchViewState extends State<_SearchView> {
     String? q;
     try {
       q = GoRouterState.of(context).uri.queryParameters['q'];
-    } catch (_) {}
+    } catch (_) {
+      q = null;
+    }
     if (q != null && q.trim().isNotEmpty && q != _lastAppliedQueryParam) {
       _lastAppliedQueryParam = q;
       _prefill(q);
@@ -307,7 +309,9 @@ class _SearchViewState extends State<_SearchView> {
         context.push('/artist', extra: match);
         return;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Fallback to search query when LibraryCubit or GoRouter is unavailable.
+    }
     // Not in the library: search for the name, restricted to artists.
     context.read<SearchCubit>().applySavedSearch(name, 'Artists');
     _controller.text = name;
@@ -324,7 +328,9 @@ class _SearchViewState extends State<_SearchView> {
         context.push('/album', extra: match);
         return;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Fallback to search query when LibraryCubit or GoRouter is unavailable.
+    }
     context.read<SearchCubit>().applySavedSearch(name, 'Albums');
     _controller.text = name;
     setState(() => _text = name);

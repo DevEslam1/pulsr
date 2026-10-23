@@ -73,6 +73,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   void setStateForTesting(PlayerState state) => emit(state);
 
   bool _userPausedIntentionally = false;
+  DateTime? _optimisticPlayingSince;
+  static const Duration _optimisticPlayingMaxWindow = Duration(seconds: 10);
   // Auto-skip-on-error bookkeeping: the id of the track that last failed and
   // how many consecutive failures it has produced. A different track (or a
   // successful track change) resets the count.
@@ -485,6 +487,17 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         previousDuration: state.duration,
         isSameSong: isSameSong,
       );
+      // Record history here too: this listener can win the race against the
+      // mediaItem listener, which would then see isSameSong and skip it.
+      final updatedHistory = List<SongsTableData>.from(state.queueHistory);
+      final previousSong = state.currentSong;
+      if (!isSameSong && previousSong != null) {
+        updatedHistory.removeWhere((s) => s.id == previousSong.id);
+        updatedHistory.insert(0, previousSong);
+        if (updatedHistory.length > 25) {
+          updatedHistory.removeRange(25, updatedHistory.length);
+        }
+      }
       safeEmit(state.copyWith(
         playback: state.playback.copyWith(
           currentSong: song,
@@ -494,6 +507,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         ),
         queueSlice: state.queueSlice.copyWith(
           currentIndex: songIndex != -1 ? songIndex : state.currentIndex,
+          queueHistory: updatedHistory,
         ),
         lyricsSlice: state.lyricsSlice.copyWith(
           lyrics: isSameSong ? state.lyrics : const [],
@@ -507,6 +521,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         unawaited(metadataController.enrichTrackParallel(song));
         unawaited(dspController.maybeFollowTrackSampleRate(song));
         unawaited(playbackOptionsController.onCurrentSongChanged(song));
+        unawaited(checkAndTriggerAutoplay());
         widgetBridge.updateWidgetThrottled(state, force: true);
       }
       _maybeScrobble(song, state.position, state.isPlaying);
@@ -750,15 +765,24 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       };
 
       var resolvedPlaying = isPlaying;
+      final transientNonReady =
+          ps.processingState == AudioProcessingState.loading ||
+              ps.processingState == AudioProcessingState.buffering;
       if (!isPlaying &&
           state.isPlaying &&
           !_userPausedIntentionally &&
-          (ps.processingState == AudioProcessingState.loading ||
-              ps.processingState == AudioProcessingState.buffering)) {
+          transientNonReady) {
         // Keep the optimistic "playing" through transient non-ready states
         // (loading/buffering) during a selection/load so the play button
-        // doesn't flicker at track start.
-        resolvedPlaying = true;
+        // doesn't flicker at track start. Bounded: an external pause (audio
+        // focus loss, unplugged headphones) while buffering must not leave the
+        // UI showing "playing" forever.
+        final since = _optimisticPlayingSince ??= DateTime.now();
+        if (DateTime.now().difference(since) < _optimisticPlayingMaxWindow) {
+          resolvedPlaying = true;
+        }
+      } else {
+        _optimisticPlayingSince = null;
       }
 
       final isBuffering = ps.processingState == AudioProcessingState.loading ||
@@ -812,8 +836,19 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         positionUpdates.throttleTime(PlayerConstants.positionThrottleDuration,
             trailing: true), (pos) {
       if (state.playback.position == pos) return;
+      // Repeat-one loop wrap: the engine restarts the same track without a
+      // track change, so re-arm scrobbling for the new play.
+      final wrapped = state.repeatMode == PlayerRepeatMode.one &&
+          state.duration > Duration.zero &&
+          state.position > state.duration * 0.5 &&
+          pos < const Duration(seconds: 3);
+      if (wrapped) _lastScrobbledSongId = null;
       safeEmit(
           state.copyWith(playback: state.playback.copyWith(position: pos)));
+      if (wrapped) {
+        final cur = state.currentSong;
+        if (cur != null) _maybeScrobble(cur, pos, state.isPlaying);
+      }
       if (state.isPlaying) {
         widgetBridge.updateWidgetProgressThrottled(state);
         // SponsorBlock auto-skip: jump past a skippable segment when one covers

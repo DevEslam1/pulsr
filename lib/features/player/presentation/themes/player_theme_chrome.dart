@@ -730,11 +730,15 @@ class PlayerBottomActionDock extends StatelessWidget {
     try {
       remainingTracks = props.state.sleepTimerRemainingTracks ??
           props.cubit.sleepTimerRemainingTracks;
-    } catch (_) {}
+    } catch (_) {
+      remainingTracks = props.state.sleepTimerRemainingTracks;
+    }
     bool isEndQ = false;
     try {
       isEndQ = props.cubit.isEndOfQueueSleepTimer == true;
-    } catch (_) {}
+    } catch (_) {
+      isEndQ = false;
+    }
     final hasTimer = props.state.sleepTimerRemaining != null ||
         remainingTracks != null ||
         isEndQ;
@@ -980,7 +984,9 @@ class _PartyDockButton extends StatelessWidget {
       if (getIt.isRegistered<ListenTogetherService>()) {
         partyService = getIt<ListenTogetherService>();
       }
-    } catch (_) {}
+    } catch (_) {
+      partyService = null;
+    }
 
     if (partyService == null) {
       return PlayerDockIconButton(
@@ -1502,7 +1508,9 @@ class PlayerControlsColumn extends StatelessWidget {
     try {
       mode = context
           .select<SettingsCubit, ExperienceMode>((c) => c.state.experienceMode);
-    } catch (_) {}
+    } catch (_) {
+      mode = ExperienceMode.normal;
+    }
     final showAbControls = showAdvancedBar &&
         (mode == ExperienceMode.professional ||
             state.abPointA != null ||
