@@ -1,4 +1,5 @@
 // lib/features/player/cubit/player_state.dart
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../core/utils/list_content_diff.dart';
@@ -21,10 +22,27 @@ enum PlayerRepeatMode { off, all, one }
 enum QueueTier { context, userQueue, autoplay }
 
 final Expando<bool> _songAutoplayExpando = Expando<bool>('songAutoplayExpando');
+final Set<int> _autoplaySongIds = <int>{};
+const int _maxAutoplaySongIds = 4096;
 
 extension SongAutoplayExtension on SongsTableData {
-  bool get isAutoplay => _songAutoplayExpando[this] ?? false;
-  set isAutoplay(bool value) => _songAutoplayExpando[this] = value;
+  bool get isAutoplay =>
+      _songAutoplayExpando[this] ?? _autoplaySongIds.contains(id);
+
+  bool get hasExplicitAutoplayFlag => _songAutoplayExpando[this] == true;
+
+  set isAutoplay(bool value) {
+    _songAutoplayExpando[this] = value;
+    if (value) {
+      _autoplaySongIds.remove(id);
+      _autoplaySongIds.add(id);
+      if (_autoplaySongIds.length > _maxAutoplaySongIds) {
+        _autoplaySongIds.remove(_autoplaySongIds.first);
+      }
+    } else {
+      _autoplaySongIds.remove(id);
+    }
+  }
 }
 
 /// Focused slice owning playback transport, track identities, positions, and options.
@@ -112,6 +130,7 @@ abstract class QueueSlice with _$QueueSlice {
         activeQueueSlot != other.activeQueueSlot ||
         currentCueIndex != other.currentCueIndex ||
         isAutoplayEnabled != other.isAutoplayEnabled ||
+        !mapEquals(trackTiers, other.trackTiers) ||
         listContentDiffers(queue, other.queue) ||
         listContentDiffers(cueChapters, other.cueChapters) ||
         listContentDiffers(queueHistory, other.queueHistory);

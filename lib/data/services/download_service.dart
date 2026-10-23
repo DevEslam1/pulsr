@@ -135,14 +135,40 @@ class DownloadService {
     int? year,
     String? artworkPath,
     String? lyrics,
+  }) =>
+      writeAudioTags(
+        filePath: filePath,
+        title: title,
+        artist: artist,
+        album: album,
+        trackNumber: trackNumber,
+        genre: genre,
+        year: year,
+        artworkPath: artworkPath,
+        lyrics: lyrics,
+      );
+
+  /// Shared static implementation for writing audio container tags with retry.
+  static Future<bool> writeAudioTags({
+    required String filePath,
+    required String title,
+    required String artist,
+    String? album,
+    int? trackNumber,
+    String? genre,
+    int? year,
+    String? artworkPath,
+    String? lyrics,
   }) async {
+    final normalizedAlbum =
+        (album != null && album.isNotEmpty) ? album : 'Unknown Album';
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         await _tagChannel.invokeMethod('writeTags', {
           'path': filePath,
           'title': title,
           'artist': artist,
-          'album': album ?? 'Unknown Album',
+          'album': normalizedAlbum,
           'genre': genre,
           'year': year,
           'trackNumber': trackNumber ?? 1,
@@ -176,7 +202,13 @@ class DownloadService {
   }
 
   /// Saves sidecar .lrc alongside audio file.
-  Future<void> saveSidecarLrc(String audioFilePath, String lrcContent) async {
+  Future<void> saveSidecarLrc(String audioFilePath, String lrcContent) =>
+      writeSidecarLrc(audioFilePath, lrcContent);
+
+  /// Shared static implementation for saving a sidecar `.lrc` alongside [audioFilePath].
+  static Future<void> writeSidecarLrc(
+      String audioFilePath, String lrcContent) async {
+    if (audioFilePath.startsWith('content:')) return;
     try {
       final lrcPath = '${p.withoutExtension(audioFilePath)}.lrc';
       final lrcFile = File(lrcPath);

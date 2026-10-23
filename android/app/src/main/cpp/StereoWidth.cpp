@@ -41,11 +41,11 @@ void StereoWidth::configureMultiband(bool multiband, double lowWidth, double mid
 }
 
 void StereoWidth::updateCrossovers() {
-    crossoverLow_.configure(sampleRate_, lowCrossoverHz_);
-    crossoverHigh_.configure(sampleRate_, highCrossoverHz_);
-    // FIX M-22: match the low-band compensating allpass to the high crossover so
-    // AP(low) == AP embedded in the mid+high sum (identical coeffs -> exact).
-    lowBandAllpass_.configure(sampleRate_, highCrossoverHz_);
+    for (int p = 0; p < MAX_PAIRS; ++p) {
+        crossoverLow_[p].configure(sampleRate_, lowCrossoverHz_);
+        crossoverHigh_[p].configure(sampleRate_, highCrossoverHz_);
+        lowBandAllpass_[p].configure(sampleRate_, highCrossoverHz_);
+    }
 }
 
 void StereoWidth::applyParams(const StereoWidthParamSet& params) {
@@ -60,9 +60,11 @@ void StereoWidth::reset() {
     smoothedLowWidth_ = targetLowWidth_;
     smoothedMidWidth_ = targetMidWidth_;
     smoothedHighWidth_ = targetHighWidth_;
-    crossoverLow_.reset();
-    crossoverHigh_.reset();
-    lowBandAllpass_.reset();  // FIX M-22
+    for (int p = 0; p < MAX_PAIRS; ++p) {
+        crossoverLow_[p].reset();
+        crossoverHigh_[p].reset();
+        lowBandAllpass_[p].reset();
+    }
 }
 
 void StereoWidth::process(float* L, float* R, int frames) {
@@ -140,11 +142,11 @@ void StereoWidth::process(float* L, float* R, int frames) {
 
         // 1. Split low vs (mid+high)
         double lowL, lowR, midHighL, midHighR;
-        crossoverLow_.process(inL, inR, lowL, lowR, midHighL, midHighR);
+        crossoverLow_[0].process(inL, inR, lowL, lowR, midHighL, midHighR);
 
         // 2. Split mid vs high
         double midL, midR, highL, highR;
-        crossoverHigh_.process(midHighL, midHighR, midL, midR, highL, highR);
+        crossoverHigh_[0].process(midHighL, midHighR, midL, midR, highL, highR);
 
         // FIX M-22: allpass-compensate the low band for the high crossover it
         // bypasses. mid+high already reconstruct to HP_f1*(LP_f2+HP_f2) =
@@ -154,7 +156,7 @@ void StereoWidth::process(float* L, float* R, int frames) {
         // width. (This is the full tree for this serial split; mid and high
         // already pass through both crossovers.)
         double apLpL, apLpR, apHpL, apHpR;
-        lowBandAllpass_.process(lowL, lowR, apLpL, apLpR, apHpL, apHpR);
+        lowBandAllpass_[0].process(lowL, lowR, apLpL, apLpR, apHpL, apHpR);
         lowL = apLpL + apHpL;
         lowR = apLpR + apHpR;
 
@@ -270,18 +272,19 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
 
     for (int i = 0; i < frames; ++i) {
         for (int ch = 0; ch + 1 < channels; ch += 2) {
+            const int p = std::min(ch / 2, MAX_PAIRS - 1);
             const double inL = buffer[i * channels + ch];
             const double inR = buffer[i * channels + ch + 1];
 
             double lowL, lowR, midHighL, midHighR;
-            crossoverLow_.process(inL, inR, lowL, lowR, midHighL, midHighR);
+            crossoverLow_[p].process(inL, inR, lowL, lowR, midHighL, midHighR);
 
             double midL, midR, highL, highR;
-            crossoverHigh_.process(midHighL, midHighR, midL, midR, highL, highR);
+            crossoverHigh_[p].process(midHighL, midHighR, midL, midR, highL, highR);
 
             // FIX M-22: allpass-compensate the low band (see process()).
             double apLpL, apLpR, apHpL, apHpR;
-            lowBandAllpass_.process(lowL, lowR, apLpL, apLpR, apHpL, apHpR);
+            lowBandAllpass_[p].process(lowL, lowR, apLpL, apLpR, apHpL, apHpR);
             lowL = apLpL + apHpL;
             lowR = apLpR + apHpR;
 

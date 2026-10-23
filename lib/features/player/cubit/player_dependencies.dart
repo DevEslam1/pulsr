@@ -9,6 +9,7 @@ import '../../../data/services/settings_profiles_service.dart';
 import '../../../core/services/smart_audio_service.dart';
 import '../../../core/services/sponsorblock_service.dart';
 import '../../../core/services/ytm_account_service.dart';
+import '../../../core/services/ytm_service.dart';
 import '../../../core/telemetry/playback_latency_tracker.dart';
 import '../../../data/audio/per_song_eq_store.dart';
 import '../../../data/audio/per_song_volume_store.dart';
@@ -39,6 +40,7 @@ class PlayerDependencies {
   final LrclibService? lrclibService;
   final YtmAccountService? ytmAccountService;
   final MediaScannerService? mediaScannerService;
+  final YtmService? ytmService;
 
   const PlayerDependencies({
     this.settingsCubit,
@@ -58,5 +60,6 @@ class PlayerDependencies {
     this.lrclibService,
     this.ytmAccountService,
     this.mediaScannerService,
+    this.ytmService,
   });
 }

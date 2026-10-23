@@ -15,11 +15,23 @@ class AppHttpOverrides extends HttpOverrides {
   static final AppHttpOverrides instance = AppHttpOverrides._();
 
   ProxyConfig _config = const ProxyConfig();
+  ServerSocket? _socks5BridgeServer;
+  Future<int?>? _socks5BridgeStarting;
 
   ProxyConfig get currentConfig => _config;
 
+  /// Port of the active local HTTP-to-SOCKS5 loopback bridge, if running.
+  int? get socks5BridgePort => _socks5BridgeServer?.port;
+
   void update(ProxyConfig newConfig) {
     _config = newConfig;
+    if (newConfig.enabled &&
+        newConfig.isValid &&
+        newConfig.type == AppProxyType.socks5) {
+      unawaited(ensureSocks5Bridge());
+    } else {
+      unawaited(stopSocks5Bridge());
+    }
     // Log the resolved findProxy string rather than the raw host:port, and
     // redact the endpoint inside it: the address may reveal a private/VPN exit
     // or a credentialed proxy and must not reach the logs verbatim.
@@ -29,6 +41,53 @@ class AppHttpOverrides extends HttpOverrides {
       '[AppHttpOverrides] Proxy updated: enabled=${newConfig.enabled}, '
       'type=${newConfig.type.name}, resolved=${_redactProxyAddress(resolved)}',
     );
+  }
+
+  /// Ensures the local loopback HTTP-to-SOCKS5 proxy bridge is listening when
+  /// a SOCKS5 proxy is configured, allowing Dart's [HttpClient] (which only
+  /// speaks HTTP `PROXY` in `findProxy`) to tunnel through SOCKS5 transparently.
+  Future<int?> ensureSocks5Bridge() async {
+    if (!_config.enabled ||
+        !_config.isValid ||
+        _config.type != AppProxyType.socks5) {
+      await stopSocks5Bridge();
+      return null;
+    }
+    if (_socks5BridgeServer != null) {
+      return _socks5BridgeServer!.port;
+    }
+    if (_socks5BridgeStarting != null) {
+      return _socks5BridgeStarting;
+    }
+    final completer = Completer<int?>();
+    _socks5BridgeStarting = completer.future;
+    try {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      _socks5BridgeServer = server;
+      server.listen(
+        _handleSocks5BridgeClient,
+        onError: (_) {},
+        cancelOnError: false,
+      );
+      completer.complete(server.port);
+      return server.port;
+    } catch (e) {
+      completer.complete(null);
+      return null;
+    } finally {
+      _socks5BridgeStarting = null;
+    }
+  }
+
+  /// Stops the local loopback HTTP-to-SOCKS5 proxy bridge if running.
+  Future<void> stopSocks5Bridge() async {
+    final server = _socks5BridgeServer;
+    _socks5BridgeServer = null;
+    if (server != null) {
+      try {
+        await server.close();
+      } catch (_) {}
+    }
   }
 
   /// Replaces the `PROXY <host>:<port>` token with a redacted placeholder so
@@ -47,6 +106,13 @@ class AppHttpOverrides extends HttpOverrides {
     // YouTube Music app (which uses the system selector) kept working.
     client.findProxy = (uri) {
       if (_config.enabled && _config.isValid && !_config.isBypassed(uri)) {
+        if (_config.type == AppProxyType.socks5) {
+          final bridgePort = _socks5BridgeServer?.port;
+          if (bridgePort != null) {
+            return 'PROXY 127.0.0.1:$bridgePort; DIRECT';
+          }
+          unawaited(ensureSocks5Bridge());
+        }
         return _config.toFindProxyString(uri);
       }
       // Delegate to Dart's environment proxy (http_proxy/https_proxy) and
@@ -269,28 +335,26 @@ class AppHttpOverrides extends HttpOverrides {
     );
   }
 
-  /// Performs raw SOCKS5 RFC 1928 greeting & CONNECT handshake.
-  @visibleForTesting
-  static Future<({bool success, int latencyMs, String? error})>
-      testSocks5ViaSocket({
-    required ProxyConfig testConfig,
-    required Uri targetUri,
+  /// Performs raw SOCKS5 RFC 1928 greeting & CONNECT handshake and returns the
+  /// established tunnel socket + byte reader.
+  static Future<({Socket socket, _SocketByteReader reader})> _openSocks5Tunnel({
+    required ProxyConfig proxyConfig,
+    required String targetHost,
+    required int targetPort,
     Duration timeout = const Duration(seconds: 10),
   }) async {
-    final sw = Stopwatch()..start();
     Socket? socket;
     _SocketByteReader? reader;
-
     try {
       socket = await Socket.connect(
-        testConfig.host,
-        testConfig.port,
+        proxyConfig.host,
+        proxyConfig.port,
         timeout: timeout,
       );
       reader = _SocketByteReader(socket);
 
       // 1. SOCKS5 greeting
-      if (testConfig.hasAuth) {
+      if (proxyConfig.hasAuth) {
         socket.add([
           0x05,
           0x02,
@@ -314,11 +378,11 @@ class AppHttpOverrides extends HttpOverrides {
 
       // 2. Authentication (RFC 1929) if required
       if (selectedMethod == 0x02) {
-        if (!testConfig.hasAuth) {
+        if (!proxyConfig.hasAuth) {
           throw const SocketException('SOCKS5 proxy requires authentication');
         }
-        final userBytes = utf8.encode(testConfig.username);
-        final passBytes = utf8.encode(testConfig.password);
+        final userBytes = utf8.encode(proxyConfig.username);
+        final passBytes = utf8.encode(proxyConfig.password);
         if (userBytes.length > 255 || passBytes.length > 255) {
           throw const SocketException(
               'SOCKS5 username and password must each be 255 bytes or fewer');
@@ -340,14 +404,11 @@ class AppHttpOverrides extends HttpOverrides {
       }
 
       // 3. SOCKS5 CONNECT to target host & port
-      final hostBytes = utf8.encode(targetUri.host);
+      final hostBytes = utf8.encode(targetHost);
       if (hostBytes.isEmpty || hostBytes.length > 255) {
         throw const SocketException(
             'SOCKS5 host must be non-empty and 255 bytes or fewer');
       }
-      final targetPort = targetUri.port > 0
-          ? targetUri.port
-          : (targetUri.isScheme('https') ? 443 : 80);
       socket.add([
         0x05, // VER
         0x01, // CMD: CONNECT
@@ -379,6 +440,139 @@ class AppHttpOverrides extends HttpOverrides {
       } else if (atyp == 0x04) {
         await reader.readBytes(16 + 2, timeout); // IPv6 + port
       }
+
+      return (socket: socket, reader: reader);
+    } catch (_) {
+      await reader?.cancel();
+      socket?.destroy();
+      rethrow;
+    }
+  }
+
+  Future<void> _handleSocks5BridgeClient(Socket clientSocket) async {
+    final clientReader = _SocketByteReader(clientSocket);
+    Socket? upstreamSocket;
+    _SocketByteReader? upstreamReader;
+    const timeout = Duration(seconds: 15);
+
+    try {
+      final headerBytes = await clientReader.readUntilHeaderEnd(timeout);
+      final headerStr = latin1.decode(headerBytes);
+      final lines = headerStr.split('\r\n');
+      if (lines.isEmpty || lines.first.isEmpty) {
+        clientSocket.destroy();
+        return;
+      }
+
+      final requestLineParts = lines.first.split(' ');
+      if (requestLineParts.length < 3) {
+        clientSocket.destroy();
+        return;
+      }
+
+      final method = requestLineParts[0].toUpperCase();
+      final requestTarget = requestLineParts[1];
+      final httpVersion = requestLineParts[2];
+
+      if (method == 'CONNECT') {
+        final colonIdx = requestTarget.lastIndexOf(':');
+        final targetHost = colonIdx > 0
+            ? requestTarget.substring(0, colonIdx)
+            : requestTarget;
+        final targetPort = colonIdx > 0
+            ? (int.tryParse(requestTarget.substring(colonIdx + 1)) ?? 443)
+            : 443;
+
+        final tunnel = await _openSocks5Tunnel(
+          proxyConfig: _config,
+          targetHost: targetHost,
+          targetPort: targetPort,
+          timeout: timeout,
+        );
+        upstreamSocket = tunnel.socket;
+        upstreamReader = tunnel.reader;
+
+        clientSocket.add(
+          ascii.encode('HTTP/1.1 200 Connection Established\r\n\r\n'),
+        );
+        await clientSocket.flush();
+
+        clientReader.forwardTo(upstreamSocket);
+        upstreamReader.forwardTo(clientSocket);
+      } else {
+        final targetUri = Uri.tryParse(requestTarget);
+        if (targetUri == null || targetUri.host.isEmpty) {
+          clientSocket.destroy();
+          return;
+        }
+        final targetHost = targetUri.host;
+        final targetPort = targetUri.hasPort
+            ? targetUri.port
+            : (targetUri.isScheme('https') ? 443 : 80);
+        final relativePath = targetUri.path.isEmpty ? '/' : targetUri.path;
+        final pathWithQuery = targetUri.hasQuery
+            ? '$relativePath?${targetUri.query}'
+            : relativePath;
+
+        final tunnel = await _openSocks5Tunnel(
+          proxyConfig: _config,
+          targetHost: targetHost,
+          targetPort: targetPort,
+          timeout: timeout,
+        );
+        upstreamSocket = tunnel.socket;
+        upstreamReader = tunnel.reader;
+
+        final rewrittenLines = <String>[
+          '$method $pathWithQuery $httpVersion',
+          ...lines.skip(1).where(
+                (l) => !l.toLowerCase().startsWith('proxy-'),
+              ),
+        ];
+        upstreamSocket.add(latin1.encode(rewrittenLines.join('\r\n')));
+        await upstreamSocket.flush();
+
+        clientReader.forwardTo(upstreamSocket);
+        upstreamReader.forwardTo(clientSocket);
+      }
+    } catch (_) {
+      await clientReader.cancel();
+      await upstreamReader?.cancel();
+      upstreamSocket?.destroy();
+      try {
+        clientSocket.add(
+          ascii.encode('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n'),
+        );
+        await clientSocket.flush();
+      } catch (_) {}
+      clientSocket.destroy();
+    }
+  }
+
+  /// Performs raw SOCKS5 RFC 1928 greeting & CONNECT handshake.
+  @visibleForTesting
+  static Future<({bool success, int latencyMs, String? error})>
+      testSocks5ViaSocket({
+    required ProxyConfig testConfig,
+    required Uri targetUri,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final sw = Stopwatch()..start();
+    Socket? socket;
+    _SocketByteReader? reader;
+
+    try {
+      final targetPort = targetUri.port > 0
+          ? targetUri.port
+          : (targetUri.isScheme('https') ? 443 : 80);
+      final tunnel = await _openSocks5Tunnel(
+        proxyConfig: testConfig,
+        targetHost: targetUri.host,
+        targetPort: targetPort,
+        timeout: timeout,
+      );
+      socket = tunnel.socket;
+      reader = tunnel.reader;
 
       sw.stop();
       return (
@@ -433,6 +627,8 @@ class _SocketByteReader {
   int _offset = 0;
   Completer<void>? _waitCompleter;
   int _waitCount = 0;
+  bool _waitHeaderEnd = false;
+  Socket? _forwardTarget;
   bool _isDone = false;
   Object? _error;
   StackTrace? _errorStack;
@@ -442,13 +638,32 @@ class _SocketByteReader {
   _SocketByteReader(this._stream) {
     _sub = _stream.listen(
       (chunk) {
+        final target = _forwardTarget;
+        if (target != null) {
+          try {
+            target.add(chunk);
+          } catch (_) {
+            target.destroy();
+          }
+          return;
+        }
         _buffer.addAll(chunk);
-        if (_waitCompleter != null && _availableBytes >= _waitCount) {
-          if (!_waitCompleter!.isCompleted) _waitCompleter!.complete();
-          _waitCompleter = null;
+        if (_waitCompleter != null) {
+          if (_waitHeaderEnd && _findHeaderEndIndex() != -1) {
+            if (!_waitCompleter!.isCompleted) _waitCompleter!.complete();
+            _waitCompleter = null;
+          } else if (!_waitHeaderEnd && _availableBytes >= _waitCount) {
+            if (!_waitCompleter!.isCompleted) _waitCompleter!.complete();
+            _waitCompleter = null;
+          }
         }
       },
       onError: (e, st) {
+        final target = _forwardTarget;
+        if (target != null) {
+          target.destroy();
+          return;
+        }
         _error = e;
         _errorStack = st;
         _isDone = true;
@@ -458,6 +673,13 @@ class _SocketByteReader {
         }
       },
       onDone: () {
+        final target = _forwardTarget;
+        if (target != null) {
+          try {
+            target.destroy();
+          } catch (_) {}
+          return;
+        }
         _isDone = true;
         if (_waitCompleter != null && !_waitCompleter!.isCompleted) {
           _waitCompleter!.complete();
@@ -466,6 +688,69 @@ class _SocketByteReader {
       },
       cancelOnError: true,
     );
+  }
+
+  int _findHeaderEndIndex() {
+    final end = _buffer.length - 3;
+    for (var i = _offset; i < end; i++) {
+      if (_buffer[i] == 13 &&
+          _buffer[i + 1] == 10 &&
+          _buffer[i + 2] == 13 &&
+          _buffer[i + 3] == 10) {
+        return i + 4;
+      }
+    }
+    return -1;
+  }
+
+  Future<List<int>> readUntilHeaderEnd(Duration timeout) async {
+    _checkAndRethrowError();
+    var endIdx = _findHeaderEndIndex();
+    if (endIdx != -1) {
+      final res = _buffer.sublist(_offset, endIdx);
+      _offset = endIdx;
+      _compactBufferIfNeeded();
+      return res;
+    }
+    if (_isDone) {
+      throw const SocketException('Connection closed before HTTP header end');
+    }
+    _waitHeaderEnd = true;
+    _waitCompleter = Completer<void>();
+    try {
+      await _waitCompleter!.future.timeout(timeout);
+    } finally {
+      _waitCompleter = null;
+      _waitHeaderEnd = false;
+    }
+    _checkAndRethrowError();
+    endIdx = _findHeaderEndIndex();
+    if (endIdx == -1) {
+      throw const SocketException('Incomplete HTTP header received');
+    }
+    final res = _buffer.sublist(_offset, endIdx);
+    _offset = endIdx;
+    _compactBufferIfNeeded();
+    return res;
+  }
+
+  void forwardTo(Socket target) {
+    if (_availableBytes > 0) {
+      final remaining = _buffer.sublist(_offset);
+      _buffer.clear();
+      _offset = 0;
+      try {
+        target.add(remaining);
+      } catch (_) {
+        target.destroy();
+        return;
+      }
+    }
+    if (_isDone) {
+      target.destroy();
+      return;
+    }
+    _forwardTarget = target;
   }
 
   void _compactBufferIfNeeded() {

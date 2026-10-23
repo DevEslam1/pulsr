@@ -22,6 +22,8 @@ public:
     static constexpr int INTERP_TAPS = 48;
     static constexpr int INTERP_PHASES = 4;
     static constexpr int TAPS_PER_PHASE = INTERP_TAPS / INTERP_PHASES; // 12
+    // Group delay of the 12-tap BS.1770 true-peak FIR: peak interpolation is centered at history[5..6]
+    static constexpr int FILTER_DELAY = (TAPS_PER_PHASE / 2) - 1; // 5 samples
 
     LookaheadLimiter();
     void setSampleRate(double sampleRate);
@@ -122,7 +124,7 @@ private:
         // the limiter's instantaneous gain, until those slots are overwritten,
         // then crossfade to the fresh delayed stream. Muting would click and
         // replaying the stale delay line would leak old audio.
-        bypassHoldRemaining_ = lookaheadSamples_;
+        bypassHoldRemaining_ = lookaheadSamples_ + FILTER_DELAY;
         bypassMix_ = 0.0f;
         bypassTarget_ = 1.0f;
         enableFading_ = true;
@@ -133,7 +135,7 @@ private:
     void syncPendingParams();
 
     inline float advanceBypassMix() {
-        const int window = std::max(1, lookaheadSamples_);
+        const int window = std::max(1, lookaheadSamples_ + FILTER_DELAY);
         const float step = 1.0f / static_cast<float>(window);
         if (bypassMix_ < bypassTarget_) {
             bypassMix_ = std::min(bypassTarget_, bypassMix_ + step);

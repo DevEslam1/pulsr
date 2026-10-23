@@ -180,8 +180,8 @@ extension PlayerQueueRadio on PlayerQueueController {
   /// Fetches radio tracks via YtmService and appends them to the queue as QueueTier.autoplay.
   Future<void> fetchAndEnqueueAutoplay(String seedVideoId,
       {String? seedArtist}) async {
-    final ytmService =
-        getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null;
+    final ytmService = _ytmService ??
+        (getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null);
     if (ytmService == null) return;
 
     try {

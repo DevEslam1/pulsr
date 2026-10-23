@@ -185,6 +185,11 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     loudnessContour_.setSampleRate(sampleRate);
     subCrossover_.setSampleRate(sampleRate);
     dynamicEq_.setSampleRate(sampleRate);
+    multibandCompressor_.setSampleRate(sampleRate);
+    dynamicBass_.prepare(sampleRate);
+    viperDdc_.setSampleRate(sampleRate);
+    arbitraryEq_.setSampleRate(sampleRate, /*resynthesize=*/false);
+    liveProg_.setSampleRate(sampleRate);
 }
 
 void AudioDspEngine::applySampleRateLocked(double sampleRate) {
@@ -224,6 +229,20 @@ void AudioDspEngine::applySampleRateLocked(double sampleRate) {
         if (prewarmedIr->numPartitions > 0) {
             reverb_.ensurePartitionCapacity(prewarmedIr->numPartitions);
         }
+    }
+    // Pre-synthesize Arbitrary EQ filter for the new rate on the control thread
+    if (current->arbitraryEq.enabled && current->arbitraryEq.parsedNodes && !current->arbitraryEq.parsedNodes->empty()) {
+        auto fir = ArbitraryResponseEq::synthesizeFirKernel(
+            *current->arbitraryEq.parsedNodes,
+            current->arbitraryEq.linearPhase,
+            sampleRate);
+        auto prep = std::make_shared<const PreparedArbitraryEqFilter>(PreparedArbitraryEqFilter{
+            current->arbitraryEq.parsedNodes,
+            std::move(fir),
+            current->arbitraryEq.linearPhase,
+            sampleRate
+        });
+        updated->arbitraryEq.preparedFilter = prep;
     }
     swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(updated));
 }
@@ -669,7 +688,6 @@ void AudioDspEngine::resetInternal() {
     for (int b = 0; b < MultibandCompressor::NUM_BANDS; ++b) {
         mbCompGrDb_[b].store(0.0f, std::memory_order_relaxed);
     }
-    const auto* snap = currentParamsPtr_.load(std::memory_order_relaxed);
 }
 
 void AudioDspEngine::reset() {
@@ -1170,8 +1188,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                                    (!snapshot->dither.isBluetooth ||
                                     snapshot->dither.bluetoothEnabled);
     if (ditherStageActive) {
-        const float scale = ditherScaleForBits(snapshot->dither.targetBitDepth);
-        const float invScale = 1.0f / scale;
+        const double scale = static_cast<double>(ditherScaleForBits(snapshot->dither.targetBitDepth));
+        const double invScale = 1.0 / scale;
+        const double maxQuant = scale - 1.0;
+        const double minQuant = -scale;
+        const bool useShaping = (sampleRate_ <= 48000.0);
         for (int f = 0; f < frames; ++f) {
             for (int ch = 0; ch < channels; ++ch) {
                 const int idx = f * channels + ch;
@@ -1179,20 +1200,19 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                 if (!std::isfinite(x)) continue;
 
                 const int chIdx = (ch < 2) ? ch : 0;
-                // Lipshitz-Wannamaker modified E-weighted error feedback noise shaping:
-                // Shifts quantization noise energy from the ear's most sensitive 1-5 kHz band
-                // into the upper spectrum (>15 kHz), yielding 14-16 dB lower perceived noise
-                // (~19-bit equivalent perceived dynamic range on 16-bit outputs).
-                const float shapedError = 1.62f * ditherErrorHistory_[chIdx][0] - 0.82f * ditherErrorHistory_[chIdx][1];
-                const float scaledInput = x * scale + shapedError;
-                const float dither = generateTpdf(); // TPDF (-1.0 .. +1.0 LSB)
-                const float quantScaled = std::round(scaledInput + dither);
+                const double shapedError = useShaping
+                    ? (1.62 * ditherErrorHistory_[chIdx][0] - 0.82 * ditherErrorHistory_[chIdx][1])
+                    : (0.5 * ditherErrorHistory_[chIdx][0]);
+                const double scaledInput = static_cast<double>(x) * scale + shapedError;
+                const double dither = static_cast<double>(generateTpdf()); // TPDF (-1.0 .. +1.0 LSB)
+                const double quantScaled = std::round(scaledInput + dither);
+                const double finalScaled = std::clamp(quantScaled, minQuant, maxQuant);
 
-                const float err = scaledInput - quantScaled;
-                ditherErrorHistory_[chIdx][1] = ditherErrorHistory_[chIdx][0];
-                ditherErrorHistory_[chIdx][0] = std::clamp(err, -2.0f, 2.0f);
+                const double err = scaledInput - finalScaled;
+                ditherErrorHistory_[chIdx][1] = static_cast<float>(ditherErrorHistory_[chIdx][0]);
+                ditherErrorHistory_[chIdx][0] = static_cast<float>(std::clamp(err, -2.0, 2.0));
 
-                buffer[idx] = std::clamp(quantScaled * invScale, -1.0f, 1.0f);
+                buffer[idx] = static_cast<float>(finalScaled * invScale);
             }
         }
     } else {

@@ -13,8 +13,15 @@ import '../db/app_database.dart';
 @Singleton(as: ISmartPlaylistEngine)
 class SmartPlaylistEngine implements ISmartPlaylistEngine {
   final AppDatabase _db;
+  final SongRatingStore? _injectedRatingStore;
+  final PulsrAudioHandler? _injectedAudioHandler;
 
-  SmartPlaylistEngine(this._db);
+  SmartPlaylistEngine(
+    this._db, {
+    @ignoreParam SongRatingStore? ratingStore,
+    @ignoreParam PulsrAudioHandler? audioHandler,
+  })  : _injectedRatingStore = ratingStore,
+        _injectedAudioHandler = audioHandler;
 
   @override
   List<SmartRule> validateRules(SmartCriteria criteria) {
@@ -58,12 +65,22 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   SimpleSelectStatement<$SongsTableTable, SongsTableData> _buildQuery(
-      SmartCriteria criteria) {
+    SmartCriteria criteria, {
+    Set<int>? allowedIds,
+  }) {
     final query = _db.select(_db.songsTable)
       ..where((t) =>
           t.isMissing.equals(false) &
           t.source.equals(SongSource.local) &
           t.path.like('ytmusic://%').not());
+
+    if (allowedIds != null) {
+      if (allowedIds.isEmpty) {
+        query.where((_) => const Constant(false));
+      } else {
+        query.where((t) => t.id.isIn(allowedIds));
+      }
+    }
 
     if (criteria.rules.isNotEmpty) {
       query.where((t) {
@@ -498,7 +515,17 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       return _postProcess(list, criteria, const []);
     }
     if (criteria.matchAll) {
-      final base = await _buildQuery(criteria).get();
+      final narrowedIds = _narrowIdsForDartRules(dartRules, matchAll: true);
+      if (narrowedIds != null && narrowedIds.isEmpty) {
+        return const <SongsTableData>[];
+      }
+      final base = await _buildQuery(
+        criteria,
+        allowedIds:
+            (narrowedIds != null && narrowedIds.length <= 900)
+                ? narrowedIds
+                : null,
+      ).get();
       return _postProcess(base, criteria, dartRules);
     }
     // matchAny: union of SQL matches and prefs-backed matches.
@@ -506,7 +533,18 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     final base = sqlRules.isEmpty
         ? <SongsTableData>[]
         : await _buildQuery(_withoutDartRules(criteria)).get();
-    final all = await _buildQuery(_allLocal(criteria)).get();
+    final narrowedIds = _narrowIdsForDartRules(dartRules, matchAll: false);
+    final List<SongsTableData> all;
+    if (narrowedIds != null && narrowedIds.isEmpty) {
+      all = const <SongsTableData>[];
+    } else if (narrowedIds != null && narrowedIds.length <= 900) {
+      all = await _buildQuery(
+        _allLocal(criteria),
+        allowedIds: narrowedIds,
+      ).get();
+    } else {
+      all = await _buildQuery(_allLocal(criteria)).get();
+    }
     final baseIds = base.map((s) => s.id).toSet();
     final merged = List<SongsTableData>.from(base)
       ..addAll(all.where((s) => !baseIds.contains(s.id)));
@@ -563,6 +601,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       SmartCriteria(matchAll: criteria.matchAll);
 
   SongRatingStore? get _ratingStore {
+    if (_injectedRatingStore != null) return _injectedRatingStore;
     try {
       if (getIt.isRegistered<SongRatingStore>()) {
         return getIt<SongRatingStore>();
@@ -572,12 +611,63 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   PulsrAudioHandler? get _audioHandler {
+    if (_injectedAudioHandler != null) return _injectedAudioHandler;
     try {
       if (getIt.isRegistered<PulsrAudioHandler>()) {
         return getIt<PulsrAudioHandler>();
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Pre-computes candidate song IDs from [SongRatingStore] when positive
+  /// rating rules constrain the result set to rated tracks (where rating 0
+  /// cannot match), avoiding a full-table scan of `songs`.
+  Set<int>? _narrowIdsForDartRules(
+    List<SmartRule> dartRules, {
+    required bool matchAll,
+  }) {
+    final store = _ratingStore;
+    if (store == null) return null;
+    final snapshot = store.snapshotRatings();
+
+    if (matchAll) {
+      Set<int>? intersection;
+      for (final rule in dartRules) {
+        if (rule.field != SmartRuleField.rating) continue;
+        if (_matchesRatingValue(0, rule)) continue;
+        final matching = <int>{};
+        for (final entry in snapshot.entries) {
+          if (_matchesRatingValue(entry.value, rule)) {
+            final id = int.tryParse(entry.key);
+            if (id != null) matching.add(id);
+          }
+        }
+        if (intersection == null) {
+          intersection = matching;
+        } else {
+          intersection = intersection.intersection(matching);
+        }
+        if (intersection.isEmpty) return const <int>{};
+      }
+      return intersection;
+    } else {
+      if (dartRules.isEmpty) return null;
+      for (final rule in dartRules) {
+        if (rule.field != SmartRuleField.rating ||
+            _matchesRatingValue(0, rule)) {
+          return null;
+        }
+      }
+      final union = <int>{};
+      for (final entry in snapshot.entries) {
+        if (dartRules.any((r) => _matchesRatingValue(entry.value, r))) {
+          final id = int.tryParse(entry.key);
+          if (id != null) union.add(id);
+        }
+      }
+      return union;
+    }
   }
 
   /// matchAll post-step: AND-filter by every prefs-backed rule, then rating
@@ -669,13 +759,16 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     return 0;
   }
 
-  /// Evaluates one rating rule (numeric operators + between) in Dart.
   /// Evaluates one rating rule (numeric operators + between) in Dart using a snapshot.
   bool _matchesRating(SongsTableData song, SmartRule rule,
       {Map<String, int>? ratingSnapshot}) {
     final rating = ratingSnapshot != null
         ? (ratingSnapshot[song.id.toString()] ?? 0)
         : _ratingOf(song);
+    return _matchesRatingValue(rating, rule);
+  }
+
+  bool _matchesRatingValue(int rating, SmartRule rule) {
     final valStr = rule.value.trim();
     if (rule.operator == SmartOperator.between) {
       final b = _parseIntBetween(valStr);

@@ -110,18 +110,47 @@ class RadioStationStore {
       final decoded = jsonDecode(raw);
       if (decoded is! List) return;
       _stations.clear();
+      var migrated = false;
       for (final item in decoded) {
         if (item is! Map) continue;
-        final station = RadioStation.fromJson(Map<String, dynamic>.from(item));
+        var station = RadioStation.fromJson(Map<String, dynamic>.from(item));
+        final migratedStation = _migrateLegacyStation(station);
+        if (migratedStation != null) {
+          station = migratedStation;
+          migrated = true;
+        }
         if (station.url.isNotEmpty && RadioStation.isHttpUrl(station.url)) {
           _stations.add(station);
         }
         if (_stations.length >= maxEntries) break;
       }
+      if (migrated) {
+        await persist();
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to load radio stations',
           error: e, stackTrace: st, category: 'RadioStationStore');
     }
+  }
+
+  static RadioStation? _migrateLegacyStation(RadioStation station) {
+    if (station.id == 'cur-quran-cairo' ||
+        station.url == 'https://stream.radiojar.com/8s5u8tpdtwzuv') {
+      const updatedUrl = 'https://stream.radiojar.com/8s5u5tpdtwzuv';
+      const updatedName = 'إذاعة القرآن الكريم المصرية - القاهرة';
+      if (station.url != updatedUrl || station.name != updatedName) {
+        return station.copyWith(name: updatedName, url: updatedUrl);
+      }
+    }
+    if (station.id == 'cur-quran-tarteel' ||
+        station.url == 'https://stream.qurango.net/radio/tarteel') {
+      const updatedUrl = 'https://backup.qurango.net/radio/tarateel';
+      const updatedName = 'إذاعة تراتيل القرآن الكريم';
+      if (station.url != updatedUrl || station.name != updatedName) {
+        return station.copyWith(name: updatedName, url: updatedUrl);
+      }
+    }
+    return null;
   }
 
   Future<void> persist() async {
@@ -140,6 +169,43 @@ class RadioStationStore {
   /// Curated starter directory (all public free streams). Imported on demand
   /// via [importCurated] — never auto-added, so user lists stay theirs.
   static List<RadioStation> curatedDirectory() => [
+        RadioStation(
+            id: 'cur-quran-cairo',
+            name: 'إذاعة القرآن الكريم المصرية - القاهرة',
+            url: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
+            genre: 'Quran'),
+        RadioStation(
+            id: 'cur-quran-cairo-backup',
+            name: 'إذاعة القرآن الكريم - القاهرة (بث بديل)',
+            url: 'https://radio.xecod.com/station/quran-cairo',
+            genre: 'Quran'),
+        RadioStation(
+            id: 'cur-quran-hussary',
+            name: 'إذاعة الشيخ محمود خليل الحصري',
+            url: 'https://backup.qurango.net/radio/mahmoud_khalil_alhussary',
+            genre: 'Quran'),
+        RadioStation(
+            id: 'cur-quran-abdulbasit',
+            name: 'إذاعة الشيخ عبد الباسط عبد الصمد (مجود)',
+            url:
+                'https://backup.qurango.net/radio/abdulbasit_abdulsamad_mojawwad',
+            genre: 'Quran'),
+        RadioStation(
+            id: 'cur-quran-minshawi',
+            name: 'إذاعة الشيخ محمد صديق المنشاوي (مجود)',
+            url:
+                'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
+            genre: 'Quran'),
+        RadioStation(
+            id: 'cur-quran-mustafa',
+            name: 'إذاعة الشيخ مصطفى إسماعيل',
+            url: 'https://backup.qurango.net/radio/mustafa_ismail',
+            genre: 'Quran'),
+        RadioStation(
+            id: 'cur-quran-tarteel',
+            name: 'إذاعة تراتيل القرآن الكريم',
+            url: 'https://backup.qurango.net/radio/tarateel',
+            genre: 'Quran'),
         RadioStation(
             id: 'cur-lofi',
             name: 'Lofi Hip Hop',
@@ -185,28 +251,27 @@ class RadioStationStore {
             name: 'BBC World Service',
             url: 'https://stream.live.vc.bbcmedia.co.uk/bbc_world_service',
             genre: 'News'),
-        RadioStation(
-            id: 'cur-quran-cairo',
-            name: 'Cairo Quran Radio',
-            url: 'https://stream.radiojar.com/8s5u8tpdtwzuv',
-            genre: 'Quran'),
-        RadioStation(
-            id: 'cur-quran-tarteel',
-            name: 'Holy Quran Tarteel',
-            url: 'https://stream.qurango.net/radio/tarteel',
-            genre: 'Quran'),
       ];
 
   /// Adds curated stations missing from the user list. Returns added count.
   Future<int> importCurated() async {
-    final existing = _stations.map((s) => s.url).toSet();
+    for (var i = 0; i < _stations.length; i++) {
+      final migrated = _migrateLegacyStation(_stations[i]);
+      if (migrated != null) {
+        _stations[i] = migrated;
+      }
+    }
+    final existingUrls = _stations.map((s) => s.url).toSet();
+    final existingIds = _stations.map((s) => s.id).toSet();
     var added = 0;
     for (final s in curatedDirectory()) {
       // Respect the same cap as add()/load so importing onto a near-full
       // user list can't push the store past maxEntries.
       if (_stations.length >= maxEntries) break;
-      if (!existing.contains(s.url)) {
+      if (!existingUrls.contains(s.url) && !existingIds.contains(s.id)) {
         _stations.add(s);
+        existingUrls.add(s.url);
+        existingIds.add(s.id);
         added++;
       }
     }

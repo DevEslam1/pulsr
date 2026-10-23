@@ -225,6 +225,26 @@ DSP Chain Status:
       coordinator.updateProgressThrottled(state);
       expect(fakeService.updateProgressCount, 1);
     });
+
+    test(
+        'SongAutoplayExtension preserves isAutoplay across copyWith and QueueSlice.differs detects trackTiers',
+        () {
+      final song = _makeSong(-9001, 'Autoplay Song', 'Artist')
+        ..isAutoplay = true;
+      expect(song.isAutoplay, isTrue);
+
+      final copied = song.copyWith(isFavorite: true);
+      expect(copied.isAutoplay, isTrue);
+
+      copied.isAutoplay = false;
+      expect(copied.copyWith(isFavorite: false).isAutoplay, isFalse);
+
+      const sliceA = QueueSlice(trackTiers: {-9001: QueueTier.autoplay});
+      const sliceB = QueueSlice(trackTiers: {-9001: QueueTier.userQueue});
+      const sliceC = QueueSlice(trackTiers: {-9001: QueueTier.autoplay});
+      expect(sliceA.differs(sliceB), isTrue);
+      expect(sliceA.differs(sliceC), isFalse);
+    });
   });
 }
 

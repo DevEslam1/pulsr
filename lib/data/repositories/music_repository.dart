@@ -645,52 +645,120 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<int>> importOnlineTracksAsFavorites(
       List<YtmTrack> tracks) async {
+    if (tracks.isEmpty) return const Right(0);
     try {
       // Single transaction: atomic import (no partial state on failure) and
-      // one round-trip instead of 2N statements.
+      // batched SELECT / UPDATE / INSERT statements instead of 2N round-trips.
       final count = await _db.transaction(() async {
-        var n = 0;
-        for (final track in tracks) {
-          final songData = track.toSongData();
-          final existing = await (_db.select(_db.songsTable)
-                ..where((t) => t.remoteId.equals(track.videoId))
-                ..limit(1))
-              .getSingleOrNull();
+        const chunkSize = 400;
+        final existingByRemoteId = <String, int>{};
+        final videoIds = tracks
+            .map((t) => t.videoId)
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList(growable: false);
+        for (var i = 0; i < videoIds.length; i += chunkSize) {
+          final chunk = videoIds.sublist(
+              i, (i + chunkSize).clamp(0, videoIds.length));
+          final rows = await (_db.select(_db.songsTable)
+                ..where((t) => t.remoteId.isIn(chunk)))
+              .get();
+          for (final row in rows) {
+            final rId = row.remoteId;
+            if (rId != null) {
+              existingByRemoteId.putIfAbsent(rId, () => row.id);
+            }
+          }
+        }
 
-          if (existing != null) {
-            await (_db.update(_db.songsTable)
-                  ..where((t) => t.id.equals(existing.id)))
-                .write(const SongsTableCompanion(
-              isFavorite: Value(true),
-              isMissing: Value(false),
-            ));
+        final takenIds = <int>{...existingByRemoteId.values};
+        final songDataList =
+            tracks.map((t) => t.toSongData()).toList(growable: false);
+        final preferredIds =
+            songDataList.map((s) => s.id).toSet().toList(growable: false);
+        for (var i = 0; i < preferredIds.length; i += chunkSize) {
+          final chunk = preferredIds.sublist(
+              i, (i + chunkSize).clamp(0, preferredIds.length));
+          final rows = await (_db.selectOnly(_db.songsTable)
+                ..addColumns([_db.songsTable.id])
+                ..where(_db.songsTable.id.isIn(chunk)))
+              .get();
+          for (final row in rows) {
+            final id = row.read(_db.songsTable.id);
+            if (id != null) takenIds.add(id);
+          }
+        }
+
+        final nowMs = DateTime.now().millisecondsSinceEpoch;
+        final idsToMarkFavorite = <int>{};
+        final toInsert = <SongsTableCompanion>[];
+        var n = 0;
+
+        for (var i = 0; i < tracks.length; i++) {
+          final track = tracks[i];
+          final songData = songDataList[i];
+          final existingId = existingByRemoteId[track.videoId];
+
+          if (existingId != null) {
+            idsToMarkFavorite.add(existingId);
             n++;
           } else {
             // The deterministic negative id is only 62 bits of the video hash,
             // so a collision with an unrelated row (a local file, a CUE virtual
             // track, or another video) is possible. Never clobber it: allocate
             // the next free id in the online id space instead.
-            final id = await _resolveFreeSongId(songData.id);
-            await _db.into(_db.songsTable).insert(
-                  SongsTableCompanion(
-                    id: Value(id),
-                    title: Value(songData.title),
-                    artist: Value(songData.artist),
-                    album: Value(songData.album),
-                    durationMs: Value(songData.durationMs),
-                    path: Value(songData.path),
-                    source: const Value(SongSource.youtube),
-                    remoteId: Value(track.videoId),
-                    remoteArtworkUrl: Value(track.artworkUrl),
-                    isFavorite: const Value(true),
-                    isMissing: const Value(false),
-                    dateAdded: Value(DateTime.now().millisecondsSinceEpoch),
-                  ),
-                  mode: InsertMode.insertOrReplace,
-                );
+            final int id;
+            if (!takenIds.contains(songData.id)) {
+              id = songData.id;
+              takenIds.add(id);
+            } else {
+              id = await _resolveFreeSongId(songData.id, takenIds: takenIds);
+              takenIds.add(id);
+            }
+            existingByRemoteId[track.videoId] = id;
+            toInsert.add(
+              SongsTableCompanion(
+                id: Value(id),
+                title: Value(songData.title),
+                artist: Value(songData.artist),
+                album: Value(songData.album),
+                durationMs: Value(songData.durationMs),
+                path: Value(songData.path),
+                source: const Value(SongSource.youtube),
+                remoteId: Value(track.videoId),
+                remoteArtworkUrl: Value(track.artworkUrl),
+                isFavorite: const Value(true),
+                isMissing: const Value(false),
+                dateAdded: Value(nowMs),
+              ),
+            );
             n++;
           }
         }
+
+        if (idsToMarkFavorite.isNotEmpty) {
+          final favList = idsToMarkFavorite.toList(growable: false);
+          for (var i = 0; i < favList.length; i += chunkSize) {
+            final chunk = favList.sublist(
+                i, (i + chunkSize).clamp(0, favList.length));
+            await (_db.update(_db.songsTable)..where((t) => t.id.isIn(chunk)))
+                .write(const SongsTableCompanion(
+              isFavorite: Value(true),
+              isMissing: Value(false),
+            ));
+          }
+        }
+
+        if (toInsert.isNotEmpty) {
+          await _db.batch((b) {
+            b.insertAll(
+              _db.songsTable,
+              toInsert,
+              mode: InsertMode.insertOrReplace,
+            );
+          });
+        }
+
         return n;
       });
       return Right(count);
@@ -701,23 +769,44 @@ class MusicRepository implements IMusicRepository {
   }
 
   /// Returns [preferred] when no row owns that id, otherwise walks the online
-  /// (negative) id space until a free slot is found. Keeps the deterministic
-  /// id for the common case while guaranteeing an insert never overwrites an
-  /// unrelated song on a hash collision. Must be called inside the import
-  /// transaction so earlier inserts in the same batch are visible.
-  Future<int> _resolveFreeSongId(int preferred) async {
-    var candidate = preferred;
-    for (var i = 0; i < 4096; i++) {
-      final clash = await (_db.select(_db.songsTable)
-            ..where((t) => t.id.equals(candidate))
-            ..limit(1))
-          .getSingleOrNull();
-      if (clash == null) return candidate;
-      candidate = candidate < 0 ? candidate - 1 : candidate + 1;
+  /// (negative) id space in batched blocks until a free slot is found. Keeps
+  /// the deterministic id for the common case while guaranteeing an insert
+  /// never overwrites an unrelated song on a hash collision. Must be called
+  /// inside the import transaction so earlier inserts in the same batch are
+  /// visible.
+  Future<int> _resolveFreeSongId(int preferred, {Set<int>? takenIds}) async {
+    const blockSize = 64;
+    final step = preferred < 0 ? -1 : 1;
+    final base = preferred;
+    for (var offset = 0; offset < 4096; offset += blockSize) {
+      final candidates = <int>[];
+      for (var j = 0; j < blockSize && (offset + j) < 4096; j++) {
+        final c = base + (offset + j) * step;
+        if (takenIds == null || !takenIds.contains(c)) {
+          candidates.add(c);
+        }
+      }
+      if (candidates.isEmpty) continue;
+      final rows = await (_db.selectOnly(_db.songsTable)
+            ..addColumns([_db.songsTable.id])
+            ..where(_db.songsTable.id.isIn(candidates)))
+          .get();
+      final dbTaken = <int>{
+        for (final r in rows)
+          if (r.read(_db.songsTable.id) != null) r.read(_db.songsTable.id)!,
+      };
+      if (takenIds != null) takenIds.addAll(dbTaken);
+      for (final c in candidates) {
+        if (!dbTaken.contains(c)) return c;
+      }
     }
     // Pathological fallback: a time-derived magnitude cannot equal a
     // video-hash id in practice, and still lives in the negative id space.
-    return -(DateTime.now().microsecondsSinceEpoch & 0x3FFFFFFFFFFFFFFF);
+    var fallback = -(DateTime.now().microsecondsSinceEpoch & 0x3FFFFFFFFFFFFFFF);
+    while (takenIds != null && takenIds.contains(fallback)) {
+      fallback -= 1;
+    }
+    return fallback;
   }
 
   @override

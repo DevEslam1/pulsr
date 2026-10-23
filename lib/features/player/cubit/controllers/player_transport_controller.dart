@@ -331,20 +331,27 @@ class PlayerTransportController {
           _audioHandler.updateFavorite(songId, isFav);
           final state = _getState();
           final updatedQueue = state.queue
-              .map((s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s)
+              .map((s) => s.id == songId
+                  ? (s.copyWith(isFavorite: isFav)..isAutoplay = s.isAutoplay)
+                  : s)
               .toList();
           if (_slotLookupCache != null) {
             final cached = _slotLookupCache![songId];
             if (cached != null) {
-              _slotLookupCache![songId] = cached.copyWith(isFavorite: isFav);
+              _slotLookupCache![songId] =
+                  cached.copyWith(isFavorite: isFav)
+                    ..isAutoplay = cached.isAutoplay;
             }
           }
           _debouncedPersistQueueSlots?.call();
           if (state.currentSong != null && state.currentSong!.id == songId) {
+            final updatedCurrent =
+                state.currentSong!.copyWith(isFavorite: isFav)
+                  ..isAutoplay = state.currentSong!.isAutoplay;
             _emit(
               state.copyWith(
                 playback: state.playback.copyWith(
-                  currentSong: state.currentSong!.copyWith(isFavorite: isFav),
+                  currentSong: updatedCurrent,
                   errorMessage: null,
                 ),
                 queueSlice: state.queueSlice.copyWith(

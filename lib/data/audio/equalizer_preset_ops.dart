@@ -79,24 +79,16 @@ extension EqualizerPresetOps on EqualizerManager {
     _abComparisonGains = List.from(currentPreset.gains);
     final targetFreqs = activeFrequencies;
     if (PlatformCapabilities.isAndroid) {
-      // Flatten BOTH EQ paths, mirroring applyCurrentPreset's dual push:
-      // the native parametric EQ and the HAL DynamicsProcessing postEq.
-      // Flattening only one left the other chain still applying the curve,
-      // so the "flat" A-side was not actually flat.
-      final futures = <Future<void>>[];
-      for (int i = 0; i < targetFreqs.length; i++) {
-        futures.add(
-          _effectsChannel.setNativeEqBand(
-              i, targetFreqs[i], 0.0, graphicEqQs(targetFreqs)[i]),
-        );
+      final flatGains = List<double>.filled(targetFreqs.length, 0.0);
+      await _effectsChannel.setNativeEqBandsBulk(
+        frequencies: targetFreqs,
+        gains: flatGains,
+        qs: graphicEqQs(targetFreqs),
+      );
+      if (legacyMirrorEnabled) {
+        final halFlatGains = List<double>.filled(customFrequencies.length, 0.0);
+        await _effectsChannel.setEqBandGains(halFlatGains);
       }
-      await Future.wait(futures);
-      // HAL postEq layout is the 10-band customFrequencies layout in both
-      // modes (32-band mode stores the interpolated curve there).
-      final halFlatGains = List<double>.filled(customFrequencies.length, 0.0);
-      await _effectsChannel.setEqBandGains(halFlatGains);
-      // Persist flat state immediately so crash mid-A/B doesn't leave flat persisted
-      await _savePreferences();
     }
   }
 
@@ -104,19 +96,15 @@ extension EqualizerPresetOps on EqualizerManager {
     isAbComparisonActive = false;
     if (_abComparisonGains.isNotEmpty) {
       final targetFreqs = activeFrequencies;
-      // BUG-11: preserve any per-band edits the user made while the comparison
-      // was active. Only bands still holding the pre-comparison value are
-      // restored; bands the user moved keep their live value.
       final live = currentPreset.gains;
-      // If the band plan changed during the comparison (10 -> 32 bands, ...)
-      // the saved gains no longer match the live layout; restoring them would
-      // write a wrong-sized curve. Keep the live curve in that case.
       final sameLayout = live.length == _abComparisonGains.length;
       final merged = List<double>.from(sameLayout ? _abComparisonGains : live);
+      bool userEdited = false;
       if (sameLayout) {
         for (int i = 0; i < merged.length; i++) {
           if (live[i] != _abComparisonGains[i]) {
             merged[i] = live[i];
+            userEdited = true;
           }
         }
       }
@@ -125,30 +113,27 @@ extension EqualizerPresetOps on EqualizerManager {
         comparisonSlots[activeComparisonSlot] = currentPreset;
       }
       if (PlatformCapabilities.isAndroid) {
-        // Restore BOTH EQ paths (mirrors applyCurrentPreset's dual push).
-        final futures = <Future<void>>[];
-        for (int i = 0; i < targetFreqs.length && i < merged.length; i++) {
-          futures.add(
-            _effectsChannel.setNativeEqBand(
-              i,
-              targetFreqs[i],
-              merged[i],
-              graphicEqQs(targetFreqs)[i],
-            ),
-          );
-        }
-        await Future.wait(futures);
-        if (eqBandCount != 10) {
-          // HAL postEq holds the interpolated 10-band curve in 32/64-band mode.
-          await _effectsChannel.setEqBandGains(
-            EqPreset.interpolateGains(
-              merged,
-              targetFrequencies: customFrequencies,
-              sourceFrequencies: targetFreqs,
-            ),
-          );
+        if (!userEdited && selectedHeadphoneProfile != null) {
+          await applyHeadphoneProfile(selectedHeadphoneProfile!);
         } else {
-          await _effectsChannel.setEqBandGains(merged);
+          await _effectsChannel.setNativeEqBandsBulk(
+            frequencies: targetFreqs,
+            gains: merged,
+            qs: graphicEqQs(targetFreqs),
+          );
+          if (legacyMirrorEnabled) {
+            if (eqBandCount != 10) {
+              await _effectsChannel.setEqBandGains(
+                EqPreset.interpolateGains(
+                  merged,
+                  targetFrequencies: customFrequencies,
+                  sourceFrequencies: targetFreqs,
+                ),
+              );
+            } else {
+              await _effectsChannel.setEqBandGains(merged);
+            }
+          }
         }
       }
       _abComparisonGains = [];

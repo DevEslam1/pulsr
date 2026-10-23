@@ -101,7 +101,6 @@ enum _ForegroundPhase { idle, starting, running, stopping }
 @lazySingleton
 class YtDownloadService {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
-  static const _tagChannel = MethodChannel(PulsrChannels.tagEditor);
   int _maxConcurrentDownloads = 3;
 
   /// Completed-download paths by video id. Bounded: nothing ever removed an
@@ -303,10 +302,17 @@ class YtDownloadService {
   /// [quality] is the per-download picker override; when null the pending
   /// picker request for this video id (if any) is used, then the persisted
   /// `setting_download_quality`, then the streaming quality, then `high`.
+  ///
+  /// When [bypassInternalQueue] is true (used by [DownloadRepositoryImpl],
+  /// which already schedules concurrency and queue order), the task skips
+  /// [_queue] and starts immediately while still registering in
+  /// [_activeDownloads] for deduplication, cancellation, and foreground-service
+  /// lifecycle tracking.
   Future<Result<int>> download(
     SongsTableData song, {
     void Function(YtDownloadProgress)? onProgress,
     YtmAudioQuality? quality,
+    bool bypassInternalQueue = false,
   }) async {
     if (song.source != SongSource.youtube) {
       return const Left(
@@ -349,11 +355,21 @@ class YtDownloadService {
       quality: requestedQuality,
     );
 
+    _startForegroundService(videoId, song.title);
+
+    if (bypassInternalQueue) {
+      ErrorLogger.addBreadcrumb(
+          'Download dispatched directly: ${task.song.remoteId}',
+          category: 'download',
+          data: {'videoId': task.song.remoteId ?? ''});
+      _startTaskExecution(task);
+      return completer.future;
+    }
+
     _queue.add(task);
     onProgress?.call(const YtDownloadProgress(YtDownloadStage.queued));
     ErrorLogger.addBreadcrumb('Download queued: ${task.song.remoteId}',
         category: 'download', data: {'videoId': task.song.remoteId ?? ''});
-    _startForegroundService(videoId, song.title);
     _processQueue();
 
     return completer.future;
@@ -499,26 +515,34 @@ class YtDownloadService {
           continue;
         }
 
-        _activeDownloads[videoId] = task;
-        _executeDownload(task).then((result) {
-          if (!task.completer.isCompleted) {
-            task.completer.complete(result);
-          }
-        }).catchError((e) {
-          if (!task.completer.isCompleted) {
-            task.completer
-                .complete(Left(DownloadFailure('Download error: $e')));
-          }
-        }).whenComplete(() {
-          _activeDownloads.remove(videoId);
-          Future.microtask(_processQueue);
-        });
+        _startTaskExecution(task);
       }
       _stopForegroundServiceIfIdle();
     } finally {
       _processing =
           false; // FIX-A03: Reset flag when queue processing turn completes
     }
+  }
+
+  void _startTaskExecution(_QueuedDownload task) {
+    final videoId = task.song.remoteId!;
+    _activeDownloads[videoId] = task;
+    _executeDownload(task).then((result) {
+      if (!task.completer.isCompleted) {
+        task.completer.complete(result);
+      }
+    }).catchError((e) {
+      if (!task.completer.isCompleted) {
+        task.completer.complete(Left(DownloadFailure('Download error: $e')));
+      }
+    }).whenComplete(() {
+      _activeDownloads.remove(videoId);
+      if (_queue.isNotEmpty) {
+        Future.microtask(_processQueue);
+      } else {
+        _stopForegroundServiceIfIdle();
+      }
+    });
   }
 
   /// Returns a failure when the current network policy forbids downloading, or
@@ -776,16 +800,7 @@ class YtDownloadService {
       if ((!embeddedLyrics || !DownloadService.carriesTags(ext)) &&
           lrcText != null &&
           lrcText.trim().isNotEmpty) {
-        if (!finalPath.startsWith('content:')) {
-          try {
-            final lrcFile = File('${p.withoutExtension(finalPath)}.lrc');
-            await lrcFile.writeAsString(lrcText, flush: true);
-            ErrorLogger.addBreadcrumb('Saved sidecar .lrc for $videoId',
-                category: 'download');
-          } catch (e) {
-            // Non-critical sidecar failure
-          }
-        }
+        await DownloadService.writeSidecarLrc(finalPath, lrcText);
       }
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.indexing));
@@ -1813,36 +1828,18 @@ class YtDownloadService {
   }
 
   Future<bool> _tag(String path, SongsTableData song,
-      {String? artworkPath, String? lyrics}) async {
-    // Retry once on transient failures — a flaky tag write must not fail
-    // the whole download.
-    Object? lastError;
-    for (var attempt = 0; attempt < 2; attempt++) {
-      try {
-        await _tagChannel.invokeMethod('writeTags', {
-          'path': path,
-          'title': song.title,
-          'artist': song.artist,
-          'album': song.album.isNotEmpty ? song.album : 'Unknown Album',
-          'genre': song.genre,
-          'year': song.year,
-          'trackNumber': song.trackNumber ?? 1,
-          'comment': null,
-          'lyrics': lyrics,
-          'artworkPath': artworkPath,
-          'removeArtwork': false,
-        });
-        return true;
-      } on PlatformException catch (e) {
-        lastError = e;
-        if (attempt == 0) {
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-        }
-      }
-    }
-    ErrorLogger.log('Tagging downloaded track failed after retry: $lastError',
-        category: 'YTM');
-    return false;
+      {String? artworkPath, String? lyrics}) {
+    return DownloadService.writeAudioTags(
+      filePath: path,
+      title: song.title,
+      artist: song.artist,
+      album: song.album.isNotEmpty ? song.album : 'Unknown Album',
+      genre: song.genre,
+      year: song.year,
+      trackNumber: song.trackNumber ?? 1,
+      artworkPath: artworkPath,
+      lyrics: lyrics,
+    );
   }
 
   /// F11: [ext] arrives from the resolver and from byte sniffing and is then

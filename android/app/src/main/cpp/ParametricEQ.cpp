@@ -378,6 +378,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // EQ smoothly approaches dry before it hard-bypasses (see fade countdown
     // below); otherwise they track the user's requested values.
     const double preampTarget = fadeOutActive_ ? 0.0 : targetPreampDb_;
+    const double initialPreampLinear = preampLinear_;
 
     // Smooth preamp gain
     if (std::abs(smoothedPreampDb_ - preampTarget) > 1e-4) {
@@ -388,13 +389,18 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
         preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
     }
 
-    // Apply smoothed preamp
-    if (std::abs(preampLinear_ - 1.0) > 1e-4) {
-        const float pLinear = static_cast<float>(preampLinear_);
+    // Apply smoothed preamp with per-sample interpolation across the block to avoid zipper noise
+    const double targetPLinear = preampLinear_;
+    if (std::abs(initialPreampLinear - 1.0) > 1e-4 || std::abs(targetPLinear - 1.0) > 1e-4) {
+        const float startP = static_cast<float>(initialPreampLinear);
+        const float endP = static_cast<float>(targetPLinear);
+        const float pStep = (frames > 1) ? ((endP - startP) / static_cast<float>(frames)) : 0.0f;
+        float curP = startP;
         for (int f = 0; f < frames; ++f) {
             for (int ch = 0; ch < channels; ++ch) {
-                buffer[f * stride + ch] *= pLinear;
+                buffer[f * stride + ch] *= curP;
             }
+            curP += pStep;
         }
     }
 

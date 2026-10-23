@@ -615,11 +615,22 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   SongsTableData? get currentSong => _queueStateMachine.currentSong;
 
+  final PlaybackLatencyTracker? _injectedLatencyTracker;
+  final HiResAudioService? _injectedHiResAudioService;
+
   @override
   PlaybackLatencyTracker? get _latencyTracker =>
-      getIt.isRegistered<PlaybackLatencyTracker>()
+      _injectedLatencyTracker ??
+      (getIt.isRegistered<PlaybackLatencyTracker>()
           ? getIt<PlaybackLatencyTracker>()
-          : null;
+          : null);
+
+  HiResAudioService? get _hiResAudioService =>
+      _injectedHiResAudioService ??
+      (getIt.isRegistered<HiResAudioService>()
+          ? getIt<HiResAudioService>()
+          : null);
+
   int _lastPositionEmitMs = 0;
   @override
   double? _preCrossfadeVolume;
@@ -633,11 +644,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     AudioPlayer? prefetchPlayer,
     AndroidLoudnessEnhancer? loudnessEnhancerA,
     AndroidLoudnessEnhancer? loudnessEnhancerB,
+    PlaybackLatencyTracker? latencyTracker,
+    HiResAudioService? hiResAudioService,
   })  : _repository = repository,
         _ytmService = ytmService,
         _playerA = playerA,
         _playerB = playerB,
-        _prefetchPlayer = prefetchPlayer ?? AudioPlayer() {
+        _prefetchPlayer = prefetchPlayer ?? AudioPlayer(),
+        _injectedLatencyTracker = latencyTracker,
+        _injectedHiResAudioService = hiResAudioService {
     _equalizerManager = EqualizerManager(
       loudnessEnhancerA: loudnessEnhancerA,
       loudnessEnhancerB: loudnessEnhancerB,
@@ -776,8 +791,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// sees the new route immediately instead of hardcoding a wired route.
   void _syncBluetoothRouteFromCache() {
     try {
-      if (!getIt.isRegistered<HiResAudioService>()) return;
-      final info = getIt<HiResAudioService>().currentOutputInfo;
+      final service = _hiResAudioService;
+      if (service == null) return;
+      final info = service.currentOutputInfo;
       if (info != null) _equalizerManager.isBluetoothRoute = info.isBluetooth;
     } catch (_) {}
   }
@@ -785,9 +801,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Refreshes the cached output info from native, then mirrors the route.
   Future<void> _refreshBluetoothRoute() async {
     try {
-      if (!getIt.isRegistered<HiResAudioService>()) return;
+      final service = _hiResAudioService;
+      if (service == null) return;
       final wasBluetooth = _equalizerManager.isBluetoothRoute;
-      final info = await getIt<HiResAudioService>().getAudioOutputInfo();
+      final info = await service.getAudioOutputInfo();
       _equalizerManager.isBluetoothRoute = info.isBluetooth;
       if (wasBluetooth != info.isBluetooth) {
         await _equalizerManager.resyncActiveEffects();
@@ -817,8 +834,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<AudioOutputInfo?> _getOutputInfo() async {
-    if (!getIt.isRegistered<HiResAudioService>()) return null;
-    return getIt<HiResAudioService>().getAudioOutputInfo();
+    final service = _hiResAudioService;
+    if (service == null) return null;
+    return service.getAudioOutputInfo();
   }
 
   Set<String> _outputDeviceIds(AudioOutputInfo info) {
@@ -890,8 +908,9 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   Future<AudioOutputInfo?> _currentOutputInfo() async {
     try {
-      if (!getIt.isRegistered<HiResAudioService>()) return null;
-      return await getIt<HiResAudioService>().getAudioOutputInfo();
+      final service = _hiResAudioService;
+      if (service == null) return null;
+      return await service.getAudioOutputInfo();
     } catch (_) {
       return null;
     }
@@ -912,7 +931,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   factory PulsrAudioHandler(
-      IMusicRepository repository, YtmService ytmService) {
+    IMusicRepository repository,
+    YtmService ytmService, {
+    PlaybackLatencyTracker? latencyTracker,
+    HiResAudioService? hiResAudioService,
+  }) {
     if (Platform.isAndroid) {
       final loadConfig = _loadConfigForBucket(BufferBucket.standard);
 
@@ -937,6 +960,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         playerA: playerA,
         playerB: playerB,
         prefetchPlayer: prefetchPlayer,
+        latencyTracker: latencyTracker,
+        hiResAudioService: hiResAudioService,
       );
     } else {
       return PulsrAudioHandler._(
@@ -954,6 +979,8 @@ class PulsrAudioHandler extends BaseAudioHandler
           useLazyPreparation: true,
           handleInterruptions: false,
         ),
+        latencyTracker: latencyTracker,
+        hiResAudioService: hiResAudioService,
       );
     }
   }
@@ -967,6 +994,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     AudioPlayer? prefetchPlayer,
     AndroidLoudnessEnhancer? loudnessEnhancerA,
     AndroidLoudnessEnhancer? loudnessEnhancerB,
+    PlaybackLatencyTracker? latencyTracker,
+    HiResAudioService? hiResAudioService,
   }) : this._(
           repository: repository,
           ytmService: ytmService,
@@ -975,6 +1004,8 @@ class PulsrAudioHandler extends BaseAudioHandler
           prefetchPlayer: prefetchPlayer,
           loudnessEnhancerA: loudnessEnhancerA,
           loudnessEnhancerB: loudnessEnhancerB,
+          latencyTracker: latencyTracker,
+          hiResAudioService: hiResAudioService,
         );
 
   static MediaItem _songToMediaItem(SongsTableData song, [Uri? artUri]) {
@@ -2233,6 +2264,42 @@ class PulsrAudioHandler extends BaseAudioHandler
           },
           onError: (e, st) {
             ErrorLogger.log('Player currentIndexStream error',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          },
+        ),
+      );
+
+      _subscriptions.add(
+        player.icyMetadataStream.listen(
+          (icy) {
+            if (_disposed || !isTargetActive()) return;
+            final song = currentSong;
+            if (song == null || song.source != SongSource.radio) return;
+            final rawTitle = icy?.info?.title?.trim();
+            if (rawTitle == null ||
+                rawTitle.isEmpty ||
+                rawTitle == song.album) {
+              return;
+            }
+            final updatedSong = song.copyWith(album: rawTitle);
+            if (_currentIndex >= 0 && _currentIndex < _songs.length) {
+              _songs[_currentIndex] = updatedSong;
+            }
+            final currentItem = mediaItem.valueOrNull;
+            if (currentItem != null) {
+              mediaItem.add(
+                currentItem.copyWith(
+                  album: rawTitle,
+                  extras: <String, dynamic>{
+                    ...?currentItem.extras,
+                    'icyTitle': rawTitle,
+                  },
+                ),
+              );
+            }
+          },
+          onError: (e, st) {
+            ErrorLogger.log('Player icyMetadataStream error',
                 error: e, stackTrace: st, category: 'AudioHandler');
           },
         ),

@@ -508,6 +508,8 @@ class _RadioScreenState extends State<RadioScreen> {
                                       buildWhen: (prev, curr) =>
                                           prev.currentSong?.path !=
                                               curr.currentSong?.path ||
+                                          prev.currentSong?.album !=
+                                              curr.currentSong?.album ||
                                           prev.isPlaying != curr.isPlaying,
                                       builder: (context, playerState) {
                                         final isCurrent =
@@ -515,6 +517,11 @@ class _RadioScreenState extends State<RadioScreen> {
                                                 station.url;
                                         final isPlaying =
                                             isCurrent && playerState.isPlaying;
+                                        final icyNowPlaying = isCurrent
+                                            ? (playerState.currentSong?.album
+                                                    .trim() ??
+                                                '')
+                                            : '';
 
                                         return ListTile(
                                           contentPadding:
@@ -592,12 +599,21 @@ class _RadioScreenState extends State<RadioScreen> {
                                               ],
                                               Expanded(
                                                 child: Text(
-                                                  station.url,
+                                                  icyNowPlaying.isNotEmpty
+                                                      ? '♫ $icyNowPlaying'
+                                                      : station.url,
                                                   maxLines: 1,
                                                   overflow:
                                                       TextOverflow.ellipsis,
                                                   style: TextStyle(
-                                                      color: p.textSecondary,
+                                                      color: icyNowPlaying
+                                                              .isNotEmpty
+                                                          ? p.accent
+                                                          : p.textSecondary,
+                                                      fontWeight: icyNowPlaying
+                                                              .isNotEmpty
+                                                          ? FontWeight.w600
+                                                          : FontWeight.normal,
                                                       fontSize:
                                                           AppFontSize.label),
                                                 ),

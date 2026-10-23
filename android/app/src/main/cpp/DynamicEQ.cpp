@@ -291,8 +291,9 @@ void DynamicEQ::process(float* L, float* R, int frames) {
                     : 0.0;
             }
 
-            const double ballisticsCoeff = (std::abs(targetGainDb) > std::abs(band.currentGainDb)) ? attackCoeff : releaseCoeff;
-            band.currentGainDb += ballisticsCoeff * (targetGainDb - band.currentGainDb);
+            // band.env[ch] is already smoothed with attackCoeff/releaseCoeff above (line 270),
+            // so targetGainDb already embodies attack/release ballistics without cascading a second one-pole filter.
+            band.currentGainDb = targetGainDb;
 
             // Application
             if (((i & 15) == 0 || i == frames - 1) &&
@@ -410,8 +411,9 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                     : 0.0;
             }
 
-            const double ballisticsCoeff = (std::abs(targetGainDb) > std::abs(band.currentGainDb)) ? attackCoeff : releaseCoeff;
-            band.currentGainDb += ballisticsCoeff * (targetGainDb - band.currentGainDb);
+            // band.env[ch] is already smoothed with attackCoeff/releaseCoeff above (line 395),
+            // so targetGainDb already embodies attack/release ballistics without cascading a second one-pole filter.
+            band.currentGainDb = targetGainDb;
 
             if (((i & 15) == 0 || i == frames - 1) &&
                 std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {

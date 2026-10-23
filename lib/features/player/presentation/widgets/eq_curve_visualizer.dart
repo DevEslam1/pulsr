@@ -100,10 +100,23 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
         ? size.width / (widget.gains.length - 1)
         : size.width;
 
+    final hasFreqs = widget.frequencies != null &&
+        widget.frequencies!.length == widget.gains.length &&
+        widget.frequencies!.length > 1;
+    final minLog = math.log(20.0);
+    final maxLog = math.log(20000.0);
+    final logSpan = maxLog - minLog;
+
     int closestIndex = 0;
     double minDistance = double.infinity;
     for (int i = 0; i < widget.gains.length; i++) {
-      final bandX = i * stepX;
+      double bandX;
+      if (hasFreqs) {
+        final f = widget.frequencies![i].clamp(20.0, 20000.0);
+        bandX = ((math.log(f) - minLog) / logSpan) * size.width;
+      } else {
+        bandX = i * stepX;
+      }
       final dist = (localPos.dx - bandX).abs();
       if (dist < minDistance) {
         minDistance = dist;
@@ -129,10 +142,23 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
         : size.width;
 
     // Find nearest band index within reach
+    final hasFreqs = widget.frequencies != null &&
+        widget.frequencies!.length == widget.gains.length &&
+        widget.frequencies!.length > 1;
+    final minLog = math.log(20.0);
+    final maxLog = math.log(20000.0);
+    final logSpan = maxLog - minLog;
+
     int closestIndex = 0;
     double minDistance = double.infinity;
     for (int i = 0; i < widget.gains.length; i++) {
-      final bandX = i * stepX;
+      double bandX;
+      if (hasFreqs) {
+        final f = widget.frequencies![i].clamp(20.0, 20000.0);
+        bandX = ((math.log(f) - minLog) / logSpan) * size.width;
+      } else {
+        bandX = i * stepX;
+      }
       final dist = (localPos.dx - bandX).abs();
       if (dist < minDistance) {
         minDistance = dist;
@@ -217,10 +243,23 @@ class _CatmullRomEqPainter extends CustomPainter {
       _paintGrid(canvas, size, midY, verticalScale);
     }
 
-    // 3. Compute Control Points
+    // 3. Compute Control Points (Logarithmic frequency spacing when available)
     final points = <Offset>[];
+    final hasFreqs = frequencies != null &&
+        frequencies!.length == gains.length &&
+        frequencies!.length > 1;
+    final minLog = math.log(20.0);
+    final maxLog = math.log(20000.0);
+    final logSpan = maxLog - minLog;
+
     for (int i = 0; i < gains.length; i++) {
-      final x = i * stepX;
+      double x;
+      if (hasFreqs) {
+        final f = frequencies![i].clamp(20.0, 20000.0);
+        x = ((math.log(f) - minLog) / logSpan) * size.width;
+      } else {
+        x = i * stepX;
+      }
       final clampedGain = gains[i].clamp(-maxGain, maxGain);
       final y = midY - (clampedGain / maxGain) * verticalScale;
       points.add(Offset(x, y));
@@ -317,6 +356,24 @@ class _CatmullRomEqPainter extends CustomPainter {
       tp.text = TextSpan(text: '-${maxGain.toInt()} dB', style: labelStyle);
       tp.layout();
       tp.paint(canvas, Offset(6, midY + verticalScale - tp.height));
+
+      // Paint frequency markers along bottom when showLabels is true
+      if (showLabels) {
+        final fMarkers = [100.0, 1000.0, 10000.0];
+        final fLabels = ['100', '1k', '10k'];
+        final markerStyle = TextStyle(
+          color: color.withValues(alpha: 0.28),
+          fontSize: 8.0,
+          fontWeight: FontWeight.w600,
+        );
+        for (int m = 0; m < fMarkers.length; m++) {
+          final f = fMarkers[m];
+          final x = ((math.log(f) - math.log(20.0)) / (math.log(20000.0) - math.log(20.0))) * size.width;
+          tp.text = TextSpan(text: fLabels[m], style: markerStyle);
+          tp.layout();
+          tp.paint(canvas, Offset((x - tp.width / 2).clamp(24.0, size.width - 24.0), size.height - tp.height - 1));
+        }
+      }
     }
   }
 

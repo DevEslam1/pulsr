@@ -259,7 +259,8 @@ class QueueScreen extends StatelessWidget {
               prev.currentIndex != curr.currentIndex ||
               prev.currentSong?.id != curr.currentSong?.id ||
               prev.isPlaying != curr.isPlaying ||
-              prev.queueHistory != curr.queueHistory,
+              prev.queueHistory != curr.queueHistory ||
+              prev.trackTiers != curr.trackTiers,
           builder: (context, state) {
             final queue = state.queue;
             final currentSong = state.currentSong;
@@ -507,7 +508,9 @@ class QueueScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(width: AppSpacing.xxs),
                                 ],
-                                if (song.isAutoplay) ...[
+                                if (song.isAutoplay ||
+                                    state.trackTiers[song.id] ==
+                                        QueueTier.autoplay) ...[
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 4, vertical: 1),

@@ -195,6 +195,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       bumpQueueVersion: () => _queueVersion++,
       isSameTrack: _isSameTrack,
       latencyTracker: deps.latencyTracker,
+      mediaScannerService: deps.mediaScannerService,
+      ytmService: deps.ytmService,
       onResumePerSongMemory: (song) =>
           unawaited(playbackOptionsController.applyPerSongPlaybackMemory(song)),
       invalidateQueueSyncResolution: invalidateQueueSyncResolution,
@@ -604,7 +606,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         final songChanged = !isSameSong ||
             state.currentSong?.isFavorite != song.isFavorite ||
             state.currentSong?.artworkUri != song.artworkUri ||
-            state.currentSong?.remoteArtworkUrl != song.remoteArtworkUrl;
+            state.currentSong?.remoteArtworkUrl != song.remoteArtworkUrl ||
+            state.currentSong?.album != song.album;
 
         final previousSong = state.currentSong;
         final updatedHistory = List<SongsTableData>.from(state.queueHistory);

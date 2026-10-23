@@ -98,6 +98,7 @@ ViperDdc::ViperDdc() {
 void ViperDdc::setSampleRate(double sampleRate) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
+    if (std::abs(sampleRate_ - sampleRate) < 0.5) return;
     sampleRate_ = sampleRate;
     updateActiveSections();
 }
@@ -233,8 +234,23 @@ void ViperDdc::updateActiveSections() {
         target = &sections441_;
     }
 
+    if (target && !activeSections_.empty() && target->size() == activeSections_.size()) {
+        bool identical = true;
+        for (size_t s = 0; s < target->size(); ++s) {
+            if ((*target)[s].b0 != activeSections_[s].b0 ||
+                (*target)[s].b1 != activeSections_[s].b1 ||
+                (*target)[s].b2 != activeSections_[s].b2 ||
+                (*target)[s].a1 != activeSections_[s].a1 ||
+                (*target)[s].a2 != activeSections_[s].a2) {
+                identical = false;
+                break;
+            }
+        }
+        if (identical) return;
+    }
+
     if (!activeSections_.empty() && (enabled_ || smoothedEnabledMix_ >= 1e-4f)) {
-        crossfadeSections_ = activeSections_;
+        crossfadeSections_.assign(activeSections_.begin(), activeSections_.end());
         sectionCrossfadeProgress_ = 0.0f;
     } else {
         crossfadeSections_.clear();

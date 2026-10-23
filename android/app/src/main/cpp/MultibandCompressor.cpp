@@ -128,13 +128,7 @@ double MultibandCompressor::computeBandGain(int band, double envDb) {
     }
 
     if (targetGainDb > 0.0) targetGainDb = 0.0; // compressor only cuts
-
-
-
-    smoothedGainDb_[band] = targetGainDb;
-    currentGainReductionDb_[band] = smoothedGainDb_[band];
-
-    return smoothedGainDb_[band] + smoothedMakeupDb_[band];
+    return targetGainDb;
 }
 
 void MultibandCompressor::processInterleaved(float* buffer, int frames, int channels) {
@@ -202,23 +196,23 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
             bandBufferR_[3][i] = static_cast<float>(b3R);
         }
 
-        // 2. Process dynamic compression per band and sum back
+        // 2. Process dynamic compression per band and sum back with dB-domain ballistics
         for (int b = 0; b < NUM_BANDS; ++b) {
             for (int i = 0; i < chunkFrames; ++i) {
                 const float sL = bandBufferL_[b][i];
                 const float sR = bandBufferR_[b][i];
 
-                // Level detector: peak envelope follower with attack/release ballistics
                 const double peak = std::max(std::abs(static_cast<double>(sL)), std::abs(static_cast<double>(sR)));
-                const double envCoeff = (peak > envelope_[b]) ? attackCoeff_[b] : releaseCoeff_[b];
-                envelope_[b] = envCoeff * envelope_[b] + (1.0 - envCoeff) * peak;
-                if (!std::isfinite(envelope_[b])) envelope_[b] = 0.0;
-                if (envelope_[b] < 1e-15) envelope_[b] = 0.0;
+                const double envDb = (peak > 1e-6) ? (20.0 * std::log10(peak)) : -120.0;
+                const double targetGainDb = computeBandGain(b, envDb);
 
-                // Convert linear envelope to dB once per sample
-                const double envDb = (envelope_[b] > 1e-6) ? (20.0 * std::log10(envelope_[b])) : -120.0;
-                const double gainDb = computeBandGain(b, envDb);
-                const float linearGain = static_cast<float>(std::pow(10.0, gainDb / 20.0));
+                // Smooth gain reduction with attack/release ballistics in dB domain
+                const double coeff = (targetGainDb < smoothedGainDb_[b]) ? attackCoeff_[b] : releaseCoeff_[b];
+                smoothedGainDb_[b] = coeff * smoothedGainDb_[b] + (1.0 - coeff) * targetGainDb;
+                currentGainReductionDb_[b] = smoothedGainDb_[b];
+
+                const double totalGainDb = smoothedGainDb_[b] + smoothedMakeupDb_[b];
+                const float linearGain = static_cast<float>(std::pow(10.0, totalGainDb / 20.0));
 
                 bandBufferL_[b][i] *= linearGain;
                 bandBufferR_[b][i] *= linearGain;

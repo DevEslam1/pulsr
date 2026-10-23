@@ -20,32 +20,42 @@ extension _EqSheetShell on _EqualizerSheetState {
     } catch (_) {}
   }
 
+  int _findClosestBand(List<double> freqs, double targetHz) {
+    if (freqs.isEmpty) return 0;
+    int best = 0;
+    double bestDiff = (freqs[0] - targetHz).abs();
+    for (int i = 1; i < freqs.length; i++) {
+      final diff = (freqs[i] - targetHz).abs();
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = i;
+      }
+    }
+    return best;
+  }
+
   double _getBassGain(PlayerState state) {
     final gains = state.eqPreset.gains;
     if (gains.isEmpty) return 0.0;
-    return gains[0].clamp(-12.0, 12.0);
+    final freqs = _activeFrequencies(state);
+    final idx = _findClosestBand(freqs, 62.0);
+    return gains[idx.clamp(0, gains.length - 1)].clamp(-12.0, 12.0);
   }
 
   double _getMidGain(PlayerState state) {
     final gains = state.eqPreset.gains;
     if (gains.isEmpty) return 0.0;
-    if (gains.length >= 10) {
-      return gains[5].clamp(-12.0, 12.0);
-    } else if (gains.length >= 3) {
-      return gains[gains.length ~/ 2].clamp(-12.0, 12.0);
-    }
-    return 0.0;
+    final freqs = _activeFrequencies(state);
+    final idx = _findClosestBand(freqs, 1000.0);
+    return gains[idx.clamp(0, gains.length - 1)].clamp(-12.0, 12.0);
   }
 
   double _getTrebleGain(PlayerState state) {
     final gains = state.eqPreset.gains;
     if (gains.isEmpty) return 0.0;
-    if (gains.length >= 10) {
-      return gains[8].clamp(-12.0, 12.0);
-    } else if (gains.length >= 3) {
-      return gains.last.clamp(-12.0, 12.0);
-    }
-    return 0.0;
+    final freqs = _activeFrequencies(state);
+    final idx = _findClosestBand(freqs, 8000.0);
+    return gains[idx.clamp(0, gains.length - 1)].clamp(-12.0, 12.0);
   }
 
   /// Preamp slider coalescing: keep the thumb responsive with a local preview
@@ -74,39 +84,61 @@ extension _EqSheetShell on _EqualizerSheetState {
 
   void _setBassMacro(PlayerCubit cubit, PlayerState state, double val) {
     if (!cubit.state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final freqs = _activeFrequencies(state);
     final count = cubit.state.eqPreset.gains.length;
-    if (count >= 10) {
+    if (count == 10) {
       cubit.setBandGain(0, val);
       cubit.setBandGain(1, (val * 0.85).clamp(-12.0, 12.0));
       cubit.setBandGain(2, (val * 0.65).clamp(-12.0, 12.0));
-    } else if (count > 0) {
-      cubit.setBandGain(0, val);
+    } else {
+      for (int i = 0; i < freqs.length && i < count; i++) {
+        final f = freqs[i];
+        if (f <= 250.0) {
+          final weight = (1.0 - (f / 280.0)).clamp(0.2, 1.0);
+          cubit.setBandGain(i, (val * weight).clamp(-12.0, 12.0));
+        }
+      }
     }
     cubit.setBassBoost(val > 0 ? (val / 12.0).clamp(0.0, 1.0) : 0.0);
   }
 
   void _setMidMacro(PlayerCubit cubit, PlayerState state, double val) {
     if (!cubit.state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final freqs = _activeFrequencies(state);
     final count = cubit.state.eqPreset.gains.length;
-    if (count >= 10) {
+    if (count == 10) {
       cubit.setBandGain(3, (val * 0.5).clamp(-12.0, 12.0));
       cubit.setBandGain(4, (val * 0.8).clamp(-12.0, 12.0));
       cubit.setBandGain(5, val);
       cubit.setBandGain(6, (val * 0.85).clamp(-12.0, 12.0));
-    } else if (count >= 3) {
-      cubit.setBandGain(count ~/ 2, val);
+    } else {
+      for (int i = 0; i < freqs.length && i < count; i++) {
+        final f = freqs[i];
+        if (f >= 250.0 && f <= 3500.0) {
+          final octDist = (math.log(f / 1000.0) / math.ln2).abs();
+          final weight = (1.0 - (octDist / 2.0)).clamp(0.3, 1.0);
+          cubit.setBandGain(i, (val * weight).clamp(-12.0, 12.0));
+        }
+      }
     }
   }
 
   void _setTrebleMacro(PlayerCubit cubit, PlayerState state, double val) {
     if (!cubit.state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final freqs = _activeFrequencies(state);
     final count = cubit.state.eqPreset.gains.length;
-    if (count >= 10) {
+    if (count == 10) {
       cubit.setBandGain(7, (val * 0.75).clamp(-12.0, 12.0));
       cubit.setBandGain(8, val);
       cubit.setBandGain(9, (val * 0.9).clamp(-12.0, 12.0));
-    } else if (count >= 3) {
-      cubit.setBandGain(count - 1, val);
+    } else {
+      for (int i = 0; i < freqs.length && i < count; i++) {
+        final f = freqs[i];
+        if (f >= 3500.0) {
+          final weight = ((f - 3000.0) / 10000.0).clamp(0.4, 1.0);
+          cubit.setBandGain(i, (val * weight).clamp(-12.0, 12.0));
+        }
+      }
     }
   }
 

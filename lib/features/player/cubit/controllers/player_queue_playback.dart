@@ -79,9 +79,12 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         !song.path.startsWith('http') &&
         !song.path.startsWith('ytmusic://')) {
       try {
-        if (getIt.isRegistered<MediaScannerService>()) {
-          unawaited(getIt<MediaScannerService>()
-              .enrichAudioQuality(song.id, song.path));
+        final scanner = _mediaScannerService ??
+            (getIt.isRegistered<MediaScannerService>()
+                ? getIt<MediaScannerService>()
+                : null);
+        if (scanner != null) {
+          unawaited(scanner.enrichAudioQuality(song.id, song.path));
         }
       } catch (e, st) {
         ErrorLogger.log('enrichAudioQuality failed in playTrack',
@@ -138,11 +141,33 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     final prevSlot = _queueSlots[state.activeQueueSlot];
     final prevQueue = state.queue;
     final prevIndex = state.currentIndex;
+    final prevTrackTiers = state.trackTiers;
     final prevSong = state.currentSong;
     final prevPosition = state.position;
     final prevDuration = state.duration;
     final prevLyrics = state.lyrics;
     final prevLyricsSource = state.lyricsSource;
+
+    final Map<int, QueueTier> nextTrackTiers;
+    if (isSameSong && preservePlaybackState && queue != null) {
+      final validIds = effectiveQueue.map((s) => s.id).toSet();
+      nextTrackTiers = {
+        for (final entry in state.trackTiers.entries)
+          if (validIds.contains(entry.key)) entry.key: entry.value,
+        for (final s in effectiveQueue)
+          if (s.isAutoplay && !state.trackTiers.containsKey(s.id))
+            s.id: QueueTier.autoplay,
+      };
+    } else {
+      nextTrackTiers = <int, QueueTier>{};
+      for (final s in effectiveQueue) {
+        if (s.hasExplicitAutoplayFlag) {
+          nextTrackTiers[s.id] = QueueTier.autoplay;
+        } else {
+          s.isAutoplay = false;
+        }
+      }
+    }
 
     setQueueSlot(
       state.activeQueueSlot,
@@ -158,6 +183,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       queueSlice: state.queueSlice.copyWith(
         queue: List<SongsTableData>.unmodifiable(effectiveQueue),
         currentIndex: effectiveIndex,
+        trackTiers: nextTrackTiers,
       ),
       playback: state.playback.copyWith(
         currentSong: song,
@@ -229,6 +255,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
             queueSlice: current.queueSlice.copyWith(
               queue: List<SongsTableData>.unmodifiable(prevQueue),
               currentIndex: prevIndex,
+              trackTiers: prevTrackTiers,
             ),
             playback: current.playback.copyWith(
               currentSong: prevSong,

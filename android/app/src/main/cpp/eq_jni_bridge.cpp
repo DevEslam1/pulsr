@@ -166,13 +166,12 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
             snap.eq.bands[i].q = vQs[i];
             snap.eq.bands[i].type = toFilterType(vTypes[i]);
             snap.eq.bands[i].enabled = true;
-            // A bulk push defines a whole preset's band set but carries no
-            // solo/mute arrays, so reset both. Otherwise a solo or mute left
-            // active by a previously loaded preset silently persists and keeps
-            // muting the freshly loaded one. Per-band type and Q from Dart are
-            // still honored above.
-            snap.eq.bands[i].solo = false;
-            snap.eq.bands[i].mute = false;
+            // Preserve existing solo/mute states across bulk gain pushes so
+            // moving multiple sliders or applying debounced edits does not drop solo/mute.
+            const bool prevSolo = (i < snap.eq.bandCount) ? snap.eq.bands[i].solo : false;
+            const bool prevMute = (i < snap.eq.bandCount) ? snap.eq.bands[i].mute : false;
+            snap.eq.bands[i].solo = prevSolo;
+            snap.eq.bands[i].mute = prevMute;
         }
     });
 }
@@ -1091,10 +1090,20 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
         const bool ok = ArbitraryResponseEq::parseGraphicEq(content, nodes);
         if (ok) {
             auto parsed = std::make_shared<const std::vector<std::pair<double, double>>>(nodes);
+            const double currentSr = AudioDspEngine::instance().getSampleRate();
+            const double targetSr = (currentSr > 0.0) ? currentSr : 48000.0;
+            auto fir = ArbitraryResponseEq::synthesizeFirKernel(nodes, linearPhase == JNI_TRUE, targetSr);
+            auto prep = std::make_shared<const PreparedArbitraryEqFilter>(PreparedArbitraryEqFilter{
+                parsed,
+                std::move(fir),
+                linearPhase == JNI_TRUE,
+                targetSr
+            });
             AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
                 snap.arbitraryEq.graphicEqString = content;
                 snap.arbitraryEq.linearPhase = linearPhase;
                 snap.arbitraryEq.parsedNodes = parsed;
+                snap.arbitraryEq.preparedFilter = prep;
             });
         }
         return ok ? JNI_TRUE : JNI_FALSE;

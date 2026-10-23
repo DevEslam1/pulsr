@@ -59,6 +59,13 @@ public:
     static bool parseGraphicEq(const std::string& eqString,
                                std::vector<std::pair<double, double>>& outNodes);
 
+    /// Synthesizes the FIR kernel on the control thread so the real-time audio
+    /// thread never executes FFTs or trigonometric functions.
+    static std::vector<float> synthesizeFirKernel(
+        const std::vector<std::pair<double, double>>& nodes,
+        bool linearPhase,
+        double sampleRate);
+
     void process(float* L, float* R, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
 
@@ -90,6 +97,7 @@ private:
     int phaseDelayIdx_ = 0;
 
     std::shared_ptr<const std::vector<std::pair<double, double>>> preparedNodesRef_;
+    std::shared_ptr<const PreparedArbitraryEqFilter> preparedFilterRef_;
     double firSynthesizedRate_ = 0.0;
 
     void synthesizeFir();

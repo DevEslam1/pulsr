@@ -78,7 +78,7 @@ void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double 
     // getLatencyFrames() always reports the length actually in effect.
     const bool lookaheadChanged = (newLookahead != lookaheadSamples_);
     lookaheadSamples_ = newLookahead;
-    latencyFramesAtomic_.store(lookaheadSamples_, std::memory_order_relaxed);
+    latencyFramesAtomic_.store(lookaheadSamples_ + FILTER_DELAY, std::memory_order_relaxed);
 
     threshold_ = static_cast<float>(std::pow(10.0, thresholdDb_ / 20.0));
     fastReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (0.015 * sampleRate_))); // 15ms fast transient release
@@ -327,7 +327,10 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 
         // Instantaneous attack to target minimum gain, smooth exponential release when lookahead window clears
         if (targetGain < envelope_) {
-            const float attackStep = 1.0f / static_cast<float>(lookaheadSamples_);
+            const float attackStep = std::max(
+                1.0f / static_cast<float>(lookaheadSamples_),
+                (envelope_ - targetGain) / static_cast<float>(lookaheadSamples_)
+            );
             envelope_ = std::max(targetGain, envelope_ - attackStep);
         } else {
             envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
@@ -350,7 +353,7 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
         }
 
         // Read delayed audio from lookahead buffer
-        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
+        int readIdx = (writeIdx_ - (lookaheadSamples_ + FILTER_DELAY)) & kMask;
         const float wetL = delayBuf_[0][readIdx] * envelope_;
         const float wetR = delayBuf_[1][readIdx] * envelope_;
         // While inserting the stage, the current input stands in for the not
@@ -432,7 +435,10 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
         const float effectiveReleaseCoeff = (1.0f - transientWeight_) * slowReleaseCoeff_ + transientWeight_ * fastReleaseCoeff_;
 
         if (targetGain < envelope_) {
-            const float attackStep = 1.0f / static_cast<float>(lookaheadSamples_);
+            const float attackStep = std::max(
+                1.0f / static_cast<float>(lookaheadSamples_),
+                (envelope_ - targetGain) / static_cast<float>(lookaheadSamples_)
+            );
             envelope_ = std::max(targetGain, envelope_ - attackStep);
         } else {
             envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
@@ -454,7 +460,7 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
             mix = advanceBypassMix();
         }
 
-        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
+        int readIdx = (writeIdx_ - (lookaheadSamples_ + FILTER_DELAY)) & kMask;
         const float wet = delayBuf_[0][readIdx] * envelope_;
         const float dryRaw = delayBuf_[0][writeIdx_];
         const float dryPeak = std::max(peak, std::abs(dryRaw));
@@ -538,7 +544,10 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
         // (the peak is delayed by exactly lookaheadSamples_), so the ceiling is
         // still enforced while the gain discontinuity is removed.
         if (targetGain < envelope_) {
-            const float attackStep = 1.0f / static_cast<float>(lookaheadSamples_);
+            const float attackStep = std::max(
+                1.0f / static_cast<float>(lookaheadSamples_),
+                (envelope_ - targetGain) / static_cast<float>(lookaheadSamples_)
+            );
             envelope_ = std::max(targetGain, envelope_ - attackStep);
         } else {
             envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
@@ -560,7 +569,7 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
             mix = advanceBypassMix();
         }
 
-        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
+        int readIdx = (writeIdx_ - (lookaheadSamples_ + FILTER_DELAY)) & kMask;
         float dryPeak = frameMaxPeak;
         for (int ch = 0; ch < processChannels; ++ch) {
             dryPeak = std::max(dryPeak, std::abs(delayBuf_[ch][writeIdx_]));

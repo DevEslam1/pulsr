@@ -276,6 +276,13 @@ struct ViperDdcParamSet {
     std::shared_ptr<const std::vector<ViperDdcSection>> sections480;
 };
 
+struct PreparedArbitraryEqFilter {
+    std::shared_ptr<const std::vector<std::pair<double, double>>> nodes;
+    std::vector<float> firFilter;
+    bool linearPhase = false;
+    double sampleRate = 48000.0;
+};
+
 struct ArbitraryEqParamSet {
     bool enabled = false;
     std::string graphicEqString; // GraphicEq: 20 0; 100 2; ...
@@ -283,6 +290,9 @@ struct ArbitraryEqParamSet {
     // Node list pre-parsed off the audio thread by the JNI setter. When set,
     // ArbitraryResponseEq::applyParams swaps this in without parsing/allocating.
     std::shared_ptr<const std::vector<std::pair<double, double>>> parsedNodes;
+    // Pre-synthesized FIR filter calculated on control thread. When present,
+    // ArbitraryResponseEq::applyParams applies this instantly on the audio thread without FFT!
+    std::shared_ptr<const PreparedArbitraryEqFilter> preparedFilter;
 };
 
 // A single LiveProg bytecode instruction in a neutral (audio-thread-safe) form.

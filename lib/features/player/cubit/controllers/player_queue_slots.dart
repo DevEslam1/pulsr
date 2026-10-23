@@ -148,6 +148,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final state = _getState();
     final current = state.currentSong;
     final retained = current != null ? [current] : <SongsTableData>[];
+    final retainedTiers = <int, QueueTier>{
+      if (current != null && state.trackTiers.containsKey(current.id))
+        current.id: state.trackTiers[current.id]!,
+    };
     setQueueSlot(
       state.activeQueueSlot,
       songs: List.from(retained),
@@ -161,6 +165,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       queueSlice: state.queueSlice.copyWith(
         queue: List<SongsTableData>.unmodifiable(retained),
         currentIndex: 0,
+        trackTiers: retainedTiers,
       ),
     ));
     try {
@@ -300,7 +305,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       debouncedPersistQueueSlots();
       _bumpQueueVersion();
       _emit(state.copyWith(
-        queueSlice: state.queueSlice.copyWith(queue: const [], currentIndex: 0),
+        queueSlice: state.queueSlice.copyWith(
+          queue: const [],
+          currentIndex: 0,
+          trackTiers: const {},
+        ),
         playback: state.playback.copyWith(
           currentSong: null,
           isPlaying: false,
@@ -323,8 +332,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     }
 
     final removingCurrent = index == state.currentIndex;
+    final removedSong = state.queue[index];
     final updatedQueue = List<SongsTableData>.from(state.queue)
       ..removeAt(index);
+    final updatedTiers = Map<int, QueueTier>.from(state.trackTiers)
+      ..remove(removedSong.id);
     int newIndex = state.currentIndex;
     if (index < state.currentIndex) {
       newIndex = state.currentIndex - 1;
@@ -358,6 +370,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       queueSlice: state.queueSlice.copyWith(
         queue: List<SongsTableData>.unmodifiable(updatedQueue),
         currentIndex: newIndex,
+        trackTiers: updatedTiers,
       ),
       playback: playback,
     ));
@@ -377,6 +390,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           queueSlice: s.queueSlice.copyWith(
             queue: List<SongsTableData>.unmodifiable(state.queue),
             currentIndex: state.currentIndex,
+            trackTiers: state.trackTiers,
           ),
         ));
       }
@@ -516,11 +530,22 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     debouncedPersistQueueSlots();
 
     if (state.queue.any((s) => s.id == oldId)) {
+      final oldSong = state.queue.firstWhere((s) => s.id == oldId);
+      final oldTier = state.trackTiers[oldId];
+      if (oldSong.isAutoplay || oldTier == QueueTier.autoplay) {
+        safeNewSong.isAutoplay = true;
+      }
+      final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
+      if (oldTier != null) {
+        updatedTiers.remove(oldId);
+        updatedTiers[safeNewSong.id] = oldTier;
+      }
       _bumpQueueVersion();
       _emit(state.copyWith(
         queueSlice: state.queueSlice.copyWith(
           queue:
               state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
+          trackTiers: updatedTiers,
         ),
         playback: state.playback.copyWith(
           currentSong:

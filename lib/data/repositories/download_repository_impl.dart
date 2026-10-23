@@ -515,49 +515,21 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       final rawJson = prefs.getString(_prefKey);
       if (rawJson != null && rawJson.isNotEmpty) {
         final list = jsonDecode(rawJson) as List<dynamic>;
-        final db = _effectiveDb;
         for (final item in list) {
-          var task = DownloadTask.fromJson(item as Map<String, dynamic>);
+          final task = DownloadTask.fromJson(item as Map<String, dynamic>);
           if (task.status == DownloadStatus.downloading ||
               task.status == DownloadStatus.queued ||
               task.status == DownloadStatus.tagging) {
             // Restore interrupted downloads as paused on startup (process death reconciliation)
             _tasks[task.videoId] = task.copyWith(status: DownloadStatus.paused);
-          } else if (task.status == DownloadStatus.complete) {
-            if ((task.filePath == null || task.fileSize == null) &&
-                task.localSongId != null &&
-                db != null) {
-              try {
-                final song = await (db.select(db.songsTable)
-                      ..where((s) => s.id.equals(task.localSongId!)))
-                    .getSingleOrNull();
-                if (song != null) {
-                  var size = song.fileSize;
-                  if ((size == null || size <= 0) &&
-                      File(song.path).existsSync()) {
-                    size = File(song.path).lengthSync();
-                  }
-                  task = task.copyWith(
-                    filePath: song.path,
-                    fileSize: size,
-                  );
-                }
-              } catch (e, st) {
-                ErrorLogger.log('Failed reconciling boot download metadata',
-                    error: e, stackTrace: st, category: 'Download');
-              }
-            }
-            if (task.filePath != null && !File(task.filePath!).existsSync()) {
-              _tasks[task.videoId] = task.copyWith(
-                  status: DownloadStatus.failed, error: 'File deleted');
-            } else {
-              _tasks[task.videoId] = task;
-            }
           } else {
             _tasks[task.videoId] = task;
           }
         }
       }
+      // FIX-A06: Reconcile completed tasks asynchronously in batched parallel
+      // chunks (no main-thread existsSync/lengthSync blocking).
+      await _reconcileCompletedFiles();
       // Keep the partials of everything we still track, so a download paused
       // across a restart can resume from its bytes instead of from zero. Named
       // by video id: the on-disk names carry the container extension
@@ -569,8 +541,6 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           .toSet();
       await _ytDownloadService.cleanOrphanPartFiles(
           protectedVideoIds: protected.isNotEmpty ? protected : null);
-      // FIX-A06: Call _reconcileCompletedFiles() from reconcileOnBoot
-      await _reconcileCompletedFiles();
     } catch (e) {
       ErrorLogger.log('DownloadRepository reconcileOnBoot failed', error: e);
     }
@@ -580,27 +550,70 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   Future<void> _reconcileCompletedFiles() async {
     final completedTasks = _tasks.values
         .where((t) => t.status == DownloadStatus.complete)
-        .toList();
-    for (final task in completedTasks) {
-      await _reconcileCompletedTask(task);
+        .toList(growable: false);
+    if (completedTasks.isEmpty) return;
+
+    final db = _effectiveDb;
+    final prefetchedSongs = <int, SongsTableData>{};
+    if (db != null) {
+      final missingMetaSongIds = completedTasks
+          .where((t) =>
+              (t.filePath == null || t.fileSize == null) &&
+              t.localSongId != null)
+          .map((t) => t.localSongId!)
+          .toSet()
+          .toList(growable: false);
+      const dbChunkSize = 400;
+      for (var i = 0; i < missingMetaSongIds.length; i += dbChunkSize) {
+        final chunk = missingMetaSongIds.sublist(
+            i, (i + dbChunkSize).clamp(0, missingMetaSongIds.length));
+        try {
+          final rows = await (db.select(db.songsTable)
+                ..where((s) => s.id.isIn(chunk)))
+              .get();
+          for (final row in rows) {
+            prefetchedSongs[row.id] = row;
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Failed batch-fetching boot download metadata',
+              error: e, stackTrace: st, category: 'Download');
+        }
+      }
+    }
+
+    const ioConcurrency = 32;
+    for (var i = 0; i < completedTasks.length; i += ioConcurrency) {
+      final batch = completedTasks.sublist(
+          i, (i + ioConcurrency).clamp(0, completedTasks.length));
+      await Future.wait(
+        batch.map((task) => _reconcileCompletedTask(
+              task,
+              prefetchedSongs: prefetchedSongs,
+            )),
+      );
     }
   }
 
   /// Reconciles a single completed [task] against disk, marking a deleted file
   /// as failed. Used right after a completion so one track does not trigger a
   /// stat of the entire download history.
-  Future<void> _reconcileCompletedTask(DownloadTask task) async {
+  Future<void> _reconcileCompletedTask(
+    DownloadTask task, {
+    Map<int, SongsTableData>? prefetchedSongs,
+  }) async {
     final db = _effectiveDb;
     try {
       var filePath = task.filePath;
       var fileSize = task.fileSize;
 
-      if ((filePath == null || fileSize == null) &&
-          task.localSongId != null &&
-          db != null) {
-        final song = await (db.select(db.songsTable)
-              ..where((s) => s.id.equals(task.localSongId!)))
-            .getSingleOrNull();
+      if ((filePath == null || fileSize == null) && task.localSongId != null) {
+        final songId = task.localSongId!;
+        SongsTableData? song = prefetchedSongs?[songId];
+        if (song == null && prefetchedSongs == null && db != null) {
+          song = await (db.select(db.songsTable)
+                ..where((s) => s.id.equals(songId)))
+              .getSingleOrNull();
+        }
         if (song != null) {
           filePath = song.path;
           fileSize = song.fileSize;
@@ -611,6 +624,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         final f = File(filePath);
         if (!await f.exists()) {
           final updated = task.copyWith(
+            filePath: filePath,
+            fileSize: fileSize,
             status: DownloadStatus.failed,
             error: 'File deleted',
           );
@@ -858,6 +873,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         }
         result = await _ytDownloadService.download(
           songRow,
+          bypassInternalQueue: true,
           onProgress: (p) {
             if (_pausedVideoIds.contains(videoId)) return;
             // A deleted task must not be resurrected by a late progress tick.

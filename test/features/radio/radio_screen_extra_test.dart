@@ -250,7 +250,10 @@ void main() {
     await tester.tap(find.byIcon(Icons.explore_rounded));
     await tester.pumpAndSettle();
 
-    expect(find.text(l10n.radioCuratedAdded(11)), findsOneWidget);
+    expect(
+        find.text(
+            l10n.radioCuratedAdded(RadioStationStore.curatedDirectory().length)),
+        findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.explore_rounded));
     await tester.pumpAndSettle();

@@ -45,6 +45,8 @@ class PlayerQueueController {
   final void Function() _bumpQueueVersion;
   final bool Function(SongsTableData? a, SongsTableData? b) _isSameTrack;
   final PlaybackLatencyTracker? _latencyTracker;
+  final MediaScannerService? _mediaScannerService;
+  final YtmService? _ytmService;
 
   /// A-01: Invoked when a track is resumed (initialPosition provided) so the
   /// per-song speed/pitch/volume/EQ memory can be re-applied.
@@ -89,6 +91,8 @@ class PlayerQueueController {
     required void Function() bumpQueueVersion,
     required bool Function(SongsTableData? a, SongsTableData? b) isSameTrack,
     PlaybackLatencyTracker? latencyTracker,
+    MediaScannerService? mediaScannerService,
+    YtmService? ytmService,
     void Function(SongsTableData song)? onResumePerSongMemory,
     void Function()? invalidateQueueSyncResolution,
     void Function()? cancelPendingSeek,
@@ -106,6 +110,8 @@ class PlayerQueueController {
         _bumpQueueVersion = bumpQueueVersion,
         _isSameTrack = isSameTrack,
         _latencyTracker = latencyTracker,
+        _mediaScannerService = mediaScannerService,
+        _ytmService = ytmService,
         _onResumePerSongMemory = onResumePerSongMemory,
         _invalidateQueueSyncResolution =
             invalidateQueueSyncResolution ?? (() {}),

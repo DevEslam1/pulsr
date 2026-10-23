@@ -444,8 +444,8 @@ bool LiveProg::loadCode(const std::string& scriptCode) {
         activeProgram_ = newProg;
         applyPreparedProgram(newProg);
         if (hadActive) {
-            prevSampleBytecode_ = std::move(oldSampleBytecode);
-            prevMemory_ = std::move(oldMemory);
+            prevSampleBytecode_.assign(oldSampleBytecode.begin(), oldSampleBytecode.end());
+            prevMemory_.assign(oldMemory.begin(), oldMemory.end());
             prevIdxSpl0_ = oldSpl0;
             prevIdxSpl1_ = oldSpl1;
             programCrossfadeProgress_ = 0.0f;
@@ -763,8 +763,9 @@ void LiveProg::executeBytecode(const std::vector<Instruction>& program, std::vec
 
     int pc = 0;
     const int len = static_cast<int>(program.size());
+    int fuel = MAX_BYTECODE * 4;
 
-    while (pc < len) {
+    while (pc < len && --fuel >= 0) {
         const auto& instr = program[pc++];
         switch (instr.op) {
             case OpCode::PushConst:

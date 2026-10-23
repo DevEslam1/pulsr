@@ -3,6 +3,7 @@
 // testConnection()'s response classification: proxy auth rejections must fail
 // before the YouTube 4xx-reachability rule, or wrong proxy credentials report
 // "working".
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/network/app_http_overrides.dart';
@@ -138,6 +139,70 @@ void main() {
         expect(result.error, isNull);
       } finally {
         await server.close();
+      }
+    });
+
+    test(
+        'Dart HttpClient tunnels HTTP requests through local SOCKS5 loopback bridge',
+        () async {
+      var socksConnectReceived = false;
+      final socksServer =
+          await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      socksServer.listen((client) {
+        var stage = 0;
+        client.listen((data) {
+          if (stage == 0 && data.isNotEmpty && data[0] == 0x05) {
+            stage = 1;
+            client.add([0x05, 0x00]);
+          } else if (stage == 1 &&
+              data.isNotEmpty &&
+              data[0] == 0x05 &&
+              data[1] == 0x01) {
+            stage = 2;
+            socksConnectReceived = true;
+            client.add([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0, 80]);
+          } else if (stage == 2) {
+            final reqText = latin1.decode(data);
+            if (reqText.contains('GET /test-socks5 HTTP/1.1')) {
+              client.add(ascii.encode(
+                'HTTP/1.1 200 OK\r\n'
+                'Content-Length: 13\r\n'
+                'Connection: close\r\n\r\n'
+                'socks5-bridge',
+              ));
+              client.close();
+            }
+          }
+        });
+      });
+
+      final previousOverrides = HttpOverrides.current;
+      try {
+        final config = ProxyConfig(
+          enabled: true,
+          type: AppProxyType.socks5,
+          host: '127.0.0.1',
+          port: socksServer.port,
+        );
+        AppHttpOverrides.instance.update(config);
+        final bridgePort = await AppHttpOverrides.instance.ensureSocks5Bridge();
+        expect(bridgePort, isNotNull);
+
+        final client = AppHttpOverrides.instance.createHttpClient(null);
+        final req =
+            await client.getUrl(Uri.parse('http://example.com/test-socks5'));
+        final res = await req.close();
+        final body = await utf8.decoder.bind(res).join();
+        client.close(force: true);
+
+        expect(socksConnectReceived, isTrue);
+        expect(res.statusCode, 200);
+        expect(body, 'socks5-bridge');
+      } finally {
+        AppHttpOverrides.instance.update(const ProxyConfig());
+        await AppHttpOverrides.instance.stopSocks5Bridge();
+        HttpOverrides.global = previousOverrides;
+        await socksServer.close();
       }
     });
   });
