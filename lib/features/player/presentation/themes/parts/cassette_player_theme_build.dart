@@ -25,19 +25,22 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
           start: -20,
           end: -20,
           height: isTablet ? 500 : 380,
-          child: IgnorePointer(
-            child: AnimatedContainer(
-              duration: context.motionMs(500),
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.center,
-                  radius: 0.85,
-                  colors: [
-                    activeColor.withValues(alpha: 0.22),
-                    activeColor.withValues(alpha: 0.05),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.52, 1.0],
+          child: RepaintBoundary(
+            child: IgnorePointer(
+              child: AnimatedContainer(
+                duration: context.motionMs(500),
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 0.88,
+                    colors: [
+                      activeColor.withValues(
+                          alpha: state.isPlaying ? 0.26 : 0.15),
+                      activeColor.withValues(alpha: 0.06),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.54, 1.0],
+                  ),
                 ),
               ),
             ),

@@ -29,7 +29,17 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
     return AnimatedContainer(
       duration: context.motionMs(400),
       curve: context.motionCurve(Curves.easeInOut),
-      color: props.bgColor,
+      decoration: BoxDecoration(
+        color: props.bgColor,
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.35),
+          radius: 1.1,
+          colors: [
+            Color.lerp(props.bgColor, activeColor, 0.10) ?? props.bgColor,
+            props.bgColor,
+          ],
+        ),
+      ),
       child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -124,7 +134,11 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                               child: Container(
                                 decoration: BoxDecoration(
                                   borderRadius: AppRadii.circular(
-                                      resolveCustomRadius(context, 20)),
+                                       resolveCustomRadius(context, 20)),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.16),
+                                      width: 1.2,
+                                    ),
                                   boxShadow: [
                                     BoxShadow(
                                       color:
@@ -393,11 +407,18 @@ class _MinimalAudiophileTelemetry extends StatelessWidget {
         margin: const EdgeInsets.only(top: AppSpacing.s10),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
         decoration: BoxDecoration(
-          color: p.surfaceContainer,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              p.surfaceContainerHigh,
+              p.surfaceContainer,
+            ],
+          ),
           borderRadius: AppRadii.r8All,
           border: Border.all(
-            color: p.hairline,
-            width: 0.8,
+            color: activeColor.withValues(alpha: 0.28),
+            width: 0.9,
           ),
         ),
         child: FittedBox(
@@ -405,6 +426,21 @@ class _MinimalAudiophileTelemetry extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                width: 5,
+                height: 5,
+                margin: const EdgeInsetsDirectional.only(end: 6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: activeColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.6),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
               _buildChip(ext, textColor: activeColor),
               _buildDivider(p.hairline),
               _buildChip(sampleRateStr, textColor: p.textSecondary),

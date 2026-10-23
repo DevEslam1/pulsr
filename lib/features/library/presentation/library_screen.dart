@@ -655,6 +655,36 @@ class _LibraryScreenState extends State<LibraryScreen>
                     controller: _tabController,
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicatorPadding: const EdgeInsets.symmetric(vertical: 6),
+                    dividerColor: p.hairline.withValues(alpha: 0.45),
+                    dividerHeight: 1.0,
+                    splashBorderRadius: BorderRadius.circular(999),
+                    labelColor: p.accent,
+                    unselectedLabelColor: p.textSecondary,
+                    labelStyle: const TextStyle(
+                      fontSize: AppFontSize.bodySmall,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontSize: AppFontSize.bodySmall,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    indicator: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          p.accent.withValues(alpha: 0.22),
+                          p.accent.withValues(alpha: 0.12),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: p.accent.withValues(alpha: 0.35),
+                        width: 1.0,
+                      ),
+                    ),
                     physics: const BouncingScrollPhysics(),
                     tabs: _activeTabs
                         .map((tab) => _buildTabItem(context, tab, state, p))
@@ -751,7 +781,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         },
         child: Container(
           color: Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),
           alignment: Alignment.center,
           child: content,
         ),

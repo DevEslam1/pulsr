@@ -17,9 +17,9 @@ import 'package:pulsr/core/constants/app_colors.dart';
 ///
 /// Features:
 /// - Guaranteed integration with [PulsrModalTracker] to hide/restore the mini player dock smoothly
-/// - Native Apple/Google sheet drag handle pill
-/// - Responsive width clamping on tablet & desktop (`maxWidth: 580`)
-/// - Frosted translucent backdrop blur and hairline border
+/// - Native Apple/Google sheet drag handle pill with top specular refraction hairline
+/// - Responsive width clamping on tablet & desktop (`maxWidth: 620`)
+/// - 120fps-optimized surface elevation and hairline border
 /// - Edge-to-edge safe area handling
 /// - Automatically adapts to centered dialog when in landscape on short phone screens
 class PulsrSheetHelper {
@@ -99,7 +99,7 @@ class PulsrSheetHelper {
       isDismissible: isDismissible,
       enableDrag: enableDrag,
       backgroundColor: Colors.transparent,
-      barrierColor: barrierColor ?? AppColors.scrimAt(p.isDark ? 0.60 : 0.40),
+      barrierColor: barrierColor ?? AppColors.scrimAt(p.isDark ? 0.62 : 0.40),
       builder: (ctx) {
         final built = builder(ctx);
         if (!wrapWithContainer || built is PulsrBottomSheetContainer) {
@@ -147,7 +147,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isTablet = context.isTablet;
-    final maxSheetWidth = isTablet ? 580.0 : double.infinity;
+    final maxSheetWidth = isTablet ? 620.0 : double.infinity;
 
     final isNested =
         context.dependOnInheritedWidgetOfExactType<_PulsrBottomSheetScope>() !=
@@ -160,7 +160,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
           if (title != null) ...[
             Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s20, vertical: AppSpacing.s6),
+                  horizontal: AppSpacing.s20, vertical: AppSpacing.s8),
               child: Row(
                 children: [
                   Expanded(
@@ -195,7 +195,12 @@ class PulsrBottomSheetContainer extends StatelessWidget {
             ),
             Divider(color: p.hairline, height: 1),
           ],
-          Flexible(child: child),
+          Flexible(
+            child: Material(
+              color: Colors.transparent,
+              child: child,
+            ),
+          ),
         ],
       );
     }
@@ -215,6 +220,20 @@ class PulsrBottomSheetContainer extends StatelessWidget {
         ? Duration.zero
         : const Duration(milliseconds: 180);
 
+    final baseSurfaceColor = GpuBudget.isGpuSaverActive
+        ? p.surface
+        : (p.isDark
+            ? p.surface.withValues(alpha: 0.96)
+            : p.surface.withValues(alpha: 0.98));
+
+    final topBlendColor = Color.alphaBlend(
+      p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
+      baseSurfaceColor,
+    );
+
+    final effectiveBorderRadius =
+        isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius;
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: AnimatedPadding(
@@ -226,119 +245,151 @@ class PulsrBottomSheetContainer extends StatelessWidget {
             maxWidth: maxSheetWidth,
             maxHeight: sheetMaxH,
           ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: GpuBudget.isGpuSaverActive
-                  ? p.surface
-                  : (p.isDark
-                      ? p.surface.withValues(alpha: 0.92)
-                      : p.surface.withValues(alpha: 0.96)),
-              borderRadius:
-                  isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius,
-              border: Border.all(
-                color: p.hairline,
-                width: 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.scrimAt(p.isDark ? 0.50 : 0.16),
-                  blurRadius: 36,
-                  spreadRadius: 0,
-                  offset: const Offset(0, -4),
+          child: RepaintBoundary(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [topBlendColor, baseSurfaceColor],
+                  stops: const [0.0, 0.35],
                 ),
-              ],
-            ),
-            margin: isTablet
-                ? const EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.lg)
-                : EdgeInsets.zero,
-            child: ClipRRect(
-              borderRadius:
-                  isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius,
-              child: Builder(
-                builder: (context) {
-                  final sheetContent = _PulsrBottomSheetScope(
-                    child: SafeArea(
-                      top: false,
-                      left: false,
-                      right: false,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                borderRadius: effectiveBorderRadius,
+                border: Border.all(
+                  color: p.isDark
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : p.hairline,
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.scrimAt(p.isDark ? 0.45 : 0.14),
+                    blurRadius: 22,
+                    spreadRadius: 0,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              margin: isTablet
+                  ? const EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.md)
+                  : EdgeInsets.zero,
+              child: ClipRRect(
+                borderRadius: effectiveBorderRadius,
+                child: _PulsrBottomSheetScope(
+                  child: SafeArea(
+                    top: false,
+                    left: false,
+                    right: false,
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Stack(
                         children: [
-                          // Top drag pill
-                          if (showDragHandle) ...[
-                            const SizedBox(height: AppSpacing.s10),
-                            Center(
-                              child: Semantics(
-                                label: context.l10n.sheetDragHandle,
-                                hint: context.l10n.sheetDragDownToDismiss,
-                                child: Container(
-                                  width: AppSpacing.s38,
-                                  height: 4.5,
-                                  decoration: BoxDecoration(
-                                    color:
-                                        (p.isDark ? Colors.white : Colors.black)
-                                            .withValues(alpha: 0.18),
-                                    borderRadius: AppRadii.full,
-                                  ),
+                          // Specular top edge highlight
+                          PositionedDirectional(
+                            top: 0,
+                            start: 24,
+                            end: 24,
+                            height: 1.2,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.specularAt(0.0),
+                                    AppColors.specularAt(
+                                        p.isDark ? 0.38 : 0.65),
+                                    AppColors.specularAt(0.0),
+                                  ],
+                                  stops: const [0.0, 0.5, 1.0],
                                 ),
                               ),
                             ),
-                            const SizedBox(height: AppSpacing.s10),
-                          ],
-
-                          // Optional Header
-                          if (title != null) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s20,
-                                  vertical: AppSpacing.s6),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        DefaultTextStyle.merge(
-                                          style: TextStyle(
-                                            color: p.textPrimary,
-                                            fontSize: AppFontSize.title,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: AppTracking.title,
-                                          ),
-                                          child: title!,
-                                        ),
-                                        if (subtitle != null) ...[
-                                          const SizedBox(height: AppSpacing.s2),
-                                          DefaultTextStyle.merge(
-                                            style: TextStyle(
-                                              color: p.textSecondary,
-                                              fontSize: AppFontSize.label,
-                                            ),
-                                            child: subtitle!,
-                                          ),
-                                        ],
-                                      ],
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Top drag pill
+                              if (showDragHandle) ...[
+                                const SizedBox(height: AppSpacing.s10),
+                                Center(
+                                  child: Semantics(
+                                    label: context.l10n.sheetDragHandle,
+                                    hint: context.l10n.sheetDragDownToDismiss,
+                                    child: Container(
+                                      width: AppSpacing.s40,
+                                      height: 4.5,
+                                      decoration: BoxDecoration(
+                                        color: (p.isDark
+                                                ? Colors.white
+                                                : Colors.black)
+                                            .withValues(alpha: 0.22),
+                                        borderRadius: AppRadii.full,
+                                      ),
                                     ),
                                   ),
-                                  if (trailing != null) trailing!,
-                                ],
-                              ),
-                            ),
-                            Divider(color: p.hairline, height: 1),
-                          ],
+                                ),
+                                const SizedBox(height: AppSpacing.s8),
+                              ],
 
-                          // Sheet Body
-                          Flexible(child: child),
+                              // Optional Header
+                              if (title != null) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.s20,
+                                      vertical: AppSpacing.s8),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            DefaultTextStyle.merge(
+                                              style: TextStyle(
+                                                color: p.textPrimary,
+                                                fontSize: AppFontSize.title,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing:
+                                                    AppTracking.title,
+                                              ),
+                                              child: title!,
+                                            ),
+                                            if (subtitle != null) ...[
+                                              const SizedBox(
+                                                  height: AppSpacing.s2),
+                                              DefaultTextStyle.merge(
+                                                style: TextStyle(
+                                                  color: p.textSecondary,
+                                                  fontSize: AppFontSize.label,
+                                                ),
+                                                child: subtitle!,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      if (trailing != null) trailing!,
+                                    ],
+                                  ),
+                                ),
+                                Divider(color: p.hairline, height: 1),
+                              ],
+
+                              // Sheet Body
+                              Flexible(
+            child: Material(
+              color: Colors.transparent,
+              child: child,
+            ),
+          ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                  );
-
-                  return sheetContent;
-                },
+                  ),
+                ),
               ),
             ),
           ),

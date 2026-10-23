@@ -56,6 +56,13 @@ class _VinylGroovesPainter extends CustomPainter {
     canvas.drawCircle(center, labelRadius + 5, deadWaxPaint);
     canvas.drawCircle(center, labelRadius + 9, deadWaxPaint);
 
+    // Subtle accent halo ring right around the label perimeter
+    final labelHaloPaint = Paint()
+      ..color = activeColor.withValues(alpha: 0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    canvas.drawCircle(center, labelRadius + 2, labelHaloPaint);
+
     // Outer rim bead
     final rimPaint = Paint()
       ..color = const Color(0xFF2B2E3C)

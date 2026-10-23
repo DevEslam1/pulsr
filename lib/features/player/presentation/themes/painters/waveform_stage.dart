@@ -46,27 +46,31 @@ class _WaveformHeroStage extends StatelessWidget {
         return Stack(
           alignment: Alignment.center,
           children: [
-            // 0. Studio Graphic Spectrum EQ HUD Header
+            // 0. Studio Graphic Spectrum EQ HUD Header (Isolated in RepaintBoundary)
             PositionedDirectional(
               top: 4,
-              child: _GraphicSpectrumHud(
-                activeColor: activeColor,
-                isPlaying: isPlaying,
-                waveController: waveController,
+              child: RepaintBoundary(
+                child: _GraphicSpectrumHud(
+                  activeColor: activeColor,
+                  isPlaying: isPlaying,
+                  waveController: waveController,
+                ),
               ),
             ),
 
-            // 0. Live FFT Visualizer Waveform Layer
+            // 0. Live FFT Visualizer Waveform Layer (Isolated in RepaintBoundary)
             Positioned.fill(
-              child: Opacity(
-                opacity: isPlaying ? 0.65 : 0.25,
-                child: AudioVisualizer(
-                  style: VisualizerStyle.wave,
-                  color: activeColor,
-                  isPlaying: isPlaying,
-                  audioSessionId: audioSessionId,
-                  trackId: song?.id,
-                  trackPath: song?.path,
+              child: RepaintBoundary(
+                child: Opacity(
+                  opacity: isPlaying ? 0.65 : 0.25,
+                  child: AudioVisualizer(
+                    style: VisualizerStyle.wave,
+                    color: activeColor,
+                    isPlaying: isPlaying,
+                    audioSessionId: audioSessionId,
+                    trackId: song?.id,
+                    trackPath: song?.path,
+                  ),
                 ),
               ),
             ),
@@ -145,7 +149,7 @@ class _WaveformHeroStage extends StatelessWidget {
                         ),
                       ],
                       border: Border.all(
-                        color: AppColors.specularAt(0.24),
+                        color: AppColors.specularAt(isPlaying ? 0.34 : 0.22),
                         width: 1.5,
                       ),
                     ),

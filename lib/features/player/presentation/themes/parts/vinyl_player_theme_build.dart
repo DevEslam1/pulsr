@@ -12,18 +12,21 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
       children: [
         // Ambient backdrop glow behind turntable plinth
         Positioned.fill(
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, -0.2),
-                  radius: 0.85,
-                  colors: [
-                    activeColor.withValues(alpha: 0.20),
-                    activeColor.withValues(alpha: 0.04),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.52, 1.0],
+          child: RepaintBoundary(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.2),
+                    radius: 0.90,
+                    colors: [
+                      activeColor.withValues(
+                          alpha: state.isPlaying ? 0.24 : 0.14),
+                      activeColor.withValues(alpha: 0.05),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.54, 1.0],
+                  ),
                 ),
               ),
             ),

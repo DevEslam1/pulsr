@@ -190,8 +190,17 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
     final p = context.palette;
     final screenHeight = MediaQuery.sizeOf(context).height;
 
+    final subtitleText = _allSongs.length > 1
+        ? context.l10n.songsCount(_allSongs.length)
+        : '${widget.song.title} • ${widget.song.artist}';
+
     return PulsrBottomSheetContainer(
       title: Text(context.l10n.addToPlaylist),
+      subtitle: Text(
+        subtitleText,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: _isMutating
           ? SizedBox(
               width: 24,
@@ -214,7 +223,10 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: p.accentContainer,
-                      borderRadius: AppRadii.r10All,
+                      borderRadius: AppRadii.r12All,
+                      border: Border.all(
+                        color: p.accent.withValues(alpha: 0.30),
+                      ),
                     ),
                     child: Icon(Icons.add_rounded, color: p.accent, size: 22),
                   ),
@@ -270,8 +282,17 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                           child: Center(
                             child: Column(
                               children: [
-                                Icon(Icons.queue_music_rounded,
-                                    size: 48, color: p.textTertiary),
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: p.surfaceContainer,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: p.hairline),
+                                  ),
+                                  child: Icon(Icons.queue_music_rounded,
+                                      size: 30, color: p.accent),
+                                ),
                                 const SizedBox(height: AppSpacing.sm),
                                 Text(
                                   context.l10n.emptyPlaylists,
@@ -317,73 +338,44 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                         (rawPlaylists) {
                           final playlists =
                               rawPlaylists.where((p) => !p.isSmart).toList();
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (int index = 0;
-                                  index < playlists.length;
-                                  index++) ...[
-                                if (index > 0)
-                                  const SizedBox(height: AppSpacing.s6),
-                                Builder(builder: (context) {
-                                  final playlist = playlists[index];
-                                  return Semantics(
-                                    button: true,
-                                    label:
-                                        '${context.l10n.addToPlaylist}: ${playlist.name}',
-                                    child: PulsrPressable(
-                                      pressedScale: 0.98,
-                                      onTap: () => _addToExistingPlaylist(
-                                          context, playlist),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: AppSpacing.s14,
-                                            vertical: AppSpacing.sm),
-                                        decoration: BoxDecoration(
-                                          color: p.surfaceContainer
-                                              .withValues(alpha: 0.6),
-                                          borderRadius: AppRadii.r14All,
-                                          border: Border.all(color: p.hairline),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(
-                                                  AppSpacing.xs),
-                                              decoration: BoxDecoration(
-                                                color: p.accentContainer,
-                                                borderRadius: AppRadii.r10All,
-                                              ),
-                                              child: Icon(
-                                                  Icons.queue_music_rounded,
-                                                  color: p.accent,
-                                                  size: 20),
-                                            ),
-                                            const SizedBox(
-                                                width: AppSpacing.sm),
-                                            Expanded(
-                                              child: Text(
-                                                playlist.name,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: AppFontSize.body,
-                                                  color: p.textPrimary,
-                                                ),
-                                              ),
-                                            ),
-                                            Icon(
-                                                Icons
-                                                    .add_circle_outline_rounded,
-                                                color: p.accent,
-                                                size: 22),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ],
+                          return LayoutBuilder(
+                            builder: (context, constraints) {
+                              final useTwoColumns =
+                                  constraints.maxWidth >= 460 &&
+                                      playlists.length >= 4;
+                              if (useTwoColumns) {
+                                return GridView.builder(
+                                  shrinkWrap: true,
+                                  physics:
+                                      const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    mainAxisExtent: 60,
+                                    crossAxisSpacing: AppSpacing.xs,
+                                    mainAxisSpacing: AppSpacing.xs,
+                                  ),
+                                  itemCount: playlists.length,
+                                  itemBuilder: (context, index) =>
+                                      _buildPlaylistCard(
+                                          context, p, playlists[index]),
+                                );
+                              }
+
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (int index = 0;
+                                      index < playlists.length;
+                                      index++) ...[
+                                    if (index > 0)
+                                      const SizedBox(height: AppSpacing.xs),
+                                    _buildPlaylistCard(
+                                        context, p, playlists[index]),
+                                  ],
+                                ],
+                              );
+                            },
                           );
                         },
                       ),
@@ -413,6 +405,65 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPlaylistCard(
+    BuildContext context,
+    PulsrPalette p,
+    PlaylistsTableData playlist,
+  ) {
+    return Semantics(
+      button: true,
+      label: '${context.l10n.addToPlaylist}: ${playlist.name}',
+      child: PulsrPressable(
+        pressedScale: 0.98,
+        onTap: () => _addToExistingPlaylist(context, playlist),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer.withValues(alpha: 0.72),
+            borderRadius: AppRadii.r16All,
+            border: Border.all(color: p.hairline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: p.accentContainer,
+                  borderRadius: AppRadii.r10All,
+                ),
+                child: Icon(Icons.queue_music_rounded,
+                    color: p.accent, size: 20),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  playlist.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppFontSize.body,
+                    color: p.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.add_rounded, color: p.accent, size: 18),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

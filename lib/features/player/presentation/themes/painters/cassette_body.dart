@@ -43,10 +43,18 @@ class _CassetteBody extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF161820),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF1E212B),
+                        Color(0xFF15171F),
+                        Color(0xFF101218),
+                      ],
+                    ),
                     borderRadius: AppRadii.r20All,
                     border: Border.all(
-                      color: const Color(0xFF2C303E),
+                      color: const Color(0xFF343848),
                       width: 3.5,
                     ),
                     boxShadow: [
@@ -159,10 +167,12 @@ class _CassetteBody extends StatelessWidget {
             ],
           ),
 
-          // Center: Stereo Dancing VU Meters
-          _CassetteStereoVuMeter(
-            activeColor: activeColor,
-            isPlaying: isPlaying,
+          // Center: Stereo Dancing VU Meters (Isolated in RepaintBoundary for 120fps)
+          RepaintBoundary(
+            child: _CassetteStereoVuMeter(
+              activeColor: activeColor,
+              isPlaying: isPlaying,
+            ),
           ),
 
           // Right: Pulsr Branding & EQ Specs
@@ -352,10 +362,11 @@ class _CassetteBody extends StatelessWidget {
             ),
           ),
 
-          // Rotating White Spool Hub with Teeth
-          RotationTransition(
-            turns: spoolController,
-            child: RepaintBoundary(
+          // Rotating White Spool Hub with Teeth (Isolated in outer + inner RepaintBoundary)
+          RepaintBoundary(
+            child: RotationTransition(
+              turns: spoolController,
+              child: RepaintBoundary(
               child: Container(
                 width: 52,
                 height: 52,
@@ -383,6 +394,7 @@ class _CassetteBody extends StatelessWidget {
                 ),
               ),
             ),
+          ),
           ),
         ],
       ),

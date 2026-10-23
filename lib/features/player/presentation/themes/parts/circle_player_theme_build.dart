@@ -24,12 +24,14 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
       curve: context.motionCurve(Curves.easeInOut),
       decoration: BoxDecoration(
         gradient: RadialGradient(
-          center: const Alignment(0, -0.3),
-          radius: 1.2,
+          center: const Alignment(0, -0.26),
+          radius: 1.25,
           colors: [
+            Color.lerp(bgColor, activeColor, 0.14) ?? bgColor,
             bgColor,
             p.bg,
           ],
+          stops: const [0.0, 0.45, 1.0],
         ),
       ),
       child: SafeArea(

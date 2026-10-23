@@ -267,6 +267,8 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final quality = AudioQualityInfo.fromSong(song);
+
     return PulsrBottomSheetContainer(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -274,110 +276,141 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.s20, AppSpacing.s10, AppSpacing.s20, AppSpacing.lg),
+              AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  CachedArtwork(
-                    id: song.id,
-                    remoteUrl: song.remoteArtworkUrl,
-                    type: ArtworkType.AUDIO,
-                    size: 64,
-                    borderRadius: 14,
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          song.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: p.textPrimary,
-                                  ),
-                        ),
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          song.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: AppFontSize.bodySmall),
-                        ),
-                      ],
+              // Hero Track Identity Card
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.s14),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: AppRadii.r18All,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Row(
+                  children: [
+                    CachedArtwork(
+                      id: song.id,
+                      remoteUrl: song.remoteArtworkUrl,
+                      type: ArtworkType.AUDIO,
+                      size: 68,
+                      borderRadius: 16,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.s20),
-              Divider(color: p.hairline),
-              const SizedBox(height: AppSpacing.xs),
-              Builder(
-                builder: (context) {
-                  final quality = AudioQualityInfo.fromSong(song);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              context.l10n.qualityAndCodec,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: AppTracking.wide,
-                                color: p.textSecondary,
-                              ),
+                          Text(
+                            song.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: p.textPrimary,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.xxs),
+                          Text(
+                            song.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.bodySmall,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          AudioQualityBadge(
-                              song: song, activeColor: p.accent, compact: true),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.xs),
-                      _buildInfoRow(
-                          context.l10n.audioFormat, quality.format, p),
-                      if (quality.bitrateKbps != null)
-                        _buildInfoRow(
-                            context.l10n.bitrate,
-                            '${quality.bitrateKbps} kbps (${quality.tierLabel})',
-                            p),
-                      _buildInfoRow(context.l10n.sampleRate,
-                          '${quality.bitDepth} / ${quality.sampleRate}', p),
-                      _buildInfoRow(context.l10n.channels, quality.channels, p),
-                      const SizedBox(height: AppSpacing.s6),
-                      Divider(color: p.hairline),
-                      const SizedBox(height: AppSpacing.s6),
-                    ],
-                  );
-                },
+                    ),
+                  ],
+                ),
               ),
-              _buildInfoRow(context.l10n.album, song.album, p),
-              _buildInfoRow(
-                  context.l10n.duration,
-                  Formatters.formatDuration(
-                      Duration(milliseconds: song.durationMs)),
-                  p),
-              _buildInfoRow(context.l10n.filePath, song.path, p),
-              _buildInfoRow(context.l10n.playCount,
-                  context.l10n.playCountTimes(song.playCount), p),
-              if (song.fileSize != null)
-                _buildInfoRow(
-                    context.l10n.fileSize,
-                    '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB',
-                    p),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Quality & Codec Bento Card
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.s14),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer.withValues(alpha: 0.72),
+                  borderRadius: AppRadii.r16All,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            context.l10n.qualityAndCodec,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: AppTracking.wide,
+                              color: p.textSecondary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        AudioQualityBadge(
+                            song: song, activeColor: p.accent, compact: true),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Divider(color: p.hairline, height: 1),
+                    const SizedBox(height: AppSpacing.xs),
+                    _buildInfoRow(context.l10n.audioFormat, quality.format, p),
+                    if (quality.bitrateKbps != null)
+                      _buildInfoRow(
+                          context.l10n.bitrate,
+                          '${quality.bitrateKbps} kbps (${quality.tierLabel})',
+                          p),
+                    _buildInfoRow(context.l10n.sampleRate,
+                        '${quality.bitDepth} / ${quality.sampleRate}', p),
+                    _buildInfoRow(context.l10n.channels, quality.channels, p),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Metadata & File Info Card
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.s14),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer.withValues(alpha: 0.72),
+                  borderRadius: AppRadii.r16All,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow(context.l10n.album, song.album, p),
+                    _buildInfoRow(
+                        context.l10n.duration,
+                        Formatters.formatDuration(
+                            Duration(milliseconds: song.durationMs)),
+                        p),
+                    _buildInfoRow(context.l10n.playCount,
+                        context.l10n.playCountTimes(song.playCount), p),
+                    if (song.fileSize != null)
+                      _buildInfoRow(
+                          context.l10n.fileSize,
+                          '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB',
+                          p),
+                    _buildInfoRow(context.l10n.filePath, song.path, p),
+                  ],
+                ),
+              ),
+
               // FIX-M6: Use _AudioOverridesSection with cached stores
               _AudioOverridesSection(song: song),
               _buildPlaybackToolsSection(context, p),
@@ -387,6 +420,8 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, 48),
+                        backgroundColor:
+                            p.surfaceContainer.withValues(alpha: 0.65),
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
@@ -396,11 +431,11 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                       ),
                       onPressed: () => _shareSong(context),
                       icon: Icon(Icons.share_rounded,
-                          size: 20, color: p.textPrimary),
+                          size: 19, color: p.accent),
                       label: Text(
                         context.l10n.share,
                         style: TextStyle(
-                            fontWeight: FontWeight.w600, color: p.textPrimary),
+                            fontWeight: FontWeight.w700, color: p.textPrimary),
                       ),
                     ),
                   ),
@@ -409,6 +444,8 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, 48),
+                        backgroundColor:
+                            p.surfaceContainer.withValues(alpha: 0.65),
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
@@ -429,14 +466,14 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                               );
                             },
                       icon: Icon(Icons.ring_volume_rounded,
-                          size: 20,
+                          size: 19,
                           color: PlatformCapabilities.hasRingtoneManager
-                              ? p.textPrimary
+                              ? p.accent
                               : p.textTertiary),
                       label: Text(
                         context.l10n.ringtone,
                         style: TextStyle(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                             color: PlatformCapabilities.hasRingtoneManager
                                 ? p.textPrimary
                                 : p.textTertiary),
@@ -445,12 +482,14 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.xs),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 48),
+                    backgroundColor:
+                        p.surfaceContainer.withValues(alpha: 0.65),
                     padding:
                         const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                     shape: RoundedRectangleBorder(
@@ -466,13 +505,13 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                   label: Text(
                     'Listen Together (Party Mode)',
                     style: TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: p.textPrimary,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.xs),
               if (PlatformCapabilities.hasTagEditor)
                 SizedBox(
                   width: double.infinity,
@@ -688,13 +727,13 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 110,
+            width: 112,
             child: Text(
               label,
               style: TextStyle(
                   color: p.textSecondary,
                   fontSize: AppFontSize.bodySmall,
-                  fontWeight: FontWeight.w500),
+                  fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -704,7 +743,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
               style: TextStyle(
                   color: p.textPrimary,
                   fontSize: AppFontSize.bodySmall,
-                  fontWeight: FontWeight.w600),
+                  fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -1019,7 +1058,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
         : (_eqLabelByLower[currentEq.toLowerCase()] ?? currentEq);
 
     return Container(
-      margin: const EdgeInsets.only(top: AppSpacing.s10, bottom: AppSpacing.sm),
+      margin: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,

@@ -239,12 +239,22 @@ class _PlayerControlsState extends State<PlayerControls> {
                           height: resolvedSideSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: widget.hasPrevious
+                                ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      p.textPrimary.withValues(alpha: 0.12),
+                                      p.textPrimary.withValues(alpha: 0.05),
+                                    ],
+                                  )
+                                : null,
                             color: widget.hasPrevious
-                                ? p.textPrimary.withValues(alpha: 0.08)
+                                ? null
                                 : p.textPrimary.withValues(alpha: 0.03),
                             border: Border.all(
                               color: widget.hasPrevious
-                                  ? p.textPrimary.withValues(alpha: 0.14)
+                                  ? p.textPrimary.withValues(alpha: 0.16)
                                   : p.textPrimary.withValues(alpha: 0.05),
                               width: 1.0,
                             ),
@@ -252,9 +262,9 @@ class _PlayerControlsState extends State<PlayerControls> {
                                 ? [
                                     BoxShadow(
                                       color:
-                                          Colors.black.withValues(alpha: 0.18),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                                          Colors.black.withValues(alpha: 0.22),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
                                     ),
                                   ]
                                 : null,
@@ -307,30 +317,34 @@ class _PlayerControlsState extends State<PlayerControls> {
                           end: Alignment.bottomRight,
                           colors: [
                             Color.lerp(
-                                    widget.primaryColor, Colors.white, 0.18) ??
+                                    widget.primaryColor, Colors.white, 0.22) ??
                                 widget.primaryColor,
                             widget.primaryColor,
+                            Color.lerp(
+                                    widget.primaryColor, Colors.black, 0.14) ??
+                                widget.primaryColor,
                           ],
+                          stops: const [0.0, 0.58, 1.0],
                         ),
                         boxShadow: [
                           BoxShadow(
                             color: widget.primaryColor.withValues(
-                                alpha: widget.isPlaying ? 0.45 : 0.25),
-                            blurRadius: widget.isPlaying ? 24 : 16,
+                                alpha: widget.isPlaying ? 0.48 : 0.28),
+                            blurRadius: widget.isPlaying ? 26 : 18,
                             spreadRadius: widget.isPlaying ? 2 : 0,
                             offset: const Offset(0, 6),
                           ),
                           BoxShadow(
-                            color: AppColors.scrimAt(0.25),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
+                            color: AppColors.scrimAt(0.28),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                         border: Border.all(
                           color: widget.abLoopActive
                               ? p.accent
-                              : AppColors.specularAt(0.25),
-                          width: widget.abLoopActive ? 2.2 : 1.2,
+                              : AppColors.specularAt(0.32),
+                          width: widget.abLoopActive ? 2.2 : 1.4,
                         ),
                       ),
                       child: Center(
@@ -418,12 +432,22 @@ class _PlayerControlsState extends State<PlayerControls> {
                           height: resolvedSideSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: widget.hasNext
+                                ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      p.textPrimary.withValues(alpha: 0.12),
+                                      p.textPrimary.withValues(alpha: 0.05),
+                                    ],
+                                  )
+                                : null,
                             color: widget.hasNext
-                                ? p.textPrimary.withValues(alpha: 0.08)
+                                ? null
                                 : p.textPrimary.withValues(alpha: 0.03),
                             border: Border.all(
                               color: widget.hasNext
-                                  ? p.textPrimary.withValues(alpha: 0.14)
+                                  ? p.textPrimary.withValues(alpha: 0.16)
                                   : p.textPrimary.withValues(alpha: 0.05),
                               width: 1.0,
                             ),
@@ -431,9 +455,9 @@ class _PlayerControlsState extends State<PlayerControls> {
                                 ? [
                                     BoxShadow(
                                       color:
-                                          Colors.black.withValues(alpha: 0.18),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                                          Colors.black.withValues(alpha: 0.22),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
                                     ),
                                   ]
                                 : null,
@@ -584,8 +608,14 @@ class _ControlButton extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isActive
-                        ? activeColor.withValues(alpha: 0.15)
+                        ? activeColor.withValues(alpha: 0.16)
                         : Colors.transparent,
+                    border: isActive
+                        ? Border.all(
+                            color: activeColor.withValues(alpha: 0.35),
+                            width: 1.0,
+                          )
+                        : null,
                   ),
                   child: Icon(
                     icon,

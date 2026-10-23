@@ -133,121 +133,164 @@ class PulsrAdaptiveSheet extends StatelessWidget {
     final vp = PulsrViewport.of(context);
     final headerTitle = title ?? (titleText != null ? Text(titleText!) : null);
 
-    final containerColor = GpuBudget.isGpuSaverActive
+    final baseSurfaceColor = GpuBudget.isGpuSaverActive
         ? p.surface
         : (p.isDark
-            ? p.surface.withValues(alpha: 0.94)
-            : p.surface.withValues(alpha: 0.97));
+            ? p.surface.withValues(alpha: 0.96)
+            : p.surface.withValues(alpha: 0.98));
 
-    final Widget content = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final topBlendColor = Color.alphaBlend(
+      p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
+      baseSurfaceColor,
+    );
+
+    final effectiveBorderRadius = isDialog
+        ? AppRadii.dialogRadius
+        : (vp.isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius);
+
+    final Widget content = Stack(
       children: [
-        if (showDragHandle && !isDialog) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Center(
-            child: Container(
-              width: AppSpacing.s38,
-              height: 4.5,
-              decoration: BoxDecoration(
-                color: (p.isDark ? Colors.white : Colors.black)
-                    .withValues(alpha: 0.18),
-                borderRadius: AppRadii.full,
+        // Specular top edge highlight
+        PositionedDirectional(
+          top: 0,
+          start: 24,
+          end: 24,
+          height: 1.2,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.specularAt(0.0),
+                  AppColors.specularAt(p.isDark ? 0.38 : 0.65),
+                  AppColors.specularAt(0.0),
+                ],
+                stops: const [0.0, 0.5, 1.0],
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
-        ],
-        if (headerTitle != null) ...[
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: vp.isShortHeight ? AppSpacing.sm : AppSpacing.md,
-              vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.sm,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      DefaultTextStyle.merge(
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.title,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: AppTracking.title,
-                        ),
-                        child: headerTitle,
-                      ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: AppSpacing.s2),
-                        DefaultTextStyle.merge(
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.label,
-                          ),
-                          child: subtitle!,
-                        ),
-                      ],
-                    ],
+        ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (showDragHandle && !isDialog) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Center(
+                child: Container(
+                  width: AppSpacing.s40,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: (p.isDark ? Colors.white : Colors.black)
+                        .withValues(alpha: 0.22),
+                    borderRadius: AppRadii.full,
                   ),
                 ),
-                if (trailing != null) trailing!,
-                if (isDialog && trailing == null)
-                  IconButton(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    icon: Icon(Icons.close_rounded,
-                        size: 20, color: p.textSecondary),
-                    tooltip:
-                        MaterialLocalizations.of(context).closeButtonTooltip,
-                    onPressed: () =>
-                        Navigator.of(context, rootNavigator: true).pop(),
-                  ),
-              ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
+            if (headerTitle != null) ...[
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: vp.isShortHeight ? AppSpacing.sm : AppSpacing.md,
+                  vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          DefaultTextStyle.merge(
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.title,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: AppTracking.title,
+                            ),
+                            child: headerTitle,
+                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: AppSpacing.s2),
+                            DefaultTextStyle.merge(
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label,
+                              ),
+                              child: subtitle!,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (trailing != null) trailing!,
+                    if (isDialog && trailing == null)
+                      IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
+                        icon: Icon(Icons.close_rounded,
+                            size: 20, color: p.textSecondary),
+                        tooltip: MaterialLocalizations.of(context)
+                            .closeButtonTooltip,
+                        onPressed: () =>
+                            Navigator.of(context, rootNavigator: true).pop(),
+                      ),
+                  ],
+                ),
+              ),
+              Divider(color: p.hairline, height: 1),
+            ],
+            Flexible(
+              child: SafeArea(
+                top: false,
+                left: false,
+                right: false,
+                // Give ListTile content a Material ancestor so its ink and tile
+                // background paint above the sheet's decorated Container instead of
+                // tripping Flutter's "invisible ListTile background" assertion.
+                child: Material(type: MaterialType.transparency, child: child),
+              ),
             ),
-          ),
-          Divider(color: p.hairline, height: 1),
-        ],
-        Flexible(
-          child: SafeArea(
-            top: false,
-            left: false,
-            right: false,
-            // Give ListTile content a Material ancestor so its ink and tile
-            // background paint above the sheet's decorated Container instead of
-            // tripping Flutter's "invisible ListTile background" assertion.
-            child: Material(type: MaterialType.transparency, child: child),
-          ),
+          ],
         ),
       ],
     );
 
-    final sheet = Container(
-      decoration: BoxDecoration(
-        color: containerColor,
-        borderRadius: isDialog
-            ? AppRadii.dialogRadius
-            : (vp.isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius),
-        border: Border.all(color: p.hairline, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.scrimAt(p.isDark ? 0.50 : 0.16),
-            blurRadius: 36,
-            offset: const Offset(0, -4),
+    final sheet = RepaintBoundary(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [topBlendColor, baseSurfaceColor],
+            stops: const [0.0, 0.35],
           ),
-        ],
+          borderRadius: effectiveBorderRadius,
+          border: Border.all(
+            color: p.isDark
+                ? Colors.white.withValues(alpha: 0.10)
+                : p.hairline,
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.scrimAt(p.isDark ? 0.45 : 0.14),
+              blurRadius: 22,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: effectiveBorderRadius,
+          child: content,
+        ),
       ),
-      child: content,
     );
 
     if (isDialog) return sheet;
 
-    // Bottom-sheet mode previously ignored [maxWidth]/[maxHeight] entirely, so
-    // tablet sheets stretched edge-to-edge and tall content could reach the
-    // status bar. Apply both bounds and lift the sheet above the IME.
+    // Bottom-sheet mode applies both bounds and lifts the sheet above the IME.
     final media = MediaQuery.of(context);
     final keyboardInset = media.viewInsets.bottom;
     final availableHeight = math.max(

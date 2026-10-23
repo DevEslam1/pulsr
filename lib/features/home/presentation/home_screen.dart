@@ -609,47 +609,72 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     ];
     PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      wrapWithContainer: false,
       builder: (sheetContext) {
         final sp = sheetContext.palette;
-        return SafeArea(
-          child: Container(
-            margin: const EdgeInsets.all(AppSpacing.sm),
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: sp.surface,
-              borderRadius: AppRadii.r24All,
-              border: Border.all(color: sp.hairline),
+        return PulsrBottomSheet(
+          title: Text(
+            sheetContext.l10n.browseMoreTools,
+            style: TextStyle(
+              color: sp.textPrimary,
+              fontSize: AppFontSize.title,
+              fontWeight: FontWeight.w800,
             ),
+          ),
+          child: Material(
+            color: Colors.transparent,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 38,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: sp.hairline,
-                    borderRadius: AppRadii.r2All,
-                  ),
-                ),
                 for (final tool in tools)
-                  ListTile(
-                    leading: Icon(tool.icon, color: tool.color),
-                    title: Text(
-                      tool.label,
-                      style: TextStyle(
-                        color: sp.textPrimary,
-                        fontWeight: FontWeight.w600,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: InkWell(
+                      borderRadius: AppRadii.r16All,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        tool.onTap();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: AppSpacing.s10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: sp.surfaceContainer,
+                          borderRadius: AppRadii.r16All,
+                          border: Border.all(color: sp.hairline),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: tool.color.withValues(alpha: 0.16),
+                                borderRadius: AppRadii.r12All,
+                              ),
+                              child: Icon(tool.icon, color: tool.color, size: 20),
+                            ),
+                            const SizedBox(width: AppSpacing.s12),
+                            Expanded(
+                              child: Text(
+                                tool.label,
+                                style: TextStyle(
+                                  color: sp.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: AppFontSize.body,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: sp.textTertiary,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadii.r14All,
-                    ),
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      tool.onTap();
-                    },
                   ),
               ],
             ),
@@ -687,64 +712,99 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         Padding(
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
               0, Adaptive.pagePadding(context), AppSpacing.md),
-          child: Column(
-            children: [
-              HeroMixCard(
-                overline: context.l10n.localMusic,
-                title: context.l10n.dailyDrive,
-                subtitle: context.l10n.autoMix,
-                onTap: () async {
-                  final list = await _fetchDailyDriveSongs(getSongsUseCase);
-                  if (!context.mounted) return;
-                  if (list == null) {
-                    _showQuickActionLoadError(context);
-                    return;
-                  }
-                  if (list.isNotEmpty) {
-                    final shuffled = List<SongsTableData>.from(list)..shuffle();
-                    playerCubit.playSong(shuffled.first, queue: shuffled);
-                  }
-                },
-              ),
-              const SizedBox(height: AppSpacing.s10),
-              Row(
+          child: Builder(
+            builder: (context) {
+              Future<void> onDailyDriveTap() async {
+                final list = await _fetchDailyDriveSongs(getSongsUseCase);
+                if (!context.mounted) return;
+                if (list == null) {
+                  _showQuickActionLoadError(context);
+                  return;
+                }
+                if (list.isNotEmpty) {
+                  final shuffled = List<SongsTableData>.from(list)..shuffle();
+                  playerCubit.playSong(shuffled.first, queue: shuffled);
+                }
+              }
+
+              Future<void> onFocusFlowTap() async {
+                final list = await _fetchTopPlayedSongs(getSongsUseCase);
+                if (!context.mounted) return;
+                if (list == null) {
+                  _showQuickActionLoadError(context);
+                  return;
+                }
+                if (list.isNotEmpty) {
+                  final top = List<SongsTableData>.from(list)
+                    ..sort((a, b) => b.playCount.compareTo(a.playCount));
+                  playerCubit.playSong(top.first, queue: top);
+                }
+              }
+
+              final favTile = QuickTile(
+                title: context.l10n.favorites,
+                subtitle: context.l10n.likedTracks,
+                icon: Icons.favorite_rounded,
+                color: p.favorite,
+                onTap: () => context.push('/favorites'),
+              );
+
+              final focusTile = QuickTile(
+                title: context.l10n.focusFlow,
+                subtitle: context.l10n.topPlayedTracks,
+                icon: Icons.headphones_rounded,
+                color: AppColors.mint,
+                onTap: onFocusFlowTap,
+              );
+
+              if (isTablet) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 11,
+                      child: HeroMixCard(
+                        height: 132,
+                        overline: context.l10n.localMusic,
+                        title: context.l10n.dailyDrive,
+                        subtitle: context.l10n.autoMix,
+                        onTap: onDailyDriveTap,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s12),
+                    Expanded(
+                      flex: 9,
+                      child: Column(
+                        children: [
+                          favTile,
+                          const SizedBox(height: AppSpacing.s10),
+                          focusTile,
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Column(
                 children: [
-                  Expanded(
-                    child: QuickTile(
-                      title: context.l10n.favorites,
-                      subtitle: context.l10n.likedTracks,
-                      icon: Icons.favorite_rounded,
-                      color: p.favorite,
-                      onTap: () => context.push('/favorites'),
-                    ),
+                  HeroMixCard(
+                    overline: context.l10n.localMusic,
+                    title: context.l10n.dailyDrive,
+                    subtitle: context.l10n.autoMix,
+                    onTap: onDailyDriveTap,
                   ),
-                  const SizedBox(width: AppSpacing.s10),
-                  Expanded(
-                    child: QuickTile(
-                      title: context.l10n.focusFlow,
-                      subtitle: context.l10n.topPlayedTracks,
-                      icon: Icons.headphones_rounded,
-                      color: AppColors.mint,
-                      onTap: () async {
-                        final list =
-                            await _fetchTopPlayedSongs(getSongsUseCase);
-                        if (!context.mounted) return;
-                        if (list == null) {
-                          _showQuickActionLoadError(context);
-                          return;
-                        }
-                        if (list.isNotEmpty) {
-                          final top = List<SongsTableData>.from(list)
-                            ..sort(
-                                (a, b) => b.playCount.compareTo(a.playCount));
-                          playerCubit.playSong(top.first, queue: top);
-                        }
-                      },
-                    ),
+                  const SizedBox(height: AppSpacing.s10),
+                  Row(
+                    children: [
+                      Expanded(child: favTile),
+                      const SizedBox(width: AppSpacing.s10),
+                      Expanded(child: focusTile),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
 

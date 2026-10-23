@@ -37,44 +37,69 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
 
     return Stack(
       children: [
-        // 1. Full-bleed Artwork Background
+        // 1 & 2. Full-bleed Artwork Background & Adaptive Scrim (Isolated in RepaintBoundary)
         Positioned.fill(
-          child: song != null
-              ? CanvasBackdrop(
-                  song: song,
-                  isPlaying: state.isPlaying,
-                  isBackdropMode: true,
-                  fallbackArtwork: CachedArtwork(
-                    id: song.id,
-                    albumId: song.albumId,
-                    remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                    type: ArtworkType.AUDIO,
-                    size: double.infinity,
-                    highQuality: true,
+          child: RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                song != null
+                    ? CanvasBackdrop(
+                        song: song,
+                        isPlaying: state.isPlaying,
+                        isBackdropMode: true,
+                        fallbackArtwork: CachedArtwork(
+                          id: song.id,
+                          albumId: song.albumId,
+                          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                          type: ArtworkType.AUDIO,
+                          size: double.infinity,
+                          highQuality: true,
+                        ),
+                      )
+                    : Container(color: p.bg),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [
+                              AppColors.scrimLight,
+                              AppColors.scrimAt(0.72),
+                              AppColors.scrimAt(0.94),
+                            ]
+                          : [
+                              AppColors.specularAt(0.35),
+                              AppColors.specularAt(0.65),
+                              AppColors.specularAt(0.92),
+                            ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
                   ),
-                )
-              : Container(color: p.bg),
-        ),
-
-        // 2. Adaptive Gradient & Blur Overlay
-        Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [
-                        AppColors.scrimLight,
-                        AppColors.scrimAt(0.75),
-                        AppColors.scrimAt(0.95),
-                      ]
-                    : [
-                        AppColors.specularAt(0.35),
-                        AppColors.specularAt(0.65),
-                        AppColors.specularAt(0.92),
-                      ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+                ),
+                // Subtle accent aura behind the floating card
+                PositionedDirectional(
+                  bottom: -40,
+                  start: -20,
+                  end: -20,
+                  height: isTablet ? 440 : 340,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 0.85,
+                          colors: [
+                            activeColor.withValues(
+                                alpha: isDark ? 0.24 : 0.14),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -141,29 +166,39 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                       maxHeight: isLandscape ? 320 : double.infinity,
                       maxWidth: isLandscape ? 320 : double.infinity,
                     ),
-                    child: AspectRatio(
-                      aspectRatio: 1.0,
-                      child: Hero(
-                        tag: props.heroTag,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: AppRadii.circular(
-                                resolveCustomRadius(context, AppRadii.r28)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.scrimAt(isDark ? 0.6 : 0.2),
-                                blurRadius: 30,
-                                spreadRadius: 4,
-                                offset: const Offset(0, 12),
+                    child: AnimatedScale(
+                      scale: state.isPlaying ? 1.0 : 0.97,
+                      duration: context.motionMs(320),
+                      curve: context.motionCurve(Curves.easeOutCubic),
+                      child: AspectRatio(
+                        aspectRatio: 1.0,
+                        child: Hero(
+                          tag: props.heroTag,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: AppRadii.circular(
+                                  resolveCustomRadius(context, AppRadii.r28)),
+                              border: Border.all(
+                                color: Colors.white
+                                    .withValues(alpha: isDark ? 0.20 : 0.45),
+                                width: 1.4,
                               ),
-                              BoxShadow(
-                                color: activeColor.withValues(alpha: 0.3),
-                                blurRadius: 24,
-                                spreadRadius: -2,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.scrimAt(isDark ? 0.62 : 0.22),
+                                  blurRadius: 32,
+                                  spreadRadius: 4,
+                                  offset: const Offset(0, 14),
+                                ),
+                                BoxShadow(
+                                  color: activeColor.withValues(
+                                      alpha: state.isPlaying ? 0.36 : 0.20),
+                                  blurRadius: 28,
+                                  spreadRadius: -2,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
                           child: song != null
                               ? CachedArtwork(
                                   id: song.id,
@@ -187,6 +222,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                                         alpha: 0.4),
                                   ),
                                 ),
+                          ),
                         ),
                       ),
                     ),
@@ -267,11 +303,12 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
               final bottomGlassCard = GlassContainer(
                 borderRadius: AppRadii.circular(
                     resolveCustomRadius(context, AppRadii.r28)),
-                blur: 24,
+                blur: 18,
+                specularHighlight: true,
                 color: cardBgColor,
                 border: Border.all(
                   color: cardBorderColor,
-                  width: 1,
+                  width: 1.1,
                 ),
                 padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
                     AppSpacing.sm, AppSpacing.md, AppSpacing.s10),

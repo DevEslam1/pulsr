@@ -24,12 +24,14 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
       curve: context.motionCurve(Curves.easeInOut),
       decoration: BoxDecoration(
         gradient: RadialGradient(
-          center: const Alignment(0, -0.2),
-          radius: 1.3,
+          center: const Alignment(0, -0.22),
+          radius: 1.32,
           colors: [
+            Color.lerp(bgColor, activeColor, 0.14) ?? bgColor,
             bgColor,
             p.bg,
           ],
+          stops: const [0.0, 0.48, 1.0],
         ),
       ),
       child: SafeArea(

@@ -54,6 +54,8 @@ class PulsrSegmentedControl extends StatelessWidget {
     if (segments.length < 2) return const SizedBox.shrink();
 
     final clampedIndex = selectedIndex.clamp(0, segments.length - 1);
+    final pillTopSheen =
+        Color.lerp(p.accent, Colors.white, p.isDark ? 0.14 : 0.10)!;
 
     if (slidingIndicator) {
       return Container(
@@ -62,7 +64,11 @@ class PulsrSegmentedControl extends StatelessWidget {
         decoration: BoxDecoration(
           color: p.surfaceContainer,
           borderRadius: AppRadii.r16All,
-          border: Border.all(color: p.hairline),
+          border: Border.all(
+            color: p.isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.06),
+          ),
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -93,9 +99,9 @@ class PulsrSegmentedControl extends StatelessWidget {
 
             return Stack(
               children: [
-                // Sliding indicator pill
+                // Sliding indicator pill with subtle top sheen & glow
                 AnimatedPositionedDirectional(
-                  duration: context.motionMs(240),
+                  duration: context.motionMs(220),
                   curve: context.motionCurve(Curves.easeOutCubic),
                   start: fitLabels
                       ? fractionStart(clampedIndex) * innerWidth
@@ -105,15 +111,23 @@ class PulsrSegmentedControl extends StatelessWidget {
                   width: fitLabels
                       ? (weights[clampedIndex] / totalWeight) * innerWidth
                       : segmentWidth,
-                  child: Container(
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: p.accent,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [pillTopSheen, p.accent],
+                      ),
                       borderRadius: AppRadii.r12All,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        width: 0.8,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: p.accent.withValues(alpha: 0.35),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
+                          color: p.accent.withValues(alpha: 0.28),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
@@ -132,6 +146,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                           onTap: () => onChanged(i),
                           excludeSemantics: true,
                           child: PulsrPressable(
+                            pressedScale: 0.97,
                             enableHaptics: false,
                             behavior: HitTestBehavior.opaque,
                             onTap: () {

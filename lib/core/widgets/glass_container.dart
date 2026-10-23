@@ -1,4 +1,5 @@
 // lib/core/widgets/glass_container.dart
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
@@ -153,21 +154,21 @@ class GlassContainer extends StatelessWidget {
               alpha: p.isDark
                   ? (isLiquid ? 0.14 : 0.10)
                   : (isLiquid ? 0.10 : 0.06)),
-          width: isLiquid ? 1.2 : 1.0,
+          width: isLiquid ? 1.15 : 1.0,
         );
 
-    // Default liquid shadow adds ambient soft depth
+    // Default liquid shadow adds ambient soft depth with a 120fps-friendly blur radius
     final effectiveShadow = boxShadow ??
         (isLiquid
             ? [
                 BoxShadow(
-                  color: AppColors.scrimAt(p.isDark ? 0.35 : 0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
+                  color: AppColors.scrimAt(p.isDark ? 0.34 : 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 5),
                 ),
                 BoxShadow(
                   color: p.accent.withValues(alpha: p.isDark ? 0.05 : 0.02),
-                  blurRadius: 12,
+                  blurRadius: 10,
                   offset: const Offset(0, 1),
                 ),
               ]
@@ -186,63 +187,65 @@ class GlassContainer extends StatelessWidget {
             boxShadow: effectiveShadow,
           );
 
+    final Widget paddedChild = padding != null
+        ? Padding(padding: padding!, child: child)
+        : child;
+
     final Widget decoratedContent = Container(
       decoration: decoration,
-      child: Stack(
-        children: [
-          // Specular refraction highlight along the top hairline
-          if (specularHighlight)
-            PositionedDirectional(
-              top: 0,
-              start: 8,
-              end: 8,
-              height: 1.2,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.specularAt(0.0),
-                      AppColors.specularAt(p.isDark ? 0.45 : 0.75),
-                      AppColors.specularAt(0.0),
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
+      child: specularHighlight
+          ? Stack(
+              children: [
+                PositionedDirectional(
+                  top: 0,
+                  start: 8,
+                  end: 8,
+                  height: 1.2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.specularAt(0.0),
+                          AppColors.specularAt(p.isDark ? 0.45 : 0.75),
+                          AppColors.specularAt(0.0),
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          Padding(
-            padding: padding ?? EdgeInsets.zero,
-            child: child,
-          ),
-        ],
-      ),
+                paddedChild,
+              ],
+            )
+          : paddedChild,
     );
 
-    Widget clipped;
-    if (shape != null) {
-      clipped = ClipPath(
-        clipper: ShapeBorderClipper(shape: shape!),
-        child: decoratedContent,
-      );
-    } else {
-      clipped = ClipRRect(
+    // When blur is explicitly disabled or GPU-saving budget mode is active,
+    // skip the expensive BackdropFilter pass.
+    if (!enableBlur || GpuBudget.isGpuSaverActive || blur <= 0) {
+      if (shape != null) {
+        return ClipPath(
+          clipper: ShapeBorderClipper(shape: shape!),
+          child: decoratedContent,
+        );
+      }
+      return ClipRRect(
         borderRadius: effectiveRadius ?? BorderRadius.zero,
         child: decoratedContent,
       );
     }
 
-    // When blur is explicitly disabled or GPU-saving budget mode is active,
-    // skip the expensive BackdropFilter pass.
-    if (!enableBlur || GpuBudget.isGpuSaverActive) {
-      return clipped;
-    }
+    // Clamp Gaussian blur kernel at 18.0 sigma to maintain 120fps <8.3ms frame budget
+    // while preserving full frosted refraction aesthetics.
+    final effectiveSigma = math.min(blur, 18.0);
 
     Widget blurred;
     if (shape != null) {
       blurred = ClipPath(
         clipper: ShapeBorderClipper(shape: shape!),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          filter: ImageFilter.blur(
+              sigmaX: effectiveSigma, sigmaY: effectiveSigma),
           child: decoratedContent,
         ),
       );
@@ -250,7 +253,8 @@ class GlassContainer extends StatelessWidget {
       blurred = ClipRRect(
         borderRadius: effectiveRadius ?? BorderRadius.zero,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          filter: ImageFilter.blur(
+              sigmaX: effectiveSigma, sigmaY: effectiveSigma),
           child: decoratedContent,
         ),
       );

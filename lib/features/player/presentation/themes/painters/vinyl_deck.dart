@@ -224,10 +224,18 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF14151C),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF1A1C26),
+                          Color(0xFF13141C),
+                          Color(0xFF0E0F15),
+                        ],
+                      ),
                       borderRadius: AppRadii.r22All,
                       border: Border.all(
-                        color: const Color(0xFF282B37),
+                        color: const Color(0xFF323646),
                         width: 1.5,
                       ),
                       boxShadow: [
@@ -325,19 +333,21 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                 _tonearmSway = 0.0;
                               });
                             },
-                            child: AnimatedBuilder(
-                              animation: widget.rotationController,
-                              child: vinylDisc,
-                              builder: (context, child) {
-                                final totalPhase =
-                                    (widget.rotationController.value +
-                                            _scrubTurns) %
-                                        1.0;
-                                return Transform.rotate(
-                                  angle: totalPhase * 2 * math.pi,
-                                  child: child,
-                                );
-                              },
+                            child: RepaintBoundary(
+                              child: AnimatedBuilder(
+                                animation: widget.rotationController,
+                                child: vinylDisc,
+                                builder: (context, child) {
+                                  final totalPhase =
+                                      (widget.rotationController.value +
+                                              _scrubTurns) %
+                                          1.0;
+                                  return Transform.rotate(
+                                    angle: totalPhase * 2 * math.pi,
+                                    child: child,
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),

@@ -63,9 +63,53 @@ class MainActivity : AudioServiceActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false)
         }
+        applyHighRefreshRateDisplayMode()
         handleAudioIntent(intent, fromColdStart = true)
     }
  
+    override fun onResume() {
+        super.onResume()
+        applyHighRefreshRateDisplayMode()
+    }
+
+    /**
+     * Requests the highest available display refresh rate (e.g. 90Hz / 120Hz / 144Hz)
+     * matching the active physical resolution unless OS Battery Saver is active.
+     */
+    private fun applyHighRefreshRateDisplayMode() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            if (powerManager?.isPowerSaveMode == true) return
+
+            val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display
+            } else {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay
+            } ?: return
+
+            val currentMode = currentDisplay.mode ?: return
+            val bestMode = currentDisplay.supportedModes
+                .filter {
+                    it.physicalWidth == currentMode.physicalWidth &&
+                        it.physicalHeight == currentMode.physicalHeight
+                }
+                .maxByOrNull { it.refreshRate } ?: return
+
+            if (bestMode.modeId != currentMode.modeId || bestMode.refreshRate > 60.5f) {
+                val params = window.attributes
+                if (params.preferredDisplayModeId != bestMode.modeId) {
+                    params.preferredDisplayModeId = bestMode.modeId
+                    params.preferredRefreshRate = bestMode.refreshRate
+                    window.attributes = params
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("MainActivity", "High refresh rate negotiation skipped: ${e.message}")
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

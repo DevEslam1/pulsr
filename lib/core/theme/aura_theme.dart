@@ -735,7 +735,8 @@ class AuraTheme {
         elevation: 24,
         shape: const RoundedRectangleBorder(
             borderRadius: AppRadii.bottomSheetRadius),
-        clipBehavior: Clip.antiAliasWithSaveLayer,
+        surfaceTintColor: Colors.transparent,
+        clipBehavior: Clip.antiAlias,
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: p.surface,

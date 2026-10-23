@@ -106,6 +106,13 @@ class _CdDiscPainter extends CustomPainter {
       ..strokeWidth = 8.0;
     canvas.drawCircle(center, labelRadius + 4, mirrorPaint);
 
+    // Subtle optical laser read-ring accent around clamping zone
+    final laserRingPaint = Paint()
+      ..color = activeColor.withValues(alpha: 0.24)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    canvas.drawCircle(center, labelRadius + 9, laserRingPaint);
+
     // 6. Outer Polycarbonate Clear Rim with Glass Refraction
     final outerRimPaint = Paint()
       ..shader = SweepGradient(

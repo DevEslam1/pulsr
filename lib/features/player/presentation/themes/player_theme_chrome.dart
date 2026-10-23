@@ -381,11 +381,21 @@ class _PlayerDockIconButtonState extends State<PlayerDockIconButton> {
               color: isActive
                   ? activeColor.withValues(alpha: style.activeFillAlpha)
                   : Colors.transparent,
-              border: style.activeBorder && isActive
+              border: isActive
                   ? Border.all(
-                      color: activeColor.withValues(alpha: 0.45),
-                      width: 1.2,
+                      color: activeColor.withValues(
+                          alpha: style.activeBorder ? 0.50 : 0.32),
+                      width: style.activeBorder ? 1.2 : 1.0,
                     )
+                  : null,
+              boxShadow: isActive
+                  ? [
+                      BoxShadow(
+                        color: activeColor.withValues(alpha: 0.20),
+                        blurRadius: 8,
+                        spreadRadius: -2,
+                      ),
+                    ]
                   : null,
             ),
             child: Icon(
@@ -586,13 +596,27 @@ class PlayerViewSwitcher extends StatelessWidget {
                         heightFactor: 1.0,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: activeColor.withValues(alpha: 0.22),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                activeColor.withValues(alpha: 0.32),
+                                activeColor.withValues(alpha: 0.16),
+                              ],
+                            ),
                             borderRadius: AppRadii.circular(
                                 math.max(4.0, barRadius - 3.0)),
                             border: Border.all(
-                              color: activeColor.withValues(alpha: 0.45),
+                              color: activeColor.withValues(alpha: 0.52),
                               width: 1.0,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: activeColor.withValues(alpha: 0.20),
+                                blurRadius: 10,
+                                spreadRadius: -2,
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -654,9 +678,11 @@ class PlayerViewSwitcher extends StatelessWidget {
               if (GpuBudget.isGpuSaverActive) {
                 return pillContainer;
               }
-              return BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: pillContainer,
+              return RepaintBoundary(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: pillContainer,
+                ),
               );
             },
           ),
@@ -745,17 +771,24 @@ class PlayerBottomActionDock extends StatelessWidget {
           borderRadius: AppRadii.circular(barRadius),
           child: Builder(
             builder: (context) {
+              final dockSurfaceBase = p.isDark ? Colors.white : Colors.black;
               final dockContainer = Container(
                 padding: const EdgeInsets.all(3.0),
                 decoration: BoxDecoration(
-                  color: GpuBudget.isGpuSaverActive
-                      ? p.surface
-                      : (p.isDark ? Colors.white : Colors.black)
-                          .withValues(alpha: 0.06),
+                  color: GpuBudget.isGpuSaverActive ? p.surface : null,
+                  gradient: GpuBudget.isGpuSaverActive
+                      ? null
+                      : LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            dockSurfaceBase.withValues(alpha: 0.09),
+                            dockSurfaceBase.withValues(alpha: 0.04),
+                          ],
+                        ),
                   borderRadius: AppRadii.circular(barRadius),
                   border: Border.all(
-                    color: (p.isDark ? Colors.white : Colors.black)
-                        .withValues(alpha: 0.12),
+                    color: dockSurfaceBase.withValues(alpha: 0.14),
                     width: 1.0,
                   ),
                   boxShadow: [
@@ -911,9 +944,11 @@ class PlayerBottomActionDock extends StatelessWidget {
               if (disableBlur || GpuBudget.isGpuSaverActive) {
                 return dockContainer;
               }
-              return BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: dockContainer,
+              return RepaintBoundary(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: dockContainer,
+                ),
               );
             },
           ),
@@ -1293,8 +1328,13 @@ class PlayerTrackHeader extends StatelessWidget {
                 width: resolvedActionButtonSize,
                 height: resolvedActionButtonSize,
                 child: Material(
-                  color: AppColors.specularAt(0.06),
-                  shape: const CircleBorder(),
+                  color: AppColors.specularAt(0.07),
+                  shape: CircleBorder(
+                    side: BorderSide(
+                      color: AppColors.specularAt(0.12),
+                      width: 1.0,
+                    ),
+                  ),
                   clipBehavior: Clip.antiAlias,
                   child: hasDownload
                       ? Center(
@@ -1359,8 +1399,13 @@ class PlayerTrackHeader extends StatelessWidget {
                 width: resolvedActionButtonSize,
                 height: resolvedActionButtonSize,
                 child: Material(
-                  color: AppColors.specularAt(0.06),
-                  shape: const CircleBorder(),
+                  color: AppColors.specularAt(0.07),
+                  shape: CircleBorder(
+                    side: BorderSide(
+                      color: AppColors.specularAt(0.12),
+                      width: 1.0,
+                    ),
+                  ),
                   clipBehavior: Clip.antiAlias,
                   child: PlayerAnimatedFavoriteButton(
                     isFavorite: song?.isFavorite == true,

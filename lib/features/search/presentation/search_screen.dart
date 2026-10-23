@@ -1078,7 +1078,7 @@ class _EntityRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return SizedBox(
-      height: 104,
+      height: 118,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -1102,7 +1102,11 @@ class _EntityRail extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.15),
                       shape: round ? BoxShape.circle : BoxShape.rectangle,
-                      borderRadius: round ? null : BorderRadius.circular(12),
+                      borderRadius: round ? null : BorderRadius.circular(16),
+                      border: Border.all(
+                        color: p.accent.withValues(alpha: 0.28),
+                        width: 1.0,
+                      ),
                     ),
                     child: Icon(icon, color: p.accent, size: 26),
                   ),

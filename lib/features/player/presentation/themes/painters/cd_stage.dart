@@ -317,19 +317,21 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                               _tonearmSway = 0.0;
                             });
                           },
-                          child: AnimatedBuilder(
-                            animation: widget.rotationController,
-                            child: cdDisc,
-                            builder: (context, child) {
-                              final totalPhase =
-                                  (widget.rotationController.value +
-                                          _scrubTurns) %
-                                      1.0;
-                              return Transform.rotate(
-                                angle: totalPhase * 2 * math.pi,
-                                child: child,
-                              );
-                            },
+                          child: RepaintBoundary(
+                            child: AnimatedBuilder(
+                              animation: widget.rotationController,
+                              child: cdDisc,
+                              builder: (context, child) {
+                                final totalPhase =
+                                    (widget.rotationController.value +
+                                            _scrubTurns) %
+                                        1.0;
+                                return Transform.rotate(
+                                  angle: totalPhase * 2 * math.pi,
+                                  child: child,
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
@@ -428,10 +430,17 @@ class _CdOpticalDisplayHud extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1017).withValues(alpha: 0.88),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF141824).withValues(alpha: 0.92),
+            const Color(0xFF0B0E15).withValues(alpha: 0.90),
+          ],
+        ),
         borderRadius: AppRadii.r8All,
         border: Border.all(
-          color: activeColor.withValues(alpha: 0.35),
+          color: activeColor.withValues(alpha: isPlaying ? 0.48 : 0.30),
           width: 1,
         ),
         boxShadow: [

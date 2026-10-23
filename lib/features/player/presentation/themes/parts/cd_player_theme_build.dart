@@ -12,18 +12,21 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
       children: [
         // Ambient backdrop glow behind CD deck
         Positioned.fill(
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, -0.25),
-                  radius: 0.90,
-                  colors: [
-                    activeColor.withValues(alpha: 0.22),
-                    activeColor.withValues(alpha: 0.05),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.54, 1.0],
+          child: RepaintBoundary(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.25),
+                    radius: 0.92,
+                    colors: [
+                      activeColor.withValues(
+                          alpha: state.isPlaying ? 0.26 : 0.15),
+                      activeColor.withValues(alpha: 0.06),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.54, 1.0],
+                  ),
                 ),
               ),
             ),

@@ -13,11 +13,12 @@ enum PulsrHapticStyle {
   heavy,
 }
 
-/// A premium, Apple/M3 tactile pressable wrapper.
+/// A premium, Apple/M3 tactile pressable wrapper tuned for 120fps responsiveness.
 ///
 /// Compresses slightly on press down (scale 0.96) and springs back with an organic
-/// curve when released. Automatically provides subtle haptic feedback and respects
-/// global Reduce Motion accessibility settings.
+/// curve when released. Automatically provides subtle haptic feedback, skips
+/// matrix transforms when idle for zero render overhead, and respects global
+/// Reduce Motion accessibility settings.
 class PulsrPressable extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
@@ -39,7 +40,7 @@ class PulsrPressable extends StatefulWidget {
     this.onTap,
     this.onLongPress,
     this.pressedScale = 0.96,
-    this.duration = const Duration(milliseconds: 120),
+    this.duration = const Duration(milliseconds: 100),
     this.enableHaptics = true,
     this.hapticStyle = PulsrHapticStyle.light,
     this.behavior = HitTestBehavior.opaque,
@@ -62,7 +63,7 @@ class _PulsrPressableState extends State<PulsrPressable>
     _controller = AnimationController(
       vsync: this,
       duration: widget.duration,
-      reverseDuration: const Duration(milliseconds: 180),
+      reverseDuration: const Duration(milliseconds: 165),
     );
     _configureScaleAnimation();
   }
@@ -73,7 +74,7 @@ class _PulsrPressableState extends State<PulsrPressable>
       end: widget.pressedScale,
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeInOutQuad,
+      curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeOutBack,
     ));
   }
@@ -148,6 +149,31 @@ class _PulsrPressableState extends State<PulsrPressable>
       return widget.child;
     }
 
+    Widget animatedChild = AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        if (!context.motionEnabled || _controller.value == 0.0) {
+          return child!;
+        }
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
+
+    if (_focused) {
+      animatedChild = DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          border: Border.all(color: context.palette.accent, width: 2),
+          borderRadius: widget.focusBorderRadius,
+        ),
+        child: animatedChild,
+      );
+    }
+
     return FocusableActionDetector(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
@@ -189,34 +215,7 @@ class _PulsrPressableState extends State<PulsrPressable>
                   widget.onLongPress?.call();
                 }
               : null,
-          child: Stack(
-            children: [
-              AnimatedBuilder(
-                animation: _scaleAnimation,
-                builder: (context, child) {
-                  if (!context.motionEnabled) return child!;
-                  return Transform.scale(
-                    scale: _scaleAnimation.value,
-                    child: child,
-                  );
-                },
-                child: widget.child,
-              ),
-              // Keyboard / switch-navigation focus ring.
-              if (_focused)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border:
-                            Border.all(color: context.palette.accent, width: 2),
-                        borderRadius: widget.focusBorderRadius,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          child: animatedChild,
         ),
       ),
     );

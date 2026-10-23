@@ -309,10 +309,17 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
               horizontal: AppSpacing.sm,
               vertical: isCompact ? 2.0 : AppSpacing.xxs),
           decoration: BoxDecoration(
-            color: AppColors.highlightSoft,
+            gradient: LinearGradient(
+              begin: AlignmentDirectional.centerStart,
+              end: AlignmentDirectional.centerEnd,
+              colors: [
+                widget.activeColor.withValues(alpha: 0.10),
+                AppColors.highlightSoft,
+              ],
+            ),
             borderRadius: AppRadii.r12All,
             border: Border.all(
-              color: AppColors.specularAt(0.08),
+              color: widget.activeColor.withValues(alpha: 0.22),
               width: 0.8,
             ),
           ),
@@ -342,6 +349,12 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+              ),
+              const SizedBox(width: AppSpacing.xxs),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 14,
+                color: p.textTertiary,
               ),
             ],
           ),

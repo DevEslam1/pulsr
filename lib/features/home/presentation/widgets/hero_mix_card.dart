@@ -14,6 +14,7 @@ class HeroMixCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final VoidCallback onTap;
+  final double height;
 
   const HeroMixCard({
     super.key,
@@ -22,6 +23,7 @@ class HeroMixCard extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.icon = Icons.graphic_eq_rounded,
+    this.height = 116,
   });
 
   @override
@@ -40,32 +42,52 @@ class HeroMixCard extends StatelessWidget {
             onTap();
           },
           child: Container(
-            height: 116,
+            height: height,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  p.accent.withValues(alpha: 0.34),
-                  p.accent.withValues(alpha: 0.08),
+                  p.accent.withValues(alpha: 0.36),
+                  p.accent.withValues(alpha: 0.12),
                   p.surfaceContainer,
                 ],
                 stops: const [0, 0.55, 1],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                begin: AlignmentDirectional.topStart,
+                end: AlignmentDirectional.bottomEnd,
               ),
               borderRadius: AppRadii.r24All,
-              border: Border.all(color: p.accent.withValues(alpha: 0.35)),
+              border: Border.all(color: p.accent.withValues(alpha: 0.38)),
               boxShadow: PulsrElevation.level2(context),
             ),
             child: Stack(
               children: [
+                // Top specular refraction edge
+                PositionedDirectional(
+                  top: 0,
+                  start: 20,
+                  end: 20,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: 1.0,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.0),
+                            Colors.white.withValues(alpha: 0.24),
+                            Colors.white.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 // Decorative waveform glyph, bleeds off the trailing edge.
                 PositionedDirectional(
                   end: -18,
                   top: -14,
                   child: ExcludeSemantics(
                     child: Icon(icon,
-                        size: 130, color: p.accent.withValues(alpha: 0.10)),
+                        size: 132, color: p.accent.withValues(alpha: 0.11)),
                   ),
                 ),
                 Padding(
@@ -77,15 +99,29 @@ class HeroMixCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              overline.toUpperCase(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: p.accent,
-                                fontSize: AppFontSize.tiny,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.2,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: p.accent.withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: p.accent.withValues(alpha: 0.26),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                overline.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: p.accent,
+                                  fontSize: AppFontSize.tiny,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.1,
+                                ),
                               ),
                             ),
                             const SizedBox(height: AppSpacing.s6),
@@ -98,6 +134,7 @@ class HeroMixCard extends StatelessWidget {
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 height: 1.1,
+                                letterSpacing: -0.3,
                               ),
                             ),
                             const SizedBox(height: AppSpacing.xs),
@@ -108,6 +145,7 @@ class HeroMixCard extends StatelessWidget {
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
@@ -119,13 +157,25 @@ class HeroMixCard extends StatelessWidget {
                           width: 52,
                           height: 52,
                           decoration: BoxDecoration(
-                            color: p.accent,
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Color.lerp(p.accent, Colors.white, 0.14)!,
+                                p.accent,
+                              ],
+                            ),
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              width: 1.0,
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                  color: p.glow,
-                                  blurRadius: 20,
-                                  spreadRadius: 1),
+                                color: p.glow,
+                                blurRadius: 18,
+                                spreadRadius: 1,
+                              ),
                             ],
                           ),
                           child: Icon(Icons.play_arrow_rounded,

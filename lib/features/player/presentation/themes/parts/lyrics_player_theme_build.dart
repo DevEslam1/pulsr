@@ -20,48 +20,75 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
 
     return Stack(
       children: [
-        // 1. Dynamic Fluid Ambient Backdrop
+        // 1 & 2. Dynamic Fluid Ambient Backdrop & Dual Glow Auras (Isolated in RepaintBoundary)
         Positioned.fill(
-          child: AnimatedContainer(
-            duration: context.motionMs(500),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color.lerp(bgColor, Colors.black, 0.45) ?? bgColor,
-                  bgColor,
-                  const Color(0xFF080910),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: const [0.0, 0.45, 1.0],
-              ),
-            ),
-          ),
-        ),
-
-        // 2. Ambient Top Glow Aura
-        PositionedDirectional(
-          top: -70,
-          start: -30,
-          end: -30,
-          height: isTablet ? 520 : 400,
-          child: IgnorePointer(
-            child: AnimatedContainer(
-              duration: context.motionMs(500),
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.center,
-                  radius: 0.85,
-                  colors: [
-                    activeColor.withValues(
-                      alpha: state.isPlaying ? 0.30 : 0.16,
+          child: RepaintBoundary(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedContainer(
+                    duration: context.motionMs(500),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color.lerp(bgColor, Colors.black, 0.42) ?? bgColor,
+                          bgColor,
+                          const Color(0xFF080910),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.48, 1.0],
+                      ),
                     ),
-                    activeColor.withValues(alpha: 0.06),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.52, 1.0],
+                  ),
                 ),
-              ),
+                PositionedDirectional(
+                  top: -70,
+                  start: -30,
+                  end: -30,
+                  height: isTablet ? 520 : 400,
+                  child: IgnorePointer(
+                    child: AnimatedContainer(
+                      duration: context.motionMs(500),
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 0.85,
+                          colors: [
+                            activeColor.withValues(
+                              alpha: state.isPlaying ? 0.32 : 0.18,
+                            ),
+                            activeColor.withValues(alpha: 0.07),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.54, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                PositionedDirectional(
+                  bottom: -60,
+                  start: 0,
+                  end: 0,
+                  height: isTablet ? 380 : 280,
+                  child: IgnorePointer(
+                    child: AnimatedContainer(
+                      duration: context.motionMs(500),
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 0.85,
+                          colors: [
+                            activeColor.withValues(alpha: 0.16),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -187,27 +214,41 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                       duration: context.motionMs(320),
                       transitionBuilder: (child, anim) =>
                           playerOverlayTransitionBuilder(context, child, anim),
-                      child: state.isLyricsVisible
-                          ? Container(
-                              key: ValueKey(
-                                  'lyrics_${song?.id}_${song?.remoteId}'),
-                              decoration: BoxDecoration(
-                                color: context.palette.surfaceContainer
-                                    .withValues(alpha: 0.25),
-                                borderRadius: AppRadii.r20All,
-                                border: Border.all(
-                                  color: AppColors.specularAt(0.08),
-                                  width: 1,
+                        child: state.isLyricsVisible
+                            ? Container(
+                                key: ValueKey(
+                                    'lyrics_${song?.id}_${song?.remoteId}'),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      AppColors.specularAt(0.07),
+                                      context.palette.surfaceContainer
+                                          .withValues(alpha: 0.24),
+                                    ],
+                                  ),
+                                  borderRadius: AppRadii.r20All,
+                                  border: Border.all(
+                                    color: activeColor.withValues(alpha: 0.22),
+                                    width: 1.1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.scrimAt(0.22),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: LyricsView(
-                                lyrics: state.lyrics,
-                                isLoading: state.isLoadingLyrics,
-                                activeColor: activeColor,
-                                source: state.lyricsSource,
-                              ),
-                            )
+                                clipBehavior: Clip.antiAlias,
+                                child: LyricsView(
+                                  lyrics: state.lyrics,
+                                  isLoading: state.isLoadingLyrics,
+                                  activeColor: activeColor,
+                                  source: state.lyricsSource,
+                                ),
+                              )
                           : state.isQueueVisible
                               ? const NowPlayingQueueView(
                                   key: ValueKey('queue_view_lyrics'),
