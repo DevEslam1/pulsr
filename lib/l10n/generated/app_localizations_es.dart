@@ -9,6 +9,37 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get goToAlbum => 'Ir al álbum';
+
+  @override
+  String get goToArtist => 'Ir al artista';
+
+  @override
+  String get goToQueue => 'Ir a la cola';
+
+  @override
+  String get removeFromPlaylist => 'Eliminar de esta lista';
+
+  @override
+  String get songRadio => 'Ir a la radio de la canción';
+
+  @override
+  String get songDetails => 'Ver créditos y detalles de audio';
+
+  @override
+  String get addToFavorites => 'Añadir a favoritos';
+
+  @override
+  String songAddedToQueue(String title) {
+    return 'Añadida \"$title\" a la cola';
+  }
+
+  @override
+  String songPlayingNext(String title) {
+    return 'Siguiente pista: \"$title\"';
+  }
+
+  @override
   String get sleepTimerDurationMinutes => 'Duración (minutos)';
 
   @override

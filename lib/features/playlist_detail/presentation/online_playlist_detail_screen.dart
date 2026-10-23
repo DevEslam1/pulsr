@@ -22,7 +22,7 @@ import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../sheets/song_options_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -605,7 +605,7 @@ class _OnlinePlaylistDetailScreenState
                         tooltip:
                             MaterialLocalizations.of(context).moreButtonTooltip,
                         onPressed: () =>
-                            SongInfoSheet.show(context, song: song),
+                            SongOptionsSheet.show(context, song: song),
                       ),
                     ],
                   ),

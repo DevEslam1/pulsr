@@ -257,10 +257,10 @@ class SongTile extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (showTrailingInTile)
+                        if (showTrailingInTile) ...[
                           if (trailing != null)
-                            RepaintBoundary(child: trailing!)
-                          else if (onMorePressed != null)
+                            RepaintBoundary(child: trailing!),
+                          if (onMorePressed != null)
                             RepaintBoundary(
                               child: IconButton(
                                 icon: Icon(Icons.more_vert_rounded,
@@ -271,6 +271,7 @@ class SongTile extends StatelessWidget {
                                 visualDensity: VisualDensity.compact,
                               ),
                             ),
+                        ],
                       ],
                     ),
                   ),

@@ -364,7 +364,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                                   onLongPress: () =>
                                       cubit.toggleSongSelection(song.id),
                                   onMorePressed: () =>
-                                      SongInfoSheet.show(context, song: song),
+                                      SongOptionsSheet.show(context, song: song, isFavoriteScreen: true),
                                 ),
                               ));
                         },

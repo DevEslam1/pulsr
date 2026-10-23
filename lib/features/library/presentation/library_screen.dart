@@ -1,5 +1,6 @@
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -33,7 +34,7 @@ import '../../../core/utils/formatters.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/add_to_playlist_sheet.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../sheets/song_options_sheet.dart';
 import '../../sheets/sort_filter_sheet.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
@@ -580,31 +581,51 @@ class _LibraryScreenState extends State<LibraryScreen>
         return Scaffold(
           appBar: isMultiSelect
               ? AppBar(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  flexibleSpace: _buildHeaderBackdrop(context, p),
                   leading: IconButton(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: context.l10n.close,
+                    onPressed: cubit.clearSelection,
+                  ),
+                  title: Text(
+                    context.l10n.selectedCount(state.selectedSongIds.length),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  actions: [
+                    IconButton(
                       constraints: const BoxConstraints(
                           minWidth: AppSpacing.minTouchTarget,
                           minHeight: AppSpacing.minTouchTarget),
-                      icon: const Icon(Icons.close_rounded),
-                      tooltip: context.l10n.close,
-                      onPressed: cubit.clearSelection),
-                  title: Text(
-                      context.l10n.selectedCount(state.selectedSongIds.length)),
-                  actions: [
-                    IconButton(
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        icon: const Icon(Icons.select_all_rounded),
-                        tooltip: context.l10n.selectAllAction,
-                        onPressed: () => cubit.selectAllSongs()),
+                      icon: const Icon(Icons.select_all_rounded),
+                      tooltip: context.l10n.selectAllAction,
+                      onPressed: () => cubit.selectAllSongs(),
+                    ),
                     FilledButton.tonalIcon(
                       style: FilledButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        backgroundColor: p.accent.withValues(alpha: 0.18),
+                        backgroundColor: p.accent.withValues(alpha: 0.22),
                         foregroundColor: p.accent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.full,
+                          side: BorderSide(
+                            color: p.accent.withValues(alpha: 0.40),
+                          ),
+                        ),
                       ),
                       icon: const Icon(Icons.tune_rounded, size: 18),
-                      label: Text(context.l10n.batchActionsSheetTitle),
+                      label: Text(
+                        context.l10n.batchActionsSheetTitle,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                       onPressed: () => _showBatchActionsSheet(
                           context, state, cubit, playerCubit),
                     ),
@@ -612,21 +633,27 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ],
                 )
               : AppBar(
-                  title: Text(context.l10n.navLibrary),
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  titleSpacing: AppSpacing.md,
+                  flexibleSpace: _buildHeaderBackdrop(context, p),
+                  title: Text(
+                    context.l10n.navLibrary,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.7,
+                    ),
+                  ),
                   actions: [
-                    IconButton(
-                      constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
+                    _LibraryHeaderActionButton(
                       icon: const Icon(Icons.dashboard_customize_rounded),
                       tooltip:
                           '${context.l10n.browseOverflowLabel} · ${context.l10n.libraryManageTabs}',
                       onPressed: () => _showManageTabsSheet(context, state),
                     ),
-                    IconButton(
-                      constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
+                    _LibraryHeaderActionButton(
                       icon: Icon(state.viewMode == LibraryViewMode.list
                           ? Icons.grid_view_rounded
                           : Icons.view_list_rounded),
@@ -634,11 +661,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                           ? context.l10n.libraryGridView
                           : context.l10n.libraryListView,
                       onPressed: cubit.toggleViewMode,
+                      isActive: state.viewMode == LibraryViewMode.grid,
                     ),
-                    IconButton(
-                      constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
+                    _LibraryHeaderActionButton(
                       icon: const Icon(Icons.sort_rounded),
                       tooltip: context.l10n.sortBy,
                       onPressed: () => SortFilterSheet.show(
@@ -647,48 +672,75 @@ class _LibraryScreenState extends State<LibraryScreen>
                         ascending: state.ascending,
                         onApply: (sort, asc) => cubit.updateSort(sort, asc),
                       ),
+                      isActive: state.sortBy != 'title' || state.ascending,
                     ),
+                    const SizedBox(width: AppSpacing.sm),
                   ],
-                  bottom: TabBar(
-                    key: ValueKey(
-                        'library_tab_bar_${_activeTabs.map((t) => t.name).join('_')}'),
-                    controller: _tabController,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    indicatorSize: TabBarIndicatorSize.label,
-                    indicatorPadding: const EdgeInsets.symmetric(vertical: 6),
-                    dividerColor: p.hairline.withValues(alpha: 0.45),
-                    dividerHeight: 1.0,
-                    splashBorderRadius: BorderRadius.circular(999),
-                    labelColor: p.accent,
-                    unselectedLabelColor: p.textSecondary,
-                    labelStyle: const TextStyle(
-                      fontSize: AppFontSize.bodySmall,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontSize: AppFontSize.bodySmall,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    indicator: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          p.accent.withValues(alpha: 0.22),
-                          p.accent.withValues(alpha: 0.12),
-                        ],
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(48),
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        AppSpacing.sm,
+                        0,
+                        AppSpacing.sm,
+                        AppSpacing.xs,
                       ),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: p.accent.withValues(alpha: 0.35),
-                        width: 1.0,
+                      child: TabBar(
+                        key: ValueKey(
+                            'library_tab_bar_${_activeTabs.map((t) => t.name).join('_')}'),
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicatorPadding: const EdgeInsets.symmetric(
+                          horizontal: 3,
+                          vertical: 3,
+                        ),
+                        dividerColor: Colors.transparent,
+                        dividerHeight: 0.0,
+                        splashBorderRadius: AppRadii.full,
+                        labelColor: p.accent,
+                        unselectedLabelColor: p.textSecondary,
+                        labelStyle: const TextStyle(
+                          fontSize: AppFontSize.bodySmall,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontSize: AppFontSize.bodySmall,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                        ),
+                        indicator: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              p.accent.withValues(alpha: 0.28),
+                              p.accent.withValues(alpha: 0.14),
+                            ],
+                          ),
+                          borderRadius: AppRadii.full,
+                          border: Border.all(
+                            color: p.accent.withValues(alpha: 0.60),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: p.accent.withValues(alpha: 0.22),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        physics: const BouncingScrollPhysics(),
+                        tabs: List.generate(
+                          _activeTabs.length,
+                          (index) => _buildTabItem(
+                              context, _activeTabs[index], index, state, p),
+                        ),
                       ),
                     ),
-                    physics: const BouncingScrollPhysics(),
-                    tabs: _activeTabs
-                        .map((tab) => _buildTabItem(context, tab, state, p))
-                        .toList(),
                   ),
                 ),
           body: Center(
@@ -711,9 +763,65 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
+  Widget _buildHeaderBackdrop(BuildContext context, PulsrPalette p) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: p.background.withValues(alpha: 0.82),
+            border: Border(
+              bottom: BorderSide(
+                color: (p.isDark ? Colors.white : Colors.black)
+                    .withValues(alpha: 0.05),
+                width: 0.8,
+              ),
+            ),
+          ),
+          child: Stack(
+            children: [
+              PositionedDirectional(
+                top: -60,
+                start: -40,
+                child: RepaintBoundary(
+                  child: Container(
+                    width: 240,
+                    height: 180,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          p.accent.withValues(alpha: p.isDark ? 0.16 : 0.10),
+                          p.accent.withValues(alpha: 0.04),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              PositionedDirectional(
+                top: 0,
+                start: 0,
+                end: 0,
+                height: 1,
+                child: Container(
+                  color: (p.isDark ? Colors.white : Colors.black)
+                      .withValues(alpha: 0.06),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTabItem(
     BuildContext context,
     LibraryTabItem tab,
+    int index,
     LibraryState state,
     PulsrPalette p,
   ) {
@@ -736,7 +844,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   vertical: AppSpacing.s2,
                 ),
                 decoration: BoxDecoration(
-                  color: p.accent.withValues(alpha: 0.2),
+                  color: p.accent.withValues(alpha: 0.22),
                   borderRadius: AppRadii.r10All,
                 ),
                 child: Text(
@@ -759,7 +867,34 @@ class _LibraryScreenState extends State<LibraryScreen>
         content = Text(context.l10n.artists);
         break;
       case LibraryTabItem.favorites:
-        content = Text(context.l10n.favorites);
+        final favCount = state.favorites.length;
+        content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.l10n.favorites),
+            if (favCount > 0) ...[
+              const SizedBox(width: AppSpacing.s6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s6,
+                  vertical: AppSpacing.s2,
+                ),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.22),
+                  borderRadius: AppRadii.r10All,
+                ),
+                child: Text(
+                  '$favCount',
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w700,
+                    color: p.accent,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
         break;
       case LibraryTabItem.folders:
         content = Text(context.l10n.folders);
@@ -779,11 +914,33 @@ class _LibraryScreenState extends State<LibraryScreen>
           HapticFeedback.mediumImpact();
           _showManageTabsSheet(context, state);
         },
-        child: Container(
-          color: Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),
-          alignment: Alignment.center,
-          child: content,
+        child: AnimatedBuilder(
+          animation: _tabController.animation ?? _tabController,
+          builder: (context, _) {
+            final animVal = _tabController.animation?.value ??
+                _tabController.index.toDouble();
+            final diff = (animVal - index).abs();
+            final unselectedFactor = diff.clamp(0.0, 1.0);
+
+            return Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 7,
+              ),
+              decoration: BoxDecoration(
+                color: p.surfaceContainer
+                    .withValues(alpha: 0.42 * unselectedFactor),
+                borderRadius: AppRadii.full,
+                border: Border.all(
+                  color: AppColors.specularAt(
+                      (p.isDark ? 0.09 : 0.05) * unselectedFactor),
+                  width: 1.0,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: content,
+            );
+          },
         ),
       ),
     );
@@ -1377,6 +1534,85 @@ class _LayoutToggleButton extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _LibraryHeaderActionButton extends StatelessWidget {
+  final Widget icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool isActive;
+
+  const _LibraryHeaderActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.isActive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2.5),
+      child: IconButton(
+        constraints: const BoxConstraints(
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget,
+        ),
+        padding: EdgeInsets.zero,
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: AnimatedContainer(
+          duration: context.motion(PulsrMotion.fast),
+          curve: Curves.easeOutCubic,
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isActive
+                  ? [
+                      p.accent.withValues(alpha: 0.32),
+                      p.accent.withValues(alpha: 0.16),
+                    ]
+                  : [
+                      (p.isDark ? Colors.white : Colors.black)
+                          .withValues(alpha: 0.08),
+                      (p.isDark ? Colors.white : Colors.black)
+                          .withValues(alpha: 0.03),
+                    ],
+            ),
+            border: Border.all(
+              color: isActive
+                  ? p.accent.withValues(alpha: 0.60)
+                  : AppColors.specularAt(p.isDark ? 0.14 : 0.08),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isActive
+                    ? p.accent.withValues(alpha: 0.22)
+                    : Colors.black.withValues(alpha: 0.18),
+                blurRadius: isActive ? 8 : 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: IconTheme(
+            data: IconThemeData(
+              size: 19,
+              color: isActive ? p.accent : p.textPrimary,
+            ),
+            child: icon,
           ),
         ),
       ),

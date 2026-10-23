@@ -19,7 +19,7 @@ import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../library/cubit/library_cubit.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../sheets/song_options_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_state.dart';
@@ -1011,7 +1011,7 @@ class _LocalResults extends StatelessWidget {
                     cubit.commitQuery();
                     player.playSong(song, queue: state.results);
                   },
-                  onMorePressed: () => SongInfoSheet.show(context, song: song),
+                  onMorePressed: () => SongOptionsSheet.show(context, song: song),
                 );
               },
               childCount: state.results.length,
@@ -1274,7 +1274,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                           player.playSong(song, queue: localSongs);
                         },
                         onMorePressed: () =>
-                            SongInfoSheet.show(context, song: song),
+                            SongOptionsSheet.show(context, song: song),
                       ),
                     if (localSongs.length > _localPreview)
                       _ShowMoreButton(

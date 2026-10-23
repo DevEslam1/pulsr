@@ -213,4 +213,42 @@ extension PlayerPlaybackOptionsLyricsExtension
     }
     return service.detect(info);
   }
+
+  // ──────────────────────────────────────────────
+  // Overlays
+  // ──────────────────────────────────────────────
+  void toggleLyrics() => toggleLyricsVisibility();
+
+  void toggleLyricsVisibility() {
+    HapticFeedback.lightImpact();
+    final s = _getState();
+    _emit(s.copyWith(
+        lyricsSlice: s.lyricsSlice.copyWith(
+            isLyricsVisible: !s.isLyricsVisible, isQueueVisible: false)));
+  }
+
+  void toggleQueue() => toggleQueueVisibility();
+
+  void toggleQueueVisibility() {
+    HapticFeedback.lightImpact();
+    final s = _getState();
+    _emit(s.copyWith(
+        lyricsSlice: s.lyricsSlice.copyWith(
+            isQueueVisible: !s.isQueueVisible, isLyricsVisible: false)));
+  }
+
+  void resetOverlayViews() {
+    final s = _getState();
+    if (s.isLyricsVisible || s.isQueueVisible) {
+      _emit(s.copyWith(
+          lyricsSlice: s.lyricsSlice
+              .copyWith(isLyricsVisible: false, isQueueVisible: false)));
+    }
+  }
+
+  void setExpanded(bool expanded) => _emit(_getState()
+      .copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
+  void setSilenceSkipSensitivity(int sensitivity) => _emit(_getState().copyWith(
+      playback:
+          _getState().playback.copyWith(silenceSkipSensitivity: sensitivity)));
 }

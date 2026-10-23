@@ -19,7 +19,7 @@ import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
 import '../../../core/errors/failures.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../sheets/song_options_sheet.dart';
 import '../../../core/utils/error_logger.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -445,7 +445,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               context.read<PlayerCubit>().playSong(song, queue: songs);
             }
           },
-          onMorePressed: () => SongInfoSheet.show(context, song: song),
+          onMorePressed: () => SongOptionsSheet.show(context, song: song),
         ),
       ],
     );

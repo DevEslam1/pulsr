@@ -19,7 +19,7 @@ import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../sheets/song_options_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
@@ -471,7 +471,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                 onTap: () =>
                                     playerCubit.playSong(song, queue: songs),
                                 onMorePressed: () =>
-                                    SongInfoSheet.show(context, song: song),
+                                    SongOptionsSheet.show(context, song: song, isFavoriteScreen: true),
                                 trailing: IconButton(
                                   constraints: const BoxConstraints(
                                       minWidth: AppSpacing.minTouchTarget,

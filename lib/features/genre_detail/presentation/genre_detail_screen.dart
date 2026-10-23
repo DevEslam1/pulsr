@@ -16,7 +16,7 @@ import '../../../data/db/app_database.dart';
 import '../../../domain/models/genre_item.dart';
 import '../../../domain/usecases/get_genres_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../sheets/song_options_sheet.dart';
 import '../../../core/errors/failures.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -195,7 +195,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                           .read<PlayerCubit>()
                           .playSong(songs[i], queue: songs),
                       onMorePressed: () =>
-                          SongInfoSheet.show(context, song: songs[i]),
+                          SongOptionsSheet.show(context, song: songs[i]),
                     ),
                   ),
           );

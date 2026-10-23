@@ -165,9 +165,39 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         _activePlayer.pause().ignore();
         _broadcastState(_activePlayer.playbackEvent);
       } else {
-        unawaited(skipToNext());
+        unawaited(_retryCurrentOrSkip(song));
       }
     }
+  }
+
+  /// A transient (non-fatal) stream error used to skip the track at once, so a
+  /// brief network drop cost the user the song. Re-prepare the current track
+  /// up to twice with a growing delay and only skip if that fails too.
+  Future<void> _retryCurrentOrSkip(SongsTableData song) async {
+    if (_streamRetrySongId != song.id) {
+      _streamRetrySongId = song.id;
+      _streamRetryCount = 0;
+    }
+    if (_streamRetryCount < 2) {
+      _streamRetryCount++;
+      await Future<void>.delayed(
+          Duration(milliseconds: 1500 * _streamRetryCount));
+      // The user (or an auto-skip) moved on while we waited: nothing to retry.
+      if (currentSong?.id != song.id) return;
+      try {
+        final wasPlaying = _activePlayer.playing;
+        final pos = _activePlayer.position;
+        await _activePlayer.load();
+        if (pos > Duration.zero) await _activePlayer.seek(pos);
+        if (wasPlaying) unawaited(_activePlayer.play());
+        return;
+      } catch (e, st) {
+        ErrorLogger.log('Stream retry failed for "${song.title}"',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
+      if (currentSong?.id != song.id) return;
+    }
+    unawaited(skipToNext());
   }
 
   /// A local song plays straight off disk; a YouTube row needs a freshly
@@ -472,6 +502,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     }
     _lastSmartPrefetchMs = nowMs;
     _lastSmartPrefetchKey = key;
+    unawaited(_evaluateBufferBucket(song));
     _preloadScheduler.schedulePreloads(
       queue: _songs,
       currentIndex: _currentIndex,
@@ -490,10 +521,36 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     );
   }
 
+  /// Feeds the network-derived bucket (measured throughput, jitter, Wi-Fi vs
+  /// cellular, local vs stream) into [AdaptiveBufferEngine], which was never
+  /// evaluated before — so slow/jittery links stayed on the "standard" buffer
+  /// until stalls had already happened. Runs at most every 10s via the
+  /// prefetch throttle; a battery/underrun force still takes precedence.
+  Future<void> _evaluateBufferBucket(SongsTableData song) async {
+    try {
+      final isLocal = song.isDownloaded == true ||
+          (song.source != SongSource.youtube &&
+              !PulsrAudioHandler._isStreamUrl(song.path));
+      final isWifi = isLocal ? true : await _ytmService.isWifiConnected();
+      adaptiveBufferEngine.evaluateBucket(isWifi: isWifi, isLocal: isLocal);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to evaluate buffer bucket',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
   // Abstract contract supplied by the composing PulsrAudioHandler (same
   // library). Declaring these here keeps the mixin stateless and lets the
   // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
+
+  int? get _streamRetrySongId;
+  set _streamRetrySongId(int? value);
+
+  int get _streamRetryCount;
+  set _streamRetryCount(int value);
+
+  AdaptiveBufferEngine get adaptiveBufferEngine;
 
   BatteryAwarePlayback get _batteryAwarePlayback;
 

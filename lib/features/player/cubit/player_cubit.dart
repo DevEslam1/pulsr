@@ -74,6 +74,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   bool _userPausedIntentionally = false;
   DateTime? _optimisticPlayingSince;
+  Timer? _optimisticPlayingTimer;
   static const Duration _optimisticPlayingMaxWindow = Duration(seconds: 10);
   // Auto-skip-on-error bookkeeping: the id of the track that last failed and
   // how many consecutive failures it has produced. A different track (or a
@@ -780,9 +781,23 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         final since = _optimisticPlayingSince ??= DateTime.now();
         if (DateTime.now().difference(since) < _optimisticPlayingMaxWindow) {
           resolvedPlaying = true;
+          // Expire on our own: without a further engine event the UI would
+          // otherwise keep claiming "playing" past the window.
+          _optimisticPlayingTimer ??= Timer(_optimisticPlayingMaxWindow, () {
+            _optimisticPlayingTimer = null;
+            if (isClosed || _userPausedIntentionally) return;
+            final eng = _audioHandler.playbackState.valueOrNull;
+            if (eng != null && eng.playing) return;
+            if (state.isPlaying) {
+              safeEmit(state.copyWith(
+                  playback: state.playback.copyWith(isPlaying: false)));
+            }
+          });
         }
       } else {
         _optimisticPlayingSince = null;
+        _optimisticPlayingTimer?.cancel();
+        _optimisticPlayingTimer = null;
       }
 
       final isBuffering = ps.processingState == AudioProcessingState.loading ||
@@ -916,7 +931,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             playback:
                 state.playback.copyWith(sleepTimerRemainingTracks: tracks)));
       });
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Optional sleep timer stream attachment failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
 
     autoSub(_audioHandler.audioSessionIdStream, (id) {
       safeEmit(state.copyWith(
@@ -991,6 +1009,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       ErrorLogger.log('PlayerCubit close queueController failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
     }
+    _optimisticPlayingTimer?.cancel();
     _remoteIdToNegativeId.clear();
     _negativeIdValues.clear();
     await super.close();

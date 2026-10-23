@@ -1,5 +1,47 @@
 {
   "@@locale": "en",
+  "goToAlbum": "Go to album",
+  "@goToAlbum": {
+    "description": "Navigate to the album page of the song"
+  },
+  "goToArtist": "Go to artist",
+  "@goToArtist": {
+    "description": "Navigate to the artist page of the song"
+  },
+  "goToQueue": "Go to Queue",
+  "@goToQueue": {
+    "description": "Navigate to the playback queue screen"
+  },
+  "removeFromPlaylist": "Remove from this playlist",
+  "@removeFromPlaylist": {
+    "description": "Remove song from current playlist"
+  },
+  "songRadio": "Go to song radio",
+  "@songRadio": {
+    "description": "Start radio station based on the song"
+  },
+  "songDetails": "View song credits & audio specs",
+  "@songDetails": {
+    "description": "Open technical song info and audio details sheet"
+  },
+  "addToFavorites": "Add to Favorites",
+  "@addToFavorites": {
+    "description": "Add song to favorites"
+  },
+  "songAddedToQueue": "Added \"{title}\" to queue",
+  "@songAddedToQueue": {
+    "description": "Toast when a single song is added to queue",
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "songPlayingNext": "Playing next: \"{title}\"",
+  "@songPlayingNext": {
+    "description": "Toast when a song is set to play next",
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
   "sleepTimerDurationMinutes": "Duration (minutes)",
   "sleepTimerMinutesHint": "e.g. 25",
   "minuteAbbreviation": "min",

@@ -552,6 +552,31 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _positionDirty = false;
   Timer? _positionSaveTimer;
   Timer? _fadeInGuardTimer; // FIX-#12: tracked for disposal
+
+  // Transient stream-error retry bookkeeping (see _retryCurrentOrSkip).
+  @override
+  int? _streamRetrySongId;
+  @override
+  int _streamRetryCount = 0;
+
+  /// Releases the underrun-forced "generous" buffer after a quiet period so a
+  /// passing network dip does not pin a 50-90s buffer for the whole session.
+  Timer? _bufferRelaxTimer;
+  static const Duration _bufferRelaxAfter = Duration(minutes: 5);
+
+  void _scheduleBufferRelax() {
+    _bufferRelaxTimer?.cancel();
+    _bufferRelaxTimer = Timer(_bufferRelaxAfter, () {
+      _bufferRelaxTimer = null;
+      if (_disposed) return;
+      // A battery policy force must outlive this timer.
+      if (_batteryAwarePlayback.currentLevel !=
+          BatteryOptimizationLevel.normal) {
+        return;
+      }
+      _adaptiveBufferEngine.releaseForce();
+    });
+  }
   @override
   final StreamController<Duration> _positionSubject =
       StreamController<Duration>.broadcast();
@@ -726,6 +751,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   EqualizerManager get equalizerManager => _equalizerManager;
   AudioSessionIdRouter get audioSessionIdRouter => _audioSessionIdRouter;
+  @override
   AdaptiveBufferEngine get adaptiveBufferEngine => _adaptiveBufferEngine;
   OptimizedDspPipeline get dspPipeline => _dspPipeline;
   PlaybackAnalytics get playbackAnalytics => _playbackAnalytics;
@@ -1702,6 +1728,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         debugPrint(
             '[AudioHandler] PlaybackAnalytics requested buffer size increase');
         _adaptiveBufferEngine.forceBucket(BufferBucket.generous);
+        _scheduleBufferRelax();
       },
       onReduceQualityRequested: () {
         debugPrint(
@@ -1884,6 +1911,9 @@ class PulsrAudioHandler extends BaseAudioHandler
                   _activePlayer.playing &&
                   _activePlayer.position > const Duration(seconds: 2)) {
                 _playbackAnalytics.recordBufferUnderrun();
+                // Still stalling: keep the widened buffer for another quiet
+                // period instead of letting the relax timer expire mid-trouble.
+                if (_bufferRelaxTimer?.isActive == true) _scheduleBufferRelax();
                 unawaited(AudioSessionLog.instance.recordUnderrun());
               }
               wasBuffering = isBuffering;
@@ -2971,6 +3001,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     _disposed = true;
     _headsetClickTimer?.cancel();
     _headsetClickTimer = null;
+    _bufferRelaxTimer?.cancel();
+    _bufferRelaxTimer = null;
     final lifecycleObserver = _lifecycleObserver;
     if (lifecycleObserver != null) {
       try {

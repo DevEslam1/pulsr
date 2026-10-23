@@ -1837,7 +1837,7 @@ class AudioEffectsChannel {
         'targetBitDepth': targetBitDepth,
         'isBluetooth': isBluetooth,
         'allowBluetoothDither': allowBluetoothDither,
-      }).timeout(const Duration(seconds: 2));
+      }).timeout(const Duration(seconds: 5));
       return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(

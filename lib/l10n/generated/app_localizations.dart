@@ -100,6 +100,60 @@ abstract class AppLocalizations {
     Locale('es')
   ];
 
+  /// Navigate to the album page of the song
+  ///
+  /// In en, this message translates to:
+  /// **'Go to album'**
+  String get goToAlbum;
+
+  /// Navigate to the artist page of the song
+  ///
+  /// In en, this message translates to:
+  /// **'Go to artist'**
+  String get goToArtist;
+
+  /// Navigate to the playback queue screen
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Queue'**
+  String get goToQueue;
+
+  /// Remove song from current playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from this playlist'**
+  String get removeFromPlaylist;
+
+  /// Start radio station based on the song
+  ///
+  /// In en, this message translates to:
+  /// **'Go to song radio'**
+  String get songRadio;
+
+  /// Open technical song info and audio details sheet
+  ///
+  /// In en, this message translates to:
+  /// **'View song credits & audio specs'**
+  String get songDetails;
+
+  /// Add song to favorites
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Favorites'**
+  String get addToFavorites;
+
+  /// Toast when a single song is added to queue
+  ///
+  /// In en, this message translates to:
+  /// **'Added \"{title}\" to queue'**
+  String songAddedToQueue(String title);
+
+  /// Toast when a song is set to play next
+  ///
+  /// In en, this message translates to:
+  /// **'Playing next: \"{title}\"'**
+  String songPlayingNext(String title);
+
   /// No description provided for @sleepTimerDurationMinutes.
   ///
   /// In en, this message translates to:

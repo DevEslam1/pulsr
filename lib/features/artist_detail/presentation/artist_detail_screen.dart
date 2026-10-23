@@ -17,7 +17,7 @@ import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_artists_usecase.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../sheets/song_options_sheet.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/services/artist_bio_service.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -367,7 +367,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                               .read<PlayerCubit>()
                               .playSong(songs[i], queue: songs),
                           onMorePressed: () =>
-                              SongInfoSheet.show(context, song: songs[i]),
+                              SongOptionsSheet.show(context, song: songs[i]),
                         ),
                     ],
                   ),

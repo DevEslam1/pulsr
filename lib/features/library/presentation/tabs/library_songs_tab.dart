@@ -145,7 +145,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                               child: InkWell(
                                 customBorder: const CircleBorder(),
                                 onTap: () =>
-                                    SongInfoSheet.show(context, song: song),
+                                    SongOptionsSheet.show(context, song: song),
                                 child: const SizedBox(
                                   width: AppSpacing.minTouchTarget,
                                   height: AppSpacing.minTouchTarget,
@@ -242,7 +242,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
             }
           },
           onLongPress: () => cubit.toggleSongSelection(song.id),
-          onMorePressed: () => SongInfoSheet.show(context, song: song),
+          onMorePressed: () => SongOptionsSheet.show(context, song: song),
         ),
       );
     }
@@ -507,7 +507,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                           },
                           onLongPress: () => cubit.toggleSongSelection(song.id),
                           onMorePressed: () =>
-                              SongInfoSheet.show(context, song: song),
+                              SongOptionsSheet.show(context, song: song),
                         ),
                       );
                     },
@@ -568,7 +568,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                           },
                           onLongPress: () => cubit.toggleSongSelection(song.id),
                           onMorePressed: () =>
-                              SongInfoSheet.show(context, song: song),
+                              SongOptionsSheet.show(context, song: song),
                         ),
                       );
                     },

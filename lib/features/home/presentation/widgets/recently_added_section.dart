@@ -17,7 +17,7 @@ import '../../../../core/widgets/staggered_reveal.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/get_songs_usecase.dart';
 import '../../../player/cubit/player_cubit.dart';
-import '../../../sheets/song_info_sheet.dart';
+import '../../../sheets/song_options_sheet.dart';
 import 'empty_library.dart';
 import 'section_error.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -266,7 +266,7 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                         songs,
                       ),
                       onMorePressed: () =>
-                          SongInfoSheet.show(context, song: song),
+                          SongOptionsSheet.show(context, song: song),
                     ),
                   );
                 },
@@ -287,7 +287,7 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                         songs,
                       ),
                       onMorePressed: () =>
-                          SongInfoSheet.show(context, song: songs[index]),
+                          SongOptionsSheet.show(context, song: songs[index]),
                     ),
                   ),
           ],

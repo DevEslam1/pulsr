@@ -29,7 +29,7 @@ import '../../../domain/usecases/folder_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../sheets/song_options_sheet.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 import '../../../core/widgets/pulsr_toast.dart';
@@ -900,7 +900,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             },
             onLongPress: () {
               HapticFeedback.mediumImpact();
-              SongInfoSheet.show(context, song: song);
+              SongOptionsSheet.show(context, song: song);
             },
             child: Padding(
               padding: EdgeInsets.symmetric(
@@ -981,7 +981,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
-                      SongInfoSheet.show(context, song: song);
+                      SongOptionsSheet.show(context, song: song);
                     },
                   ),
                 ],

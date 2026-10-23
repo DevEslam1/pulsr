@@ -26,7 +26,9 @@ import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../data/usecases/playlist_io_usecases.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../../sheets/song_info_sheet.dart';
+import '../../library/cubit/library_cubit.dart';
+import '../../../domain/usecases/toggle_favorite_usecase.dart';
+import '../../sheets/song_options_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -603,8 +605,11 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                         onTap: () => context
                             .read<PlayerCubit>()
                             .playSong(song, queue: visibleSongs),
-                        onMorePressed: () =>
-                            SongInfoSheet.show(context, song: song),
+                        onMorePressed: () => SongOptionsSheet.show(
+                          context,
+                          song: song,
+                          playlist: playlist,
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -612,38 +617,31 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                 song.remoteId != null &&
                                 song.remoteId!.isNotEmpty)
                               YtmDownloadButton(song: song),
-                            if (!playlist.isSmart)
-                              IconButton(
-                                icon: Icon(Icons.remove_circle_outline_rounded,
-                                    size: 20, color: p.textTertiary),
-                                tooltip: context.l10n.remove,
-                                constraints: const BoxConstraints(
-                                  minWidth: AppSpacing.minTouchTarget,
-                                  minHeight: AppSpacing.minTouchTarget,
-                                ),
-                                onPressed: () async {
-                                  await playlistUseCases.removeSongFromPlaylist(
-                                      playlist.id, song.id);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context)
-                                        .clearSnackBars();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(context.l10n
-                                            .songRemovedFromPlaylist(
-                                                song.title, playlist.name)),
-                                        action: SnackBarAction(
-                                          label: context.l10n.undo,
-                                          onPressed: () {
-                                            playlistUseCases.addSongsToPlaylist(
-                                                playlist.id, [song.id]);
-                                          },
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
+                            IconButton(
+                              constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget,
                               ),
+                              tooltip: context.l10n.favorite,
+                              icon: Icon(
+                                song.isFavorite
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                color: song.isFavorite
+                                    ? p.favorite
+                                    : p.textTertiary,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                try {
+                                  context
+                                      .read<LibraryCubit>()
+                                      .toggleFavorite(song.id);
+                                } on ProviderNotFoundException {
+                                  getIt<ToggleFavoriteUseCase>()(song.id);
+                                }
+                              },
+                            ),
                           ],
                         ),
                       );

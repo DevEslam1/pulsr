@@ -14,7 +14,7 @@ import '../../../../core/widgets/song_tile.dart';
 import '../../../../core/widgets/staggered_reveal.dart';
 import '../../../../domain/models/ytm_track.dart';
 import '../../../player/cubit/player_cubit.dart';
-import '../../../sheets/song_info_sheet.dart';
+import '../../../sheets/song_options_sheet.dart';
 import '../../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'home_card_metrics.dart';
@@ -193,7 +193,7 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
                             widget.playerCubit.playSong(songs[i], queue: songs),
                         trailing: YtmDownloadButton(song: songs[i]),
                         onMorePressed: () =>
-                            SongInfoSheet.show(context, song: songs[i]),
+                            SongOptionsSheet.show(context, song: songs[i]),
                       ),
                     ),
                   )
@@ -209,7 +209,7 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
                             widget.playerCubit.playSong(songs[i], queue: songs),
                         trailing: YtmDownloadButton(song: songs[i]),
                         onMorePressed: () =>
-                            SongInfoSheet.show(context, song: songs[i]),
+                            SongOptionsSheet.show(context, song: songs[i]),
                       ),
                     ),
               ],

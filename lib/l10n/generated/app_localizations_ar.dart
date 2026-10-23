@@ -9,6 +9,37 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
+  String get goToAlbum => 'الانتقال إلى الألبوم';
+
+  @override
+  String get goToArtist => 'الانتقال إلى الفنان';
+
+  @override
+  String get goToQueue => 'الانتقال إلى قائمة الانتظار';
+
+  @override
+  String get removeFromPlaylist => 'إزالة من قائمة التشغيل هذه';
+
+  @override
+  String get songRadio => 'تشغيل راديو الأغنية';
+
+  @override
+  String get songDetails => 'عرض تفاصيل ومواصفات الأغنية';
+
+  @override
+  String get addToFavorites => 'إضافة إلى المفضلة';
+
+  @override
+  String songAddedToQueue(String title) {
+    return 'تمت إضافة \"$title\" إلى قائمة الانتظار';
+  }
+
+  @override
+  String songPlayingNext(String title) {
+    return 'التشغيل تاليًا: \"$title\"';
+  }
+
+  @override
   String get sleepTimerDurationMinutes => 'المدة (بالدقائق)';
 
   @override
