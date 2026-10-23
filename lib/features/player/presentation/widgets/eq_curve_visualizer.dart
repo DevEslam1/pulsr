@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/eq_curve_visualizer.dart
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -72,6 +73,10 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
       visualizer = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onDoubleTapDown: (details) => _handleDoubleTap(details.localPosition),
+        onTapUp: (details) {
+          _handlePanStart(details.localPosition);
+          _handlePanEnd();
+        },
         onPanStart: (details) => _handlePanStart(details.localPosition),
         onPanUpdate: (details) => _handlePanUpdate(details.localPosition),
         onPanEnd: (_) => _handlePanEnd(),
@@ -161,7 +166,8 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     // Invert Y: top is +maxGain, bottom is -maxGain
     final rawGain = ((midY - yPos) / effectiveSpan) * widget.maxGain;
     final clampedGain = rawGain.clamp(-widget.maxGain, widget.maxGain);
-    widget.onGainChanged?.call(bandIndex, clampedGain);
+    final roundedGain = (clampedGain * 10).roundToDouble() / 10;
+    widget.onGainChanged?.call(bandIndex, roundedGain);
   }
 
   void _handlePanEnd() {
@@ -421,10 +427,10 @@ class _CatmullRomEqPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CatmullRomEqPainter oldDelegate) {
-    return oldDelegate.gains != gains ||
+    return !listEquals(oldDelegate.gains, gains) ||
         oldDelegate.color != color ||
-        oldDelegate.spectrumData != spectrumData ||
-        oldDelegate.frequencies != frequencies ||
+        !listEquals(oldDelegate.spectrumData, spectrumData) ||
+        !listEquals(oldDelegate.frequencies, frequencies) ||
         oldDelegate.maxGain != maxGain ||
         oldDelegate.showGrid != showGrid ||
         oldDelegate.showLabels != showLabels ||

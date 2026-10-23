@@ -6,6 +6,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 
 /// Modal bottom sheet listing all desktop and tablet keyboard shortcut bindings.
 ///
@@ -14,11 +15,10 @@ class ShortcutHelpSheet extends StatelessWidget {
   const ShortcutHelpSheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return PulsrAdaptiveSheet.show<void>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      showDragHandle: true,
+      titleText: context.l10n.shortcutHelpTitle,
+      subtitle: Text(context.l10n.shortcutHelpSubtitle),
       builder: (_) => const ShortcutHelpSheet(),
     );
   }
@@ -103,129 +103,94 @@ class ShortcutHelpSheet extends StatelessWidget {
       ),
     ];
 
-    return SafeArea(
-      top: false,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.75,
-        ),
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-            AppSpacing.md,
-            0,
-            AppSpacing.md,
-            AppSpacing.md,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.shortcutHelpTitle,
-                style: TextStyle(
-                  fontSize: AppFontSize.titleLarge,
-                  fontWeight: FontWeight.w800,
-                  color: p.textPrimary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                l10n.shortcutHelpSubtitle,
-                style: TextStyle(
-                  fontSize: AppFontSize.bodySmall,
-                  fontWeight: FontWeight.w500,
-                  color: p.textSecondary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: shortcuts.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppSpacing.xs),
-                  itemBuilder: (context, index) {
-                    final item = shortcuts[index];
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.s10,
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const BouncingScrollPhysics(),
+        itemCount: shortcuts.length,
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
+        itemBuilder: (context, index) {
+          final item = shortcuts[index];
+          return Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.s10,
+            ),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer.withValues(alpha: 0.6),
+              borderRadius: AppRadii.r14All,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  constraints: const BoxConstraints(minWidth: 38),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s8,
+                    vertical: AppSpacing.xxs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainerHigh,
+                    borderRadius: AppRadii.r8All,
+                    border: Border.all(
+                      color: p.hairline.withValues(alpha: 0.8),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
                       ),
-                      decoration: BoxDecoration(
-                        color: p.surfaceContainer.withValues(alpha: 0.6),
-                        borderRadius: AppRadii.r14All,
-                        border: Border.all(color: p.hairline),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            constraints: const BoxConstraints(minWidth: 38),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s8,
-                              vertical: AppSpacing.xxs,
-                            ),
-                            decoration: BoxDecoration(
-                              color: p.surfaceContainerHigh,
-                              borderRadius: AppRadii.r8All,
-                              border: Border.all(
-                                color: p.hairline.withValues(alpha: 0.8),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              item.keyLabel,
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: AppFontSize.label,
-                                fontWeight: FontWeight.w800,
-                                color: p.accent,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.title,
-                                  style: TextStyle(
-                                    fontSize: AppFontSize.body,
-                                    fontWeight: FontWeight.w700,
-                                    color: p.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  item.description,
-                                  style: TextStyle(
-                                    fontSize: AppFontSize.label,
-                                    fontWeight: FontWeight.w500,
-                                    color: p.textTertiary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Icon(item.icon, size: 20, color: p.textTertiary),
-                        ],
-                      ),
-                    );
-                  },
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    item.keyLabel,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w800,
+                      color: p.accent,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: TextStyle(
+                          fontSize: AppFontSize.body,
+                          fontWeight: FontWeight.w700,
+                          color: p.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.description,
+                        style: TextStyle(
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w500,
+                          color: p.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Icon(item.icon, size: 20, color: p.textTertiary),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

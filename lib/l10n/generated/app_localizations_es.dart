@@ -4210,6 +4210,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get autoEqDatabase => 'Base de datos AutoEQ 2.0';
 
   @override
+  String autoEqProfilesSubtitle(int count) {
+    return '$count perfiles · paramétrico (frec/Q/ganancia)';
+  }
+
+  @override
   String get noHpMatch => 'Sin perfiles coincidentes';
 
   @override

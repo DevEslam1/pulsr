@@ -24,10 +24,10 @@ enum PulsrButtonVariant {
 }
 
 enum PulsrButtonSize {
-  /// Compact button (height 36dp).
+  /// Compact visual height (36dp) with a 48dp interactive target.
   sm,
 
-  /// Standard button (height 44dp — min touch target).
+  /// Standard visual height (44dp) with a 48dp interactive target.
   md,
 
   /// Prominent call-to-action button (height 52dp).
@@ -175,7 +175,7 @@ class PulsrButton extends StatelessWidget {
       ],
     );
 
-    final buttonWidget = Container(
+    final visual = Container(
       constraints: BoxConstraints(minHeight: _height),
       padding: _padding.add(
         const EdgeInsets.symmetric(vertical: AppSpacing.s10),
@@ -186,6 +186,18 @@ class PulsrButton extends StatelessWidget {
         border: border,
       ),
       child: content,
+    );
+
+    // Keep the compact visual size but expand the interactive bounds to the
+    // 48dp platform minimum so small buttons remain comfortably tappable.
+    final buttonWidget = ConstrainedBox(
+      constraints: const BoxConstraints(
+        minHeight: AppSpacing.minTouchTarget,
+      ),
+      child: Center(
+        widthFactor: expand ? null : 1.0,
+        child: visual,
+      ),
     );
 
     return Semantics(

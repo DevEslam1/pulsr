@@ -180,6 +180,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   bool _isAbComparing = false;
   Timer? _abCompareTimer;
   bool? _isStudioModeOverride;
+  Timer? _preampDebounce;
+  double? _preampPreview;
+  int? _lastMacroHapticStep;
 
   /// F-35: per-band solo/mute are push-to-native only (the engine exposes no
   /// getter), so the sheet owns the transient UI state. Cleared on a band-count
@@ -208,8 +211,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   @override
   void dispose() {
+    // Leaving the sheet mid-comparison would otherwise strand the manager's
+    // A/B latch: the next sheet open would snap its "original" to the flat
+    // preview instead of the user's real curve.
+    if (_isAbComparing) {
+      _isAbComparing = false;
+      final manager = _cachedEqualizerManager;
+      if (manager != null) {
+        unawaited(manager.endAbComparison());
+      }
+    }
     _abCompareTimer?.cancel();
     _abCompareTimer = null;
+    _preampDebounce?.cancel();
+    _preampDebounce = null;
     _degradedSessionSub?.cancel();
     _tabController.dispose();
     _searchController.dispose();

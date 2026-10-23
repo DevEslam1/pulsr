@@ -75,6 +75,8 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   bool get isCrossfeedEnabled => false;
   @override
+  bool get crossfeedUserEnabled => false;
+  @override
   double get crossfeedDelayUs => 350.0;
   @override
   double get crossfeedFeedDb => -9.0;
@@ -222,7 +224,11 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   Future<void> setVolumeBoost(double value) async {}
   @override
   Future<void> setCrossfeed(bool enabled,
-      {double? delayUs, double? feedDb, int? mode}) async {}
+      {double? delayUs,
+      double? feedDb,
+      double? fcut,
+      int? mode,
+      bool? preferenceEnabled}) async {}
   @override
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}

@@ -1,4 +1,6 @@
 // lib/core/widgets/pulsr_adaptive_sheet.dart
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
@@ -214,13 +216,16 @@ class PulsrAdaptiveSheet extends StatelessWidget {
             top: false,
             left: false,
             right: false,
-            child: child,
+            // Give ListTile content a Material ancestor so its ink and tile
+            // background paint above the sheet's decorated Container instead of
+            // tripping Flutter's "invisible ListTile background" assertion.
+            child: Material(type: MaterialType.transparency, child: child),
           ),
         ),
       ],
     );
 
-    return Container(
+    final sheet = Container(
       decoration: BoxDecoration(
         color: containerColor,
         borderRadius: isDialog
@@ -236,6 +241,40 @@ class PulsrAdaptiveSheet extends StatelessWidget {
         ],
       ),
       child: content,
+    );
+
+    if (isDialog) return sheet;
+
+    // Bottom-sheet mode previously ignored [maxWidth]/[maxHeight] entirely, so
+    // tablet sheets stretched edge-to-edge and tall content could reach the
+    // status bar. Apply both bounds and lift the sheet above the IME.
+    final media = MediaQuery.of(context);
+    final keyboardInset = media.viewInsets.bottom;
+    final availableHeight = math.max(
+      AppSpacing.s56,
+      media.size.height - keyboardInset - media.padding.top - AppSpacing.xs,
+    );
+    final effectiveMaxHeight = maxHeight == null
+        ? availableHeight
+        : math.min(maxHeight!, availableHeight);
+    final insetDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: AnimatedPadding(
+        duration: insetDuration,
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: maxWidth ?? double.infinity,
+            maxHeight: effectiveMaxHeight,
+          ),
+          child: sheet,
+        ),
+      ),
     );
   }
 }

@@ -6,9 +6,9 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Modal bottom sheet allowing users to select download quality with live
 /// file size estimates before starting a download.
@@ -31,13 +31,9 @@ class DownloadQualityPickerSheet extends StatefulWidget {
     YtmAudioQuality initialQuality = YtmAudioQuality.high,
     ValueChanged<YtmAudioQuality>? onConfirm,
   }) {
-    return showModalBottomSheet<YtmAudioQuality>(
+    return PulsrAdaptiveSheet.show<YtmAudioQuality>(
       context: context,
-      // Push on the root navigator so the single root PulsrModalObserver tracks
-      // it and the dock/mini-player hides regardless of which tab opened it.
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      titleText: context.l10n.downloadQuality,
       builder: (ctx) => DownloadQualityPickerSheet(
         song: song,
         initialQuality: initialQuality,
@@ -108,84 +104,28 @@ class _DownloadQualityPickerSheetState
       ),
     ];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppRadii.r24),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.scrimAt(0.35),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      padding: EdgeInsetsDirectional.fromSTEB(
+    return SingleChildScrollView(
+      padding: const EdgeInsetsDirectional.fromSTEB(
         AppSpacing.md,
-        AppSpacing.sm,
+        AppSpacing.xxs,
         AppSpacing.md,
-        MediaQuery.of(context).padding.bottom + AppSpacing.md,
+        AppSpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: p.textTertiary.withValues(alpha: 0.4),
-                borderRadius: AppRadii.r4All,
-              ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '${widget.song.title} • ${widget.song.artist}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: AppFontSize.label,
+              color: p.textSecondary,
             ),
           ),
-
-          // Header
-          Row(
-            children: [
-              Icon(Icons.downloading_rounded, color: p.accent, size: 24),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.downloadQuality,
-                      style: TextStyle(
-                        fontSize: AppFontSize.titleLarge,
-                        fontWeight: FontWeight.w700,
-                        color: p.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      '${widget.song.title} • ${widget.song.artist}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: AppFontSize.label,
-                        color: p.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget),
-                icon: const Icon(Icons.close_rounded),
-                color: p.textSecondary,
-                tooltip: context.l10n.cancel,
-                onPressed: () => Navigator.of(context).maybePop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
 
           // Quality Option Cards
           ...options.map((opt) {
@@ -228,7 +168,10 @@ class _DownloadQualityPickerSheetState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                spacing: AppSpacing.xs,
+                                runSpacing: AppSpacing.xxs,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   Text(
                                     opt.title,
@@ -239,7 +182,6 @@ class _DownloadQualityPickerSheetState
                                           isSelected ? p.accent : p.textPrimary,
                                     ),
                                   ),
-                                  const SizedBox(width: AppSpacing.xs),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: AppSpacing.xs,

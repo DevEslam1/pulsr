@@ -6,6 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../core/widgets/pulsr_badge.dart';
 import '../../../core/widgets/pulsr_button.dart';
 import '../../../data/party/listen_together_service.dart';
@@ -15,11 +16,9 @@ class PartySheet extends StatefulWidget {
   const PartySheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return PulsrAdaptiveSheet.show<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const PartySheet(),
+      builder: (_) => const PartySheet(),
     );
   }
 
@@ -142,7 +141,6 @@ class _PartySheetState extends State<PartySheet> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final mediaQuery = MediaQuery.of(context);
 
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -157,85 +155,63 @@ class _PartySheetState extends State<PartySheet> {
         final snap = _partyService.partySnapshot.value;
         final inParty = _partyService.inParty && snap != null;
 
-        return Container(
-          padding: EdgeInsetsDirectional.only(
-            bottom: mediaQuery.viewInsets.bottom + AppSpacing.md,
-            top: AppSpacing.md,
-            start: AppSpacing.md,
-            end: AppSpacing.md,
+        return SingleChildScrollView(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.md,
+            AppSpacing.xs,
+            AppSpacing.md,
+            AppSpacing.md,
           ),
-          decoration: BoxDecoration(
-            color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border.all(color: p.hairline),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Top drag handle
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: p.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: AppRadii.r2All,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(
+                    Icons.group_rounded,
+                    color: inParty ? p.accent : p.textPrimary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: AppSpacing.s8),
+                  Expanded(
+                    child: Text(
+                      'Listen Together',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppFontSize.title,
+                        fontWeight: FontWeight.w800,
+                        color: p.textPrimary,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.group_rounded,
-                          color: inParty ? p.accent : p.textPrimary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: AppSpacing.s8),
-                        Text(
-                          'Listen Together',
-                          style: TextStyle(
-                            fontSize: AppFontSize.title,
-                            fontWeight: FontWeight.w800,
-                            color: p.textPrimary,
-                          ),
-                        ),
-                      ],
+                  IconButton(
+                    icon: Icon(
+                      _showSettings
+                          ? Icons.close_rounded
+                          : Icons.settings_rounded,
+                      color: p.textSecondary,
+                      size: 20,
                     ),
-                    IconButton(
-                      icon: Icon(
-                        _showSettings
-                            ? Icons.close_rounded
-                            : Icons.settings_rounded,
-                        color: p.textSecondary,
-                        size: 20,
-                      ),
-                      tooltip: 'Server Settings',
-                      onPressed: () {
-                        setState(() => _showSettings = !_showSettings);
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-
-                if (_showSettings) ...[
-                  _buildSettingsView(p),
-                ] else if (inParty) ...[
-                  _buildInPartyView(p, snap),
-                ] else ...[
-                  _buildLobbyView(p),
+                    tooltip: 'Server Settings',
+                    onPressed: () {
+                      setState(() => _showSettings = !_showSettings);
+                    },
+                  ),
                 ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              if (_showSettings) ...[
+                _buildSettingsView(p),
+              ] else if (inParty) ...[
+                _buildInPartyView(p, snap),
+              ] else ...[
+                _buildLobbyView(p),
               ],
-            ),
+            ],
           ),
         );
       },
@@ -421,41 +397,57 @@ class _PartySheetState extends State<PartySheet> {
           child: Column(
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ROOM CODE',
-                        style: TextStyle(
-                          fontSize: AppFontSize.tiny,
-                          fontWeight: FontWeight.w800,
-                          color: p.textSecondary,
-                          letterSpacing: 1.2,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ROOM CODE',
+                          style: TextStyle(
+                            fontSize: AppFontSize.tiny,
+                            fontWeight: FontWeight.w800,
+                            color: p.textSecondary,
+                            letterSpacing: 1.2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        snap.code,
-                        style: TextStyle(
-                          fontSize: AppFontSize.display,
-                          fontWeight: FontWeight.w900,
-                          color: p.accent,
-                          letterSpacing: 4.0,
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            snap.code,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: AppFontSize.display,
+                              fontWeight: FontWeight.w900,
+                              color: p.accent,
+                              letterSpacing: 4.0,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton.filledTonal(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
                         icon: const Icon(Icons.copy_rounded, size: 20),
                         tooltip: 'Copy Invite Link',
                         onPressed: () => _copyInvite(snap.code),
                       ),
                       const SizedBox(width: AppSpacing.xs),
                       IconButton.filledTonal(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
                         icon: const Icon(Icons.share_rounded, size: 20),
                         tooltip: 'Share Invite',
                         onPressed: () => _shareInvite(snap.code),
@@ -474,16 +466,19 @@ class _PartySheetState extends State<PartySheet> {
                         : PulsrBadgeColor.warning,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    isSynced
-                        ? 'Synced (RTT: ${rtt}ms)'
-                        : 'Synchronizing clock...',
-                    style: TextStyle(
-                      fontSize: AppFontSize.tiny,
-                      color: p.textSecondary,
+                  Expanded(
+                    child: Text(
+                      isSynced
+                          ? 'Synced (RTT: ${rtt}ms)'
+                          : 'Synchronizing clock...',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppFontSize.tiny,
+                        color: p.textSecondary,
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   if (isHost)
                     const PulsrBadge(
                       label: 'HOST',

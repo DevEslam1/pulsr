@@ -91,12 +91,80 @@ void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double 
 }
 
 void LookaheadLimiter::setEnabled(bool enabled) {
+    if (enabled == enabled_) return;
     enabled_ = enabled;
+    if (enabled) {
+        // Re-entering the stage after being bypassed must not replay stale
+        // delay-line contents or old gain state. Hold the current input
+        // (with instantaneous limiting) until the window is fresh, then
+        // fade the delayed stream in.
+        beginEnableTransition();
+    } else {
+        // Direct disable bypasses immediately. The engine's main limiter
+        // fades out instead by keeping enabled_ true and calling
+        // setProcessingActive(false) until isDraining() clears.
+        bypassPending_ = false;
+        bypassTarget_ = 0.0f;
+        bypassMix_ = 0.0f;
+        bypassHoldRemaining_ = 0;
+        enableFading_ = false;
+        disabledSinceProcess_ = false;
+    }
+}
+
+void LookaheadLimiter::setProcessingActive(bool active) {
+    if (active == processingActive_) return;
+    processingActive_ = active;
+    if (active) {
+        if (disabledSinceProcess_ || bypassMix_ <= 0.0f) {
+            beginEnableTransition();
+        } else {
+            // Re-enable during the release/bypass fade: reverse the ramp
+            // instead of snapping to either side.
+            bypassPending_ = false;
+            bypassTarget_ = 1.0f;
+        }
+    } else if (bypassMix_ > 0.0f) {
+        // The engine keeps calling process() while isDraining() is true; the
+        // fade-out starts once any insertion fade has finished and the gain
+        // envelope has settled.
+        disabledSinceProcess_ = true;
+        bypassPending_ = true;
+    } else {
+        bypassPending_ = false;
+        bypassTarget_ = 0.0f;
+        bypassHoldRemaining_ = 0;
+        enableFading_ = false;
+        disabledSinceProcess_ = false;
+    }
 }
 
 void LookaheadLimiter::applyParams(const LimiterParamSet& params) {
     pendingParams_ = params;
     paramsChanged_.store(true, std::memory_order_release);
+}
+
+void LookaheadLimiter::syncPendingParams() {
+    if (!paramsChanged_.load(std::memory_order_acquire)) return;
+    const bool wasEnabled = enabled_;
+    enabled_ = pendingParams_.enabled;
+    configure(pendingParams_.lookaheadMs, pendingParams_.thresholdDb, pendingParams_.releaseMs, pendingParams_.truePeakMode);
+    paramsChanged_.store(false, std::memory_order_release);
+
+    if (enabled_ && !wasEnabled) {
+        // The stage may have been dormant while processingActive_ was already
+        // true (e.g. the engine requested it for safety gain while the user
+        // had it disabled). Its delay line was not advanced during that time,
+        // so always discard it rather than replaying stale samples.
+        beginEnableTransition();
+    } else if (!enabled_ && wasEnabled) {
+        bypassPending_ = false;
+        bypassTarget_ = 0.0f;
+        bypassMix_ = 0.0f;
+        bypassHoldRemaining_ = 0;
+        enableFading_ = false;
+        disabledSinceProcess_ = false;
+    }
 }
 
 void LookaheadLimiter::reset() {
@@ -112,6 +180,13 @@ void LookaheadLimiter::reset() {
     avgEnergy_ = 0.0f;
     transientWeight_ = 0.0f;
     gainReductionDb_.store(0.0f, std::memory_order_relaxed);
+    bypassMix_ = 1.0f;
+    bypassTarget_ = 1.0f;
+    bypassHoldRemaining_ = 0;
+    enableFading_ = false;
+    bypassPending_ = false;
+    processingActive_ = false;
+    disabledSinceProcess_ = false;
 }
 
 float LookaheadLimiter::estimateTruePeak(const float* history) {
@@ -198,13 +273,10 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
 }
 
 void LookaheadLimiter::process(float* L, float* R, int frames) {
-    if (paramsChanged_.load(std::memory_order_acquire)) {
-        enabled_ = pendingParams_.enabled;
-        configure(pendingParams_.lookaheadMs, pendingParams_.thresholdDb, pendingParams_.releaseMs, pendingParams_.truePeakMode);
-        paramsChanged_.store(false, std::memory_order_release);
-    }
+    syncPendingParams();
 
     if (!enabled_ || frames <= 0) return;
+    disabledSinceProcess_ = false;
 
     constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
     float historyWindowL[TAPS_PER_PHASE] = {};
@@ -266,14 +338,48 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
         blockMinEnvelope = std::min(blockMinEnvelope, envelope_);
 
+        if (bypassPending_ && !enableFading_ && envelope_ >= 0.999f) {
+            bypassTarget_ = 0.0f;
+            bypassHoldRemaining_ = 0;
+        }
+        float mix = 0.0f;
+        if (bypassHoldRemaining_ > 0) {
+            --bypassHoldRemaining_;
+        } else {
+            mix = advanceBypassMix();
+        }
+
         // Read delayed audio from lookahead buffer
         int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
-        if (envelope_ == 1.0f) {
-            L[i] = delayBuf_[0][readIdx];
-            R[i] = delayBuf_[1][readIdx];
+        const float wetL = delayBuf_[0][readIdx] * envelope_;
+        const float wetR = delayBuf_[1][readIdx] * envelope_;
+        // While inserting the stage, the current input stands in for the not
+        // yet fresh delay line. Scale it by the instantaneous limiter gain so
+        // the lead-in cannot exceed the ceiling; after the hold it crossfades
+        // to the properly delayed stream. The lookahead estimate is centred on
+        // an older history sample, so include the current sample explicitly.
+        const float dryRawL = delayBuf_[0][writeIdx_];
+        const float dryRawR = delayBuf_[1][writeIdx_];
+        const float dryPeak = std::max(
+            maxPeak, std::max(std::abs(dryRawL), std::abs(dryRawR)));
+        const float dryGain = (bypassTarget_ > 0.0f && dryPeak > 1e-6f)
+            ? std::min(targetGain, threshold_ / dryPeak)
+            : 1.0f;
+        const float dryL = dryRawL * dryGain;
+        const float dryR = dryRawR * dryGain;
+        if (mix >= 1.0f) {
+            enableFading_ = false;
+            L[i] = wetL;
+            R[i] = wetR;
+        } else if (mix <= 0.0f) {
+            L[i] = dryL;
+            R[i] = dryR;
         } else {
-            L[i] = delayBuf_[0][readIdx] * envelope_;
-            R[i] = delayBuf_[1][readIdx] * envelope_;
+            L[i] = dryL + mix * (wetL - dryL);
+            R[i] = dryR + mix * (wetR - dryR);
+        }
+        if (bypassTarget_ == 0.0f && bypassMix_ <= 0.0f) {
+            bypassPending_ = false;
         }
 
         writeIdx_ = (writeIdx_ + 1) & kMask;
@@ -283,13 +389,10 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 }
 
 void LookaheadLimiter::processMono(float* inOut, int frames) {
-    if (paramsChanged_.load(std::memory_order_acquire)) {
-        enabled_ = pendingParams_.enabled;
-        configure(pendingParams_.lookaheadMs, pendingParams_.thresholdDb, pendingParams_.releaseMs, pendingParams_.truePeakMode);
-        paramsChanged_.store(false, std::memory_order_release);
-    }
+    syncPendingParams();
 
     if (!enabled_ || frames <= 0) return;
+    disabledSinceProcess_ = false;
 
     constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
     float historyWindow[TAPS_PER_PHASE] = {};
@@ -340,11 +443,35 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
         blockMinEnvelope = std::min(blockMinEnvelope, envelope_);
 
-        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
-        if (envelope_ == 1.0f) {
-            inOut[i] = delayBuf_[0][readIdx];
+        if (bypassPending_ && !enableFading_ && envelope_ >= 0.999f) {
+            bypassTarget_ = 0.0f;
+            bypassHoldRemaining_ = 0;
+        }
+        float mix = 0.0f;
+        if (bypassHoldRemaining_ > 0) {
+            --bypassHoldRemaining_;
         } else {
-            inOut[i] = delayBuf_[0][readIdx] * envelope_;
+            mix = advanceBypassMix();
+        }
+
+        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
+        const float wet = delayBuf_[0][readIdx] * envelope_;
+        const float dryRaw = delayBuf_[0][writeIdx_];
+        const float dryPeak = std::max(peak, std::abs(dryRaw));
+        const float dryGain = (bypassTarget_ > 0.0f && dryPeak > 1e-6f)
+            ? std::min(targetGain, threshold_ / dryPeak)
+            : 1.0f;
+        const float dry = dryRaw * dryGain;
+        if (mix >= 1.0f) {
+            enableFading_ = false;
+            inOut[i] = wet;
+        } else if (mix <= 0.0f) {
+            inOut[i] = dry;
+        } else {
+            inOut[i] = dry + mix * (wet - dry);
+        }
+        if (bypassTarget_ == 0.0f && bypassMix_ <= 0.0f) {
+            bypassPending_ = false;
         }
 
         writeIdx_ = (writeIdx_ + 1) & kMask;
@@ -354,13 +481,10 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
 }
 
 void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channels) {
-    if (paramsChanged_.load(std::memory_order_acquire)) {
-        enabled_ = pendingParams_.enabled;
-        configure(pendingParams_.lookaheadMs, pendingParams_.thresholdDb, pendingParams_.releaseMs, pendingParams_.truePeakMode);
-        paramsChanged_.store(false, std::memory_order_release);
-    }
+    syncPendingParams();
 
     if (!enabled_ || frames <= 0) return;
+    disabledSinceProcess_ = false;
     // Keep the real interleave stride; clamp only the number of channels we
     // process. Using the clamped count as the stride garbles wide streams.
     const int stride = channels > 0 ? channels : 1;
@@ -425,15 +549,41 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
         blockMinEnvelope = std::min(blockMinEnvelope, envelope_);
 
-        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
-        if (envelope_ == 1.0f) {
-            for (int ch = 0; ch < processChannels; ++ch) {
-                buffer[i * stride + ch] = delayBuf_[ch][readIdx];
-            }
+        if (bypassPending_ && !enableFading_ && envelope_ >= 0.999f) {
+            bypassTarget_ = 0.0f;
+            bypassHoldRemaining_ = 0;
+        }
+        float mix = 0.0f;
+        if (bypassHoldRemaining_ > 0) {
+            --bypassHoldRemaining_;
         } else {
-            for (int ch = 0; ch < processChannels; ++ch) {
-                buffer[i * stride + ch] = delayBuf_[ch][readIdx] * envelope_;
+            mix = advanceBypassMix();
+        }
+
+        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
+        float dryPeak = frameMaxPeak;
+        for (int ch = 0; ch < processChannels; ++ch) {
+            dryPeak = std::max(dryPeak, std::abs(delayBuf_[ch][writeIdx_]));
+        }
+        const float dryGain = (bypassTarget_ > 0.0f && dryPeak > 1e-6f)
+            ? std::min(targetGain, threshold_ / dryPeak)
+            : 1.0f;
+        for (int ch = 0; ch < processChannels; ++ch) {
+            const float wet = delayBuf_[ch][readIdx] * envelope_;
+            const float dry = delayBuf_[ch][writeIdx_] * dryGain;
+            if (mix >= 1.0f) {
+                buffer[i * stride + ch] = wet;
+            } else if (mix <= 0.0f) {
+                buffer[i * stride + ch] = dry;
+            } else {
+                buffer[i * stride + ch] = dry + mix * (wet - dry);
             }
+        }
+        if (mix >= 1.0f) {
+            enableFading_ = false;
+        }
+        if (bypassTarget_ == 0.0f && bypassMix_ <= 0.0f) {
+            bypassPending_ = false;
         }
 
         writeIdx_ = (writeIdx_ + 1) & kMask;

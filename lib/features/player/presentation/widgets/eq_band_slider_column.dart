@@ -63,15 +63,29 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
   }) {
     final isMuted = _mutedBands.contains(index);
     final isSoloed = _soloedBands.contains(index);
-    return Semantics(
-      slider: true,
-      label: context.l10n.eqBandLabel(index + 1),
-      value: '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)} dB',
-      child: RepaintBoundary(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _VerticalEqSlider(
+    void adjustGain(double delta) {
+      if (!state.isEqEnabled) {
+        cubit.setEqualizerEnabled(true);
+      }
+      cubit.setBandGain(index, gain + delta);
+    }
+
+    return RepaintBoundary(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Semantics(
+            slider: true,
+            enabled: isEnabled,
+            label: context.l10n.eqBandLabel(index + 1),
+            value: '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)} dB',
+            increasedValue:
+                '${gain + 1 > 0 ? '+' : ''}${(gain + 1).toStringAsFixed(1)} dB',
+            decreasedValue:
+                '${gain - 1 > 0 ? '+' : ''}${(gain - 1).toStringAsFixed(1)} dB',
+            onIncrease: isEnabled ? () => adjustGain(1.0) : null,
+            onDecrease: isEnabled ? () => adjustGain(-1.0) : null,
+            child: _VerticalEqSlider(
               key: ValueKey('eq_band_$index'),
               value: gain,
               label: label,
@@ -98,71 +112,71 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
                 _setStateSafe(() => _activeDraggedBandIndex = null);
               },
             ),
-            const SizedBox(height: AppSpacing.xxs),
-            // F-35: fast solo/mute toggles. State is transient (native has no
-            // getter), so it is mirrored locally for the current session only.
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _bandToggle(
-                    label: 'M',
-                    tooltip: isMuted
-                        ? context.l10n.dspUnmuteBand
-                        : context.l10n.dspMuteBand,
-                    active: isMuted,
-                    activeColor: errorColor,
-                    onTap: isEnabled
-                        ? () async {
-                            final next = !isMuted;
-                            final manager = _equalizerManagerOrNull();
-                            if (manager != null) {
-                              await manager.setBandMute(index, next);
-                            }
-                            if (!mounted) return;
-                            _setStateSafe(() {
-                              if (next) {
-                                _mutedBands.add(index);
-                              } else {
-                                _mutedBands.remove(index);
-                              }
-                            });
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          // F-35: fast solo/mute toggles. State is transient (native has no
+          // getter), so it is mirrored locally for the current session only.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _bandToggle(
+                  label: 'M',
+                  tooltip: isMuted
+                      ? context.l10n.dspUnmuteBand
+                      : context.l10n.dspMuteBand,
+                  active: isMuted,
+                  activeColor: errorColor,
+                  onTap: isEnabled
+                      ? () async {
+                          final next = !isMuted;
+                          final manager = _equalizerManagerOrNull();
+                          if (manager != null) {
+                            await manager.setBandMute(index, next);
                           }
-                        : null,
-                  ),
-                  const SizedBox(width: AppSpacing.s2),
-                  _bandToggle(
-                    label: 'S',
-                    tooltip: isSoloed
-                        ? context.l10n.dspUnsoloBand
-                        : context.l10n.dspSoloBand,
-                    active: isSoloed,
-                    activeColor: accentColor,
-                    onTap: isEnabled
-                        ? () async {
-                            final next = !isSoloed;
-                            final manager = _equalizerManagerOrNull();
-                            if (manager != null) {
-                              await manager.setBandSolo(index, next);
+                          if (!mounted) return;
+                          _setStateSafe(() {
+                            if (next) {
+                              _mutedBands.add(index);
+                            } else {
+                              _mutedBands.remove(index);
                             }
-                            if (!mounted) return;
-                            _setStateSafe(() {
-                              if (next) {
-                                _soloedBands.add(index);
-                              } else {
-                                _soloedBands.remove(index);
-                              }
-                            });
+                          });
+                        }
+                      : null,
+                ),
+                const SizedBox(width: AppSpacing.s2),
+                _bandToggle(
+                  label: 'S',
+                  tooltip: isSoloed
+                      ? context.l10n.dspUnsoloBand
+                      : context.l10n.dspSoloBand,
+                  active: isSoloed,
+                  activeColor: accentColor,
+                  onTap: isEnabled
+                      ? () async {
+                          final next = !isSoloed;
+                          final manager = _equalizerManagerOrNull();
+                          if (manager != null) {
+                            await manager.setBandSolo(index, next);
                           }
-                        : null,
-                  ),
-                ],
-              ),
+                          if (!mounted) return;
+                          _setStateSafe(() {
+                            if (next) {
+                              _soloedBands.add(index);
+                            } else {
+                              _soloedBands.remove(index);
+                            }
+                          });
+                        }
+                      : null,
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -182,28 +196,31 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
         child: InkWell(
           onTap: onTap,
           borderRadius: AppRadii.r4All,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 1.5, vertical: 3),
-            child: Container(
-              width: 15,
-              height: 15,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: active
-                    ? activeColor.withValues(alpha: 0.18)
-                    : Colors.transparent,
-                borderRadius: AppRadii.r4All,
-                border: Border.all(
-                  color: active ? activeColor : context.palette.hairline,
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: Center(
+              child: Container(
+                width: 15,
+                height: 15,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: active
+                      ? activeColor.withValues(alpha: 0.18)
+                      : Colors.transparent,
+                  borderRadius: AppRadii.r4All,
+                  border: Border.all(
+                    color: active ? activeColor : context.palette.hairline,
+                  ),
                 ),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: AppFontSize.micro,
-                  height: 1.0,
-                  fontWeight: FontWeight.w800,
-                  color: active ? activeColor : context.palette.textTertiary,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: AppFontSize.micro,
+                    height: 1.0,
+                    fontWeight: FontWeight.w800,
+                    color: active ? activeColor : context.palette.textTertiary,
+                  ),
                 ),
               ),
             ),
@@ -331,8 +348,8 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                // Tap-to-set: a deliberate tap on the track jumps the band to that gain.
-                onTapDown: (details) {
+                // Tap-to-set on release so starting a drag never jumps the band.
+                onTapUp: (details) {
                   _handlePointer(details.localPosition.dy, height,
                       notifyParent: true);
                 },

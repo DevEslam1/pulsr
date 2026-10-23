@@ -155,6 +155,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       guardDsp: (feature, {showError = true}) =>
           dspController.guardDsp(feature, showError: showError),
       playbackRateBlockedReason: dspController.playbackRateBlockedReason,
+      onPerSongEqOverride: (song, presetName) => dspController
+          .applyTrackDspState(song, perSongPresetName: presetName),
       getState: () => state,
       emit: safeEmit,
       isClosed: () => isClosed,
@@ -261,7 +263,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         isVolumeBoostSupported: _audioHandler.isVolumeBoostSupported,
         volumeBoost: _audioHandler.volumeBoost,
         preampDb: _audioHandler.preampDb,
-        isCrossfeedEnabled: _audioHandler.isCrossfeedEnabled,
+        isCrossfeedEnabled: _audioHandler.crossfeedUserEnabled,
         crossfeedDelayUs: _audioHandler.crossfeedDelayUs,
         crossfeedFeedDb: _audioHandler.crossfeedFeedDb,
         crossfeedMode: _audioHandler.crossfeedMode,

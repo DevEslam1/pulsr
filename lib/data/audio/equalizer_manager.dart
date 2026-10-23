@@ -18,6 +18,7 @@ import 'async_lock.dart';
 import 'audio_effects_channel.dart';
 import 'comparison_slot.dart';
 import 'dsp_param_ranges.dart';
+import 'dsp_warmup_scheduler.dart';
 import 'eq_frequency_validation.dart';
 import 'eq_preset_schema_validator.dart';
 import 'headphone_profiles_repository.dart';
@@ -84,7 +85,6 @@ List<double> graphicEqQs(List<double> freqs) {
   return qs;
 }
 
-
 /// Numeric DSP-parameter sanitation lives in `dsp_param_ranges.dart`:
 /// [DspParamRanges] is the single source of truth for every parameter's valid
 /// range, and [clampFinite] / [DspRange.clamp] are the NaN/Inf-safe clamps the
@@ -98,11 +98,16 @@ class EqualizerManager {
   final AndroidLoudnessEnhancer? loudnessEnhancerA;
   final AndroidLoudnessEnhancer? loudnessEnhancerB;
   final AudioEffectsChannel _effectsChannel = AudioEffectsChannel();
+  late final DspWarmupScheduler _warmupScheduler =
+      DspWarmupScheduler(channel: _effectsChannel);
   Timer? _saveDebounce;
   Timer? _bandGainDebounce;
   final Map<int, double> _pendingBandGains = {};
   final _effectsLock =
       AsyncLock(); // Serializes concurrent effect state changes
+  final _prefsLock =
+      AsyncLock(); // Serializes preference writes (separate from effects so
+  // callers that already hold _effectsLock can persist without deadlocking).
   SharedPreferences? _cachedPrefs;
   bool _isDisposed = false;
   bool get isDisposed => _isDisposed;
@@ -167,6 +172,11 @@ class EqualizerManager {
 
   // Tier 1 & Tier 2 & Tier 3 Native DSP features
   bool isCrossfeedEnabled = false;
+
+  /// User intent for crossfeed, independent of route gating. Persisted so a
+  /// user preference set on a speaker route is not lost (the native stage is
+  /// gated off there without overwriting this flag).
+  bool crossfeedUserEnabled = false;
   double crossfeedDelayUs = 350.0; // 200 - 700 us
   double crossfeedFeedDb = -9.0; // -15 to -6 dB
   double crossfeedFcut = 650.0; // 200 - 2000 Hz (Custom-mode cutoff)
@@ -474,8 +484,9 @@ class EqualizerManager {
     // debounced path and direct await _savePreferences() call sites.
     if (_isDegradedForPower) return;
     // Serialize concurrent preference writes to prevent torn reads/writes
-    // when multiple effects are toggled rapidly.
-    await _effectsLock.lock(() => _performSavePreferences());
+    // when multiple effects are toggled rapidly. Uses its own lock because
+    // effect setters may already hold [_effectsLock] (snapshot recall).
+    await _prefsLock.lock(() => _performSavePreferences());
   }
 
   Map<String, dynamic> _buildSavePreferencesMap() {
@@ -497,7 +508,7 @@ class EqualizerManager {
       PrefsKeys.eqDynamicsEnabled: isDynamicsEnabled,
       PrefsKeys.eqDynamicsBypassed: _isDynamicsBypassed,
       PrefsKeys.eqSpatializerEnabled: isSpatializerEnabled,
-      PrefsKeys.crossfeedEnabled: isCrossfeedEnabled,
+      PrefsKeys.crossfeedEnabled: crossfeedUserEnabled,
       PrefsKeys.crossfeedDelayUs: crossfeedDelayUs,
       PrefsKeys.crossfeedFeedDb: crossfeedFeedDb,
       PrefsKeys.crossfeedFcut: crossfeedFcut,
@@ -657,6 +668,10 @@ class EqualizerManager {
   /// interpolating the current curve onto the new centers and re-pushing the
   /// whole plan to the native parametric EQ in a single bulk hop.
   Future<void> setBandMode(int count) async {
+    await _effectsLock.lock(() => _setBandModeCore(count));
+  }
+
+  Future<void> _setBandModeCore(int count) async {
     if (count != 10 && count != 32 && count != 64) {
       ErrorLogger.log(
         'Rejected unsupported EQ band count $count (need 10, 32 or 64)',
@@ -665,6 +680,7 @@ class EqualizerManager {
       return;
     }
     final int oldBandCount = eqBandCount;
+    final oldFreqs = activeFrequencies;
     eqBandCount = count;
     final targetFreqs = activeFrequencies;
     _pendingBandGains.removeWhere((k, _) => k < 0 || k >= targetFreqs.length);
@@ -676,6 +692,7 @@ class EqualizerManager {
       targetFrequencies: targetFreqs,
       bandsMap: updatedBandsMap,
       currentBandCount: oldBandCount,
+      sourceFrequencies: oldFreqs,
     );
     currentPreset = currentPreset.copyWith(
       gains: interpolated,
@@ -716,6 +733,7 @@ class EqualizerManager {
           final tenBandGains = EqPreset.interpolateGains(
             currentPreset.gains,
             targetFrequencies: customFrequencies,
+            sourceFrequencies: targetFreqs,
           );
           await _effectsChannel.setEqBands(customFrequencies);
           await _effectsChannel.setEqBandGains(tenBandGains);
@@ -730,18 +748,29 @@ class EqualizerManager {
   Future<void> set32BandMode(bool enabled) => setBandMode(enabled ? 32 : 10);
 
   Future<void> setEnabled(bool enabled) async {
+    await _effectsLock.lock(() => _setEnabledCore(enabled));
+  }
+
+  Future<void> _setEnabledCore(bool enabled) async {
     final previous = isEnabled;
     isEnabled = enabled;
     try {
       await _effectsChannel.setEqEnabled(enabled);
       await _effectsChannel.setNativeEqEnabled(enabled);
       if (enabled) {
-        await applyCurrentPreset();
+        await _applyCurrentPresetCore();
       }
       await _savePreferences();
       _syncPipeline();
     } catch (e, st) {
       isEnabled = previous;
+      // If the native push failed, the engine may still hold the previous
+      // bypass gate; re-push the rolled-back value so UI and engine agree.
+      try {
+        await _effectsChannel.setEqEnabled(previous);
+        await _effectsChannel.setNativeEqEnabled(previous);
+        if (previous) await _applyCurrentPresetCore();
+      } catch (_) {}
       _syncPipeline();
       ErrorLogger.log(
         'Failed to toggle equalizer state ($enabled)',
@@ -758,6 +787,10 @@ class EqualizerManager {
       setHeadphoneProfile(profile);
 
   Future<void> setPreset(EqPreset preset) async {
+    await _effectsLock.lock(() => _setPresetCore(preset));
+  }
+
+  Future<void> _setPresetCore(EqPreset preset) async {
     selectedHeadphoneProfile = null;
     final targetFreqs = activeFrequencies;
     final gains = EqPreset.interpolateGains(
@@ -769,7 +802,7 @@ class EqualizerManager {
     currentPreset = preset.copyWith(gains: gains);
     comparisonSlots[activeComparisonSlot] = currentPreset;
     try {
-      await applyCurrentPreset();
+      await _applyCurrentPresetCore();
       await setBassBoost(preset.bassBoost);
       _debouncedSavePreferences();
     } catch (e, st) {
@@ -846,6 +879,7 @@ class EqualizerManager {
               final tenBandGains = EqPreset.interpolateGains(
                 currentPreset.gains,
                 targetFrequencies: customFrequencies,
+                sourceFrequencies: targetFreqs,
               );
               await _effectsChannel.setEqBandGains(tenBandGains);
             }
@@ -912,6 +946,10 @@ class EqualizerManager {
   }
 
   Future<void> applyCurrentPreset() async {
+    await _effectsLock.lock(_applyCurrentPresetCore);
+  }
+
+  Future<void> _applyCurrentPresetCore() async {
     if (!isEnabled) return;
     final targetFreqs = activeFrequencies;
     if (PlatformCapabilities.isAndroid) {
@@ -930,6 +968,7 @@ class EqualizerManager {
             final tenBandGains = EqPreset.interpolateGains(
               currentPreset.gains,
               targetFrequencies: customFrequencies,
+              sourceFrequencies: targetFreqs,
             );
             await _effectsChannel.setEqBands(customFrequencies);
             await _effectsChannel.setEqBandGains(tenBandGains);
@@ -1013,6 +1052,10 @@ class EqualizerManager {
   }
 
   Future<void> setHeadphoneProfile(HeadphoneProfile? profile) async {
+    await _effectsLock.lock(() => _setHeadphoneProfileCore(profile));
+  }
+
+  Future<void> _setHeadphoneProfileCore(HeadphoneProfile? profile) async {
     final prevPreset = currentPreset;
     final prevProfile = selectedHeadphoneProfile;
     try {
@@ -1057,10 +1100,10 @@ class EqualizerManager {
           if (!applied) {
             // Native PEQ unavailable: fall back to the graphic-gain path using
             // the filter-derived curve so the correction still applies.
-            await applyCurrentPreset();
+            await _applyCurrentPresetCore();
           }
         } else {
-          await applyCurrentPreset();
+          await _applyCurrentPresetCore();
         }
         await setBassBoost(profile.bassBoost);
         // Prefer the filter-derived safe headroom; fall back to the stored
@@ -2068,10 +2111,10 @@ class EqualizerManager {
     _pendingReattachSessionId = sessionId;
     // Serialize the reattach through _effectsLock (not just _reattachChain) so a
     // release -> re-push cannot interleave with a concurrent _flushBandGains or
-    // _savePreferences, both of which already hold _effectsLock. _runReattach /
-    // _pushFullEffectState push native via _effectsChannel directly and never
-    // re-enter _effectsLock, so this cannot deadlock. _reattachChain still
-    // collapses rapid session ids down to the newest.
+    // applyEffectsState. _runReattach / _pushFullEffectState push native via
+    // _effectsChannel directly and never re-enter _effectsLock, so this cannot
+    // deadlock. _reattachChain still collapses rapid session ids to the newest.
+    // Preference writes use their own lock and may safely run concurrently.
     _reattachChain = _reattachChain
         .then((_) => _effectsLock.lock(() => _runReattach()))
         .catchError((
@@ -2205,7 +2248,7 @@ class EqualizerManager {
       await _effectsChannel.setNativeEqBandCount(freqs.length);
 
       if (isEnabled) {
-        await applyCurrentPreset();
+        await _applyCurrentPresetCore();
       }
 
       await _effectsChannel.setEqEnabled(isEnabled);
@@ -2430,7 +2473,7 @@ class EqualizerManager {
     }
 
     if (isReverbEnabled || isViperDdcEnabled || isArbitraryEqEnabled) {
-      await _effectsChannel.sendWarmupBuffer(durationMs: 100);
+      await _warmupScheduler.warmup();
     }
 
     // Readback verification to catch parameter drift
@@ -2477,20 +2520,32 @@ class EqualizerManager {
     unawaited(_effectsChannel.getAutoDegradedStages());
   }
 
-  void dispose() {
+  Future<void> dispose() async {
     _isDisposed = true;
     // Flush pending work instead of dropping it: disposing mid-drag
     // otherwise loses the last ~60ms of slider movement and ~350ms of prefs.
+    _bandGainDebounce?.cancel();
+    _bandGainDebounce = null;
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
     if (_pendingBandGains.isNotEmpty) {
       final pending = Map<int, double>.from(_pendingBandGains);
       _pendingBandGains.clear();
-      unawaited(_flushBandGains(pending));
+      try {
+        await _flushBandGains(pending);
+      } catch (_) {}
     }
-    _saveDebounce?.cancel();
-    _saveDebounce = null;
-    _bandGainDebounce?.cancel();
-    _bandGainDebounce = null;
-    _performSavePreferencesSync();
+    // Await the persisted write so the last edit survives an immediate exit;
+    // fall back to the synchronous fan-out when prefs are unavailable.
+    if (_cachedPrefs != null) {
+      try {
+        await _prefsLock.lock(_performSavePreferences);
+      } catch (_) {
+        _performSavePreferencesSync();
+      }
+    } else {
+      _performSavePreferencesSync();
+    }
     try {
       effectStatusNotifier.dispose();
     } catch (_) {}

@@ -618,19 +618,39 @@ class PulsrAudioHandler extends BaseAudioHandler
       loudnessEnhancerB: loudnessEnhancerB,
     );
     _audioSessionIdRouter = AudioSessionIdRouter(
-      onSessionChanged: (sessionId) {
-        _equalizerManager.reapplyToSession(sessionId);
-        _equalizerManager.syncNativeLatency(assumedOutputSampleRate);
+      onSessionChanged: (sessionId) async {
         _currentAudioSessionId = sessionId;
         _audioSessionIdSubject.add(sessionId);
+        try {
+          // Reattach before reading latency: the HAL chain must exist on the
+          // new session before the native query can report its real latency.
+          await _equalizerManager.reapplyToSession(sessionId);
+          await _equalizerManager.syncNativeLatency(assumedOutputSampleRate);
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Session-change DSP reattach failed',
+            error: e,
+            stackTrace: st,
+            category: 'PulsrAudioHandler',
+          );
+        }
         // Track start: re-seed the loudness contour from the hardware volume
         // (no-op / software fallback when the contour is disabled).
         unawaited(_refreshLoudnessContourFromSystemVolume());
       },
-      onRouteChanged: () {
+      onRouteChanged: () async {
         _syncBluetoothRouteFromCache();
-        _equalizerManager.resyncActiveEffects();
-        _equalizerManager.syncNativeLatency(assumedOutputSampleRate);
+        try {
+          await _equalizerManager.resyncActiveEffects();
+          await _equalizerManager.syncNativeLatency(assumedOutputSampleRate);
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Route-change DSP resync failed',
+            error: e,
+            stackTrace: st,
+            category: 'PulsrAudioHandler',
+          );
+        }
         unawaited(_refreshBluetoothRoute());
         unawaited(_recordSessionRouteChange());
       },

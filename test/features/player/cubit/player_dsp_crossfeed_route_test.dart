@@ -21,7 +21,11 @@ class CrossfeedHandler extends RecordingAudioHandler {
 
   @override
   Future<void> setCrossfeed(bool enabled,
-      {double? delayUs, double? feedDb, int? mode}) async {
+      {double? delayUs,
+      double? feedDb,
+      double? fcut,
+      int? mode,
+      bool? preferenceEnabled}) async {
     calls.add('setCrossfeed');
     lastEnabled = enabled;
     _xfeed = enabled;

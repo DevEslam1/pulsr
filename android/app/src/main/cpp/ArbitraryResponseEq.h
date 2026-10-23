@@ -30,8 +30,11 @@ public:
     // underestimates it. Minimum-phase mode (the AutoEQ import default) front-
     // loads its energy at n=0 and is effectively zero-latency, so it reports 0.
     int getLatencyFrames() const {
+        if (filterCrossfadeProgress_ < 1.0f) {
+            return (linearPhase_ || oldLinearPhase_) ? (FIR_TAPS / 2) : 0;
+        }
         if ((!enabled_ && smoothedEnabledMix_ < 1e-4f) || !hasResponse_) return 0;
-        return (linearPhase_ || oldLinearPhase_) ? (FIR_TAPS / 2) : 0;
+        return linearPhase_ ? (FIR_TAPS / 2) : 0;
     }
     void applyParams(const ArbitraryEqParamSet& params);
     void reset();

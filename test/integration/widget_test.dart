@@ -255,7 +255,11 @@ class MockPulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> setCrossfeed(bool enabled,
-      {double? delayUs, double? feedDb, int? mode}) async {}
+      {double? delayUs,
+      double? feedDb,
+      double? fcut,
+      int? mode,
+      bool? preferenceEnabled}) async {}
   @override
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}

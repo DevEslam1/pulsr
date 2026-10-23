@@ -487,10 +487,11 @@ ConvolutionReverb::ConvolutionReverb() {
     accumFreqL_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     accumFreqR_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
 
-    // Lazy history partition allocation: partitions are grown on-demand up to
-    // active IR's numPartitions (capped at MAX_PREALLOC_PARTITIONS) on control thread.
-    inputHistoryFreqL_.clear();
-    inputHistoryFreqR_.clear();
+    // Lazy history partition allocation: inner buffers are grown on-demand up
+    // to the active IR's numPartitions (capped at MAX_PREALLOC_PARTITIONS) on
+    // the control thread. Existing slots never move, so the render thread can
+    // keep reading [0, historyPartitionCount_) while capacity grows.
+    historyPartitionCount_.store(0, std::memory_order_relaxed);
     directRingL_.assign(4096, 0.0f);
     directRingR_.assign(4096, 0.0f);
     dryDelayL_.assign(PARTITION_SIZE, 0.0f);
@@ -518,7 +519,7 @@ ConvolutionReverb::~ConvolutionReverb() = default;
 
 void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
     if (!preparedIr_) return;
-    const int allocated = static_cast<int>(inputHistoryFreqL_.size());
+    const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
     if (effectivePartitions <= 0) return;
 
@@ -587,7 +588,7 @@ void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
 
 void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
     if (!preparedIr_) return;
-    const int allocated = static_cast<int>(inputHistoryFreqR_.size());
+    const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
     if (effectivePartitions <= 0) return;
 
@@ -761,19 +762,24 @@ void ConvolutionReverb::updatePreparedIr() {
 void ConvolutionReverb::ensurePartitionCapacity(int numPartitions) {
     if (numPartitions <= 0) return;
     const int targetPartitions = std::min(numPartitions, MAX_PREALLOC_PARTITIONS);
-    if (static_cast<int>(inputHistoryFreqL_.size()) < targetPartitions) {
-        inputHistoryFreqL_.resize(targetPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
-        inputHistoryFreqR_.resize(targetPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+    const int currentPartitions = historyPartitionCount_.load(std::memory_order_acquire);
+    if (currentPartitions >= targetPartitions) return;
+
+    // Only touch slots the render thread cannot observe yet. Existing slots are
+    // never moved or reallocated: the outer arrays have fixed storage.
+    for (int p = currentPartitions; p < targetPartitions; ++p) {
+        inputHistoryFreqL_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+        inputHistoryFreqR_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     }
+    historyPartitionCount_.store(targetPartitions, std::memory_order_release);
 }
 
 size_t ConvolutionReverb::getHistoryAllocatedBytes() const {
     size_t bytes = 0;
-    for (const auto& p : inputHistoryFreqL_) {
-        bytes += p.capacity() * sizeof(FftUtil::Complex) + sizeof(p);
-    }
-    for (const auto& p : inputHistoryFreqR_) {
-        bytes += p.capacity() * sizeof(FftUtil::Complex) + sizeof(p);
+    const int count = historyPartitionCount_.load(std::memory_order_acquire);
+    for (int p = 0; p < count; ++p) {
+        bytes += inputHistoryFreqL_[p].capacity() * sizeof(FftUtil::Complex) + sizeof(inputHistoryFreqL_[p]);
+        bytes += inputHistoryFreqR_[p].capacity() * sizeof(FftUtil::Complex) + sizeof(inputHistoryFreqR_[p]);
     }
     return bytes;
 }
@@ -916,7 +922,8 @@ void ConvolutionReverb::preparePartitions() {
 
     // Preserving active audio buffers (inputBlock, prevBlock, accumFreq) during live playback
     // ensures seamless, click-free continuity across IR preset switches.
-    const int usedPartitions = std::min(preparedIr_->numPartitions, static_cast<int>(inputHistoryFreqL_.size()));
+    const int usedPartitions = std::min(
+        preparedIr_->numPartitions, historyPartitionCount_.load(std::memory_order_acquire));
     if (usedPartitions > 0 && historyHead_ >= usedPartitions) {
         historyHead_ = 0;
     }
@@ -947,7 +954,8 @@ void ConvolutionReverb::reset() {
         std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
         std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
         std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
-        const int usedPartitions = std::min(preparedIr_->numPartitions, static_cast<int>(inputHistoryFreqL_.size()));
+        const int usedPartitions = std::min(
+            preparedIr_->numPartitions, historyPartitionCount_.load(std::memory_order_acquire));
         for (int p = 0; p < usedPartitions; ++p) {
             std::fill(inputHistoryFreqL_[p].begin(), inputHistoryFreqL_[p].end(), FftUtil::Complex(0.0f, 0.0f));
             std::fill(inputHistoryFreqR_[p].begin(), inputHistoryFreqR_[p].end(), FftUtil::Complex(0.0f, 0.0f));
@@ -1211,8 +1219,9 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
     }
 
     // Textbook Uniform-Partitioned Overlap-Save FFT Convolution (for IR > 1024)
-    // B-06 clamp: keep effective partitions within preallocated max to guarantee RT safety
-    const int numPartitions = std::min(preparedIr_->numPartitions, static_cast<int>(inputHistoryFreqL_.size()));
+    // B-06 clamp: keep effective partitions within the published capacity.
+    const int numPartitions = std::min(
+        preparedIr_->numPartitions, historyPartitionCount_.load(std::memory_order_acquire));
 
     for (int i = 0; i < frames; ++i) {
         float inSampleL = inL[i];

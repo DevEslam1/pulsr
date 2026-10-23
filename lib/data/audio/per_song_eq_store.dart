@@ -21,6 +21,13 @@ class PerSongEqStore {
   /// Returns the assigned EQ preset name for [trackKey] (e.g. song.id or song.path), or null if none.
   String? getPresetForTrack(String trackKey) => _overrides[trackKey];
 
+  /// Cold-start-safe variant: waits for the initial prefs load before reading,
+  /// so the first track after launch cannot miss its stored override.
+  Future<String?> getPresetForTrackWhenReady(String trackKey) async {
+    await ready;
+    return _overrides[trackKey];
+  }
+
   /// Sets or clears the EQ preset override for [trackKey].
   Future<void> setPresetForTrack(String trackKey, String? presetName) async {
     // Await the initial load so a pre-load write cannot persist a partial map.

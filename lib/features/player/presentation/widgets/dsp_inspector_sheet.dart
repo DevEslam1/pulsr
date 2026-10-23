@@ -281,7 +281,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                         constraints: const BoxConstraints(
                             minWidth: AppSpacing.minTouchTarget,
                             minHeight: AppSpacing.minTouchTarget),
-                        tooltip: 'Share DSP report',
+                        tooltip: context.l10n.share,
                         icon: Icon(Icons.share_rounded,
                             color: p.accent, size: 20),
                         onPressed: () => _shareReport(context),
@@ -290,7 +290,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                         constraints: const BoxConstraints(
                             minWidth: AppSpacing.minTouchTarget,
                             minHeight: AppSpacing.minTouchTarget),
-                        tooltip: 'Latency & Sync Diagnostics',
+                        tooltip: context.l10n.latencySyncDiagnostics,
                         icon:
                             Icon(Icons.sync_rounded, color: p.accent, size: 20),
                         onPressed: () => SyncDiagnosticsSheet.show(context),

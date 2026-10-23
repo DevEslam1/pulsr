@@ -144,6 +144,7 @@ extension EqualizerPresetOps on EqualizerManager {
             EqPreset.interpolateGains(
               merged,
               targetFrequencies: customFrequencies,
+              sourceFrequencies: targetFreqs,
             ),
           );
         } else {

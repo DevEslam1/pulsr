@@ -48,6 +48,30 @@ extension _EqSheetShell on _EqualizerSheetState {
     return 0.0;
   }
 
+  /// Preamp slider coalescing: keep the thumb responsive with a local preview
+  /// while pushing at most one native write per 60ms (previously every pixel
+  /// crossed the platform channel and bypassed the cubit's guard/rollback).
+  void _schedulePreamp(
+    PlayerCubit cubit,
+    double value,
+    VoidCallback setCardState,
+  ) {
+    _preampPreview = value;
+    setCardState();
+    _preampDebounce?.cancel();
+    _preampDebounce = Timer(const Duration(milliseconds: 60), () {
+      _preampPreview = null;
+      unawaited(cubit.setPreamp(value));
+    });
+  }
+
+  void _setPreampImmediate(PlayerCubit cubit, double value) {
+    _preampDebounce?.cancel();
+    _preampDebounce = null;
+    _preampPreview = null;
+    unawaited(cubit.setPreamp(value));
+  }
+
   void _setBassMacro(PlayerCubit cubit, PlayerState state, double val) {
     if (!cubit.state.isEqEnabled) cubit.setEqualizerEnabled(true);
     final count = cubit.state.eqPreset.gains.length;
@@ -975,10 +999,19 @@ extension _EqSheetShell on _EqualizerSheetState {
   ) {
     final preset = state.eqPreset;
     final simplifiedPresets = <(String, EqPreset)>[
-      ('Flat', EqPreset.defaultPresets.firstWhere((p) => p.name == 'Flat')),
+      (
+        'Flat',
+        EqPreset.defaultPresets.firstWhere(
+          (p) => p.name == 'Flat',
+          orElse: () => EqPreset.defaultPresets.first,
+        )
+      ),
       (
         'Bass Boost',
-        EqPreset.defaultPresets.firstWhere((p) => p.name == 'Bass Boost')
+        EqPreset.defaultPresets.firstWhere(
+          (p) => p.name == 'Bass Boost',
+          orElse: () => EqPreset.defaultPresets.first,
+        )
       ),
       (
         'Vocal',
@@ -1282,10 +1315,19 @@ extension _EqSheetShell on _EqualizerSheetState {
     final preset = state.eqPreset;
 
     final simplifiedPresets = <(String, EqPreset)>[
-      ('Flat', EqPreset.defaultPresets.firstWhere((p) => p.name == 'Flat')),
+      (
+        'Flat',
+        EqPreset.defaultPresets.firstWhere(
+          (p) => p.name == 'Flat',
+          orElse: () => EqPreset.defaultPresets.first,
+        )
+      ),
       (
         'Bass Boost',
-        EqPreset.defaultPresets.firstWhere((p) => p.name == 'Bass Boost')
+        EqPreset.defaultPresets.firstWhere(
+          (p) => p.name == 'Bass Boost',
+          orElse: () => EqPreset.defaultPresets.first,
+        )
       ),
       (
         'Vocal',
@@ -1490,7 +1532,13 @@ extension _EqSheetShell on _EqualizerSheetState {
                 max: 12.0,
                 divisions: 48,
                 onChanged: (v) {
-                  HapticFeedback.selectionClick();
+                  // One tick per 0.5 dB step instead of every pixel; the slider
+                  // previously fired a haptic on every frame of a drag.
+                  final step = ((v + 12.0) * 2).round();
+                  if (step != _lastMacroHapticStep) {
+                    _lastMacroHapticStep = step;
+                    HapticFeedback.selectionClick();
+                  }
                   onChanged(v);
                 },
               ),
@@ -2353,9 +2401,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           Builder(
             builder: (context) => StatefulBuilder(
               builder: (context, setCardState) {
-                final manager = _equalizerManagerOrNull();
-                final currentPreamp = manager?.preampDb ??
-                    (state.selectedHeadphoneProfile?.preampGain ?? 0.0);
+                final currentPreamp = _preampPreview ?? state.dsp.preampDb;
                 final maxBoost = state.eqPreset.gains.isEmpty
                     ? 0.0
                     : state.eqPreset.gains.reduce((a, b) => a > b ? a : b);
@@ -2468,7 +2514,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                             .selectedHeadphoneProfile
                                             ?.preampGain ??
                                         0.0;
-                                    manager?.setPreamp(target);
+                                    _setPreampImmediate(cubit, target);
                                     setCardState(() {});
                                   },
                           ),
@@ -2504,8 +2550,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                                     }
                                     final rounded =
                                         (val * 10).roundToDouble() / 10.0;
-                                    manager?.setPreamp(rounded);
-                                    setCardState(() {});
+                                    _schedulePreamp(cubit, rounded,
+                                        () => setCardState(() {}));
                                   },
                           ),
                         ),
@@ -2553,7 +2599,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                               const SizedBox(width: AppSpacing.xs),
                               Expanded(
                                 child: Text(
-                                  '${context.l10n.volume}: High volume boost (>+6dB) may cause audio distortion and permanent hearing damage.',
+                                  '${context.l10n.volume}: ${context.l10n.highBoostWarn}',
                                   style: TextStyle(
                                     color: p.error,
                                     fontSize: AppFontSize.caption,

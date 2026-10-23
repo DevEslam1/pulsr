@@ -83,12 +83,16 @@ void Crossfeed::setMode(CrossfeedMode mode) {
     // into Custom would otherwise read stale samples from a previous Custom run
     // (or zeros/garbage) until the line refills. Clear it on any mode change.
     if (mode_ != previousMode) {
-        std::memset(delayBufferL_, 0, sizeof(delayBufferL_));
-        std::memset(delayBufferR_, 0, sizeof(delayBufferR_));
-        writeIdx_ = 0;
-        lpL_ = 0.0f;
-        lpR_ = 0.0f;
+        clearCustomState();
     }
+}
+
+void Crossfeed::clearCustomState() {
+    std::memset(delayBufferL_, 0, sizeof(delayBufferL_));
+    std::memset(delayBufferR_, 0, sizeof(delayBufferR_));
+    writeIdx_ = 0;
+    lpL_ = 0.0f;
+    lpR_ = 0.0f;
 }
 
 void Crossfeed::configure(double delayUs, double feedDb, double fcut) {
@@ -113,11 +117,18 @@ void Crossfeed::setEnabled(bool enabled) {
 
 void Crossfeed::applyParams(const CrossfeedParamSet& params) {
     enabled_ = params.enabled;
-    mode_ = params.mode;
-    if (mode_ == CrossfeedMode::Custom) {
+    const CrossfeedMode requested = static_cast<CrossfeedMode>(params.mode);
+    if (requested == CrossfeedMode::Custom) {
+        const CrossfeedMode previousMode = mode_;
+        mode_ = CrossfeedMode::Custom;
         configure(params.delayUs, params.feedDb, params.fcut);
+        // Entering Custom from a preset leaves the delay line holding stale
+        // audio; clear it just like setMode() does for a preset transition.
+        if (mode_ != previousMode) clearCustomState();
     } else {
-        setMode(mode_);
+        // Let setMode() observe the old mode so a preset change still resets
+        // the BS2B/custom state. Assigning mode_ before the call prevented it.
+        setMode(requested);
     }
 }
 

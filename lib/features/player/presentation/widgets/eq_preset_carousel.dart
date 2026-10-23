@@ -226,7 +226,7 @@ extension _EqPresetCarousel on _EqualizerSheetState {
                   final parsed = <double>[];
                   for (final c in controllers) {
                     final v = double.tryParse(c.text.trim());
-                    if (v == null) {
+                    if (v == null || !v.isFinite) {
                       setDialogState(
                           () => error = context.l10n.dspEveryBandValidNumber);
                       return;

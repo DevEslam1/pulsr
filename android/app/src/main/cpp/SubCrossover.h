@@ -66,6 +66,7 @@ private:
     bool antiPop_ = true;
     bool enabled_ = false;
     double smoothedEnabledMix_ = 0.0;
+    double smoothedAntiPopMix_ = 1.0;
     bool cascade_ = true; // 24 dB/oct = two cascaded sections
 
     static constexpr int MAX_PAIRS = MAX_CHANNELS / 2; // 4 stereo pairs

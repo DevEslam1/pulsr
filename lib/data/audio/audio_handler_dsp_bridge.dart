@@ -190,6 +190,9 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   // Native DSP features
   bool get isCrossfeedEnabled => _equalizerManager.isCrossfeedEnabled;
 
+  /// Persisted user intent (not route-gated); the UI toggle mirrors this.
+  bool get crossfeedUserEnabled => _equalizerManager.crossfeedUserEnabled;
+
   double get crossfeedDelayUs => _equalizerManager.crossfeedDelayUs;
 
   double get crossfeedFeedDb => _equalizerManager.crossfeedFeedDb;
@@ -197,9 +200,17 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   int get crossfeedMode => _equalizerManager.crossfeedMode;
 
   Future<void> setCrossfeed(bool enabled,
-          {double? delayUs, double? feedDb, int? mode}) =>
+          {double? delayUs,
+          double? feedDb,
+          double? fcut,
+          int? mode,
+          bool? preferenceEnabled}) =>
       _equalizerManager.setCrossfeed(enabled,
-          delayUs: delayUs, feedDb: feedDb, mode: mode);
+          delayUs: delayUs,
+          feedDb: feedDb,
+          fcut: fcut,
+          mode: mode,
+          preferenceEnabled: preferenceEnabled);
 
   Future<void> setCrossfeedMode(int mode) =>
       _equalizerManager.setCrossfeedMode(mode);

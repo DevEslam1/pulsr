@@ -222,6 +222,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   bool get isCrossfeedEnabled => false;
   @override
+  bool get crossfeedUserEnabled => isCrossfeedEnabled;
+  @override
   double get crossfeedDelayUs => 350.0;
   @override
   double get crossfeedFeedDb => -9.0;
@@ -367,7 +369,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     bool enabled, {
     double? delayUs,
     double? feedDb,
+    double? fcut,
     int? mode,
+    bool? preferenceEnabled,
   }) async {}
   @override
   Future<void> setLookaheadLimiter(

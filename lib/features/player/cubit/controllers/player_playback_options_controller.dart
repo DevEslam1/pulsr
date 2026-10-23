@@ -58,6 +58,8 @@ class PlayerPlaybackOptionsController {
   /// applied by ExoPlayer's Sonic processor in the same sink chain the native
   /// bit-perfect early-return protects, so they must obey their own guard.
   final String? Function()? _playbackRateBlockedReason;
+  final Future<void> Function(SongsTableData song, String? presetName)?
+      _onPerSongEqOverride;
   int _quranToggleGen = 0;
   bool? _targetQuranModeEnabled;
   int _reciterStyleGen = 0;
@@ -78,6 +80,8 @@ class PlayerPlaybackOptionsController {
     SongRatingStore? songRatingStore,
     bool Function(String feature, {bool showError})? guardDsp,
     String? Function()? playbackRateBlockedReason,
+    Future<void> Function(SongsTableData song, String? presetName)?
+        onPerSongEqOverride,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
     required bool Function() isClosed,
@@ -88,6 +92,7 @@ class PlayerPlaybackOptionsController {
         _hiResAudioService = hiResAudioService,
         _guardDsp = guardDsp,
         _playbackRateBlockedReason = playbackRateBlockedReason,
+        _onPerSongEqOverride = onPerSongEqOverride,
         _getState = getState,
         _emit = emit,
         _isClosed = isClosed,
@@ -246,9 +251,14 @@ class PlayerPlaybackOptionsController {
   Future<void> setSongEqOverrideById(int songId, String? presetName) async {
     await _perSongEqStore.setPresetForTrack(songId.toString(), presetName);
     final s = _getState();
-    if (s.currentSong?.id == songId) {
+    final currentSong = s.currentSong;
+    if (currentSong?.id == songId) {
       _emit(s.copyWith(
           playback: s.playback.copyWith(currentSongEqOverride: presetName)));
+      final applyOverride = _onPerSongEqOverride;
+      if (applyOverride != null) {
+        unawaited(applyOverride(currentSong!, presetName));
+      }
     }
   }
 
@@ -308,7 +318,7 @@ class PlayerPlaybackOptionsController {
     final speed = _perSongPlaybackStore.getSpeed(key);
     final pitch = _perSongPlaybackStore.getPitch(key);
     final gainDb = _perSongVolumeStore.getGainDbForTrack(key);
-    final eqPreset = _perSongEqStore.getPresetForTrack(key);
+    final eqPreset = await _perSongEqStore.getPresetForTrackWhenReady(key);
 
     if (_isClosed() || gen != _playbackMemoryGen) return;
     if (_getState().currentSong?.id != song.id) return;
@@ -358,6 +368,12 @@ class PlayerPlaybackOptionsController {
         currentSongEqOverride: eqPreset,
       ),
     ));
+    // The track-change hook normally applies this; re-assert it here for
+    // resume paths where no mediaItem change fires.
+    final applyOverride = _onPerSongEqOverride;
+    if (applyOverride != null && eqPreset != null) {
+      unawaited(applyOverride(song, eqPreset));
+    }
   }
 
   // ──────────────────────────────────────────────

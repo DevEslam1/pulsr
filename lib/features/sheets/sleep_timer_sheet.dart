@@ -357,16 +357,8 @@ class _CustomMinutesDialogState extends State<_CustomMinutesDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
-    return AlertDialog(
-      backgroundColor: p.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppRadii.r18All,
-      ),
-      title: Text(
-        context.l10n.customTime,
-        style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
-      ),
+    return PulsrDialog(
+      title: Text(context.l10n.customTime),
       content: TextField(
         controller: _controller,
         keyboardType: TextInputType.number,

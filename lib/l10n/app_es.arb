@@ -2892,6 +2892,15 @@
   "@autoEqDatabase": {
     "description": "tranche8 l10n"
   },
+  "autoEqProfilesSubtitle": "{count} perfiles · paramétrico (frec/Q/ganancia)",
+  "@autoEqProfilesSubtitle": {
+    "description": "Recuento de perfiles y tipo de corrección en la hoja de AutoEQ",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "noHpMatch": "Sin perfiles coincidentes",
   "@noHpMatch": {
     "description": "tranche8 l10n"

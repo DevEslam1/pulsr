@@ -484,7 +484,7 @@ class _SearchViewState extends State<_SearchView> {
       builder: (context, state) {
         final cubit = context.read<SearchCubit>();
         return SizedBox(
-          height: 48,
+          height: AppSpacing.minTouchTarget + (AppSpacing.xs * 2),
           child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),

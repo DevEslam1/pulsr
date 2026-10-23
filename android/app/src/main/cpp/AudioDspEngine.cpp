@@ -763,6 +763,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         arbitraryEq_.applyParams(snapshot->arbitraryEq);
         liveProg_.applyParams(snapshot->liveProg);
         safetyLimiter_.configure(5.0, snapshot->headphoneSafety.safetyCeilingDb, 50.0, true);
+        // The safety stage is a hard guard: enabling/disabling it is immediate.
+        // The user-facing limiter fades in/out via setProcessingActive().
         safetyLimiter_.setEnabled(snapshot->headphoneSafety.enabled);
 
         lastAppliedGeneration_.store(snapshot->generation);
@@ -776,6 +778,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         safetyAttenuationActive_.store(false, std::memory_order_relaxed);
+        limiter_.setProcessingActive(false);
         return frames;
     }
 
@@ -784,6 +787,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         safetyAttenuationActive_.store(false, std::memory_order_relaxed);
+        limiter_.setProcessingActive(false);
         if (std::abs(snapshot->bypassCompare.gainCompensationLinear - 1.0) > 1e-4) {
             const int totalSamples = frames * channels;
             const float gain = static_cast<float>(snapshot->bypassCompare.gainCompensationLinear);
@@ -887,9 +891,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // clipping bug the audit flagged is fixed by adding CROSSFEED/CROSSOVER to
     // hasNetPositiveGain above — NOT by forcing the limiter always-on, which
     // added latency to neutral chains and broke bit-exact bypass.
-    const bool runLimiter = hasNetPositiveGain ||
-        ((stages & STAGE_LIMITER) && snapshot->limiter.enabled) ||
-        limiter_.isDraining();
+    const bool limiterRequested = hasNetPositiveGain ||
+        ((stages & STAGE_LIMITER) && snapshot->limiter.enabled);
+    // Tell the limiter whether the graph wants it this block. When it stops
+    // being requested the limiter ramps from its delayed/limited path back to
+    // the direct signal over one lookahead window; isDraining() keeps it in the
+    // chain until that crossfade completes instead of dropping ~5 ms abruptly.
+    limiter_.setProcessingActive(limiterRequested);
+    const bool runLimiter = limiterRequested || limiter_.isDraining();
     const bool dvcActive = snapshot->directVolume.enabled &&
         (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(snapshot->directVolume.gainLinear - 1.0) > 1e-4);
     const bool nonUnityGain = (stages != 0) ||
@@ -904,7 +913,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                               saturation_.isRamping() || arbitraryEq_.isRamping() ||
                               viperDdc_.isRamping() || liveProg_.isRamping() ||
                               dynamicBass_.isRamping() || multibandCompressor_.isRamping() ||
-                              panner_.isRamping();
+                              panner_.isRamping() ||
+                              runLimiter;
 
     if (nonUnityGain) {
         // Apply smoothed ReplayGain pre-gain before EQ stage

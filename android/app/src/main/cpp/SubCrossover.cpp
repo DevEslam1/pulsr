@@ -26,6 +26,7 @@ void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGa
     // skip the recompute entirely.
     const bool structural =
         std::abs(newCorner - cornerHz_) > 0.01 || newCascade != cascade_;
+    const bool bassMonoChanged = (bassMono != bassMono_);
     cornerHz_ = newCorner;
     slopeDbPerOct_ = newCascade ? 24.0 : 12.0;
     cascade_ = newCascade;
@@ -40,6 +41,13 @@ void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGa
     if (structural) {
         computeCoeffs();
         reset();
+    } else if (bassMonoChanged) {
+        // The side-channel low-pass only runs while Bass Mono is on. Clear its
+        // dormant state so re-enabling cannot replay samples from an old run.
+        for (int p = 0; p < MAX_PAIRS; ++p) {
+            stageSide1_[p].z1 = stageSide1_[p].z2 = 0.0;
+            stageSide2_[p].z1 = stageSide2_[p].z2 = 0.0;
+        }
     }
 }
 
@@ -75,6 +83,7 @@ void SubCrossover::computeCoeffs() {
 void SubCrossover::reset() {
     smoothedSubGain_ = targetSubGain_;
     smoothedEnabledMix_ = enabled_ ? 1.0 : 0.0;
+    smoothedAntiPopMix_ = antiPop_ ? 1.0 : 0.0;
     for (int p = 0; p < MAX_PAIRS; ++p) {
         stage1_[p].z1 = stage1_[p].z2 = 0.0;
         stage2_[p].z1 = stage2_[p].z2 = 0.0;
@@ -99,6 +108,16 @@ void SubCrossover::process(float* L, float* R, int frames) {
     }
     const double mixStep = (frames > 0) ? ((smoothedEnabledMix_ - startMix) / frames) : 0.0;
 
+    // Anti-pop is a nonlinear stage; crossfade it in/out instead of switching
+    // tanh() on instantly (which produces a discontinuity at the toggle point).
+    const double startAntiPop = smoothedAntiPopMix_;
+    smoothedAntiPopMix_ += smoothFactor * ((antiPop_ ? 1.0 : 0.0) - startAntiPop);
+    if (std::abs(smoothedAntiPopMix_ - (antiPop_ ? 1.0 : 0.0)) < 5e-4) {
+        smoothedAntiPopMix_ = antiPop_ ? 1.0 : 0.0;
+    }
+    const double antiPopStep = (frames > 0) ? ((smoothedAntiPopMix_ - startAntiPop) / frames) : 0.0;
+    double curAntiPop = startAntiPop;
+
     const float gain = static_cast<float>(smoothedSubGain_);
     // FIX M-6: makeup only attenuates the added sub tap, not the entire mix
     const float subAttenuation = 1.0f / (1.0f + gain * 0.5f);
@@ -108,12 +127,13 @@ void SubCrossover::process(float* L, float* R, int frames) {
     LpStage& ss2 = stageSide2_[0];
 
     const bool doBassMono = bassMono_;
-    const bool doAntiPop = antiPop_;
 
     double curMix = startMix;
     for (int i = 0; i < frames; ++i) {
         curMix += mixStep;
+        curAntiPop += antiPopStep;
         const float mixF = static_cast<float>(curMix);
+        const float antiPopMix = static_cast<float>(std::clamp(curAntiPop, 0.0, 1.0));
         float l = L[i];
         float r = R[i];
 
@@ -131,9 +151,9 @@ void SubCrossover::process(float* L, float* R, int frames) {
         float sub = s1.process(mono);
         if (cascade_) sub = s2.process(sub);
 
-        // 3. Anti-pop soft limiting
-        if (doAntiPop) {
-            sub = std::tanh(sub);
+        // 3. Anti-pop soft limiting (crossfaded so toggling it cannot click)
+        if (antiPopMix > 0.0f) {
+            sub = sub * (1.0f - antiPopMix) + std::tanh(sub) * antiPopMix;
         }
 
         // FIX M-6: apply sub gain + makeup attenuation only to the added sub tap
@@ -168,16 +188,25 @@ void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
     }
     const double mixStep = (frames > 0) ? ((smoothedEnabledMix_ - startMix) / frames) : 0.0;
 
+    const double startAntiPop = smoothedAntiPopMix_;
+    smoothedAntiPopMix_ += smoothFactor * ((antiPop_ ? 1.0 : 0.0) - startAntiPop);
+    if (std::abs(smoothedAntiPopMix_ - (antiPop_ ? 1.0 : 0.0)) < 5e-4) {
+        smoothedAntiPopMix_ = antiPop_ ? 1.0 : 0.0;
+    }
+    const double antiPopStep = (frames > 0) ? ((smoothedAntiPopMix_ - startAntiPop) / frames) : 0.0;
+    double curAntiPop = startAntiPop;
+
     const float gain = static_cast<float>(smoothedSubGain_);
     // FIX M-6: makeup only attenuates the added sub tap, not the entire mix
     const float subAttenuation = 1.0f / (1.0f + gain * 0.5f);
     const bool doBassMono = bassMono_;
-    const bool doAntiPop = antiPop_;
 
     double curMix = startMix;
     for (int i = 0; i < frames; ++i) {
         curMix += mixStep;
+        curAntiPop += antiPopStep;
         const float mixF = static_cast<float>(curMix);
+        const float antiPopMix = static_cast<float>(std::clamp(curAntiPop, 0.0, 1.0));
         for (int ch = 0; ch + 1 < channels; ch += 2) {
             const int iL = i * channels + ch;
             const int iR = i * channels + ch + 1;
@@ -202,8 +231,8 @@ void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
             float sub = s1.process(mono);
             if (cascade_) sub = s2.process(sub);
 
-            if (doAntiPop) {
-                sub = std::tanh(sub);
+            if (antiPopMix > 0.0f) {
+                sub = sub * (1.0f - antiPopMix) + std::tanh(sub) * antiPopMix;
             }
 
             // FIX M-6: apply sub gain + makeup attenuation only to the added sub tap

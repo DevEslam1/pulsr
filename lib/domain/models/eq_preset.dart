@@ -260,6 +260,7 @@ class EqPreset {
     List<double> targetFrequencies = centerFrequencies,
     Map<int, List<double>>? bandsMap,
     int? currentBandCount,
+    List<double>? sourceFrequencies,
   }) {
     if (bandsMap != null && currentBandCount != null) {
       bandsMap[currentBandCount] = List<double>.from(source);
@@ -277,15 +278,21 @@ class EqPreset {
     // Key the source centers off the exact band count: the app's 32-band plan
     // (iso32BandFrequencies, 20 Hz–20 kHz) is distinct from the 31-entry ISO
     // 1/3-octave list, so a 32-band curve converted to 10 bands stays aligned.
-    final srcFreqs = source.length == centerFrequencies.length
-        ? centerFrequencies
-        : (source.length == iso32BandFrequencies.length
-            ? iso32BandFrequencies
-            : (source.length == iso31Frequencies.length
-                ? iso31Frequencies
-                : (source.length == iso64Frequencies.length
-                    ? iso64Frequencies
-                    : _logSpread(source.length, targetFrequencies))));
+    final List<double> srcFreqs;
+    if (sourceFrequencies != null &&
+        sourceFrequencies.length == source.length) {
+      srcFreqs = sourceFrequencies;
+    } else if (source.length == centerFrequencies.length) {
+      srcFreqs = centerFrequencies;
+    } else if (source.length == iso32BandFrequencies.length) {
+      srcFreqs = iso32BandFrequencies;
+    } else if (source.length == iso31Frequencies.length) {
+      srcFreqs = iso31Frequencies;
+    } else if (source.length == iso64Frequencies.length) {
+      srcFreqs = iso64Frequencies;
+    } else {
+      srcFreqs = _logSpread(source.length, targetFrequencies);
+    }
 
     return [
       for (final f in targetFrequencies) _interpAtLogFreq(f, srcFreqs, source)

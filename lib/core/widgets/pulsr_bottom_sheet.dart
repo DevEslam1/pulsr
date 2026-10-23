@@ -200,10 +200,27 @@ class PulsrBottomSheetContainer extends StatelessWidget {
       );
     }
 
-    final sheetMaxH = Adaptive.sheetMaxHeight(context);
+    // Lift the sheet above the software keyboard and cap its height to the
+    // space that actually remains, so text-field sheets never hide their
+    // inputs or overflow behind the IME.
+    final media = MediaQuery.of(context);
+    final keyboardInset = media.viewInsets.bottom;
+    final availableHeight = math.max(
+      AppSpacing.s56,
+      media.size.height - keyboardInset - media.padding.top - AppSpacing.xs,
+    );
+    final sheetMaxH =
+        math.min(Adaptive.sheetMaxHeight(context), availableHeight);
+    final insetDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
 
     return Align(
-        alignment: Alignment.bottomCenter,
+      alignment: Alignment.bottomCenter,
+      child: AnimatedPadding(
+        duration: insetDuration,
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.only(bottom: keyboardInset),
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: maxSheetWidth,
@@ -325,6 +342,8 @@ class PulsrBottomSheetContainer extends StatelessWidget {
               ),
             ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 }

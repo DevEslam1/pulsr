@@ -8,6 +8,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import 'stacked_bottom_dock.dart';
 
 /// Explicit picker for the mini-player dock stacking style.
@@ -31,11 +32,10 @@ class DockStylePickerSheet extends StatefulWidget {
     required DockStackMode current,
     required ValueChanged<DockStackMode> onSelected,
   }) {
-    return showModalBottomSheet<void>(
+    return PulsrAdaptiveSheet.show<void>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      showDragHandle: true,
+      titleText: context.l10n.dockStyleTitle,
+      subtitle: Text(context.l10n.dockStyleSubtitle),
       builder: (_) => DockStylePickerSheet(
         current: current,
         onSelected: onSelected,
@@ -58,7 +58,6 @@ class _DockStylePickerSheetState extends State<DockStylePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
     final options = <(DockStackMode, String, String, String)>[
       (
         DockStackMode.defaultLayout,
@@ -86,67 +85,43 @@ class _DockStylePickerSheetState extends State<DockStylePickerSheet> {
       ),
     ];
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(
-          AppSpacing.md,
-          0,
-          AppSpacing.md,
-          AppSpacing.md,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                context.l10n.dockStyleTitle,
-                style: TextStyle(
-                  fontSize: AppFontSize.titleLarge,
-                  fontWeight: FontWeight.w800,
-                  color: p.textPrimary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                context.l10n.dockStyleSubtitle,
-                style: TextStyle(
-                  fontSize: AppFontSize.bodySmall,
-                  fontWeight: FontWeight.w500,
-                  color: p.textSecondary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Live Interactive Preview Banner
-              _LiveDockPreviewBanner(
-                previewMode: _previewMode,
-                selectedMode: widget.current,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              for (final (mode, name, desc, bestFor) in options)
-                _DockStyleOption(
-                  mode: mode,
-                  name: name,
-                  description: desc,
-                  bestFor: bestFor,
-                  selected: mode == widget.current,
-                  onHover: () {
-                    if (_previewMode != mode) {
-                      setState(() => _previewMode = mode);
-                    }
-                  },
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).pop();
-                    widget.onSelected(mode);
-                  },
-                ),
-            ],
+    return SingleChildScrollView(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Live Interactive Preview Banner
+          _LiveDockPreviewBanner(
+            previewMode: _previewMode,
+            selectedMode: widget.current,
           ),
-        ),
+          const SizedBox(height: AppSpacing.sm),
+
+          for (final (mode, name, desc, bestFor) in options)
+            _DockStyleOption(
+              mode: mode,
+              name: name,
+              description: desc,
+              bestFor: bestFor,
+              selected: mode == widget.current,
+              onHover: () {
+                if (_previewMode != mode) {
+                  setState(() => _previewMode = mode);
+                }
+              },
+              onTap: () {
+                HapticFeedback.selectionClick();
+                Navigator.of(context).pop();
+                widget.onSelected(mode);
+              },
+            ),
+        ],
       ),
     );
   }

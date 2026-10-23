@@ -26,9 +26,9 @@ void DynamicEQ::setSampleRate(double sampleRate) {
         computeBandCoeffs(bands_[i], bands_[i].currentGainDb);
         // FIX M-7: the detection band-pass and application biquads were just
         // recomputed for the new rate; their retained registers belong to the
-        // old coefficients and would thump. computeBandCoeffs only clears the
-        // application state when |gain|<1e-6 and never clears the detector
-        // state, so flush both explicitly on a rate change (mirrors reset()).
+        // old coefficients and would thump. computeBandCoeffs never clears the
+        // detector state, so flush both explicitly on a rate change (mirrors
+        // reset()).
         BandState& band = bands_[i];
         std::memset(band.dx1, 0, sizeof(band.dx1));
         std::memset(band.dx2, 0, sizeof(band.dx2));
@@ -52,10 +52,9 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
     BandState& band = bands_[idx];
 
     // FIX M-8: detect a structural change (frequency / Q / filter type) so this
-    // band's retained filter state can be cleared below. computeBandCoeffs only
-    // zeroes the application state when |gain|<1e-6 (~:137-140) and never
-    // touches the detector state, so a retune at non-zero gain otherwise leaves
-    // stale registers and clicks. Capture old values before overwriting them.
+    // band's retained filter state can be cleared below. computeBandCoeffs
+    // never touches the detector state, so a retune at non-zero gain otherwise
+    // leaves stale registers and clicks. Capture old values before overwriting.
     const double newFreq = std::clamp(params.frequency, 20.0, sampleRate_ * 0.45);
     const double newQ = std::clamp(params.q, 0.1, 12.0);
     const int newFilterType = std::clamp(params.filterType, 0, 2);
@@ -175,12 +174,11 @@ void DynamicEQ::computeHighShelfCoeffs(double& b0, double& b1, double& b2,
 
 void DynamicEQ::computeBandCoeffs(BandState& band, double gainDb) {
     if (std::abs(gainDb) < 1e-6) {
+        // Identity coefficients keep the biquad state valid: y tracks x, so
+        // crossing 0 dB must not zero the delay registers (that injects a click
+        // every time a dynamic band returns to unity gain).
         band.b0 = 1.0; band.b1 = 0.0; band.b2 = 0.0;
         band.a1 = 0.0; band.a2 = 0.0;
-        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-            band.x1[ch] = 0.0; band.x2[ch] = 0.0;
-            band.y1[ch] = 0.0; band.y2[ch] = 0.0;
-        }
         band.lastCoeffGainDb = 0.0;
         return;
     }

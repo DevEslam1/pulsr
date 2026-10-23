@@ -38,6 +38,7 @@ public:
 
 private:
     void initBs2b(double fcut, double feedDb);
+    void clearCustomState();
 
     double sampleRate_ = 48000.0;
     CrossfeedMode mode_ = CrossfeedMode::Bs2bDefault;

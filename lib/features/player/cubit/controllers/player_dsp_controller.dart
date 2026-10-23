@@ -68,6 +68,7 @@ class PlayerDspController {
 
   StreamSubscription<AudioOutputInfo>? _deviceSub;
   DspSlice? _dspSnapshot;
+  bool _multibandCompressorRestore = false;
 
   /// Pure, route-based DSP compensation (crossfeed gating + codec-aware music
   /// EQ/reverb) runs through [EarbudOptimizationService.detect], whose methods
@@ -87,6 +88,8 @@ class PlayerDspController {
   EqPreset? globalEqBackup;
   HeadphoneProfile? globalHeadphoneProfileBackup;
   bool perSongOverrideActive = false;
+  int _perSongEqApplyGen = 0;
+  int _trackDspStateGen = 0;
   String? _lastAutoAppliedDeviceKey;
   bool _smartAutoBitPerfectApplied = false;
   DateTime _lastUserInteraction = DateTime.fromMillisecondsSinceEpoch(0);

@@ -96,8 +96,22 @@ void HarmonicSaturation::reset() {
     }
     std::memset(subDelay_, 0, sizeof(subDelay_));
     smoothedEnabledMix_ = enabled_ ? 1.0f : 0.0f;
+    smoothedDrive_ = drive_;
+    smoothedMix_ = mix_;
+    smoothedTilt_ = tilt_;
     prevMode_ = mode_;
     modeCrossfadeProgress_ = 1.0f;
+}
+
+void HarmonicSaturation::smoothParameters(int frames) {
+    if (frames <= 0) return;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * 0.020));
+    smoothedDrive_ += smoothFactor * (drive_ - smoothedDrive_);
+    smoothedMix_ += smoothFactor * (mix_ - smoothedMix_);
+    smoothedTilt_ += smoothFactor * (tilt_ - smoothedTilt_);
+    if (std::abs(smoothedDrive_ - drive_) < 1e-5) smoothedDrive_ = drive_;
+    if (std::abs(smoothedMix_ - mix_) < 1e-5) smoothedMix_ = mix_;
+    if (std::abs(smoothedTilt_ - tilt_) < 1e-5) smoothedTilt_ = tilt_;
 }
 
 static inline float shapeSample(float x, double k, float invNorm, int mode) {
@@ -136,9 +150,10 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
     const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
     float currentEnabledMix = startEnabledMix;
 
-    const double k = k_;
-    const float mix = static_cast<float>(mix_);
-    const float tilt = static_cast<float>(tilt_);
+    smoothParameters(frames);
+    const double k = smoothedDrive_ * kMaxDrive;
+    const float mix = static_cast<float>(smoothedMix_);
+    const float tilt = static_cast<float>(smoothedTilt_);
     const float hpCoeff = tiltHpCoeff_;
     const float invNorm = (k > 1e-9) ? static_cast<float>(1.0 / k) : 1.0f;
     const int mode = mode_;
@@ -376,10 +391,11 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
     const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
     float currentEnabledMix = startEnabledMix;
 
+    smoothParameters(frames);
     if (channels == 2) {
-        const double k = k_;
-        const float mix = static_cast<float>(mix_);
-        const float tilt = static_cast<float>(tilt_);
+        const double k = smoothedDrive_ * kMaxDrive;
+        const float mix = static_cast<float>(smoothedMix_);
+        const float tilt = static_cast<float>(smoothedTilt_);
         const float hpCoeff = tiltHpCoeff_;
         const float invNorm = (k > 1e-9) ? static_cast<float>(1.0 / k) : 1.0f;
         const int mode = mode_;
@@ -597,9 +613,9 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
         return;
     }
 
-    const double k = k_;
-    const float mix = static_cast<float>(mix_);
-    const float tilt = static_cast<float>(tilt_);
+    const double k = smoothedDrive_ * kMaxDrive;
+    const float mix = static_cast<float>(smoothedMix_);
+    const float tilt = static_cast<float>(smoothedTilt_);
     const float hpCoeff = tiltHpCoeff_;
     const float invNorm = (k > 1e-9) ? static_cast<float>(1.0 / k) : 1.0f;
     const int mode = mode_;

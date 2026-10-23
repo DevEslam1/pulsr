@@ -7619,6 +7619,12 @@ abstract class AppLocalizations {
   /// **'AutoEQ 2.0 Database'**
   String get autoEqDatabase;
 
+  /// Profile count and correction type in the AutoEQ database sheet
+  ///
+  /// In en, this message translates to:
+  /// **'{count} profiles · parametric (freq/Q/gain)'**
+  String autoEqProfilesSubtitle(int count);
+
   /// tranche8 l10n
   ///
   /// In en, this message translates to:
@@ -15020,4 +15026,6 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   throw FlutterError(
       'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
       'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible samp
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
+}

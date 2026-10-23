@@ -163,13 +163,37 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
 
     channels = std::clamp(channels, 1, MAX_CHANNELS);
 
-    for (int f = 0; f < inFrames; ++f) {
+    // The FIR reads up to HALF_TAPS samples of already-consumed history behind
+    // the oldest unread frame, so leave headroom below the physical capacity.
+    constexpr int FIFO_LIMIT = FIFO_CAPACITY - 256;
+    int sourceOffset = 0;
+    int framesToWrite = inFrames;
+    int overflow = availableFrames_ + framesToWrite - FIFO_LIMIT;
+    bool droppedFrames = false;
+    if (overflow > 0) {
+        droppedFrames = true;
+        const int droppedExisting = std::min(overflow, availableFrames_);
+        if (droppedExisting > 0) {
+            availableFrames_ -= droppedExisting;
+            phase_ = std::max(0.0, phase_ - static_cast<double>(droppedExisting));
+            overflow -= droppedExisting;
+        }
+        if (overflow > 0) {
+            // The new block alone exceeds the FIFO: retain its newest frames and
+            // rebase the read phase to their start.
+            sourceOffset = std::min(overflow, framesToWrite);
+            framesToWrite -= sourceOffset;
+            phase_ = 0.0;
+        }
+    }
+
+    for (int f = sourceOffset; f < inFrames; ++f) {
         for (int ch = 0; ch < channels; ++ch) {
             ringBuf_[ch][writePos_] = in[ch][f];
         }
         writePos_ = (writePos_ + 1) % FIFO_CAPACITY;
     }
-    availableFrames_ += inFrames;
+    availableFrames_ += framesToWrite;
 
     int outFrames = 0;
     while (phase_ < static_cast<double>(availableFrames_ - HALF_TAPS) && outFrames < maxOutFrames) {
@@ -271,16 +295,15 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
         availableFrames_ = std::max(0, availableFrames_ - consumedInt);
     }
 
-    if (availableFrames_ > FIFO_CAPACITY - 256) {
+    if (droppedFrames) {
 #if defined(__ANDROID__)
         __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
-            "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames",
-            availableFrames_, FIFO_CAPACITY - 256);
+            "SincResampler: FIFO overflow, dropped oldest frames (limit %d)",
+            FIFO_LIMIT);
 #else
-        fprintf(stderr, "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames\n",
-            availableFrames_, FIFO_CAPACITY - 256);
+        fprintf(stderr, "SincResampler: FIFO overflow, dropped oldest frames (limit %d)\n",
+            FIFO_LIMIT);
 #endif
-        availableFrames_ = FIFO_CAPACITY - 256;
     }
 
     return outFrames;

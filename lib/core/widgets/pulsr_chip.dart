@@ -64,77 +64,89 @@ class PulsrChip extends StatelessWidget {
       label: label,
       child: PulsrPressable(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: context.motion(PulsrMotion.fast),
-          curve: Curves.easeOutCubic,
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 36),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
+        focusBorderRadius: AppRadii.full,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: AppSpacing.minTouchTarget,
           ),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: AppRadii.full,
-            border: Border.all(
-              color: borderColor,
-              width: selected ? 1.4 : 1.0,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 16.0,
-                  color: iconColor,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-              ] else if (selected && variant == PulsrChipVariant.filter) ...[
-                Icon(
-                  Icons.check_rounded,
-                  size: 15.0,
-                  color: iconColor,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-              ],
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Manrope',
-                    fontSize: AppFontSize.label,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                    letterSpacing: AppTracking.label,
-                    color: textColor,
-                    height: 1.1,
-                  ),
+          child: Center(
+            widthFactor: 1.0,
+            child: AnimatedContainer(
+              duration: context.motion(PulsrMotion.fast),
+              curve: Curves.easeOutCubic,
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 36),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: AppRadii.full,
+                border: Border.all(
+                  color: borderColor,
+                  width: selected ? 1.4 : 1.0,
                 ),
               ),
-              if (onDeleted != null) ...[
-                const SizedBox(width: AppSpacing.xs),
-                Semantics(
-                  button: true,
-                  label: MaterialLocalizations.of(context).deleteButtonTooltip,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onDeleted,
-                    child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Icon(
-                        Icons.close_rounded,
-                        size: 16.0,
-                        color: textColor.withValues(alpha: 0.7),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(
+                      icon,
+                      size: 16.0,
+                      color: iconColor,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                  ] else if (selected &&
+                      variant == PulsrChipVariant.filter) ...[
+                    Icon(
+                      Icons.check_rounded,
+                      size: 15.0,
+                      color: iconColor,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        fontSize: AppFontSize.label,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w600,
+                        letterSpacing: AppTracking.label,
+                        color: textColor,
+                        height: 1.1,
                       ),
                     ),
                   ),
-                ),
-              ],
-            ],
+                  if (onDeleted != null) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    Semantics(
+                      button: true,
+                      label:
+                          MaterialLocalizations.of(context).deleteButtonTooltip,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onDeleted,
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 16.0,
+                            color: textColor.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

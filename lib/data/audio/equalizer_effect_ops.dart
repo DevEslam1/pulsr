@@ -170,12 +170,15 @@ extension EqualizerEffectOps on EqualizerManager {
     double? feedDb,
     double? fcut,
     int? mode,
+    bool? preferenceEnabled,
   }) async {
     final prevDelay = crossfeedDelayUs;
     final prevFeed = crossfeedFeedDb;
     final prevFcut = crossfeedFcut;
     final prevMode = crossfeedMode;
     final prevEnabled = isCrossfeedEnabled;
+    final prevUserEnabled = crossfeedUserEnabled;
+    final targetPreference = preferenceEnabled ?? enabled;
 
     final targetDelay = delayUs != null
         ? DspParamRanges.crossfeedDelayUs.clamp(delayUs)
@@ -203,6 +206,7 @@ extension EqualizerEffectOps on EqualizerManager {
       crossfeedFcut = targetFcut;
       crossfeedMode = targetMode;
       isCrossfeedEnabled = enabled;
+      crossfeedUserEnabled = targetPreference;
       _debouncedSavePreferences();
       _syncPipeline();
     } catch (e, st) {
@@ -211,6 +215,7 @@ extension EqualizerEffectOps on EqualizerManager {
       crossfeedFcut = prevFcut;
       crossfeedMode = prevMode;
       isCrossfeedEnabled = prevEnabled;
+      crossfeedUserEnabled = prevUserEnabled;
       ErrorLogger.log('Failed to set crossfeed',
           error: e, stackTrace: st, category: 'EqualizerManager');
       rethrow;

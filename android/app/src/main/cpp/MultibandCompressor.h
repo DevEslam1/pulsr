@@ -72,7 +72,9 @@ private:
     double releaseCoeff_[NUM_BANDS] = {};
     double envelopeDb_[NUM_BANDS] = {};    // linear amplitude envelope per band (attack/release smoothed)
     double smoothedGainDb_[NUM_BANDS] = {};
+    double smoothedMakeupDb_[NUM_BANDS] = {};
     double currentGainReductionDb_[NUM_BANDS] = {};
+    double makeupSmoothCoeff_ = 0.0;
 
     // Scratch buffers for chunked processing (zero heap allocation during audio stream)
     float bandBufferL_[NUM_BANDS][MAX_CHUNK_FRAMES] = {};

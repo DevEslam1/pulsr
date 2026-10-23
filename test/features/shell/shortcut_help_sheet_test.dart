@@ -19,19 +19,16 @@ Widget host(Widget child) => MaterialApp(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('renders the title, subtitle and every shortcut row',
-      (tester) async {
+  testWidgets('renders every shortcut row', (tester) async {
     // Tall surface so all 12 lazily-built list rows are laid out at once.
     tester.view.physicalSize = const Size(1200, 2600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
+    // The shared adaptive shell owns the title/subtitle; this widget only
+    // supplies the shortcut list.
     await tester.pumpWidget(host(const ShortcutHelpSheet()));
     await tester.pumpAndSettle();
-
-    expect(find.text('Keyboard Shortcuts'), findsOneWidget);
-    expect(
-        find.text('Desktop and tablet quick navigation keys'), findsOneWidget);
 
     // One row per binding: 12 keys.
     for (final key in [
@@ -74,6 +71,8 @@ void main() {
 
     expect(find.byType(ShortcutHelpSheet), findsOneWidget);
     expect(find.text('Keyboard Shortcuts'), findsOneWidget);
+    expect(
+        find.text('Desktop and tablet quick navigation keys'), findsOneWidget);
 
     // Dismiss the modal so no timers/routes survive the test.
     await tester.tapAt(const Offset(20, 20));

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../constants/app_radii.dart';
+import '../constants/app_spacing.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
 
 /// {@category DesignSystem}
-/// Circular icon button with guaranteed 44x44 minimum touch target,
+/// Circular icon button with a guaranteed 48dp minimum touch target,
 /// background tint, and badge integration.
 class PulsrIconButton extends StatelessWidget {
   final IconData icon;
@@ -12,6 +14,8 @@ class PulsrIconButton extends StatelessWidget {
   final String? semanticLabel;
   final Color? iconColor;
   final Color? backgroundColor;
+
+  /// Visual diameter. The interactive target expands to at least 48dp.
   final double size;
   final double iconSize;
   final Widget? badge;
@@ -72,10 +76,11 @@ class PulsrIconButton extends StatelessWidget {
 
     button = PulsrPressable(
       onTap: onPressed,
+      focusBorderRadius: AppRadii.full,
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minWidth: 44.0,
-          minHeight: 44.0,
+        constraints: const BoxConstraints(
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget,
         ),
         child: Center(child: button),
       ),

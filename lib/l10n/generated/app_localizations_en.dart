@@ -4212,6 +4212,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get autoEqDatabase => 'AutoEQ 2.0 Database';
 
   @override
+  String autoEqProfilesSubtitle(int count) {
+    return '$count profiles · parametric (freq/Q/gain)';
+  }
+
+  @override
   String get noHpMatch => 'No matching headphone profiles found';
 
   @override

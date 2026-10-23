@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
@@ -96,40 +97,39 @@ Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
     return;
   }
 
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(context.l10n.bitPerfectConflictTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(context.l10n.bitPerfectConflictBody),
-          const SizedBox(height: 12),
-          for (final c in conflicts)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                children: [
-                  const Icon(Icons.block_rounded, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(c.label)),
-                ],
-              ),
+  final confirmed = await PulsrDialogHelper.showPulsrDialog<bool>(
+    context,
+    icon: const Icon(Icons.headphones_rounded),
+    title: Text(context.l10n.bitPerfectConflictTitle),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(context.l10n.bitPerfectConflictBody),
+        const SizedBox(height: 12),
+        for (final c in conflicts)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                const Icon(Icons.block_rounded, size: 16),
+                const SizedBox(width: 8),
+                Expanded(child: Text(c.label)),
+              ],
             ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(context.l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(context.l10n.bitPerfectDisableAndEnable),
-        ),
+          ),
       ],
     ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+        child: Text(context.l10n.cancel),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+        child: Text(context.l10n.bitPerfectDisableAndEnable),
+      ),
+    ],
   );
   if (confirmed != true) return;
 

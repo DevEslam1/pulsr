@@ -154,6 +154,15 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         if (state.isDspEffectsActive) {
           _dspSnapshot = state.dsp;
         }
+        // MBC is owned by the manager (not part of DspSlice), so capture it
+        // separately; leave an existing restore flag alone on a repeat disable.
+        // The manager is unavailable in partial handler fakes, so never let
+        // this best-effort capture abort the master bypass.
+        try {
+          if (_audioHandler.equalizerManager.isMultibandCompressorEnabled) {
+            _multibandCompressorRestore = true;
+          }
+        } catch (_) {}
         _emit(state.copyWith(
           dsp: state.dsp.copyWith(
             isSpatializerEnabled: false,
@@ -191,6 +200,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         await _audioHandler.setLiveProg(false);
         await _audioHandler.setDynamicBass(enabled: false);
         await _audioHandler.setVolumeBoost(0.0);
+        try {
+          await _audioHandler.equalizerManager.setMultibandCompressor(false);
+        } catch (_) {}
       } else {
         final snap = _dspSnapshot;
         if (snap != null && snap.isDspEffectsActive) {
@@ -354,6 +366,10 @@ extension PlayerDspEffectsExtension on PlayerDspController {
           await _audioHandler.setLookaheadLimiter(true,
               thresholdDb: -0.2, releaseMs: 50.0);
         }
+        if (_multibandCompressorRestore) {
+          _multibandCompressorRestore = false;
+          await _audioHandler.equalizerManager.setMultibandCompressor(true);
+        }
       }
     } catch (e) {
       _syncAudioEffects();
@@ -419,20 +435,22 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       );
 
   Future<void> setCrossfeed(bool enabled,
-      {double? delayUs, double? feedDb, int? mode}) {
+      {double? delayUs, double? feedDb, double? fcut, int? mode}) {
     final clampedDelay = delayUs != null
         ? DspParamRanges.crossfeedDelayUs.clampRaw(delayUs)
         : null;
     final clampedFeed =
         feedDb != null ? DspParamRanges.crossfeedFeedDb.clampRaw(feedDb) : null;
+    final clampedFcut =
+        fcut != null ? DspParamRanges.crossfeedFcut.clampRaw(fcut) : null;
     final clampedMode =
         mode != null ? DspParamRanges.crossfeedMode.clamp(mode) : null;
     // Route-gating (fix #1): crossfeed is a headphone-imaging effect that
-    // collapses the stereo image on speakers / car / HDMI. The user's stored
-    // preference stays in state.isCrossfeedEnabled (never overwritten here);
-    // only the value PUSHED to the engine is gated so it auto-bypasses off a
-    // headphone route and restores on one. onOutputDeviceChanged re-pushes the
-    // gated value on every route change (see reevaluateCrossfeedForRoute).
+    // collapses the stereo image on speakers / car / HDMI. The stored user
+    // preference is persisted separately from the gated engine value, so it is
+    // not overwritten when the push is suppressed off a headphone route.
+    // onOutputDeviceChanged re-pushes the gated value on every route change
+    // (see reevaluateCrossfeedForRoute).
     final effective =
         enabled && PlayerDspController.routeWantsCrossfeed(currentOutputInfo());
     return applyDspEffect(
@@ -445,7 +463,11 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         crossfeedMode: clampedMode ?? dsp.crossfeedMode,
       ),
       applyAudioHandler: () => _audioHandler.setCrossfeed(effective,
-          delayUs: clampedDelay, feedDb: clampedFeed, mode: clampedMode),
+          delayUs: clampedDelay,
+          feedDb: clampedFeed,
+          fcut: clampedFcut,
+          mode: clampedMode,
+          preferenceEnabled: enabled),
     );
   }
 

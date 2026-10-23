@@ -6,6 +6,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../../domain/models/quran_metadata.dart';
 import '../../../../domain/models/quran_surah.dart';
 import '../../../../domain/repositories/quran_repository.dart';
@@ -78,94 +79,59 @@ class _QuranMushafViewState extends State<QuranMushafView> {
 
   void _showSurahPicker(BuildContext context, PulsrPalette p) {
     final surahs = _repo.getSurahs();
-    showModalBottomSheet<void>(
+    PulsrAdaptiveSheet.show<void>(
       context: context,
-      backgroundColor: p.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
-      ),
+      titleText: 'Select Surah (فهرس السور)',
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.s16),
-                child: Row(
-                  children: [
-                    Icon(Icons.menu_book_rounded, color: p.accent, size: 22),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      'Select Surah (فهرس السور)',
-                      style: TextStyle(
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w800,
-                        color: p.textPrimary,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          itemCount: surahs.length,
+          separatorBuilder: (_, __) => Divider(height: 1, color: p.hairline),
+          itemBuilder: (_, i) {
+            final s = surahs[i];
+            final isSelected = widget.metadata?.surahNumber == s.number;
+            return ListTile(
+              selected: isSelected,
+              selectedTileColor: p.accent.withValues(alpha: 0.12),
+              leading: CircleAvatar(
+                radius: 16,
+                backgroundColor: isSelected ? p.accent : p.surfaceContainerHigh,
+                child: Text(
+                  '${s.number}',
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? p.onAccent : p.textSecondary,
+                  ),
                 ),
               ),
-              Divider(height: 1, color: p.hairline),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: surahs.length,
-                  separatorBuilder: (_, __) =>
-                      Divider(height: 1, color: p.hairline),
-                  itemBuilder: (_, i) {
-                    final s = surahs[i];
-                    final isSelected = widget.metadata?.surahNumber == s.number;
-                    return ListTile(
-                      selected: isSelected,
-                      selectedTileColor: p.accent.withValues(alpha: 0.12),
-                      leading: CircleAvatar(
-                        radius: 16,
-                        backgroundColor:
-                            isSelected ? p.accent : p.surfaceContainerHigh,
-                        child: Text(
-                          '${s.number}',
-                          style: TextStyle(
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w700,
-                            color: isSelected ? p.onAccent : p.textSecondary,
-                          ),
-                        ),
-                      ),
-                      title: Text(
-                        '${s.nameTransliteration} (${s.nameArabic})',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? p.accent : p.textPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${s.nameEnglish} • ${s.totalAyahs} Ayahs • ${s.revelationPlace}',
-                        style: TextStyle(
-                            fontSize: AppFontSize.caption,
-                            color: p.textSecondary),
-                      ),
-                      trailing: Text(
-                        s.nameArabic,
-                        style: TextStyle(
-                          fontSize: AppFontSize.title,
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? p.accent : p.textSecondary,
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        widget.onSelectSurah?.call(s.number);
-                      },
-                    );
-                  },
+              title: Text(
+                '${s.nameTransliteration} (${s.nameArabic})',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? p.accent : p.textPrimary,
                 ),
               ),
-            ],
-          ),
+              subtitle: Text(
+                '${s.nameEnglish} • ${s.totalAyahs} Ayahs • ${s.revelationPlace}',
+                style: TextStyle(
+                    fontSize: AppFontSize.caption, color: p.textSecondary),
+              ),
+              trailing: Text(
+                s.nameArabic,
+                style: TextStyle(
+                  fontSize: AppFontSize.title,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? p.accent : p.textSecondary,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                widget.onSelectSurah?.call(s.number);
+              },
+            );
+          },
         );
       },
     );

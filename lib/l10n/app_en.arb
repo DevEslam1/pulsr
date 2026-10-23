@@ -3177,6 +3177,15 @@
   "@autoEqDatabase": {
     "description": "tranche8 l10n"
   },
+  "autoEqProfilesSubtitle": "{count} profiles · parametric (freq/Q/gain)",
+  "@autoEqProfilesSubtitle": {
+    "description": "Profile count and correction type in the AutoEQ database sheet",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "noHpMatch": "No matching headphone profiles found",
   "@noHpMatch": {
     "description": "tranche8 l10n"

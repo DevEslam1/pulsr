@@ -4181,6 +4181,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get autoEqDatabase => 'قاعدة بيانات AutoEQ 2.0';
 
   @override
+  String autoEqProfilesSubtitle(int count) {
+    return '$count ملف تعريف · حدودي (تردد/Q/مكسب)';
+  }
+
+  @override
   String get noHpMatch => 'لا توجد ملفات مطابقة';
 
   @override

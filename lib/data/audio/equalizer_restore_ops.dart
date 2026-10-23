@@ -148,7 +148,8 @@ extension EqualizerRestoreOps on EqualizerManager {
       isSpatializerEnabled =
           prefs.getBool(PrefsKeys.eqSpatializerEnabled) ?? false;
 
-      isCrossfeedEnabled = prefs.getBool(PrefsKeys.crossfeedEnabled) ?? false;
+      crossfeedUserEnabled = prefs.getBool(PrefsKeys.crossfeedEnabled) ?? false;
+      isCrossfeedEnabled = crossfeedUserEnabled;
       crossfeedDelayUs = prefs.getDouble(PrefsKeys.crossfeedDelayUs) ?? 350.0;
       crossfeedFeedDb = prefs.getDouble(PrefsKeys.crossfeedFeedDb) ?? -9.0;
       crossfeedMode = prefs.getInt(PrefsKeys.crossfeedMode) ?? 0;
@@ -402,7 +403,7 @@ extension EqualizerRestoreOps on EqualizerManager {
       final pendingFutures = <Future<void>>[];
       if (isEnabled) {
         // Apply preset first without enabling, then enable atomically
-        await applyCurrentPreset();
+        await _applyCurrentPresetCore();
         pendingFutures.add(_effectsChannel.setEqEnabled(true));
         pendingFutures.add(_effectsChannel.setNativeEqEnabled(true));
       }

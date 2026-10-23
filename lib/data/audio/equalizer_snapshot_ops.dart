@@ -63,8 +63,10 @@ extension EqualizerSnapshotOps on EqualizerManager {
       // Dynamics (HAL preset)
       'dynamicsEnabled': isDynamicsEnabled,
       'dynamicsPreset': dynamicsPreset.name,
-      // Crossfeed
-      'crossfeedEnabled': isCrossfeedEnabled,
+      // Crossfeed: capture the USER preference, not the route-gated engine
+      // value, so recalling an album off a headphone route cannot silently
+      // disable crossfeed for later headphone listening.
+      'crossfeedEnabled': crossfeedUserEnabled,
       'crossfeedDelayUs': crossfeedDelayUs,
       'crossfeedFeedDb': crossfeedFeedDb,
       'crossfeedFcut': crossfeedFcut,
@@ -168,6 +170,10 @@ extension EqualizerSnapshotOps on EqualizerManager {
   /// resurrect the heavy stages that [degradeToEssentials] intentionally
   /// suppressed; the recall is stashed and re-applied on [restoreFromDegrade].
   Future<void> applyEffectsState(Map<String, dynamic> m) async {
+    await _effectsLock.lock(() => _applyEffectsStateCore(m));
+  }
+
+  Future<void> _applyEffectsStateCore(Map<String, dynamic> m) async {
     // Battery degrade intentionally suppressed the heavy DSP stages; a snapshot
     // recall must not resurrect them mid-session. Defer it to restore so the
     // user's recall is honored once power is back (see the doc above).
@@ -240,7 +246,7 @@ extension EqualizerSnapshotOps on EqualizerManager {
         (targetBandCount == 10 ||
             targetBandCount == 32 ||
             targetBandCount == 64)) {
-      await setBandMode(targetBandCount);
+      await _setBandModeCore(targetBandCount);
     }
 
     // EQ curve + preamp + boosts.
@@ -251,14 +257,14 @@ extension EqualizerSnapshotOps on EqualizerManager {
     final gains = (parsedGains != null && parsedGains.isNotEmpty)
         ? parsedGains
         : List<double>.from(currentPreset.gains);
-    await setPreset(EqPreset(
+    await _setPresetCore(EqPreset(
       name: s('presetName', currentPreset.name),
       gains: gains,
       bassBoost: d('bassBoost', currentPreset.bassBoost),
     ));
     await setPreamp(d('preampDb', preampDb));
     await setVolumeBoost(d('volumeBoost', volumeBoost));
-    await setEnabled(b('eqEnabled', isEnabled));
+    await _setEnabledCore(b('eqEnabled', isEnabled));
 
     // Virtualizer / spatializer.
     await setVirtualizerStrength(d('virtualizerStrength', virtualizerStrength));
@@ -274,13 +280,16 @@ extension EqualizerSnapshotOps on EqualizerManager {
     await setDynamicsPreset(dynPreset,
         enabled: b('dynamicsEnabled', isDynamicsEnabled));
 
-    // Crossfeed.
+    // Crossfeed. Restore the stored user preference and let the setter derive
+    // the route-gated engine value; otherwise a recall on speakers would
+    // overwrite the preference with the temporarily-disabled engine state.
     await setCrossfeed(
-      b('crossfeedEnabled', isCrossfeedEnabled),
+      crossfeedUserEnabled,
       delayUs: d('crossfeedDelayUs', crossfeedDelayUs),
       feedDb: d('crossfeedFeedDb', crossfeedFeedDb),
       fcut: d('crossfeedFcut', crossfeedFcut),
       mode: i('crossfeedMode', crossfeedMode),
+      preferenceEnabled: b('crossfeedEnabled', crossfeedUserEnabled),
     );
 
     // Lookahead limiter (+ compressor knobs when the snapshot owns them).

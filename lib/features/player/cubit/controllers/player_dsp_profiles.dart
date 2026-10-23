@@ -334,7 +334,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
   /// WITHOUT touching the stored user preference (fix #1). The preference lives
   /// in state.isCrossfeedEnabled; only the engine value is gated so crossfeed
   /// auto-bypasses on speaker/car/HDMI and restores on headphones/BT.
-  Future<void> reevaluateCrossfeedForRoute(AudioOutputInfo device) async {
+  Future<void> reevaluateCrossfeedForRoute(AudioOutputInfo? device) async {
     if (_isClosed()) return;
     final s = _getState();
     if (s.isQuranModeEnabled) return; // Quran owns its own chain
@@ -347,7 +347,8 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       await _audioHandler.setCrossfeed(effective,
           delayUs: s.crossfeedDelayUs,
           feedDb: s.crossfeedFeedDb,
-          mode: s.crossfeedMode);
+          mode: s.crossfeedMode,
+          preferenceEnabled: s.isCrossfeedEnabled);
     } catch (e, st) {
       ErrorLogger.log('Crossfeed route re-evaluation failed',
           error: e, stackTrace: st, category: 'PlayerDspController');
@@ -415,17 +416,21 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     final activating = !newIsZero;
     final wasEqEnabled = state.isEqEnabled;
     bool eqEnabledAfter = wasEqEnabled;
+    final changedIndices = <int>[];
+    var forcedEnable = false;
     try {
       if (activating && !wasEqEnabled && !_musicForcedEqEnabled) {
         // Enable EQ so the overlay is audible; remember WE forced it so the
         // reverse path can restore the user's "EQ off" state.
         await _audioHandler.setEqualizerEnabled(true);
         _musicForcedEqEnabled = true;
+        forcedEnable = true;
       }
 
       for (var i = 0; i < n; i++) {
         if ((effective[i] - gains[i]).abs() > 1e-6) {
           await _audioHandler.setBandGain(i, effective[i]);
+          changedIndices.add(i);
         }
       }
 
@@ -437,8 +442,10 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         eqEnabledAfter = false;
       }
 
-      if (_isClosed()) return;
+      // Bookkeeping must mirror what the engine actually received even when
+      // the controller closed mid-flight; skip only the state emission.
       _appliedMusicEqComp = newIsZero ? null : List<double>.from(newComp);
+      if (_isClosed()) return;
       final cur = _getState();
       _emit(cur.copyWith(
         dsp: cur.dsp.copyWith(
@@ -447,6 +454,19 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         ),
       ));
     } catch (e, st) {
+      // Roll the partially-applied overlay back so the next pass computes the
+      // new base against the gains that are actually live in the engine.
+      for (final i in changedIndices) {
+        try {
+          await _audioHandler.setBandGain(i, gains[i]);
+        } catch (_) {}
+      }
+      if (forcedEnable) {
+        try {
+          await _audioHandler.setEqualizerEnabled(wasEqEnabled);
+          _musicForcedEqEnabled = false;
+        } catch (_) {}
+      }
       ErrorLogger.log('Codec-aware music EQ compensation failed',
           error: e, stackTrace: st, category: 'PlayerDspController');
     }

@@ -28,6 +28,11 @@ class PulsrPressable extends StatefulWidget {
   final PulsrHapticStyle hapticStyle;
   final HitTestBehavior behavior;
 
+  /// Shape of the keyboard focus ring. Match the child's silhouette (for
+  /// example [AppRadii.full] for circular icon buttons) so focus stays legible
+  /// without drawing a rounded square around a round control.
+  final BorderRadius focusBorderRadius;
+
   const PulsrPressable({
     super.key,
     required this.child,
@@ -38,6 +43,7 @@ class PulsrPressable extends StatefulWidget {
     this.enableHaptics = true,
     this.hapticStyle = PulsrHapticStyle.light,
     this.behavior = HitTestBehavior.opaque,
+    this.focusBorderRadius = AppRadii.r12All,
   });
 
   @override
@@ -204,7 +210,7 @@ class _PulsrPressableState extends State<PulsrPressable>
                       decoration: BoxDecoration(
                         border:
                             Border.all(color: context.palette.accent, width: 2),
-                        borderRadius: AppRadii.r12All,
+                        borderRadius: widget.focusBorderRadius,
                       ),
                     ),
                   ),

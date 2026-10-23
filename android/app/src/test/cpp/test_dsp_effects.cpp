@@ -402,6 +402,65 @@ static void testHarmonicSaturationTransitions() {
     std::cout << "PASS: HarmonicSaturation transitions verified smooth & bounded." << std::endl;
 }
 
+static void testLookaheadLimiterStageTransitions() {
+    std::cout << "Testing LookaheadLimiter stage insertion/removal crossfades..." << std::endl;
+    auto limiter = std::make_unique<LookaheadLimiter>();
+    limiter->setSampleRate(48000.0);
+    limiter->configure(5.0, -0.2, 50.0, false);
+    limiter->setEnabled(true);
+    limiter->setProcessingActive(true);
+
+    const int blockSize = 256;
+    const int channels = 2;
+    std::vector<float> prevBlock;
+    int currentFrame = 0;
+    const float maxDelta = 0.08f;
+
+    for (int b = 0; b < 60; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        limiter->processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "Limiter Insertion");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    limiter->setProcessingActive(false);
+    for (int b = 0; b < 60 && limiter->isDraining(); ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        limiter->processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "Limiter Removal");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+    if (limiter->isDraining()) {
+        std::cerr << "FAIL: LookaheadLimiter removal did not finish." << std::endl;
+        std::exit(1);
+    }
+
+    auto dryBlock = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+    auto dryProcessed = dryBlock;
+    limiter->processInterleaved(dryProcessed.data(), blockSize, channels);
+    for (size_t i = 0; i < dryBlock.size(); ++i) {
+        if (std::abs(dryProcessed[i] - dryBlock[i]) > 1e-6f) {
+            std::cerr << "FAIL: LookaheadLimiter is not dry after removal." << std::endl;
+            std::exit(1);
+        }
+    }
+    prevBlock = dryProcessed;
+    currentFrame += blockSize;
+
+    limiter->setProcessingActive(true);
+    for (int b = 0; b < 60; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        limiter->processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "Limiter Reinsertion");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    std::cout << "PASS: LookaheadLimiter insertion/removal transitions verified smooth." << std::endl;
+}
+
 static void testArbitraryEqTransitions() {
     std::cout << "Testing ArbitraryResponseEq enable/disable and profile crossfading..." << std::endl;
     ArbitraryResponseEq eq;
@@ -442,6 +501,17 @@ static void testArbitraryEqTransitions() {
         auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
         eq.processInterleaved(block.data(), blockSize, channels);
         checkSignalContinuity(prevBlock, block, channels, maxDelta, "ArbitraryEq Reconfiguring");
+        prevBlock = block;
+        currentFrame += blockSize;
+    }
+
+    // Clear the response on the fly: the old kernel must crossfade to the
+    // passthrough impulse instead of snapping the EQ off in one sample.
+    eq.loadGraphicEqString("");
+    for (int b = 0; b < 25; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.7f, currentFrame);
+        eq.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, maxDelta, "ArbitraryEq Clearing");
         prevBlock = block;
         currentFrame += blockSize;
     }
@@ -673,6 +743,7 @@ int main() {
     std::cout << "Running DSP effects C++ unit tests..." << std::endl;
     testConvolutionReverbUnityGain();
     testLookaheadLimiterCeiling();
+    testLookaheadLimiterStageTransitions();
     testMultibandCompressor();
     testHarmonicSaturationModes();
     testStereoWidthBassMono();

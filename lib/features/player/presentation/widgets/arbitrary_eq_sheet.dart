@@ -74,7 +74,12 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
       if (parts.length >= 2) {
         final f = double.tryParse(parts[0]);
         final g = double.tryParse(parts[1]);
-        if (f != null && g != null) {
+        if (f != null &&
+            g != null &&
+            f.isFinite &&
+            g.isFinite &&
+            f > 0 &&
+            g.abs() <= 30) {
           freqs.add(f);
           gains.add(g);
         }

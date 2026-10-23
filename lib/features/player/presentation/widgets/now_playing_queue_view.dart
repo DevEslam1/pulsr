@@ -9,6 +9,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/cached_artwork.dart';
+import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../../core/widgets/song_tile.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
@@ -112,32 +113,36 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
     SongsTableData song,
   ) {
     HapticFeedback.selectionClick();
-    showModalBottomSheet<void>(
+    PulsrAdaptiveSheet.show<void>(
       context: context,
+      titleText: song.title,
+      subtitle: Text(
+        song.artist,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       builder: (sheetContext) {
         final p = sheetContext.palette;
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Icons.playlist_play_rounded, color: p.accent),
-                title: Text(sheetContext.l10n.playNext),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  cubit.playNext(song);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.queue_music_rounded, color: p.accent),
-                title: Text(sheetContext.l10n.addToQueue),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  cubit.addToQueue(song);
-                },
-              ),
-            ],
-          ),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.playlist_play_rounded, color: p.accent),
+              title: Text(sheetContext.l10n.playNext),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                cubit.playNext(song);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.queue_music_rounded, color: p.accent),
+              title: Text(sheetContext.l10n.addToQueue),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                cubit.addToQueue(song);
+              },
+            ),
+          ],
         );
       },
     );

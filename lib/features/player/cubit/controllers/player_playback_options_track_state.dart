@@ -56,6 +56,25 @@ extension PlayerPlaybackOptionsTrackState on PlayerPlaybackOptionsController {
       }
     }
     _syncAbLoopFromHandler();
+    await _applyPerSongEqForTrack(song);
+  }
+
+  /// Mirrors the stored per-song EQ override into state and hands it to the
+  /// EQ engine. Runs on every real track change so a stored override is
+  /// actually applied (and the global preset restored when there is none).
+  Future<void> _applyPerSongEqForTrack(SongsTableData song) async {
+    final presetName =
+        await _perSongEqStore.getPresetForTrackWhenReady(song.id.toString());
+    if (_isClosed()) return;
+    final s = _getState();
+    if (s.currentSong?.id == song.id) {
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(currentSongEqOverride: presetName)));
+    }
+    final applyOverride = _onPerSongEqOverride;
+    if (applyOverride != null) {
+      await applyOverride(song, presetName);
+    }
   }
 
   void _syncTrackDelayFromHandler() {

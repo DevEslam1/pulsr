@@ -49,6 +49,8 @@ public:
     int getMode() const { return mode_; }
 
 private:
+    void smoothParameters(int frames);
+
     static constexpr int OVERSAMPLE_FACTOR = 4;
     // FIX M-23: lengthened the anti-alias polyphase FIR from 24 to 32 taps
     // (6 -> 8 taps/phase) at the same 4x oversampling for a deeper decimation
@@ -64,6 +66,9 @@ private:
     double drive_ = 0.0;
     double mix_ = 0.5;
     double tilt_ = 0.0;
+    double smoothedDrive_ = 0.0;
+    double smoothedMix_ = 0.5;
+    double smoothedTilt_ = 0.0;
     int mode_ = 0;              // 0 = Tape, 1 = Tube, 2 = Analog
     int prevMode_ = 0;
     float modeCrossfadeProgress_ = 1.0f;

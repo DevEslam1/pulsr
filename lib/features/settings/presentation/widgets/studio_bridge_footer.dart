@@ -8,6 +8,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 
@@ -87,13 +88,9 @@ class StudioBridgeFooter extends StatelessWidget {
 
 /// Explains what Professional mode unlocks, with a single switch CTA.
 Future<void> showStudioExplainerSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return PulsrAdaptiveSheet.show<void>(
     context: context,
-    // Root navigator so the single root PulsrModalObserver tracks it and the
-    // dock hides even when opened from inside the Settings branch.
-    useRootNavigator: true,
-    showDragHandle: true,
-    isScrollControlled: true,
+    titleText: context.l10n.studioExplainerTitle,
     builder: (sheetContext) {
       final p = sheetContext.palette;
       final l10n = sheetContext.l10n;
@@ -104,82 +101,62 @@ Future<void> showStudioExplainerSheet(BuildContext context) {
         (Icons.volume_up_rounded, l10n.expGainPro),
         (Icons.bar_chart_rounded, l10n.expVisualizersPro),
       ];
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-            AppSpacing.md,
-            0,
-            AppSpacing.md,
-            AppSpacing.md,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.tune_rounded, color: p.accent),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      l10n.studioExplainerTitle,
-                      style: TextStyle(
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w800,
-                        color: p.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
+      return SingleChildScrollView(
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.studioExplainerBody,
+              style: TextStyle(
+                fontSize: AppFontSize.bodySmall,
+                height: 1.35,
+                color: p.textSecondary,
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                l10n.studioExplainerBody,
-                style: TextStyle(
-                  fontSize: AppFontSize.bodySmall,
-                  height: 1.35,
-                  color: p.textSecondary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              for (final (icon, text) in unlocks)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(icon, size: 16, color: p.accent),
-                      const SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          text,
-                          style: TextStyle(
-                            fontSize: AppFontSize.bodySmall,
-                            color: p.textSecondary,
-                          ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            for (final (icon, text) in unlocks)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, size: 16, color: p.accent),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        text,
+                        style: TextStyle(
+                          fontSize: AppFontSize.bodySmall,
+                          color: p.textSecondary,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    context
-                        .read<SettingsCubit>()
-                        .setExperienceMode(ExperienceMode.professional);
-                    Navigator.of(sheetContext).pop();
-                  },
-                  icon: const Icon(Icons.tune_rounded),
-                  label: Text(l10n.studioSwitchCta),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  HapticFeedback.mediumImpact();
+                  context
+                      .read<SettingsCubit>()
+                      .setExperienceMode(ExperienceMode.professional);
+                  Navigator.of(sheetContext).pop();
+                },
+                icon: const Icon(Icons.tune_rounded),
+                label: Text(l10n.studioSwitchCta),
+              ),
+            ),
+          ],
         ),
       );
     },

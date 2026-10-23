@@ -2892,6 +2892,15 @@
   "@autoEqDatabase": {
     "description": "tranche8 l10n"
   },
+  "autoEqProfilesSubtitle": "{count} ملف تعريف · حدودي (تردد/Q/مكسب)",
+  "@autoEqProfilesSubtitle": {
+    "description": "عدد ملفات التعريف ونوع التصحيح في نافذة قاعدة بيانات AutoEQ",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "noHpMatch": "لا توجد ملفات مطابقة",
   "@noHpMatch": {
     "description": "tranche8 l10n"

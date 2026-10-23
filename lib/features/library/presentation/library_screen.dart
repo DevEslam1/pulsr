@@ -37,7 +37,6 @@ import '../../sheets/song_info_sheet.dart';
 import '../../sheets/sort_filter_sheet.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
-import '../../tag_editor/tag_editor_screen.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'widgets/alphabet_quick_scroll.dart';
@@ -852,14 +851,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   if (!context.mounted) return;
                   if (selected.isNotEmpty) {
                     cubit.clearSelection();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => TagEditorScreen(
-                          song: selected.first,
-                          batchSongs: selected,
-                        ),
-                      ),
-                    );
+                    context.push('/tag-editor', extra: selected);
                   }
                 },
               ),

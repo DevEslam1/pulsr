@@ -5,6 +5,7 @@
 #include "FftUtil.h"
 #include "SincResampler.h"
 #include <vector>
+#include <array>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -76,7 +77,9 @@ public:
     void drainRetiredIrs();
 
     void ensurePartitionCapacity(int numPartitions);
-    size_t getHistoryPartitionCount() const { return inputHistoryFreqL_.size(); }
+    size_t getHistoryPartitionCount() const {
+        return static_cast<size_t>(historyPartitionCount_.load(std::memory_order_acquire));
+    }
     size_t getHistoryAllocatedBytes() const;
 
 private:
@@ -138,9 +141,13 @@ private:
     std::vector<float> inputBlockR_;
     int inputBlockPos_ = 0;
 
-    // Overlap-save input history ring buffer: [numPartitions][FFT_SIZE]
-    std::vector<std::vector<FftUtil::Complex>> inputHistoryFreqL_;
-    std::vector<std::vector<FftUtil::Complex>> inputHistoryFreqR_;
+    // Overlap-save input history ring buffer: [numPartitions][FFT_SIZE].
+    // The outer arrays are fixed-size so a control-thread capacity grow never
+    // moves existing inner buffers. Only slots [0, historyPartitionCount_) are
+    // visible to the render thread; the count is published with release/acquire.
+    std::array<std::vector<FftUtil::Complex>, MAX_PREALLOC_PARTITIONS> inputHistoryFreqL_;
+    std::array<std::vector<FftUtil::Complex>, MAX_PREALLOC_PARTITIONS> inputHistoryFreqR_;
+    std::atomic<int> historyPartitionCount_{0};
     int historyHead_ = 0;
 
     // Direct convolution ring buffers for short IRs (<= 1024)

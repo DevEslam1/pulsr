@@ -126,12 +126,25 @@ bool ArbitraryResponseEq::parseGraphicEq(
 
 bool ArbitraryResponseEq::loadGraphicEqString(const std::string& eqString, bool linearPhase) {
     if (eqString.empty()) {
+        // Clearing a live response must crossfade from the old kernel to the
+        // passthrough impulse. Dropping straight to firFilter_ made the wet
+        // path bit-identical to dry, so the audible EQ vanished instantly even
+        // though smoothedEnabledMix_ still needed to ramp down.
+        if (hasResponse_ && smoothedEnabledMix_ > 1e-4f) {
+            std::copy(firFilter_.begin(), firFilter_.end(), oldFirFilter_.begin());
+            filterCrossfadeProgress_ = 0.0f;
+            oldLinearPhase_ = linearPhase_;
+        } else {
+            filterCrossfadeProgress_ = 1.0f;
+            oldLinearPhase_ = linearPhase;
+        }
         nodes_.clear();
         loadedString_.clear();
         preparedNodesRef_.reset();
         hasResponse_ = false;
         firFilter_.assign(FIR_TAPS, 0.0f);
         firFilter_[0] = 1.0f;
+        firSynthesizedRate_ = sampleRate_;
         return false;
     }
 
