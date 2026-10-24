@@ -127,6 +127,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
     final hinge = _findHorizontalHinge(context);
+    final p = context.palette;
 
     // 1. Tabletop Mode for Foldables (horizontal fold detected).
     // A zero-height hinge (degenerate/zero-width report) must not produce a
@@ -167,19 +168,20 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                   vertical: AppSpacing.sm,
                 ),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppColors.specularAt(0.08),
-                      AppColors.specularAt(0.03),
-                    ],
-                  ),
+                  color: p.surfaceContainer,
                   borderRadius: AppRadii.r24All,
                   border: Border.all(
-                    color: AppColors.specularAt(0.14),
+                    color: p.hairline,
                     width: 1.0,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black
+                          .withValues(alpha: p.isDark ? 0.35 : 0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -265,47 +267,51 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                     ),
                   ),
 
-                  // Ambient Glow Sphere behind artwork (Left)
+                  // Expansive unified ambient glow spanning the full screen width
                   PositionedDirectional(
-                    top: -40,
-                    start: -30,
-                    width: width * 0.52,
-                    height: mediaQuery.size.height * 0.75,
+                    top: -60,
+                    start: -40,
+                    end: -40,
+                    height: mediaQuery.size.height * 0.90,
                     child: IgnorePointer(
                       child: AnimatedContainer(
                         duration: context.motionMs(500),
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: Alignment.center,
-                            radius: 0.85,
+                            center: const Alignment(-0.25, -0.30),
+                            radius: 1.15,
                             colors: [
-                              widget.activeColor.withValues(alpha: 0.30),
-                              widget.activeColor.withValues(alpha: 0.08),
+                              widget.activeColor
+                                  .withValues(alpha: p.isDark ? 0.28 : 0.16),
+                              widget.activeColor
+                                  .withValues(alpha: p.isDark ? 0.10 : 0.06),
+                              widget.activeColor.withValues(alpha: 0.02),
                               Colors.transparent,
                             ],
-                            stops: const [0.0, 0.52, 1.0],
+                            stops: const [0.0, 0.40, 0.75, 1.0],
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  // Ambient Glow Sphere behind lyrics (Right)
+                  // Harmonizing atmospheric glow across the stage
                   PositionedDirectional(
-                    top: 40,
-                    end: -30,
-                    width: width * 0.50,
-                    height: mediaQuery.size.height * 0.65,
+                    top: 0,
+                    start: 0,
+                    end: 0,
+                    bottom: 0,
                     child: IgnorePointer(
                       child: AnimatedContainer(
                         duration: context.motionMs(500),
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: Alignment.center,
-                            radius: 0.85,
+                            center: const Alignment(0.40, -0.15),
+                            radius: 1.0,
                             colors: [
-                              widget.activeColor.withValues(alpha: 0.16),
-                              widget.activeColor.withValues(alpha: 0.04),
+                              widget.activeColor
+                                  .withValues(alpha: p.isDark ? 0.12 : 0.07),
+                              widget.activeColor.withValues(alpha: 0.03),
                               Colors.transparent,
                             ],
                             stops: const [0.0, 0.50, 1.0],
@@ -334,24 +340,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                   ),
                 ),
 
-                // Subtle vertical specular divider between panes
-                Container(
-                  width: 1,
-                  margin: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        AppColors.specularAt(0.10),
-                        AppColors.specularAt(0.10),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.25, 0.75, 1.0],
-                    ),
-                  ),
-                ),
+                const SizedBox(width: AppSpacing.sm),
 
                 // Right Pane: Tabbed View (Lyrics by default, Queue, Quick DSP)
                 Expanded(
@@ -372,24 +361,18 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                                   PulsrLayoutMetrics.fieldHeight(context) + 6,
                               padding: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    AppColors.specularAt(0.10),
-                                    AppColors.specularAt(0.05),
-                                  ],
-                                ),
+                                color: p.surfaceContainer,
                                 borderRadius: AppRadii.r20All,
                                 border: Border.all(
-                                  color: AppColors.specularAt(0.15),
+                                  color: p.hairline,
                                   width: 1.0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.scrimAt(0.24),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 4),
+                                    color: Colors.black
+                                        .withValues(alpha: p.isDark ? 0.30 : 0.06),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 3),
                                   ),
                                 ],
                               ),

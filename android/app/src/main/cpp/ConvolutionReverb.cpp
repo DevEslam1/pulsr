@@ -292,7 +292,13 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
     // Air absorption one-pole lowpass filter state
     float lpStateL = 0.0f;
     float lpStateR = 0.0f;
-    const float lpAlpha = 1.0f - std::clamp(damp * 0.8f, 0.05f, 0.95f);
+    const float baseLpAlpha = 1.0f - std::clamp(damp * 0.65f, 0.05f, 0.92f);
+    // 90 Hz 1-pole high-pass state to prevent low-end rumble/mud in reverb tails
+    float hpLpStateL = 0.0f;
+    float hpLpStateR = 0.0f;
+    const float hpCoeff = 1.0f - static_cast<float>(std::exp(-2.0 * M_PI * 90.0 / effectiveRate));
+    // Smooth diffuse-field buildup time (prevents transient smearing on vocals/drums)
+    const float attackSamples = std::max(1.0f, static_cast<float>(effectiveRate) * std::min(0.022f, rt60 * 0.012f));
 
     double energySum = 0.0;
 
@@ -301,16 +307,46 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
         const float noiseL = dist(genL);
         const float noiseR = dist(genR);
 
+        // Progressive air absorption: HF decays faster than mids over time
+        const float progress = static_cast<float>(i) / static_cast<float>(totalSamples);
+        const float lpAlpha = std::max(0.04f, baseLpAlpha * (1.0f - 0.55f * progress));
         lpStateL += lpAlpha * (noiseL - lpStateL);
         lpStateR += lpAlpha * (noiseR - lpStateR);
 
-        const float sL = env * lpStateL;
-        const float sR = env * lpStateR;
+        hpLpStateL += hpCoeff * (lpStateL - hpLpStateL);
+        hpLpStateR += hpCoeff * (lpStateR - hpLpStateR);
+        const float buildUp = (preset == ReverbPreset::Plate)
+            ? 1.0f
+            : (1.0f - std::exp(-static_cast<float>(i + 1) / attackSamples));
+        const float sL = env * buildUp * (lpStateL - hpLpStateL);
+        const float sR = env * buildUp * (lpStateR - hpLpStateR);
 
         irL[i] = sL;
         irR[i] = sR;
 
         energySum += sL * sL + sR * sR;
+    }
+
+    // Inject discrete stereo-decorrelated early reflections (Haas zone) for 3D spatial depth
+    const float erScale = std::clamp(rt60 * 0.55f, 0.25f, 1.8f);
+    static constexpr float kErMsL[6]  = { 7.3f, 13.7f, 21.1f, 31.4f, 43.8f, 57.2f };
+    static constexpr float kErMsR[6]  = { 8.9f, 12.1f, 23.6f, 29.1f, 46.5f, 54.8f };
+    static constexpr float kErGain[6] = { 0.42f, -0.34f, 0.28f, -0.23f, 0.19f, -0.15f };
+    const float erDamp = 1.0f - 0.35f * damp;
+    for (int r = 0; r < 6; ++r) {
+        const int idxL = static_cast<int>(kErMsL[r] * erScale * 0.001f * static_cast<float>(effectiveRate));
+        const int idxR = static_cast<int>(kErMsR[r] * erScale * 0.001f * static_cast<float>(effectiveRate));
+        const float g = kErGain[r] * erDamp;
+        if (idxL > 0 && idxL < totalSamples) {
+            energySum -= static_cast<double>(irL[idxL]) * irL[idxL];
+            irL[idxL] += g;
+            energySum += static_cast<double>(irL[idxL]) * irL[idxL];
+        }
+        if (idxR > 0 && idxR < totalSamples) {
+            energySum -= static_cast<double>(irR[idxR]) * irR[idxR];
+            irR[idxR] += g * ((r & 1) ? -0.95f : 0.95f);
+            energySum += static_cast<double>(irR[idxR]) * irR[idxR];
+        }
     }
 
     // Normalize to maintain unity acoustic gain

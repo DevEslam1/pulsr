@@ -17,6 +17,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../core/widgets/staggered_reveal.dart';
+import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 
 class RadioScreen extends StatefulWidget {
@@ -528,30 +529,9 @@ class _RadioScreenState extends State<RadioScreen> {
                                               const EdgeInsets.symmetric(
                                                   horizontal: AppSpacing.md,
                                                   vertical: AppSpacing.xxs),
-                                          leading: Container(
-                                            width: 44,
-                                            height: 44,
-                                            decoration: BoxDecoration(
-                                              color: isPlaying
-                                                  ? p.accent
-                                                      .withValues(alpha: 0.2)
-                                                  : p.accentContainer
-                                                      .withValues(alpha: 0.35),
-                                              borderRadius: AppRadii.r12All,
-                                              border: isPlaying
-                                                  ? Border.all(
-                                                      color: p.accent,
-                                                      width: 1.5)
-                                                  : null,
-                                            ),
-                                            alignment: Alignment.center,
-                                            child: Icon(
-                                              isPlaying
-                                                  ? Icons.graphic_eq_rounded
-                                                  : Icons.radio_rounded,
-                                              color: p.accent,
-                                              size: 22,
-                                            ),
+                                          leading: _StationArtwork(
+                                            station: station,
+                                            isPlaying: isPlaying,
                                           ),
                                           title: Text(
                                             station.name,
@@ -692,6 +672,69 @@ class _RadioScreenState extends State<RadioScreen> {
         ),
       ),
     ));
+  }
+}
+
+class _StationArtwork extends StatelessWidget {
+  const _StationArtwork({required this.station, required this.isPlaying});
+
+  final RadioStation station;
+  final bool isPlaying;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final artworkUrl = station.artworkUrl;
+    if (artworkUrl == null || artworkUrl.isEmpty) {
+      return Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isPlaying
+              ? p.accent.withValues(alpha: 0.2)
+              : p.accentContainer.withValues(alpha: 0.35),
+          borderRadius: AppRadii.r12All,
+          border: isPlaying ? Border.all(color: p.accent, width: 1.5) : null,
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          isPlaying ? Icons.graphic_eq_rounded : Icons.radio_rounded,
+          color: p.accent,
+          size: 22,
+        ),
+      );
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CachedArtwork(
+          id: 0,
+          remoteUrl: artworkUrl,
+          size: 44,
+          borderRadius: AppRadii.r12,
+          fallbackIcon: Icons.radio_rounded,
+        ),
+        if (isPlaying)
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: p.accent,
+                shape: BoxShape.circle,
+                border: Border.all(color: p.bg, width: 1.5),
+              ),
+              child: Icon(
+                Icons.graphic_eq_rounded,
+                color: p.onAccent,
+                size: 11,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
 

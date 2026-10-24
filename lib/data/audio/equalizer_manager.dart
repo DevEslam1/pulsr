@@ -915,6 +915,14 @@ class EqualizerManager {
     });
   }
 
+  /// Effective preamp in dB including smart auto-headroom compensation when
+  /// no manual preamp override is active.
+  double get effectivePreampDb {
+    if (!isEnabled) return 0.0;
+    if (preampDb.abs() > 1e-4) return preampDb;
+    return currentPreset.recommendedPreampDb;
+  }
+
   Future<void> setPreamp(double preampDb) async {
     // Finite-guard before clamp: a NaN would otherwise survive clamp() and
     // reach native (mirrors setBandGain's isFinite guard). Range lives in the

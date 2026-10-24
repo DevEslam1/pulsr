@@ -114,6 +114,15 @@ void HarmonicSaturation::smoothParameters(int frames) {
     if (std::abs(smoothedTilt_ - tilt_) < 1e-5) smoothedTilt_ = tilt_;
 }
 
+static inline float computeInvNorm(double k) {
+    if (k <= 1e-9) return 1.0f;
+    // Small-signal unity (lim_{k->0} tanh(k*x)/tanh(k) = x) combined with
+    // soft crest-factor loudness compensation at higher drive so full-scale
+    // signals retain musical warmth and body without -14 dB volume collapse.
+    const double denom = std::tanh(k) * std::sqrt(1.0 + 0.12 * k * k);
+    return (denom > 1e-9) ? static_cast<float>(1.0 / denom) : 1.0f;
+}
+
 static inline float shapeSample(float x, double k, float invNorm, int mode) {
     const float xin = static_cast<float>(k) * x;
     if (mode == 1) {
@@ -123,12 +132,16 @@ static inline float shapeSample(float x, double k, float invNorm, int mode) {
         // is removed by the post de-emphasis DC blocker. (The previous
         // quadratic ratio was algebraically identical to x for any input, so
         // Tube mode produced no harmonics at all.)
-        return std::tanh(xin + 0.40f) * invNorm;
+        constexpr float kTubeBias = 0.40f;
+        constexpr float kTubeQuiescent = 0.37994896f; // std::tanh(0.40f)
+        return (std::tanh(xin + kTubeBias) - kTubeQuiescent) * invNorm;
     } else if (mode == 2) {
         // Analog Class-A single-ended transistor: stronger asymmetry for a
         // fatter even-harmonic ratio. Monotonic and bounded, unlike the old
         // cubic curve which folded back above |xin|~1.77 and changed sign.
-        return std::tanh(xin + 0.80f) * invNorm;
+        constexpr float kAnalogBias = 0.80f;
+        constexpr float kAnalogQuiescent = 0.66403677f; // std::tanh(0.80f)
+        return (std::tanh(xin + kAnalogBias) - kAnalogQuiescent) * invNorm;
     }
     // Mode 0: Tape (symmetric tanh)
     return std::tanh(xin) * invNorm;
@@ -155,7 +168,7 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
     const float mix = static_cast<float>(smoothedMix_);
     const float tilt = static_cast<float>(smoothedTilt_);
     const float hpCoeff = tiltHpCoeff_;
-    const float invNorm = (k > 1e-9) ? static_cast<float>(1.0 / k) : 1.0f;
+    const float invNorm = computeInvNorm(k);
     const int mode = mode_;
     float& hpL = hpState_[0];
     float& hpR = hpState_[1];
@@ -397,7 +410,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
         const float mix = static_cast<float>(smoothedMix_);
         const float tilt = static_cast<float>(smoothedTilt_);
         const float hpCoeff = tiltHpCoeff_;
-        const float invNorm = (k > 1e-9) ? static_cast<float>(1.0 / k) : 1.0f;
+        const float invNorm = computeInvNorm(k);
         const int mode = mode_;
         float& hpL = hpState_[0];
         float& hpR = hpState_[1];
@@ -617,7 +630,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
     const float mix = static_cast<float>(smoothedMix_);
     const float tilt = static_cast<float>(smoothedTilt_);
     const float hpCoeff = tiltHpCoeff_;
-    const float invNorm = (k > 1e-9) ? static_cast<float>(1.0 / k) : 1.0f;
+    const float invNorm = computeInvNorm(k);
     const int mode = mode_;
 
     for (int i = 0; i < frames; ++i) {

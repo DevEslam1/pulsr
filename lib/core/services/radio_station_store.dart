@@ -19,6 +19,20 @@ class RadioStationStore {
   static const String prefsKey = 'radio_stations_v1';
   static const int maxEntries = 500;
 
+  static const String quranCairoArtwork = 'assets/Pictures/quran_cairo.jpg';
+  static const String minshawiArtwork = 'assets/Pictures/minshawi.jpg';
+  static const String mustafaIsmailArtwork =
+      'assets/Pictures/mustafa_ismail.jpg';
+  static const String abdulBasitArtwork = 'assets/Pictures/abdulbasit.jpg';
+
+  static const Map<String, String> _curatedArtwork = {
+    'cur-quran-cairo': quranCairoArtwork,
+    'cur-quran-cairo-backup': quranCairoArtwork,
+    'cur-quran-minshawi': minshawiArtwork,
+    'cur-quran-mustafa': mustafaIsmailArtwork,
+    'cur-quran-abdulbasit': abdulBasitArtwork,
+  };
+
   static final List<RadioStation> _stations = [];
   late final Future<void> ready;
 
@@ -134,12 +148,13 @@ class RadioStationStore {
   }
 
   static RadioStation? _migrateLegacyStation(RadioStation station) {
+    var updated = station;
     if (station.id == 'cur-quran-cairo' ||
         station.url == 'https://stream.radiojar.com/8s5u8tpdtwzuv') {
       const updatedUrl = 'https://stream.radiojar.com/8s5u5tpdtwzuv';
       const updatedName = 'إذاعة القرآن الكريم المصرية - القاهرة';
       if (station.url != updatedUrl || station.name != updatedName) {
-        return station.copyWith(name: updatedName, url: updatedUrl);
+        updated = updated.copyWith(name: updatedName, url: updatedUrl);
       }
     }
     if (station.id == 'cur-quran-tarteel' ||
@@ -147,10 +162,15 @@ class RadioStationStore {
       const updatedUrl = 'https://backup.qurango.net/radio/tarateel';
       const updatedName = 'إذاعة تراتيل القرآن الكريم';
       if (station.url != updatedUrl || station.name != updatedName) {
-        return station.copyWith(name: updatedName, url: updatedUrl);
+        updated = updated.copyWith(name: updatedName, url: updatedUrl);
       }
     }
-    return null;
+    final artwork = _curatedArtwork[updated.id];
+    if (artwork != null &&
+        (updated.artworkUrl == null || updated.artworkUrl!.isEmpty)) {
+      updated = updated.copyWith(artworkUrl: artwork);
+    }
+    return identical(updated, station) ? null : updated;
   }
 
   Future<void> persist() async {
@@ -173,12 +193,14 @@ class RadioStationStore {
             id: 'cur-quran-cairo',
             name: 'إذاعة القرآن الكريم المصرية - القاهرة',
             url: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
-            genre: 'Quran'),
+            genre: 'Quran',
+            artworkUrl: quranCairoArtwork),
         RadioStation(
             id: 'cur-quran-cairo-backup',
             name: 'إذاعة القرآن الكريم - القاهرة (بث بديل)',
             url: 'https://radio.xecod.com/station/quran-cairo',
-            genre: 'Quran'),
+            genre: 'Quran',
+            artworkUrl: quranCairoArtwork),
         RadioStation(
             id: 'cur-quran-hussary',
             name: 'إذاعة الشيخ محمود خليل الحصري',
@@ -189,18 +211,21 @@ class RadioStationStore {
             name: 'إذاعة الشيخ عبد الباسط عبد الصمد (مجود)',
             url:
                 'https://backup.qurango.net/radio/abdulbasit_abdulsamad_mojawwad',
-            genre: 'Quran'),
+            genre: 'Quran',
+            artworkUrl: abdulBasitArtwork),
         RadioStation(
             id: 'cur-quran-minshawi',
             name: 'إذاعة الشيخ محمد صديق المنشاوي (مجود)',
             url:
                 'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
-            genre: 'Quran'),
+            genre: 'Quran',
+            artworkUrl: minshawiArtwork),
         RadioStation(
             id: 'cur-quran-mustafa',
             name: 'إذاعة الشيخ مصطفى إسماعيل',
             url: 'https://backup.qurango.net/radio/mustafa_ismail',
-            genre: 'Quran'),
+            genre: 'Quran',
+            artworkUrl: mustafaIsmailArtwork),
         RadioStation(
             id: 'cur-quran-tarteel',
             name: 'إذاعة تراتيل القرآن الكريم',

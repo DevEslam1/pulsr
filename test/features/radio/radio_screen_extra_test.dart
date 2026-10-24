@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/radio_station_store.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/core/widgets/cached_artwork.dart';
 import 'package:pulsr/domain/models/radio_station.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -112,6 +113,27 @@ void main() {
     expect(find.byType(FilterChip), findsNWidgets(3));
     expect(find.widgetWithText(FilterChip, l10n.all), findsOneWidget);
     expect(find.widgetWithText(FilterChip, 'Rock'), findsOneWidget);
+
+    await drain(tester);
+  });
+
+  testWidgets('a station with artwork renders it from the bundled asset',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      RadioStationStore.prefsKey: jsonEncode([
+        {
+          'id': 'cur-quran-cairo',
+          'name': 'Quran Cairo',
+          'url': 'https://stream.radiojar.com/8s5u5tpdtwzuv',
+          'genre': 'Quran',
+          'artworkUrl': RadioStationStore.quranCairoArtwork,
+        },
+      ]),
+    });
+    await pumpRadio(tester);
+
+    final artwork = tester.widget<CachedArtwork>(find.byType(CachedArtwork));
+    expect(artwork.remoteUrl, RadioStationStore.quranCairoArtwork);
 
     await drain(tester);
   });
@@ -251,8 +273,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-        find.text(
-            l10n.radioCuratedAdded(RadioStationStore.curatedDirectory().length)),
+        find.text(l10n
+            .radioCuratedAdded(RadioStationStore.curatedDirectory().length)),
         findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.explore_rounded));

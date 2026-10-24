@@ -1,10 +1,8 @@
 // lib/features/player/presentation/widgets/tablet_player_bar.dart
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -193,16 +191,16 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black
-                                  .withValues(alpha: p.isDark ? 0.36 : 0.12),
+                                  .withValues(alpha: p.isDark ? 0.35 : 0.08),
                               blurRadius: 18,
                               spreadRadius: 0,
                               offset: const Offset(0, 6),
                             ),
                             BoxShadow(
-                              color: p.accent
-                                  .withValues(alpha: p.isDark ? 0.09 : 0.04),
-                              blurRadius: 14,
-                              spreadRadius: -2,
+                              color: Colors.black
+                                  .withValues(alpha: p.isDark ? 0.15 : 0.04),
+                              blurRadius: 6,
+                              spreadRadius: 0,
                               offset: const Offset(0, 2),
                             ),
                           ],
@@ -214,59 +212,20 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                               final barContainer = Container(
                                 height: maxAllowedHeight,
                                 decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      GpuBudget.isGpuSaverActive
-                                          ? p.surface
-                                          : p.surface.withValues(
-                                              alpha: p.isDark ? 0.84 : 0.90),
-                                      GpuBudget.isGpuSaverActive
-                                          ? p.surfaceContainer
-                                          : p.surfaceContainer.withValues(
-                                              alpha: p.isDark ? 0.78 : 0.86),
-                                    ],
-                                  ),
+                                  color: p.surfaceContainer,
                                   border: Border.all(
-                                    color: p.isDark
-                                        ? AppColors.specularStrong
-                                        : AppColors.scrimAt(0.08),
-                                    width: 1.2,
+                                    color: p.hairline,
+                                    width: 1.0,
                                   ),
                                 ),
-                                child: Stack(
-                                  children: [
-                                    // Specular refraction highlight along top edge
-                                    PositionedDirectional(
-                                      top: 0,
-                                      start: 16,
-                                      end: 16,
-                                      height: 1.2,
-                                      child: IgnorePointer(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                AppColors.specularAt(0.0),
-                                                AppColors.specularAt(
-                                                    p.isDark ? 0.38 : 0.65),
-                                                AppColors.specularAt(0.0),
-                                              ],
-                                              stops: const [0.0, 0.5, 1.0],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.md,
-                                        vertical: isShortHeight
-                                            ? AppSpacing.xxs
-                                            : AppSpacing.s6,
-                                      ),
-                                      child: LayoutBuilder(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.md,
+                                    vertical: isShortHeight
+                                        ? AppSpacing.xxs
+                                        : AppSpacing.s6,
+                                  ),
+                                  child: LayoutBuilder(
                                         builder: (context, barConstraints) {
                                           final totalWidth =
                                               barConstraints.maxWidth;
@@ -1192,18 +1151,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                         },
                                       ),
                                     ),
-                                  ],
-                                ),
-                              );
+                                  );
 
-                              if (GpuBudget.isGpuSaverActive) {
                                 return barContainer;
-                              }
-                              return BackdropFilter(
-                                filter:
-                                    ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                                child: barContainer,
-                              );
                             },
                           ),
                         ),

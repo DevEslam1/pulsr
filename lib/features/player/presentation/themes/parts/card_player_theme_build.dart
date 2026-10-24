@@ -28,10 +28,6 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
     final isTablet = context.isTablet;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBgColor = isDark
-        ? const Color(0xFF141828).withValues(alpha: 0.78)
-        : AppColors.specularAt(0.92);
-    final cardBorderColor = isDark ? AppColors.specularAt(0.15) : p.hairline;
     final textTitleColor = isDark ? Colors.white : p.textPrimary;
     final textSubtitleColor = isDark ? Colors.white70 : p.textSecondary;
 
@@ -300,15 +296,23 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                 dock: bottomDock,
               );
 
-              final bottomGlassCard = GlassContainer(
-                borderRadius: AppRadii.circular(
-                    resolveCustomRadius(context, AppRadii.r28)),
-                blur: 18,
-                specularHighlight: true,
-                color: cardBgColor,
-                border: Border.all(
-                  color: cardBorderColor,
-                  width: 1.1,
+              final bottomGlassCard = Container(
+                decoration: BoxDecoration(
+                  borderRadius: AppRadii.circular(
+                      resolveCustomRadius(context, AppRadii.r28)),
+                  color: isDark ? const Color(0xFF141828) : p.surfaceContainer,
+                  border: Border.all(
+                    color: p.hairline,
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
                     AppSpacing.sm, AppSpacing.md, AppSpacing.s10),

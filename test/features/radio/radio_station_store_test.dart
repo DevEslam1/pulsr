@@ -72,6 +72,43 @@ void main() {
     expect(store.list.single.url, oldStation.url);
   });
 
+  test('curated reciter stations carry their artwork assets', () async {
+    final store = RadioStationStore();
+    await store.ready;
+    await store.importCurated();
+    final byId = {for (final s in store.list) s.id: s};
+
+    expect(byId['cur-quran-cairo']!.artworkUrl,
+        RadioStationStore.quranCairoArtwork);
+    expect(byId['cur-quran-cairo-backup']!.artworkUrl,
+        RadioStationStore.quranCairoArtwork);
+    expect(byId['cur-quran-minshawi']!.artworkUrl,
+        RadioStationStore.minshawiArtwork);
+    expect(byId['cur-quran-mustafa']!.artworkUrl,
+        RadioStationStore.mustafaIsmailArtwork);
+    expect(byId['cur-quran-abdulbasit']!.artworkUrl,
+        RadioStationStore.abdulBasitArtwork);
+  });
+
+  test('loading a persisted curated station backfills missing artwork',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      RadioStationStore.prefsKey: jsonEncode([
+        {
+          'id': 'cur-quran-minshawi',
+          'name': 'إذاعة الشيخ محمد صديق المنشاوي (مجود)',
+          'url':
+              'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
+          'genre': 'Quran',
+        },
+      ]),
+    });
+    final store = RadioStationStore();
+    await store.ready;
+
+    expect(store.list.single.artworkUrl, RadioStationStore.minshawiArtwork);
+  });
+
   test('hasUrlCollision can exclude the station being edited', () async {
     final store = RadioStationStore();
     await store.ready;

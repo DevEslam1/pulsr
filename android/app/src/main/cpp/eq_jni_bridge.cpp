@@ -142,12 +142,21 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
 
     std::vector<double> vFreqs(freqs, freqs + count);
     std::vector<double> vGains(gains, gains + count);
-    std::vector<double> vQs(count, 1.414);
+    const double defaultPeakQ = (count <= 12) ? 1.0 : 2.0;
+    std::vector<double> vQs(count, defaultPeakQ);
+    if (!qs && count >= 5) {
+        vQs[0] = 0.7071;
+        vQs[count - 1] = 0.7071;
+    }
     if (qs) {
         const jsize limit = std::min(count, qLen);
         for (jsize i = 0; i < limit; ++i) vQs[i] = qs[i];
     }
     std::vector<int> vTypes(count, static_cast<int>(FilterType::Peaking));
+    if (!types && count >= 5) {
+        vTypes[0] = static_cast<int>(FilterType::LowShelf);
+        vTypes[count - 1] = static_cast<int>(FilterType::HighShelf);
+    }
     if (types) {
         const jsize limit = std::min(count, typeLen);
         for (jsize i = 0; i < limit; ++i) vTypes[i] = types[i];

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../di/injection.dart';
 import '../motion/pulsr_motion.dart';
@@ -306,6 +307,19 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
   static Future<Uint8List?> _fetchRemote(String url,
       {bool highQuality = false, bool lowQuality = false}) async {
+    if (url.startsWith('assets/')) {
+      try {
+        final data = await rootBundle.load(url);
+        return data.buffer.asUint8List(
+          data.offsetInBytes,
+          data.lengthInBytes,
+        );
+      } catch (e, st) {
+        ErrorLogger.log('Asset artwork load failed',
+            error: e, stackTrace: st, category: 'Artwork');
+        return null;
+      }
+    }
     if (url.startsWith('file://')) {
       try {
         final file = File(Uri.parse(url).toFilePath());

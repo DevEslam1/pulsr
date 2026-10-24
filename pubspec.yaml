@@ -91,6 +91,10 @@ flutter:
   assets:
     - assets/app_icon/
     - assets/eq_profiles/
+    - assets/Pictures/quran_cairo.jpg
+    - assets/Pictures/minshawi.jpg
+    - assets/Pictures/mustafa_ismail.jpg
+    - assets/Pictures/abdulbasit.jpg
 
   shaders:
     - shaders/milkdrop.frag

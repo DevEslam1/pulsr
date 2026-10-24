@@ -7,7 +7,6 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/cached_artwork.dart';
-import '../../../../core/widgets/glass_container.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../widgets/audio_visualizer.dart';

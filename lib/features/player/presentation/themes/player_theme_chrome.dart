@@ -6,7 +6,6 @@
 // file. They now live here; themes parameterise the handful of visual tokens
 // they actually differ on instead of keeping private copies.
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -675,14 +674,8 @@ class PlayerViewSwitcher extends StatelessWidget {
                 ),
               );
 
-              if (GpuBudget.isGpuSaverActive) {
-                return pillContainer;
-              }
               return RepaintBoundary(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                  child: pillContainer,
-                ),
+                child: pillContainer,
               );
             },
           ),
@@ -945,14 +938,8 @@ class PlayerBottomActionDock extends StatelessWidget {
                 ),
               );
 
-              if (disableBlur || GpuBudget.isGpuSaverActive) {
-                return dockContainer;
-              }
               return RepaintBoundary(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                  child: dockContainer,
-                ),
+                child: dockContainer,
               );
             },
           ),

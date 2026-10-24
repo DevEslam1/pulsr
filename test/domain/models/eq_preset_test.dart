@@ -207,6 +207,28 @@ void main() {
     });
 
     test('EqBand equality considers every field', () {
+      final flat = EqPreset.defaultPresets.firstWhere((p) => p.name == 'Flat');
+      expect(flat.recommendedPreampDb, 0.0);
+      final bass =
+          EqPreset.defaultPresets.firstWhere((p) => p.name == 'Bass Boost');
+      expect(bass.recommendedPreampDb, lessThan(-1.5));
+      expect(bass.recommendedPreampDb, greaterThanOrEqualTo(-6.0));
+      expect(
+        EqPreset.defaultPresets.any((p) => p.name == 'Harman Target'),
+        isTrue,
+      );
+      expect(
+        EqPreset.defaultPresets.any((p) => p.name == 'Audiophile Warm'),
+        isTrue,
+      );
+      expect(
+        EqPreset.defaultPresets.any((p) => p.name == 'Studio Reference'),
+        isTrue,
+      );
+      expect(
+        EqPreset.defaultPresets.any((p) => p.name == 'Late Night'),
+        isTrue,
+      );
       const a = EqBand(index: 0, centerFrequency: 1000, gain: 3);
       expect(a, equals(const EqBand(index: 0, centerFrequency: 1000, gain: 3)));
       expect(

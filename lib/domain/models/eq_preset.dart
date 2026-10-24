@@ -327,36 +327,72 @@ class EqPreset {
     ];
   }
 
+  /// Crest-aware recommended preamp attenuation (dB) to prevent positive EQ
+  /// boosts from driving the true-peak limiter into broadband gain pumping.
+  double get recommendedPreampDb {
+    double maxBoost = 0.0;
+    double sumPosSq = 0.0;
+    int posCount = 0;
+    for (final g in gains) {
+      if (g.isFinite && g > 0.5) {
+        if (g > maxBoost) maxBoost = g;
+        sumPosSq += g * g;
+        posCount++;
+      }
+    }
+    if (maxBoost <= 1.5) return 0.0;
+    final rmsBoost = posCount > 0 ? math.sqrt(sumPosSq / posCount) : maxBoost;
+    final effectiveBoost = 0.65 * maxBoost + 0.35 * rmsBoost;
+    return -((effectiveBoost - 1.5) * 0.55).clamp(0.0, 6.0);
+  }
+
   static const List<EqPreset> defaultPresets = [
     EqPreset(
         name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], bassBoost: 0.0),
     EqPreset(
         name: 'Bass Boost',
-        gains: [7, 6.5, 5, 3, 1, 0, 0, 0, 0, 0],
-        bassBoost: 0.5),
+        gains: [6.5, 5.5, 3.0, 0.5, -0.5, 0.0, 0.5, 1.0, 1.5, 1.0],
+        bassBoost: 0.35),
+
     EqPreset(
         name: 'Rock',
-        gains: [5, 4, 2.5, 0, -1, -1, 0.5, 2.5, 4, 4.5],
+        gains: [4.5, 3.8, 2.0, -0.5, -1.2, -0.5, 1.5, 3.2, 3.8, 3.5],
         bassBoost: 0.2),
     EqPreset(
         name: 'Pop',
-        gains: [-1, -0.5, 0.5, 2, 3.5, 4, 3, 1.5, 0, -1],
+        gains: [2.5, 3.0, 1.5, 0.0, 0.5, 1.8, 2.8, 2.5, 2.0, 2.5],
         bassBoost: 0.1),
     EqPreset(
         name: 'Jazz',
-        gains: [3.5, 3, 2, 1, -0.5, -1, 0, 1.5, 3, 3.5],
+        gains: [3.0, 2.8, 1.8, 0.5, -0.5, 0.0, 1.0, 2.0, 2.8, 3.2],
         bassBoost: 0.1),
     EqPreset(
         name: 'Electronic',
-        gains: [6, 5.5, 4, 2, 0, -0.5, 0.5, 2.5, 4.5, 5],
+        gains: [6.0, 5.0, 2.5, -0.5, -1.0, 0.0, 1.2, 2.8, 4.0, 4.5],
         bassBoost: 0.4),
     EqPreset(
         name: 'Vocal Boost',
-        gains: [-3, -2.5, -1, 1, 3.5, 4.5, 4, 2, 0.5, -0.5],
+        gains: [-2.0, -1.5, -0.5, 0.5, 2.2, 3.5, 3.8, 2.5, 1.0, 0.5],
         bassBoost: 0.0),
     EqPreset(
         name: 'Classical',
-        gains: [4, 3.5, 2.5, 1, 0, -0.5, 0, 1.5, 3, 3.5],
+        gains: [3.2, 2.8, 1.5, 0.0, -0.5, 0.0, 0.8, 1.8, 2.8, 3.5],
+        bassBoost: 0.0),
+    EqPreset(
+        name: 'Harman Target',
+        gains: [4.5, 4.0, 2.0, 0.0, -0.5, 0.2, 1.8, 3.2, 2.5, 3.0],
+        bassBoost: 0.15),
+    EqPreset(
+        name: 'Audiophile Warm',
+        gains: [3.0, 2.8, 2.0, 0.8, 0.2, 0.0, -0.4, 0.5, 1.5, 2.2],
+        bassBoost: 0.1),
+    EqPreset(
+        name: 'Studio Reference',
+        gains: [1.5, 1.2, 0.5, -0.3, -0.2, 0.0, 0.6, 1.2, 1.8, 2.2],
+        bassBoost: 0.0),
+    EqPreset(
+        name: 'Late Night',
+        gains: [3.8, 3.2, 1.5, -0.5, -0.8, 0.5, 1.8, 2.2, 2.8, 3.2],
         bassBoost: 0.0),
   ];
 }

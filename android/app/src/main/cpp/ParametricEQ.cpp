@@ -259,7 +259,16 @@ void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
     const double sinW = std::sin(w0);
     const double A = std::pow(10.0, gainDb / 40.0);
     const double q = std::max(band.smoothedQ, 0.05);
-    const double alpha = sinW / (2.0 * q);
+    double alpha = sinW / (2.0 * q);
+    if (band.type == FilterType::Peaking && w0 > 0.25 * M_PI) {
+        // Nyquist bandwidth decramping in the upper octave (f0 > 0.125 * fs):
+        // Bilinear frequency warping compresses analog bandwidth near pi
+        // as sin(w0) -> 0. Compensate effective Q smoothly above 0.25*pi
+        // so 8 kHz - 20 kHz treble bands retain open, analog-like air
+        // while keeping lower/mid bands (< 6 kHz @ 48k) bit-exact RBJ.
+        const double t = std::clamp((w0 - 0.25 * M_PI) / (0.75 * M_PI), 0.0, 1.0);
+        alpha *= (1.0 + 0.65 * t * t);
+    }
 
     double b0 = 1.0, b1 = 0.0, b2 = 0.0, a0 = 1.0, a1 = 0.0, a2 = 0.0;
 
@@ -377,7 +386,29 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // During a disable fade-out every gain/preamp target is unity (0 dB) so the
     // EQ smoothly approaches dry before it hard-bypasses (see fade countdown
     // below); otherwise they track the user's requested values.
-    const double preampTarget = fadeOutActive_ ? 0.0 : targetPreampDb_;
+    double autoHeadroomDb = 0.0;
+    if (!fadeOutActive_ && bandCount_ >= 5 && std::abs(targetPreampDb_) < 1e-4) {
+        double maxBoost = 0.0;
+        double sumPosSq = 0.0;
+        int posCount = 0;
+        for (int b = 0; b < bandCount_; ++b) {
+            if (bands_[b].enabled && !bands_[b].mute && bands_[b].targetGainDb > 0.5) {
+                const double g = bands_[b].targetGainDb;
+                if (g > maxBoost) maxBoost = g;
+                sumPosSq += g * g;
+                ++posCount;
+            }
+        }
+        if (maxBoost > 1.5) {
+            // Crest-aware auto-headroom compensation: attenuate by 55% of excess
+            // peak boost (capped at -6.0 dB) so positive EQ presets do not drive
+            // the downstream true-peak limiter into broadband gain pumping.
+            const double rmsBoost = (posCount > 0) ? std::sqrt(sumPosSq / posCount) : maxBoost;
+            const double effectiveBoost = 0.65 * maxBoost + 0.35 * rmsBoost;
+            autoHeadroomDb = -std::clamp((effectiveBoost - 1.5) * 0.55, 0.0, 6.0);
+        }
+    }
+    const double preampTarget = fadeOutActive_ ? 0.0 : (targetPreampDb_ + autoHeadroomDb);
     const double initialPreampLinear = preampLinear_;
 
     // Smooth preamp gain

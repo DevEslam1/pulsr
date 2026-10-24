@@ -35,6 +35,20 @@ struct EqParamSet {
     EqBandParam bands[MAX_BANDS];
     int bandCount = 10;
     double preampDb = 0.0;
+    EqParamSet() {
+        static constexpr double kDefaultFreqs[10] = {
+            31.5, 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
+        };
+        for (int i = 0; i < 10; ++i) {
+            bands[i].frequency = kDefaultFreqs[i];
+            bands[i].gainDb = 0.0;
+            bands[i].q = (i == 0 || i == 9) ? 0.7071 : 1.0;
+            bands[i].type = (i == 0) ? FilterType::LowShelf
+                          : (i == 9) ? FilterType::HighShelf
+                                     : FilterType::Peaking;
+            bands[i].enabled = true;
+        }
+    }
     bool enabled = true;
 };
 

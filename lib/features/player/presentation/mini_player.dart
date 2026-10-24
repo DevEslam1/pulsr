@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/utils/adaptive.dart';
@@ -492,23 +490,22 @@ class MiniPlayerState extends State<MiniPlayer> {
                     isTablet ? 24 : 14,
                     0,
                   ),
-                  // Same glass recipe as the bottom navigation bar so the two dock
-                  // cards read as one surface family.
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: playerRadius,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.scrimAt(p.isDark ? 0.40 : 0.12),
-                          blurRadius: 24,
+                          color: Colors.black
+                              .withValues(alpha: p.isDark ? 0.35 : 0.08),
+                          blurRadius: 18,
                           spreadRadius: 0,
-                          offset: const Offset(0, 8),
+                          offset: const Offset(0, 6),
                         ),
                         BoxShadow(
-                          color: p.accent
-                              .withValues(alpha: p.isDark ? 0.10 : 0.05),
-                          blurRadius: 18,
-                          spreadRadius: -2,
+                          color: Colors.black
+                              .withValues(alpha: p.isDark ? 0.15 : 0.04),
+                          blurRadius: 6,
+                          spreadRadius: 0,
                           offset: const Offset(0, 2),
                         ),
                       ],
@@ -520,25 +517,10 @@ class MiniPlayerState extends State<MiniPlayer> {
                           final miniPlayerContainer = Container(
                             decoration: BoxDecoration(
                               borderRadius: playerRadius,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  GpuBudget.isGpuSaverActive
-                                      ? p.surface
-                                      : p.surface.withValues(
-                                          alpha: p.isDark ? 0.76 : 0.86),
-                                  GpuBudget.isGpuSaverActive
-                                      ? p.surfaceContainer
-                                      : p.surfaceContainer.withValues(
-                                          alpha: p.isDark ? 0.70 : 0.82),
-                                ],
-                              ),
+                              color: p.surfaceContainer,
                               border: Border.all(
-                                color: p.isDark
-                                    ? AppColors.specularStrong
-                                    : AppColors.scrimAt(0.08),
-                                width: 1.2,
+                                color: p.hairline,
+                                width: 1.0,
                               ),
                             ),
                             child: ClipRRect(
@@ -546,28 +528,6 @@ class MiniPlayerState extends State<MiniPlayer> {
                               child: Stack(
                                 alignment: Alignment.topCenter,
                                 children: [
-                                  // Specular refraction highlight along top edge
-                                  PositionedDirectional(
-                                    top: 0,
-                                    start: 16,
-                                    end: 16,
-                                    height: 1.2,
-                                    child: IgnorePointer(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              AppColors.specularAt(0.0),
-                                              AppColors.specularAt(
-                                                  p.isDark ? 0.35 : 0.65),
-                                              AppColors.specularAt(0.0),
-                                            ],
-                                            stops: const [0.0, 0.5, 1.0],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
                                   Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -986,13 +946,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                             ),
                           );
 
-                          if (GpuBudget.isGpuSaverActive) {
-                            return miniPlayerContainer;
-                          }
-                          return BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                            child: miniPlayerContainer,
-                          );
+                          return miniPlayerContainer;
                         },
                       ),
                     ),
