@@ -9,7 +9,6 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
-import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -425,93 +424,95 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                       child: ExpansionTile(
-                      dense: true,
-                      tilePadding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s14, vertical: AppSpacing.s2),
-                      childrenPadding: const EdgeInsetsDirectional.fromSTEB(
-                          AppSpacing.s14, 0, AppSpacing.s14, AppSpacing.sm),
-                      title: Text(
-                        i < bandNames.length ? bandNames[i] : 'Band ${i + 1}',
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.bodySmall,
-                          fontWeight: FontWeight.w600,
+                        dense: true,
+                        tilePadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s14,
+                            vertical: AppSpacing.s2),
+                        childrenPadding: const EdgeInsetsDirectional.fromSTEB(
+                            AppSpacing.s14, 0, AppSpacing.s14, AppSpacing.sm),
+                        title: Text(
+                          i < bandNames.length ? bandNames[i] : 'Band ${i + 1}',
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
+                        subtitle: Text(
+                          '${band.thresholdDb.toStringAsFixed(1)} dB · ${band.ratio.toStringAsFixed(1)}:1 · +${band.makeupGainDb.toStringAsFixed(1)} dB',
+                          style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption,
+                              fontFamily: 'monospace'),
+                        ),
+                        children: [
+                          _buildParamRow(
+                            title: context.l10n.dspThreshold,
+                            valueDisplay:
+                                '${band.thresholdDb.toStringAsFixed(1)} dB',
+                            value: band.thresholdDb,
+                            min: -60.0,
+                            max: 0.0,
+                            enabled: _mbcEnabled,
+                            onChanged: (val) => _applyMbcBand(
+                                i, band.copyWith(thresholdDb: val)),
+                          ),
+                          _buildParamRow(
+                            title: context.l10n.dspRatio,
+                            valueDisplay: '${band.ratio.toStringAsFixed(1)}:1',
+                            value: band.ratio,
+                            min: 1.0,
+                            max: 20.0,
+                            enabled: _mbcEnabled,
+                            onChanged: (val) =>
+                                _applyMbcBand(i, band.copyWith(ratio: val)),
+                          ),
+                          _buildParamRow(
+                            title: context.l10n.dspMakeupGain,
+                            valueDisplay:
+                                '+${band.makeupGainDb.toStringAsFixed(1)} dB',
+                            value: band.makeupGainDb,
+                            min: 0.0,
+                            max: 24.0,
+                            enabled: _mbcEnabled,
+                            onChanged: (val) => _applyMbcBand(
+                                i, band.copyWith(makeupGainDb: val)),
+                          ),
+                          _buildParamRow(
+                            title: context.l10n.dspAttackTime,
+                            valueDisplay:
+                                '${band.attackMs.toStringAsFixed(1)} ms',
+                            value: band.attackMs,
+                            min: 0.1,
+                            max: 200.0,
+                            enabled: _mbcEnabled,
+                            onChanged: (val) =>
+                                _applyMbcBand(i, band.copyWith(attackMs: val)),
+                          ),
+                          _buildParamRow(
+                            title: context.l10n.releaseTime,
+                            valueDisplay:
+                                '${band.releaseMs.toStringAsFixed(0)} ms',
+                            value: band.releaseMs,
+                            min: 5.0,
+                            max: 1000.0,
+                            enabled: _mbcEnabled,
+                            onChanged: (val) =>
+                                _applyMbcBand(i, band.copyWith(releaseMs: val)),
+                          ),
+                          _buildParamRow(
+                            title: context.l10n.dspKnee,
+                            valueDisplay:
+                                '${band.kneeDb.toStringAsFixed(1)} dB',
+                            value: band.kneeDb,
+                            min: 0.0,
+                            max: 12.0,
+                            enabled: _mbcEnabled,
+                            onChanged: (val) =>
+                                _applyMbcBand(i, band.copyWith(kneeDb: val)),
+                          ),
+                        ],
                       ),
-                      subtitle: Text(
-                        '${band.thresholdDb.toStringAsFixed(1)} dB · ${band.ratio.toStringAsFixed(1)}:1 · +${band.makeupGainDb.toStringAsFixed(1)} dB',
-                        style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.caption,
-                            fontFamily: 'monospace'),
-                      ),
-                      children: [
-                        _buildParamRow(
-                          title: context.l10n.dspThreshold,
-                          valueDisplay:
-                              '${band.thresholdDb.toStringAsFixed(1)} dB',
-                          value: band.thresholdDb,
-                          min: -60.0,
-                          max: 0.0,
-                          enabled: _mbcEnabled,
-                          onChanged: (val) =>
-                              _applyMbcBand(i, band.copyWith(thresholdDb: val)),
-                        ),
-                        _buildParamRow(
-                          title: context.l10n.dspRatio,
-                          valueDisplay: '${band.ratio.toStringAsFixed(1)}:1',
-                          value: band.ratio,
-                          min: 1.0,
-                          max: 20.0,
-                          enabled: _mbcEnabled,
-                          onChanged: (val) =>
-                              _applyMbcBand(i, band.copyWith(ratio: val)),
-                        ),
-                        _buildParamRow(
-                          title: context.l10n.dspMakeupGain,
-                          valueDisplay:
-                              '+${band.makeupGainDb.toStringAsFixed(1)} dB',
-                          value: band.makeupGainDb,
-                          min: 0.0,
-                          max: 24.0,
-                          enabled: _mbcEnabled,
-                          onChanged: (val) => _applyMbcBand(
-                              i, band.copyWith(makeupGainDb: val)),
-                        ),
-                        _buildParamRow(
-                          title: context.l10n.dspAttackTime,
-                          valueDisplay:
-                              '${band.attackMs.toStringAsFixed(1)} ms',
-                          value: band.attackMs,
-                          min: 0.1,
-                          max: 200.0,
-                          enabled: _mbcEnabled,
-                          onChanged: (val) =>
-                              _applyMbcBand(i, band.copyWith(attackMs: val)),
-                        ),
-                        _buildParamRow(
-                          title: context.l10n.releaseTime,
-                          valueDisplay:
-                              '${band.releaseMs.toStringAsFixed(0)} ms',
-                          value: band.releaseMs,
-                          min: 5.0,
-                          max: 1000.0,
-                          enabled: _mbcEnabled,
-                          onChanged: (val) =>
-                              _applyMbcBand(i, band.copyWith(releaseMs: val)),
-                        ),
-                        _buildParamRow(
-                          title: context.l10n.dspKnee,
-                          valueDisplay: '${band.kneeDb.toStringAsFixed(1)} dB',
-                          value: band.kneeDb,
-                          min: 0.0,
-                          max: 12.0,
-                          enabled: _mbcEnabled,
-                          onChanged: (val) =>
-                              _applyMbcBand(i, band.copyWith(kneeDb: val)),
-                        ),
-                      ],
-                    ),
                     ),
                   );
                 }),

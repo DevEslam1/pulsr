@@ -13,6 +13,7 @@ import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/download_task.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/add_to_playlist_sheet.dart';
@@ -209,7 +210,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     : const PulsrBackButton(),
                 title: Text(
                   _isSelectionMode
-                      ? '${_selectedVideoIds.length} selected'
+                      ? context.l10n.selectedCount(_selectedVideoIds.length)
                       : l10n.downloadsTitle,
                   style: TextStyle(
                     color: p.textPrimary,
@@ -399,7 +400,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                         const SizedBox(width: AppSpacing.xs),
                                         Expanded(
                                           child: Text(
-                                            'Downloading ${activeTasks.length} • ${completedTasks.length}/${allTasks.length} completed',
+                                            context.l10n
+                                                .downloadsProgressSummary(
+                                              activeTasks.length,
+                                              completedTasks.length,
+                                              allTasks.length,
+                                            ),
                                             style: TextStyle(
                                               fontSize: AppFontSize.caption,
                                               color: p.accent,
@@ -730,7 +736,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     if (count <= 0) return;
     PulsrToast.show(
       context,
-      message: '$count re-queued',
+      message: context.l10n.downloadsRequeued(count),
       icon: Icons.schedule_rounded,
     );
   }

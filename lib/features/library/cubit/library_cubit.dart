@@ -11,6 +11,7 @@ import '../../../core/services/library_cache_manager.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/song_classification.dart';
 import '../../../data/audio/song_rating_store.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/ytm_track.dart';
@@ -43,6 +44,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   StreamSubscription? _genresSub;
   StreamSubscription? _yearsSub;
   StreamSubscription? _favoritesSub;
+  StreamSubscription? _downloadedSub;
   int _songsToken = 0;
   bool _snapshotConsumed = false;
 
@@ -140,11 +142,27 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _subscribeGenres();
     _subscribeYears();
     _subscribeFavorites();
+    _subscribeDownloaded();
     loadFolders();
   }
 
   void clearError() {
     safeEmit(state.copyWith(errorMessage: null));
+  }
+
+  /// Current hidden-folder paths, shared by every library/discovery
+  /// subscription so exclusion changes propagate consistently.
+  Future<List<String>> _currentExcludedFolders() async {
+    try {
+      final excludedRes = await _folderUseCases.getExcludedFolders();
+      if (isClosed) return const [];
+      final List<String> paths = excludedRes.fold((_) => <String>[], (r) => r);
+      return paths;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to fetch excluded folders',
+          error: e, stackTrace: st, category: 'LibraryCubit');
+      return const [];
+    }
   }
 
   Future<void> _subscribeSongs({bool resetLimit = false}) async {
@@ -156,16 +174,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       _songsLimit = songsPageSize;
       _hasMoreSongs = false;
     }
-    List<String> excluded = const [];
-    try {
-      final excludedRes = await _folderUseCases.getExcludedFolders();
-      if (isClosed || t != _songsToken) return;
-      excluded = excludedRes.fold((l) => <String>[], (r) => r);
-    } catch (e, st) {
-      if (isClosed || t != _songsToken) return;
-      ErrorLogger.log('Failed to fetch excluded folders in _subscribeSongs',
-          error: e, stackTrace: st, category: 'LibraryCubit');
-    }
+    final excluded = await _currentExcludedFolders();
+    if (isClosed || t != _songsToken) return;
     // Top-rated sort is prefs-backed: SQL has no rating column, so watch a
     // bounded window and sort in Dart. 5000 covers realistic libraries
     // without holding the full table; pagination is disabled in this mode
@@ -309,10 +319,13 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     });
   }
 
-  void _subscribeGenres() {
+  Future<void> _subscribeGenres() async {
     _genresSub?.cancel();
     removeFromComposite(_genresSub);
-    _genresSub = autoSub(_getGenresUseCase.watchGenres(), (result) {
+    final excluded = await _currentExcludedFolders();
+    if (isClosed) return;
+    _genresSub = autoSub(
+        _getGenresUseCase.watchGenres(excludedFolders: excluded), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (genres) => safeEmit(state.copyWith(
@@ -321,16 +334,48 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     });
   }
 
-  void _subscribeYears() {
+  Future<void> _subscribeYears() async {
     _yearsSub?.cancel();
     removeFromComposite(_yearsSub);
-    _yearsSub = autoSub(_getYearsUseCase.watchYears(), (result) {
+    final excluded = await _currentExcludedFolders();
+    if (isClosed) return;
+    _yearsSub = autoSub(_getYearsUseCase.watchYears(excludedFolders: excluded),
+        (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (years) => safeEmit(state.copyWith(
             years: List.unmodifiable(years), errorMessage: null)),
       );
     });
+  }
+
+  /// Streams songs directly inside [folderPath] from the repository, so the
+  /// folder tree does not depend on the paginated songs window.
+  Stream<Result<List<SongsTableData>>> watchFolderSongs(String folderPath) {
+    return _folderUseCases.watchFolderSongs(folderPath);
+  }
+
+  void _subscribeDownloaded() {
+    _downloadedSub?.cancel();
+    removeFromComposite(_downloadedSub);
+    final repo = _musicRepository;
+    if (repo == null) return;
+    () async {
+      final excluded = await _currentExcludedFolders();
+      if (isClosed) return;
+      _downloadedSub = autoSub(
+          repo.watchDownloadedSongs(excludedFolders: excluded), (result) {
+        result.fold(
+          (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+          (songs) => safeEmit(state.copyWith(
+            downloadedSongs: List<SongsTableData>.unmodifiable(
+              songs.where(isDownloadedOnlineTrack),
+            ),
+            errorMessage: null,
+          )),
+        );
+      });
+    }();
   }
 
   void _subscribeFavorites() {
@@ -578,6 +623,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     await loadFolders();
     if (isClosed) return result;
     await _subscribeSongs();
+    _subscribeGenres();
+    _subscribeYears();
+    _subscribeDownloaded();
     return result;
   }
 
@@ -593,6 +641,18 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       selectedSongIds: current,
       isMultiSelectMode: current.isNotEmpty,
     ));
+  }
+
+  /// Selects an explicit set of songs. Used by tab-scoped "Select all" so
+  /// Favorites/Downloaded can never silently select the whole library.
+  void selectSongs(Iterable<int> ids) {
+    final selected = ids.toSet();
+    if (selected.isEmpty) {
+      clearSelection();
+      return;
+    }
+    safeEmit(
+        state.copyWith(selectedSongIds: selected, isMultiSelectMode: true));
   }
 
   /// Selects every song in the library. Bounded (gap 06-04): resolves IDs in a
@@ -772,6 +832,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _genresSub?.cancel();
     _yearsSub?.cancel();
     _favoritesSub?.cancel();
+    _downloadedSub?.cancel();
     _favoriteLocks.clear();
     return super.close();
   }

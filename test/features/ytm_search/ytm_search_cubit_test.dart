@@ -554,6 +554,33 @@ void main() {
           cubit.state.results.where((t) => t.videoId.startsWith('w')), isEmpty);
     });
 
+    test('a failed page sets loadMoreFailed until an explicit retry', () async {
+      final first = [for (var i = 0; i < 30; i++) _track('v$i')];
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => first);
+      when(() => service.searchWithFallback(any(), limit: 60))
+          .thenThrow(Exception('offline'));
+
+      final cubit = build();
+      cubit.onQueryChanged('abc');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+      expect(cubit.hasMore, isTrue);
+
+      await cubit.loadMore();
+      expect(cubit.state.isLoading, isFalse);
+      expect(cubit.state.loadMoreFailed, isTrue);
+      expect(cubit.state.results.length, 30);
+
+      when(() => service.searchWithFallback(any(), limit: 60))
+          .thenAnswer((_) async => [
+                for (var i = 25; i < 55; i++) _track('v$i'),
+              ]);
+      await cubit.loadMore();
+      expect(cubit.state.loadMoreFailed, isFalse);
+      expect(cubit.state.results.length, 55);
+    });
+
     test('a search returning fewer than the page size disables load-more',
         () async {
       when(() => service.searchWithFallback(any()))

@@ -121,6 +121,32 @@ void main() {
     expect(find.byType(GridView), findsOneWidget);
   });
 
+  testWidgets('grid view paginates when scrolled near the bottom',
+      (tester) async {
+    disableAnimations(tester);
+    setSurface(tester, size: const Size(600, 900));
+    final songs = List.generate(
+      80,
+      (i) => testSong(id: i + 1, title: 'Grid Song $i'),
+    );
+    final cubit = stubLibraryCubit(
+      LibraryState(songs: songs, viewMode: LibraryViewMode.grid),
+      hasMoreSongs: true,
+    );
+
+    await tester.pumpWidget(libraryHarness(
+      libraryCubit: cubit,
+      child: const LibraryScreen(),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GridView), findsOneWidget);
+    await tester.drag(find.byType(GridView), const Offset(0, -12000));
+    await tester.pumpAndSettle();
+
+    verify(() => cubit.loadMoreSongs()).called(greaterThanOrEqualTo(1));
+  });
+
   testWidgets('online songs are pre-warmed for streaming', (tester) async {
     disableAnimations(tester);
     setSurface(tester);
@@ -163,16 +189,17 @@ void main() {
   testWidgets('downloaded tab lists downloaded online tracks', (tester) async {
     disableAnimations(tester);
     setSurface(tester);
-    final cubit = stubLibraryCubit(LibraryState(songs: [
-      testSong(
-        id: 1,
-        title: 'Downloaded Track',
-        source: 'local',
-        path: '/storage/downloads/dl.mp3',
-        isDownloaded: true,
-      ),
-      testSong(id: 2, title: 'Plain Local'),
-    ]));
+    final downloaded = testSong(
+      id: 1,
+      title: 'Downloaded Track',
+      source: 'local',
+      path: '/storage/downloads/dl.mp3',
+      isDownloaded: true,
+    );
+    final cubit = stubLibraryCubit(LibraryState(
+      songs: [downloaded, testSong(id: 2, title: 'Plain Local')],
+      downloadedSongs: [downloaded],
+    ));
 
     await tester.pumpWidget(libraryHarness(
       libraryCubit: cubit,
@@ -182,6 +209,41 @@ void main() {
 
     expect(find.text('Downloaded Track'), findsWidgets);
     expect(find.byType(SongTile), findsOneWidget);
+  });
+
+  testWidgets(
+      'downloaded tab shows downloads outside the loaded 500-row page',
+      (tester) async {
+    disableAnimations(tester);
+    setSurface(tester);
+    // Simulate a large library: page 1 is full of non-downloaded rows while
+    // the only download sits beyond the pagination window.
+    final page = List.generate(
+      500,
+      (i) => testSong(id: i + 1, title: 'Page Song $i'),
+    );
+    final beyondPage = testSong(
+      id: 9001,
+      title: 'Beyond Page Download',
+      source: 'local',
+      path: '/storage/downloads/beyond.mp3',
+      isDownloaded: true,
+    );
+    final cubit = stubLibraryCubit(LibraryState(
+      songs: page,
+      downloadedSongs: [beyondPage],
+    ));
+
+    await tester.pumpWidget(libraryHarness(
+      libraryCubit: cubit,
+      child: const LibraryScreen(initialTabName: 'downloaded'),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Beyond Page Download'), findsWidgets);
+    expect(find.byType(SongTile), findsOneWidget);
+    // The tab badge count comes from the full downloaded list, not the page.
+    expect(find.text('1'), findsWidgets);
   });
 
   testWidgets('downloaded tab shows an empty state when nothing is downloaded',

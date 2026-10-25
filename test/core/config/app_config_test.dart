@@ -7,8 +7,10 @@ void main() {
       expect(AppConfig.environment, AppEnvironment.dev);
       expect(AppConfig.isDev, isTrue);
       expect(AppConfig.isProd, isFalse);
-      // B-08 single source: dev flavor native label is "Pulsr Plus"
-      expect(AppConfig.appTitle, 'Pulsr Plus');
+      // YTM builds intentionally brand as "Pulsr Music"; the default dev
+      // flavor is "Pulsr Plus" (B-08 single source).
+      expect(AppConfig.appTitle,
+          AppConfig.ytmEnabled ? 'Pulsr Music' : 'Pulsr Plus');
     });
 
     test('Reads environment fields', () {

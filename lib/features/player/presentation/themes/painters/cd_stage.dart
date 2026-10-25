@@ -305,10 +305,13 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                           behavior: HitTestBehavior.opaque,
                           onPanStart: (d) => _onPlatterPanStart(d, cdSize),
                           onPanUpdate: (d) => _onPlatterPanUpdate(d, cdSize),
-                          onPanEnd: (_) => _onPlatterPanEnd(
-                            state.duration.inMilliseconds,
-                            state.position.inMilliseconds,
-                          ),
+                          onPanEnd: (_) {
+                            final current = widget.props.cubit.state;
+                            _onPlatterPanEnd(
+                              current.duration.inMilliseconds,
+                              current.position.inMilliseconds,
+                            );
+                          },
                           onPanCancel: () {
                             setState(() {
                               _isScrubbing = false;

@@ -75,6 +75,13 @@ extension _YtmWebLoginShell on _YtmWebLoginSheetState {
                               urlStr.contains('play.google.com')) {
                             return false;
                           }
+                          // Popup navigation must obey the same allowlist as
+                          // top-level navigation; otherwise a page-triggered
+                          // window.open can escape the login sandbox.
+                          if (YtmWebLoginSheet.evaluateNavigation(url) ==
+                              NavigationActionPolicy.CANCEL) {
+                            return false;
+                          }
                           await controller.loadUrl(
                               urlRequest: URLRequest(url: url));
                         }

@@ -3847,6 +3847,939 @@ class ExcludedFoldersTableCompanion
   }
 }
 
+class $OnlinePlaylistsTableTable extends OnlinePlaylistsTable
+    with TableInfo<$OnlinePlaylistsTableTable, OnlinePlaylistsTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OnlinePlaylistsTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _playlistIdMeta =
+      const VerificationMeta('playlistId');
+  @override
+  late final GeneratedColumn<String> playlistId = GeneratedColumn<String>(
+      'playlist_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _authorMeta = const VerificationMeta('author');
+  @override
+  late final GeneratedColumn<String> author = GeneratedColumn<String>(
+      'author', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _artworkUrlMeta =
+      const VerificationMeta('artworkUrl');
+  @override
+  late final GeneratedColumn<String> artworkUrl = GeneratedColumn<String>(
+      'artwork_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+      'kind', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(OnlineLibraryKind.custom));
+  static const VerificationMeta _sortOrderMeta =
+      const VerificationMeta('sortOrder');
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+      'sort_order', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _hasCustomOrderMeta =
+      const VerificationMeta('hasCustomOrder');
+  @override
+  late final GeneratedColumn<bool> hasCustomOrder = GeneratedColumn<bool>(
+      'has_custom_order', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("has_custom_order" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _cachedAtMeta =
+      const VerificationMeta('cachedAt');
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+      'cached_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        playlistId,
+        title,
+        author,
+        artworkUrl,
+        kind,
+        sortOrder,
+        hasCustomOrder,
+        cachedAt,
+        updatedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'online_playlists';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<OnlinePlaylistsTableData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('playlist_id')) {
+      context.handle(
+          _playlistIdMeta,
+          playlistId.isAcceptableOrUnknown(
+              data['playlist_id']!, _playlistIdMeta));
+    } else if (isInserting) {
+      context.missing(_playlistIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('author')) {
+      context.handle(_authorMeta,
+          author.isAcceptableOrUnknown(data['author']!, _authorMeta));
+    }
+    if (data.containsKey('artwork_url')) {
+      context.handle(
+          _artworkUrlMeta,
+          artworkUrl.isAcceptableOrUnknown(
+              data['artwork_url']!, _artworkUrlMeta));
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+          _kindMeta, kind.isAcceptableOrUnknown(data['kind']!, _kindMeta));
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(_sortOrderMeta,
+          sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta));
+    }
+    if (data.containsKey('has_custom_order')) {
+      context.handle(
+          _hasCustomOrderMeta,
+          hasCustomOrder.isAcceptableOrUnknown(
+              data['has_custom_order']!, _hasCustomOrderMeta));
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(_cachedAtMeta,
+          cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {playlistId};
+  @override
+  OnlinePlaylistsTableData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OnlinePlaylistsTableData(
+      playlistId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}playlist_id'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      author: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}author'])!,
+      artworkUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}artwork_url']),
+      kind: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}kind'])!,
+      sortOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sort_order'])!,
+      hasCustomOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}has_custom_order'])!,
+      cachedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $OnlinePlaylistsTableTable createAlias(String alias) {
+    return $OnlinePlaylistsTableTable(attachedDatabase, alias);
+  }
+}
+
+class OnlinePlaylistsTableData extends DataClass
+    implements Insertable<OnlinePlaylistsTableData> {
+  final String playlistId;
+  final String title;
+  final String author;
+  final String? artworkUrl;
+
+  /// One of [OnlineLibraryKind].
+  final String kind;
+
+  /// Position in the online library list, kept so cached listings can be
+  /// rebuilt without re-sorting by title.
+  final int sortOrder;
+
+  /// True once the user has dragged songs. While true, remote refreshes merge
+  /// new tracks into the saved order instead of replacing it.
+  final bool hasCustomOrder;
+
+  /// Last time the full track list was fetched. Null means only a preview or
+  /// metadata is cached. Used by the background sync to skip fresh entries.
+  final DateTime? cachedAt;
+  final DateTime updatedAt;
+  const OnlinePlaylistsTableData(
+      {required this.playlistId,
+      required this.title,
+      required this.author,
+      this.artworkUrl,
+      required this.kind,
+      required this.sortOrder,
+      required this.hasCustomOrder,
+      this.cachedAt,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['playlist_id'] = Variable<String>(playlistId);
+    map['title'] = Variable<String>(title);
+    map['author'] = Variable<String>(author);
+    if (!nullToAbsent || artworkUrl != null) {
+      map['artwork_url'] = Variable<String>(artworkUrl);
+    }
+    map['kind'] = Variable<String>(kind);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['has_custom_order'] = Variable<bool>(hasCustomOrder);
+    if (!nullToAbsent || cachedAt != null) {
+      map['cached_at'] = Variable<DateTime>(cachedAt);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  OnlinePlaylistsTableCompanion toCompanion(bool nullToAbsent) {
+    return OnlinePlaylistsTableCompanion(
+      playlistId: Value(playlistId),
+      title: Value(title),
+      author: Value(author),
+      artworkUrl: artworkUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(artworkUrl),
+      kind: Value(kind),
+      sortOrder: Value(sortOrder),
+      hasCustomOrder: Value(hasCustomOrder),
+      cachedAt: cachedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cachedAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory OnlinePlaylistsTableData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OnlinePlaylistsTableData(
+      playlistId: serializer.fromJson<String>(json['playlistId']),
+      title: serializer.fromJson<String>(json['title']),
+      author: serializer.fromJson<String>(json['author']),
+      artworkUrl: serializer.fromJson<String?>(json['artworkUrl']),
+      kind: serializer.fromJson<String>(json['kind']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      hasCustomOrder: serializer.fromJson<bool>(json['hasCustomOrder']),
+      cachedAt: serializer.fromJson<DateTime?>(json['cachedAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'playlistId': serializer.toJson<String>(playlistId),
+      'title': serializer.toJson<String>(title),
+      'author': serializer.toJson<String>(author),
+      'artworkUrl': serializer.toJson<String?>(artworkUrl),
+      'kind': serializer.toJson<String>(kind),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'hasCustomOrder': serializer.toJson<bool>(hasCustomOrder),
+      'cachedAt': serializer.toJson<DateTime?>(cachedAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  OnlinePlaylistsTableData copyWith(
+          {String? playlistId,
+          String? title,
+          String? author,
+          Value<String?> artworkUrl = const Value.absent(),
+          String? kind,
+          int? sortOrder,
+          bool? hasCustomOrder,
+          Value<DateTime?> cachedAt = const Value.absent(),
+          DateTime? updatedAt}) =>
+      OnlinePlaylistsTableData(
+        playlistId: playlistId ?? this.playlistId,
+        title: title ?? this.title,
+        author: author ?? this.author,
+        artworkUrl: artworkUrl.present ? artworkUrl.value : this.artworkUrl,
+        kind: kind ?? this.kind,
+        sortOrder: sortOrder ?? this.sortOrder,
+        hasCustomOrder: hasCustomOrder ?? this.hasCustomOrder,
+        cachedAt: cachedAt.present ? cachedAt.value : this.cachedAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  OnlinePlaylistsTableData copyWithCompanion(
+      OnlinePlaylistsTableCompanion data) {
+    return OnlinePlaylistsTableData(
+      playlistId:
+          data.playlistId.present ? data.playlistId.value : this.playlistId,
+      title: data.title.present ? data.title.value : this.title,
+      author: data.author.present ? data.author.value : this.author,
+      artworkUrl:
+          data.artworkUrl.present ? data.artworkUrl.value : this.artworkUrl,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      hasCustomOrder: data.hasCustomOrder.present
+          ? data.hasCustomOrder.value
+          : this.hasCustomOrder,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OnlinePlaylistsTableData(')
+          ..write('playlistId: $playlistId, ')
+          ..write('title: $title, ')
+          ..write('author: $author, ')
+          ..write('artworkUrl: $artworkUrl, ')
+          ..write('kind: $kind, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('hasCustomOrder: $hasCustomOrder, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(playlistId, title, author, artworkUrl, kind,
+      sortOrder, hasCustomOrder, cachedAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OnlinePlaylistsTableData &&
+          other.playlistId == this.playlistId &&
+          other.title == this.title &&
+          other.author == this.author &&
+          other.artworkUrl == this.artworkUrl &&
+          other.kind == this.kind &&
+          other.sortOrder == this.sortOrder &&
+          other.hasCustomOrder == this.hasCustomOrder &&
+          other.cachedAt == this.cachedAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class OnlinePlaylistsTableCompanion
+    extends UpdateCompanion<OnlinePlaylistsTableData> {
+  final Value<String> playlistId;
+  final Value<String> title;
+  final Value<String> author;
+  final Value<String?> artworkUrl;
+  final Value<String> kind;
+  final Value<int> sortOrder;
+  final Value<bool> hasCustomOrder;
+  final Value<DateTime?> cachedAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const OnlinePlaylistsTableCompanion({
+    this.playlistId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.author = const Value.absent(),
+    this.artworkUrl = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.hasCustomOrder = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OnlinePlaylistsTableCompanion.insert({
+    required String playlistId,
+    required String title,
+    this.author = const Value.absent(),
+    this.artworkUrl = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.hasCustomOrder = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : playlistId = Value(playlistId),
+        title = Value(title);
+  static Insertable<OnlinePlaylistsTableData> custom({
+    Expression<String>? playlistId,
+    Expression<String>? title,
+    Expression<String>? author,
+    Expression<String>? artworkUrl,
+    Expression<String>? kind,
+    Expression<int>? sortOrder,
+    Expression<bool>? hasCustomOrder,
+    Expression<DateTime>? cachedAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (playlistId != null) 'playlist_id': playlistId,
+      if (title != null) 'title': title,
+      if (author != null) 'author': author,
+      if (artworkUrl != null) 'artwork_url': artworkUrl,
+      if (kind != null) 'kind': kind,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (hasCustomOrder != null) 'has_custom_order': hasCustomOrder,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OnlinePlaylistsTableCompanion copyWith(
+      {Value<String>? playlistId,
+      Value<String>? title,
+      Value<String>? author,
+      Value<String?>? artworkUrl,
+      Value<String>? kind,
+      Value<int>? sortOrder,
+      Value<bool>? hasCustomOrder,
+      Value<DateTime?>? cachedAt,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
+    return OnlinePlaylistsTableCompanion(
+      playlistId: playlistId ?? this.playlistId,
+      title: title ?? this.title,
+      author: author ?? this.author,
+      artworkUrl: artworkUrl ?? this.artworkUrl,
+      kind: kind ?? this.kind,
+      sortOrder: sortOrder ?? this.sortOrder,
+      hasCustomOrder: hasCustomOrder ?? this.hasCustomOrder,
+      cachedAt: cachedAt ?? this.cachedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (playlistId.present) {
+      map['playlist_id'] = Variable<String>(playlistId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (author.present) {
+      map['author'] = Variable<String>(author.value);
+    }
+    if (artworkUrl.present) {
+      map['artwork_url'] = Variable<String>(artworkUrl.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (hasCustomOrder.present) {
+      map['has_custom_order'] = Variable<bool>(hasCustomOrder.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OnlinePlaylistsTableCompanion(')
+          ..write('playlistId: $playlistId, ')
+          ..write('title: $title, ')
+          ..write('author: $author, ')
+          ..write('artworkUrl: $artworkUrl, ')
+          ..write('kind: $kind, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('hasCustomOrder: $hasCustomOrder, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $OnlinePlaylistEntriesTableTable extends OnlinePlaylistEntriesTable
+    with
+        TableInfo<$OnlinePlaylistEntriesTableTable,
+            OnlinePlaylistEntriesTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OnlinePlaylistEntriesTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _playlistIdMeta =
+      const VerificationMeta('playlistId');
+  @override
+  late final GeneratedColumn<String> playlistId = GeneratedColumn<String>(
+      'playlist_id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES online_playlists (playlist_id) ON DELETE CASCADE'));
+  static const VerificationMeta _videoIdMeta =
+      const VerificationMeta('videoId');
+  @override
+  late final GeneratedColumn<String> videoId = GeneratedColumn<String>(
+      'video_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _artistMeta = const VerificationMeta('artist');
+  @override
+  late final GeneratedColumn<String> artist = GeneratedColumn<String>(
+      'artist', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('Unknown Artist'));
+  static const VerificationMeta _durationMsMeta =
+      const VerificationMeta('durationMs');
+  @override
+  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
+      'duration_ms', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _artworkUrlMeta =
+      const VerificationMeta('artworkUrl');
+  @override
+  late final GeneratedColumn<String> artworkUrl = GeneratedColumn<String>(
+      'artwork_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _orderIndexMeta =
+      const VerificationMeta('orderIndex');
+  @override
+  late final GeneratedColumn<int> orderIndex = GeneratedColumn<int>(
+      'order_index', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        playlistId,
+        videoId,
+        title,
+        artist,
+        durationMs,
+        artworkUrl,
+        orderIndex
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'online_playlist_entries';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<OnlinePlaylistEntriesTableData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('playlist_id')) {
+      context.handle(
+          _playlistIdMeta,
+          playlistId.isAcceptableOrUnknown(
+              data['playlist_id']!, _playlistIdMeta));
+    } else if (isInserting) {
+      context.missing(_playlistIdMeta);
+    }
+    if (data.containsKey('video_id')) {
+      context.handle(_videoIdMeta,
+          videoId.isAcceptableOrUnknown(data['video_id']!, _videoIdMeta));
+    } else if (isInserting) {
+      context.missing(_videoIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('artist')) {
+      context.handle(_artistMeta,
+          artist.isAcceptableOrUnknown(data['artist']!, _artistMeta));
+    }
+    if (data.containsKey('duration_ms')) {
+      context.handle(
+          _durationMsMeta,
+          durationMs.isAcceptableOrUnknown(
+              data['duration_ms']!, _durationMsMeta));
+    }
+    if (data.containsKey('artwork_url')) {
+      context.handle(
+          _artworkUrlMeta,
+          artworkUrl.isAcceptableOrUnknown(
+              data['artwork_url']!, _artworkUrlMeta));
+    }
+    if (data.containsKey('order_index')) {
+      context.handle(
+          _orderIndexMeta,
+          orderIndex.isAcceptableOrUnknown(
+              data['order_index']!, _orderIndexMeta));
+    } else if (isInserting) {
+      context.missing(_orderIndexMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {playlistId, videoId},
+      ];
+  @override
+  OnlinePlaylistEntriesTableData map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OnlinePlaylistEntriesTableData(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      playlistId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}playlist_id'])!,
+      videoId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}video_id'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      artist: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}artist'])!,
+      durationMs: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}duration_ms'])!,
+      artworkUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}artwork_url']),
+      orderIndex: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}order_index'])!,
+    );
+  }
+
+  @override
+  $OnlinePlaylistEntriesTableTable createAlias(String alias) {
+    return $OnlinePlaylistEntriesTableTable(attachedDatabase, alias);
+  }
+}
+
+class OnlinePlaylistEntriesTableData extends DataClass
+    implements Insertable<OnlinePlaylistEntriesTableData> {
+  final int id;
+  final String playlistId;
+  final String videoId;
+  final String title;
+  final String artist;
+  final int durationMs;
+  final String? artworkUrl;
+  final int orderIndex;
+  const OnlinePlaylistEntriesTableData(
+      {required this.id,
+      required this.playlistId,
+      required this.videoId,
+      required this.title,
+      required this.artist,
+      required this.durationMs,
+      this.artworkUrl,
+      required this.orderIndex});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['playlist_id'] = Variable<String>(playlistId);
+    map['video_id'] = Variable<String>(videoId);
+    map['title'] = Variable<String>(title);
+    map['artist'] = Variable<String>(artist);
+    map['duration_ms'] = Variable<int>(durationMs);
+    if (!nullToAbsent || artworkUrl != null) {
+      map['artwork_url'] = Variable<String>(artworkUrl);
+    }
+    map['order_index'] = Variable<int>(orderIndex);
+    return map;
+  }
+
+  OnlinePlaylistEntriesTableCompanion toCompanion(bool nullToAbsent) {
+    return OnlinePlaylistEntriesTableCompanion(
+      id: Value(id),
+      playlistId: Value(playlistId),
+      videoId: Value(videoId),
+      title: Value(title),
+      artist: Value(artist),
+      durationMs: Value(durationMs),
+      artworkUrl: artworkUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(artworkUrl),
+      orderIndex: Value(orderIndex),
+    );
+  }
+
+  factory OnlinePlaylistEntriesTableData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OnlinePlaylistEntriesTableData(
+      id: serializer.fromJson<int>(json['id']),
+      playlistId: serializer.fromJson<String>(json['playlistId']),
+      videoId: serializer.fromJson<String>(json['videoId']),
+      title: serializer.fromJson<String>(json['title']),
+      artist: serializer.fromJson<String>(json['artist']),
+      durationMs: serializer.fromJson<int>(json['durationMs']),
+      artworkUrl: serializer.fromJson<String?>(json['artworkUrl']),
+      orderIndex: serializer.fromJson<int>(json['orderIndex']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'playlistId': serializer.toJson<String>(playlistId),
+      'videoId': serializer.toJson<String>(videoId),
+      'title': serializer.toJson<String>(title),
+      'artist': serializer.toJson<String>(artist),
+      'durationMs': serializer.toJson<int>(durationMs),
+      'artworkUrl': serializer.toJson<String?>(artworkUrl),
+      'orderIndex': serializer.toJson<int>(orderIndex),
+    };
+  }
+
+  OnlinePlaylistEntriesTableData copyWith(
+          {int? id,
+          String? playlistId,
+          String? videoId,
+          String? title,
+          String? artist,
+          int? durationMs,
+          Value<String?> artworkUrl = const Value.absent(),
+          int? orderIndex}) =>
+      OnlinePlaylistEntriesTableData(
+        id: id ?? this.id,
+        playlistId: playlistId ?? this.playlistId,
+        videoId: videoId ?? this.videoId,
+        title: title ?? this.title,
+        artist: artist ?? this.artist,
+        durationMs: durationMs ?? this.durationMs,
+        artworkUrl: artworkUrl.present ? artworkUrl.value : this.artworkUrl,
+        orderIndex: orderIndex ?? this.orderIndex,
+      );
+  OnlinePlaylistEntriesTableData copyWithCompanion(
+      OnlinePlaylistEntriesTableCompanion data) {
+    return OnlinePlaylistEntriesTableData(
+      id: data.id.present ? data.id.value : this.id,
+      playlistId:
+          data.playlistId.present ? data.playlistId.value : this.playlistId,
+      videoId: data.videoId.present ? data.videoId.value : this.videoId,
+      title: data.title.present ? data.title.value : this.title,
+      artist: data.artist.present ? data.artist.value : this.artist,
+      durationMs:
+          data.durationMs.present ? data.durationMs.value : this.durationMs,
+      artworkUrl:
+          data.artworkUrl.present ? data.artworkUrl.value : this.artworkUrl,
+      orderIndex:
+          data.orderIndex.present ? data.orderIndex.value : this.orderIndex,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OnlinePlaylistEntriesTableData(')
+          ..write('id: $id, ')
+          ..write('playlistId: $playlistId, ')
+          ..write('videoId: $videoId, ')
+          ..write('title: $title, ')
+          ..write('artist: $artist, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('artworkUrl: $artworkUrl, ')
+          ..write('orderIndex: $orderIndex')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, playlistId, videoId, title, artist,
+      durationMs, artworkUrl, orderIndex);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OnlinePlaylistEntriesTableData &&
+          other.id == this.id &&
+          other.playlistId == this.playlistId &&
+          other.videoId == this.videoId &&
+          other.title == this.title &&
+          other.artist == this.artist &&
+          other.durationMs == this.durationMs &&
+          other.artworkUrl == this.artworkUrl &&
+          other.orderIndex == this.orderIndex);
+}
+
+class OnlinePlaylistEntriesTableCompanion
+    extends UpdateCompanion<OnlinePlaylistEntriesTableData> {
+  final Value<int> id;
+  final Value<String> playlistId;
+  final Value<String> videoId;
+  final Value<String> title;
+  final Value<String> artist;
+  final Value<int> durationMs;
+  final Value<String?> artworkUrl;
+  final Value<int> orderIndex;
+  const OnlinePlaylistEntriesTableCompanion({
+    this.id = const Value.absent(),
+    this.playlistId = const Value.absent(),
+    this.videoId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.artist = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    this.artworkUrl = const Value.absent(),
+    this.orderIndex = const Value.absent(),
+  });
+  OnlinePlaylistEntriesTableCompanion.insert({
+    this.id = const Value.absent(),
+    required String playlistId,
+    required String videoId,
+    required String title,
+    this.artist = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    this.artworkUrl = const Value.absent(),
+    required int orderIndex,
+  })  : playlistId = Value(playlistId),
+        videoId = Value(videoId),
+        title = Value(title),
+        orderIndex = Value(orderIndex);
+  static Insertable<OnlinePlaylistEntriesTableData> custom({
+    Expression<int>? id,
+    Expression<String>? playlistId,
+    Expression<String>? videoId,
+    Expression<String>? title,
+    Expression<String>? artist,
+    Expression<int>? durationMs,
+    Expression<String>? artworkUrl,
+    Expression<int>? orderIndex,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (playlistId != null) 'playlist_id': playlistId,
+      if (videoId != null) 'video_id': videoId,
+      if (title != null) 'title': title,
+      if (artist != null) 'artist': artist,
+      if (durationMs != null) 'duration_ms': durationMs,
+      if (artworkUrl != null) 'artwork_url': artworkUrl,
+      if (orderIndex != null) 'order_index': orderIndex,
+    });
+  }
+
+  OnlinePlaylistEntriesTableCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? playlistId,
+      Value<String>? videoId,
+      Value<String>? title,
+      Value<String>? artist,
+      Value<int>? durationMs,
+      Value<String?>? artworkUrl,
+      Value<int>? orderIndex}) {
+    return OnlinePlaylistEntriesTableCompanion(
+      id: id ?? this.id,
+      playlistId: playlistId ?? this.playlistId,
+      videoId: videoId ?? this.videoId,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      durationMs: durationMs ?? this.durationMs,
+      artworkUrl: artworkUrl ?? this.artworkUrl,
+      orderIndex: orderIndex ?? this.orderIndex,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (playlistId.present) {
+      map['playlist_id'] = Variable<String>(playlistId.value);
+    }
+    if (videoId.present) {
+      map['video_id'] = Variable<String>(videoId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (artist.present) {
+      map['artist'] = Variable<String>(artist.value);
+    }
+    if (durationMs.present) {
+      map['duration_ms'] = Variable<int>(durationMs.value);
+    }
+    if (artworkUrl.present) {
+      map['artwork_url'] = Variable<String>(artworkUrl.value);
+    }
+    if (orderIndex.present) {
+      map['order_index'] = Variable<int>(orderIndex.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OnlinePlaylistEntriesTableCompanion(')
+          ..write('id: $id, ')
+          ..write('playlistId: $playlistId, ')
+          ..write('videoId: $videoId, ')
+          ..write('title: $title, ')
+          ..write('artist: $artist, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('artworkUrl: $artworkUrl, ')
+          ..write('orderIndex: $orderIndex')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3862,6 +4795,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $QueueItemsTableTable(this);
   late final $ExcludedFoldersTableTable excludedFoldersTable =
       $ExcludedFoldersTableTable(this);
+  late final $OnlinePlaylistsTableTable onlinePlaylistsTable =
+      $OnlinePlaylistsTableTable(this);
+  late final $OnlinePlaylistEntriesTableTable onlinePlaylistEntriesTable =
+      $OnlinePlaylistEntriesTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3874,7 +4811,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         playlistEntriesTable,
         playHistoryTable,
         queueItemsTable,
-        excludedFoldersTable
+        excludedFoldersTable,
+        onlinePlaylistsTable,
+        onlinePlaylistEntriesTable
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -3905,6 +4844,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
                 limitUpdateKind: UpdateKind.delete),
             result: [
               TableUpdate('queue_items', kind: UpdateKind.delete),
+            ],
+          ),
+          WritePropagation(
+            on: TableUpdateQuery.onTableName('online_playlists',
+                limitUpdateKind: UpdateKind.delete),
+            result: [
+              TableUpdate('online_playlist_entries', kind: UpdateKind.delete),
             ],
           ),
         ],
@@ -6505,6 +7451,679 @@ typedef $$ExcludedFoldersTableTableProcessedTableManager
         ),
         ExcludedFoldersTableData,
         PrefetchHooks Function()>;
+typedef $$OnlinePlaylistsTableTableCreateCompanionBuilder
+    = OnlinePlaylistsTableCompanion Function({
+  required String playlistId,
+  required String title,
+  Value<String> author,
+  Value<String?> artworkUrl,
+  Value<String> kind,
+  Value<int> sortOrder,
+  Value<bool> hasCustomOrder,
+  Value<DateTime?> cachedAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+typedef $$OnlinePlaylistsTableTableUpdateCompanionBuilder
+    = OnlinePlaylistsTableCompanion Function({
+  Value<String> playlistId,
+  Value<String> title,
+  Value<String> author,
+  Value<String?> artworkUrl,
+  Value<String> kind,
+  Value<int> sortOrder,
+  Value<bool> hasCustomOrder,
+  Value<DateTime?> cachedAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+final class $$OnlinePlaylistsTableTableReferences extends BaseReferences<
+    _$AppDatabase, $OnlinePlaylistsTableTable, OnlinePlaylistsTableData> {
+  $$OnlinePlaylistsTableTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$OnlinePlaylistEntriesTableTable,
+      List<OnlinePlaylistEntriesTableData>> _onlinePlaylistEntriesTableRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.onlinePlaylistEntriesTable,
+          aliasName:
+              'online_playlists__playlist_id__online_playlist_entries__playlist_id');
+
+  $$OnlinePlaylistEntriesTableTableProcessedTableManager
+      get onlinePlaylistEntriesTableRefs {
+    final manager = $$OnlinePlaylistEntriesTableTableTableManager(
+            $_db, $_db.onlinePlaylistEntriesTable)
+        .filter((f) => f.playlistId.playlistId
+            .sqlEquals($_itemColumn<String>('playlist_id')!));
+
+    final cache = $_typedResult
+        .readTableOrNull(_onlinePlaylistEntriesTableRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$OnlinePlaylistsTableTableFilterComposer
+    extends Composer<_$AppDatabase, $OnlinePlaylistsTableTable> {
+  $$OnlinePlaylistsTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get playlistId => $composableBuilder(
+      column: $table.playlistId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get author => $composableBuilder(
+      column: $table.author, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get artworkUrl => $composableBuilder(
+      column: $table.artworkUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+      column: $table.sortOrder, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get hasCustomOrder => $composableBuilder(
+      column: $table.hasCustomOrder,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> onlinePlaylistEntriesTableRefs(
+      Expression<bool> Function(
+              $$OnlinePlaylistEntriesTableTableFilterComposer f)
+          f) {
+    final $$OnlinePlaylistEntriesTableTableFilterComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.playlistId,
+            referencedTable: $db.onlinePlaylistEntriesTable,
+            getReferencedColumn: (t) => t.playlistId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$OnlinePlaylistEntriesTableTableFilterComposer(
+                  $db: $db,
+                  $table: $db.onlinePlaylistEntriesTable,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+}
+
+class $$OnlinePlaylistsTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $OnlinePlaylistsTableTable> {
+  $$OnlinePlaylistsTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get playlistId => $composableBuilder(
+      column: $table.playlistId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get author => $composableBuilder(
+      column: $table.author, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get artworkUrl => $composableBuilder(
+      column: $table.artworkUrl, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+      column: $table.sortOrder, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get hasCustomOrder => $composableBuilder(
+      column: $table.hasCustomOrder,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$OnlinePlaylistsTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OnlinePlaylistsTableTable> {
+  $$OnlinePlaylistsTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get playlistId => $composableBuilder(
+      column: $table.playlistId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get author =>
+      $composableBuilder(column: $table.author, builder: (column) => column);
+
+  GeneratedColumn<String> get artworkUrl => $composableBuilder(
+      column: $table.artworkUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get hasCustomOrder => $composableBuilder(
+      column: $table.hasCustomOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> onlinePlaylistEntriesTableRefs<T extends Object>(
+      Expression<T> Function(
+              $$OnlinePlaylistEntriesTableTableAnnotationComposer a)
+          f) {
+    final $$OnlinePlaylistEntriesTableTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.playlistId,
+            referencedTable: $db.onlinePlaylistEntriesTable,
+            getReferencedColumn: (t) => t.playlistId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$OnlinePlaylistEntriesTableTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.onlinePlaylistEntriesTable,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+}
+
+class $$OnlinePlaylistsTableTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $OnlinePlaylistsTableTable,
+    OnlinePlaylistsTableData,
+    $$OnlinePlaylistsTableTableFilterComposer,
+    $$OnlinePlaylistsTableTableOrderingComposer,
+    $$OnlinePlaylistsTableTableAnnotationComposer,
+    $$OnlinePlaylistsTableTableCreateCompanionBuilder,
+    $$OnlinePlaylistsTableTableUpdateCompanionBuilder,
+    (OnlinePlaylistsTableData, $$OnlinePlaylistsTableTableReferences),
+    OnlinePlaylistsTableData,
+    PrefetchHooks Function({bool onlinePlaylistEntriesTableRefs})> {
+  $$OnlinePlaylistsTableTableTableManager(
+      _$AppDatabase db, $OnlinePlaylistsTableTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OnlinePlaylistsTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OnlinePlaylistsTableTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OnlinePlaylistsTableTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> playlistId = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String> author = const Value.absent(),
+            Value<String?> artworkUrl = const Value.absent(),
+            Value<String> kind = const Value.absent(),
+            Value<int> sortOrder = const Value.absent(),
+            Value<bool> hasCustomOrder = const Value.absent(),
+            Value<DateTime?> cachedAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              OnlinePlaylistsTableCompanion(
+            playlistId: playlistId,
+            title: title,
+            author: author,
+            artworkUrl: artworkUrl,
+            kind: kind,
+            sortOrder: sortOrder,
+            hasCustomOrder: hasCustomOrder,
+            cachedAt: cachedAt,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String playlistId,
+            required String title,
+            Value<String> author = const Value.absent(),
+            Value<String?> artworkUrl = const Value.absent(),
+            Value<String> kind = const Value.absent(),
+            Value<int> sortOrder = const Value.absent(),
+            Value<bool> hasCustomOrder = const Value.absent(),
+            Value<DateTime?> cachedAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              OnlinePlaylistsTableCompanion.insert(
+            playlistId: playlistId,
+            title: title,
+            author: author,
+            artworkUrl: artworkUrl,
+            kind: kind,
+            sortOrder: sortOrder,
+            hasCustomOrder: hasCustomOrder,
+            cachedAt: cachedAt,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$OnlinePlaylistsTableTable,
+                        OnlinePlaylistsTableData>(table),
+                    $$OnlinePlaylistsTableTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({onlinePlaylistEntriesTableRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (onlinePlaylistEntriesTableRefs)
+                  db.onlinePlaylistEntriesTable
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (onlinePlaylistEntriesTableRefs)
+                    await $_getPrefetchedData<
+                            OnlinePlaylistsTableData,
+                            $OnlinePlaylistsTableTable,
+                            OnlinePlaylistEntriesTableData>(
+                        currentTable: table,
+                        referencedTable: $$OnlinePlaylistsTableTableReferences
+                            ._onlinePlaylistEntriesTableRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$OnlinePlaylistsTableTableReferences(db, table, p0)
+                                .onlinePlaylistEntriesTableRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.playlistId == item.playlistId),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$OnlinePlaylistsTableTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $OnlinePlaylistsTableTable,
+        OnlinePlaylistsTableData,
+        $$OnlinePlaylistsTableTableFilterComposer,
+        $$OnlinePlaylistsTableTableOrderingComposer,
+        $$OnlinePlaylistsTableTableAnnotationComposer,
+        $$OnlinePlaylistsTableTableCreateCompanionBuilder,
+        $$OnlinePlaylistsTableTableUpdateCompanionBuilder,
+        (OnlinePlaylistsTableData, $$OnlinePlaylistsTableTableReferences),
+        OnlinePlaylistsTableData,
+        PrefetchHooks Function({bool onlinePlaylistEntriesTableRefs})>;
+typedef $$OnlinePlaylistEntriesTableTableCreateCompanionBuilder
+    = OnlinePlaylistEntriesTableCompanion Function({
+  Value<int> id,
+  required String playlistId,
+  required String videoId,
+  required String title,
+  Value<String> artist,
+  Value<int> durationMs,
+  Value<String?> artworkUrl,
+  required int orderIndex,
+});
+typedef $$OnlinePlaylistEntriesTableTableUpdateCompanionBuilder
+    = OnlinePlaylistEntriesTableCompanion Function({
+  Value<int> id,
+  Value<String> playlistId,
+  Value<String> videoId,
+  Value<String> title,
+  Value<String> artist,
+  Value<int> durationMs,
+  Value<String?> artworkUrl,
+  Value<int> orderIndex,
+});
+
+final class $$OnlinePlaylistEntriesTableTableReferences extends BaseReferences<
+    _$AppDatabase,
+    $OnlinePlaylistEntriesTableTable,
+    OnlinePlaylistEntriesTableData> {
+  $$OnlinePlaylistEntriesTableTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $OnlinePlaylistsTableTable _playlistIdTable(_$AppDatabase db) =>
+      db.onlinePlaylistsTable.createAlias(
+          'online_playlist_entries__playlist_id__online_playlists__playlist_id');
+
+  $$OnlinePlaylistsTableTableProcessedTableManager get playlistId {
+    final $_column = $_itemColumn<String>('playlist_id')!;
+
+    final manager =
+        $$OnlinePlaylistsTableTableTableManager($_db, $_db.onlinePlaylistsTable)
+            .filter((f) => f.playlistId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_playlistIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$OnlinePlaylistEntriesTableTableFilterComposer
+    extends Composer<_$AppDatabase, $OnlinePlaylistEntriesTableTable> {
+  $$OnlinePlaylistEntriesTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get videoId => $composableBuilder(
+      column: $table.videoId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get artist => $composableBuilder(
+      column: $table.artist, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get durationMs => $composableBuilder(
+      column: $table.durationMs, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get artworkUrl => $composableBuilder(
+      column: $table.artworkUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get orderIndex => $composableBuilder(
+      column: $table.orderIndex, builder: (column) => ColumnFilters(column));
+
+  $$OnlinePlaylistsTableTableFilterComposer get playlistId {
+    final $$OnlinePlaylistsTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.playlistId,
+        referencedTable: $db.onlinePlaylistsTable,
+        getReferencedColumn: (t) => t.playlistId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$OnlinePlaylistsTableTableFilterComposer(
+              $db: $db,
+              $table: $db.onlinePlaylistsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$OnlinePlaylistEntriesTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $OnlinePlaylistEntriesTableTable> {
+  $$OnlinePlaylistEntriesTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get videoId => $composableBuilder(
+      column: $table.videoId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get artist => $composableBuilder(
+      column: $table.artist, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get durationMs => $composableBuilder(
+      column: $table.durationMs, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get artworkUrl => $composableBuilder(
+      column: $table.artworkUrl, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get orderIndex => $composableBuilder(
+      column: $table.orderIndex, builder: (column) => ColumnOrderings(column));
+
+  $$OnlinePlaylistsTableTableOrderingComposer get playlistId {
+    final $$OnlinePlaylistsTableTableOrderingComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.playlistId,
+            referencedTable: $db.onlinePlaylistsTable,
+            getReferencedColumn: (t) => t.playlistId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$OnlinePlaylistsTableTableOrderingComposer(
+                  $db: $db,
+                  $table: $db.onlinePlaylistsTable,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return composer;
+  }
+}
+
+class $$OnlinePlaylistEntriesTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OnlinePlaylistEntriesTableTable> {
+  $$OnlinePlaylistEntriesTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get videoId =>
+      $composableBuilder(column: $table.videoId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get artist =>
+      $composableBuilder(column: $table.artist, builder: (column) => column);
+
+  GeneratedColumn<int> get durationMs => $composableBuilder(
+      column: $table.durationMs, builder: (column) => column);
+
+  GeneratedColumn<String> get artworkUrl => $composableBuilder(
+      column: $table.artworkUrl, builder: (column) => column);
+
+  GeneratedColumn<int> get orderIndex => $composableBuilder(
+      column: $table.orderIndex, builder: (column) => column);
+
+  $$OnlinePlaylistsTableTableAnnotationComposer get playlistId {
+    final $$OnlinePlaylistsTableTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.playlistId,
+            referencedTable: $db.onlinePlaylistsTable,
+            getReferencedColumn: (t) => t.playlistId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$OnlinePlaylistsTableTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.onlinePlaylistsTable,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return composer;
+  }
+}
+
+class $$OnlinePlaylistEntriesTableTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $OnlinePlaylistEntriesTableTable,
+    OnlinePlaylistEntriesTableData,
+    $$OnlinePlaylistEntriesTableTableFilterComposer,
+    $$OnlinePlaylistEntriesTableTableOrderingComposer,
+    $$OnlinePlaylistEntriesTableTableAnnotationComposer,
+    $$OnlinePlaylistEntriesTableTableCreateCompanionBuilder,
+    $$OnlinePlaylistEntriesTableTableUpdateCompanionBuilder,
+    (
+      OnlinePlaylistEntriesTableData,
+      $$OnlinePlaylistEntriesTableTableReferences
+    ),
+    OnlinePlaylistEntriesTableData,
+    PrefetchHooks Function({bool playlistId})> {
+  $$OnlinePlaylistEntriesTableTableTableManager(
+      _$AppDatabase db, $OnlinePlaylistEntriesTableTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OnlinePlaylistEntriesTableTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OnlinePlaylistEntriesTableTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OnlinePlaylistEntriesTableTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> playlistId = const Value.absent(),
+            Value<String> videoId = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String> artist = const Value.absent(),
+            Value<int> durationMs = const Value.absent(),
+            Value<String?> artworkUrl = const Value.absent(),
+            Value<int> orderIndex = const Value.absent(),
+          }) =>
+              OnlinePlaylistEntriesTableCompanion(
+            id: id,
+            playlistId: playlistId,
+            videoId: videoId,
+            title: title,
+            artist: artist,
+            durationMs: durationMs,
+            artworkUrl: artworkUrl,
+            orderIndex: orderIndex,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String playlistId,
+            required String videoId,
+            required String title,
+            Value<String> artist = const Value.absent(),
+            Value<int> durationMs = const Value.absent(),
+            Value<String?> artworkUrl = const Value.absent(),
+            required int orderIndex,
+          }) =>
+              OnlinePlaylistEntriesTableCompanion.insert(
+            id: id,
+            playlistId: playlistId,
+            videoId: videoId,
+            title: title,
+            artist: artist,
+            durationMs: durationMs,
+            artworkUrl: artworkUrl,
+            orderIndex: orderIndex,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$OnlinePlaylistEntriesTableTable,
+                        OnlinePlaylistEntriesTableData>(table),
+                    $$OnlinePlaylistEntriesTableTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({playlistId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (playlistId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.playlistId,
+                    referencedTable: $$OnlinePlaylistEntriesTableTableReferences
+                        ._playlistIdTable(db),
+                    referencedColumn:
+                        $$OnlinePlaylistEntriesTableTableReferences
+                            ._playlistIdTable(db)
+                            .playlistId,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$OnlinePlaylistEntriesTableTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $OnlinePlaylistEntriesTableTable,
+        OnlinePlaylistEntriesTableData,
+        $$OnlinePlaylistEntriesTableTableFilterComposer,
+        $$OnlinePlaylistEntriesTableTableOrderingComposer,
+        $$OnlinePlaylistEntriesTableTableAnnotationComposer,
+        $$OnlinePlaylistEntriesTableTableCreateCompanionBuilder,
+        $$OnlinePlaylistEntriesTableTableUpdateCompanionBuilder,
+        (
+          OnlinePlaylistEntriesTableData,
+          $$OnlinePlaylistEntriesTableTableReferences
+        ),
+        OnlinePlaylistEntriesTableData,
+        PrefetchHooks Function({bool playlistId})>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6525,4 +8144,10 @@ class $AppDatabaseManager {
       $$QueueItemsTableTableTableManager(_db, _db.queueItemsTable);
   $$ExcludedFoldersTableTableTableManager get excludedFoldersTable =>
       $$ExcludedFoldersTableTableTableManager(_db, _db.excludedFoldersTable);
+  $$OnlinePlaylistsTableTableTableManager get onlinePlaylistsTable =>
+      $$OnlinePlaylistsTableTableTableManager(_db, _db.onlinePlaylistsTable);
+  $$OnlinePlaylistEntriesTableTableTableManager
+      get onlinePlaylistEntriesTable =>
+          $$OnlinePlaylistEntriesTableTableTableManager(
+              _db, _db.onlinePlaylistEntriesTable);
 }

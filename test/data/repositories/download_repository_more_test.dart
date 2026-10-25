@@ -100,7 +100,9 @@ void main() {
   group('native download callbacks', () {
     test('onDownloadPaused pauses a known task and syncs the notification',
         () async {
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) => Completer<Result<int>>().future);
       await seed([task('abcdefghijk')]);
 
@@ -112,7 +114,9 @@ void main() {
     });
 
     test('onDownloadResumed requeues a paused task', () async {
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) async => const Right(3));
       await seed([task('abcdefghijk', status: DownloadStatus.paused)]);
 
@@ -123,7 +127,9 @@ void main() {
     });
 
     test('onDownloadCancelled deletes a task', () async {
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) => Completer<Result<int>>().future);
       await seed([task('abcdefghijk')]);
 
@@ -152,15 +158,17 @@ void main() {
         if (call.method == 'getFreeDiskSpace') return 0;
         return null;
       });
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) async => const Right(1));
 
       final res = await repo.queueDownload(task('abcdefghijk'));
       expect(res.isRight(), isTrue);
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      verify(() =>
-              service.download(any(), onProgress: any(named: 'onProgress')))
-          .called(1);
+      verify(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).called(1);
     });
 
     test('proceeds when the disk-space channel throws', () async {
@@ -170,19 +178,23 @@ void main() {
         }
         return null;
       });
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) async => const Right(1));
 
       expect((await repo.queueDownload(task('abcdefghijk'))).isRight(), isTrue);
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      verify(() =>
-              service.download(any(), onProgress: any(named: 'onProgress')))
-          .called(1);
+      verify(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).called(1);
     });
 
     test('dedupes a task that is actively downloading', () async {
       final completer = Completer<Result<int>>();
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) => completer.future);
 
       final first = await repo.queueDownload(task('abcdefghijk'));
@@ -191,30 +203,34 @@ void main() {
 
       expect(first.isRight(), isTrue);
       expect(second.isRight(), isTrue);
-      verify(() =>
-              service.download(any(), onProgress: any(named: 'onProgress')))
-          .called(1);
+      verify(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).called(1);
       completer.complete(const Left(DownloadFailure('done')));
       await Future<void>.delayed(const Duration(milliseconds: 10));
     });
 
     test('a complete task with no file path is re-downloaded', () async {
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) async => const Right(1));
       await seed([task('abcdefghijk', status: DownloadStatus.complete)]);
 
       await repo.queueDownload(task('abcdefghijk'));
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      verify(() =>
-              service.download(any(), onProgress: any(named: 'onProgress')))
-          .called(1);
+      verify(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).called(1);
     });
   });
 
   group('retry / delete', () {
     test('retryDownload turns a failed task back into a transfer', () async {
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) async => const Right(7));
       await seed([task('abcdefghijk', status: DownloadStatus.failed)]);
 
@@ -227,7 +243,9 @@ void main() {
 
     test('deleteDownload cancels an in-flight transfer', () async {
       final completer = Completer<Result<int>>();
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) => completer.future);
 
       await repo.queueDownload(task('abcdefghijk'));
@@ -303,7 +321,9 @@ void main() {
     test('falls back to the local song row size', () async {
       db = AppDatabase.forTesting(NativeDatabase.memory());
       repo = DownloadRepositoryImpl(service, db);
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) async => const Right(42));
 
       await repo.queueDownload(task('abcdefghijk'));

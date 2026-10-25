@@ -72,7 +72,7 @@ void main() {
         );
 
         expect(valResult.isValid, isTrue);
-        expect(valResult.currentVersion, equals(11));
+        expect(valResult.currentVersion, equals(12));
         expect(valResult.missingTables, isEmpty);
         expect(valResult.missingColumns, isEmpty);
         expect(valResult.missingIndexes, isEmpty);

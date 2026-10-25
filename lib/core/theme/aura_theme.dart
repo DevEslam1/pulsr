@@ -101,6 +101,10 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   final Color info; // informational / neutral highlight role
   final bool isDark;
 
+  /// Readable foreground for surfaces painted with [error].
+  Color get onError =>
+      error.computeLuminance() > 0.179 ? AppColors.onBright : Colors.white;
+
   /// Immersive card-player surface (glass card / solid card).
   final Color playerCard;
 
@@ -286,6 +290,13 @@ class AuraTheme {
         isHighContrast: true);
   }
 
+  /// Darkens bright brand/status colours used as foreground text or icons on
+  /// a light surface until they clear the WCAG AA body-text threshold.
+  static Color _lightReadable(Color color, double amount) {
+    if (color.computeLuminance() <= 0.18) return color;
+    return Color.lerp(color, Colors.black, amount)!;
+  }
+
   static PulsrPalette _palette(
       Color accent, Brightness brightness, bool isAmoled,
       {bool dimWhitePoint = false, bool isHighContrast = false}) {
@@ -297,12 +308,23 @@ class AuraTheme {
         accent.computeLuminance() > 0.179 ? AppColors.onBright : Colors.white;
 
     if (!isDark) {
+      final readableAccent =
+          _lightReadable(accent, isHighContrast ? 0.40 : 0.30);
+      final readableSuccess =
+          _lightReadable(AppColors.success, isHighContrast ? 0.40 : 0.30);
+      final readableError =
+          _lightReadable(AppColors.error, isHighContrast ? 0.35 : 0.30);
+      final readableWarning =
+          _lightReadable(AppColors.warning, isHighContrast ? 0.45 : 0.40);
+      final lightOnAccent = readableAccent.computeLuminance() > 0.179
+          ? AppColors.onBright
+          : Colors.white;
       if (isHighContrast) {
         return PulsrPalette(
-          accent: accent,
-          onAccent: onAccent,
-          accentContainer: accent.withValues(alpha: 0.22),
-          glow: accent.withValues(alpha: 0.45),
+          accent: readableAccent,
+          onAccent: lightOnAccent,
+          accentContainer: readableAccent.withValues(alpha: 0.22),
+          glow: readableAccent.withValues(alpha: 0.45),
           bg: Colors.white,
           surface: Colors.white,
           surfaceContainer: const Color(0xFFF1F1F1),
@@ -314,28 +336,29 @@ class AuraTheme {
           scrimHeavy: AppColors.scrimAt(0.65),
           borderSubtle: Colors.black.withValues(alpha: 0.30),
           borderStrong: Colors.black.withValues(alpha: 0.60),
-          accentSoft: accent.withValues(alpha: 0.18),
-          accentMedium: accent.withValues(alpha: 0.32),
-          successSoft: AppColors.success.withValues(alpha: 0.22),
-          errorSoft: AppColors.error.withValues(alpha: 0.22),
-          warningSoft: AppColors.warning.withValues(alpha: 0.22),
+          accentSoft: readableAccent.withValues(alpha: 0.18),
+          accentMedium: readableAccent.withValues(alpha: 0.32),
+          successSoft: readableSuccess.withValues(alpha: 0.22),
+          errorSoft: readableError.withValues(alpha: 0.22),
+          warningSoft: readableWarning.withValues(alpha: 0.22),
           hairline: Colors.black.withValues(alpha: 0.42),
           textPrimary: Colors.black,
           textSecondary: const Color(0xFF33373F),
           textTertiary: const Color(0xFF444B5A),
           favorite: AppColors.favorite,
-          success: AppColors.success,
-          error: AppColors.error,
+          success: readableSuccess,
+          error: readableError,
+          warning: readableWarning,
           isDark: false,
           playerCard: Colors.white,
           deepShade: Colors.white,
         );
       }
       return PulsrPalette(
-        accent: accent,
-        onAccent: onAccent,
-        accentContainer: accent.withValues(alpha: 0.12),
-        glow: accent.withValues(alpha: 0.22),
+        accent: readableAccent,
+        onAccent: lightOnAccent,
+        accentContainer: readableAccent.withValues(alpha: 0.12),
+        glow: readableAccent.withValues(alpha: 0.22),
         bg: const Color(0xFFFAFAFA),
         surface: Colors.white,
         surfaceContainer: const Color(0xFFF5F5F5),
@@ -347,23 +370,25 @@ class AuraTheme {
         scrimHeavy: AppColors.scrimAt(0.50),
         borderSubtle: const Color(0x14000000),
         borderStrong: const Color(0x33000000),
-        accentSoft: accent.withValues(alpha: 0.12),
-        accentMedium: accent.withValues(alpha: 0.25),
-        successSoft: AppColors.success.withValues(alpha: 0.15),
-        errorSoft: AppColors.error.withValues(alpha: 0.15),
-        warningSoft: AppColors.warning.withValues(alpha: 0.15),
+        accentSoft: readableAccent.withValues(alpha: 0.12),
+        accentMedium: readableAccent.withValues(alpha: 0.25),
+        successSoft: readableSuccess.withValues(alpha: 0.15),
+        errorSoft: readableError.withValues(alpha: 0.15),
+        warningSoft: readableWarning.withValues(alpha: 0.15),
         hairline: const Color(0xFF0F1724).withValues(alpha: 0.09),
         textPrimary: const Color(0xFF101425),
         textSecondary: const Color(0xFF5D6880),
         textTertiary: const Color(0xFF59657E),
         favorite: AppColors.favorite,
-        success: AppColors.success,
-        error: AppColors.error,
+        success: readableSuccess,
+        error: readableError,
+        warning: readableWarning,
         isDark: false,
         playerCard: Colors.white,
         deepShade: const Color(0xFFFAFAFA),
       );
     }
+
     if (isHighContrast) {
       return PulsrPalette(
         accent: accent,
@@ -608,7 +633,7 @@ class AuraTheme {
         onSurface: p.textPrimary,
         outline: p.hairline,
         error: p.error,
-        onError: Colors.white,
+        onError: p.onError,
       ),
       textTheme: textTheme,
       splashFactory: InkSparkle.splashFactory,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -344,6 +345,9 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                                 : Icons.visibility_off_outlined,
                             color: p.textSecondary,
                           ),
+                          tooltip: _obscureToken
+                              ? context.l10n.showPassword
+                              : context.l10n.hidePassword,
                           onPressed: () =>
                               setState(() => _obscureToken = !_obscureToken),
                         ),

@@ -100,6 +100,22 @@ class QuranMetadata {
     return null;
   }
 
+  /// Ayah that contains [position], falling back to the closest preceding
+  /// timing when the track position sits in a gap between timings.
+  int ayahAt(Duration position) {
+    QuranAyahTiming? nearest;
+    for (final timing in ayahTimings) {
+      if (timing.start <= position && position < timing.end) {
+        return timing.ayahNumber;
+      }
+      if (timing.start <= position &&
+          (nearest == null || timing.start > nearest.start)) {
+        nearest = timing;
+      }
+    }
+    return nearest?.ayahNumber ?? ayahStart;
+  }
+
   Map<String, dynamic> toMap() => {
         'surahNumber': surahNumber,
         'surahName': surahName,

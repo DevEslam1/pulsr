@@ -22,7 +22,7 @@ void main() {
           duration: Duration(minutes: 3),
           position: Duration(seconds: 30),
         ),
-        queueSlice: QueueSlice(queue: [testSong], currentIndex: 0),
+        queueSlice: QueueSlice(queue: [testSong, testSong], currentIndex: 0),
       );
 
   MockPlayerCubit stubTransport() {

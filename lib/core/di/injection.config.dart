@@ -193,25 +193,6 @@ extension GetItInjectableX on _i174.GetIt {
         ));
     gh.lazySingleton<_i452.MetadataSearchService>(
         () => _i452.MetadataSearchService(gh<_i519.Client>()));
-    gh.factory<_i1046.PlayerDependencies>(() => _i1046.PlayerDependencies(
-          settingsCubit: gh<_i41.SettingsCubit>(),
-          widgetService: gh<_i42.WidgetService>(),
-          scrobblerService: gh<_i629.ScrobblerService>(),
-          settingsProfilesService: gh<_i775.SettingsProfilesService>(),
-          deviceProfileService: gh<_i818.DeviceProfileService>(),
-          hiResAudioService: gh<_i451.HiResAudioService>(),
-          smartAudioService: gh<_i197.SmartAudioService>(),
-          latencyTracker: gh<_i626.PlaybackLatencyTracker>(),
-          perSongEqStore: gh<_i1054.PerSongEqStore>(),
-          perSongVolumeStore: gh<_i866.PerSongVolumeStore>(),
-          songRatingStore: gh<_i227.SongRatingStore>(),
-          sponsorBlockService: gh<_i912.SponsorBlockService>(),
-          quranModeService: gh<_i322.QuranModeService>(),
-          earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
-          lrclibService: gh<_i621.LrclibService>(),
-          ytmAccountService: gh<_i631.YtmAccountService>(),
-          mediaScannerService: gh<_i483.MediaScannerService>(),
-        ));
     gh.lazySingleton<_i629.ScrobblerService>(() => _i629.ScrobblerService(
           gh<_i519.Client>(),
           gh<_i558.FlutterSecureStorage>(),
@@ -288,6 +269,26 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()),
       dispose: (i) => i.dispose(),
     );
+    gh.factory<_i1046.PlayerDependencies>(() => _i1046.PlayerDependencies(
+          settingsCubit: gh<_i41.SettingsCubit>(),
+          widgetService: gh<_i42.WidgetService>(),
+          scrobblerService: gh<_i629.ScrobblerService>(),
+          settingsProfilesService: gh<_i775.SettingsProfilesService>(),
+          deviceProfileService: gh<_i818.DeviceProfileService>(),
+          hiResAudioService: gh<_i451.HiResAudioService>(),
+          smartAudioService: gh<_i197.SmartAudioService>(),
+          latencyTracker: gh<_i626.PlaybackLatencyTracker>(),
+          perSongEqStore: gh<_i1054.PerSongEqStore>(),
+          perSongVolumeStore: gh<_i866.PerSongVolumeStore>(),
+          songRatingStore: gh<_i227.SongRatingStore>(),
+          sponsorBlockService: gh<_i912.SponsorBlockService>(),
+          quranModeService: gh<_i322.QuranModeService>(),
+          earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
+          lrclibService: gh<_i621.LrclibService>(),
+          ytmAccountService: gh<_i631.YtmAccountService>(),
+          mediaScannerService: gh<_i483.MediaScannerService>(),
+          ytmService: gh<_i391.YtmService>(),
+        ));
     gh.lazySingleton<_i742.YtDownloadService>(() => _i742.YtDownloadService(
           gh<_i497.HttpClient>(),
           gh<_i391.YtmService>(),

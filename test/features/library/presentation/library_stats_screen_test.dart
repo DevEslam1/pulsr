@@ -18,7 +18,10 @@ class _Repo extends Mock implements IMusicRepository {}
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUpAll(registerLibraryFallbacks);
+  setUpAll(() {
+    registerLibraryFallbacks();
+    registerFallbackValue(<String>[]);
+  });
 
   late _Repo repo;
   late MockPlayerCubit player;
@@ -26,6 +29,8 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     repo = _Repo();
+    when(() => repo.getExcludedFolderPaths())
+        .thenAnswer((_) async => const Right([]));
     player = stubPlayerCubit();
   });
 
@@ -76,7 +81,8 @@ void main() {
 
   testWidgets('renders populated metrics, leaders and artists', (tester) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    when(() => repo.getAllSongs()).thenAnswer((_) async => Right([
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([
           song(
               id: 1,
               title: 'Hit One',
@@ -106,7 +112,8 @@ void main() {
 
   testWidgets('shows the no-history message for an unplayed library',
       (tester) async {
-    when(() => repo.getAllSongs())
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) async => Right([song(id: 1, title: 'Never')]));
 
     await pump(tester, state: const LibraryState());
@@ -119,7 +126,8 @@ void main() {
 
   testWidgets('lossless stats agree with the shared quality predicate',
       (tester) async {
-    when(() => repo.getAllSongs()).thenAnswer((_) async => Right([
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([
           song(id: 1, codec: 'wav', bitDepth: 16),
           song(id: 2, path: '/music/album.flac'),
           song(id: 3, bitDepth: 24),
@@ -134,21 +142,25 @@ void main() {
 
   testWidgets('surfaces a failed full-library load with a retry',
       (tester) async {
-    when(() => repo.getAllSongs())
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) async => const Left(DatabaseFailure('db down')));
 
     await pump(tester, state: const LibraryState());
 
     expect(find.textContaining('Failed to fetch'), findsOneWidget);
 
-    when(() => repo.getAllSongs()).thenAnswer((_) async => Right([]));
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([]));
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
-    verify(() => repo.getAllSongs()).called(2);
+    verify(() => repo.getAllSongs(
+        excludedFolders: any(named: 'excludedFolders'))).called(2);
   });
 
   testWidgets('tapping a leaderboard track starts playback', (tester) async {
-    when(() => repo.getAllSongs()).thenAnswer((_) async => Right([
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([
           song(id: 1, title: 'Play Me', artist: 'A', playCount: 9),
         ]));
 
@@ -161,7 +173,8 @@ void main() {
 
   testWidgets('changing the time range persists the preference',
       (tester) async {
-    when(() => repo.getAllSongs()).thenAnswer((_) async => Right([
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([
           song(
               id: 1,
               title: 'Recent',
@@ -180,18 +193,22 @@ void main() {
   });
 
   testWidgets('the refresh action re-queries the library', (tester) async {
-    when(() => repo.getAllSongs()).thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => const Right([]));
 
     await pump(tester, state: const LibraryState());
 
     await tester.tap(find.byIcon(Icons.refresh_rounded));
     await tester.pumpAndSettle();
-    verify(() => repo.getAllSongs()).called(greaterThanOrEqualTo(2));
+    verify(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders')))
+        .called(greaterThanOrEqualTo(2));
   });
 
   testWidgets('clearing play history confirms then calls the repository',
       (tester) async {
-    when(() => repo.getAllSongs()).thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => const Right([]));
     when(() => repo.clearRecentlyPlayed())
         .thenAnswer((_) async => const Right(null));
 
@@ -207,8 +224,36 @@ void main() {
     verify(() => repo.clearRecentlyPlayed()).called(1);
   });
 
+  testWidgets('clearing history refreshes the visible recently-played section',
+      (tester) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => Right([
+              song(
+                  id: 1,
+                  title: 'OnlyRecent',
+                  artist: 'A',
+                  playCount: 0,
+                  lastPlayed: now),
+            ]));
+    when(() => repo.clearRecentlyPlayed())
+        .thenAnswer((_) async => const Right(null));
+
+    await pump(tester, state: const LibraryState());
+    expect(find.text('OnlyRecent'), findsWidgets);
+
+    await tester.tap(find.byIcon(Icons.delete_sweep_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Clear History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('OnlyRecent'), findsNothing);
+  });
+
   testWidgets('a failed history clear reports the error', (tester) async {
-    when(() => repo.getAllSongs()).thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => const Right([]));
     when(() => repo.clearRecentlyPlayed())
         .thenAnswer((_) async => const Left(DatabaseFailure('locked')));
 

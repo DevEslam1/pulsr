@@ -78,7 +78,7 @@ class PlayerThemeMetrics {
     this.titleFontSize = 19.5,
     this.artistFontSize = 13.5,
     this.actionButtonSize = 44.0,
-    this.dockBarHeight = 44.0,
+    this.dockBarHeight = 54.0,
   });
 
   factory PlayerThemeMetrics.calculate(
@@ -221,11 +221,10 @@ class PlayerThemeMetrics {
         ? 48.0
         : (isShortHeight ? 38.0 : (isCompactHeight ? 42.0 : 46.0));
 
-    final double dockBarHeight = isTablet
-        ? 48.0
-        : (isLandscape
-            ? 36.0
-            : (isShortHeight ? 38.0 : (isCompactHeight ? 40.0 : 44.0)));
+    // 54dp outer - 3dp inset each side leaves a 48dp target inside the dock.
+    // Five actions now share the bar, so the extra height is what keeps the
+    // icons from shrinking below the minimum touch target.
+    final double dockBarHeight = isTablet ? 56.0 : 54.0;
 
     return PlayerThemeMetrics(
       constraints: constraints,

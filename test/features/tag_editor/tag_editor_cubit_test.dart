@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/services/metadata_search_service.dart';
@@ -562,6 +563,39 @@ void main() {
       await cubit.saveTags();
       expect(cubit.state.status, TagEditorStatus.success);
       verify(() => scanner.rescanSingleFile(any())).called(2);
+      await cubit.close();
+    });
+
+    test('preserves each track disc number when disc is not edited', () async {
+      final writes = <Map<Object?, Object?>>[];
+      handler = (call) async {
+        if (call.method == 'readTags') return <String, dynamic>{};
+        if (call.method == 'writeTags') {
+          writes.add(call.arguments as Map<Object?, Object?>);
+        }
+        return true;
+      };
+      final a = createTestSong(
+        id: 1,
+        title: 'A',
+        artist: 'X',
+        path: '/music/A.mp3',
+      ).copyWith(discNumber: const Value(1));
+      final b = createTestSong(
+        id: 2,
+        title: 'B',
+        artist: 'Y',
+        path: '/music/B.mp3',
+      ).copyWith(discNumber: const Value(2));
+      final cubit = TagEditorCubit(
+        song: a,
+        batchSongs: [a, b],
+        scannerService: scanner,
+        metadataSearchService: metadata,
+      );
+      await cubit.saveTags();
+      expect(cubit.state.status, TagEditorStatus.success);
+      expect(writes.map((w) => w['discNumber']), ['1', '2']);
       await cubit.close();
     });
 

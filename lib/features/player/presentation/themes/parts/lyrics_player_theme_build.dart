@@ -17,6 +17,7 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
         ));
     final isTablet = context.isTablet;
+    final p = context.palette;
 
     return Stack(
       children: [
@@ -31,9 +32,11 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Color.lerp(bgColor, Colors.black, 0.42) ?? bgColor,
+                          Color.lerp(bgColor, Colors.black,
+                                  p.isDark ? 0.42 : 0.04) ??
+                              bgColor,
                           bgColor,
-                          const Color(0xFF080910),
+                          p.isDark ? const Color(0xFF080910) : p.bg,
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -214,41 +217,41 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                       duration: context.motionMs(320),
                       transitionBuilder: (child, anim) =>
                           playerOverlayTransitionBuilder(context, child, anim),
-                        child: state.isLyricsVisible
-                            ? Container(
-                                key: ValueKey(
-                                    'lyrics_${song?.id}_${song?.remoteId}'),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      AppColors.specularAt(0.07),
-                                      context.palette.surfaceContainer
-                                          .withValues(alpha: 0.24),
-                                    ],
-                                  ),
-                                  borderRadius: AppRadii.r20All,
-                                  border: Border.all(
-                                    color: activeColor.withValues(alpha: 0.22),
-                                    width: 1.1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.scrimAt(0.22),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 6),
-                                    ),
+                      child: state.isLyricsVisible
+                          ? Container(
+                              key: ValueKey(
+                                  'lyrics_${song?.id}_${song?.remoteId}'),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    AppColors.specularAt(0.07),
+                                    context.palette.surfaceContainer
+                                        .withValues(alpha: 0.24),
                                   ],
                                 ),
-                                clipBehavior: Clip.antiAlias,
-                                child: LyricsView(
-                                  lyrics: state.lyrics,
-                                  isLoading: state.isLoadingLyrics,
-                                  activeColor: activeColor,
-                                  source: state.lyricsSource,
+                                borderRadius: AppRadii.r20All,
+                                border: Border.all(
+                                  color: activeColor.withValues(alpha: 0.22),
+                                  width: 1.1,
                                 ),
-                              )
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.scrimAt(0.22),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: LyricsView(
+                                lyrics: state.lyrics,
+                                isLoading: state.isLoadingLyrics,
+                                activeColor: activeColor,
+                                source: state.lyricsSource,
+                              ),
+                            )
                           : state.isQueueVisible
                               ? const NowPlayingQueueView(
                                   key: ValueKey('queue_view_lyrics'),

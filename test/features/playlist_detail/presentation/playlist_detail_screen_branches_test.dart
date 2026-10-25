@@ -123,7 +123,16 @@ void main() {
   }
 
   Future<void> openMenu(WidgetTester tester) async {
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byIcon(Icons.more_vert_rounded),
+    ));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> confirmDelete(WidgetTester tester) async {
+    expect(find.text('Delete Playlist'), findsWidgets);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
     await tester.pumpAndSettle();
   }
 
@@ -230,6 +239,7 @@ void main() {
     await openMenu(tester);
     await tester.tap(find.text('Delete Playlist'));
     await tester.pumpAndSettle();
+    await confirmDelete(tester);
 
     verify(() => useCases.deletePlaylist(1)).called(1);
     expect(find.textContaining('Deleted'), findsWidgets);
@@ -267,6 +277,26 @@ void main() {
     verifyNever(() => useCases.watchSmartPlaylistSongs(any()));
   });
 
+  testWidgets('a failed delete keeps the playlist and reports the error',
+      (tester) async {
+    when(() => useCases.deletePlaylist(any()))
+        .thenAnswer((_) async => const Left(DatabaseFailure('delete denied')));
+    await pump(
+      tester,
+      playlist: _localPlaylist,
+      stream: Stream.value(Right([createTestSong(id: 1)])),
+    );
+    await openMenu(tester);
+    await tester.tap(find.text('Delete Playlist'));
+    await tester.pumpAndSettle();
+    await confirmDelete(tester);
+
+    verify(() => useCases.deletePlaylist(1)).called(1);
+    expect(find.byType(PlaylistDetailScreen), findsOneWidget);
+    expect(find.text('delete denied'), findsOneWidget);
+    expect(find.text('Undo'), findsNothing);
+  });
+
   testWidgets('embedded delete does not pop the enclosing route',
       (tester) async {
     when(() => useCases.watchPlaylistSongs(any()))
@@ -282,6 +312,7 @@ void main() {
     await openMenu(tester);
     await tester.tap(find.text('Delete Playlist'));
     await tester.pumpAndSettle();
+    await confirmDelete(tester);
 
     verify(() => useCases.deletePlaylist(1)).called(1);
     // The embedded detail has no route of its own; it must stay mounted.

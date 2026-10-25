@@ -46,12 +46,12 @@ extension _YtmGeoBlockBanner on _YtmWebLoginSheetState {
       await cookieManager.setCookie(
         url: WebUri('https://music.youtube.com'),
         name: 'PREF',
-        value: YtmLocale.prefCookieValue(),
+        value: 'f1=50000000&gl=EG&hl=en',
         domain: '.youtube.com',
         path: '/',
       );
     } catch (_) {}
-    await _navigateTo(YtmLocale.homeUrl());
+    await _navigateTo('https://music.youtube.com/?gl=EG&hl=en');
   }
 
   Widget _buildGeoBlockBanner(PulsrPalette p) {

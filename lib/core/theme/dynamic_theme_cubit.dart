@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:injectable/injectable.dart';
@@ -197,22 +198,36 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
 
       // 1. If online remote artwork URL exists (YouTube Music streaming / online song)
       if (remoteArtworkUrl != null && remoteArtworkUrl.isNotEmpty) {
-        final highResUrl =
-            CachedArtwork.upgradeToHighResArtwork(remoteArtworkUrl);
-        final cachedBytes = ArtworkLruCache().get(highResUrl) ??
-            ArtworkLruCache().get(remoteArtworkUrl);
-        if (cachedBytes != null && cachedBytes.isNotEmpty) {
-          imageProvider = MemoryImage(cachedBytes);
-        } else {
-          // Palette sampling only needs a 64x64 swatch, so fetching the ~1200px
-          // high-res artwork here wastes bandwidth and memory. Feed the low-res
-          // thumbnail URL to the extractor instead of the high-res upgrade.
-          final lowResUrl = ArtworkCacheManager.toLowQualityArtworkUrl(
-              remoteArtworkUrl,
-              width: 220,
-              height: 220);
+        if (remoteArtworkUrl.startsWith('assets/')) {
+          imageProvider = AssetImage(remoteArtworkUrl);
+        } else if (remoteArtworkUrl.startsWith('file://')) {
           imageProvider =
-              ResizeImage(NetworkImage(lowResUrl), width: 128, height: 128);
+              FileImage(File(Uri.parse(remoteArtworkUrl).toFilePath()));
+        } else if (!remoteArtworkUrl.startsWith('http://') &&
+            !remoteArtworkUrl.startsWith('https://')) {
+          final localFile = File(remoteArtworkUrl);
+          if (localFile.existsSync()) {
+            imageProvider = FileImage(localFile);
+          }
+        }
+        if (imageProvider == null) {
+          final highResUrl =
+              CachedArtwork.upgradeToHighResArtwork(remoteArtworkUrl);
+          final cachedBytes = ArtworkLruCache().get(highResUrl) ??
+              ArtworkLruCache().get(remoteArtworkUrl);
+          if (cachedBytes != null && cachedBytes.isNotEmpty) {
+            imageProvider = MemoryImage(cachedBytes);
+          } else {
+            // Palette sampling only needs a 64x64 swatch, so fetching the ~1200px
+            // high-res artwork here wastes bandwidth and memory. Feed the low-res
+            // thumbnail URL to the extractor instead of the high-res upgrade.
+            final lowResUrl = ArtworkCacheManager.toLowQualityArtworkUrl(
+                remoteArtworkUrl,
+                width: 220,
+                height: 220);
+            imageProvider =
+                ResizeImage(NetworkImage(lowResUrl), width: 128, height: 128);
+          }
         }
       } else {
         // 2. Local audio file from MediaStore

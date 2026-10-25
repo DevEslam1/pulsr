@@ -46,6 +46,12 @@ void main() {
             songCount: 2,
             isExcluded: false,
             representativeSongId: 1),
+        FolderItem(
+            path: '/music/AlbumA/Sub',
+            name: 'Sub',
+            songCount: 1,
+            isExcluded: false,
+            representativeSongId: 3),
       ],
     ));
 
@@ -110,5 +116,39 @@ void main() {
     // Inside the subfolder: nested song visible, parent-directory affordance.
     expect(find.text('Nested Song'), findsOneWidget);
     expect(find.text('Parent Directory'), findsOneWidget);
+  });
+
+  testWidgets(
+      'shows folders from the full hierarchy even when no songs from them '
+      'are in the paginated window', (tester) async {
+    setSurface(tester);
+    final cubit = stubLibraryCubit(LibraryState(
+      // Only one row from the loaded page; the nested folder lives outside it.
+      songs: [
+        testSong(id: 1, title: 'Page Song', path: '/music/AlbumA/s1.mp3'),
+      ],
+      folders: const [
+        FolderItem(
+            path: '/music/AlbumA',
+            name: 'AlbumA',
+            songCount: 1,
+            isExcluded: false,
+            representativeSongId: 1),
+        FolderItem(
+            path: '/music/AlbumA/OutsidePage',
+            name: 'OutsidePage',
+            songCount: 42,
+            isExcluded: false,
+            representativeSongId: 99),
+      ],
+    ));
+
+    await tester.pumpWidget(libraryHarness(
+      libraryCubit: cubit,
+      child: const Scaffold(body: FolderTreeBrowserTab()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('OutsidePage'), findsOneWidget);
   });
 }

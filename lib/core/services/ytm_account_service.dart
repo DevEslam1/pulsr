@@ -12,9 +12,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart';
 import 'package:pulsr/core/services/ytm_oauth_service.dart';
+import 'package:pulsr/core/services/ytm_account_models.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+export 'ytm_account_models.dart';
+
 import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
 import '../constants/channels.dart';
@@ -27,61 +31,6 @@ import '../utils/ytm_locale.dart';
 import '../utils/ytm_rate_limiter.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
     hide AndroidOptions;
-
-/// YouTube caps a playlist at 5,000 items. Callers that need the complete list
-/// (e.g. "download all") pass this as `maxTracks`.
-const int kYtmMaxPlaylistTracks = 5000;
-
-class YtmAccountPlaylist {
-  final String playlistId;
-  final String title;
-  final String subtitle;
-  final String? artworkUrl;
-
-  const YtmAccountPlaylist({
-    required this.playlistId,
-    required this.title,
-    required this.subtitle,
-    this.artworkUrl,
-  });
-
-  String get cleanPlaylistId =>
-      playlistId.startsWith('VL') ? playlistId.substring(2) : playlistId;
-
-  String get shareUrl =>
-      'https://music.youtube.com/playlist?list=$cleanPlaylistId';
-
-  Map<String, dynamic> toJson() => {
-        'playlistId': playlistId,
-        'title': title,
-        'subtitle': subtitle,
-        'artworkUrl': artworkUrl,
-      };
-
-  factory YtmAccountPlaylist.fromJson(Map<String, dynamic> json) =>
-      YtmAccountPlaylist(
-        playlistId: json['playlistId'] as String? ?? '',
-        title: json['title'] as String? ?? 'Playlist',
-        subtitle: json['subtitle'] as String? ?? 'YouTube Music',
-        artworkUrl: json['artworkUrl'] as String?,
-      );
-}
-
-class YtmPlaylistDetails {
-  final String id;
-  final String title;
-  final String author;
-  final String? artworkUrl;
-  final List<YtmTrack> tracks;
-
-  const YtmPlaylistDetails({
-    required this.id,
-    required this.title,
-    required this.author,
-    this.artworkUrl,
-    required this.tracks,
-  });
-}
 
 enum SessionValidationResult {
   valid,
@@ -133,9 +82,6 @@ class YtmAccountService {
   YtmAccountService(this._versionResolver);
 
   /// Shared persistent HTTP client for the Dart Innertube chain (login-state
-  /// resolve path issues up to 9 sequential player requests; keep-alive skips
-  /// a fresh TCP+TLS handshake on each). Field, not a ctor param, so the
-  /// injectable binding stays untouched.
   http.Client _innertubeClient = http.Client();
 
   /// Swaps in a scripted client so tests can drive the Tier-1 player chain's
@@ -426,15 +372,6 @@ class YtmAccountService {
   }
 
   /// Folds a pasted or scraped cookie blob into one well-formed `Cookie` header
-  /// value: `name=value` pairs, `; `-joined, last writer wins, no CR/LF and no
-  /// leftover cookie attributes.
-  ///
-  /// The login sheet lets people paste a header by hand and a DevTools copy
-  /// brings along newlines, a `Cookie:` prefix and per-cookie attributes such as
-  /// `Path=/` or `Expires=Wed, 21 Oct 2026 ...`. Stored verbatim those either
-  /// make the http client reject the request outright or reach the native cookie
-  /// store as extra header lines, and a duplicated `SAPISID` silently decides
-  /// which account gets signed in.
   static String normalizeCookieHeader(String raw) {
     const attributeNames = {
       'path',
@@ -466,14 +403,6 @@ class YtmAccountService {
   }
 
   /// Cookies that belong to Google's account-management surface and are never
-  /// sent to a YouTube host by a real browser.
-  ///
-  /// The login WebView spans `accounts.google.com` and `music.youtube.com`, and
-  /// both the Dart and native jars are keyed by cookie *name* only — so the
-  /// account-chooser and identity cookies from the Google side end up in the
-  /// same map as the YouTube session and ride along on every InnerTube request.
-  /// That is a needless leak of account-management state to a different host,
-  /// and an oversized `Cookie` header is itself a bot signal.
   static const Set<String> _googleAccountOnlyCookies = {
     'LSID',
     'LSOLH',
@@ -493,11 +422,6 @@ class YtmAccountService {
   };
 
   /// Drops from [raw] the cookies a browser would never send to a YouTube host.
-  ///
-  /// `__Host-`-prefixed cookies are host-locked by definition — carrying one
-  /// across hosts is always wrong — and the names above belong to Google's
-  /// account surface. Mirrors `YtmCookieStore.isSendableToYouTube` on the
-  /// native side so both jars scope identically.
   static String scopeCookiesForYouTube(String raw) {
     final kept = <String>[];
     for (final pair in normalizeCookieHeader(raw).split('; ')) {
@@ -569,10 +493,6 @@ class YtmAccountService {
   }
 
   /// Adopts a freshly-completed Google TV OAuth device-flow session and
-  /// notifies listeners. Called by the OAuth login sheet on success.
-  ///
-  /// No cookie jar exists for this session, so playback continues through the
-  /// guest engine chain; the bearer unlocks library, browse and playlists.
   Future<void> adoptOAuthSession() async {
     final oauth = YtmOAuthService.shared;
     await oauth.init();
@@ -648,16 +568,6 @@ class YtmAccountService {
   }
 
   /// Cookie scopes owned by the YTM sign-in flow, as `(url, domain)` pairs.
-  /// Logout clears only these instead of wiping every WebView/Google cookie on
-  /// the device.
-  ///
-  /// Both scopes of each host are listed on purpose. The Google session cookies
-  /// are *domain* cookies (`Domain=.youtube.com`, `Domain=.google.com`), and
-  /// expiring a name host-only does not remove the domain-scoped cookie of the
-  /// same name — it just adds a second, host-scoped one, leaving the live
-  /// credential in the jar. The dotted entries used to be turned into the URL
-  /// `https://.youtube.com`, which is not a valid host at all, so the domain
-  /// cookies were never touched.
   static const List<(String, String?)> _sessionCookieScopes = [
     ('https://youtube.com', '.youtube.com'),
     ('https://youtube.com', null),
@@ -741,9 +651,6 @@ class YtmAccountService {
   }
 
   /// Splits a (possibly comma-merged) Set-Cookie header into individual
-  /// cookies without breaking on `Expires=Wed, 21 Oct ...` dates: a comma only
-  /// Robust splitting of comma-delimited Set-Cookie headers while respecting
-  /// expires dates containing commas (e.g. `Expires=Wed, 21 Oct 2026 07:28:00 GMT`).
   static List<String> splitSetCookies(String header) {
     final results = <String>[];
     int start = 0;
@@ -894,15 +801,6 @@ class YtmAccountService {
   }
 
   /// Re-derives the credential-bearing headers from the live cookie jar just
-  /// before a request goes out, leaving every other header the caller set alone.
-  ///
-  /// Callers build headers once and reuse them across a browse loop, up to 20
-  /// continuation pages and three backoff attempts. Two things go stale in that
-  /// window: SAPISIDHASH embeds the second it was computed, so a paging walk
-  /// signs its later pages with a minutes-old timestamp, and the jar itself now
-  /// rotates underneath them as [_ingestSetCookies] takes in `Set-Cookie` — a
-  /// stale `Cookie` header would keep presenting the superseded values. Doing it
-  /// here rather than at each call site means no request can forget.
   Map<String, String>? _resignHeaders(Map<String, String>? headers) {
     if (headers == null) return null;
     // OAuth sessions re-read the (possibly just refreshed) bearer so a retry
@@ -975,9 +873,6 @@ class YtmAccountService {
   }
 
   /// Exact-name session-cookie validation: requires an SAPISID-family cookie
-  /// AND a PSID login cookie. Unlike raw substring checks on the whole header,
-  /// this cannot be fooled by values that merely contain a cookie name and
-  /// never validates an empty value as present.
   static bool looksLikeSignedInCookies(String rawCookies) {
     String? valueOf(String name) {
       for (final pair in rawCookies.split(';')) {
@@ -1264,7 +1159,8 @@ class YtmAccountService {
         if (e is YtmException && e.isAuth) rethrow;
         debugPrint(
             '[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
-        if (e is YtmException && (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
+        if (e is YtmException &&
+            (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
           break;
         }
       }
@@ -1336,7 +1232,8 @@ class YtmAccountService {
                 ' (top-level keys: ${json.keys.take(8).join(', ')})');
 
             if (tracks.isEmpty) {
-              debugPrint('[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks '
+              debugPrint(
+                  '[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks '
                   '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
               // YouTube Music frequently delivers the liked-songs list only via
               // continuation — the initial browse response is a header shell.
@@ -1532,7 +1429,8 @@ class YtmAccountService {
             }
           }
         } catch (e) {
-          debugPrint('[YTM_ACCOUNT] Account playlists liked resolution error: $e');
+          debugPrint(
+              '[YTM_ACCOUNT] Account playlists liked resolution error: $e');
         }
 
         // Try Native Kotlin Innertube browse with full WebView cookie jar
@@ -1559,11 +1457,6 @@ class YtmAccountService {
   }
 
   /// Fetches details and tracks for any YouTube / YouTube Music playlist by URL or ID.
-  /// Handles:
-  /// - User's private & unlisted playlists (when signed in with cookies)
-  /// - Public YouTube and YouTube Music playlists (with or without login)
-  /// - Curated mixes, albums, and auto-generated playlists (`RDCLAK...`, `OLAK...`, `VL...`)
-  /// - Liked Music (`LM`, `VLLM`, `FEmusic_liked_videos`)
   Future<YtmPlaylistDetails?> fetchPlaylistDetails(
     String urlOrId, {
     int maxTracks = 200,
@@ -1779,8 +1672,29 @@ class YtmAccountService {
 
       if (nextRes.statusCode == 200) {
         final json = jsonDecode(nextRes.body) as Map<String, dynamic>;
+        final panel = json['contents']
+            ?['singleColumnMusicWatchNextResultsRenderer']
+            ?['playlist']?['playlistPanelRenderer'];
+        if (panel is Map<String, dynamic>) {
+          if (panel['title'] is String &&
+              (panel['title'] as String).trim().isNotEmpty) {
+            playlistTitle = (panel['title'] as String).trim();
+          } else if (panel['title']?['runs'] is List) {
+            final t = (panel['title']['runs'] as List)
+                .map((r) => r['text']?.toString() ?? '')
+                .join()
+                .trim();
+            if (t.isNotEmpty) playlistTitle = t;
+          } else if (panel['title']?['simpleText'] != null) {
+            final t = panel['title']['simpleText'].toString().trim();
+            if (t.isNotEmpty) playlistTitle = t;
+          }
+        }
         final headerInfo = _extractPlaylistHeaderInfo(json);
-        if (headerInfo['title'] != null && headerInfo['title']!.isNotEmpty) {
+        if (headerInfo['title'] != null &&
+            headerInfo['title']!.isNotEmpty &&
+            headerInfo['title'] != 'YouTube Playlist' &&
+            !headerInfo['title']!.startsWith('Playlist (')) {
           playlistTitle = headerInfo['title']!;
         }
         if (headerInfo['author'] != null && headerInfo['author']!.isNotEmpty) {
@@ -1876,16 +1790,43 @@ class YtmAccountService {
     String? artwork;
 
     void checkHeaderNode(Map<String, dynamic> header) {
-      final titleRuns = header['title']?['runs'] as List<dynamic>?;
-      if (titleRuns != null && titleRuns.isNotEmpty && title == null) {
-        title = titleRuns.map((r) => r['text']?.toString() ?? '').join();
+      if (title == null) {
+        if (header['title'] is String) {
+          final t = (header['title'] as String).trim();
+          if (t.isNotEmpty && t != 'YouTube Playlist' && t != 'Playlist') {
+            title = t;
+          }
+        } else if (header['title'] is Map) {
+          final titleObj = header['title'] as Map<String, dynamic>;
+          final titleRuns = titleObj['runs'] as List<dynamic>?;
+          if (titleRuns != null && titleRuns.isNotEmpty) {
+            final t =
+                titleRuns.map((r) => r['text']?.toString() ?? '').join().trim();
+            if (t.isNotEmpty && t != 'YouTube Playlist' && t != 'Playlist') {
+              title = t;
+            }
+          }
+          if (title == null && titleObj['simpleText'] != null) {
+            final t = titleObj['simpleText'].toString().trim();
+            if (t.isNotEmpty && t != 'YouTube Playlist' && t != 'Playlist') {
+              title = t;
+            }
+          }
+          if (title == null && titleObj['text'] != null) {
+            final t = titleObj['text'].toString().trim();
+            if (t.isNotEmpty && t != 'YouTube Playlist' && t != 'Playlist') {
+              title = t;
+            }
+          }
+        }
       }
 
       // Prioritize straplineTextOne / straplineText / owner as they contain the actual author/creator
       final straplineRuns = (header['straplineTextOne']?['runs'] ??
           header['straplineText']?['runs'] ??
           header['strapline']?['runs'] ??
-          header['owner']?['runs']) as List<dynamic>?;
+          header['owner']?['runs'] ??
+          header['shortBylineText']?['runs']) as List<dynamic>?;
       if (straplineRuns != null && straplineRuns.isNotEmpty && author == null) {
         final text = straplineRuns
             .map((r) => r['text']?.toString().trim() ?? '')
@@ -1936,13 +1877,19 @@ class YtmAccountService {
 
     void traverse(dynamic node) {
       if (node is Map<String, dynamic>) {
-        if (node.containsKey('musicDetailHeaderRenderer')) {
-          checkHeaderNode(
-              node['musicDetailHeaderRenderer'] as Map<String, dynamic>);
-        }
-        if (node.containsKey('musicResponsiveHeaderRenderer')) {
-          checkHeaderNode(
-              node['musicResponsiveHeaderRenderer'] as Map<String, dynamic>);
+        const headerKeys = [
+          'musicDetailHeaderRenderer',
+          'musicResponsiveHeaderRenderer',
+          'musicVisualHeaderRenderer',
+          'musicHeaderRenderer',
+          'playlistHeaderRenderer',
+          'playlistPanelRenderer',
+          'playlistPanelHeaderRenderer',
+        ];
+        for (final k in headerKeys) {
+          if (node.containsKey(k) && node[k] is Map<String, dynamic>) {
+            checkHeaderNode(node[k] as Map<String, dynamic>);
+          }
         }
         if (node.containsKey('musicEditablePlaylistDetailHeaderRenderer')) {
           final ed = node['musicEditablePlaylistDetailHeaderRenderer']
@@ -1950,6 +1897,12 @@ class YtmAccountService {
           final inner = ed['header']?['musicResponsiveHeaderRenderer']
               as Map<String, dynamic>?;
           if (inner != null) checkHeaderNode(inner);
+        }
+        for (final entry in node.entries) {
+          if (entry.key.endsWith('HeaderRenderer') &&
+              entry.value is Map<String, dynamic>) {
+            checkHeaderNode(entry.value as Map<String, dynamic>);
+          }
         }
         for (final v in node.values) {
           traverse(v);
@@ -2178,16 +2131,6 @@ class YtmAccountService {
   }
 
   /// Resolves an audio stream using multi-client priority fallback:
-  /// 1. WEB_REMIX + cookies
-  /// 2. ANDROID client
-  /// 3. IOS client
-  /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
-  /// Mints the content-bound (videoId) player poToken.
-  ///
-  /// Split out so the mint can be *started* as soon as the generator is ready
-  /// and awaited alongside the guest-state read, instead of queueing behind it.
-  /// Never throws: an unmintable token simply means the request goes out
-  /// without one rather than with the wrong one.
   Future<String?> _mintPlayerPoToken(String videoId) async {
     try {
       return await getIt<YtmService>()
@@ -2934,13 +2877,6 @@ class YtmAccountService {
   }
 
   /// Public, throttled trigger for [_bootstrapDataSyncId].
-  ///
-  /// Called when a resolve needs the account-bound poToken but no dataSyncId is
-  /// known yet. Without this the only harvest sites were login and a cold-start
-  /// `validateSession()`, so a session restored from storage whose validation
-  /// was transiently blocked stayed on the guest chain forever and every
-  /// signed-in resolve fell through to the native tier (where WEB_REMIX pairs
-  /// session cookies with a guest poToken and returns "Video unavailable").
   Future<void> ensureDataSyncId() async {
     if (!isLoggedIn) return;
     final existing = _dataSyncId;

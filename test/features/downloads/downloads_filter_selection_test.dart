@@ -158,12 +158,12 @@ void main() {
 
     await tester.longPress(find.byType(DownloadTile).first);
     await tester.pump();
-    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.text('1 Selected'), findsOneWidget);
 
     await tester.tap(find.text('${l10n.statusFailed} (1)'));
     await tester.pump();
 
-    expect(find.textContaining('selected'), findsNothing);
+    expect(find.textContaining('Selected'), findsNothing);
     expect(find.text(l10n.downloadsTitle), findsOneWidget);
   });
 
@@ -188,7 +188,7 @@ void main() {
 
     await tester.longPress(find.text('Song c'));
     await tester.pump();
-    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.text('1 Selected'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(TextButton, l10n.retry));
     await tester.pump();
@@ -197,7 +197,7 @@ void main() {
     final captured = verify(() => cubit.retryDownloads(captureAny())).captured;
     expect((captured.single as Iterable<String>).toList(), ['c']);
     expect(find.text('3 re-queued'), findsOneWidget);
-    expect(find.textContaining('selected'), findsNothing);
+    expect(find.textContaining('Selected'), findsNothing);
   });
 
   testWidgets('retry-all is disabled while the batch is running',

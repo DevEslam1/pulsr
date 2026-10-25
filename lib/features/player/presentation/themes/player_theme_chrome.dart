@@ -37,21 +37,24 @@ import '../widgets/equalizer_sheet.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import '../widgets/player_volume_bar.dart';
-import '../widgets/quran_mode_button.dart';
 import '../widgets/speed_picker_sheet.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../data/party/listen_together_service.dart';
 import '../../../../data/party/party_models.dart';
-import '../../../party/presentation/party_sheet.dart';
-import '../widgets/canvas_backdrop.dart';
+import '../widgets/player_more_sheet.dart';
 import 'player_theme.dart';
 import 'player_theme_scaffold.dart' show PlayerThemeMetrics;
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+
+/// Readable foreground for a badge painted with an arbitrary (possibly
+/// artwork-derived) accent, instead of assuming every accent is dark.
+Color _readableOn(Color background) =>
+    background.computeLuminance() > 0.179 ? AppColors.onBright : Colors.white;
 
 /// Human-readable remaining sleep-timer time: seconds below a minute, whole
 /// minutes below an hour, then `h`/`m` so a 90-minute timer never reads "90m".
@@ -247,7 +250,9 @@ class PlayerSwitcherItem extends StatelessWidget {
                       style: TextStyle(
                         fontSize: isTablet ? 10.5 : 9.5,
                         fontWeight: FontWeight.w800,
-                        color: isSelected ? p.onAccent : p.textSecondary,
+                        color: isSelected
+                            ? _readableOn(activeColor)
+                            : p.textSecondary,
                       ),
                     ),
                   ),
@@ -431,7 +436,7 @@ class _PlayerDockIconButtonState extends State<PlayerDockIconButton> {
                 child: Text(
                   badgeText,
                   style: TextStyle(
-                    color: Colors.black,
+                    color: _readableOn(activeColor),
                     fontSize: style.badgeFontSize,
                     fontWeight: FontWeight.w900,
                   ),
@@ -897,41 +902,14 @@ class PlayerBottomActionDock extends StatelessWidget {
                       ),
                     ),
 
-                    // 5. Listen Together / Party
+                    // 5. Secondary actions (party / Quran / canvas / playlist)
                     Expanded(
-                      child: _PartyDockButton(
-                        activeColor: AppColors.accentCyan,
-                        inactiveColor: p.textSecondary,
-                        isTablet: isTablet,
-                        style: dockIconStyle,
-                      ),
-                    ),
-
-                    // 6. Quran Mode
-                    Expanded(
-                      child: QuranModeDockButton(
-                        activeColor: props.activeColor,
-                        inactiveColor: p.textSecondary,
-                        isTablet: isTablet,
-                      ),
-                    ),
-
-                    // 7. Add to Playlist
-                    Expanded(
-                      child: PlayerDockIconButton(
-                        icon: Icons.playlist_add_rounded,
-                        tooltip: l10n.addToPlaylist,
-                        isActive: false,
+                      child: _MoreDockButton(
+                        song: song,
                         activeColor: props.activeColor,
                         inactiveColor: p.textSecondary,
                         isTablet: isTablet,
                         style: dockIconStyle,
-                        onTap: () {
-                          if (song != null) {
-                            HapticFeedback.lightImpact();
-                            AddToPlaylistSheet.show(context, song: song);
-                          }
-                        },
                       ),
                     ),
                   ],
@@ -949,53 +927,70 @@ class PlayerBottomActionDock extends StatelessWidget {
   }
 }
 
-/// Reactive dock icon button for Listen Together / Party mode that reflects
-/// live room connection state and member count.
-class _PartyDockButton extends StatelessWidget {
+/// Reactive "More" dock button. Keeps live party state and Quran mode visible
+/// without spending three permanent slots in the transport dock.
+class _MoreDockButton extends StatelessWidget {
+  final SongsTableData? song;
   final Color activeColor;
   final Color inactiveColor;
   final bool isTablet;
   final PlayerDockIconStyle style;
 
-  const _PartyDockButton({
+  const _MoreDockButton({
+    required this.song,
     required this.activeColor,
     required this.inactiveColor,
     required this.isTablet,
     required this.style,
   });
 
+  void _open(BuildContext context) {
+    HapticFeedback.lightImpact();
+    PlayerMoreSheet.show(context, song: song, activeColor: activeColor);
+  }
+
+  Widget _button(
+    BuildContext context, {
+    required bool active,
+    String? badge,
+  }) {
+    return PlayerDockIconButton(
+      icon: Icons.apps_rounded,
+      tooltip: context.l10n.moreOptions,
+      isActive: active,
+      badgeText: badge,
+      activeColor: activeColor,
+      inactiveColor: inactiveColor,
+      isTablet: isTablet,
+      style: style,
+      onTap: () => _open(context),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    ListenTogetherService? partyService;
+    final isQuranMode = context.select<PlayerCubit, bool>(
+      (c) => c.state.isQuranModeEnabled,
+    );
+
+    ListenTogetherService? resolved;
     try {
       if (getIt.isRegistered<ListenTogetherService>()) {
-        partyService = getIt<ListenTogetherService>();
+        resolved = getIt<ListenTogetherService>();
       }
     } catch (_) {
-      partyService = null;
+      resolved = null;
     }
-
+    final partyService = resolved;
     if (partyService == null) {
-      return PlayerDockIconButton(
-        icon: Icons.group_rounded,
-        tooltip: 'Listen Together',
-        isActive: false,
-        activeColor: activeColor,
-        inactiveColor: inactiveColor,
-        isTablet: isTablet,
-        style: style,
-        onTap: () {
-          HapticFeedback.lightImpact();
-          PartySheet.show(context);
-        },
-      );
+      return _button(context, active: isQuranMode);
     }
 
     return ValueListenableBuilder<PartyConnectionState>(
       valueListenable: partyService.connectionState,
       builder: (context, connState, _) {
         return ValueListenableBuilder<PartySnapshot?>(
-          valueListenable: partyService!.partySnapshot,
+          valueListenable: partyService.partySnapshot,
           builder: (context, snapshot, _) {
             final isLive = connState == PartyConnectionState.live;
             final isConnecting = connState == PartyConnectionState.connecting;
@@ -1004,21 +999,10 @@ class _PartyDockButton extends StatelessWidget {
                 ? (count > 1 ? '$count' : 'LIVE')
                 : (isConnecting ? '...' : null);
 
-            return PlayerDockIconButton(
-              icon: Icons.group_rounded,
-              tooltip: isLive
-                  ? 'Listen Together ($count connected)'
-                  : 'Listen Together',
-              isActive: isLive || isConnecting,
-              badgeText: badge,
-              activeColor: activeColor,
-              inactiveColor: inactiveColor,
-              isTablet: isTablet,
-              style: style,
-              onTap: () {
-                HapticFeedback.lightImpact();
-                PartySheet.show(context);
-              },
+            return _button(
+              context,
+              active: isLive || isConnecting || isQuranMode,
+              badge: badge,
             );
           },
         );
@@ -1039,6 +1023,7 @@ class PlayerPlayHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Padding(
       padding: padding,
       child: Center(
@@ -1046,7 +1031,8 @@ class PlayerPlayHandle extends StatelessWidget {
           width: 38,
           height: 4,
           decoration: BoxDecoration(
-            color: AppColors.specularAt(0.22),
+            color: (p.isDark ? Colors.white : Colors.black)
+                .withValues(alpha: 0.22),
             borderRadius: AppRadii.r2All,
           ),
         ),
@@ -1106,8 +1092,13 @@ class PlayerTopBar extends StatelessWidget {
         width: 48,
         height: 48,
         child: Material(
-          color: AppColors.specular,
-          shape: const CircleBorder(),
+          // Specular white disappears on a light backdrop; use a real
+          // surface + hairline there so the dismiss/options buttons read as
+          // buttons in both themes.
+          color: p.isDark ? AppColors.specular : p.surfaceContainer,
+          shape: p.isDark
+              ? const CircleBorder()
+              : CircleBorder(side: BorderSide(color: p.hairline)),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
@@ -1182,8 +1173,8 @@ class PlayerTopBar extends StatelessWidget {
                                     fontSize: AppFontSize.tiny,
                                     letterSpacing: AppTracking.wide,
                                     fontWeight: FontWeight.w800,
-                                    color:
-                                        resolvedSubtitle.withValues(alpha: 0.8),
+                                    color: resolvedSubtitle.withValues(
+                                        alpha: p.isDark ? 0.8 : 1.0),
                                   ),
                             )),
                           ],
@@ -1321,10 +1312,12 @@ class PlayerTrackHeader extends StatelessWidget {
                 width: resolvedActionButtonSize,
                 height: resolvedActionButtonSize,
                 child: Material(
-                  color: AppColors.specularAt(0.07),
+                  color: p.isDark
+                      ? AppColors.specularAt(0.07)
+                      : p.surfaceContainer,
                   shape: CircleBorder(
                     side: BorderSide(
-                      color: AppColors.specularAt(0.12),
+                      color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
                       width: 1.0,
                     ),
                   ),
@@ -1342,13 +1335,13 @@ class PlayerTrackHeader extends StatelessWidget {
                           onTap: () {
                             if (song != null) {
                               HapticFeedback.lightImpact();
-                              SongInfoSheet.show(context, song: song);
+                              AddToPlaylistSheet.show(context, song: song);
                             }
                           },
                           child: Center(
                             child: Icon(
-                              Icons.info_outline_rounded,
-                              semanticLabel: context.l10n.songInfo,
+                              Icons.playlist_add_rounded,
+                              semanticLabel: context.l10n.addToPlaylist,
                               size: iconSize,
                               color: resolvedSubtitle,
                             ),
@@ -1392,10 +1385,12 @@ class PlayerTrackHeader extends StatelessWidget {
                 width: resolvedActionButtonSize,
                 height: resolvedActionButtonSize,
                 child: Material(
-                  color: AppColors.specularAt(0.07),
+                  color: p.isDark
+                      ? AppColors.specularAt(0.07)
+                      : p.surfaceContainer,
                   shape: CircleBorder(
                     side: BorderSide(
-                      color: AppColors.specularAt(0.12),
+                      color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
                       width: 1.0,
                     ),
                   ),
@@ -1428,11 +1423,6 @@ class PlayerTrackHeader extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     qualityBadge,
-                    const SizedBox(width: AppSpacing.xs),
-                    CanvasToggleChip(
-                      activeColor: props.activeColor,
-                      compact: true,
-                    ),
                     if (extraBadge != null) ...[
                       const SizedBox(width: AppSpacing.xs),
                       extraBadge!,

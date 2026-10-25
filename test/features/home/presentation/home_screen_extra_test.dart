@@ -50,6 +50,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(createTestSong(id: -1));
     registerFallbackValue(<SongsTableData>[]);
+    registerFallbackValue(<String>[]);
   });
 
   setUp(() {
@@ -76,8 +77,11 @@ void main() {
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
           limit: any(named: 'limit'),
+          excludedFolders: any(named: 'excludedFolders'),
         )).thenAnswer((_) async => const Right(<SongsTableData>[]));
-    when(() => getSongs.watchTopPlayed(limit: any(named: 'limit')))
+    when(() => getSongs.watchTopPlayed(
+            limit: any(named: 'limit'),
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
@@ -121,7 +125,9 @@ void main() {
 
   testWidgets('the Focus Flow tile plays the most-played tracks first',
       (tester) async {
-    when(() => getSongs.watchTopPlayed(limit: any(named: 'limit')))
+    when(() => getSongs.watchTopPlayed(
+            limit: any(named: 'limit'),
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(Right([
               createTestSong(id: 1, title: 'Low', playCount: 1),
               createTestSong(id: 2, title: 'High', playCount: 9),
@@ -139,11 +145,13 @@ void main() {
     expect(first.title, 'High');
 
     // Focus Flow reads the top-played source, not the title-ordered page.
-    verify(() => getSongs.watchTopPlayed(limit: 200)).called(1);
+    verify(() => getSongs.watchTopPlayed(
+        limit: 200, excludedFolders: any(named: 'excludedFolders'))).called(1);
     verifyNever(() => getSongs.getAllSongs(
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
           limit: any(named: 'limit'),
+          excludedFolders: any(named: 'excludedFolders'),
         ));
   });
 
@@ -167,6 +175,7 @@ void main() {
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
           limit: any(named: 'limit'),
+          excludedFolders: any(named: 'excludedFolders'),
         )).called(1);
   });
 

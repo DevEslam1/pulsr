@@ -7120,7 +7120,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get miniPlayerSwipeHint => 'اسحب لليسار/اليمين للتخطي';
+  String get miniPlayerSwipeHint => 'اسحب للتخطي · أعلى/أسفل لتغيير نمط الشريط';
 
   @override
   String get phoneSpeaker => 'مكبر صوت الهاتف';
@@ -8417,4 +8417,202 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String queueRecentlyPlayed(Object count) {
+    return 'تم تشغيلها مؤخرًا ($count)';
+  }
+
+  @override
+  String get queueAutoplayOn => 'التشغيل التلقائي: مفعّل';
+
+  @override
+  String get queueAutoplayOff => 'التشغيل التلقائي: متوقف';
+
+  @override
+  String get queueReordered => 'تمت إعادة ترتيب قائمة الانتظار';
+
+  @override
+  String downloadsProgressSummary(
+      Object active, Object completed, Object total) {
+    return 'جارٍ التنزيل $active • اكتمل $completed/$total';
+  }
+
+  @override
+  String downloadsRequeued(Object count) {
+    return 'أُعيدت $count إلى قائمة الانتظار';
+  }
+
+  @override
+  String get partyListenTogether => 'الاستماع معًا';
+
+  @override
+  String get partyServerSettings => 'إعدادات الخادم';
+
+  @override
+  String get partyServerConfiguration => 'إعداد الخادم';
+
+  @override
+  String get partyServerUrl => 'عنوان الخادم';
+
+  @override
+  String get partyResetDefault => 'استعادة الافتراضي';
+
+  @override
+  String get partySyncDescription =>
+      'زامن الموسيقى عبر عدة أجهزة في الوقت الفعلي.';
+
+  @override
+  String get partyDisplayNameHint => 'اسم العرض (اختياري)';
+
+  @override
+  String get partyCreateNew => 'إنشاء جلسة جديدة';
+
+  @override
+  String get partyOrJoinByCode => 'أو انضم بالرمز';
+
+  @override
+  String get partyJoin => 'انضمام';
+
+  @override
+  String get partyRoomCode => 'رمز الغرفة';
+
+  @override
+  String get partyCopyInvite => 'نسخ رابط الدعوة';
+
+  @override
+  String get partyShareInvite => 'مشاركة الدعوة';
+
+  @override
+  String partySyncedRtt(Object rtt) {
+    return 'متزامن (زمن الاستجابة: $rtt مللي ثانية)';
+  }
+
+  @override
+  String get partySynchronizingClock => 'جارٍ مزامنة الساعة...';
+
+  @override
+  String get partyHost => 'المضيف';
+
+  @override
+  String partyMembers(Object count, Object max) {
+    return 'الأعضاء ($count/$max)';
+  }
+
+  @override
+  String get partyHostMember => 'المضيف';
+
+  @override
+  String get partyLeave => 'مغادرة الجلسة';
+
+  @override
+  String get partyUnableReconnect =>
+      'تعذر إعادة الاتصال بالجلسة. تحقق من اتصالك.';
+
+  @override
+  String partyShareText(Object link) {
+    return 'انضم إلى جلسة الاستماع على Pulsr: $link';
+  }
+
+  @override
+  String partyShareSubject(Object code) {
+    return 'Pulsr Party $code';
+  }
+
+  @override
+  String get radioDuplicateUrl => 'يوجد بالفعل محطة بهذا الرابط.';
+
+  @override
+  String get lyricsTrackChanged =>
+      'تغيّر المقطع المشغّل. أعد فتح محرر الكلمات لهذا المقطع.';
+
+  @override
+  String get lyricsTranslationUnavailable => 'الترجمة غير متاحة الآن.';
+
+  @override
+  String get discardChangesTitle => 'تجاهل التغييرات؟';
+
+  @override
+  String get discardChangesBody => 'ستفقد التعديلات غير المحفوظة.';
+
+  @override
+  String onboardingPageIndicator(Object count, Object index) {
+    return 'الصفحة $index من $count';
+  }
+
+  @override
+  String get smartFieldLabel => 'الحقل';
+
+  @override
+  String get smartOperatorLabel => 'العامل';
+
+  @override
+  String abLoopPointA(Object time) {
+    return 'نقطة التكرار A $time';
+  }
+
+  @override
+  String get abLoopSetA => 'تعيين نقطة التكرار A';
+
+  @override
+  String abLoopPointB(Object time) {
+    return 'نقطة التكرار B $time';
+  }
+
+  @override
+  String get abLoopSetB => 'تعيين نقطة التكرار B';
+
+  @override
+  String get playerNoPlayableTracks =>
+      'لا توجد مقاطع قابلة للتشغيل في قائمة الانتظار';
+
+  @override
+  String get discard => 'تجاهل';
+
+  @override
+  String get reorderSongs => 'إعادة ترتيب الأغاني';
+
+  @override
+  String get reorderFailed => 'تعذر حفظ الترتيب الجديد';
+
+  @override
+  String get reorderInstructions =>
+      'اسحب لإعادة الترتيب. حدد المقاطع لنقلها دفعة واحدة.';
+
+  @override
+  String get moveToTop => 'نقل إلى الأعلى';
+
+  @override
+  String get moveToBottom => 'نقل إلى الأسفل';
+
+  @override
+  String get moveToPosition => 'نقل إلى موضع';
+
+  @override
+  String enterPosition(int total) {
+    return 'أدخل رقم الموضع (1 - $total)';
+  }
+
+  @override
+  String get position => 'الموضع';
+
+  @override
+  String get reorderDone => 'تم';
+
+  @override
+  String get customOrder => 'ترتيب مخصص';
+
+  @override
+  String get cachedCopy => 'محفوظة محليًا';
+
+  @override
+  String onlineCacheProgress(int done, int total) {
+    return 'جارٍ حفظ المكتبة… $done/$total';
+  }
+
+  @override
+  String get canvasEffects => 'تأثيرات كانفس';
+
+  @override
+  String get canvasEffectsSubtitle => 'حركة فنية متحركة في المشغل';
 }

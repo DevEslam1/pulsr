@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -47,6 +48,8 @@ class ListenTogetherService {
       ValueNotifier<PartyMember?>(null);
 
   final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  int _reconnectAttempts = 0;
 
   final ValueNotifier<bool> clockSynced = ValueNotifier<bool>(false);
 
@@ -81,7 +84,18 @@ class ListenTogetherService {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final savedCode = prefs.getString(prefSavedCodeKey);
-    final savedToken = prefs.getString(prefSavedTokenKey);
+    String? savedToken;
+    try {
+      savedToken = await _secureStorage.read(key: prefSavedTokenKey);
+      final legacyToken = prefs.getString(prefSavedTokenKey);
+      if (legacyToken != null && legacyToken.isNotEmpty) {
+        savedToken ??= legacyToken;
+        await _secureStorage.write(key: prefSavedTokenKey, value: legacyToken);
+        await prefs.remove(prefSavedTokenKey);
+      }
+    } catch (_) {
+      savedToken = prefs.getString(prefSavedTokenKey);
+    }
     final serverBase = await getServerUrl();
 
     if (savedCode != null && savedToken != null) {
@@ -139,23 +153,17 @@ class ListenTogetherService {
     final savedNick = prefs.getString(prefNicknameKey);
     String nickname = (customNickname ?? savedNick ?? '').trim();
 
-    String? avatarUrl;
-    String userId = 'pulsr_user';
-
     try {
       if (getIt.isRegistered<YtmAccountService>()) {
         final ytmAccount = getIt<YtmAccountService>();
-        if (ytmAccount.isLoggedIn) {
-          if (nickname.isEmpty && ytmAccount.accountName != null) {
-            nickname = ytmAccount.accountName!;
-          }
-          avatarUrl = ytmAccount.accountAvatar;
-          if (ytmAccount.dataSyncId != null) {
-            userId = ytmAccount.dataSyncId!;
-          }
+        if (ytmAccount.isLoggedIn && nickname.isEmpty) {
+          nickname = ytmAccount.accountName ?? '';
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read YTM party nickname',
+          error: e, stackTrace: st, category: 'PARTY');
+    }
 
     if (nickname.isEmpty) {
       nickname = 'Pulsr Listener';
@@ -168,11 +176,12 @@ class ListenTogetherService {
       await prefs.setString('pulsr_device_unique_id', deviceId);
     }
 
+    // Never broadcast a Google session-derived identifier or account avatar to
+    // a third-party party server; the random per-install id is sufficient.
     return JoinPartyRequest(
-      userId: userId,
+      userId: deviceId,
       deviceId: deviceId,
       displayName: nickname,
-      avatarUrl: avatarUrl,
     );
   }
 
@@ -183,18 +192,19 @@ class ListenTogetherService {
     final identity = await _buildIdentity(nickname);
 
     final url = Uri.parse('$serverBase/api/parties');
-    final resp = await _httpClient.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(JoinPartyRequest(
-        userId: identity.userId,
-        deviceId: identity.deviceId,
-        displayName: identity.displayName,
-        avatarUrl: identity.avatarUrl,
-        maxMembers: maxMembers,
-        autoplayEnabled: false,
-      ).toJson()),
-    );
+    final resp = await _httpClient
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(JoinPartyRequest(
+            userId: identity.userId,
+            deviceId: identity.deviceId,
+            displayName: identity.displayName,
+            maxMembers: maxMembers,
+            autoplayEnabled: false,
+          ).toJson()),
+        )
+        .timeout(const Duration(seconds: 12));
 
     if (resp.statusCode != 200 && resp.statusCode != 201) {
       final err = 'Failed to create party (${resp.statusCode}): ${resp.body}';
@@ -227,11 +237,13 @@ class ListenTogetherService {
     final identity = await _buildIdentity(nickname);
 
     final url = Uri.parse('$serverBase/api/parties/$cleanedCode/join');
-    final resp = await _httpClient.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(identity.toJson()),
-    );
+    final resp = await _httpClient
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(identity.toJson()),
+        )
+        .timeout(const Duration(seconds: 12));
 
     if (resp.statusCode != 200) {
       final err = 'Failed to join party (${resp.statusCode}): ${resp.body}';
@@ -256,6 +268,9 @@ class ListenTogetherService {
     final serverBase = _activeServerBase ?? await getServerUrl();
 
     _disconnectWebSocket();
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _reconnectAttempts = 0;
     _clock.reset();
     clockSynced.value = false;
     roundTripMs.value = 0;
@@ -270,6 +285,12 @@ class ListenTogetherService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(prefSavedCodeKey);
     await prefs.remove(prefSavedTokenKey);
+    try {
+      await _secureStorage.delete(key: prefSavedTokenKey);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to delete party token',
+          error: e, stackTrace: st, category: 'PARTY');
+    }
 
     if (code != null && token != null) {
       try {
@@ -277,8 +298,11 @@ class ListenTogetherService {
         await _httpClient.post(
           url,
           headers: {'Authorization': 'Bearer $token'},
-        );
-      } catch (_) {}
+        ).timeout(const Duration(seconds: 10));
+      } catch (e, st) {
+        ErrorLogger.log('Party leave request failed',
+            error: e, stackTrace: st, category: 'PARTY');
+      }
     }
   }
 
@@ -290,7 +314,13 @@ class ListenTogetherService {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(prefSavedCodeKey, code);
-    await prefs.setString(prefSavedTokenKey, token);
+    await prefs.remove(prefSavedTokenKey);
+    try {
+      await _secureStorage.write(key: prefSavedTokenKey, value: token);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist party token securely',
+          error: e, stackTrace: st, category: 'PARTY');
+    }
   }
 
   void _applyMembership(PartyMembership membership) {
@@ -303,7 +333,7 @@ class ListenTogetherService {
   // WebSocket Connection & Protocol
   // --------------------------------------------------------------------------
 
-  void _connectWebSocket() {
+  Future<void> _connectWebSocket() async {
     _disconnectWebSocket();
 
     final code = _activeCode;
@@ -318,9 +348,12 @@ class ListenTogetherService {
     try {
       _channel = WebSocketChannel.connect(
         wsUri,
-        protocols: ['Bearer', token], // or Authorization header when supported
+        protocols: ['Bearer', token],
       );
-
+      // Do not claim "live" before the WebSocket handshake succeeds.
+      await _channel!.ready.timeout(const Duration(seconds: 12));
+      _reconnectAttempts = 0;
+      lastError.value = null;
       _channelSub = _channel!.stream.listen(
         _onWebSocketMessage,
         onError: (e, st) {
@@ -352,15 +385,28 @@ class ListenTogetherService {
     _channelSub = null;
     try {
       _channel?.sink.close();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to close party socket',
+          error: e, stackTrace: st, category: 'PARTY');
+    }
     _channel = null;
   }
 
   Timer? _reconnectTimer;
   void _scheduleReconnect() {
-    connectionState.value = PartyConnectionState.connecting;
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 3), () {
+    if (_activeCode == null || _activeToken == null) return;
+    _reconnectAttempts++;
+    if (_reconnectAttempts > 5) {
+      connectionState.value = PartyConnectionState.offline;
+      lastError.value =
+          'Unable to reconnect to the party. Check your connection.';
+      return;
+    }
+    connectionState.value = PartyConnectionState.connecting;
+    final delay =
+        Duration(seconds: math.min(30, 3 * (1 << (_reconnectAttempts - 1))));
+    _reconnectTimer = Timer(delay, () {
       if (_activeCode != null && _activeToken != null) {
         _connectWebSocket();
       }
@@ -530,11 +576,31 @@ class ListenTogetherService {
     if (!getIt.isRegistered<PlayerCubit>()) return;
 
     final playerCubit = getIt<PlayerCubit>();
+    DateTime? lastAt;
+    Duration lastPosition = Duration.zero;
+    String? lastSongKey;
+    bool? lastPlaying;
     _playerStateSub = playerCubit.stream.listen((state) {
       if (!inParty || !_isHost) return;
       if (_isReconcilingInbound) return;
 
-      // When Host state changes, broadcast playback frame to the room
+      final now = DateTime.now();
+      final songKey =
+          state.currentSong?.remoteId ?? state.currentSong?.id.toString();
+      final expectedPosition = lastPlaying == true && lastAt != null
+          ? lastPosition + now.difference(lastAt!)
+          : lastPosition;
+      final seeked = (state.position - expectedPosition).abs() >
+          const Duration(seconds: 2);
+      final changed =
+          songKey != lastSongKey || state.isPlaying != lastPlaying || seeked;
+      final heartbeatDue = lastAt == null ||
+          now.difference(lastAt!) >= const Duration(seconds: 2);
+      if (!changed && !(state.isPlaying && heartbeatDue)) return;
+      lastAt = now;
+      lastPosition = state.position;
+      lastSongKey = songKey;
+      lastPlaying = state.isPlaying;
       _broadcastHostPlayback(
           state.currentSong, state.isPlaying, state.position);
     });
@@ -692,7 +758,10 @@ class ListenTogetherService {
                 s.artist.toLowerCase() == track.artist.toLowerCase())
             .firstOrNull;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to match local party track',
+          error: e, stackTrace: st, category: 'PARTY');
+    }
 
     // 2. If not in local library, create a YtmTrack
     match ??= YtmTrack(

@@ -7,6 +7,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_badge.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_progress.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../domain/models/download_task.dart';
@@ -222,7 +223,7 @@ class DownloadTile extends StatelessWidget {
                     icon: Icon(Icons.more_vert_rounded,
                         color: p.textSecondary, size: 20),
                     color: p.surfaceContainerHigh,
-                    onSelected: (action) {
+                    onSelected: (action) async {
                       switch (action) {
                         case 'pause':
                           cubit.pauseDownload(task.videoId);
@@ -234,20 +235,26 @@ class DownloadTile extends StatelessWidget {
                           cubit.retryDownload(task.videoId);
                           break;
                         case 'delete':
-                          cubit.deleteDownload(task.videoId);
-                          // For a completed entry the file is already gone, so
-                          // the action cannot undo the delete — it starts a
-                          // fresh download. Label it honestly instead of
-                          // offering an "Undo" that silently re-downloads.
-                          final isComplete =
-                              task.status == DownloadStatus.complete;
+                          final confirmed =
+                              await PulsrDialogHelper.showConfirmDialog(
+                            context,
+                            title: l10n.delete,
+                            message: l10n.deleteFileConfirmBody(
+                                task.title.isNotEmpty
+                                    ? task.title
+                                    : task.videoId),
+                            icon: Icons.delete_outline_rounded,
+                            confirmLabel: l10n.delete,
+                            isDestructive: true,
+                          );
+                          if (confirmed != true) return;
+                          await cubit.deleteDownload(task.videoId);
+                          if (!context.mounted) return;
                           PulsrToast.show(
                             context,
-                            message:
-                                '${task.title.isNotEmpty ? task.title : task.videoId} ${l10n.delete.toLowerCase()}',
+                            message: l10n.songDeleted,
                             icon: Icons.delete_outline_rounded,
-                            actionLabel: isComplete ? l10n.retry : l10n.undo,
-                            onActionPressed: () => cubit.queueDownload(task),
+                            isSuccess: true,
                           );
                           break;
                       }

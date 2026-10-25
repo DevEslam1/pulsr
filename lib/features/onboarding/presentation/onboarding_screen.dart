@@ -117,8 +117,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ..clearSnackBars()
               ..showSnackBar(
                 SnackBar(
-                  content: Text(
-                      '$msg Notifications are needed for playback controls.'),
+                  content: Text(msg),
                   behavior: SnackBarBehavior.floating,
                   action: SnackBarAction(
                     label: context.l10n.openSettings,
@@ -152,7 +151,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
       }
     } else {
-      await _setNotificationDeniedPref(true);
+      // "Not now" is a deliberate deferral, not a denial. Marking it denied
+      // made Home show a persistent nag banner for a permission the user never
+      // refused at the OS level.
+      await _setNotificationDeniedPref(false);
     }
   }
 
@@ -349,7 +351,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       final isActive = index == _currentPage;
                       return Semantics(
                         selected: isActive,
-                        label: 'Page ${index + 1} of $_pageCount',
+                        label: context.l10n
+                            .onboardingPageIndicator(index + 1, _pageCount),
                         child: AnimatedContainer(
                           duration: context.motionMs(300),
                           margin: const EdgeInsets.symmetric(
@@ -581,22 +584,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     Expanded(
-                      child: _buildPlaybackFeatureIcon(
-                          Icons.equalizer_rounded,
-                          context.l10n.browseTenBandGraphicEq,
-                          p.accent),
+                      child: _buildPlaybackFeatureIcon(Icons.equalizer_rounded,
+                          context.l10n.browseTenBandGraphicEq, p.accent),
                     ),
                     Expanded(
-                      child: _buildPlaybackFeatureIcon(
-                          Icons.tune_rounded,
-                          context.l10n.browseCrossfade,
-                          p.accent),
+                      child: _buildPlaybackFeatureIcon(Icons.tune_rounded,
+                          context.l10n.browseCrossfade, p.accent),
                     ),
                     Expanded(
-                      child: _buildPlaybackFeatureIcon(
-                          Icons.timer_rounded,
-                          context.l10n.sleepTimer,
-                          p.accent),
+                      child: _buildPlaybackFeatureIcon(Icons.timer_rounded,
+                          context.l10n.sleepTimer, p.accent),
                     ),
                   ],
                 ),

@@ -5,12 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
-import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/responsive/detail_scaffold.dart';
@@ -223,7 +224,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                             .headlineSmall),
                                     const SizedBox(height: AppSpacing.xxs),
                                     Text(
-                                        '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
+                                        '${album.artist} • ${context.l10n.tracksCount(songs.length)}',
                                         style: TextStyle(
                                             color: p.textSecondary,
                                             fontSize: AppFontSize.bodySmall)),
@@ -252,14 +253,31 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                           padding: EdgeInsets.only(
                               top: AppSpacing.xs,
                               bottom: PulsrLayoutMetrics.scrollBottom(context)),
-                          sliver: SliverList.builder(
-                            addAutomaticKeepAlives: false,
-                            addRepaintBoundaries: true,
-                            itemCount: songs.length,
-                            itemBuilder: (context, index) {
-                              return _buildSongItem(context, songs, index);
-                            },
-                          ),
+                          sliver: songs.isEmpty
+                              // Real empty state instead of a complete header
+                              // over a blank body (also used while loading is
+                              // resolved to the skeleton below).
+                              ? SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.all(AppSpacing.xl),
+                                    child: PulsrEmptyState(
+                                      icon: Icons.music_off_rounded,
+                                      title: context.l10n.browseNoTracks,
+                                      subtitle:
+                                          context.l10n.browseNoTracksFound,
+                                    ),
+                                  ),
+                                )
+                              : SliverList.builder(
+                                  addAutomaticKeepAlives: false,
+                                  addRepaintBoundaries: true,
+                                  itemCount: songs.length,
+                                  itemBuilder: (context, index) {
+                                    return _buildSongItem(
+                                        context, songs, index);
+                                  },
+                                ),
                         ),
                       ],
                     ),
@@ -274,7 +292,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
         return AsyncStateBuilder<Result<List<SongsTableData>>>(
           snapshot: snapshot,
-          loadingWidget: emptyView,
+          loadingWidget: _AlbumLoadingView(
+            album: album,
+            expandedHeight: expandedHeight,
+            artworkSize: artworkSize,
+          ),
           emptyWidget: emptyView,
           onError: (_) =>
               _AlbumErrorView(onRetry: () => setState(_updateStream)),
@@ -488,7 +510,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: AppSpacing.xxs),
         Text(
-          '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
+          '${album.artist} • ${context.l10n.tracksCount(songs.length)}',
           textAlign: TextAlign.center,
           style: TextStyle(
               color: p.textSecondary, fontSize: AppFontSize.bodySmall),
@@ -505,6 +527,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   // Right pane (tablet/landscape split): queue header + track list, reusing the
   // same item builder as the phone sliver list.
   Widget _buildTrackListBody(BuildContext context, List<SongsTableData> songs) {
+    if (songs.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: PulsrEmptyState(
+          icon: Icons.music_off_rounded,
+          title: context.l10n.browseNoTracks,
+          subtitle: context.l10n.browseNoTracksFound,
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -517,6 +549,76 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         for (int i = 0; i < songs.length; i++)
           _buildSongItem(context, songs, i),
       ],
+    );
+  }
+}
+
+class _AlbumLoadingView extends StatelessWidget {
+  final AlbumsTableData album;
+  final double expandedHeight;
+  final double artworkSize;
+
+  const _AlbumLoadingView({
+    required this.album,
+    required this.expandedHeight,
+    required this.artworkSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return PulsrPagePopScope(
+      child: Scaffold(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: PulsrLayoutMetrics.contentConstraints(context),
+            child: CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  leading: const PulsrBackButton(),
+                  expandedHeight: expandedHeight,
+                  pinned: true,
+                  backgroundColor: p.bg,
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [p.accentContainer, p.bg],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      child: SafeArea(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            SkeletonBox(
+                              width: artworkSize,
+                              height: artworkSize,
+                              radius: 24,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            const SkeletonBox(width: 180, height: 22),
+                            const SizedBox(height: AppSpacing.xxs),
+                            const SkeletonBox(width: 120, height: 14),
+                            const SizedBox(height: AppSpacing.md),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: AppSpacing.md),
+                    child: SkeletonList(itemCount: 6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

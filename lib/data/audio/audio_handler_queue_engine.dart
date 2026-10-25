@@ -172,8 +172,17 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       return await _crossfadeManager.protect(() async {
         if (_crossfadeManager.isCrossfading) return;
         if (nextIndex < 0 || nextIndex >= _songs.length) return;
+        // Nothing to fade from. The trigger is a position tick, so it can be
+        // delivered AFTER a pause already ran cancel() - which found no fade
+        // yet and returned - leaving this fade to start the incoming player
+        // audible while the transport stays paused: audio the user cannot
+        // stop from the UI, with the old track still shown.
+        if (!_activePlayer.playing) return;
         _crossfadeManager.beginCrossfade(nextIndex);
         final currentFadeId = _crossfadeManager.nextFadeId();
+        // Feeds CrossfadeManager.triggerMargin: the next fade must fire early
+        // enough to cover THIS transition's real prepare time.
+        final prepStopwatch = Stopwatch()..start();
 
         final initialActiveVolume = _calculateReplayGainVolume(currentSong);
         _preCrossfadeVolume = initialActiveVolume;
@@ -473,6 +482,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
                 _tripleBufferPipeline.prefetchAhead(_songs[nextNextIndex]));
           }
 
+          // The incoming player is decodable and the sink has settled: all
+          // of the fade's fixed overhead is now known.
+          _crossfadeManager.recordPrepDuration(prepStopwatch.elapsed);
           await _crossfadeManager.crossfadeVolumes(
             active: active,
             inactive: inactive,
@@ -586,6 +598,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         } finally {
           if (_crossfadeManager.currentFadeId == currentFadeId) {
             _crossfadeManager.finishCrossfade();
+            // The active player now carries the NEW track's replay-gain
+            // volume; keeping the outgoing track's value made a later
+            // pause/seek restore the wrong gain.
+            _preCrossfadeVolume = null;
           } else {
             // Stale fade (a skip/stop superseded it): drop any native gain
             // curves armed meanwhile so neither player keeps a fade multiplier
@@ -677,7 +693,13 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
     final isCompleted =
         _activePlayer.processingState == ProcessingState.completed;
-    final isPlaying = _activePlayer.playing && !isCompleted;
+    // A load in flight was already requested by the user: report it as playing
+    // (loading) instead of flashing the notification, the lock-screen and the
+    // widget to "paused" for the whole resolve/prepare window, then back. The
+    // intent is cleared by pause(), stop(), a failed start and a deliberate
+    // paused load, so a real pause still reports paused.
+    final isPlaying =
+        (_activePlayer.playing || _pendingPlaybackStart) && !isCompleted;
     final activeSong = currentSong;
     final isStream =
         activeSong != null && PulsrAudioHandler._isStreamUrl(activeSong.path);
@@ -1374,6 +1396,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     // in-flight gapless load target so a stalled one cannot keep
     // _broadcastState suppressed and freeze the notification (item 13).
     _gaplessTargetIndex = null;
+    // The native playlist no longer matches _songs, so the "gapless concat is
+    // loaded" invariant is now false. Leaving it set made the completion
+    // handler keep waiting for a native advance that can never come: it found
+    // no next item, seeked back to track 1 and parked the queue PAUSED.
+    _gaplessLoaded = false;
     // A YouTube resolve below can await for seconds; a second skip during that
     // window must win. Capture a generation token FIRST so a pre-resolve
     // failure can bail without touching current playback at all.

@@ -6,7 +6,7 @@ import 'package:injectable/injectable.dart';
 import '../../core/utils/error_logger.dart';
 import 'tables.dart';
 
-export 'tables.dart' show SongSource;
+export 'tables.dart' show SongSource, OnlineLibraryKind;
 export 'database_health_check.dart';
 
 part 'app_database.g.dart';
@@ -21,6 +21,8 @@ part 'app_database.g.dart';
   PlayHistoryTable,
   QueueItemsTable,
   ExcludedFoldersTable,
+  OnlinePlaylistsTable,
+  OnlinePlaylistEntriesTable,
 ])
 class AppDatabase extends _$AppDatabase {
   /// Set true when the FTS rebuild during migration failed, so the
@@ -133,7 +135,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   static Future<void> _createFtsTable(
       Future<void> Function(String) executeSql) async {
@@ -206,6 +208,9 @@ class AppDatabase extends _$AppDatabase {
         'CREATE INDEX IF NOT EXISTS idx_queue_items_song_id ON queue_items (song_id);');
     await executeSql(
         'CREATE INDEX IF NOT EXISTS idx_queue_items_order_index ON queue_items (order_index);');
+    await executeSql(
+        'CREATE INDEX IF NOT EXISTS idx_online_playlist_entries_playlist_order '
+        'ON online_playlist_entries (playlist_id, order_index);');
   }
 
   static Future<void> _createRemoteSourceIndexes(
@@ -435,6 +440,10 @@ class AppDatabase extends _$AppDatabase {
             if (!await hasColumn('songs', 'cue_file')) {
               await m.addColumn(songsTable, songsTable.cueFile);
             }
+          }
+          if (from < 12) {
+            await m.createTable(onlinePlaylistsTable);
+            await m.createTable(onlinePlaylistEntriesTable);
           }
           if (from < 11) {
             await _createV11Constraints(customStatement, db: this);

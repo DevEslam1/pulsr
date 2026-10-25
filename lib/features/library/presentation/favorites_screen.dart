@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/ytm_account_service.dart';
+import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/song_classification.dart';
@@ -19,7 +22,10 @@ import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_options_sheet.dart';
+import '../../auth/cubit/auth_cubit.dart';
+import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
@@ -93,6 +99,91 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  /// Pull-to-refresh mirrors the integrated Favorites tab: a rescan for the
+  /// Local bucket and a Liked-Music sync for the Online bucket.
+  Future<void> _refreshFavorites() async {
+    if (_favTabFilter == 1 && AppConfig.ytmEnabled) {
+      await _syncOnlineLikes();
+      return;
+    }
+    final settingsCubit = context.read<SettingsCubit?>();
+    if (settingsCubit != null) {
+      try {
+        final count = await settingsCubit.rescanLibrary();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.scanResult(count)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } catch (_) {
+        // A failed rescan still falls through to a library re-subscribe.
+      }
+    }
+    if (!mounted) return;
+    await context.read<LibraryCubit>().init();
+  }
+
+  Future<void> _syncOnlineLikes() async {
+    if (!getIt.isRegistered<YtmAccountService>()) return;
+    final accountService = getIt<YtmAccountService>();
+    if (!accountService.isLoggedIn) {
+      final success = await YtmWebLoginSheet.show(context);
+      if (success != true || !mounted) return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final libraryCubit = context.read<LibraryCubit>();
+    final authCubit = context.read<AuthCubit?>();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.syncingYtm),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+    try {
+      final count = await libraryCubit.syncYtmAccountLikes();
+      if (!mounted) return;
+      if (_favTabFilter != 1) setState(() => _favTabFilter = 1);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.syncedOnline(count)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      try {
+        authCubit?.syncNow();
+      } catch (e, st) {
+        ErrorLogger.log('Failed to trigger sync after saving online favorites',
+            error: e, stackTrace: st, category: 'FavoritesScreen');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      final isAuth = (e is YtmException && e.isAuth) ||
+          e.toString().toLowerCase().contains('unauthenticated') ||
+          e.toString().toLowerCase().contains('session expired') ||
+          e.toString().toLowerCase().contains('not signed in');
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(isAuth
+              ? context.l10n.sessionExpired
+              : context.l10n.syncFailed(e.toString())),
+          behavior: SnackBarBehavior.floating,
+          action: isAuth
+              ? SnackBarAction(
+                  label: context.l10n.signIn,
+                  onPressed: () => YtmWebLoginSheet.show(context),
+                )
+              : null,
+        ),
+      );
+    }
   }
 
   @override
@@ -171,7 +262,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 child: RefreshIndicator(
                   color: p.accent,
                   backgroundColor: p.surfaceContainer,
-                  onRefresh: () => context.read<LibraryCubit>().init(),
+                  onRefresh: _refreshFavorites,
                   child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
@@ -267,7 +358,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        '${Formatters.formatTrackCount(songs.length).toUpperCase()}${songs.isNotEmpty ? " • ${Formatters.formatDuration(Duration(milliseconds: totalDurationMs)).toUpperCase()}" : ""}',
+                                        '${context.l10n.tracksCount(songs.length).toUpperCase()}${songs.isNotEmpty ? " • ${Formatters.formatDuration(Duration(milliseconds: totalDurationMs)).toUpperCase()}" : ""}',
                                         style: TextStyle(
                                           fontSize: AppFontSize.tiny,
                                           fontWeight: FontWeight.w700,
@@ -470,8 +561,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                 index: index,
                                 onTap: () =>
                                     playerCubit.playSong(song, queue: songs),
-                                onMorePressed: () =>
-                                    SongOptionsSheet.show(context, song: song, isFavoriteScreen: true),
+                                onMorePressed: () => SongOptionsSheet.show(
+                                    context,
+                                    song: song,
+                                    isFavoriteScreen: true),
                                 trailing: IconButton(
                                   constraints: const BoxConstraints(
                                       minWidth: AppSpacing.minTouchTarget,

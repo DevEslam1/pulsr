@@ -33,6 +33,36 @@ class MusicRepository implements IMusicRepository {
   static String _likeEscape(String s) =>
       s.replaceAll(r'\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_');
 
+  /// Central hidden-folder predicate used by every discovery query (recently
+  /// played/added, top played, genres, years, stats and duplicate scans).
+  ///
+  /// A folder path is prefix-matched with a trailing separator so excluding
+  /// `/music/A` never also hides `/music/AB`. The predicate is a no-op when no
+  /// folders are excluded.
+  Expression<bool> _notInExcludedFolders(List<String> excludedFolders) {
+    Expression<bool> predicate = const Constant(true);
+    for (final raw in excludedFolders) {
+      final base = raw.replaceAll(RegExp(r'[\\/]+$'), '').trim();
+      if (base.isEmpty) continue;
+      // Paths on Android use '/', while desktop libraries may use '\'. Apply
+      // both prefixes so exclusions behave identically in tests and on device.
+      final slashPrefix = _likeEscape('$base/');
+      final backslashPrefix = _likeEscape('$base\\');
+      predicate = predicate &
+          _db.songsTable.path.like('$slashPrefix%', escapeChar: r'\').not() &
+          _db.songsTable.path.like('$backslashPrefix%', escapeChar: r'\').not();
+    }
+    return predicate;
+  }
+
+  void _applyExcludedFolders(
+    SimpleSelectStatement<$SongsTableTable, SongsTableData> query,
+    List<String> excludedFolders,
+  ) {
+    if (excludedFolders.isEmpty) return;
+    query.where((_) => _notInExcludedFolders(excludedFolders));
+  }
+
   // --- SONGS ---
   @override
   Stream<Result<List<SongsTableData>>> watchAllSongs({
@@ -91,17 +121,7 @@ class MusicRepository implements IMusicRepository {
       }
 
       if (excludedFolders.isNotEmpty) {
-        final sanitizedFolders = excludedFolders
-            .where((f) => f.trim().isNotEmpty)
-            .map((folder) => folder.endsWith(Platform.pathSeparator)
-                ? folder
-                : '$folder${Platform.pathSeparator}')
-            .toList();
-
-        for (final prefix in sanitizedFolders) {
-          query.where((t) =>
-              t.path.like('${_likeEscape(prefix)}%', escapeChar: r'\').not());
-        }
+        _applyExcludedFolders(query, excludedFolders);
       }
 
       if (sortBy == 'title') {
@@ -319,6 +339,7 @@ class MusicRepository implements IMusicRepository {
     bool ascending = true,
     int? limit,
     int? offset,
+    List<String> excludedFolders = const [],
   }) async {
     try {
       final query = _db.select(_db.songsTable)
@@ -327,6 +348,7 @@ class MusicRepository implements IMusicRepository {
             t.source.equals(SongSource.local) &
             t.path.like('ytmusic://%').not() &
             (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
+      _applyExcludedFolders(query, excludedFolders);
       if (sortBy == 'title') {
         query.orderBy([
           (t) => OrderingTerm(
@@ -603,6 +625,42 @@ class MusicRepository implements IMusicRepository {
     }
   }
 
+  /// All downloaded rows, independent of the paginated 500-row library window.
+  ///
+  /// Candidates are rows flagged [SongsTable.isDownloaded] or legacy local
+  /// rows that kept a YouTube [SongsTable.remoteId]. The caller still applies
+  /// the shared `isDownloadedOnlineTrack` classifier, so the two definitions
+  /// cannot drift.
+  @override
+  Stream<Result<List<SongsTableData>>> watchDownloadedSongs({
+    List<String> excludedFolders = const [],
+  }) {
+    try {
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.isMissing.equals(false) &
+            t.path.equals('').not() &
+            t.path.like('ytmusic://%').not() &
+            (t.isDownloaded.equals(true) |
+                (t.source.equals(SongSource.local) &
+                    t.remoteId.isNotNull() &
+                    t.remoteId.equals('').not())))
+        ..orderBy([
+          (t) => OrderingTerm(expression: t.title),
+          (t) => OrderingTerm(expression: t.id),
+        ]);
+      _applyExcludedFolders(query, excludedFolders);
+      return query
+          .watch()
+          .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch downloaded songs', e)));
+    } catch (e) {
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch downloaded songs', e)));
+    }
+  }
+
   @override
   Stream<Result<List<SongsTableData>>> watchFavorites() {
     try {
@@ -658,8 +716,8 @@ class MusicRepository implements IMusicRepository {
             .toSet()
             .toList(growable: false);
         for (var i = 0; i < videoIds.length; i += chunkSize) {
-          final chunk = videoIds.sublist(
-              i, (i + chunkSize).clamp(0, videoIds.length));
+          final chunk =
+              videoIds.sublist(i, (i + chunkSize).clamp(0, videoIds.length));
           final rows = await (_db.select(_db.songsTable)
                 ..where((t) => t.remoteId.isIn(chunk)))
               .get();
@@ -739,8 +797,8 @@ class MusicRepository implements IMusicRepository {
         if (idsToMarkFavorite.isNotEmpty) {
           final favList = idsToMarkFavorite.toList(growable: false);
           for (var i = 0; i < favList.length; i += chunkSize) {
-            final chunk = favList.sublist(
-                i, (i + chunkSize).clamp(0, favList.length));
+            final chunk =
+                favList.sublist(i, (i + chunkSize).clamp(0, favList.length));
             await (_db.update(_db.songsTable)..where((t) => t.id.isIn(chunk)))
                 .write(const SongsTableCompanion(
               isFavorite: Value(true),
@@ -802,7 +860,8 @@ class MusicRepository implements IMusicRepository {
     }
     // Pathological fallback: a time-derived magnitude cannot equal a
     // video-hash id in practice, and still lives in the negative id space.
-    var fallback = -(DateTime.now().microsecondsSinceEpoch & 0x3FFFFFFFFFFFFFFF);
+    var fallback =
+        -(DateTime.now().microsecondsSinceEpoch & 0x3FFFFFFFFFFFFFFF);
     while (takenIds != null && takenIds.contains(fallback)) {
       fallback -= 1;
     }
@@ -888,23 +947,28 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20}) {
+  Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({
+    int limit = 20,
+    List<String> excludedFolders = const [],
+  }) {
     try {
-      return (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.lastPlayed.isNotNull() &
-                t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
-            ..orderBy([
-              (t) => OrderingTerm(
-                  expression: t.lastPlayed, mode: OrderingMode.desc),
-              // Deterministic tie-breaker so the stream and the one-shot
-              // [getRecentlyPlayed] snapshot agree on the order.
-              (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
-            ])
-            ..limit(limit))
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.lastPlayed.isNotNull() &
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        ..orderBy([
+          (t) =>
+              OrderingTerm(expression: t.lastPlayed, mode: OrderingMode.desc),
+          // Deterministic tie-breaker so the stream and the one-shot
+          // [getRecentlyPlayed] snapshot agree on the order.
+          (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+        ])
+        ..limit(limit);
+      _applyExcludedFolders(query, excludedFolders);
+      return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError((e) => Left<AppFailure, List<SongsTableData>>(
@@ -916,25 +980,28 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<List<SongsTableData>>> getRecentlyPlayed(
-      {int limit = 20}) async {
+  Future<Result<List<SongsTableData>>> getRecentlyPlayed({
+    int limit = 20,
+    List<String> excludedFolders = const [],
+  }) async {
     try {
-      final songs = await (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.lastPlayed.isNotNull() &
-                t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
-            ..orderBy([
-              (t) => OrderingTerm(
-                  expression: t.lastPlayed, mode: OrderingMode.desc),
-              // Must stay in sync with [watchRecentlyPlayed] so a queue built
-              // from this one-shot snapshot matches the displayed order.
-              (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
-            ])
-            ..limit(limit))
-          .get();
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.lastPlayed.isNotNull() &
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        ..orderBy([
+          (t) =>
+              OrderingTerm(expression: t.lastPlayed, mode: OrderingMode.desc),
+          // Must stay in sync with [watchRecentlyPlayed] so a queue built
+          // from this one-shot snapshot matches the displayed order.
+          (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+        ])
+        ..limit(limit);
+      _applyExcludedFolders(query, excludedFolders);
+      final songs = await query.get();
       return Right(songs);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch recently played songs', e));
@@ -954,7 +1021,10 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int? limit = 20}) {
+  Stream<Result<List<SongsTableData>>> watchRecentlyAdded({
+    int? limit = 20,
+    List<String> excludedFolders = const [],
+  }) {
     try {
       final query = _db.select(_db.songsTable)
         ..where((t) =>
@@ -972,6 +1042,7 @@ class MusicRepository implements IMusicRepository {
       if (limit != null) {
         query.limit(limit);
       }
+      _applyExcludedFolders(query, excludedFolders);
       return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
@@ -984,8 +1055,10 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<List<SongsTableData>>> getRecentlyAdded(
-      {int? limit = 20}) async {
+  Future<Result<List<SongsTableData>>> getRecentlyAdded({
+    int? limit = 20,
+    List<String> excludedFolders = const [],
+  }) async {
     try {
       final query = _db.select(_db.songsTable)
         ..where((t) =>
@@ -1002,6 +1075,7 @@ class MusicRepository implements IMusicRepository {
       if (limit != null) {
         query.limit(limit);
       }
+      _applyExcludedFolders(query, excludedFolders);
       final songs = await query.get();
       return Right(songs);
     } catch (e) {
@@ -1010,20 +1084,24 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30}) {
+  Stream<Result<List<SongsTableData>>> watchTopPlayed({
+    int limit = 30,
+    List<String> excludedFolders = const [],
+  }) {
     try {
-      return (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.playCount.isBiggerThanValue(0) &
-                t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
-            ..orderBy([
-              (t) =>
-                  OrderingTerm(expression: t.playCount, mode: OrderingMode.desc)
-            ])
-            ..limit(limit))
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.playCount.isBiggerThanValue(0) &
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        ..orderBy([
+          (t) => OrderingTerm(expression: t.playCount, mode: OrderingMode.desc)
+        ])
+        ..limit(limit);
+      _applyExcludedFolders(query, excludedFolders);
+      return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError((e) => Left<AppFailure, List<SongsTableData>>(
@@ -1562,6 +1640,290 @@ class MusicRepository implements IMusicRepository {
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to reorder playlist songs', e));
+    }
+  }
+
+  // --- ONLINE LIBRARY CACHE ---
+
+  static YtmTrack _toYtmTrack(OnlinePlaylistEntriesTableData row) => YtmTrack(
+        videoId: row.videoId,
+        title: row.title,
+        artist: row.artist,
+        duration: Duration(milliseconds: row.durationMs),
+        artworkUrl: row.artworkUrl,
+      );
+
+  static OnlinePlaylistEntriesTableCompanion _onlineEntryCompanion({
+    required String playlistId,
+    required int orderIndex,
+    required YtmTrack track,
+  }) =>
+      OnlinePlaylistEntriesTableCompanion.insert(
+        playlistId: playlistId,
+        videoId: track.videoId,
+        title: track.title,
+        artist: Value(track.artist),
+        durationMs: Value(track.duration.inMilliseconds),
+        artworkUrl: Value(track.artworkUrl),
+        orderIndex: orderIndex,
+      );
+
+  @override
+  Stream<Result<List<YtmTrack>>> watchOnlinePlaylistTracks(String playlistId) {
+    try {
+      final query = _db.select(_db.onlinePlaylistEntriesTable)
+        ..where((t) => t.playlistId.equals(playlistId))
+        ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]);
+      return query.watch().map((rows) => Right<AppFailure, List<YtmTrack>>(
+          rows.map(_toYtmTrack).toList(growable: false)));
+    } catch (e) {
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch online playlist tracks', e)));
+    }
+  }
+
+  @override
+  Future<Result<List<YtmTrack>>> getOnlinePlaylistTracks(
+      String playlistId) async {
+    try {
+      final rows = await (_db.select(_db.onlinePlaylistEntriesTable)
+            ..where((t) => t.playlistId.equals(playlistId))
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      return Right(rows.map(_toYtmTrack).toList(growable: false));
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch online playlist tracks', e));
+    }
+  }
+
+  @override
+  Future<Result<OnlinePlaylistsTableData?>> getOnlinePlaylist(
+      String playlistId) async {
+    try {
+      final row = await (_db.select(_db.onlinePlaylistsTable)
+            ..where((t) => t.playlistId.equals(playlistId)))
+          .getSingleOrNull();
+      return Right(row);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch online playlist', e));
+    }
+  }
+
+  @override
+  Future<Result<List<OnlinePlaylistsTableData>>> getOnlinePlaylists() async {
+    try {
+      final rows = await (_db.select(_db.onlinePlaylistsTable)
+            ..orderBy([
+              (t) => OrderingTerm(expression: t.sortOrder),
+              (t) => OrderingTerm(expression: t.title),
+            ]))
+          .get();
+      return Right(rows);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch online playlists', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> cacheOnlinePlaylist({
+    required String playlistId,
+    required String kind,
+    required String title,
+    String author = '',
+    String? artworkUrl,
+    int sortOrder = 0,
+    required List<YtmTrack> tracks,
+    bool fullSnapshot = true,
+  }) async {
+    try {
+      await _db.transaction(() async {
+        final now = DateTime.now();
+        final existing = await (_db.select(_db.onlinePlaylistsTable)
+              ..where((t) => t.playlistId.equals(playlistId)))
+            .getSingleOrNull();
+
+        // Video ids are unique within a playlist; keep the first occurrence so
+        // a duplicated remote page cannot create a duplicate order slot.
+        final uniqueTracks = <String, YtmTrack>{};
+        for (final track in tracks) {
+          if (track.videoId.isEmpty) continue;
+          uniqueTracks.putIfAbsent(track.videoId, () => track);
+        }
+
+        await _db.into(_db.onlinePlaylistsTable).insertOnConflictUpdate(
+              OnlinePlaylistsTableCompanion.insert(
+                playlistId: playlistId,
+                title: title,
+                author: Value(author),
+                artworkUrl: Value(artworkUrl ?? existing?.artworkUrl),
+                // Keep the classification the playlist was first cached
+                // under: opening it from a pasted URL must not turn an
+                // account playlist into a custom one.
+                kind: Value(existing?.kind ?? kind),
+                sortOrder: Value(sortOrder),
+                hasCustomOrder: Value(existing?.hasCustomOrder ?? false),
+                cachedAt: Value(
+                  fullSnapshot && uniqueTracks.isNotEmpty
+                      ? now
+                      : existing?.cachedAt,
+                ),
+                updatedAt: Value(now),
+              ),
+            );
+
+        // An empty response is ambiguous (truncated body, transient parse
+        // failure). Keep the cached list rather than presenting an empty
+        // playlist and losing a hand-built order.
+        if (uniqueTracks.isEmpty) return;
+
+        final existingEntries =
+            await (_db.select(_db.onlinePlaylistEntriesTable)
+                  ..where((t) => t.playlistId.equals(playlistId))
+                  ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+                .get();
+
+        final orderedIds = <String>[];
+        final kept = <String>{};
+        if ((existing?.hasCustomOrder ?? false) && existingEntries.isNotEmpty) {
+          for (final entry in existingEntries) {
+            if (uniqueTracks.containsKey(entry.videoId) &&
+                kept.add(entry.videoId)) {
+              orderedIds.add(entry.videoId);
+            }
+          }
+          for (final id in uniqueTracks.keys) {
+            if (kept.add(id)) orderedIds.add(id);
+          }
+        } else {
+          orderedIds.addAll(uniqueTracks.keys);
+        }
+
+        // Replace the snapshot wholesale: simpler than diffing, and the ids of
+        // these rows are not referenced anywhere else.
+        await (_db.delete(_db.onlinePlaylistEntriesTable)
+              ..where((t) => t.playlistId.equals(playlistId)))
+            .go();
+
+        await _db.batch((batch) {
+          for (var i = 0; i < orderedIds.length; i++) {
+            batch.insert(
+              _db.onlinePlaylistEntriesTable,
+              _onlineEntryCompanion(
+                playlistId: playlistId,
+                orderIndex: i,
+                track: uniqueTracks[orderedIds[i]]!,
+              ),
+            );
+          }
+        });
+      });
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to cache online playlist', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> reorderOnlinePlaylistTracks(
+      String playlistId, List<String> orderedVideoIds) async {
+    try {
+      await _db.transaction(() async {
+        final entries = await (_db.select(_db.onlinePlaylistEntriesTable)
+              ..where((t) => t.playlistId.equals(playlistId))
+              ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+            .get();
+        if (entries.isEmpty) return;
+
+        final byVideoId = <String, OnlinePlaylistEntriesTableData>{
+          for (final entry in entries) entry.videoId: entry,
+        };
+        final ordered = <String>[];
+        final seen = <String>{};
+        for (final id in orderedVideoIds) {
+          if (byVideoId.containsKey(id) && seen.add(id)) {
+            ordered.add(id);
+          }
+        }
+        // Tracks that arrived while the user was dragging keep their relative
+        // order and land at the end instead of being dropped.
+        for (final entry in entries) {
+          if (seen.add(entry.videoId)) ordered.add(entry.videoId);
+        }
+
+        await (_db.delete(_db.onlinePlaylistEntriesTable)
+              ..where((t) => t.playlistId.equals(playlistId)))
+            .go();
+
+        await _db.batch((batch) {
+          for (var i = 0; i < ordered.length; i++) {
+            final entry = byVideoId[ordered[i]]!;
+            batch.insert(
+              _db.onlinePlaylistEntriesTable,
+              _onlineEntryCompanion(
+                playlistId: playlistId,
+                orderIndex: i,
+                track: _toYtmTrack(entry),
+              ),
+            );
+          }
+        });
+
+        await (_db.update(_db.onlinePlaylistsTable)
+              ..where((t) => t.playlistId.equals(playlistId)))
+            .write(OnlinePlaylistsTableCompanion(
+          hasCustomOrder: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
+      });
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to reorder online playlist', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> renameOnlinePlaylist(
+      String playlistId, String newTitle) async {
+    try {
+      await (_db.update(_db.onlinePlaylistsTable)
+            ..where((t) => t.playlistId.equals(playlistId)))
+          .write(OnlinePlaylistsTableCompanion(
+        title: Value(newTitle.trim()),
+        updatedAt: Value(DateTime.now()),
+      ));
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to rename online playlist', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> removeOnlinePlaylist(String playlistId) async {
+    try {
+      await _db.transaction(() async {
+        await (_db.delete(_db.onlinePlaylistEntriesTable)
+              ..where((t) => t.playlistId.equals(playlistId)))
+            .go();
+        await (_db.delete(_db.onlinePlaylistsTable)
+              ..where((t) => t.playlistId.equals(playlistId)))
+            .go();
+      });
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to remove online playlist', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> clearOnlineLibraryCache() async {
+    try {
+      await _db.transaction(() async {
+        await _db.delete(_db.onlinePlaylistEntriesTable).go();
+        await _db.delete(_db.onlinePlaylistsTable).go();
+      });
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to clear online library cache', e));
     }
   }
 
@@ -2870,7 +3232,9 @@ class MusicRepository implements IMusicRepository {
 
   // --- GENRES ---
   @override
-  Stream<Result<List<GenreItem>>> watchGenres() {
+  Stream<Result<List<GenreItem>>> watchGenres({
+    List<String> excludedFolders = const [],
+  }) {
     try {
       final countExp = _db.songsTable.id.count();
       final query = _db.selectOnly(_db.songsTable)
@@ -2880,7 +3244,8 @@ class MusicRepository implements IMusicRepository {
             _db.songsTable.isMissing.equals(false) &
             _db.songsTable.path.like('ytmusic://%').not() &
             (_db.songsTable.cueFile.isNull() |
-                _db.songsTable.cueStartMs.isNotNull()))
+                _db.songsTable.cueStartMs.isNotNull()) &
+            _notInExcludedFolders(excludedFolders))
         ..groupBy([_db.songsTable.genre])
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
 
@@ -2902,7 +3267,9 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<List<GenreItem>>> getGenres() async {
+  Future<Result<List<GenreItem>>> getGenres({
+    List<String> excludedFolders = const [],
+  }) async {
     try {
       final countExp = _db.songsTable.id.count();
       final query = _db.selectOnly(_db.songsTable)
@@ -2912,7 +3279,8 @@ class MusicRepository implements IMusicRepository {
             _db.songsTable.isMissing.equals(false) &
             _db.songsTable.path.like('ytmusic://%').not() &
             (_db.songsTable.cueFile.isNull() |
-                _db.songsTable.cueStartMs.isNotNull()))
+                _db.songsTable.cueStartMs.isNotNull()) &
+            _notInExcludedFolders(excludedFolders))
         ..groupBy([_db.songsTable.genre])
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
 
@@ -2970,7 +3338,9 @@ class MusicRepository implements IMusicRepository {
 
   // --- YEARS ---
   @override
-  Stream<Result<List<YearItem>>> watchYears() {
+  Stream<Result<List<YearItem>>> watchYears({
+    List<String> excludedFolders = const [],
+  }) {
     try {
       final countExp = _db.songsTable.id.count();
       final query = _db.selectOnly(_db.songsTable)
@@ -2980,7 +3350,8 @@ class MusicRepository implements IMusicRepository {
             _db.songsTable.isMissing.equals(false) &
             _db.songsTable.path.like('ytmusic://%').not() &
             (_db.songsTable.cueFile.isNull() |
-                _db.songsTable.cueStartMs.isNotNull()))
+                _db.songsTable.cueStartMs.isNotNull()) &
+            _notInExcludedFolders(excludedFolders))
         ..groupBy([_db.songsTable.year])
         ..orderBy([
           OrderingTerm(expression: _db.songsTable.year, mode: OrderingMode.desc)

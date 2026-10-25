@@ -88,6 +88,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
   ) {
     final prevQueue = List<SongsTableData>.from(state.queue);
     final prevIndex = state.currentIndex;
+    final prevPosition = state.position;
     cubit.removeQueueItem(index);
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -100,7 +101,8 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
         action: SnackBarAction(
           label: context.l10n.undo,
           onPressed: () {
-            cubit.restoreQueue(prevQueue, prevIndex);
+            cubit.restoreQueue(prevQueue, prevIndex,
+                initialPosition: prevPosition);
           },
         ),
       ),

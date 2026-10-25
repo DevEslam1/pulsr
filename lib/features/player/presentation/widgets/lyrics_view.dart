@@ -361,6 +361,7 @@ class _LyricsViewState extends State<LyricsView> {
   void dispose() {
     _advancedPosition.dispose();
     _lyricController.dispose();
+    _translationService.dispose();
     super.dispose();
   }
 
@@ -436,7 +437,15 @@ class _LyricsViewState extends State<LyricsView> {
         currentPosition: cubit.state.position,
         initialLyrics: cubit.state.lyrics,
         onSave: (lines) async {
-          final persisted = await cubit.updateLyrics(lines);
+          if (cubit.state.currentSong?.id != song.id) {
+            messenger?.showSnackBar(SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text(l10n.somethingWentWrong),
+            ));
+            return;
+          }
+          final persisted =
+              await cubit.updateLyrics(lines, expectedSongId: song.id);
           messenger?.showSnackBar(SnackBar(
             behavior: SnackBarBehavior.floating,
             content: Text(
@@ -474,15 +483,31 @@ class _LyricsViewState extends State<LyricsView> {
           lines: widget.lyrics,
           targetLanguage: locale,
         );
-        if (mounted) {
-          setState(() {
-            _translatedLyrics = result.lines;
-            _translationMode = 1;
-            _isTranslating = false;
-          });
+        if (!mounted) return;
+        if (result.isSameLanguage) {
+          setState(() => _isTranslating = false);
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text(context.l10n.lyricsTranslationUnavailable),
+            ),
+          );
+          return;
         }
+        setState(() {
+          _translatedLyrics = result.lines;
+          _translationMode = 1;
+          _isTranslating = false;
+        });
       } catch (e) {
-        if (mounted) setState(() => _isTranslating = false);
+        if (!mounted) return;
+        setState(() => _isTranslating = false);
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(context.l10n.lyricsTranslationUnavailable),
+          ),
+        );
       }
     } else if (_translationMode == 1) {
       // Translated -> Romanized

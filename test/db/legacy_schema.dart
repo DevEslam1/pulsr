@@ -9,7 +9,53 @@
 import 'package:drift/native.dart';
 import 'package:pulsr/data/db/app_database.dart';
 
-String _songsDdl({required bool withV4Columns}) => '''
+const _songsV11Ddl = '''
+CREATE TABLE songs (
+  id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL DEFAULT 'Unknown Artist',
+  artist_id INTEGER,
+  album TEXT NOT NULL DEFAULT 'Unknown Album',
+  album_id INTEGER,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  path TEXT NOT NULL,
+  uri TEXT,
+  track_number INTEGER,
+  disc_number INTEGER,
+  year INTEGER,
+  date_added INTEGER,
+  genre TEXT,
+  is_favorite INTEGER NOT NULL DEFAULT 0,
+  is_missing INTEGER NOT NULL DEFAULT 0,
+  replay_gain_track REAL,
+  replay_gain_album REAL,
+  replay_gain_track_peak REAL,
+  replay_gain_album_peak REAL,
+  loudness_range REAL,
+  play_count INTEGER NOT NULL DEFAULT 0,
+  last_played INTEGER,
+  last_position_ms INTEGER NOT NULL DEFAULT 0,
+  artwork_uri TEXT,
+  file_size INTEGER,
+  sample_rate INTEGER,
+  bit_depth INTEGER,
+  bitrate_kbps INTEGER,
+  codec TEXT,
+  source TEXT NOT NULL DEFAULT 'local',
+  remote_id TEXT,
+  remote_artwork_url TEXT,
+  pending_download_path TEXT,
+  is_downloaded INTEGER NOT NULL DEFAULT 0,
+  cue_start_ms INTEGER,
+  cue_end_ms INTEGER,
+  cue_file TEXT,
+  PRIMARY KEY (id)
+);
+''';
+
+String _songsDdl({required bool withV4Columns, required bool v11}) {
+  if (v11) return _songsV11Ddl;
+  return '''
 CREATE TABLE songs (
   id INTEGER NOT NULL,
   title TEXT NOT NULL,
@@ -35,6 +81,7 @@ CREATE TABLE songs (
   PRIMARY KEY (id)
 );
 ''';
+}
 
 const _otherTablesDdl = <String>[
   '''
@@ -117,7 +164,7 @@ AppDatabase openLegacyDatabase(int version,
   return AppDatabase.forTesting(
     NativeDatabase.memory(
       setup: (raw) {
-        raw.execute(_songsDdl(withV4Columns: version >= 4));
+        raw.execute(_songsDdl(withV4Columns: version >= 4, v11: version >= 11));
         for (final ddl in _otherTablesDdl) {
           raw.execute(ddl);
         }

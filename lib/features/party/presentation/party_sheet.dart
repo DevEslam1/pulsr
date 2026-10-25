@@ -5,10 +5,13 @@ import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../core/widgets/pulsr_badge.dart';
 import '../../../core/widgets/pulsr_button.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../../data/party/listen_together_service.dart';
 import '../../../data/party/party_models.dart';
 
@@ -72,7 +75,8 @@ class _PartySheetState extends State<PartySheet> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = resolveUiErrorMessage(
+              context, e.toString().replaceAll('Exception: ', ''));
         });
       }
     } finally {
@@ -100,7 +104,8 @@ class _PartySheetState extends State<PartySheet> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = resolveUiErrorMessage(
+              context, e.toString().replaceAll('Exception: ', ''));
         });
       }
     } finally {
@@ -117,24 +122,23 @@ class _PartySheetState extends State<PartySheet> {
     }
   }
 
-  void _copyInvite(String code) {
+  Future<void> _copyInvite(String code) async {
     HapticFeedback.lightImpact();
-    final link = 'pulsr://party/$code';
-    Clipboard.setData(ClipboardData(text: link));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Party invite copied: $link'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    final base = await _partyService.getServerUrl();
+    final link = '$base/invite/$code';
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    PulsrToast.show(context, message: link, isSuccess: true);
   }
 
-  void _shareInvite(String code) {
+  Future<void> _shareInvite(String code) async {
     HapticFeedback.lightImpact();
-    final link = 'pulsr://party/$code';
-    SharePlus.instance.share(ShareParams(
-      text: 'Join my Pulsr listening party: $link',
-      subject: 'Pulsr Party $code',
+    final loc = context.l10n;
+    final base = await _partyService.getServerUrl();
+    final link = '$base/invite/$code';
+    await SharePlus.instance.share(ShareParams(
+      text: loc.partyShareText(link),
+      subject: loc.partyShareSubject(code),
     ));
   }
 
@@ -177,7 +181,7 @@ class _PartySheetState extends State<PartySheet> {
                   const SizedBox(width: AppSpacing.s8),
                   Expanded(
                     child: Text(
-                      'Listen Together',
+                      context.l10n.partyListenTogether,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -195,13 +199,34 @@ class _PartySheetState extends State<PartySheet> {
                       color: p.textSecondary,
                       size: 20,
                     ),
-                    tooltip: 'Server Settings',
+                    tooltip: context.l10n.partyServerSettings,
                     onPressed: () {
                       setState(() => _showSettings = !_showSettings);
                     },
                   ),
                 ],
               ),
+              if (_partyService.connectionState.value ==
+                  PartyConnectionState.connecting)
+                const Padding(
+                  padding: EdgeInsets.only(top: AppSpacing.xs),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              if (_partyService.connectionState.value ==
+                      PartyConnectionState.offline &&
+                  _partyService.lastError.value != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: Text(
+                    resolveUiErrorMessage(
+                        context, _partyService.lastError.value!),
+                    style: TextStyle(
+                      color: p.error,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               const SizedBox(height: AppSpacing.sm),
 
               if (_showSettings) ...[
@@ -223,7 +248,7 @@ class _PartySheetState extends State<PartySheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Server Configuration',
+          context.l10n.partyServerConfiguration,
           style: TextStyle(
             fontSize: AppFontSize.body,
             fontWeight: FontWeight.w700,
@@ -235,7 +260,7 @@ class _PartySheetState extends State<PartySheet> {
           controller: _serverController,
           decoration: InputDecoration(
             hintText: 'https://party.pulsr.app',
-            labelText: 'Server URL',
+            labelText: context.l10n.partyServerUrl,
             border: OutlineInputBorder(borderRadius: AppRadii.r12All),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -251,7 +276,7 @@ class _PartySheetState extends State<PartySheet> {
                 _partyService.setCustomServerUrl(null);
                 setState(() => _showSettings = false);
               },
-              child: const Text('Reset Default'),
+              child: Text(context.l10n.partyResetDefault),
             ),
             const SizedBox(width: AppSpacing.xs),
             FilledButton(
@@ -262,7 +287,7 @@ class _PartySheetState extends State<PartySheet> {
                   setState(() => _showSettings = false);
                 }
               },
-              child: const Text('Save'),
+              child: Text(context.l10n.save),
             ),
           ],
         ),
@@ -275,7 +300,7 @@ class _PartySheetState extends State<PartySheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Synchronize music across multiple devices in real-time.',
+          context.l10n.partySyncDescription,
           style: TextStyle(
             fontSize: AppFontSize.bodySmall,
             color: p.textSecondary,
@@ -287,7 +312,7 @@ class _PartySheetState extends State<PartySheet> {
         TextField(
           controller: _nicknameController,
           decoration: InputDecoration(
-            hintText: 'Your display name (optional)',
+            hintText: context.l10n.partyDisplayNameHint,
             prefixIcon: const Icon(Icons.person_outline_rounded),
             border: OutlineInputBorder(borderRadius: AppRadii.r12All),
             contentPadding:
@@ -306,7 +331,7 @@ class _PartySheetState extends State<PartySheet> {
                       strokeWidth: 2, color: Colors.white),
                 )
               : const Icon(Icons.add_rounded),
-          label: const Text('Create New Party'),
+          label: Text(context.l10n.partyCreateNew),
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -323,7 +348,7 @@ class _PartySheetState extends State<PartySheet> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
               child: Text(
-                'OR JOIN BY CODE',
+                context.l10n.partyOrJoinByCode,
                 style: TextStyle(
                   fontSize: AppFontSize.tiny,
                   fontWeight: FontWeight.w700,
@@ -357,7 +382,7 @@ class _PartySheetState extends State<PartySheet> {
             ),
             const SizedBox(width: AppSpacing.sm),
             PulsrButton(
-              label: 'Join',
+              label: context.l10n.partyJoin,
               size: PulsrButtonSize.md,
               variant: PulsrButtonVariant.primary,
               loading: _isJoining,
@@ -404,7 +429,7 @@ class _PartySheetState extends State<PartySheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'ROOM CODE',
+                          context.l10n.partyRoomCode,
                           style: TextStyle(
                             fontSize: AppFontSize.tiny,
                             fontWeight: FontWeight.w800,
@@ -439,7 +464,7 @@ class _PartySheetState extends State<PartySheet> {
                           minHeight: AppSpacing.minTouchTarget,
                         ),
                         icon: const Icon(Icons.copy_rounded, size: 20),
-                        tooltip: 'Copy Invite Link',
+                        tooltip: context.l10n.partyCopyInvite,
                         onPressed: () => _copyInvite(snap.code),
                       ),
                       const SizedBox(width: AppSpacing.xs),
@@ -449,7 +474,7 @@ class _PartySheetState extends State<PartySheet> {
                           minHeight: AppSpacing.minTouchTarget,
                         ),
                         icon: const Icon(Icons.share_rounded, size: 20),
-                        tooltip: 'Share Invite',
+                        tooltip: context.l10n.partyShareInvite,
                         onPressed: () => _shareInvite(snap.code),
                       ),
                     ],
@@ -469,8 +494,8 @@ class _PartySheetState extends State<PartySheet> {
                   Expanded(
                     child: Text(
                       isSynced
-                          ? 'Synced (RTT: ${rtt}ms)'
-                          : 'Synchronizing clock...',
+                          ? context.l10n.partySyncedRtt(rtt)
+                          : context.l10n.partySynchronizingClock,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -480,8 +505,8 @@ class _PartySheetState extends State<PartySheet> {
                     ),
                   ),
                   if (isHost)
-                    const PulsrBadge(
-                      label: 'HOST',
+                    PulsrBadge(
+                      label: context.l10n.partyHost,
                       color: PulsrBadgeColor.accent,
                     ),
                 ],
@@ -496,7 +521,7 @@ class _PartySheetState extends State<PartySheet> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Members (${snap.members.length}/${snap.maxMembers})',
+              context.l10n.partyMembers(snap.members.length, snap.maxMembers),
               style: TextStyle(
                 fontSize: AppFontSize.body,
                 fontWeight: FontWeight.w700,
@@ -576,7 +601,7 @@ class _PartySheetState extends State<PartySheet> {
                       borderRadius: AppRadii.r6All,
                     ),
                     child: Text(
-                      'Host',
+                      context.l10n.partyHostMember,
                       style: TextStyle(
                         fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w700,
@@ -594,7 +619,7 @@ class _PartySheetState extends State<PartySheet> {
         // Leave Party Button
         OutlinedButton.icon(
           icon: const Icon(Icons.exit_to_app_rounded, color: Colors.redAccent),
-          label: const Text('Leave Party',
+          label: Text(context.l10n.partyLeave,
               style: TextStyle(color: Colors.redAccent)),
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Colors.redAccent),

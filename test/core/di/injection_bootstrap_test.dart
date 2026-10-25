@@ -22,11 +22,18 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
-    await getIt.reset();
+    try {
+      await getIt.reset().timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // A YTM-enabled graph can leave a plugin-bound async singleton pending
+      // under flutter_test; never let teardown outlive the test timeout.
+    }
   });
 
   tearDown(() async {
-    await getIt.reset();
+    try {
+      await getIt.reset().timeout(const Duration(seconds: 10));
+    } catch (_) {}
   });
 
   test(

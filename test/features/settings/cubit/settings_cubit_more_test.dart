@@ -220,7 +220,10 @@ void main() {
       addTearDown(cubit.close);
 
       await cubit.setThemeMode(AppThemeMode.light);
+      await cubit.setThemeColorSource(ThemeColorSource.artwork);
       await cubit.setCustomAccentColor(const Color(0xFF123456));
+      expect(cubit.state.themeColorSource, ThemeColorSource.custom,
+          reason: 'picking an accent must switch to the custom source');
       await cubit.setWaveformSeekBar(true);
       await cubit.setHighContrast(true);
       await cubit.setDimWhitePoint(true);

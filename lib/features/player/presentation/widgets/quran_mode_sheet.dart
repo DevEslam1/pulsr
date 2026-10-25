@@ -703,7 +703,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 onPressed: () async {
                   final uri = _lastLoadedTrackUri;
                   if (uri == null) return;
-                  final currentAyah = meta.ayahStart;
+                  final currentAyah = meta.ayahAt(state.position);
                   final newBookmark = QuranBookmark(
                     trackUri: uri,
                     metadata: meta,

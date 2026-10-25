@@ -169,8 +169,9 @@ class _PlayerControlsState extends State<PlayerControls> {
                 // Point A Button (next to Back/Previous)
                 Semantics(
                   label: widget.abPointA != null
-                      ? 'Loop point A ${Formatters.formatDuration(widget.abPointA!)}'
-                      : 'Set loop point A',
+                      ? l10n.abLoopPointA(
+                          Formatters.formatDuration(widget.abPointA!))
+                      : l10n.abLoopSetA,
                   button: true,
                   child: _AbPointButton(
                     label: 'A',
@@ -181,7 +182,11 @@ class _PlayerControlsState extends State<PlayerControls> {
                     inactiveColor: p.textSecondary,
                     onPressed: () {
                       PulsrHaptics.selection();
-                      widget.onSetAbPointA?.call();
+                      if (widget.abPointA != null && widget.abPointB != null) {
+                        widget.onToggleAbLoop?.call();
+                      } else {
+                        widget.onSetAbPointA?.call();
+                      }
                     },
                     onLongPress: () {
                       if (widget.abPointA != null || widget.abPointB != null) {
@@ -195,9 +200,11 @@ class _PlayerControlsState extends State<PlayerControls> {
                         );
                       }
                     },
-                    tooltip: widget.abPointA != null
-                        ? 'Point A: ${Formatters.formatDuration(widget.abPointA!)} (${l10n.clearAbLoop})'
-                        : 'Set loop point A',
+                    tooltip: widget.abPointA != null && widget.abPointB != null
+                        ? l10n.repeat
+                        : widget.abPointA != null
+                            ? 'Point A: ${Formatters.formatDuration(widget.abPointA!)} (${l10n.clearAbLoop})'
+                            : 'Set loop point A',
                     buttonSize: abButtonSize,
                   ),
                 ),
@@ -483,8 +490,9 @@ class _PlayerControlsState extends State<PlayerControls> {
                 // Point B Button (next to Next)
                 Semantics(
                   label: widget.abPointB != null
-                      ? 'Loop point B ${Formatters.formatDuration(widget.abPointB!)}'
-                      : 'Set loop point B',
+                      ? l10n.abLoopPointB(
+                          Formatters.formatDuration(widget.abPointB!))
+                      : l10n.abLoopSetB,
                   button: true,
                   child: _AbPointButton(
                     label: 'B',
@@ -495,7 +503,11 @@ class _PlayerControlsState extends State<PlayerControls> {
                     inactiveColor: p.textSecondary,
                     onPressed: () {
                       PulsrHaptics.selection();
-                      widget.onSetAbPointB?.call();
+                      if (widget.abPointA != null && widget.abPointB != null) {
+                        widget.onToggleAbLoop?.call();
+                      } else {
+                        widget.onSetAbPointB?.call();
+                      }
                     },
                     onLongPress: () {
                       if (widget.abPointA != null || widget.abPointB != null) {
@@ -509,9 +521,11 @@ class _PlayerControlsState extends State<PlayerControls> {
                         );
                       }
                     },
-                    tooltip: widget.abPointB != null
-                        ? 'Point B: ${Formatters.formatDuration(widget.abPointB!)} (${l10n.clearAbLoop})'
-                        : 'Set loop point B',
+                    tooltip: widget.abPointA != null && widget.abPointB != null
+                        ? l10n.repeat
+                        : widget.abPointB != null
+                            ? 'Point B: ${Formatters.formatDuration(widget.abPointB!)} (${l10n.clearAbLoop})'
+                            : 'Set loop point B',
                     buttonSize: abButtonSize,
                   ),
                 ),

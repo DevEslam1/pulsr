@@ -70,7 +70,7 @@ void main() {
     // Long-press enters selection mode.
     await tester.longPress(find.byType(DownloadTile));
     await tester.pump();
-    expect(find.textContaining('selected'), findsOneWidget);
+    expect(find.textContaining('Selected'), findsOneWidget);
 
     // The task is removed (e.g. completed + cleared). The selection listener
     // must prune the stale id and leave selection mode.
@@ -79,7 +79,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.textContaining('selected'), findsNothing);
+    expect(find.textContaining('Selected'), findsNothing);
     expect(find.byType(DownloadTile), findsNothing);
   });
 }

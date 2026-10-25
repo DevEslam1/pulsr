@@ -14,6 +14,8 @@ class QuickTile extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final IconData trailingIcon;
+  final double trailingIconSize;
 
   const QuickTile({
     super.key,
@@ -22,6 +24,8 @@ class QuickTile extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.trailingIcon = Icons.chevron_right_rounded,
+    this.trailingIconSize = 16,
   });
 
   @override
@@ -55,8 +59,8 @@ class QuickTile extends StatelessWidget {
               ),
               borderRadius: AppRadii.r18All,
               border: Border.all(
-                color: Color.alphaBlend(
-                    color.withValues(alpha: 0.22), p.hairline),
+                color:
+                    Color.alphaBlend(color.withValues(alpha: 0.22), p.hairline),
               ),
             ),
             child: Row(
@@ -105,8 +109,8 @@ class QuickTile extends StatelessWidget {
                 ),
                 ExcludeSemantics(
                   child: Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
+                    trailingIcon,
+                    size: trailingIconSize,
                     color: p.textTertiary.withValues(alpha: 0.6),
                   ),
                 ),

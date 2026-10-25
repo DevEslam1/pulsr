@@ -182,6 +182,35 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
+  // Settings lives inside a StatefulShellRoute branch in the real app, where
+  // the screen context's nearest Navigator is a nested branch navigator while
+  // PulsrDialogHelper pushes onto the root. This reproduces that structure.
+  Future<void> pumpNestedSection(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(700, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(
+      BlocProvider<SettingsCubit>.value(
+        value: settingsCubit,
+        child: MaterialApp(
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Navigator(
+            onGenerateRoute: (_) => MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: BackupSection()),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
   Future<void> unmount(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -368,6 +397,45 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, l10n.doneAction));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+
+      await unmount(tester);
+    });
+
+    testWidgets(
+        'inside a shell branch the restore dialog still completes and closes',
+        (tester) async {
+      picker.pickResult = _FakePlatformFile(seedFile(
+        'backup.json',
+        '{"version":4,"favorites":[],"playlists":[],"settings":{},"playHistory":[],"excludedFolders":[]}',
+      ));
+      when(() => importUseCase.execute(any())).thenAnswer(
+        (_) async => const ImportResult(
+          restoredFavoritesCount: 0,
+          restoredPlaylistsCount: 0,
+          restoredHistoryCount: 0,
+          restoredSettingsCount: 0,
+          restoredExcludedFoldersCount: 0,
+          unmatchedPaths: [],
+        ),
+      );
+
+      await pumpNestedSection(tester);
+      await tester.tap(find.text(l10n.importBackup));
+      await tester.pump();
+      await pumpReal(tester);
+
+      await tester.tap(find.widgetWithText(FilledButton, l10n.confirmRestore));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text(l10n.backupRestored), findsOneWidget);
+      verify(() => importUseCase.execute(any())).called(1);
+
+      await tester.tap(find.widgetWithText(TextButton, l10n.doneAction));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text(l10n.backupRestored), findsNothing);
 
       await unmount(tester);
     });

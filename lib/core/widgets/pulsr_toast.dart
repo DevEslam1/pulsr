@@ -68,7 +68,7 @@ class PulsrToast {
     required String message,
     String? title,
     IconData? icon,
-    Duration duration = const Duration(milliseconds: 2200),
+    Duration duration = const Duration(milliseconds: 3200),
     bool isError = false,
     bool isSuccess = false,
     String? actionLabel,
@@ -251,7 +251,15 @@ class _ToastWidgetState extends State<_ToastWidget>
   }
 
   void _startAutoDismissTimer() {
-    _autoDismissTimer = Timer(widget.duration, () {
+    var effective = widget.duration;
+    if (widget.action != null) {
+      effective += const Duration(seconds: 2);
+    }
+    if (WidgetsBinding.instance.platformDispatcher.accessibilityFeatures
+        .accessibleNavigation) {
+      effective += const Duration(seconds: 4);
+    }
+    _autoDismissTimer = Timer(effective, () {
       if (mounted) dismiss();
     });
   }
@@ -379,9 +387,8 @@ class _ToastWidgetState extends State<_ToastWidget>
         MediaQuery.maybeOrientationOf(context) == Orientation.landscape;
     final isCompactLandscape = isLandscape && !isTablet;
 
-    final double maxDockWidth = isTablet
-        ? 480.0
-        : (isCompactLandscape ? 380.0 : 420.0);
+    final double maxDockWidth =
+        isTablet ? 480.0 : (isCompactLandscape ? 380.0 : 420.0);
     final snackbarRadius = isTablet
         ? AppRadii.r24All
         : (isCompactLandscape ? AppRadii.r16All : AppRadii.r20All);
@@ -586,56 +593,72 @@ class _ToastWidgetState extends State<_ToastWidget>
                                       // Optional Action Button
                                       if (widget.action != null) ...[
                                         const SizedBox(width: 8),
-                                        GestureDetector(
-                                          behavior: HitTestBehavior.opaque,
-                                          onTap: () {
-                                            HapticFeedback.lightImpact();
-                                            widget.action!.onPressed();
-                                            dismiss();
-                                          },
-                                          child: Container(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal:
-                                                  isCompactLandscape ? 9 : 11,
-                                              vertical:
-                                                  isCompactLandscape ? 4 : 5,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: statusColor.withValues(
-                                                  alpha:
-                                                      p.isDark ? 0.20 : 0.14),
-                                              borderRadius: AppRadii.r10All,
-                                              border: Border.all(
-                                                color: statusColor.withValues(
-                                                    alpha: 0.32),
-                                                width: 1.0,
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                if (widget.action!.icon !=
-                                                    null) ...[
-                                                  Icon(
-                                                    widget.action!.icon,
-                                                    size: isCompactLandscape
-                                                        ? 12
-                                                        : 14,
-                                                    color: statusColor,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                ],
-                                                Text(
-                                                  widget.action!.label,
-                                                  style: TextStyle(
-                                                    color: statusColor,
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: isCompactLandscape
-                                                        ? 11.5
-                                                        : AppFontSize.bodySmall,
+                                        Semantics(
+                                          button: true,
+                                          label: widget.action!.label,
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                                minWidth: 48, minHeight: 48),
+                                            child: GestureDetector(
+                                              behavior: HitTestBehavior.opaque,
+                                              onTap: () {
+                                                HapticFeedback.lightImpact();
+                                                widget.action!.onPressed();
+                                                dismiss();
+                                              },
+                                              child: Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: isCompactLandscape
+                                                      ? 9
+                                                      : 11,
+                                                  vertical: isCompactLandscape
+                                                      ? 4
+                                                      : 5,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: statusColor.withValues(
+                                                      alpha: p.isDark
+                                                          ? 0.20
+                                                          : 0.14),
+                                                  borderRadius: AppRadii.r10All,
+                                                  border: Border.all(
+                                                    color:
+                                                        statusColor.withValues(
+                                                            alpha: 0.32),
+                                                    width: 1.0,
                                                   ),
                                                 ),
-                                              ],
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    if (widget.action!.icon !=
+                                                        null) ...[
+                                                      Icon(
+                                                        widget.action!.icon,
+                                                        size: isCompactLandscape
+                                                            ? 12
+                                                            : 14,
+                                                        color: statusColor,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                    ],
+                                                    Text(
+                                                      widget.action!.label,
+                                                      style: TextStyle(
+                                                        color: statusColor,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize:
+                                                            isCompactLandscape
+                                                                ? 11.5
+                                                                : AppFontSize
+                                                                    .bodySmall,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -643,18 +666,25 @@ class _ToastWidgetState extends State<_ToastWidget>
 
                                       // Close Button
                                       const SizedBox(width: 4),
-                                      GestureDetector(
-                                        behavior: HitTestBehavior.opaque,
-                                        onTap: () {
-                                          HapticFeedback.lightImpact();
-                                          dismiss();
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(4),
-                                          child: Icon(
-                                            Icons.close_rounded,
-                                            size: isCompactLandscape ? 16 : 18,
-                                            color: p.textTertiary,
+                                      Semantics(
+                                        button: true,
+                                        label: MaterialLocalizations.of(context)
+                                            .closeButtonTooltip,
+                                        child: GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            dismiss();
+                                          },
+                                          child: SizedBox(
+                                            width: 48,
+                                            height: 48,
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              size:
+                                                  isCompactLandscape ? 16 : 18,
+                                              color: p.textTertiary,
+                                            ),
                                           ),
                                         ),
                                       ),

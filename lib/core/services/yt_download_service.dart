@@ -1202,6 +1202,7 @@ class YtDownloadService {
     }
 
     final chunkReceived = List<int>.filled(concurrentChunks, 0);
+    var baseReceived = 0;
     var lastEmitTime = 0;
     var mergeCompleted = false;
     var keepParts = false;
@@ -1251,6 +1252,7 @@ class YtDownloadService {
               have = 0;
             }
             chunkReceived[chunkIndex] = have;
+            baseReceived += have;
             // Already complete from an earlier attempt. Asking anyway would send
             // `bytes=${end + 1}-$end` and come back 416.
             if (have == expectedSize) return;
@@ -1325,8 +1327,10 @@ class YtDownloadService {
                     lastEmitTime = now;
                     final elapsedSeconds =
                         stopwatch.elapsedMilliseconds / 1000.0;
+                    final movedThisAttempt =
+                        (totalReceived - baseReceived).clamp(0, total);
                     final speedKbps = elapsedSeconds > 0
-                        ? (totalReceived / elapsedSeconds) / 1024.0
+                        ? (movedThisAttempt / elapsedSeconds) / 1024.0
                         : 0.0;
                     final fraction = (totalReceived / total).clamp(0.0, 1.0);
                     final remainingBytes =

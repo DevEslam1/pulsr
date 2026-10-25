@@ -13,6 +13,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/constants/channels.dart';
 import '../../core/di/injection.dart';
+import '../../core/errors/error_message_resolver.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/theme/aura_theme.dart';
@@ -21,6 +22,7 @@ import '../../core/utils/l10n_extensions.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../core/widgets/pulsr_dialog.dart';
+import '../../core/widgets/pulsr_toast.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../domain/usecases/playlist_usecases.dart';
@@ -178,21 +180,46 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     if (pl == null || pl.isSmart) return;
 
     final playlistUseCases = getIt<PlaylistUseCases>();
-    await playlistUseCases.removeSongFromPlaylist(pl.id, song.id);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              context.l10n.songRemovedFromPlaylist(song.title, pl.name)),
-          behavior: SnackBarBehavior.floating,
-          action: SnackBarAction(
-            label: context.l10n.undo,
-            onPressed: () {
-              playlistUseCases.addSongsToPlaylist(pl.id, [song.id]);
-            },
+    // Capture the exact order first: Undo used to append the track, silently
+    // moving it to the end of a hand-ordered playlist.
+    List<int> originalOrder = const [];
+    try {
+      final orderRes = await playlistUseCases.watchPlaylistSongs(pl.id).first;
+      originalOrder = orderRes.fold(
+        (_) => const <int>[],
+        (songs) => [for (final s in songs) s.id],
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Failed to capture playlist order for undo',
+          error: e, stackTrace: st, category: 'SongOptionsSheet');
+    }
+    final result =
+        await playlistUseCases.removeSongFromPlaylist(pl.id, song.id);
+    if (result.isLeft()) {
+      if (context.mounted) {
+        PulsrToast.show(
+          context,
+          message: result.fold(
+            (failure) => resolveUiErrorMessage(context, failure.message),
+            (_) => context.l10n.somethingWentWrong,
           ),
-        ),
+          isError: true,
+        );
+      }
+      return;
+    }
+    if (context.mounted) {
+      PulsrToast.show(
+        context,
+        message: context.l10n.songRemovedFromPlaylist(song.title, pl.name),
+        actionLabel: context.l10n.undo,
+        onActionPressed: () async {
+          final added =
+              await playlistUseCases.addSongsToPlaylist(pl.id, [song.id]);
+          if (added.isRight() && originalOrder.isNotEmpty) {
+            await playlistUseCases.reorderPlaylistSongs(pl.id, originalOrder);
+          }
+        },
       );
     }
   }
@@ -446,11 +473,11 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isLocal = song.source == SongSource.local &&
-        !song.path.startsWith('ytmusic://');
-    final canRemoveFromPlaylist = (widget.playlist != null &&
-            !widget.playlist!.isSmart) ||
-        widget.onRemoveFromPlaylist != null;
+    final isLocal =
+        song.source == SongSource.local && !song.path.startsWith('ytmusic://');
+    final canRemoveFromPlaylist =
+        (widget.playlist != null && !widget.playlist!.isSmart) ||
+            widget.onRemoveFromPlaylist != null;
     final hasValidAlbum =
         song.album.isNotEmpty && song.album != 'Unknown Album';
     final hasValidArtist =
@@ -692,8 +719,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                     decoration: BoxDecoration(
                       color: isActive
                           ? p.favorite.withValues(alpha: 0.18)
-                          : p.surface.withValues(
-                              alpha: p.isDark ? 0.45 : 0.65),
+                          : p.surface.withValues(alpha: p.isDark ? 0.45 : 0.65),
                       borderRadius: AppRadii.r16All,
                       border: Border.all(
                         color: isActive

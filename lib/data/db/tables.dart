@@ -156,6 +156,76 @@ class PlaylistEntriesTable extends Table {
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
 }
 
+/// Allowed values for [OnlinePlaylistsTable.kind].
+abstract final class OnlineLibraryKind {
+  static const String liked = 'liked';
+  static const String account = 'account';
+  static const String custom = 'custom';
+}
+
+/// Locally cached metadata for an online (YouTube Music) library playlist.
+///
+/// Keyed by the canonical remote id (the `list=` value without its `VL`
+/// prefix; Liked Music is normalised to `VLLM`). Track rows live in
+/// [OnlinePlaylistEntriesTable] ordered by `orderIndex`, so a user's custom
+/// order survives app restarts and online refreshes.
+class OnlinePlaylistsTable extends Table {
+  @override
+  String get tableName => 'online_playlists';
+
+  TextColumn get playlistId => text()();
+  TextColumn get title => text()();
+  TextColumn get author => text().withDefault(const Constant(''))();
+  TextColumn get artworkUrl => text().nullable()();
+
+  /// One of [OnlineLibraryKind].
+  TextColumn get kind =>
+      text().withDefault(const Constant(OnlineLibraryKind.custom))();
+
+  /// Position in the online library list, kept so cached listings can be
+  /// rebuilt without re-sorting by title.
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  /// True once the user has dragged songs. While true, remote refreshes merge
+  /// new tracks into the saved order instead of replacing it.
+  BoolColumn get hasCustomOrder =>
+      boolean().withDefault(const Constant(false))();
+
+  /// Last time the full track list was fetched. Null means only a preview or
+  /// metadata is cached. Used by the background sync to skip fresh entries.
+  DateTimeColumn get cachedAt => dateTime().nullable()();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {playlistId};
+}
+
+/// Cached track rows for one [OnlinePlaylistsTable] entry.
+class OnlinePlaylistEntriesTable extends Table {
+  @override
+  String get tableName => 'online_playlist_entries';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get playlistId => text().references(
+        OnlinePlaylistsTable,
+        #playlistId,
+        onDelete: KeyAction.cascade,
+      )();
+  TextColumn get videoId => text()();
+  TextColumn get title => text()();
+  TextColumn get artist =>
+      text().withDefault(const Constant('Unknown Artist'))();
+  IntColumn get durationMs => integer().withDefault(const Constant(0))();
+  TextColumn get artworkUrl => text().nullable()();
+  IntColumn get orderIndex => integer()();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {playlistId, videoId},
+      ];
+}
+
 class PlayHistoryTable extends Table {
   @override
   String get tableName => 'play_history';

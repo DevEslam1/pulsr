@@ -11,8 +11,10 @@ class GetGenresUseCase {
 
   GetGenresUseCase(this._repository);
 
-  Stream<Result<List<GenreItem>>> watchGenres() {
-    return _repository.watchGenres();
+  Stream<Result<List<GenreItem>>> watchGenres({
+    List<String> excludedFolders = const [],
+  }) {
+    return _repository.watchGenres(excludedFolders: excludedFolders);
   }
 
   Stream<Result<List<SongsTableData>>> watchGenreSongs(String genre) {

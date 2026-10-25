@@ -67,6 +67,32 @@ class CrossfadeManager {
   /// Current in-flight or calculated transition plan for Automix.
   TransitionPlan? activeTransitionPlan;
 
+  /// Measured time from [_startCrossfade] entry to the moment the gain ramp
+  /// actually opens (source resolve, play acknowledgement, decoder settle and
+  /// the buffer gate), as an exponential moving average in milliseconds.
+  ///
+  /// The position tick that arms a fade has to fire early enough that the
+  /// WHOLE configured fade still fits before the outgoing track ends. A fixed
+  /// margin either truncated every slow (YouTube) transition or fired absurdly
+  /// early for preloaded local ones, so the trigger sizes itself from this.
+  double prepMsEwma = 1000.0;
+
+  /// Records one observed prepare duration into [prepMsEwma] (30% new sample).
+  void recordPrepDuration(Duration elapsed) {
+    final ms = elapsed.inMilliseconds.toDouble();
+    if (!ms.isFinite || ms < 0) return;
+    prepMsEwma = (prepMsEwma * 0.7) + (ms * 0.3);
+  }
+
+  /// Early-fire margin for the crossfade position trigger: the measured
+  /// prepare time plus the arbiter's own 500 ms tail guard (plus a small
+  /// scheduler allowance), floored at 1.5 s and capped at 4 s so a single bad
+  /// sample can neither open fades absurdly early nor too late to fit.
+  Duration get triggerMargin {
+    final ms = (prepMsEwma + 560).round().clamp(1500, 4000);
+    return Duration(milliseconds: ms);
+  }
+
   /// Per-track BPM overrides (track id -> bpm). BPM sources: tag metadata or
   /// manual entry; tracks without an override fall back to the base duration.
   final Map<String, double> bpmOverrides = <String, double>{};

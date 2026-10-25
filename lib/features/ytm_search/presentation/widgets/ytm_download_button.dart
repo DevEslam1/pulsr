@@ -60,8 +60,12 @@ class YtmDownloadButton extends StatelessWidget {
     final tintColor = activeColor ?? p.accent;
     final baseColor = iconColor ?? p.textTertiary;
 
-    final cubit =
-        context.watch<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final provided = context.watch<YtmDownloadCubit?>();
+    final cubit = provided ??
+        (getIt.isRegistered<YtmDownloadCubit>()
+            ? getIt<YtmDownloadCubit>()
+            : null);
+    if (cubit == null) return const SizedBox.shrink();
 
     return BlocBuilder<YtmDownloadCubit, YtmDownloadState>(
       bloc: cubit,

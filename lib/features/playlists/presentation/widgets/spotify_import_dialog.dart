@@ -4,6 +4,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../data/services/spotify_importer_service.dart';
@@ -93,7 +94,8 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
       if (!mounted) return;
       setState(() {
         _stage = _ImportStage.error;
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = resolveUiErrorMessage(
+            context, e.toString().replaceFirst('Exception: ', ''));
       });
     }
   }

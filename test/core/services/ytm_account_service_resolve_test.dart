@@ -252,44 +252,31 @@ void main() {
       expect(stream!.bitrateKbps, 192);
     });
 
-    test('ciphered formats are skipped and the client is demoted', () async {
+    test('authenticated ciphered formats hand off to the native tier',
+        () async {
       final service = await loggedIn(dataSyncId: 'dsid||');
-      handler = (request) async {
-        switch (_clientName(request)) {
-          case 'WEB_REMIX':
-            return _playerOk(formats: [
-              _format(
-                url: 'https://x/cipher?expire=1800000000',
-                cipher: true,
-              ),
-            ]);
-          case 'ANDROID_VR':
-            return _playerOk(formats: [
-              _format(url: 'https://x/guest?expire=1800000000'),
-            ]);
-          default:
-            return _playability('UNPLAYABLE');
-        }
-      };
-
-      final first = await service.resolvePlayerStream('dQw4w9WgXcQ');
-      expect(first!.url, 'https://x/guest?expire=1800000000');
-
-      // The demotion puts WEB_REMIX at the tail for the next 10 minutes.
       requests.clear();
       handler = (request) async {
-        if (_clientName(request) == 'ANDROID_VR') {
+        if (_clientName(request) == 'WEB_REMIX') {
           return _playerOk(formats: [
-            _format(url: 'https://x/guest2?expire=1800000000'),
+            _format(
+              url: 'https://x/cipher?expire=1800000000',
+              cipher: true,
+            ),
           ]);
         }
-        return _playability('UNPLAYABLE');
+        return _playerOk(formats: [
+          _format(url: 'https://x/guest?expire=1800000000'),
+        ]);
       };
-      final second = await service.resolvePlayerStream('dQw4w9WgXcQ');
-      expect(second!.url, 'https://x/guest2?expire=1800000000');
-      expect(_clientName(requests.first), 'ANDROID_VR');
-      expect(requests.map(_clientName), isNot(contains('WEB_REMIX')),
-          reason: 'the demoted client is tried last, after a success wins');
+
+      // Dart cannot decipher signatureCipher; returning null lets YtmService
+      // run the native extractor instead of handing back a 403 URL.
+      final stream = await service.resolvePlayerStream('dQw4w9WgXcQ');
+      expect(stream, isNull);
+      expect(requests.map(_clientName), contains('WEB_REMIX'));
+      expect(requests.map(_clientName), isNot(contains('ANDROID_VR')),
+          reason: 'a session-auth ciphered answer hands off immediately');
     });
   });
 

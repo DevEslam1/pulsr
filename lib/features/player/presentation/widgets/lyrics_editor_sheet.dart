@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
@@ -45,6 +46,12 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   final ValueNotifier<Duration> _livePosition = ValueNotifier(Duration.zero);
   StreamSubscription<Duration>? _positionSub;
   Timer? _fallbackTimer;
+  late String _initialSnapshot;
+  bool _allowPop = false;
+
+  String _snapshot() => _lines
+      .map((l) => '${l.timestamp.inMilliseconds}|${l.text}')
+      .join(String.fromCharCode(10));
 
   @override
   void initState() {
@@ -58,6 +65,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
       ];
     }
     _rowKeys = List.generate(_lines.length, (_) => UniqueKey());
+    _initialSnapshot = _snapshot();
     try {
       final cubit = context.read<PlayerCubit>();
       _positionSub = cubit.rawPositionStream.listen((pos) {
@@ -162,226 +170,246 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.82,
-      padding: const EdgeInsetsDirectional.fromSTEB(
-          AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: p.textSecondary.withValues(alpha: 0.3),
-                borderRadius: AppRadii.r2All,
+    return PopScope(
+      canPop: _allowPop || _snapshot() == _initialSnapshot,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await PulsrDialogHelper.showConfirmDialog(
+          context,
+          title: context.l10n.discardChangesTitle,
+          message: context.l10n.discardChangesBody,
+          confirmLabel: context.l10n.discard,
+          isDestructive: true,
+        );
+        if (discard == true && context.mounted) {
+          setState(() => _allowPop = true);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) Navigator.of(context).pop();
+          });
+        }
+      },
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.82,
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: p.textSecondary.withValues(alpha: 0.3),
+                  borderRadius: AppRadii.r2All,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    context.l10n.lyricsEditorTitle,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontSize: AppFontSize.title,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    context.l10n.nowAtLabel,
-                    style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: AppSpacing.s6),
-                  ValueListenableBuilder<Duration>(
-                    valueListenable: _livePosition,
-                    builder: (context, pos, _) => Text(
-                      Formatters.formatDuration(pos),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.lyricsEditorTitle,
                       style: TextStyle(
-                          color: p.primary,
+                        color: p.textPrimary,
+                        fontSize: AppFontSize.title,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      context.l10n.nowAtLabel,
+                      style: TextStyle(
+                          color: p.textSecondary,
                           fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w600),
                     ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  IconButton(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    icon: Icon(Icons.sort_rounded, color: p.primary),
-                    onPressed: _sortLines,
-                    tooltip: context.l10n.dspSortByTime,
-                  ),
-                  IconButton(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    icon: Icon(Icons.add_rounded, color: p.primary),
-                    onPressed: _addNewLine,
-                    tooltip: context.l10n.dspAddLine,
-                  ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: p.primary,
-                      shape:
-                          RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-                    ),
-                    onPressed: () {
-                      final sorted = List<LyricsLine>.from(_lines)
-                        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                      widget.onSave(sorted);
-                      Navigator.pop(context);
-                    },
-                    child: Text(context.l10n.save,
+                    const SizedBox(height: AppSpacing.s6),
+                    ValueListenableBuilder<Duration>(
+                      valueListenable: _livePosition,
+                      builder: (context, pos, _) => Text(
+                        Formatters.formatDuration(pos),
                         style: TextStyle(
-                            color: p.onAccent, fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.s14),
-          Expanded(
-            child: ListView.separated(
-              itemCount: _lines.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppSpacing.xs),
-              itemBuilder: (context, index) {
-                final line = _lines[index];
-                return Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: p.surfaceCard,
-                    borderRadius: AppRadii.r14All,
-                    border: Border.all(color: p.hairline),
-                  ),
-                  child: Row(
-                    children: [
-                      // Tap-to-play preview button
-                      IconButton(
-                        icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                        color: p.primary,
-                        tooltip: context.l10n.play,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget,
-                        ),
-                        onPressed: () {
-                          try {
-                            final cubit = context.read<PlayerCubit>();
-                            cubit.seek(line.timestamp);
-                          } catch (_) {
-                            getIt<PlayerCubit>().seek(line.timestamp);
-                          }
-                        },
+                            color: p.primary,
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(width: AppSpacing.s2),
-                      // Timestamp stamp button
-                      InkWell(
-                        onTap: () => _stampCurrentPosition(index),
-                        borderRadius: AppRadii.r8All,
-                        child: ConstrainedBox(
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
+                      icon: Icon(Icons.sort_rounded, color: p.primary),
+                      onPressed: _sortLines,
+                      tooltip: context.l10n.dspSortByTime,
+                    ),
+                    IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
+                      icon: Icon(Icons.add_rounded, color: p.primary),
+                      onPressed: _addNewLine,
+                      tooltip: context.l10n.dspAddLine,
+                    ),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: p.primary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: AppRadii.r12All),
+                      ),
+                      onPressed: () {
+                        final sorted = List<LyricsLine>.from(_lines)
+                          ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                        _allowPop = true;
+                        widget.onSave(sorted);
+                        Navigator.pop(context);
+                      },
+                      child: Text(context.l10n.save,
+                          style: TextStyle(
+                              color: p.onAccent, fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s14),
+            Expanded(
+              child: ListView.separated(
+                itemCount: _lines.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(height: AppSpacing.xs),
+                itemBuilder: (context, index) {
+                  final line = _lines[index];
+                  return Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: p.surfaceCard,
+                      borderRadius: AppRadii.r14All,
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: Row(
+                      children: [
+                        // Tap-to-play preview button
+                        IconButton(
+                          icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                          color: p.primary,
+                          tooltip: context.l10n.play,
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                            minHeight: AppSpacing.minTouchTarget,
                             minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget,
                           ),
-                          child: Container(
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.xs,
-                                vertical: AppSpacing.s6),
-                            decoration: BoxDecoration(
-                              color: p.primary.withValues(alpha: 0.15),
-                              borderRadius: AppRadii.r8All,
+                          onPressed: () {
+                            try {
+                              final cubit = context.read<PlayerCubit>();
+                              cubit.seek(line.timestamp);
+                            } catch (_) {
+                              getIt<PlayerCubit>().seek(line.timestamp);
+                            }
+                          },
+                        ),
+                        const SizedBox(width: AppSpacing.s2),
+                        // Timestamp stamp button
+                        InkWell(
+                          onTap: () => _stampCurrentPosition(index),
+                          borderRadius: AppRadii.r8All,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              minHeight: AppSpacing.minTouchTarget,
+                              minWidth: AppSpacing.minTouchTarget,
                             ),
-                            child: Text(
-                              Formatters.formatDuration(line.timestamp),
-                              style: TextStyle(
-                                color: p.primary,
-                                fontSize: AppFontSize.label,
-                                fontWeight: FontWeight.w700,
+                            child: Container(
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.xs,
+                                  vertical: AppSpacing.s6),
+                              decoration: BoxDecoration(
+                                color: p.primary.withValues(alpha: 0.15),
+                                borderRadius: AppRadii.r8All,
+                              ),
+                              child: Text(
+                                Formatters.formatDuration(line.timestamp),
+                                style: TextStyle(
+                                  color: p.primary,
+                                  fontSize: AppFontSize.label,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.s10),
-                      // Text input field
-                      Expanded(
-                        child: TextFormField(
-                          // Stable per-row key so deleting a row cannot make
-                          // the wrong line's editing state render here.
-                          key: _rowKeys[index],
-                          initialValue: line.text,
-                          style: TextStyle(
-                              color: p.textPrimary,
-                              fontSize: AppFontSize.bodySmall),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
+                        const SizedBox(width: AppSpacing.s10),
+                        // Text input field
+                        Expanded(
+                          child: TextFormField(
+                            // Stable per-row key so deleting a row cannot make
+                            // the wrong line's editing state render here.
+                            key: _rowKeys[index],
+                            initialValue: line.text,
+                            style: TextStyle(
+                                color: p.textPrimary,
+                                fontSize: AppFontSize.bodySmall),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: (val) {
+                              _lines[index] = LyricsLine(
+                                  timestamp: line.timestamp, text: val);
+                            },
                           ),
-                          onChanged: (val) {
-                            _lines[index] = LyricsLine(
-                                timestamp: line.timestamp, text: val);
-                          },
                         ),
-                      ),
-                      // Offset adjust buttons
-                      IconButton(
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        icon: const Icon(Icons.remove_rounded, size: 16),
-                        tooltip: context.l10n.lyricsShiftEarlier,
-                        color: p.textSecondary,
-                        onPressed: () => _adjustOffset(index, -250),
-                      ),
-                      IconButton(
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        tooltip: context.l10n.lyricsShiftLater,
-                        color: p.textSecondary,
-                        onPressed: () => _adjustOffset(index, 250),
-                      ),
-                      IconButton(
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        icon:
-                            const Icon(Icons.delete_outline_rounded, size: 16),
-                        color: p.textSecondary,
-                        onPressed: () => _deleteLine(index),
-                        tooltip: context.l10n.dspDeleteLine,
-                      ),
-                    ],
-                  ),
-                );
-              },
+                        // Offset adjust buttons
+                        IconButton(
+                          constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
+                          icon: const Icon(Icons.remove_rounded, size: 16),
+                          tooltip: context.l10n.lyricsShiftEarlier,
+                          color: p.textSecondary,
+                          onPressed: () => _adjustOffset(index, -250),
+                        ),
+                        IconButton(
+                          constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          tooltip: context.l10n.lyricsShiftLater,
+                          color: p.textSecondary,
+                          onPressed: () => _adjustOffset(index, 250),
+                        ),
+                        IconButton(
+                          constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              size: 16),
+                          color: p.textSecondary,
+                          onPressed: () => _deleteLine(index),
+                          tooltip: context.l10n.dspDeleteLine,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

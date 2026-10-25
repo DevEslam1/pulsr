@@ -136,7 +136,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         ));
 
     return BlocConsumer<PlayerCubit, PlayerState>(
-      buildWhen: (prev, curr) => prev.differsFromBeyondPosition(curr),
+      buildWhen: (prev, curr) =>
+          prev.differsFromBeyondPosition(curr) ||
+          prev.position.inSeconds != curr.position.inSeconds,
       listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
       listener: (context, state) {
         final song = state.currentSong;

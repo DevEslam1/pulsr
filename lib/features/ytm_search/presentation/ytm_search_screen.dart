@@ -323,7 +323,8 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
               onNotification: (notification) {
                 if (notification.metrics.extentAfter < 400 &&
                     cubit.hasMore &&
-                    !state.isLoading) {
+                    !state.isLoading &&
+                    !state.loadMoreFailed) {
                   unawaited(cubit.loadMore());
                 }
                 return false;
@@ -335,9 +336,23 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                 padding: EdgeInsets.only(
                     bottom: PulsrLayoutMetrics.scrollBottom(context),
                     top: AppSpacing.xxs),
-                itemCount: songs.length + (state.isLoading ? 1 : 0),
+                itemCount: songs.length +
+                    (state.isLoading || state.loadMoreFailed ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index >= songs.length) {
+                    if (state.loadMoreFailed) {
+                      return Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                        child: Center(
+                          child: TextButton.icon(
+                            onPressed: () => cubit.loadMore(),
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: Text(context.l10n.retry),
+                          ),
+                        ),
+                      );
+                    }
                     return const Padding(
                       padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
                       child: Center(

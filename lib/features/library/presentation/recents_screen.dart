@@ -15,6 +15,7 @@ import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/staggered_list_item.dart';
 import '../../../data/db/app_database.dart';
+import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/add_to_playlist_sheet.dart';
@@ -44,9 +45,28 @@ class _RecentsScreenState extends State<RecentsScreen> {
   bool _hasMore = true;
   late final GetSongsUseCase _getSongsUseCase;
   late Stream<dynamic> _recentStream;
+  List<String> _excludedFolders = const [];
 
   void _updateStream() {
-    _recentStream = _getSongsUseCase.watchRecentlyPlayed(limit: _historyLimit);
+    _recentStream = _getSongsUseCase.watchRecentlyPlayed(
+      limit: _historyLimit,
+      excludedFolders: _excludedFolders,
+    );
+  }
+
+  Future<void> _initHistory() async {
+    if (getIt.isRegistered<FolderUseCases>()) {
+      try {
+        final res = await getIt<FolderUseCases>().getExcludedFolders();
+        _excludedFolders = res.fold((_) => <String>[], (list) => list);
+      } catch (_) {
+        // Exclusion lookup failure must not block the history list.
+      }
+    }
+    if (!mounted || _excludedFolders.isEmpty) return;
+    // Only the first stream needs replacing when exclusions were loaded; an
+    // unconditional resubscribe duplicated the DB query on every open.
+    setState(_updateStream);
   }
 
   void _retryHistory() {
@@ -70,6 +90,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
     super.initState();
     _getSongsUseCase = getIt<GetSongsUseCase>();
     _updateStream();
+    _initHistory();
   }
 
   @override

@@ -120,4 +120,38 @@ void main() {
     expect(store.hasUrlCollision(station.url, exceptId: station.id), isFalse);
     expect(store.hasUrlCollision('https://fresh.example.com/live'), isFalse);
   });
+
+  test('resolveArtworkForStation matches sheikhs by name and stream url', () {
+    expect(
+      RadioStationStore.resolveArtworkForStation(
+        name: 'إذاعة الشيخ محمد صديق المنشاوي (مجود)',
+        url: 'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
+      ),
+      RadioStationStore.minshawiArtwork,
+    );
+
+    expect(
+      RadioStationStore.resolveArtworkForStation(
+        name: 'الشيخ عبد الباسط',
+        url: 'https://custom.stream/live',
+      ),
+      RadioStationStore.abdulBasitArtwork,
+    );
+
+    expect(
+      RadioStationStore.resolveArtworkForStation(
+        name: 'إذاعة الشيخ مصطفى إسماعيل',
+        url: 'https://stream.example/mustafa_ismail',
+      ),
+      RadioStationStore.mustafaIsmailArtwork,
+    );
+
+    expect(
+      RadioStationStore.resolveArtworkForStation(
+        name: 'إذاعة القرآن الكريم المصرية - القاهرة',
+        url: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
+      ),
+      RadioStationStore.quranCairoArtwork,
+    );
+  });
 }

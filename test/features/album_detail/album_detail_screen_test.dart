@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/errors/failures.dart';
+import 'package:pulsr/core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/get_albums_usecase.dart';
@@ -86,13 +87,25 @@ void main() {
     expect(find.text('Alpha'), findsOneWidget);
   });
 
-  testWidgets('renders an empty-but-usable scaffold while loading',
+  testWidgets('renders a skeleton while the album tracks are loading',
       (tester) async {
-    await tester.pumpWidget(build(const Stream.empty()));
+    final pending = StreamController<Result<List<SongsTableData>>>();
+    addTearDown(pending.close);
+    await tester.pumpWidget(build(pending.stream));
     await tester.pump();
 
     expect(find.byType(AlbumDetailScreen), findsOneWidget);
+    expect(find.byType(SkeletonList), findsOneWidget);
     expect(find.byType(SongTile), findsNothing);
+  });
+
+  testWidgets('renders a localized empty state when the album has no tracks',
+      (tester) async {
+    await tester.pumpWidget(build(Stream.value(const Right([]))));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No Tracks'), findsOneWidget);
+    expect(find.text('No Tracks Found'), findsOneWidget);
   });
 
   testWidgets('shows the error view and retry recreates the stream',

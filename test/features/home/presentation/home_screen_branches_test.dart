@@ -52,6 +52,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(createTestSong(id: -1));
     registerFallbackValue(<SongsTableData>[]);
+    registerFallbackValue(<String>[]);
   });
 
   setUp(() {
@@ -74,8 +75,11 @@ void main() {
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
           limit: any(named: 'limit'),
+          excludedFolders: any(named: 'excludedFolders'),
         )).thenAnswer((_) async => const Right(<SongsTableData>[]));
-    when(() => getSongs.watchTopPlayed(limit: any(named: 'limit')))
+    when(() => getSongs.watchTopPlayed(
+            limit: any(named: 'limit'),
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
@@ -123,6 +127,7 @@ void main() {
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
           limit: any(named: 'limit'),
+          excludedFolders: any(named: 'excludedFolders'),
         )).thenAnswer((_) async => const Left(DatabaseFailure('offline')));
 
     await pumpScreen(tester);

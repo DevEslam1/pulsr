@@ -69,8 +69,7 @@ void main() {
     final player = stubPlayerCubit(
       PlayerState(queueSlice: QueueSlice(queue: songs)),
     );
-    when(() => player.playSong(any(), queue: any(named: 'queue')))
-        .thenAnswer((_) async {});
+    when(() => player.skipToQueueItem(any())).thenAnswer((_) async {});
 
     await tester.pumpWidget(build(player));
     await tester.pumpAndSettle();
@@ -78,7 +77,7 @@ void main() {
     await tester.tap(find.text('Alpha'));
     await tester.pump();
 
-    verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);
+    verify(() => player.skipToQueueItem(0)).called(1);
   });
 
   testWidgets('the overflow menu exposes shuffle, auto-mix, save and clear',

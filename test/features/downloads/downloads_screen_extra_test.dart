@@ -208,11 +208,11 @@ void main() {
 
     await tester.longPress(find.byType(DownloadTile).first);
     await tester.pump();
-    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.text('1 Selected'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.select_all_rounded));
     await tester.pump();
-    expect(find.text('4 selected'), findsOneWidget);
+    expect(find.text('4 Selected'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.deselect_rounded));
     await tester.pump();

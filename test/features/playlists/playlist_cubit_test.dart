@@ -76,7 +76,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
       expect(cubit.state.playlists.any((p) => p.id == playlistId), isTrue);
 
-      await cubit.deletePlaylist(playlistId);
+      expect(await cubit.deletePlaylist(playlistId), isTrue);
       await Future.delayed(const Duration(milliseconds: 50));
 
       expect(cubit.state.playlists.any((p) => p.id == playlistId), isFalse);

@@ -43,30 +43,36 @@ mixin SettingsAppearanceSection
                 ),
               ),
               const SizedBox(height: AppSpacing.s10),
-              SizedBox(
-                width: double.infinity,
-                child: PulsrSegmentedControl(
-                  fitLabels: true,
-                  segments: [
-                    PulsrSegment(
-                      label: context.l10n.systemDefault,
-                      icon: Icons.brightness_auto_rounded,
+              Opacity(
+                opacity: state.autoThemeByTime ? 0.45 : 1.0,
+                child: IgnorePointer(
+                  ignoring: state.autoThemeByTime,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: PulsrSegmentedControl(
+                      fitLabels: true,
+                      segments: [
+                        PulsrSegment(
+                          label: context.l10n.systemDefault,
+                          icon: Icons.brightness_auto_rounded,
+                        ),
+                        PulsrSegment(
+                          label: context.l10n.themeLight,
+                          icon: Icons.light_mode_rounded,
+                        ),
+                        PulsrSegment(
+                          label: context.l10n.themeDark,
+                          icon: Icons.dark_mode_rounded,
+                        ),
+                        PulsrSegment(
+                          label: context.l10n.amoledLabel,
+                          icon: Icons.contrast_rounded,
+                        ),
+                      ],
+                      selectedIndex: _themeModeOrder.indexOf(state.themeMode),
+                      onChanged: (i) => cubit.setThemeMode(_themeModeOrder[i]),
                     ),
-                    PulsrSegment(
-                      label: context.l10n.themeLight,
-                      icon: Icons.light_mode_rounded,
-                    ),
-                    PulsrSegment(
-                      label: context.l10n.themeDark,
-                      icon: Icons.dark_mode_rounded,
-                    ),
-                    PulsrSegment(
-                      label: context.l10n.amoledLabel,
-                      icon: Icons.contrast_rounded,
-                    ),
-                  ],
-                  selectedIndex: _themeModeOrder.indexOf(state.themeMode),
-                  onChanged: (i) => cubit.setThemeMode(_themeModeOrder[i]),
+                  ),
                 ),
               ),
             ],

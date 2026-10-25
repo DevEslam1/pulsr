@@ -127,8 +127,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   }
 
   Future<void> _performSeek(Duration position) async {
+    // Mid-fade seek: cancel() writes restoreVolume straight into the player,
+    // so the raw user volume would drop the track's replay-gain normalisation
+    // until the next load. Prefer the gain captured when the fade opened.
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-        restoreVolume: _volume);
+        restoreVolume: _preCrossfadeVolume ?? _volume);
     try {
       await _activePlayer.seek(position);
     } catch (_) {
@@ -148,7 +151,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // or swiping to another queue item must auto-play rather than load paused.
     // Mirrors the same guard in skipToNext/skipToPrevious; without it the
     // mini-player carousel swipe after a track ends parks the new song paused.
+    // Same intent window as skipToNext: the track being loaded is not paused,
+    // so a carousel swipe during preparation must keep playing.
     final wasPlaying = _activePlayer.playing ||
+        _pendingPlaybackStart ||
         _activePlayer.processingState == ProcessingState.completed;
     await loadQueue(_songs, initialIndex: index, autoPlay: wasPlaying);
   }
@@ -171,7 +177,15 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // A track that naturally completed has playing == false and
     // processingState == completed. The user was listening to it, so the
     // next track must auto-play instead of loading paused.
+    //
+    // _pendingPlaybackStart covers the other "not playing yet" window: while
+    // playSongAt() prepares the next source (pause/stop teardown, a YouTube
+    // resolve, setAudioSource) the transport reports playing == false even
+    // though playback is still wanted. Reading `playing` alone in that window
+    // took the _loadSongPaused() branch, which also CLEARS the pending-start
+    // intent, so the successor sat at 0:00 paused and nothing could start it.
     final wasPlaying = _activePlayer.playing ||
+        _pendingPlaybackStart ||
         _activePlayer.processingState == ProcessingState.completed;
 
     try {
@@ -183,16 +197,19 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         // Native advance: invalidate any in-flight manual playSongAt resolve so
         // a slow YouTube URL fetch cannot clobber the new current item.
         _playGeneration++;
+        // unawaited: just_audio's play() future only completes on the next
+        // pause/stop (and never if audio-session activation fails), so a skip
+        // must not park on it. Start order is unchanged.
         if (_activePlayer.hasNext && _songs.isNotEmpty) {
           await _activePlayer.seekToNext();
           if (wasPlaying) {
-            await _activePlayer.play();
+            unawaited(_activePlayer.play());
           }
         } else if (_activePlayer.loopMode == LoopMode.all &&
             _songs.isNotEmpty) {
           await _activePlayer.seek(Duration.zero, index: 0);
           if (wasPlaying) {
-            await _activePlayer.play();
+            unawaited(_activePlayer.play());
           }
         } else {
           // Native concat says "no next" — but it can desync from _songs
@@ -222,7 +239,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
                   .add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
               _notifyTrackChanged(song);
               if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
-                await _activePlayer.play();
+                unawaited(_activePlayer.play());
               } else {
                 await _activePlayer.pause();
               }
@@ -243,12 +260,14 @@ mixin PulsrAudioTransport on BaseAudioHandler {
           await _loadSongPaused(nextIdx, initialPosition: Duration.zero);
         }
       } else {
-        // True end-of-queue: Reset to track 0 instead of staying on the last track
+        // True end of queue with repeat off: stay on the final track instead of
+        // silently loading track 1 and pausing. Repeat-all still wraps.
         if (_songs.isNotEmpty) {
           if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
             await playSongAt(0);
           } else {
-            await _loadSongPaused(0, initialPosition: Duration.zero);
+            await _activePlayer.pause();
+            _broadcastState(_activePlayer.playbackEvent);
           }
         } else {
           await _activePlayer.seek(Duration.zero);
@@ -302,7 +321,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // makes previous resume it (and clear completed). This is intentionally
     // scoped to the user-driven skipToPrevious — the auto-advance skipToNext must
     // stay paused at end-of-queue so it doesn't loop the last track forever.
+    // Same intent window as skipToNext: a load in flight is not a pause.
     final wasPlaying = _activePlayer.playing ||
+        _pendingPlaybackStart ||
         _activePlayer.processingState == ProcessingState.completed;
 
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
@@ -312,7 +333,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
         await _activePlayer.seek(Duration.zero);
         if (wasPlaying) {
-          await _activePlayer.play();
+          unawaited(_activePlayer.play());
         }
         _saveCurrentPosition();
         return;
@@ -320,17 +341,17 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       if (_activePlayer.hasPrevious) {
         await _activePlayer.seekToPrevious();
         if (wasPlaying) {
-          await _activePlayer.play();
+          unawaited(_activePlayer.play());
         }
       } else if (_activePlayer.loopMode == LoopMode.all && _songs.isNotEmpty) {
         await _activePlayer.seek(Duration.zero, index: _songs.length - 1);
         if (wasPlaying) {
-          await _activePlayer.play();
+          unawaited(_activePlayer.play());
         }
       } else {
         await _activePlayer.seek(Duration.zero);
         if (wasPlaying) {
-          await _activePlayer.play();
+          unawaited(_activePlayer.play());
         }
         _saveCurrentPosition();
       }
@@ -339,7 +360,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
       await _activePlayer.seek(Duration.zero);
       if (wasPlaying) {
-        await _activePlayer.play();
+        unawaited(_activePlayer.play());
       }
       _saveCurrentPosition();
       return;
@@ -354,7 +375,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     } else {
       await _activePlayer.seek(Duration.zero);
       if (wasPlaying) {
-        await _activePlayer.play();
+        unawaited(_activePlayer.play());
       }
       _saveCurrentPosition();
     }

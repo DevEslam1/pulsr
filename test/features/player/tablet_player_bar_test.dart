@@ -105,7 +105,8 @@ void main() {
         duration: const Duration(seconds: 180),
         repeatMode: repeat,
       ),
-      queueSlice: const QueueSlice(queue: [testSong], currentIndex: 0),
+      queueSlice:
+          const QueueSlice(queue: [testSong, testSong], currentIndex: 0),
       dsp: const DspSlice(isEqEnabled: true),
     );
   }

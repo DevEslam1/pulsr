@@ -4,6 +4,7 @@ import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../models/smart_playlist_criteria.dart';
+import '../models/ytm_track.dart';
 import '../repositories/music_repository_interface.dart';
 
 @singleton
@@ -63,6 +64,63 @@ class PlaylistUseCases {
   Future<Result<void>> reorderPlaylistSongs(
       int playlistId, List<int> orderedSongIds) {
     return _repository.reorderPlaylistSongs(playlistId, orderedSongIds);
+  }
+
+  // --- ONLINE LIBRARY CACHE ---
+  Stream<Result<List<YtmTrack>>> watchOnlinePlaylistTracks(String playlistId) {
+    return _repository.watchOnlinePlaylistTracks(playlistId);
+  }
+
+  Future<Result<List<YtmTrack>>> getOnlinePlaylistTracks(String playlistId) {
+    return _repository.getOnlinePlaylistTracks(playlistId);
+  }
+
+  Future<Result<OnlinePlaylistsTableData?>> getOnlinePlaylist(
+      String playlistId) {
+    return _repository.getOnlinePlaylist(playlistId);
+  }
+
+  Future<Result<List<OnlinePlaylistsTableData>>> getOnlinePlaylists() {
+    return _repository.getOnlinePlaylists();
+  }
+
+  Future<Result<void>> cacheOnlinePlaylist({
+    required String playlistId,
+    required String kind,
+    required String title,
+    String author = '',
+    String? artworkUrl,
+    int sortOrder = 0,
+    required List<YtmTrack> tracks,
+    bool fullSnapshot = true,
+  }) {
+    return _repository.cacheOnlinePlaylist(
+      playlistId: playlistId,
+      kind: kind,
+      title: title,
+      author: author,
+      artworkUrl: artworkUrl,
+      sortOrder: sortOrder,
+      tracks: tracks,
+      fullSnapshot: fullSnapshot,
+    );
+  }
+
+  Future<Result<void>> reorderOnlinePlaylistTracks(
+      String playlistId, List<String> orderedVideoIds) {
+    return _repository.reorderOnlinePlaylistTracks(playlistId, orderedVideoIds);
+  }
+
+  Future<Result<void>> renameOnlinePlaylist(String playlistId, String newTitle) {
+    return _repository.renameOnlinePlaylist(playlistId, newTitle);
+  }
+
+  Future<Result<void>> removeOnlinePlaylist(String playlistId) {
+    return _repository.removeOnlinePlaylist(playlistId);
+  }
+
+  Future<Result<void>> clearOnlineLibraryCache() {
+    return _repository.clearOnlineLibraryCache();
   }
 
   Future<void> seedDefaultSmartPlaylists() async {

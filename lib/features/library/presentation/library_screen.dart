@@ -29,7 +29,6 @@ import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
-import '../../../core/utils/formatters.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/add_to_playlist_sheet.dart';
@@ -96,16 +95,15 @@ enum LibraryTabItem {
   String subtitle(BuildContext context, LibraryState state) {
     switch (this) {
       case LibraryTabItem.songs:
-        return Formatters.formatSongCount(state.songs.length);
+        return context.l10n.songsCount(state.songs.length);
       case LibraryTabItem.downloaded:
-        final count = state.songs.where(isDownloadedOnlineTrack).length;
-        return '$count ${context.l10n.downloaded.toLowerCase()}';
+        return '${state.downloadedSongs.length} ${context.l10n.downloaded.toLowerCase()}';
       case LibraryTabItem.albums:
         return '${state.albums.length} ${context.l10n.albums.toLowerCase()}';
       case LibraryTabItem.artists:
         return '${state.artists.length} ${context.l10n.artists.toLowerCase()}';
       case LibraryTabItem.favorites:
-        return Formatters.formatSongCount(state.favorites.length);
+        return context.l10n.songsCount(state.favorites.length);
       case LibraryTabItem.folders:
         return '${state.folders.length} ${context.l10n.folders.toLowerCase()}';
       case LibraryTabItem.genres:
@@ -209,11 +207,43 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   /// Remember the user's last library surface so reopening Library resumes
   /// where they left off (e.g. Albums) instead of always snapping to Songs.
+  LibraryTabItem? get _activeTab {
+    final index = _tabController.index;
+    if (index < 0 || index >= _activeTabs.length) return null;
+    return _activeTabs[index];
+  }
+
+  /// Select-all is scoped to what the current tab is actually showing. The
+  /// Songs tab may select the whole library (bounded); Favorites and Downloaded
+  /// must only select rows from their own filtered list.
+  void _selectAllInCurrentTab(LibraryState state, LibraryCubit cubit) {
+    switch (_activeTab) {
+      case LibraryTabItem.favorites:
+        final favorites = state.favorites.where((s) =>
+            _favTabFilter == 0 ? !_isOnlineFavorite(s) : _isOnlineFavorite(s));
+        cubit.selectSongs(favorites.map((s) => s.id));
+      case LibraryTabItem.downloaded:
+        cubit.selectSongs(state.downloadedSongs.map((s) => s.id));
+      case LibraryTabItem.songs:
+      case null:
+        cubit.selectAllSongs();
+      case LibraryTabItem.albums:
+      case LibraryTabItem.artists:
+      case LibraryTabItem.folders:
+      case LibraryTabItem.genres:
+      case LibraryTabItem.years:
+        cubit.selectSongs(state.songs.map((s) => s.id));
+    }
+  }
+
   void _onTabChanged() {
     if (!mounted) return;
     if (_tabController.indexIsChanging) return;
     final index = _tabController.index;
     if (index == _lastPersistedTab) return;
+    // Selection is scoped to the list it started in. Carrying it into another
+    // tab would let a batch action hit rows the user can no longer see.
+    context.read<LibraryCubit>().clearSelection();
     _persistTabTimer?.cancel();
     _persistTabTimer = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
@@ -575,6 +605,11 @@ class _LibraryScreenState extends State<LibraryScreen>
         final cubit = context.read<LibraryCubit>();
         final playerCubit = context.read<PlayerCubit>();
         final isMultiSelect = state.isMultiSelectMode;
+        // Collection tabs (Albums/Artists/Folders/Genres/Years) use the fixed
+        // repository order, so the global sort control would silently do
+        // nothing there. Keep it active only on Songs (and Favorites/Downloads,
+        // which share the song ordering).
+        final canSort = _activeTab == LibraryTabItem.songs;
         final p = context.palette;
 
         return Scaffold(
@@ -605,7 +640,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                           minHeight: AppSpacing.minTouchTarget),
                       icon: const Icon(Icons.select_all_rounded),
                       tooltip: context.l10n.selectAllAction,
-                      onPressed: () => cubit.selectAllSongs(),
+                      onPressed: () => _selectAllInCurrentTab(state, cubit),
                     ),
                     FilledButton.tonalIcon(
                       style: FilledButton.styleFrom(
@@ -671,16 +706,21 @@ class _LibraryScreenState extends State<LibraryScreen>
                           minWidth: AppSpacing.minTouchTarget,
                           minHeight: AppSpacing.minTouchTarget),
                       icon: const Icon(Icons.sort_rounded),
-                      color: (state.sortBy != 'title' || state.ascending)
-                          ? p.accent
-                          : p.textSecondary,
+                      color: !canSort
+                          ? p.textTertiary
+                          : (state.sortBy != 'title' || state.ascending)
+                              ? p.accent
+                              : p.textSecondary,
                       tooltip: context.l10n.sortBy,
-                      onPressed: () => SortFilterSheet.show(
-                        context,
-                        currentSort: state.sortBy,
-                        ascending: state.ascending,
-                        onApply: (sort, asc) => cubit.updateSort(sort, asc),
-                      ),
+                      onPressed: canSort
+                          ? () => SortFilterSheet.show(
+                                context,
+                                currentSort: state.sortBy,
+                                ascending: state.ascending,
+                                onApply: (sort, asc) =>
+                                    cubit.updateSort(sort, asc),
+                              )
+                          : null,
                     ),
                     const SizedBox(width: AppSpacing.xs),
                   ],
@@ -753,7 +793,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         content = Text(context.l10n.songs);
         break;
       case LibraryTabItem.downloaded:
-        final count = state.songs.where(isDownloadedOnlineTrack).length;
+        final count = state.downloadedSongs.length;
         content = Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1438,5 +1478,3 @@ class _LayoutToggleButton extends StatelessWidget {
     );
   }
 }
-
-

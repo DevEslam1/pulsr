@@ -188,13 +188,24 @@ void main() {
             '/hidden-folders',
           ]));
 
-      // YTM routes are compile-time gated off in the default flavor.
-      // /browse is always registered and redirects appropriately.
-      expect(paths, isNot(contains('/ytm-search')));
-      expect(paths, isNot(contains('/ytm-explore')));
-      expect(paths, isNot(contains('/online-playlist')));
-      expect(paths, contains('/browse'));
-      expect(paths, isNot(contains('/downloads')));
+      // YTM routes are compile-time gated; /browse always redirects.
+      if (AppConfig.ytmEnabled) {
+        expect(
+            paths,
+            containsAll(<String>[
+              '/ytm-search',
+              '/ytm-explore',
+              '/online-playlist',
+              '/downloads',
+              '/browse',
+            ]));
+      } else {
+        expect(paths, isNot(contains('/ytm-search')));
+        expect(paths, isNot(contains('/ytm-explore')));
+        expect(paths, isNot(contains('/online-playlist')));
+        expect(paths, isNot(contains('/downloads')));
+        expect(paths, contains('/browse'));
+      }
 
       final names =
           goRoutes.map((route) => route.name).whereType<String>().toList();
@@ -263,18 +274,20 @@ void main() {
         '/downloads',
         '/online-playlist',
       ]) {
-        expect(redirect(context, stateFor(path)), '/', reason: path);
+        expect(redirect(context, stateFor(path)),
+            AppConfig.ytmEnabled ? null : '/',
+            reason: path);
       }
       expect(redirect(context, stateFor('/library')), isNull);
       expect(redirect(context, stateFor('/')), isNull);
     });
 
-    testWidgets('/browse redirect leads to /search in non-YTM builds',
-        (tester) async {
+    testWidgets('/browse redirect follows the YTM build gate', (tester) async {
       await pumpContext(tester);
       final redirect = routeFor('/browse').redirect;
       expect(redirect, isNotNull);
-      expect(redirect!(context, stateFor('/browse')), '/search');
+      expect(redirect!(context, stateFor('/browse')),
+          AppConfig.ytmEnabled ? '/ytm-search' : '/search');
     });
 
     testWidgets('cloud backup redirect follows AppConfig.isCloudSyncAllowed',

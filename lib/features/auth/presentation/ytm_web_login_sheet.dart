@@ -207,6 +207,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
 
   bool _isLoggedIn = false;
+  bool _finishing = false;
   String? _detectedCookies;
   bool _showHint = false;
   Timer? _hintTimer;
@@ -878,6 +879,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   }
 
   Future<void> _forceSaveAndFinish() async {
+    if (_finishing) return;
+    _finishing = true;
     final accountService = getIt<YtmAccountService>();
     var cookies = _detectedCookies;
 
@@ -959,6 +962,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       }
     }
 
+    _finishing = false;
     if (mounted) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(

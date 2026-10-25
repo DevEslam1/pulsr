@@ -20,6 +20,9 @@ abstract class LibraryState with _$LibraryState {
     @Default([]) List<GenreItem> genres,
     @Default([]) List<YearItem> years,
     @Default([]) List<SongsTableData> favorites,
+    /// Full downloaded list, streamed independently of the paginated [songs]
+    /// window so downloads outside the loaded page are visible and counted.
+    @Default([]) List<SongsTableData> downloadedSongs,
     @Default([]) List<FolderItem> folders,
     @Default('title') String sortBy,
     @Default(true) bool ascending,

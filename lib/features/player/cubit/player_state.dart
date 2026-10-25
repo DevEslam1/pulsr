@@ -468,9 +468,18 @@ abstract class PlayerState with _$PlayerState {
   bool _hasQueueNeighbour({required bool forward}) {
     final length =
         queue.isNotEmpty ? queue.length : (currentSong != null ? 1 : 0);
-    if (length <= 1) return false;
-    if (isShuffle) return true;
-    if (repeatMode == PlayerRepeatMode.all) return true;
-    return forward ? currentIndex + 1 < length : currentIndex > 0;
+    if (forward) {
+      if (length <= 1) return false;
+      if (isShuffle) return true;
+      if (repeatMode == PlayerRepeatMode.all) return true;
+      return currentIndex + 1 < length;
+    }
+    // Previous always has useful work at index 0: restart the current track
+    // after 3s, or jump to queue history. The button used to be disabled
+    // exactly when both paths were reachable.
+    if (isShuffle || repeatMode == PlayerRepeatMode.all) return true;
+    return currentIndex > 0 ||
+        position > const Duration(seconds: 3) ||
+        queueHistory.isNotEmpty;
   }
 }

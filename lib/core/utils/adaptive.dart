@@ -130,7 +130,13 @@ abstract class Adaptive {
     final available = (w - railWidth).clamp(0.0, maxContentWidth);
     final usable = available - pagePadding(context) * 2;
     final calculated = (usable / minItemWidth).floor();
-    return calculated.clamp(phoneColumns, maxColumns);
+    final requested = calculated.clamp(phoneColumns, maxColumns);
+    // Respect the caller's minimum card width on very narrow phones instead of
+    // forcing a second column that clips artwork and labels.
+    if (usable < 320 && usable < minItemWidth * requested) {
+      return calculated < 1 ? 1 : calculated;
+    }
+    return requested;
   }
 
   static double pagePadding(BuildContext context) {

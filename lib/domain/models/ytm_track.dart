@@ -1,6 +1,40 @@
 // lib/domain/models/ytm_track.dart
 import '../../data/db/app_database.dart';
 
+/// Stable cache id for the private Liked Music playlist.
+const String kLikedMusicPlaylistId = 'VLLM';
+
+/// Normalises a YouTube Music playlist URL or id to the single key used by the
+/// local online-library cache.
+///
+/// Accepts full URLs (`...?list=PL123`), `VL`-prefixed browse ids and the
+/// several aliases YouTube uses for Liked Music. Without this, opening the
+/// same playlist from a pasted URL and from the account list would create two
+/// independent caches and two independent orders.
+String canonicalYtmPlaylistId(String raw) {
+  var id = raw.trim();
+  if (id.isEmpty) return id;
+
+  final listParam = Uri.tryParse(id)?.queryParameters['list'];
+  if (listParam != null && listParam.isNotEmpty) {
+    id = listParam;
+  }
+
+  if (id.startsWith('VL') && id != kLikedMusicPlaylistId && id.length > 2) {
+    id = id.substring(2);
+  }
+
+  const likedAliases = {
+    'LM',
+    'LL',
+    'SE',
+    'VLLM',
+    'FEmusic_liked_videos',
+    'FEmusic_liked_tracks',
+  };
+  return likedAliases.contains(id) ? kLikedMusicPlaylistId : id;
+}
+
 /// A YouTube Music search result, before it has any row in the database.
 class YtmTrack {
   final String videoId;

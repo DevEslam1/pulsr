@@ -11,8 +11,10 @@ class GetYearsUseCase {
 
   GetYearsUseCase(this._repository);
 
-  Stream<Result<List<YearItem>>> watchYears() {
-    return _repository.watchYears();
+  Stream<Result<List<YearItem>>> watchYears({
+    List<String> excludedFolders = const [],
+  }) {
+    return _repository.watchYears(excludedFolders: excludedFolders);
   }
 
   Stream<Result<List<SongsTableData>>> watchYearSongs(int year) {

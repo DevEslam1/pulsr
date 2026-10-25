@@ -144,11 +144,8 @@ class PlayerTransportController {
 
   Future<void> seek(Duration position) => _seekThrottle.seek(position);
 
-  /// Drops any coalesced trailing seek. Wired into every track-change path
-  /// (skips, queue loads, slot switches) so a pending seek for the old track
-  /// never lands on the new one.
+  /// Drops any coalesced trailing seek before a track change.
   void cancelPendingSeek() => _seekThrottle.cancelPending();
-
   Future<void> next() async {
     _seekThrottle.cancelPending();
     try {
@@ -163,7 +160,6 @@ class PlayerTransportController {
       }
     }
   }
-
   Future<void> previous() async {
     _seekThrottle.cancelPending();
     final state = _getState();
@@ -338,16 +334,15 @@ class PlayerTransportController {
           if (_slotLookupCache != null) {
             final cached = _slotLookupCache![songId];
             if (cached != null) {
-              _slotLookupCache![songId] =
-                  cached.copyWith(isFavorite: isFav)
-                    ..isAutoplay = cached.isAutoplay;
+              _slotLookupCache![songId] = cached.copyWith(isFavorite: isFav)
+                ..isAutoplay = cached.isAutoplay;
             }
           }
           _debouncedPersistQueueSlots?.call();
           if (state.currentSong != null && state.currentSong!.id == songId) {
-            final updatedCurrent =
-                state.currentSong!.copyWith(isFavorite: isFav)
-                  ..isAutoplay = state.currentSong!.isAutoplay;
+            final updatedCurrent = state.currentSong!
+                .copyWith(isFavorite: isFav)
+              ..isAutoplay = state.currentSong!.isAutoplay;
             _emit(
               state.copyWith(
                 playback: state.playback.copyWith(

@@ -9,7 +9,6 @@ import '../../core/utils/l10n_extensions.dart';
 import '../../core/widgets/pulsr_back_button.dart';
 import '../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../core/widgets/pulsr_dialog.dart';
-import '../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import 'artwork_picker.dart';
@@ -48,6 +47,29 @@ class _TagEditorView extends StatefulWidget {
 }
 
 class _TagEditorViewState extends State<_TagEditorView> {
+  bool _allowPop = false;
+
+  Future<void> _confirmExit(BuildContext context, TagEditorCubit cubit) async {
+    if (cubit.state.status == TagEditorStatus.saving) return;
+    if (!cubit.hasUnsavedChanges) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    final discard = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: context.l10n.discardChangesTitle,
+      message: context.l10n.discardChangesBody,
+      confirmLabel: context.l10n.discard,
+      isDestructive: true,
+    );
+    if (discard == true && context.mounted) {
+      setState(() => _allowPop = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).maybePop();
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -223,7 +245,11 @@ class _TagEditorViewState extends State<_TagEditorView> {
                 backgroundColor: p.accent,
               ),
             );
-          Navigator.of(context).pop(true);
+          _allowPop = true;
+          if (mounted) setState(() {});
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) Navigator.of(context).pop(true);
+          });
         } else if (state.status == TagEditorStatus.failure ||
             state.errorMessage != null) {
           messenger
@@ -242,7 +268,11 @@ class _TagEditorViewState extends State<_TagEditorView> {
         final isLoading = state.status == TagEditorStatus.loading;
         final isAutoFetching = state.isAutoFetching;
 
-        return PulsrPagePopScope(
+        return PopScope(
+          canPop: _allowPop || !cubit.hasUnsavedChanges,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) _confirmExit(context, cubit);
+          },
           child: Scaffold(
             backgroundColor: p.bg,
             appBar: _TagEditorAppBar(
@@ -250,6 +280,7 @@ class _TagEditorViewState extends State<_TagEditorView> {
               cubit: cubit,
               isSaving: isSaving,
               isAutoFetching: isAutoFetching,
+              onExit: () => _confirmExit(context, cubit),
             ),
             body: isLoading
                 ? Center(child: CircularProgressIndicator(color: p.accent))
@@ -272,12 +303,14 @@ class _TagEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.cubit,
     required this.isSaving,
     required this.isAutoFetching,
+    required this.onExit,
   });
 
   final TagEditorState state;
   final TagEditorCubit cubit;
   final bool isSaving;
   final bool isAutoFetching;
+  final VoidCallback onExit;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -288,7 +321,7 @@ class _TagEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       backgroundColor: p.bg,
       elevation: 0,
-      leading: const PulsrBackButton(),
+      leading: PulsrBackButton(onPressed: onExit),
       title: Text(
         state.isBatchMode
             ? '${context.l10n.browseBatchEdit} (${state.batchSongs.length} ${context.l10n.browseTracks})'

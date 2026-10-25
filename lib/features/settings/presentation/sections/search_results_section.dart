@@ -728,6 +728,15 @@ mixin SettingsSearchResults
       _SearchItem(
         categoryId: 'library',
         category: libraryCat,
+        title: context.l10n.quranMode,
+        subtitle: context.l10n.settingsQuranModeSubtitle,
+        icon: Icons.menu_book_rounded,
+        keywords: ['quran', 'recitation', 'surah', 'ayah', 'islam'],
+        onTap: () => context.push('/quran-mode'),
+      ),
+      _SearchItem(
+        categoryId: 'library',
+        category: libraryCat,
         title: context.l10n.hiddenAndExcludedFolders,
         subtitle: context.l10n.settingsSearchHiddenFoldersSubtitle,
         icon: Icons.folder_off_rounded,

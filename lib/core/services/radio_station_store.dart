@@ -33,8 +33,70 @@ class RadioStationStore {
     'cur-quran-abdulbasit': abdulBasitArtwork,
   };
 
+  /// Resolves matching curated Sheikh/station artwork from assets by ID, URL, or name keywords.
+  static String? resolveArtworkForStation({
+    String? id,
+    String? name,
+    String? url,
+  }) {
+    final lowerId = id?.toLowerCase().trim() ?? '';
+    final lowerUrl = url?.toLowerCase().trim() ?? '';
+    final lowerName = name?.toLowerCase().trim() ?? '';
+
+    // Cairo Quran Radio
+    if (lowerId == 'cur-quran-cairo' ||
+        lowerId == 'cur-quran-cairo-backup' ||
+        lowerUrl.contains('8s5u') ||
+        lowerUrl.contains('quran-cairo') ||
+        lowerName.contains('القاهرة') ||
+        lowerName.contains('القرآن الكريم') ||
+        lowerName.contains('القران الكريم')) {
+      return quranCairoArtwork;
+    }
+
+    // Minshawi
+    if (lowerId == 'cur-quran-minshawi' ||
+        lowerUrl.contains('minshawi') ||
+        lowerName.contains('منشاوي') ||
+        lowerName.contains('المنشاوي') ||
+        lowerName.contains('minshawi')) {
+      return minshawiArtwork;
+    }
+
+    // Abdulbasit
+    if (lowerId == 'cur-quran-abdulbasit' ||
+        lowerUrl.contains('abdulbasit') ||
+        lowerUrl.contains('abdulsamad') ||
+        lowerName.contains('عبد الباسط') ||
+        lowerName.contains('عبدالباسط') ||
+        lowerName.contains('عبد الصمد') ||
+        lowerName.contains('عبدالصمد') ||
+        lowerName.contains('abdulbasit')) {
+      return abdulBasitArtwork;
+    }
+
+    // Mustafa Ismail
+    if (lowerId == 'cur-quran-mustafa' ||
+        lowerUrl.contains('mustafa_ismail') ||
+        lowerName.contains('مصطفى إسماعيل') ||
+        lowerName.contains('مصطفي اسماعيل') ||
+        lowerName.contains('مسطفي اسماعيل') ||
+        lowerName.contains('مصطفى اسماعيل') ||
+        lowerName.contains('mustafa')) {
+      return mustafaIsmailArtwork;
+    }
+
+    if (id != null && _curatedArtwork.containsKey(id)) {
+      return _curatedArtwork[id];
+    }
+
+    return null;
+  }
+
   static final List<RadioStation> _stations = [];
   late final Future<void> ready;
+  bool _loadFailed = false;
+  bool get loadFailed => _loadFailed;
 
   @visibleForTesting
   static void resetForTesting() {
@@ -50,8 +112,19 @@ class RadioStationStore {
 
   Future<void> add(RadioStation station) async {
     if (!RadioStation.isHttpUrl(station.url)) return;
-    _stations.removeWhere((s) => s.id == station.id || s.url == station.url);
-    _stations.insert(0, station);
+    final effectiveStation =
+        (station.artworkUrl == null || station.artworkUrl!.isEmpty)
+            ? station.copyWith(
+                artworkUrl: resolveArtworkForStation(
+                  id: station.id,
+                  name: station.name,
+                  url: station.url,
+                ),
+              )
+            : station;
+    _stations.removeWhere(
+        (s) => s.id == effectiveStation.id || s.url == effectiveStation.url);
+    _stations.insert(0, effectiveStation);
     if (_stations.length > maxEntries) {
       _stations.removeRange(maxEntries, _stations.length);
     }
@@ -70,9 +143,20 @@ class RadioStationStore {
   /// Returns false (touching nothing) when [updated] is not a valid URL.
   Future<bool> replace(RadioStation previous, RadioStation updated) async {
     if (!RadioStation.isHttpUrl(updated.url)) return false;
+    final effectiveUpdated =
+        (updated.artworkUrl == null || updated.artworkUrl!.isEmpty)
+            ? updated.copyWith(
+                artworkUrl: resolveArtworkForStation(
+                  id: updated.id,
+                  name: updated.name,
+                  url: updated.url,
+                ),
+              )
+            : updated;
     _stations.removeWhere((s) => s.id == previous.id);
-    _stations.removeWhere((s) => s.id == updated.id || s.url == updated.url);
-    _stations.insert(0, updated);
+    _stations.removeWhere((s) =>
+        s.id == effectiveUpdated.id || s.url == effectiveUpdated.url);
+    _stations.insert(0, effectiveUpdated);
     if (_stations.length > maxEntries) {
       _stations.removeRange(maxEntries, _stations.length);
     }
@@ -86,8 +170,19 @@ class RadioStationStore {
     var accepted = 0;
     for (final station in stations) {
       if (!RadioStation.isHttpUrl(station.url)) continue;
-      _stations.removeWhere((s) => s.id == station.id || s.url == station.url);
-      _stations.insert(0, station);
+      final effectiveStation =
+          (station.artworkUrl == null || station.artworkUrl!.isEmpty)
+              ? station.copyWith(
+                  artworkUrl: resolveArtworkForStation(
+                    id: station.id,
+                    name: station.name,
+                    url: station.url,
+                  ),
+                )
+              : station;
+      _stations.removeWhere(
+          (s) => s.id == effectiveStation.id || s.url == effectiveStation.url);
+      _stations.insert(0, effectiveStation);
       if (_stations.length > maxEntries) {
         _stations.removeRange(maxEntries, _stations.length);
       }
@@ -111,6 +206,7 @@ class RadioStationStore {
   }
 
   Future<void> load() async {
+    _loadFailed = false;
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(prefsKey);
@@ -133,6 +229,17 @@ class RadioStationStore {
           station = migratedStation;
           migrated = true;
         }
+        if (station.artworkUrl == null || station.artworkUrl!.isEmpty) {
+          final autoArt = resolveArtworkForStation(
+            id: station.id,
+            name: station.name,
+            url: station.url,
+          );
+          if (autoArt != null) {
+            station = station.copyWith(artworkUrl: autoArt);
+            migrated = true;
+          }
+        }
         if (station.url.isNotEmpty && RadioStation.isHttpUrl(station.url)) {
           _stations.add(station);
         }
@@ -142,6 +249,7 @@ class RadioStationStore {
         await persist();
       }
     } catch (e, st) {
+      _loadFailed = true;
       ErrorLogger.log('Failed to load radio stations',
           error: e, stackTrace: st, category: 'RadioStationStore');
     }
@@ -165,7 +273,11 @@ class RadioStationStore {
         updated = updated.copyWith(name: updatedName, url: updatedUrl);
       }
     }
-    final artwork = _curatedArtwork[updated.id];
+    final artwork = resolveArtworkForStation(
+      id: updated.id,
+      name: updated.name,
+      url: updated.url,
+    );
     if (artwork != null &&
         (updated.artworkUrl == null || updated.artworkUrl!.isEmpty)) {
       updated = updated.copyWith(artworkUrl: artwork);

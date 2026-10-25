@@ -101,7 +101,9 @@ void main() {
           );
 
       final download = Completer<Result<int>>();
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) => download.future);
 
       expect((await repo.queueDownload(task('abcdefghijk'))).isRight(), isTrue);
@@ -119,8 +121,9 @@ void main() {
     test('a progress tick after delete does not resurrect the task', () async {
       void Function(YtDownloadProgress)? onProgress;
       final download = Completer<Result<int>>();
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((invocation) {
+      when(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((invocation) {
         onProgress = invocation.namedArguments[const Symbol('onProgress')]
             as void Function(YtDownloadProgress)?;
         return download.future;
@@ -142,8 +145,9 @@ void main() {
 
   group('stale failure/speed/eta text', () {
     test('completion clears error, speed and eta', () async {
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((invocation) async {
+      when(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((invocation) async {
         final onProgress = invocation.namedArguments[const Symbol('onProgress')]
             as void Function(YtDownloadProgress)?;
         onProgress?.call(const YtDownloadProgress(
@@ -163,8 +167,9 @@ void main() {
     });
 
     test('failure clears stale speed and eta', () async {
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((invocation) async {
+      when(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((invocation) async {
         final onProgress = invocation.namedArguments[const Symbol('onProgress')]
             as void Function(YtDownloadProgress)?;
         onProgress?.call(const YtDownloadProgress(
@@ -185,8 +190,9 @@ void main() {
     test('retry clears the previous failure, speed and eta', () async {
       var calls = 0;
       final pending = Completer<Result<int>>();
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((invocation) {
+      when(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((invocation) {
         calls++;
         if (calls == 1) {
           final onProgress =

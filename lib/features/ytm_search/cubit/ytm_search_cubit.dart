@@ -213,7 +213,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       return;
     }
     final gen = _generation;
-    safeEmit(state.copyWith(isLoading: true));
+    safeEmit(state.copyWith(isLoading: true, loadMoreFailed: false));
     try {
       final more = await _service.searchWithFallback(query, limit: nextLimit);
       if (gen != _generation || isClosed) return;
@@ -236,7 +236,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       if (gen != _generation || isClosed) return;
       ErrorLogger.log('Failed to load more YTM search results',
           error: e, stackTrace: st, category: 'YtmSearchCubit');
-      safeEmit(state.copyWith(isLoading: false));
+      safeEmit(state.copyWith(isLoading: false, loadMoreFailed: true));
     }
   }
 
@@ -330,6 +330,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       safeEmit(state.copyWith(
           results: List<YtmTrack>.unmodifiable(results),
           isLoading: false,
+          loadMoreFailed: false,
           errorMessage: null));
       if (results.isNotEmpty) unawaited(_saveToHistory(query));
       // Speculative warm: the first [_warmTopN] hits are the taps users make

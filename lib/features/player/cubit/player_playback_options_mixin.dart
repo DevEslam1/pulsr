@@ -142,8 +142,9 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> resetQuranProfile() =>
       playbackOptionsController.resetQuranProfile();
 
-  Future<bool> updateLyrics(List<LyricsLine> lines) =>
-      playbackOptionsController.updateLyrics(lines);
+  Future<bool> updateLyrics(List<LyricsLine> lines, {int? expectedSongId}) =>
+      playbackOptionsController.updateLyrics(lines,
+          expectedSongId: expectedSongId);
 
   Future<void> refreshLyrics() => playbackOptionsController.refreshLyrics();
 

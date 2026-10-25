@@ -56,7 +56,11 @@ void main() {
 
   Future<void> pumpScreen(
       WidgetTester tester, List<SongsTableData> songs) async {
-    when(() => repo.getAllSongs()).thenAnswer((_) async => Right(songs));
+    when(() => repo.getExcludedFolderPaths())
+        .thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => Right(songs));
     await tester.pumpWidget(
       MultiBlocProvider(
         providers: [BlocProvider<PlayerCubit>.value(value: cubit)],
@@ -227,5 +231,79 @@ void main() {
 
     expect(find.text('Identical Title & Artist (2 copies)'), findsOneWidget);
     expect(find.text('2 tracks'), findsOneWidget);
+  });
+
+  testWidgets('a failed scan shows an error state instead of the clean message',
+      (tester) async {
+    when(() => repo.getExcludedFolderPaths())
+        .thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => throw Exception('db down'));
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [BlocProvider<PlayerCubit>.value(value: cubit)],
+        child: MaterialApp(
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const DuplicateFinderScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Failed to fetch'), findsOneWidget);
+    expect(find.text('No Duplicates Found!'), findsNothing);
+    expect(find.text('Your library is cleanly organized.'), findsNothing);
+
+    // Retry recovers to the real (empty) result.
+    when(() => repo.getAllSongs(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => const Right([]));
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('No Duplicates Found!'), findsOneWidget);
+  });
+
+  testWidgets('bulk cleanup deletes every non-kept duplicate after confirmation',
+      (tester) async {
+    when(() => repo.deleteSongs(any(that: equals([2]))))
+        .thenAnswer((_) async => const Right(null));
+
+    await pumpScreen(tester, [
+      song(
+          id: 1,
+          path: '/storage/music/Comfortably Numb.flac',
+          bitrateKbps: 950),
+      song(
+          id: 2,
+          title: 'comfortably numb',
+          path: '/storage/music/Comfortably Numb.mp3',
+          bitrateKbps: 320),
+    ]);
+
+    await tester.tap(find.byIcon(Icons.auto_awesome_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Kept'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.delete_sweep_rounded));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+          'Are you sure you want to permanently delete 1 songs from your device?'),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.deleteSongs(any(that: equals([2])))).called(1);
+    expect(find.text('No Duplicates Found!'), findsOneWidget);
   });
 }

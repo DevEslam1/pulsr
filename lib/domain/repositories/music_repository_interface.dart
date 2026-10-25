@@ -20,6 +20,7 @@ abstract class IMusicRepository {
     bool ascending = true,
     int? limit,
     int? offset,
+    List<String> excludedFolders = const [],
   });
 
   /// Lightweight song entry used for folder aggregation with artwork metadata.
@@ -87,6 +88,12 @@ abstract class IMusicRepository {
   Future<Result<List<SongsTableData>>> getFavorites();
   Future<Result<int>> importOnlineTracksAsFavorites(List<YtmTrack> tracks);
 
+  /// Every downloaded row in the database (not limited to the paginated
+  /// library window). Callers apply the shared download classifier on top.
+  Stream<Result<List<SongsTableData>>> watchDownloadedSongs({
+    List<String> excludedFolders = const [],
+  });
+
   /// Returns a `songs.id` that is guaranteed to exist, so FK-constrained
   /// children (playlists, queue) can reference [song].
   ///
@@ -96,13 +103,28 @@ abstract class IMusicRepository {
   /// (without marking it favorite). Fails when no row can be established.
   Future<Result<int>> ensureSongPersisted(SongsTableData song);
 
-  Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20});
-  Future<Result<List<SongsTableData>>> getRecentlyPlayed({int limit = 20});
+  Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({
+    int limit = 20,
+    List<String> excludedFolders = const [],
+  });
+  Future<Result<List<SongsTableData>>> getRecentlyPlayed({
+    int limit = 20,
+    List<String> excludedFolders = const [],
+  });
   Future<Result<void>> clearRecentlyPlayed();
 
-  Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int? limit});
-  Future<Result<List<SongsTableData>>> getRecentlyAdded({int? limit = 20});
-  Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30});
+  Stream<Result<List<SongsTableData>>> watchRecentlyAdded({
+    int? limit,
+    List<String> excludedFolders = const [],
+  });
+  Future<Result<List<SongsTableData>>> getRecentlyAdded({
+    int? limit = 20,
+    List<String> excludedFolders = const [],
+  });
+  Stream<Result<List<SongsTableData>>> watchTopPlayed({
+    int limit = 30,
+    List<String> excludedFolders = const [],
+  });
 
   Future<Result<bool>> toggleFavorite(int songId);
   Future<Result<void>> recordPlayHistory(int songId, {bool completed = false});
@@ -153,6 +175,38 @@ abstract class IMusicRepository {
   Future<Result<void>> removeSongFromPlaylist(int playlistId, int songId);
   Future<Result<void>> reorderPlaylistSongs(
       int playlistId, List<int> orderedSongIds);
+
+  // --- ONLINE LIBRARY CACHE ---
+  /// Cached tracks for an online playlist, ordered by the user's saved order.
+  Stream<Result<List<YtmTrack>>> watchOnlinePlaylistTracks(String playlistId);
+  Future<Result<List<YtmTrack>>> getOnlinePlaylistTracks(String playlistId);
+  Future<Result<OnlinePlaylistsTableData?>> getOnlinePlaylist(
+      String playlistId);
+  Future<Result<List<OnlinePlaylistsTableData>>> getOnlinePlaylists();
+
+  /// Upserts playlist metadata and its full track snapshot.
+  ///
+  /// When the playlist already has a custom order, the merge keeps that order
+  /// for tracks still present remotely and appends new tracks at the end.
+  /// [fullSnapshot] is false when seeding a preview so the row is not marked
+  /// as freshly cached.
+  Future<Result<void>> cacheOnlinePlaylist({
+    required String playlistId,
+    required String kind,
+    required String title,
+    String author = '',
+    String? artworkUrl,
+    int sortOrder = 0,
+    required List<YtmTrack> tracks,
+    bool fullSnapshot = true,
+  });
+
+  Future<Result<void>> reorderOnlinePlaylistTracks(
+      String playlistId, List<String> orderedVideoIds);
+  Future<Result<void>> renameOnlinePlaylist(
+      String playlistId, String newTitle);
+  Future<Result<void>> removeOnlinePlaylist(String playlistId);
+  Future<Result<void>> clearOnlineLibraryCache();
 
   // --- EXCLUDED FOLDERS ---
   Stream<Result<List<ExcludedFoldersTableData>>> watchExcludedFolders();
@@ -221,13 +275,19 @@ abstract class IMusicRepository {
   });
 
   // --- GENRES ---
-  Stream<Result<List<GenreItem>>> watchGenres();
-  Future<Result<List<GenreItem>>> getGenres();
+  Stream<Result<List<GenreItem>>> watchGenres({
+    List<String> excludedFolders = const [],
+  });
+  Future<Result<List<GenreItem>>> getGenres({
+    List<String> excludedFolders = const [],
+  });
   Stream<Result<List<SongsTableData>>> watchGenreSongs(String genre);
   Future<Result<List<SongsTableData>>> getGenreSongs(String genre);
 
   // --- YEARS ---
-  Stream<Result<List<YearItem>>> watchYears();
+  Stream<Result<List<YearItem>>> watchYears({
+    List<String> excludedFolders = const [],
+  });
   Stream<Result<List<SongsTableData>>> watchYearSongs(int year);
 }
 

@@ -81,6 +81,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   // successful track change) resets the count.
   int? _lastFailedSongId;
   int _consecutiveErrorCount = 0;
+  final Set<int> _autoSkippedSongIds = <int>{};
+  DateTime? _lastAutoSkipAt;
   // Monotonic counter bumped whenever the queue is mutated; used to invalidate
   // the home-widget "up next" title cache on reorder.
   int _queueVersion = 0;
@@ -158,8 +160,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       guardDsp: (feature, {showError = true}) =>
           dspController.guardDsp(feature, showError: showError),
       playbackRateBlockedReason: dspController.playbackRateBlockedReason,
-      onPerSongEqOverride: (song, presetName) => dspController
-          .applyTrackDspState(song, perSongPresetName: presetName),
+      onPerSongEqOverride: (song, presetName) =>
+          dspController.applyTrackDspState(song, perSongPresetName: presetName),
       getState: () => state,
       emit: safeEmit,
       isClosed: () => isClosed,
@@ -907,8 +909,27 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         _consecutiveErrorCount = 1;
       }
       if (_consecutiveErrorCount >= 2 && _canAutoSkipUnplayable()) {
+        final now = DateTime.now();
+        if (_lastAutoSkipAt == null ||
+            now.difference(_lastAutoSkipAt!) > const Duration(minutes: 2)) {
+          _autoSkippedSongIds.clear();
+        }
+        _lastAutoSkipAt = now;
+        // Never chase an entirely unplayable queue forever: cap the number of
+        // distinct auto-skips at the queue length and stop with a clear error.
+        final exhausted = !_autoSkippedSongIds.add(failed.id) ||
+            _autoSkippedSongIds.length >= state.queue.length;
         _lastFailedSongId = null;
         _consecutiveErrorCount = 0;
+        if (exhausted) {
+          safeEmit(state.copyWith(
+            playback: state.playback.copyWith(
+              errorMessage: 'No playable tracks in the queue',
+              isBuffering: false,
+            ),
+          ));
+          return;
+        }
         safeEmit(state.copyWith(
           playback: state.playback.copyWith(
             errorMessage: 'Skipped ${failed.title} (unplayable)',

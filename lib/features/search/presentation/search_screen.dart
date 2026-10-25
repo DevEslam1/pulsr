@@ -71,6 +71,10 @@ class SearchScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final view = _SearchView(initialQuery: initialQuery);
     if (!AppConfig.ytmEnabled) return view;
+    if (!getIt.isRegistered<YtmSearchCubit>() ||
+        !getIt.isRegistered<YtmDownloadCubit>()) {
+      return view;
+    }
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
@@ -873,6 +877,7 @@ class _RecentRow extends StatelessWidget {
             ),
             IconButton(
               visualDensity: VisualDensity.compact,
+              tooltip: context.l10n.remove,
               icon: Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
               onPressed: onRemove,
             ),
@@ -1011,7 +1016,8 @@ class _LocalResults extends StatelessWidget {
                     cubit.commitQuery();
                     player.playSong(song, queue: state.results);
                   },
-                  onMorePressed: () => SongOptionsSheet.show(context, song: song),
+                  onMorePressed: () =>
+                      SongOptionsSheet.show(context, song: song),
                 );
               },
               childCount: state.results.length,
@@ -1083,8 +1089,9 @@ class _EntityRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final scale = MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0);
     return SizedBox(
-      height: 118,
+      height: 118 + (scale - 1.0) * 30,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),

@@ -110,9 +110,11 @@ void main() {
           .thenAnswer((_) => Stream.value(const Right([])));
       when(() => mockGetArtists.watchArtists())
           .thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockGetGenres.watchGenres())
+      when(() => mockGetGenres.watchGenres(
+              excludedFolders: any(named: 'excludedFolders')))
           .thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockGetYears.watchYears())
+      when(() => mockGetYears.watchYears(
+              excludedFolders: any(named: 'excludedFolders')))
           .thenAnswer((_) => Stream.value(const Right([])));
       when(() => mockGetFavorites.watchFavorites())
           .thenAnswer((_) => Stream.value(const Right([])));
@@ -122,6 +124,9 @@ void main() {
           .thenAnswer((_) async => const Right([]));
       when(() => mockMusicRepo.getSongById(any()))
           .thenAnswer((_) async => Right(sampleSong));
+      when(() => mockMusicRepo.watchDownloadedSongs(
+              excludedFolders: any(named: 'excludedFolders')))
+          .thenAnswer((_) => Stream.value(const Right([])));
       when(() => mockMusicRepo.getSongsByIds(any()))
           .thenAnswer((_) async => Right([sampleSong]));
     });

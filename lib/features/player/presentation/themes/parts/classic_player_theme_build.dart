@@ -60,7 +60,9 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Color.lerp(bgColor, Colors.black, 0.40) ?? bgColor,
+                          Color.lerp(bgColor, Colors.black,
+                                  p.isDark ? 0.40 : 0.04) ??
+                              bgColor,
                           p.bg,
                           Color.lerp(
                                   p.bg, Colors.black, p.isDark ? 0.48 : 0.05) ??

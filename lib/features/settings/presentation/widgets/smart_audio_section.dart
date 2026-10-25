@@ -5,6 +5,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../data/services/hires_audio_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/motion/pulsr_motion.dart';
@@ -94,7 +95,9 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
         _deviceName = deviceName;
         _matchedProfileName = matchedName;
         _lastAppliedProfileName = lastProfileName;
-        _deviceDetectionError = detectionError;
+        _deviceDetectionError = detectionError == null
+            ? null
+            : resolveUiErrorMessage(context, detectionError);
       });
     } catch (e, st) {
       ErrorLogger.log('Error reloading SmartAudioSection',

@@ -138,7 +138,10 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     // Canceled lives only here: the repository deletes the task on cancel, so a
     // canceled row keeps its state until the song is downloaded again.
     for (final entry in state.items.entries) {
-      if (entry.value.status == YtDownloadStatus.canceled) {
+      // Canceled/failed admissions have no repository task behind them; keep
+      // the row (and its error) visible until the user retries or it queues.
+      if (entry.value.status == YtDownloadStatus.canceled ||
+          entry.value.status == YtDownloadStatus.failed) {
         mapped.putIfAbsent(entry.key, () => entry.value);
       }
     }

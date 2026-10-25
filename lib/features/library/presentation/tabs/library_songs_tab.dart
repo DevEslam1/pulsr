@@ -65,6 +65,14 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     }
 
     final isGrid = state.viewMode == LibraryViewMode.grid;
+    final hasMore = cubit.hasMoreSongs;
+
+    Widget buildLoadMoreTile() {
+      if (!state.isLoadingMore) return const SizedBox.shrink();
+      return const SkeletonShimmer(
+        child: SkeletonSongRow(artworkSize: 40),
+      );
+    }
 
     if (isGrid) {
       return RefreshIndicator(
@@ -72,6 +80,10 @@ mixin LibrarySongsTab on State<LibraryScreen> {
         backgroundColor: p.surfaceContainer,
         onRefresh: () => _handleRefresh(context),
         child: GridView.builder(
+          // Grid shares the list's scroll controller so the same near-bottom
+          // listener grows the paginated window instead of hard-stopping at
+          // the first page (500 rows).
+          controller: _songsScrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: true,
@@ -88,8 +100,11 @@ mixin LibrarySongsTab on State<LibraryScreen> {
             mainAxisSpacing: 18,
             childAspectRatio: 0.76,
           ),
-          itemCount: songs.length,
+          itemCount: songs.length + (hasMore ? 1 : 0),
           itemBuilder: (context, index) {
+            if (index >= songs.length) {
+              return Center(child: buildLoadMoreTile());
+            }
             final song = songs[index];
             final isSelected = state.selectedSongIds.contains(song.id);
             return Semantics(
@@ -190,14 +205,6 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     final alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
 
     final trackCols = PulsrAdaptiveGrid.songColumns(context);
-    final hasMore = cubit.hasMoreSongs;
-
-    Widget buildLoadMoreTile() {
-      if (!state.isLoadingMore) return const SizedBox.shrink();
-      return const SkeletonShimmer(
-        child: SkeletonSongRow(artworkSize: 40),
-      );
-    }
 
     Widget buildSongItem(SongsTableData song, int index) {
       return PulsrDismissible(
@@ -330,7 +337,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     PlayerCubit playerCubit,
   ) {
     final p = context.palette;
-    final downloaded = state.songs.where((s) => _isOnlineDownload(s)).toList();
+    // Full downloaded list from the repository stream (not the paginated
+    // songs window), so downloads outside page 1 stay visible and counted.
+    final downloaded = state.downloadedSongs;
     final trackCols = PulsrAdaptiveGrid.songColumns(context);
 
     if (downloaded.isEmpty) {
@@ -578,8 +587,6 @@ mixin LibrarySongsTab on State<LibraryScreen> {
       ),
     );
   }
-
-  bool _isOnlineDownload(SongsTableData s) => isDownloadedOnlineTrack(s);
 
   // Requires: provided by the composing class (same library).
   Widget _buildEmpty(

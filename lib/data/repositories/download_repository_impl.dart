@@ -62,6 +62,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   StorageStats? _cachedStorageStats;
   DateTime? _storageStatsCacheTime;
   static const Duration _storageStatsTtl = Duration(seconds: 5);
+  Timer? _policyWatchdog;
 
   DownloadRepositoryImpl(
     this._ytDownloadService, [
@@ -723,6 +724,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   Future<void> dispose() async {
     _saveDebounce?.cancel();
     _saveDebounce = null;
+    _policyWatchdog?.cancel();
+    _policyWatchdog = null;
     // Flush pending state so terminal states are never lost
     // on a fast close/kill after the debounce window opened.
     await _persistNow();
@@ -758,18 +761,19 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   /// tail used to discard metadata for files that are still on disk and made
   /// those downloads look lost after a restart. Non-terminal rows are always
   /// kept (they are the resume/recovery state).
-  static const Duration _persistedTerminalRetention = Duration(days: 30);
   static const int _maxPersistedTasks = 2000;
 
   Future<void> _persistNow() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cutoff = DateTime.now().subtract(_persistedTerminalRetention);
       final live = <DownloadTask>[];
       final terminal = <DownloadTask>[];
       for (final task in _tasks.values) {
+        // Keep terminal rows for files the user may still manage; the hard
+        // 2000-row cap bounds prefs size. Age-based pruning made downloads
+        // older than 30 days vanish while their files stayed on disk.
         if (task.status.isTerminal) {
-          if (task.createdAt.isAfter(cutoff)) terminal.add(task);
+          terminal.add(task);
         } else {
           live.add(task);
         }
@@ -786,6 +790,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 
   void _processQueue() {
+    _ensurePolicyWatchdog();
     while (_activeVideoIds.length < _maxConcurrent && _queue.isNotEmpty) {
       final videoId = _queue.removeFirst();
 
@@ -805,6 +810,39 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // one that actually has jobs in it, and it drains after this one does. This
     // used to stop the service the moment the repository's own sets emptied,
     // which is true while the service is still finishing the last transfer.
+    _ensurePolicyWatchdog();
+  }
+
+  /// Re-checks Wi-Fi/offline-only policy while transfers are running. The
+  /// admission-time check alone let a job keep downloading after the device
+  /// left Wi-Fi despite the user's data-saving preference.
+  void _ensurePolicyWatchdog() {
+    final busy = _activeVideoIds.isNotEmpty || _queue.isNotEmpty;
+    if (!busy) {
+      _policyWatchdog?.cancel();
+      _policyWatchdog = null;
+      return;
+    }
+    _policyWatchdog ??= Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(_enforcePolicy());
+    });
+  }
+
+  Future<void> _enforcePolicy() async {
+    if (_activeVideoIds.isEmpty) return;
+    AppFailure? block;
+    try {
+      block = await _ytDownloadService.downloadPolicyBlock();
+    } catch (e, st) {
+      ErrorLogger.log('Download policy watch failed',
+          error: e, stackTrace: st, category: 'Download');
+      return;
+    }
+    if (block == null) return;
+    // pauseDownload mutates _activeVideoIds; iterate a snapshot.
+    for (final videoId in List<String>.of(_activeVideoIds)) {
+      await pauseDownload(videoId);
+    }
   }
 
   /// Failures worth an automatic retry (network blip, rate limit, bot

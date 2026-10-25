@@ -20,6 +20,10 @@ String resolveUiErrorMessage(BuildContext context, String message) {
   if (l10n == null) return message;
 
   switch (message) {
+    case 'Unable to reconnect to the party. Check your connection.':
+      return l10n.partyUnableReconnect;
+    case 'No playable tracks in the queue':
+      return l10n.playerNoPlayableTracks;
     case 'Failed to save queue':
       return l10n.errSaveQueue;
     case 'Failed to clear queue':

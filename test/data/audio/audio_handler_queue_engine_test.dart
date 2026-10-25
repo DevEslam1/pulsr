@@ -230,7 +230,11 @@ void main() {
           .thenAnswer((_) async => Right(songs));
 
       handler = await buildTestHandler(repository: repo, ytmService: ytm);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // Restore is asynchronous and does extra YTM-aware init work; poll
+      // briefly instead of assuming a single 50 ms window.
+      for (var i = 0; i < 50 && handler!.queue.value.length < 2; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
 
       expect(handler!.queue.value.length, 2);
       expect(handler!.mediaItem.value?.title, 'Track 2');

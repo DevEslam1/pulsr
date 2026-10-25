@@ -22,6 +22,7 @@ abstract class YtmSearchState with _$YtmSearchState {
     @Default('') String query,
     @Default([]) List<YtmTrack> results,
     @Default(false) bool isLoading,
+    @Default(false) bool loadMoreFailed,
     String? errorMessage,
   }) = _YtmSearchState;
 

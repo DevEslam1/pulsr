@@ -57,13 +57,16 @@ void main() {
   test('rejects a malformed video id', () async {
     final result = await repo.queueDownload(task('short'));
     expect(result.isLeft(), isTrue);
-    verifyNever(
-        () => service.download(any(), onProgress: any(named: 'onProgress')));
+    verifyNever(() => service.download(any(),
+        bypassInternalQueue: any(named: 'bypassInternalQueue'),
+        onProgress: any(named: 'onProgress')));
   });
 
   test('dedupes a task that is already queued', () async {
     final completer = Completer<Result<int>>();
-    when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+    when(() => service.download(any(),
+            bypassInternalQueue: any(named: 'bypassInternalQueue'),
+            onProgress: any(named: 'onProgress')))
         .thenAnswer((_) => completer.future);
 
     final first = await repo.queueDownload(task('abcdefghijk'));
@@ -73,8 +76,9 @@ void main() {
     expect(second.isRight(), isTrue);
     expect(first.toNullable()!.taskId, second.toNullable()!.taskId);
     expect(second.toNullable()!.admission, DownloadAdmission.alreadyActive);
-    verify(() => service.download(any(), onProgress: any(named: 'onProgress')))
-        .called(1);
+    verify(() => service.download(any(),
+        bypassInternalQueue: any(named: 'bypassInternalQueue'),
+        onProgress: any(named: 'onProgress'))).called(1);
     completer.complete(const Left(DownloadFailure('done')));
     await Future.delayed(Duration.zero);
   });
@@ -87,16 +91,18 @@ void main() {
 
     expect(result.isLeft(), isTrue);
     expect(result.getLeft().toNullable()?.message, contains('Wi-Fi'));
-    verifyNever(
-        () => service.download(any(), onProgress: any(named: 'onProgress')));
+    verifyNever(() => service.download(any(),
+        bypassInternalQueue: any(named: 'bypassInternalQueue'),
+        onProgress: any(named: 'onProgress')));
   });
 
   test('honours maxConcurrent from DownloadSettings', () async {
     SharedPreferences.setMockInitialValues(
         {'setting_download_max_concurrent': 2});
     final completers = <Completer<Result<int>>>[];
-    when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-        .thenAnswer((_) {
+    when(() => service.download(any(),
+        bypassInternalQueue: any(named: 'bypassInternalQueue'),
+        onProgress: any(named: 'onProgress'))).thenAnswer((_) {
       final c = Completer<Result<int>>();
       completers.add(c);
       return c.future;
@@ -122,8 +128,9 @@ void main() {
   });
 
   test('maps tagging stage and records the reconciled local id', () async {
-    when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-        .thenAnswer((invocation) async {
+    when(() => service.download(any(),
+        bypassInternalQueue: any(named: 'bypassInternalQueue'),
+        onProgress: any(named: 'onProgress'))).thenAnswer((invocation) async {
       final onProgress = invocation.namedArguments[const Symbol('onProgress')]
           as void Function(YtDownloadProgress)?;
       onProgress
@@ -151,8 +158,9 @@ void main() {
   });
 
   test('persists tasks across a reload of the preference store', () async {
-    when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-        .thenAnswer((invocation) async {
+    when(() => service.download(any(),
+        bypassInternalQueue: any(named: 'bypassInternalQueue'),
+        onProgress: any(named: 'onProgress'))).thenAnswer((invocation) async {
       final onProgress = invocation.namedArguments[const Symbol('onProgress')]
           as void Function(YtDownloadProgress)?;
       onProgress
@@ -173,8 +181,9 @@ void main() {
 
   test('getStorageStats calculates accurate storage sizes from completed tasks',
       () async {
-    when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-        .thenAnswer((invocation) async {
+    when(() => service.download(any(),
+        bypassInternalQueue: any(named: 'bypassInternalQueue'),
+        onProgress: any(named: 'onProgress'))).thenAnswer((invocation) async {
       final onProgress = invocation.namedArguments[const Symbol('onProgress')]
           as void Function(YtDownloadProgress)?;
       onProgress

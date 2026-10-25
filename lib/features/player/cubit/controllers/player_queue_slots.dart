@@ -68,8 +68,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(PrefsKeys.queueSlots);
       if (raw == null) return;
-      final data =
-          QueueSlotCodec.decodeDocument(jsonDecode(raw));
+      final data = QueueSlotCodec.decodeDocument(jsonDecode(raw));
       if (data == null) return;
       for (final key in data.keys) {
         final slotIndex = QueueSlotCodec.slotIndexForKey(key);
@@ -177,22 +176,26 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
   }
 
   Future<void> restoreQueue(
-          List<SongsTableData> previousQueue, int previousIndex) =>
-      _queueMutex.protect(
-          () async => _restoreQueueLocked(previousQueue, previousIndex));
+          List<SongsTableData> previousQueue, int previousIndex,
+          {Duration? initialPosition}) =>
+      _queueMutex.protect(() async => _restoreQueueLocked(
+          previousQueue, previousIndex,
+          initialPosition: initialPosition));
 
   void _restoreQueueLocked(
-      List<SongsTableData> previousQueue, int previousIndex) {
+      List<SongsTableData> previousQueue, int previousIndex,
+      {Duration? initialPosition}) {
     // Empty queue is a safe no-op: `clamp(0, previousQueue.length - 1)` would
     // be clamp(0, -1) and throw ArgumentError.
     if (previousQueue.isEmpty) return;
     final state = _getState();
     final validIndex = previousIndex.clamp(0, previousQueue.length - 1);
+    final restorePosition = initialPosition ?? state.position;
     setQueueSlot(
       state.activeQueueSlot,
       songs: List.from(previousQueue),
       currentIndex: validIndex,
-      position: state.position,
+      position: restorePosition,
       speed: state.playbackSpeed,
     );
     debouncedPersistQueueSlots();
@@ -202,13 +205,14 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         queue: List<SongsTableData>.unmodifiable(previousQueue),
         currentIndex: validIndex,
       ),
+      playback: state.playback.copyWith(position: restorePosition),
     ));
     _invalidateQueueSyncResolution();
     _audioHandler
         .loadQueue(
       previousQueue,
       initialIndex: validIndex,
-      initialPosition: state.position,
+      initialPosition: restorePosition,
       autoPlay: state.isPlaying,
     )
         .catchError((Object e, StackTrace st) {
@@ -386,12 +390,15 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         // change that landed during the await must not be rolled back to the
         // stale pre-await playback snapshot.
         final s = _getState();
+        final stillOnOptimisticNext =
+            removingCurrent && s.currentSong?.id == nextSong?.id;
         _emit(s.copyWith(
           queueSlice: s.queueSlice.copyWith(
             queue: List<SongsTableData>.unmodifiable(state.queue),
             currentIndex: state.currentIndex,
             trackTiers: state.trackTiers,
           ),
+          playback: stillOnOptimisticNext ? state.playback : s.playback,
         ));
       }
     }

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -69,6 +70,10 @@ void main() {
       'pulsr_hint_song_tile_swipe': true,
     });
     useCase = _Playlists();
+  });
+
+  tearDown(() async {
+    await getIt.reset();
   });
 
   Widget build(
@@ -172,13 +177,21 @@ void main() {
       (tester) async {
     when(() => useCase.removeSongFromPlaylist(any(), any()))
         .thenAnswer((_) async => const Right(null));
+    when(() => useCase.addSongsToPlaylist(any(), any()))
+        .thenAnswer((_) async => const Right(null));
+    getIt.registerSingleton<PlaylistUseCases>(useCase);
     await tester.pumpWidget(build(() => Stream.value(Right([
           _song(7, 'Alpha'),
           _song(8, 'Beta'),
         ]))));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Remove').first);
+    await tester.tap(find.descendant(
+      of: find.byType(SongTile).first,
+      matching: find.byIcon(Icons.more_vert_rounded),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove from this playlist'));
     await tester.pumpAndSettle();
 
     verify(() => useCase.removeSongFromPlaylist(1, 7)).called(1);
@@ -196,7 +209,10 @@ void main() {
         .pumpWidget(build(() => Stream.value(Right([_song(1, 'Alpha')]))));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byIcon(Icons.more_vert_rounded),
+    ));
     await tester.pumpAndSettle();
 
     expect(find.text('Manage Songs'), findsWidgets);

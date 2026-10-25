@@ -27,6 +27,7 @@ class _StubRepo extends IMusicRepository {
     bool ascending = true,
     int? limit,
     int? offset,
+    List<String> excludedFolders = const [],
   }) async =>
       Right(songs);
 

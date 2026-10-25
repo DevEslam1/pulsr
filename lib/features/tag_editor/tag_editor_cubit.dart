@@ -47,6 +47,13 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   bool get canUndo => _history.isNotEmpty;
 
+  /// True when the user has edits that have not been written to disk.
+  bool get hasUnsavedChanges =>
+      _history.isNotEmpty ||
+      _userEditedFields.isNotEmpty ||
+      state.newArtworkPath != null ||
+      state.removeArtwork;
+
   void _pushHistory(String field) {
     if (isClosed) return;
     final now = DateTime.now();
@@ -593,7 +600,9 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
               'trackNumber': _batchTrackEdited
                   ? state.trackNumber
                   : (s.trackNumber?.toString() ?? ''),
-              'discNumber': _batchDiscEdited ? state.discNumber : '',
+              'discNumber': _batchDiscEdited
+                  ? state.discNumber
+                  : (s.discNumber?.toString() ?? ''),
               'artworkPath': state.newArtworkPath,
               'removeArtwork': state.removeArtwork,
             };

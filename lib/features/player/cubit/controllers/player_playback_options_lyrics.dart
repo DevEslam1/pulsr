@@ -93,7 +93,8 @@ extension PlayerPlaybackOptionsLyricsExtension
     } catch (_) {}
   }
 
-  Future<bool> updateLyrics(List<LyricsLine> lines) async {
+  Future<bool> updateLyrics(List<LyricsLine> lines,
+      {int? expectedSongId}) async {
     if (lines.isEmpty) {
       // Do not overwrite an existing sidecar .lrc file with an empty list
       return false;
@@ -110,6 +111,9 @@ extension PlayerPlaybackOptionsLyricsExtension
 
     final song = s.currentSong;
     if (song == null) return false;
+    // The sheet may stay open while playback advances; never write the previous
+    // track's edited lyrics into the new track's sidecar.
+    if (expectedSongId != null && song.id != expectedSongId) return false;
 
     LrcParser.invalidateSong(songId: song.id, path: song.path);
 

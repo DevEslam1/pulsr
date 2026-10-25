@@ -12914,7 +12914,7 @@ abstract class AppLocalizations {
   /// No description provided for @miniPlayerSwipeHint.
   ///
   /// In en, this message translates to:
-  /// **'Swipe left/right to skip'**
+  /// **'Swipe to skip · up/down for dock style'**
   String get miniPlayerSwipeHint;
 
   /// No description provided for @phoneSpeaker.
@@ -15047,6 +15047,343 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 local track skipped} other{{count} local tracks skipped}}'**
   String batchSkippedLocalTracks(int count);
+
+  /// No description provided for @queueRecentlyPlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently Played ({count})'**
+  String queueRecentlyPlayed(Object count);
+
+  /// No description provided for @queueAutoplayOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Autoplay: ON'**
+  String get queueAutoplayOn;
+
+  /// No description provided for @queueAutoplayOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Autoplay: OFF'**
+  String get queueAutoplayOff;
+
+  /// No description provided for @queueReordered.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue reordered'**
+  String get queueReordered;
+
+  /// No description provided for @downloadsProgressSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {active} • {completed}/{total} completed'**
+  String downloadsProgressSummary(
+      Object active, Object completed, Object total);
+
+  /// No description provided for @downloadsRequeued.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} re-queued'**
+  String downloadsRequeued(Object count);
+
+  /// No description provided for @partyListenTogether.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen Together'**
+  String get partyListenTogether;
+
+  /// No description provided for @partyServerSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Server Settings'**
+  String get partyServerSettings;
+
+  /// No description provided for @partyServerConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Server Configuration'**
+  String get partyServerConfiguration;
+
+  /// No description provided for @partyServerUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL'**
+  String get partyServerUrl;
+
+  /// No description provided for @partyResetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Default'**
+  String get partyResetDefault;
+
+  /// No description provided for @partySyncDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Synchronize music across multiple devices in real-time.'**
+  String get partySyncDescription;
+
+  /// No description provided for @partyDisplayNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your display name (optional)'**
+  String get partyDisplayNameHint;
+
+  /// No description provided for @partyCreateNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Create New Party'**
+  String get partyCreateNew;
+
+  /// No description provided for @partyOrJoinByCode.
+  ///
+  /// In en, this message translates to:
+  /// **'OR JOIN BY CODE'**
+  String get partyOrJoinByCode;
+
+  /// No description provided for @partyJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get partyJoin;
+
+  /// No description provided for @partyRoomCode.
+  ///
+  /// In en, this message translates to:
+  /// **'ROOM CODE'**
+  String get partyRoomCode;
+
+  /// No description provided for @partyCopyInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Invite Link'**
+  String get partyCopyInvite;
+
+  /// No description provided for @partyShareInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Invite'**
+  String get partyShareInvite;
+
+  /// No description provided for @partySyncedRtt.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced (RTT: {rtt}ms)'**
+  String partySyncedRtt(Object rtt);
+
+  /// No description provided for @partySynchronizingClock.
+  ///
+  /// In en, this message translates to:
+  /// **'Synchronizing clock...'**
+  String get partySynchronizingClock;
+
+  /// No description provided for @partyHost.
+  ///
+  /// In en, this message translates to:
+  /// **'HOST'**
+  String get partyHost;
+
+  /// No description provided for @partyMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Members ({count}/{max})'**
+  String partyMembers(Object count, Object max);
+
+  /// No description provided for @partyHostMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Host'**
+  String get partyHostMember;
+
+  /// No description provided for @partyLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave Party'**
+  String get partyLeave;
+
+  /// No description provided for @partyUnableReconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to reconnect to the party. Check your connection.'**
+  String get partyUnableReconnect;
+
+  /// No description provided for @partyShareText.
+  ///
+  /// In en, this message translates to:
+  /// **'Join my Pulsr listening party: {link}'**
+  String partyShareText(Object link);
+
+  /// No description provided for @partyShareSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr Party {code}'**
+  String partyShareSubject(Object code);
+
+  /// No description provided for @radioDuplicateUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'A station with this URL already exists.'**
+  String get radioDuplicateUrl;
+
+  /// No description provided for @lyricsTrackChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The playing track changed. Reopen the lyrics editor for this track.'**
+  String get lyricsTrackChanged;
+
+  /// No description provided for @lyricsTranslationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation is unavailable right now.'**
+  String get lyricsTranslationUnavailable;
+
+  /// No description provided for @discardChangesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get discardChangesTitle;
+
+  /// No description provided for @discardChangesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your unsaved edits will be lost.'**
+  String get discardChangesBody;
+
+  /// No description provided for @onboardingPageIndicator.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {index} of {count}'**
+  String onboardingPageIndicator(Object count, Object index);
+
+  /// No description provided for @smartFieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Field'**
+  String get smartFieldLabel;
+
+  /// No description provided for @smartOperatorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator'**
+  String get smartOperatorLabel;
+
+  /// No description provided for @abLoopPointA.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop point A {time}'**
+  String abLoopPointA(Object time);
+
+  /// No description provided for @abLoopSetA.
+  ///
+  /// In en, this message translates to:
+  /// **'Set loop point A'**
+  String get abLoopSetA;
+
+  /// No description provided for @abLoopPointB.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop point B {time}'**
+  String abLoopPointB(Object time);
+
+  /// No description provided for @abLoopSetB.
+  ///
+  /// In en, this message translates to:
+  /// **'Set loop point B'**
+  String get abLoopSetB;
+
+  /// No description provided for @playerNoPlayableTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'No playable tracks in the queue'**
+  String get playerNoPlayableTracks;
+
+  /// No description provided for @discard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get discard;
+
+  /// No description provided for @reorderSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder Songs'**
+  String get reorderSongs;
+
+  /// No description provided for @reorderFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the new order'**
+  String get reorderFailed;
+
+  /// No description provided for @reorderInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder. Select tracks to move them in bulk.'**
+  String get reorderInstructions;
+
+  /// No description provided for @moveToTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to top'**
+  String get moveToTop;
+
+  /// No description provided for @moveToBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to bottom'**
+  String get moveToBottom;
+
+  /// Button to move selected songs to a specific position number in the playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Move to position'**
+  String get moveToPosition;
+
+  /// Prompt to enter target position index in playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Enter position (1 - {total})'**
+  String enterPosition(int total);
+
+  /// Label for position input field
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get position;
+
+  /// No description provided for @reorderDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get reorderDone;
+
+  /// Badge on a playlist with a user-defined song order
+  ///
+  /// In en, this message translates to:
+  /// **'Custom order'**
+  String get customOrder;
+
+  /// Badge shown when an online playlist is served from the local cache
+  ///
+  /// In en, this message translates to:
+  /// **'Cached'**
+  String get cachedCopy;
+
+  /// Background progress of the online library metadata cache
+  ///
+  /// In en, this message translates to:
+  /// **'Caching library… {done}/{total}'**
+  String onlineCacheProgress(int done, int total);
+
+  /// Toggle for the animated artwork effects on the now-playing screen
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas effects'**
+  String get canvasEffects;
+
+  /// Subtitle explaining the Canvas effects toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Animated artwork motion in the player'**
+  String get canvasEffectsSubtitle;
 }
 
 class _AppLocalizationsDelegate

@@ -37,6 +37,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   bool _isScanning = true;
   bool _isFetchingArtwork = false;
 
+  /// A failed scan must not fall through to the "no duplicates" success view:
+  /// an empty [_duplicateGroups] after a failure would falsely claim the
+  /// library is clean.
+  bool _scanFailed = false;
+  bool _isBulkDeleting = false;
+
   @override
   void initState() {
     super.initState();
@@ -45,11 +51,25 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   }
 
   Future<void> _scan() async {
-    if (mounted) setState(() => _isScanning = true);
+    if (mounted) {
+      setState(() {
+        _isScanning = true;
+        _scanFailed = false;
+      });
+    }
     try {
       var songs = const <SongsTableData>[];
       if (getIt.isRegistered<IMusicRepository>()) {
-        final res = await getIt<IMusicRepository>().getAllSongs();
+        var excluded = const <String>[];
+        try {
+          final excludedRes =
+              await getIt<IMusicRepository>().getExcludedFolderPaths();
+          excluded = excludedRes.fold((_) => <String>[], (list) => list);
+        } catch (_) {
+          // A failed exclusion lookup must not abort the duplicate scan.
+        }
+        final res = await getIt<IMusicRepository>()
+            .getAllSongs(excludedFolders: excluded);
         songs = res.fold((_) => const <SongsTableData>[], (list) => list);
       }
       // CUE chapter rows share the container's path/duration/fileSize, so the
@@ -68,10 +88,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       // BUG-17: never let a scan failure leave the spinner running forever.
       ErrorLogger.log('Duplicate scan failed',
           error: e, stackTrace: st, category: 'DuplicateFinder');
-      if (mounted) {
-        PulsrToast.show(context,
-            message: context.l10n.browseFailedToFetch, isError: true);
-      }
+      if (mounted) setState(() => _scanFailed = true);
     } finally {
       if (mounted) setState(() => _isScanning = false);
     }
@@ -137,6 +154,72 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       context,
       message: context.l10n.selectedHighestQuality(updatedCount),
       icon: Icons.auto_awesome_rounded,
+    );
+  }
+
+  /// Every copy that is not the explicitly kept row, across all groups where a
+  /// keeper was chosen. Used by the bulk cleanup action.
+  List<SongsTableData> _nonKeptDuplicates() {
+    final targets = <SongsTableData>[];
+    for (final group in _duplicateGroups) {
+      final keptId = _keptSongByGroup[group.key];
+      if (keptId == null) continue;
+      for (final song in group.songs) {
+        if (song.id != keptId) targets.add(song);
+      }
+    }
+    return targets;
+  }
+
+  Future<void> _deleteNonKeptDuplicates() async {
+    if (_isBulkDeleting) return;
+    final targets = _nonKeptDuplicates();
+    if (targets.isEmpty) return;
+
+    final l10n = context.l10n;
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: l10n.delete,
+      message: l10n.deleteMultipleConfirmation(targets.length),
+      icon: Icons.delete_sweep_rounded,
+      confirmLabel: l10n.delete,
+      isDestructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    if (!getIt.isRegistered<IMusicRepository>()) {
+      PulsrToast.show(context,
+          message: l10n.deleteIsUnavailable, isError: true);
+      return;
+    }
+
+    setState(() => _isBulkDeleting = true);
+    final ids = targets.map((s) => s.id).toSet();
+    final res = await getIt<IMusicRepository>().deleteSongs(ids.toList());
+    if (!mounted) return;
+    setState(() => _isBulkDeleting = false);
+
+    res.fold(
+      (failure) => PulsrToast.show(context,
+          message: l10n.failedToDelete(failure.message), isError: true),
+      (_) {
+        setState(() {
+          _duplicateGroups = _duplicateGroups
+              .map((g) => DuplicateGroup(
+                    key: g.key,
+                    reason: g.reason,
+                    songs:
+                        g.songs.where((s) => !ids.contains(s.id)).toList(),
+                  ))
+              .where((g) => g.songs.length > 1)
+              .toList();
+          final groupKeys = _duplicateGroups.map((g) => g.key).toSet();
+          _keptSongByGroup.removeWhere((key, _) => !groupKeys.contains(key));
+        });
+        if (!mounted) return;
+        PulsrToast.show(context,
+            message: l10n.songsDeleted,
+            icon: Icons.delete_outline_rounded);
+      },
     );
   }
 
@@ -268,6 +351,25 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 ),
                 onPressed: _autoSelectBestQuality,
               ),
+            if (_keptSongByGroup.isNotEmpty)
+              IconButton(
+                icon: _isBulkDeleting
+                    ? SizedBox(
+                        width: AppSpacing.s20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: p.error,
+                        ),
+                      )
+                    : Icon(Icons.delete_sweep_rounded, color: p.error),
+                tooltip: context.l10n.delete,
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                onPressed: _isBulkDeleting ? null : _deleteNonKeptDuplicates,
+              ),
             IconButton(
               icon: _isFetchingArtwork
                   ? SizedBox(
@@ -320,6 +422,41 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           padding: EdgeInsetsDirectional.fromSTEB(
               AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
         ),
+      );
+    }
+
+    if (_scanFailed) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.lg, 96, AppSpacing.lg, AppSpacing.lg),
+        children: [
+          Icon(Icons.error_outline_rounded, size: 64, color: p.error),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            context.l10n.browseFailedToFetch,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: AppFontSize.title,
+                fontWeight: FontWeight.w700,
+                color: p.textPrimary),
+          ),
+          const SizedBox(height: AppSpacing.s6),
+          Text(
+            context.l10n.libraryReadError,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+          ),
+          const SizedBox(height: AppSpacing.s20),
+          Center(
+            child: FilledButton.icon(
+              onPressed: _scan,
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(context.l10n.retry),
+            ),
+          ),
+        ],
       );
     }
 

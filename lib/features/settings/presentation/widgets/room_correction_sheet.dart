@@ -14,6 +14,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../data/services/room_correction_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../l10n/generated/app_localizations.dart';
@@ -368,7 +369,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       if (mounted) {
         setState(() {
           _phase = _RcPhase.idle;
-          _error = e.toString();
+          _error = resolveUiErrorMessage(context, e.toString());
         });
       }
     }
@@ -479,7 +480,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       if (mounted) {
         setState(() {
           _phase = _RcPhase.result;
-          _error = e.toString();
+          _error = resolveUiErrorMessage(context, e.toString());
         });
       }
     }

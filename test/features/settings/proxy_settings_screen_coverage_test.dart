@@ -96,7 +96,7 @@ void main() {
 
     await tester.tap(find.byType(Switch));
     await tester.pump();
-    verify(() => cubit.setProxyEnabled(false)).called(1);
+    verifyNever(() => cubit.setProxyEnabled(any()));
 
     await tester.tap(find.text(l10n.socks5).first);
     await tester.pump();

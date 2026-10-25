@@ -184,12 +184,13 @@ class _BackupSectionState extends State<BackupSection> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context, false),
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(false),
           child: Text(context.l10n.cancel,
               style: TextStyle(color: context.palette.textSecondary)),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
           style: FilledButton.styleFrom(
             backgroundColor: context.palette.accent,
             foregroundColor: context.palette.onAccent,
@@ -251,7 +252,7 @@ class _BackupSectionState extends State<BackupSection> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
               child: Text(context.l10n.doneAction),
             ),
           ],

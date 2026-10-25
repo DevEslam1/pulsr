@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/services/playlist_share_service.dart';
 import '../../../core/services/playlist_suggestions_service.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -328,7 +329,6 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   void _confirmDelete(
       BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) async {
-    final messenger = ScaffoldMessenger.of(context);
     final undoLabel = context.l10n.undo;
     final deleteTitle = '${context.l10n.delete} "${pl.name}"?';
     final deleteMessage = context.l10n.browseCannotBeUndone;
@@ -362,19 +362,25 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               error: e, stackTrace: st, category: 'PlaylistsScreen');
         }
       }
-      await cubit.deletePlaylist(pl.id);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('$plName - $undoLabel?'),
-          action: SnackBarAction(
-            label: undoLabel,
-            onPressed: () => cubit.restorePlaylist(
-              plName,
-              isSmart: isSmart,
-              criteria: smartCriteria,
-              songIds: songIds,
-            ),
-          ),
+      final deleted = await cubit.deletePlaylist(pl.id);
+      if (!context.mounted) return;
+      if (!deleted) {
+        PulsrToast.show(
+          context,
+          message: cubit.state.errorMessage ?? context.l10n.somethingWentWrong,
+          isError: true,
+        );
+        return;
+      }
+      PulsrToast.show(
+        context,
+        message: context.l10n.playlistDeleted(plName),
+        actionLabel: undoLabel,
+        onActionPressed: () => cubit.restorePlaylist(
+          plName,
+          isSmart: isSmart,
+          criteria: smartCriteria,
+          songIds: songIds,
         ),
       );
     }
@@ -521,7 +527,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       minHeight: AppSpacing.minTouchTarget),
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: context.l10n.syncOnlineLibrary,
-                  onPressed: () => cubit.autoFetchOnlineLibrary(force: true),
+                  onPressed: () => cubit.refreshOnlineLibrary(),
                 ),
                 IconButton(
                   constraints: const BoxConstraints(
@@ -834,7 +840,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               PulsrEmptyState(
                 icon: Icons.error_outline_rounded,
                 title: context.l10n.playlistLoadFailed,
-                subtitle: state.errorMessage!,
+                subtitle: resolveUiErrorMessage(context, state.errorMessage!),
                 primaryActionLabel: context.l10n.retry,
                 onPrimaryAction: cubit.reloadPlaylists,
               )
@@ -961,7 +967,15 @@ class _OnlinePlaylistsContent extends StatelessWidget {
           .timeout(const Duration(seconds: 120));
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
-        final downloadCubit = getIt<YtmDownloadCubit>();
+        final downloadCubit = getIt.isRegistered<YtmDownloadCubit>()
+            ? getIt<YtmDownloadCubit>()
+            : null;
+        if (downloadCubit == null) {
+          if (context.mounted) {
+            PulsrToast.show(context, message: loadFailedText, isError: true);
+          }
+          return;
+        }
         final report = await downloadCubit.downloadAllDetailed(songs);
         final queuedCount = report.queued;
         final extras = describeBatchOutcomeExtras(
@@ -1019,8 +1033,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     if (!context.mounted) return;
 
     final songs = tracks.map((t) => t.toSongData()).toList();
-    final downloadCubit =
-        context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final downloadCubit = context.read<YtmDownloadCubit?>() ??
+        (getIt.isRegistered<YtmDownloadCubit>()
+            ? getIt<YtmDownloadCubit>()
+            : null);
+    if (downloadCubit == null) return;
     final report = await downloadCubit.downloadAllDetailed(songs);
     if (!context.mounted) return;
     final queuedCount = report.queued;
@@ -1049,8 +1066,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       return;
     }
     final songs = likedTracks.map((t) => t.toSongData()).toList();
-    final downloadCubit =
-        context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final downloadCubit = context.read<YtmDownloadCubit?>() ??
+        (getIt.isRegistered<YtmDownloadCubit>()
+            ? getIt<YtmDownloadCubit>()
+            : null);
+    if (downloadCubit == null) return;
     final report = await downloadCubit.downloadAllDetailed(songs);
     if (!context.mounted) return;
     final queuedCount = report.queued;
@@ -1180,6 +1200,63 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                     ),
                   ),
 
+                if (isLoggedIn && online.isCachingLibrary)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      Adaptive.pagePadding(context),
+                      AppSpacing.xs,
+                      Adaptive.pagePadding(context),
+                      0,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer,
+                        borderRadius: AppRadii.r12All,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.cloud_download_rounded,
+                              color: p.accent, size: 20),
+                          const SizedBox(width: AppSpacing.s10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  context.l10n.onlineCacheProgress(
+                                    online.cacheCompleted,
+                                    online.cacheTotal,
+                                  ),
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.s6),
+                                ClipRRect(
+                                  borderRadius: AppRadii.r6All,
+                                  child: LinearProgressIndicator(
+                                    value: online.cacheTotal == 0
+                                        ? null
+                                        : online.cacheCompleted /
+                                            online.cacheTotal,
+                                    minHeight: 4,
+                                    backgroundColor: p.surfaceContainerHigh,
+                                    color: p.accent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 if (isLoggedIn) ...[
                   // Liked Music Online Hero Card
                   Padding(
@@ -1199,6 +1276,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           title: context.l10n.likedMusic,
                           subtitle: 'YouTube Music',
                           initialTracks: online.likedTracks,
+                          kind: OnlineLibraryKind.liked,
                         ),
                       ),
                     ),
@@ -1638,7 +1716,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
         break;
       case YtmFetchStatus.done:
         subtitle =
-            '$trackCount ${context.l10n.songs} ${context.l10n.browseSynced} • ${context.l10n.browseTapToPlayOrDownload}';
+            '${context.l10n.songsCount(trackCount)} ${context.l10n.browseSynced} • ${context.l10n.browseTapToPlayOrDownload}';
         break;
       case YtmFetchStatus.error:
         subtitle = error ?? context.l10n.browseFailedToFetch;

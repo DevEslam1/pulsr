@@ -42,7 +42,13 @@ class PulsrAdaptiveGrid {
       case GridType.playlists:
         switch (breakpoint) {
           case PulsrBreakpoint.compact:
-            return isLandscape ? 3 : 2;
+            // A 320dp phone cannot fit two 160dp cards plus page padding.
+            // Fall back to one column instead of squeezing the artwork.
+            final itemWidth =
+                math.max(1.0, (customMinItemWidth ?? minCardWidth).toDouble());
+            final calculated =
+                (math.max(0.0, width - 24.0) / itemWidth).floor();
+            return calculated.clamp(1, isLandscape ? 3 : 2);
           case PulsrBreakpoint.medium:
             return isLandscape ? 4 : 3;
           case PulsrBreakpoint.expanded:

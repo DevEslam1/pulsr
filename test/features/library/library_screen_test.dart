@@ -147,6 +147,36 @@ void main() {
     verify(() => cubit.selectAllSongs()).called(1);
   });
 
+  testWidgets('select-all on Favorites only selects favorite songs',
+      (tester) async {
+    final state = LibraryState(
+      isMultiSelectMode: true,
+      selectedSongIds: const {1},
+      songs: [
+        testSong(id: 1, title: 'Alpha'),
+        testSong(id: 3, title: 'Gamma'),
+      ],
+      favorites: [
+        testSong(id: 2, title: 'Beta'),
+        testSong(id: 4, title: 'Delta'),
+      ],
+    );
+    final cubit = stubLibraryCubit(state);
+    await tester.pumpWidget(libraryHarness(
+      libraryCubit: cubit,
+      child: const LibraryScreen(initialTabName: 'favorites'),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.select_all_rounded));
+    await tester.pump();
+
+    final captured =
+        verify(() => cubit.selectSongs(captureAny())).captured.single;
+    expect((captured as Iterable<int>).toSet(), {2, 4});
+    verifyNever(() => cubit.selectAllSongs());
+  });
+
   testWidgets('an info message is surfaced as a snackbar', (tester) async {
     final controller = StreamController<LibraryState>.broadcast();
     addTearDown(controller.close);

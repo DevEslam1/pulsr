@@ -875,10 +875,13 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                 color: p.textPrimary,
                                                 size: 28,
                                               ),
-                                              onPressed: () {
-                                                HapticFeedback.selectionClick();
-                                                cubit.next();
-                                              },
+                                              onPressed: state.hasNextNeighbour
+                                                  ? () {
+                                                      HapticFeedback
+                                                          .selectionClick();
+                                                      cubit.next();
+                                                    }
+                                                  : null,
                                             ),
                                           ],
                                         ),
@@ -887,7 +890,13 @@ class MiniPlayerState extends State<MiniPlayer> {
                                         child: _MiniPlayerProgressBar(
                                           duration: state.duration,
                                           activeAccent: activeAccent,
-                                          hairlineColor: p.hairline,
+                                          // hairline at 35% was invisible against
+                                          // the card; a tertiary tone keeps the
+                                          // remaining track readable.
+                                          hairlineColor: p.textTertiary
+                                              .withValues(
+                                                  alpha:
+                                                      p.isDark ? 0.50 : 0.40),
                                           isPlaying: state.isPlaying,
                                           isBuffering: state.isBuffering,
                                           onSeek: (pos) => cubit.seek(pos),
@@ -913,10 +922,10 @@ class MiniPlayerState extends State<MiniPlayer> {
                                   ),
                                   if (state.errorMessage != null)
                                     PositionedDirectional(
-                                      top: 6,
-                                      start: 10,
-                                      end: 10,
-                                      child: _MiniPlayerErrorPill(
+                                      top: 4,
+                                      start: 6,
+                                      end: 6,
+                                      child: _MiniPlayerErrorBar(
                                         message: state.errorMessage!,
                                         accentColor: activeAccent,
                                         onRetry: () {
@@ -955,7 +964,7 @@ class MiniPlayerState extends State<MiniPlayer> {
               ),
             ),
             PositionedDirectional(
-              top: -38,
+              top: -48,
               start: 16,
               end: 16,
               child: GestureHintOverlay(
@@ -1229,8 +1238,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                                     progress: progress,
                                     phase: _waveController.value * 2 * math.pi,
                                     activeColor: widget.activeAccent,
-                                    inactiveColor: widget.hairlineColor
-                                        .withValues(alpha: 0.35),
+                                    inactiveColor: widget.hairlineColor,
                                     isPlaying: widget.isPlaying,
                                   ),
                                 ),
@@ -1272,15 +1280,16 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
   }
 }
 
-/// Compact error overlay for the mini player: shows the active playback
-/// error, retries the current track from its position, and can be dismissed.
-class _MiniPlayerErrorPill extends StatelessWidget {
+/// Full-width error state for the mini player. It replaces the track row
+/// instead of floating tiny 15px action icons over the controls, so retry and
+/// dismiss both have a 48dp target.
+class _MiniPlayerErrorBar extends StatelessWidget {
   final String message;
   final Color accentColor;
   final VoidCallback onRetry;
   final VoidCallback onDismiss;
 
-  const _MiniPlayerErrorPill({
+  const _MiniPlayerErrorBar({
     required this.message,
     required this.accentColor,
     required this.onRetry,
@@ -1290,53 +1299,62 @@ class _MiniPlayerErrorPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onRetry,
-        borderRadius: AppRadii.r10All,
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: message,
+      child: Material(
+        color: p.surfaceContainerHigh,
+        borderRadius: AppRadii.r18All,
+        clipBehavior: Clip.antiAlias,
         child: Container(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.s6, AppSpacing.xxs, AppSpacing.xxs, AppSpacing.xxs),
+          height: 52,
+          padding: const EdgeInsetsDirectional.only(
+            start: AppSpacing.s10,
+            end: AppSpacing.xxs,
+          ),
           decoration: BoxDecoration(
-            color: p.error.withValues(alpha: p.isDark ? 0.24 : 0.14),
-            borderRadius: AppRadii.r10All,
-            border: Border.all(color: p.error.withValues(alpha: 0.55)),
+            borderRadius: AppRadii.r18All,
+            border: Border.all(color: p.error.withValues(alpha: 0.45)),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline_rounded, size: 13, color: p.error),
+              Icon(Icons.error_outline_rounded, size: 18, color: p.error),
               const SizedBox(width: AppSpacing.s6),
               Expanded(
                 child: Text(
                   message,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w700,
+                    height: 1.25,
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.s6),
-              Tooltip(
-                message: context.l10n.retry,
-                excludeFromSemantics: true,
-                child: InkWell(
-                  onTap: onRetry,
-                  borderRadius: AppRadii.r8All,
-                  child:
-                      Icon(Icons.refresh_rounded, size: 15, color: accentColor),
+              IconButton(
+                tooltip: context.l10n.retry,
+                onPressed: onRetry,
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
                 ),
+                iconSize: 19,
+                color: accentColor,
+                icon: const Icon(Icons.refresh_rounded),
               ),
-              const SizedBox(width: AppSpacing.s2),
-              InkWell(
-                onTap: onDismiss,
-                borderRadius: AppRadii.r8All,
-                child:
-                    Icon(Icons.close_rounded, size: 15, color: p.textSecondary),
+              IconButton(
+                tooltip: context.l10n.close,
+                onPressed: onDismiss,
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                iconSize: 19,
+                color: p.textSecondary,
+                icon: const Icon(Icons.close_rounded),
               ),
             ],
           ),
@@ -1494,32 +1512,36 @@ class MiniPlayerHorizontal extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          song.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: AppFontSize.bodySmall,
-                            fontWeight: FontWeight.w700,
-                            color: p.textPrimary,
+                    child: MediaQuery.withClampedTextScaling(
+                      minScaleFactor: 0.8,
+                      maxScaleFactor: 1.3,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            song.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppFontSize.bodySmall,
+                              fontWeight: FontWeight.w700,
+                              color: p.textPrimary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          song.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: AppFontSize.tiny,
-                            fontWeight: FontWeight.w500,
-                            color: p.textSecondary,
+                          const SizedBox(height: 1),
+                          Text(
+                            song.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppFontSize.tiny,
+                              fontWeight: FontWeight.w500,
+                              color: p.textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   IconButton(
@@ -1560,10 +1582,12 @@ class MiniPlayerHorizontal extends StatelessWidget {
                       Icons.skip_next_rounded,
                       color: p.textPrimary,
                     ),
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      cubit.next();
-                    },
+                    onPressed: state.hasNextNeighbour
+                        ? () {
+                            HapticFeedback.selectionClick();
+                            cubit.next();
+                          }
+                        : null,
                   ),
                   const SizedBox(width: AppSpacing.xs),
                 ],

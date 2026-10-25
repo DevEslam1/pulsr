@@ -1,6 +1,7 @@
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/library/presentation/library_stats_screen.dart
 import 'package:flutter/material.dart';
+import 'package:drift/drift.dart' show Value;
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -174,7 +175,14 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
   Future<void> _loadAllSongs() async {
     final repo = _musicRepository;
     if (repo == null) return;
-    final res = await repo.getAllSongs();
+    var excluded = const <String>[];
+    try {
+      final excludedRes = await repo.getExcludedFolderPaths();
+      excluded = excludedRes.fold((_) => <String>[], (list) => list);
+    } catch (_) {
+      // Stats stay usable even when the exclusion lookup fails.
+    }
+    final res = await repo.getAllSongs(excludedFolders: excluded);
     if (!mounted) return;
     res.fold(
       (failure) {
@@ -214,11 +222,26 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                   '${context.l10n.browseClearHistoryFailed}: ${err.message}',
               isError: true,
             ),
-            (_) => PulsrToast.show(
-              context,
-              message: context.l10n.browseHistoryCleared,
-              icon: Icons.history_rounded,
-            ),
+            (_) {
+              // Clear the local snapshot's play timestamps too. Otherwise the
+              // Recently Played section keeps rendering the pre-clear rows
+              // until the next full reload.
+              final current = _allSongs;
+              if (current != null) {
+                _allSongs = [
+                  for (final song in current)
+                    song.copyWith(lastPlayed: const Value(null)),
+                ];
+                _statsCache = null;
+                _statsSongsRef = null;
+                setState(() {});
+              }
+              PulsrToast.show(
+                context,
+                message: context.l10n.browseHistoryCleared,
+                icon: Icons.history_rounded,
+              );
+            },
           );
         }
       }

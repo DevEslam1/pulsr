@@ -17,9 +17,9 @@ void main() {
       await db.close();
     });
 
-    test('Fresh database opens at schemaVersion 11 and has all indexes',
+    test('Fresh database opens at schemaVersion 12 and has all indexes',
         () async {
-      expect(db.schemaVersion, equals(11));
+      expect(db.schemaVersion, equals(12));
 
       // Test inserting a song with schema v4 fields
       final songId = await db.into(db.songsTable).insert(
@@ -161,7 +161,7 @@ void main() {
 
       final version =
           await upgraded!.customSelect('PRAGMA user_version;').getSingle();
-      expect(version.data['user_version'], equals(11));
+      expect(version.data['user_version'], equals(12));
 
       // The upgraded schema must accept remote rows, not just the fresh one.
       await upgraded!.into(upgraded!.songsTable).insert(
@@ -196,6 +196,27 @@ void main() {
             'idx_songs_source',
             'idx_songs_remote_id'
           ]));
+    });
+
+    test('v11 -> v12 creates the online library cache tables', () async {
+      upgraded = openLegacyDatabase(11);
+
+      final tables = await upgraded!
+          .customSelect(
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name IN ('online_playlists', 'online_playlist_entries');",
+          )
+          .get();
+      expect(
+        tables.map((r) => r.read<String>('name')),
+        containsAll(['online_playlists', 'online_playlist_entries']),
+      );
+
+      final indexes = await upgraded!
+          .customSelect('PRAGMA index_list("online_playlist_entries");')
+          .get();
+      expect(indexes.map((r) => r.read<String>('name')),
+          contains('idx_online_playlist_entries_playlist_order'));
     });
 
     test('v4 -> v11 creates v11 constraints and a populated FTS index',

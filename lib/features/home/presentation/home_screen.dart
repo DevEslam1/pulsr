@@ -22,8 +22,6 @@ import '../cubit/home_cubit.dart';
 import 'widgets/hero_mix_card.dart';
 import 'widgets/quick_tile.dart';
 import 'widgets/online_category_section.dart';
-import 'widgets/quick_actions_row.dart';
-import 'widgets/quick_card.dart';
 import 'widgets/quick_discovery_header.dart';
 import 'widgets/recently_added_section.dart';
 import 'widgets/recently_played_section.dart';
@@ -117,6 +115,17 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
       stopwatch.isRunning &&
       stopwatch.elapsed < _quickActionCacheTtl;
 
+  /// Current hidden-folder exclusions, shared by the quick-action queries so
+  /// excluded songs never re-enter discovery through Daily Drive/Focus Flow.
+  List<String> _currentExcludedFolders() {
+    final cubit = context.read<LibraryCubit?>();
+    if (cubit == null) return const [];
+    return [
+      for (final folder in cubit.state.folders)
+        if (folder.isExcluded) folder.path,
+    ];
+  }
+
   /// Daily Drive: a broad, recently-played-first window (200 rows) so the
   /// shuffle is not confined to the first 50 titles.
   Future<List<SongsTableData>?> _fetchDailyDriveSongs(
@@ -129,6 +138,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
       sortBy: 'lastPlayed',
       ascending: false,
       limit: _dailyDriveLimit,
+      excludedFolders: _currentExcludedFolders(),
     );
     return res.fold(
       // Null means failure (distinct from a genuinely empty library) so the
@@ -152,7 +162,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     List<SongsTableData>? songs;
     try {
       final res = await useCase
-          .watchTopPlayed(limit: _focusFlowLimit)
+          .watchTopPlayed(
+            limit: _focusFlowLimit,
+            excludedFolders: _currentExcludedFolders(),
+          )
           .first
           .timeout(const Duration(seconds: 5));
       songs = res.fold<List<SongsTableData>?>(
@@ -185,6 +198,38 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         SnackBar(
           content: Text(context.l10n.browseFailedToFetch),
           behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  /// Daily Drive/Focus Flow used to no-op when their queue came back empty.
+  /// Surface why (empty library vs no play history) and offer a scan CTA for
+  /// the empty-library case.
+  void _showQuickActionEmpty(BuildContext context, {required bool dailyDrive}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(dailyDrive
+              ? context.l10n.browseNoSongsInLibrary
+              : context.l10n.noPlayHistory),
+          behavior: SnackBarBehavior.floating,
+          action: dailyDrive
+              ? SnackBarAction(
+                  label: context.l10n.scanStorage,
+                  onPressed: () async {
+                    final count =
+                        await context.read<SettingsCubit>().rescanLibrary();
+                    if (!context.mounted) return;
+                    messenger
+                      ..clearSnackBars()
+                      ..showSnackBar(
+                        SnackBar(content: Text(context.l10n.scanResult(count))),
+                      );
+                  },
+                )
+              : null,
         ),
       );
   }
@@ -653,7 +698,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                                 color: tool.color.withValues(alpha: 0.16),
                                 borderRadius: AppRadii.r12All,
                               ),
-                              child: Icon(tool.icon, color: tool.color, size: 20),
+                              child:
+                                  Icon(tool.icon, color: tool.color, size: 20),
                             ),
                             const SizedBox(width: AppSpacing.s12),
                             Expanded(
@@ -684,10 +730,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     );
   }
 
-  Widget _buildQuickActionsRow(BuildContext context, List<Widget> cards) {
-    return QuickActionsRow(cards: cards);
-  }
-
   Widget _buildLocalView(
     BuildContext context,
     PulsrPalette p,
@@ -700,15 +742,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ---------- Single shortcut strip ----------
-        const SizedBox(height: AppSpacing.md),
-        QuickDiscoveryHeader(
-          showYtm: AppConfig.ytmEnabled && !offlineOnly,
-          onMore: () => _showDiscoveryToolsSheet(context),
-        ),
-        const SizedBox(height: AppSpacing.md),
-
         // ---------- Hero action + secondary tiles ----------
+        const SizedBox(height: AppSpacing.md),
         Padding(
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
               0, Adaptive.pagePadding(context), AppSpacing.md),
@@ -724,6 +759,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 if (list.isNotEmpty) {
                   final shuffled = List<SongsTableData>.from(list)..shuffle();
                   playerCubit.playSong(shuffled.first, queue: shuffled);
+                } else {
+                  _showQuickActionEmpty(context, dailyDrive: true);
                 }
               }
 
@@ -738,6 +775,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   final top = List<SongsTableData>.from(list)
                     ..sort((a, b) => b.playCount.compareTo(a.playCount));
                   playerCubit.playSong(top.first, queue: top);
+                } else {
+                  _showQuickActionEmpty(context, dailyDrive: false);
                 }
               }
 
@@ -755,6 +794,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 icon: Icons.headphones_rounded,
                 color: AppColors.mint,
                 onTap: onFocusFlowTap,
+                // Focus Flow starts playback immediately; a play glyph sets
+                // the right expectation next to Favorites' navigation chevron.
+                trailingIcon: Icons.play_arrow_rounded,
+                trailingIconSize: 20,
               );
 
               if (isTablet) {
@@ -808,6 +851,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           ),
         ),
 
+        // ---------- Single shortcut strip ----------
+        QuickDiscoveryHeader(
+          showYtm: AppConfig.ytmEnabled && !offlineOnly,
+          onMore: () => _showDiscoveryToolsSheet(context),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
         // ---------- Recently played (50 by 50 smooth lazy load) ----------
         // Section isolation (gap 04-02): each stream section is wrapped in a
         // RepaintBoundary so one emission never repaints unrelated sections.
@@ -840,11 +890,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: AppSpacing.md),
-        QuickDiscoveryHeader(
-          online: true,
-          onMore: () => _showDiscoveryToolsSheet(context),
-        ),
         const SizedBox(height: AppSpacing.md),
         // ---------- Search YouTube Music Action Banner ----------
         Padding(
@@ -913,51 +958,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
         const SizedBox(height: AppSpacing.md),
 
-        // ---------- Quick Moods & Vibe Cards ----------
-        Padding(
-          padding:
-              EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
-          child: _buildQuickActionsRow(
-            context,
-            [
-              QuickCard(
-                title: _ytmAccountService.isLoggedIn
-                    ? context.l10n.browseForYou
-                    : context.l10n.browseTopHits,
-                subtitle: _ytmAccountService.isLoggedIn
-                    ? context.l10n.browsePersonalized
-                    : context.l10n.browseTrending,
-                icon: _ytmAccountService.isLoggedIn
-                    ? Icons.auto_awesome_rounded
-                    : Icons.local_fire_department_rounded,
-                color:
-                    _ytmAccountService.isLoggedIn ? p.accent : AppColors.error,
-                onTap: () => setState(() => _selectedOnlineCategory =
-                    _ytmAccountService.isLoggedIn
-                        ? 'Recommended For You'
-                        : 'Global Top Hits'),
-              ),
-              QuickCard(
-                title: context.l10n.newReleases,
-                subtitle: context.l10n.browseTrending,
-                icon: Icons.fiber_new_rounded,
-                color: AppColors.azure,
-                onTap: () =>
-                    setState(() => _selectedOnlineCategory = 'New Releases'),
-              ),
-              QuickCard(
-                title: context.l10n.browseChillLofi,
-                subtitle: context.l10n.browseRelaxing,
-                icon: Icons.spa_rounded,
-                color: AppColors.ldacViolet,
-                onTap: () =>
-                    setState(() => _selectedOnlineCategory = 'Chill & Lo-Fi'),
-              ),
-            ],
-          ),
+        // ---------- Single shortcut strip ----------
+        QuickDiscoveryHeader(
+          online: true,
+          onMore: () => _showDiscoveryToolsSheet(context),
         ),
-
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.sm),
 
         // ---------- Category Chips ----------
         SingleChildScrollView(

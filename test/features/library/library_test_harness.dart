@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -72,10 +73,28 @@ MockLibraryCubit stubLibraryCubit(
   when(() => cubit.toggleSongSelection(any())).thenAnswer((_) {});
   when(() => cubit.toggleFavorite(any())).thenAnswer((_) async {});
   when(() => cubit.selectAllSongs()).thenAnswer((_) async {});
+  when(() => cubit.selectSongs(any())).thenAnswer((_) {});
   when(() => cubit.loadFolders()).thenAnswer((_) async {});
+  when(() => cubit.watchFolderSongs(any())).thenAnswer((invocation) {
+    final path = invocation.positionalArguments.first as String;
+    final normalized = _normalizeDir(path);
+    return Stream.value(Right(<SongsTableData>[
+      for (final song in state.songs)
+        if (_normalizeDir(_parentDir(song.path)) == normalized) song,
+    ]));
+  });
   when(() => cubit.getSelectedSongs())
       .thenAnswer((_) async => const <SongsTableData>[]);
   return cubit;
+}
+
+String _normalizeDir(String path) =>
+    path.replaceAll('\\', '/').toLowerCase().trim();
+
+String _parentDir(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  final slash = normalized.lastIndexOf('/');
+  return slash <= 0 ? normalized : normalized.substring(0, slash);
 }
 
 /// Sets a deterministic logical surface (1000x1600 by default) and restores it

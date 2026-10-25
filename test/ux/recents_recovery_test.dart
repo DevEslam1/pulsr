@@ -27,8 +27,9 @@ void main() {
       var queries = 0;
       when(() => player.state).thenReturn(const PlayerState());
       when(() => player.stream).thenAnswer((_) => const Stream.empty());
-      when(() => songs.watchRecentlyPlayed(limit: any(named: 'limit')))
-          .thenAnswer((_) {
+      when(() => songs.watchRecentlyPlayed(
+          limit: any(named: 'limit'),
+          excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) {
         queries++;
         if (queries > 1) {
           return Stream.value(

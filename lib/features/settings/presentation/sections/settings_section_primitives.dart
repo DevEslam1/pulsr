@@ -238,7 +238,7 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
             child: Text(context.l10n.cancel)),
         FilledButton(
           style: FilledButton.styleFrom(
@@ -247,7 +247,7 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
           ),
           onPressed: () {
             cubit.setMinDuration(selected);
-            Navigator.pop(context);
+            Navigator.of(context, rootNavigator: true).pop();
           },
           child: Text(context.l10n.save),
         ),
@@ -271,14 +271,15 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
       content: Text(contentText),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () =>
+                Navigator.of(context, rootNavigator: true).pop(false),
             child: Text(context.l10n.cancel)),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: context.palette.error,
             foregroundColor: Colors.white,
           ),
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
           child: Text(l10n.remove),
         ),
       ],
@@ -301,14 +302,15 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
       content: Text(l10n.fetchMissingArtworkBody),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () =>
+                Navigator.of(context, rootNavigator: true).pop(false),
             child: Text(l10n.cancel)),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: context.palette.accent,
             foregroundColor: context.palette.onAccent,
           ),
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
           child: Text(l10n.fetchArtwork),
         ),
       ],

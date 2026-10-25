@@ -693,6 +693,7 @@ GoRouter createRouter(MediaScannerService scannerService,
                   title: extra.title,
                   subtitle: extra.subtitle,
                   artworkUrl: extra.artworkUrl,
+                  kind: OnlineLibraryKind.account,
                 ),
               );
             } else if (extra is OnlinePlaylistEntry) {
@@ -702,6 +703,7 @@ GoRouter createRouter(MediaScannerService scannerService,
                   title: extra.title,
                   subtitle: extra.uploader,
                   initialTracks: extra.tracks,
+                  kind: OnlineLibraryKind.custom,
                 ),
               );
             } else {

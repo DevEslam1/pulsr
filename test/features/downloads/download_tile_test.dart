@@ -256,52 +256,33 @@ void main() {
     verify(() => cubit.retryDownload('vid1')).called(1);
   });
 
-  testWidgets('popup menu delete action is wired and always present',
+  testWidgets('delete asks for confirmation before removing a completed file',
       (tester) async {
     await pumpTile(tester, _task(status: DownloadStatus.complete));
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
+    await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.delete));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    // Confirmation dialog, not an immediate delete.
+    verifyNever(() => cubit.deleteDownload(any()));
+    await tester.tap(find.widgetWithText(FilledButton, l10n.delete));
+    await tester.pumpAndSettle();
 
     verify(() => cubit.deleteDownload('vid1')).called(1);
   });
 
-  testWidgets(
-      'delete toast offers Retry (a fresh download), not Undo, for completed tasks',
-      (tester) async {
+  testWidgets('cancelling delete keeps the download', (tester) async {
     await pumpTile(tester, _task(status: DownloadStatus.complete));
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.delete));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, l10n.cancel));
+    await tester.pumpAndSettle();
 
-    expect(find.text(l10n.retry), findsOneWidget);
-    expect(find.text(l10n.undo), findsNothing);
-
-    await tester.tap(find.text(l10n.retry));
-    await tester.pump();
-    verify(() => cubit.queueDownload(any())).called(1);
-  });
-
-  testWidgets('delete toast keeps Undo for tasks that can be re-queued',
-      (tester) async {
-    await pumpTile(tester, _task(status: DownloadStatus.failed));
-
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text(l10n.delete));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(find.text(l10n.undo), findsOneWidget);
+    verifyNever(() => cubit.deleteDownload(any()));
   });
 }

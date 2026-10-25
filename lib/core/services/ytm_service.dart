@@ -1137,7 +1137,6 @@ class YtmService {
     return const [];
   }
 
-  /// Fetches radio / autoplay recommendations for [videoId].
   Future<List<YtmTrack>> getRadioTracks(String videoId,
       {int limit = 25}) async {
     final cleanId = videoId.trim();

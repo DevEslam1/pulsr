@@ -178,6 +178,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
                   color: p.textTertiary,
+                  tooltip: context.l10n.close,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],

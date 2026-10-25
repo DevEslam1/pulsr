@@ -60,9 +60,11 @@ void main() {
         .thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockGetArtists.watchArtists())
         .thenAnswer((_) => Stream.value(const Right([])));
-    when(() => mockGetGenres.watchGenres())
+    when(() => mockGetGenres.watchGenres(
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right([])));
-    when(() => mockGetYears.watchYears())
+    when(() => mockGetYears.watchYears(
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockGetFavorites.watchFavorites())
         .thenAnswer((_) => Stream.value(const Right([])));
@@ -182,9 +184,11 @@ void main() {
           .thenAnswer((_) => Stream.value(const Right([])));
       when(() => mockGetArtists.watchArtists())
           .thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockGetGenres.watchGenres())
+      when(() => mockGetGenres.watchGenres(
+              excludedFolders: any(named: 'excludedFolders')))
           .thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockGetYears.watchYears())
+      when(() => mockGetYears.watchYears(
+              excludedFolders: any(named: 'excludedFolders')))
           .thenAnswer((_) => Stream.value(const Right([])));
       when(() => mockGetFavorites.watchFavorites())
           .thenAnswer((_) => Stream.value(const Right([])));

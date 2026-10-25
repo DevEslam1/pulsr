@@ -19,7 +19,9 @@
   "trackCount": "{count, plural, =1{مسار واحد} =2{مساران} few{{count} مسارات} many{{count} مسارًا} other{{count} مسار}}",
   "@trackCount": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "decades": "العقود",
@@ -28,21 +30,31 @@
   "libraryTabsReorder": "{active} من {total} تبويبات • اسحب لإعادة الترتيب",
   "@libraryTabsReorder": {
     "placeholders": {
-      "active": { "type": "int" },
-      "total": { "type": "int" }
+      "active": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "libraryTabsLongPress": "{active} من {total} تبويبات • اضغط مطولاً للتنظيم",
   "@libraryTabsLongPress": {
     "placeholders": {
-      "active": { "type": "int" },
-      "total": { "type": "int" }
+      "active": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "libraryInactiveTabs": "غير مفعّلة ({count})",
   "@libraryInactiveTabs": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "whatsNew": "الجديد",
@@ -72,14 +84,20 @@
   "songRemovedFromPlaylist": "تمت إزالة {title} من {playlist}",
   "@songRemovedFromPlaylist": {
     "placeholders": {
-      "title": { "type": "String" },
-      "playlist": { "type": "String" }
+      "title": {
+        "type": "String"
+      },
+      "playlist": {
+        "type": "String"
+      }
     }
   },
   "playlistDeleted": "تم حذف {name}",
   "@playlistDeleted": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "voiceSearch": "البحث الصوتي",
@@ -88,13 +106,17 @@
   "noLocalSongsMatch": "لا توجد أغانٍ محلية تطابق \"{query}\"",
   "@noLocalSongsMatch": {
     "placeholders": {
-      "query": { "type": "String" }
+      "query": {
+        "type": "String"
+      }
     }
   },
   "noOnlineSongsMatch": "لا توجد أغانٍ عبر الإنترنت تطابق \"{query}\"",
   "@noOnlineSongsMatch": {
     "placeholders": {
-      "query": { "type": "String" }
+      "query": {
+        "type": "String"
+      }
     }
   },
   "professionalMode": "الوضع الاحترافي",
@@ -128,16 +150,26 @@
   "queueReorderSemantics": "إعادة ترتيب {title}. الموضع {index} من {count}",
   "@queueReorderSemantics": {
     "placeholders": {
-      "title": { "type": "String" },
-      "index": { "type": "int" },
-      "count": { "type": "int" }
+      "title": {
+        "type": "String"
+      },
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
     }
   },
   "songByArtist": "{title} بواسطة {artist}",
   "@songByArtist": {
     "placeholders": {
-      "title": { "type": "String" },
-      "artist": { "type": "String" }
+      "title": {
+        "type": "String"
+      },
+      "artist": {
+        "type": "String"
+      }
     }
   },
   "customDurationMinutes": "مدة مخصصة (بالدقائق).",
@@ -4161,7 +4193,7 @@
   "dacRateSwitchResample": "إعادة تشكيل إلى {target} كيلوهرتز للحصول على إخراج دقيق؟",
   "dacRateSwitchRemember": "التبديل التلقائي دائماً في المستقبل",
   "dacRateSwitchConfirm": "تبديل ({target} ك)",
-  "miniPlayerSwipeHint": "اسحب لليسار/اليمين للتخطي",
+  "miniPlayerSwipeHint": "اسحب للتخطي · أعلى/أسفل لتغيير نمط الشريط",
   "phoneSpeaker": "مكبر صوت الهاتف",
   "usbDacNoneAttached": "محول USB DAC: لا يوجد جهاز متصل",
   "directPlaybackNotReported": "التشغيل المباشر: غير مُبلّغ عنه",
@@ -4200,10 +4232,22 @@
   "dockStyleNavTopDesc": "يظهر المشغّل المصغّر خلف شريط التنقّل",
   "dockStyleHint": "اضغط مطوّلًا على المشغّل المصغّر لتغيير نمط الإرساء",
   "whatsNewSubtitle": "شاهد الجديد في الإصدار {version}",
-  "@whatsNewSubtitle": {"placeholders": {"version": {"type": "String"}}},
+  "@whatsNewSubtitle": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "studioMoreInStudio": "المزيد في وضع الاستوديو",
   "studioControlsAvailable": "{count} من أدوات الاستوديو متاحة",
-  "@studioControlsAvailable": {"placeholders": {"count": {"type": "int"}}},
+  "@studioControlsAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "studioSwitchCta": "التبديل إلى الاستوديو",
   "studioExplainerTitle": "ما الذي يضيفه وضع الاستوديو",
   "studioExplainerBody": "إخراج مثالي للبت، وحزمة DSP الكاملة، وملفات الأجهزة، والأتمتة، وخادم الوسيط. يمكنك الرجوع في أي وقت.",
@@ -4211,7 +4255,13 @@
   "badgeOn": "مُشغّل",
   "keepBestQualityForAll": "الإبقاء على أفضل جودة للجميع",
   "selectedHighestQuality": "تم اختيار أعلى جودة لـ {count} مجموعة",
-  "@selectedHighestQuality": {"placeholders": {"count": {"type": "int"}}},
+  "@selectedHighestQuality": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "enterSearchValue": "أدخل قيمة البحث…",
   "radioSearchHint": "ابحث عن محطة أو نوع أو رابط…",
   "webSessionInterruptedTitle": "انقطعت جلسة الويب",
@@ -4517,11 +4567,98 @@
   "quranRepeatRange": "تكرار النطاق",
   "quranRepeatOff": "التكرار: متوقف",
   "batchCappedTracks": "{count, plural, =1{تم تخطي مسار واحد (حد الدفعة)} other{تم تخطي {count} مسارات (حد الدفعة)}}",
-  "@batchCappedTracks": {"description": "لاحقة إشعار تنزيل الدفعة للمسارات غير المضافة بسبب حد الدفعة", "placeholders": {"count": {"type": "int"}}},
+  "@batchCappedTracks": {
+    "description": "لاحقة إشعار تنزيل الدفعة للمسارات غير المضافة بسبب حد الدفعة",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "batchFailedTracks": "{count, plural, =1{فشل مسار واحد} other{فشل {count} مسارات}}",
-  "@batchFailedTracks": {"description": "لاحقة إشعار تنزيل الدفعة للمسارات الفاشلة", "placeholders": {"count": {"type": "int"}}},
+  "@batchFailedTracks": {
+    "description": "لاحقة إشعار تنزيل الدفعة للمسارات الفاشلة",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "batchFailedTracksWithError": "{count, plural, =1{فشل مسار واحد ({error})} other{فشل {count} مسارات ({error})}}",
-  "@batchFailedTracksWithError": {"description": "لاحقة إشعار تنزيل الدفعة للمسارات الفاشلة مع أول خطأ", "placeholders": {"count": {"type": "int"}, "error": {"type": "String"}}},
+  "@batchFailedTracksWithError": {
+    "description": "لاحقة إشعار تنزيل الدفعة للمسارات الفاشلة مع أول خطأ",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "batchSkippedLocalTracks": "{count, plural, =1{تم تخطي مسار محلي واحد} other{تم تخطي {count} مسارات محلية}}",
-  "@batchSkippedLocalTracks": {"description": "لاحقة إشعار تنزيل الدفعة للمسارات المحلية المتاحة", "placeholders": {"count": {"type": "int"}}}
+  "@batchSkippedLocalTracks": {
+    "description": "لاحقة إشعار تنزيل الدفعة للمسارات المحلية المتاحة",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "queueRecentlyPlayed": "تم تشغيلها مؤخرًا ({count})",
+  "queueAutoplayOn": "التشغيل التلقائي: مفعّل",
+  "queueAutoplayOff": "التشغيل التلقائي: متوقف",
+  "queueReordered": "تمت إعادة ترتيب قائمة الانتظار",
+  "downloadsProgressSummary": "جارٍ التنزيل {active} • اكتمل {completed}/{total}",
+  "downloadsRequeued": "أُعيدت {count} إلى قائمة الانتظار",
+  "partyListenTogether": "الاستماع معًا",
+  "partyServerSettings": "إعدادات الخادم",
+  "partyServerConfiguration": "إعداد الخادم",
+  "partyServerUrl": "عنوان الخادم",
+  "partyResetDefault": "استعادة الافتراضي",
+  "partySyncDescription": "زامن الموسيقى عبر عدة أجهزة في الوقت الفعلي.",
+  "partyDisplayNameHint": "اسم العرض (اختياري)",
+  "partyCreateNew": "إنشاء جلسة جديدة",
+  "partyOrJoinByCode": "أو انضم بالرمز",
+  "partyJoin": "انضمام",
+  "partyRoomCode": "رمز الغرفة",
+  "partyCopyInvite": "نسخ رابط الدعوة",
+  "partyShareInvite": "مشاركة الدعوة",
+  "partySyncedRtt": "متزامن (زمن الاستجابة: {rtt} مللي ثانية)",
+  "partySynchronizingClock": "جارٍ مزامنة الساعة...",
+  "partyHost": "المضيف",
+  "partyMembers": "الأعضاء ({count}/{max})",
+  "partyHostMember": "المضيف",
+  "partyLeave": "مغادرة الجلسة",
+  "partyUnableReconnect": "تعذر إعادة الاتصال بالجلسة. تحقق من اتصالك.",
+  "partyShareText": "انضم إلى جلسة الاستماع على Pulsr: {link}",
+  "partyShareSubject": "Pulsr Party {code}",
+  "radioDuplicateUrl": "يوجد بالفعل محطة بهذا الرابط.",
+  "lyricsTrackChanged": "تغيّر المقطع المشغّل. أعد فتح محرر الكلمات لهذا المقطع.",
+  "lyricsTranslationUnavailable": "الترجمة غير متاحة الآن.",
+  "discardChangesTitle": "تجاهل التغييرات؟",
+  "discardChangesBody": "ستفقد التعديلات غير المحفوظة.",
+  "onboardingPageIndicator": "الصفحة {index} من {count}",
+  "smartFieldLabel": "الحقل",
+  "smartOperatorLabel": "العامل",
+  "abLoopPointA": "نقطة التكرار A {time}",
+  "abLoopSetA": "تعيين نقطة التكرار A",
+  "abLoopPointB": "نقطة التكرار B {time}",
+  "abLoopSetB": "تعيين نقطة التكرار B",
+  "playerNoPlayableTracks": "لا توجد مقاطع قابلة للتشغيل في قائمة الانتظار",
+  "discard": "تجاهل",
+  "reorderSongs": "إعادة ترتيب الأغاني",
+  "reorderFailed": "تعذر حفظ الترتيب الجديد",
+  "reorderInstructions": "اسحب لإعادة الترتيب. حدد المقاطع لنقلها دفعة واحدة.",
+  "moveToTop": "نقل إلى الأعلى",
+  "moveToBottom": "نقل إلى الأسفل",
+  "moveToPosition": "نقل إلى موضع",
+  "enterPosition": "أدخل رقم الموضع (1 - {total})",
+  "position": "الموضع",
+  "reorderDone": "تم",
+  "customOrder": "ترتيب مخصص",
+  "cachedCopy": "محفوظة محليًا",
+  "onlineCacheProgress": "جارٍ حفظ المكتبة… {done}/{total}",
+  "canvasEffects": "تأثيرات كانفس",
+  "canvasEffectsSubtitle": "حركة فنية متحركة في المشغل"
 }

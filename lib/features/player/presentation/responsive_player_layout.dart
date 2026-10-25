@@ -254,7 +254,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Color.lerp(widget.bgColor, Colors.black, 0.45) ??
+                            Color.lerp(widget.bgColor, Colors.black,
+                                    p.isDark ? 0.45 : 0.05) ??
                                 widget.bgColor,
                             p.bg,
                             p.deepShade,
@@ -328,7 +329,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
           // 2. Foreground 2-Pane Split (Apple Music Element Ordering)
           SafeArea(
             top: true,
-            bottom: false,
+            bottom: true,
             child: Row(
               children: [
                 // Left Pane: Persistent Full-Fidelity Player Theme (Artwork + Controls Column)
@@ -369,8 +370,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black
-                                        .withValues(alpha: p.isDark ? 0.30 : 0.06),
+                                    color: Colors.black.withValues(
+                                        alpha: p.isDark ? 0.30 : 0.06),
                                     blurRadius: 12,
                                     offset: const Offset(0, 3),
                                   ),

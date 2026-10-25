@@ -88,6 +88,14 @@ extension PlayerQueueRadio on PlayerQueueController {
               errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
       return;
     }
+    final artwork = (station.artworkUrl != null &&
+            station.artworkUrl!.isNotEmpty)
+        ? station.artworkUrl
+        : RadioStationStore.resolveArtworkForStation(
+            id: station.id,
+            name: station.name,
+            url: station.url,
+          );
     final song = SongsTableData(
       id: station.songId,
       title: station.name,
@@ -98,7 +106,7 @@ extension PlayerQueueRadio on PlayerQueueController {
       durationMs: 0,
       path: station.url,
       source: SongSource.radio,
-      remoteArtworkUrl: station.artworkUrl,
+      remoteArtworkUrl: artwork,
       isFavorite: false,
       isMissing: false,
       isDownloaded: false,

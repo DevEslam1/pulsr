@@ -88,7 +88,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                     fontSize: AppFontSize.bodySmall)),
                             const SizedBox(height: AppSpacing.s2),
                             Text(
-                                '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
+                                '${album.artist} • ${context.l10n.tracksCount(album.songCount)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -136,7 +136,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                     fontSize: AppFontSize.body,
                                     color: p.textPrimary)),
                             subtitle: Text(
-                                '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
+                                '${album.artist} • ${context.l10n.tracksCount(album.songCount)}',
                                 style: TextStyle(
                                     color: p.textSecondary,
                                     fontSize: AppFontSize.label)),
@@ -234,7 +234,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                     color: p.textPrimary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: AppFontSize.bodySmall)),
-                            Text(Formatters.formatTrackCount(artist.songCount),
+                            Text(context.l10n.tracksCount(artist.songCount),
                                 style: TextStyle(
                                     color: p.textSecondary,
                                     fontSize: AppFontSize.caption)),
@@ -280,7 +280,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                     fontSize: AppFontSize.body,
                                     color: p.textPrimary)),
                             subtitle: Text(
-                                Formatters.formatTrackCount(artist.songCount),
+                                context.l10n.tracksCount(artist.songCount),
                                 style: TextStyle(
                                     color: p.textSecondary,
                                     fontSize: AppFontSize.label)),
@@ -360,7 +360,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                     return CategoryCard(
                       icon: Icons.style_rounded,
                       title: g.name,
-                      subtitle: Formatters.formatTrackCount(g.songCount),
+                      subtitle: context.l10n.tracksCount(g.songCount),
                       color: p.accent,
                       onTap: () => context.pushDebounced('/genre', extra: g),
                     );
@@ -432,7 +432,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         return CategoryCard(
           icon: Icons.calendar_today_rounded,
           title: '${y.year}',
-          subtitle: Formatters.formatTrackCount(y.songCount),
+          subtitle: context.l10n.tracksCount(y.songCount),
           color: AppColors.skyBlue,
           onTap: () => context.pushDebounced('/year', extra: y),
         );

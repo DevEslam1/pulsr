@@ -43,6 +43,8 @@ class LyricsTranslationService {
   LyricsTranslationService({http.Client? client})
       : _client = client ?? http.Client();
 
+  void dispose() => _client.close();
+
   /// Generates a deterministic cache key.
   static String _generateCacheKey({
     required String trackId,

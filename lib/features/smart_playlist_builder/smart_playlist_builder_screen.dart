@@ -316,6 +316,11 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                     ...List.generate(state.criteria.rules.length, (index) {
                       final rule = state.criteria.rules[index];
                       return _RuleCard(
+                        // Recreate the row when the rule at this position
+                        // changes so the dropdowns never display the deleted
+                        // neighbour's field/operator.
+                        key: ValueKey(
+                            '$index-${rule.field.name}-${rule.operator.name}'),
                         rule: rule,
                         onChanged: (updated) =>
                             cubit.updateRule(index, updated),
@@ -627,6 +632,7 @@ class _RuleCard extends StatefulWidget {
   final VoidCallback onDelete;
 
   const _RuleCard({
+    super.key,
     required this.rule,
     required this.onChanged,
     required this.onDelete,
@@ -683,7 +689,7 @@ class _RuleCardState extends State<_RuleCard> {
                 Expanded(
                   flex: 3,
                   child: Semantics(
-                    label: 'Field',
+                    label: context.l10n.smartFieldLabel,
                     child: DropdownButtonFormField<SmartRuleField>(
                       initialValue: widget.rule.field,
                       decoration: InputDecoration(
@@ -720,7 +726,7 @@ class _RuleCardState extends State<_RuleCard> {
                 Expanded(
                   flex: 3,
                   child: Semantics(
-                    label: 'Operator',
+                    label: context.l10n.smartOperatorLabel,
                     child: DropdownButtonFormField<SmartOperator>(
                       initialValue: widget.rule.operator,
                       decoration: InputDecoration(

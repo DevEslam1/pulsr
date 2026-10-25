@@ -48,6 +48,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(createTestSong(id: -1));
     registerFallbackValue(<SongsTableData>[]);
+    registerFallbackValue(<String>[]);
   });
 
   setUp(() {
@@ -69,8 +70,11 @@ void main() {
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
           limit: any(named: 'limit'),
+          excludedFolders: any(named: 'excludedFolders'),
         )).thenAnswer((_) async => const Right(<SongsTableData>[]));
-    when(() => getSongs.watchTopPlayed(limit: any(named: 'limit')))
+    when(() => getSongs.watchTopPlayed(
+            limit: any(named: 'limit'),
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
     when(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
@@ -122,6 +126,7 @@ void main() {
               sortBy: any(named: 'sortBy'),
               ascending: any(named: 'ascending'),
               limit: any(named: 'limit'),
+              excludedFolders: any(named: 'excludedFolders'),
             ))
         .thenAnswer((_) async =>
             Right([createTestSong(id: 1, title: 'A'), createTestSong(id: 2)]));
@@ -134,6 +139,7 @@ void main() {
           sortBy: 'lastPlayed',
           ascending: false,
           limit: 200,
+          excludedFolders: any(named: 'excludedFolders'),
         )).called(1);
     verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);
   });

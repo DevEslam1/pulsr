@@ -1399,15 +1399,23 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
   Future<void> setCustomAccentColor(Color color) async {
     markDirty('customAccentColorValue');
+    markDirty('themeColorSource');
     int colorVal;
     try {
       colorVal = (color as dynamic).toARGB32() as int;
     } catch (_) {
       colorVal = color.toARGB32();
     }
-    safeEmit(state.copyWith(customAccentColorValue: colorVal));
+    // Picking a swatch is an explicit request to use it. Without switching the
+    // source, the default artwork theme kept overriding the selection.
+    safeEmit(state.copyWith(
+      customAccentColorValue: colorVal,
+      themeColorSource: ThemeColorSource.custom,
+    ));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyCustomAccent, colorVal);
+    await prefs.setString(_keyThemeColorSource, ThemeColorSource.custom.name);
+    await prefs.setBool(_keyDynamicTheme, false);
   }
 
   Future<void> setCustomThemeRadius(double radius) async {

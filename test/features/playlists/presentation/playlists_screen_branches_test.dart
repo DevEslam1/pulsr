@@ -100,7 +100,7 @@ void main() {
         .thenReturn(ValueNotifier<YtmOnlineState>(const YtmOnlineState()));
     when(() => cubit.createPlaylist(any())).thenAnswer((_) async {});
     when(() => cubit.renamePlaylist(any(), any())).thenAnswer((_) async {});
-    when(() => cubit.deletePlaylist(any())).thenAnswer((_) async {});
+    when(() => cubit.deletePlaylist(any())).thenAnswer((_) async => true);
     when(() => cubit.reloadPlaylists()).thenReturn(null);
     when(() => cubit.autoFetchOnlineLibrary()).thenAnswer((_) async {});
     when(() => cubit.autoFetchOnlineLibrary(force: true))

@@ -4,14 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/widgets/pulsr_pressable.dart';
 
 double _scaleOf(WidgetTester tester) {
-  final transform = tester.widget<Transform>(
-    find
-        .descendant(
-          of: find.byType(PulsrPressable),
-          matching: find.byType(Transform),
-        )
-        .first,
+  final finder = find.descendant(
+    of: find.byType(PulsrPressable),
+    matching: find.byType(Transform),
   );
+  // The widget deliberately omits the Transform at rest; no Transform means
+  // the unscaled (1.0) state, not a missing widget.
+  if (finder.evaluate().isEmpty) return 1.0;
+  final transform = tester.widget<Transform>(finder.first);
   // X-axis entry: getMaxScaleOnAxis() includes the untouched Z axis (1.0).
   return transform.transform.entry(0, 0);
 }

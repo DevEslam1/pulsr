@@ -248,9 +248,11 @@ void main() {
           .thenAnswer((_) => const Stream.empty());
       when(() => mockArtists.watchArtists())
           .thenAnswer((_) => const Stream.empty());
-      when(() => mockGenres.watchGenres())
+      when(() => mockGenres.watchGenres(
+              excludedFolders: any(named: 'excludedFolders')))
           .thenAnswer((_) => const Stream.empty());
-      when(() => mockYears.watchYears())
+      when(() => mockYears.watchYears(
+              excludedFolders: any(named: 'excludedFolders')))
           .thenAnswer((_) => const Stream.empty());
       when(() => mockFavorites.watchFavorites())
           .thenAnswer((_) => const Stream.empty());

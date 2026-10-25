@@ -21,6 +21,10 @@ mixin _$LibraryState {
   List<GenreItem> get genres;
   List<YearItem> get years;
   List<SongsTableData> get favorites;
+
+  /// Full downloaded list, streamed independently of the paginated [songs]
+  /// window so downloads outside the loaded page are visible and counted.
+  List<SongsTableData> get downloadedSongs;
   List<FolderItem> get folders;
   String get sortBy;
   bool get ascending;
@@ -55,6 +59,8 @@ mixin _$LibraryState {
             const DeepCollectionEquality()
                 .equals(other.favorites, _this.favorites) &&
             const DeepCollectionEquality()
+                .equals(other.downloadedSongs, _this.downloadedSongs) &&
+            const DeepCollectionEquality()
                 .equals(other.folders, _this.folders) &&
             (identical(other.sortBy, _this.sortBy) ||
                 other.sortBy == _this.sortBy) &&
@@ -87,6 +93,7 @@ mixin _$LibraryState {
         const DeepCollectionEquality().hash(_this.genres),
         const DeepCollectionEquality().hash(_this.years),
         const DeepCollectionEquality().hash(_this.favorites),
+        const DeepCollectionEquality().hash(_this.downloadedSongs),
         const DeepCollectionEquality().hash(_this.folders),
         _this.sortBy,
         _this.ascending,
@@ -102,7 +109,7 @@ mixin _$LibraryState {
   @override
   String toString() {
     final _this = this as LibraryState;
-    return 'LibraryState(songs: ${_this.songs}, albums: ${_this.albums}, artists: ${_this.artists}, genres: ${_this.genres}, years: ${_this.years}, favorites: ${_this.favorites}, folders: ${_this.folders}, sortBy: ${_this.sortBy}, ascending: ${_this.ascending}, isLoading: ${_this.isLoading}, isLoadingMore: ${_this.isLoadingMore}, errorMessage: ${_this.errorMessage}, infoMessage: ${_this.infoMessage}, selectedSongIds: ${_this.selectedSongIds}, isMultiSelectMode: ${_this.isMultiSelectMode}, viewMode: ${_this.viewMode})';
+    return 'LibraryState(songs: ${_this.songs}, albums: ${_this.albums}, artists: ${_this.artists}, genres: ${_this.genres}, years: ${_this.years}, favorites: ${_this.favorites}, downloadedSongs: ${_this.downloadedSongs}, folders: ${_this.folders}, sortBy: ${_this.sortBy}, ascending: ${_this.ascending}, isLoading: ${_this.isLoading}, isLoadingMore: ${_this.isLoadingMore}, errorMessage: ${_this.errorMessage}, infoMessage: ${_this.infoMessage}, selectedSongIds: ${_this.selectedSongIds}, isMultiSelectMode: ${_this.isMultiSelectMode}, viewMode: ${_this.viewMode})';
   }
 }
 
@@ -119,6 +126,7 @@ abstract mixin class $LibraryStateCopyWith<$Res> {
       List<GenreItem> genres,
       List<YearItem> years,
       List<SongsTableData> favorites,
+      List<SongsTableData> downloadedSongs,
       List<FolderItem> folders,
       String sortBy,
       bool ascending,
@@ -149,6 +157,7 @@ class _$LibraryStateCopyWithImpl<$Res> implements $LibraryStateCopyWith<$Res> {
     Object? genres = null,
     Object? years = null,
     Object? favorites = null,
+    Object? downloadedSongs = null,
     Object? folders = null,
     Object? sortBy = null,
     Object? ascending = null,
@@ -184,6 +193,10 @@ class _$LibraryStateCopyWithImpl<$Res> implements $LibraryStateCopyWith<$Res> {
       favorites: null == favorites
           ? _self.favorites
           : favorites // ignore: cast_nullable_to_non_nullable
+              as List<SongsTableData>,
+      downloadedSongs: null == downloadedSongs
+          ? _self.downloadedSongs
+          : downloadedSongs // ignore: cast_nullable_to_non_nullable
               as List<SongsTableData>,
       folders: null == folders
           ? _self.folders
@@ -329,6 +342,7 @@ extension LibraryStatePatterns on LibraryState {
             List<GenreItem> genres,
             List<YearItem> years,
             List<SongsTableData> favorites,
+            List<SongsTableData> downloadedSongs,
             List<FolderItem> folders,
             String sortBy,
             bool ascending,
@@ -352,6 +366,7 @@ extension LibraryStatePatterns on LibraryState {
             _that.genres,
             _that.years,
             _that.favorites,
+            _that.downloadedSongs,
             _that.folders,
             _that.sortBy,
             _that.ascending,
@@ -389,6 +404,7 @@ extension LibraryStatePatterns on LibraryState {
             List<GenreItem> genres,
             List<YearItem> years,
             List<SongsTableData> favorites,
+            List<SongsTableData> downloadedSongs,
             List<FolderItem> folders,
             String sortBy,
             bool ascending,
@@ -411,6 +427,7 @@ extension LibraryStatePatterns on LibraryState {
             _that.genres,
             _that.years,
             _that.favorites,
+            _that.downloadedSongs,
             _that.folders,
             _that.sortBy,
             _that.ascending,
@@ -447,6 +464,7 @@ extension LibraryStatePatterns on LibraryState {
             List<GenreItem> genres,
             List<YearItem> years,
             List<SongsTableData> favorites,
+            List<SongsTableData> downloadedSongs,
             List<FolderItem> folders,
             String sortBy,
             bool ascending,
@@ -469,6 +487,7 @@ extension LibraryStatePatterns on LibraryState {
             _that.genres,
             _that.years,
             _that.favorites,
+            _that.downloadedSongs,
             _that.folders,
             _that.sortBy,
             _that.ascending,
@@ -495,6 +514,7 @@ class _LibraryState extends LibraryState {
       List<GenreItem> genres = const [],
       List<YearItem> years = const [],
       List<SongsTableData> favorites = const [],
+      List<SongsTableData> downloadedSongs = const [],
       List<FolderItem> folders = const [],
       this.sortBy = 'title',
       this.ascending = true,
@@ -511,6 +531,7 @@ class _LibraryState extends LibraryState {
         _genres = genres,
         _years = years,
         _favorites = favorites,
+        _downloadedSongs = downloadedSongs,
         _folders = folders,
         _selectedSongIds = selectedSongIds,
         super._();
@@ -567,6 +588,20 @@ class _LibraryState extends LibraryState {
     if (_favorites is EqualUnmodifiableListView) return _favorites;
     // ignore: implicit_dynamic_type
     return EqualUnmodifiableListView(_favorites);
+  }
+
+  /// Full downloaded list, streamed independently of the paginated [songs]
+  /// window so downloads outside the loaded page are visible and counted.
+  final List<SongsTableData> _downloadedSongs;
+
+  /// Full downloaded list, streamed independently of the paginated [songs]
+  /// window so downloads outside the loaded page are visible and counted.
+  @override
+  @JsonKey()
+  List<SongsTableData> get downloadedSongs {
+    if (_downloadedSongs is EqualUnmodifiableListView) return _downloadedSongs;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_downloadedSongs);
   }
 
   final List<FolderItem> _folders;
@@ -630,6 +665,8 @@ class _LibraryState extends LibraryState {
             const DeepCollectionEquality().equals(other.years, _years) &&
             const DeepCollectionEquality()
                 .equals(other.favorites, _favorites) &&
+            const DeepCollectionEquality()
+                .equals(other.downloadedSongs, _downloadedSongs) &&
             const DeepCollectionEquality().equals(other.folders, _folders) &&
             (identical(other.sortBy, sortBy) || other.sortBy == sortBy) &&
             (identical(other.ascending, ascending) ||
@@ -660,6 +697,7 @@ class _LibraryState extends LibraryState {
         const DeepCollectionEquality().hash(_genres),
         const DeepCollectionEquality().hash(_years),
         const DeepCollectionEquality().hash(_favorites),
+        const DeepCollectionEquality().hash(_downloadedSongs),
         const DeepCollectionEquality().hash(_folders),
         sortBy,
         ascending,
@@ -674,7 +712,7 @@ class _LibraryState extends LibraryState {
 
   @override
   String toString() {
-    return 'LibraryState(songs: $songs, albums: $albums, artists: $artists, genres: $genres, years: $years, favorites: $favorites, folders: $folders, sortBy: $sortBy, ascending: $ascending, isLoading: $isLoading, isLoadingMore: $isLoadingMore, errorMessage: $errorMessage, infoMessage: $infoMessage, selectedSongIds: $selectedSongIds, isMultiSelectMode: $isMultiSelectMode, viewMode: $viewMode)';
+    return 'LibraryState(songs: $songs, albums: $albums, artists: $artists, genres: $genres, years: $years, favorites: $favorites, downloadedSongs: $downloadedSongs, folders: $folders, sortBy: $sortBy, ascending: $ascending, isLoading: $isLoading, isLoadingMore: $isLoadingMore, errorMessage: $errorMessage, infoMessage: $infoMessage, selectedSongIds: $selectedSongIds, isMultiSelectMode: $isMultiSelectMode, viewMode: $viewMode)';
   }
 }
 
@@ -693,6 +731,7 @@ abstract mixin class _$LibraryStateCopyWith<$Res>
       List<GenreItem> genres,
       List<YearItem> years,
       List<SongsTableData> favorites,
+      List<SongsTableData> downloadedSongs,
       List<FolderItem> folders,
       String sortBy,
       bool ascending,
@@ -724,6 +763,7 @@ class __$LibraryStateCopyWithImpl<$Res>
     Object? genres = null,
     Object? years = null,
     Object? favorites = null,
+    Object? downloadedSongs = null,
     Object? folders = null,
     Object? sortBy = null,
     Object? ascending = null,
@@ -759,6 +799,10 @@ class __$LibraryStateCopyWithImpl<$Res>
       favorites: null == favorites
           ? _self._favorites
           : favorites // ignore: cast_nullable_to_non_nullable
+              as List<SongsTableData>,
+      downloadedSongs: null == downloadedSongs
+          ? _self._downloadedSongs
+          : downloadedSongs // ignore: cast_nullable_to_non_nullable
               as List<SongsTableData>,
       folders: null == folders
           ? _self._folders

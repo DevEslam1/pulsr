@@ -431,7 +431,8 @@ void main() {
       expect(service.debugBotCooldownRemaining, const Duration(seconds: 720));
     });
 
-    test('notePlaybackFailure classifies raw stream errors into the ledger', () {
+    test('notePlaybackFailure classifies raw stream errors into the ledger',
+        () {
       final service = _newService();
       service.notePlaybackFailure(
           'p1', Exception("Sign in to confirm you're not a bot"));
@@ -591,6 +592,7 @@ void main() {
                   duration: Duration.zero,
                 ),
               ]);
+      when(() => account.isFetchingLikedSongs).thenReturn(false);
       getIt.registerSingleton<YtmAccountService>(account);
 
       final tracks = await _newService().getPlaylistTracks('PLabc');
@@ -604,6 +606,7 @@ void main() {
       when(() => account.fetchPlaylistTracks(any(),
               maxTracks: any(named: 'maxTracks')))
           .thenAnswer((_) async => const []);
+      when(() => account.isFetchingLikedSongs).thenReturn(false);
       getIt.registerSingleton<YtmAccountService>(account);
 
       channelHandler = (call) async => call.method == 'getPlaylist'

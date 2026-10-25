@@ -158,8 +158,9 @@ void main() {
       final res = await repo.queueDownload(task('abcdefghijk'));
       expect(res.isLeft(), isTrue);
       expect(res.getLeft().toNullable(), isA<StorageFailure>());
-      verifyNever(
-          () => service.download(any(), onProgress: any(named: 'onProgress')));
+      verifyNever(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress')));
     });
 
     test('re-queues a complete task only after its file disappears', () async {
@@ -169,8 +170,9 @@ void main() {
         ..writeAsStringSync('audio');
       when(() => service.getDownloadedPath(any())).thenReturn(file.path);
       var downloadCalls = 0;
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((_) async {
+      when(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((_) async {
         downloadCalls++;
         return const Right(77);
       });
@@ -197,8 +199,9 @@ void main() {
 
   group('progress stage mapping', () {
     test('broadcasts every stage mapping', () async {
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((invocation) async {
+      when(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((invocation) async {
         final onProgress = invocation.namedArguments[const Symbol('onProgress')]
             as void Function(YtDownloadProgress)?;
         onProgress?.call(const YtDownloadProgress(YtDownloadStage.queued));
@@ -225,8 +228,9 @@ void main() {
 
     test('retries a transient failure then succeeds', () async {
       var calls = 0;
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((_) async {
+      when(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((_) async {
         calls++;
         if (calls == 1) {
           return const Left(DownloadFailure('HTTP 429 Rate limited'));
@@ -243,8 +247,9 @@ void main() {
 
     test('a permanent failure stops retrying', () async {
       var calls = 0;
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((_) async {
+      when(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((_) async {
         calls++;
         return const Left(DownloadFailure('Video unavailable'));
       });
@@ -273,7 +278,9 @@ void main() {
       final file = File('${temp.path}${Platform.pathSeparator}stat.m4a')
         ..writeAsStringSync('0123456789');
       when(() => service.getDownloadedPath(any())).thenReturn(file.path);
-      when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
           .thenAnswer((_) async => const Right(5));
 
       await repo.queueDownload(task('abcdefghijk'));

@@ -7,7 +7,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Drift Migration Smoke Tests', () {
-    test('fresh database initializes schema v11 with all tables and indexes',
+    test('fresh database initializes schema v12 with all tables and indexes',
         () async {
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(() async => await db.close());
@@ -16,7 +16,7 @@ void main() {
       final songs = await db.select(db.songsTable).get();
       expect(songs, isEmpty);
 
-      expect(db.schemaVersion, equals(11));
+      expect(db.schemaVersion, equals(12));
       expect(db.migrationFailed, isFalse);
     });
 

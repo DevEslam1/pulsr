@@ -105,7 +105,7 @@ void main() {
     when(() => cubit.ytmOnline).thenReturn(online);
     when(() => cubit.createPlaylist(any())).thenAnswer((_) async {});
     when(() => cubit.renamePlaylist(any(), any())).thenAnswer((_) async {});
-    when(() => cubit.deletePlaylist(any())).thenAnswer((_) async {});
+    when(() => cubit.deletePlaylist(any())).thenAnswer((_) async => true);
     when(() => cubit.autoFetchOnlineLibrary()).thenAnswer((_) async {});
     when(() => cubit.autoFetchOnlineLibrary(force: true))
         .thenAnswer((_) async {});

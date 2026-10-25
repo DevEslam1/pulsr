@@ -107,6 +107,9 @@ Future<void> main() async {
     );
     return Builder(
       builder: (context) => Material(
+        // Theme may not be reachable when a build error happens high in the
+        // tree; a fixed dark surface keeps the fallback readable in both modes.
+        color: const Color(0xFF17191F),
         child: Center(
           child: Text(
             AppLocalizations.of(context)?.somethingWentWrong ?? 'Error',
@@ -390,6 +393,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   bool _dependenciesReady = false;
   bool _bootstrapFailed = false;
   bool _bootstrapInFlight = false;
+  bool _pausedSinceStart = false;
+  bool _resumeScanInFlight = false;
 
   @override
   void initState() {
@@ -530,9 +535,14 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // No-op: locale is stable; avoid AssetManager thrash (LOG-16)
+      // No-op for locale; pick up media-store changes after a real background
+      // stint using the scanner's 15-minute delta gate.
+      if (_pausedSinceStart) {
+        unawaited(_maybeRescanOnResume());
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
+      _pausedSinceStart = true;
       // Flush the debounced queue-slot write before the process can be killed.
       try {
         if (getIt.isRegistered<PlayerCubit>()) {
@@ -542,6 +552,35 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
         ErrorLogger.log('Failed to persist queue slots on detach',
             error: e, stackTrace: st, category: 'PulsrApp');
       }
+    }
+  }
+
+  /// Runs a silent, time-gated delta scan so tracks added while the app was
+  /// backgrounded appear without the user manually opening Settings.
+  Future<void> _maybeRescanOnResume() async {
+    // MediaStore/photo permissions only exist on mobile; desktop scans on an
+    // explicit request. Skipping keeps widget tests and desktop startup quiet.
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    if (_resumeScanInFlight) return;
+    _resumeScanInFlight = true;
+    try {
+      final scanner = getIt<MediaScannerService>();
+      if (!scanner.shouldRescanOnResume()) return;
+      if (!await scanner.checkPermission()) return;
+      if (!mounted) return;
+      final settings = getIt<SettingsCubit>().state;
+      final prefs = await SharedPreferences.getInstance();
+      await scanner.scanDeviceLibrary(
+        ignoreShortFiles: settings.minDurationSec > 0,
+        minDurationSec: settings.minDurationSec,
+        minSizeKb: prefs.getInt('setting_min_file_size_kb') ?? 0,
+        autoHideSystemMedia: settings.autoHideSystemMedia,
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Resume media scan failed',
+          error: e, stackTrace: st, category: 'PulsrApp');
+    } finally {
+      _resumeScanInFlight = false;
     }
   }
 

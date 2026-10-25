@@ -23,41 +23,42 @@ mixin SettingsOnlineSection
           // Account + web-player entries trigger network; hide them when the
           // user has turned on offline-only mode (Home/Search already do).
           if (!state.offlineOnlyMode) ...[
-            () {
-              final ytmAccount = getIt<YtmAccountService>();
-              return ValueListenableBuilder<bool>(
-                valueListenable: ytmAccount.loginState,
-                builder: (context, isLoggedIn, _) {
-                  if (!isLoggedIn) {
-                    return _navTile(
-                      context,
-                      Icons.account_circle_outlined,
-                      context.l10n.connectYtmAccount,
-                      context.l10n.connectYtmSubtitle,
-                      onTap: () async {
-                        final ok = await YtmWebLoginSheet.show(context);
-                        if (ok == true && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(context.l10n.ytmConnected),
-                            ),
-                          );
-                        }
-                      },
-                    );
-                  } else {
-                    return _navTile(
-                      context,
-                      Icons.account_circle_rounded,
-                      context.l10n.ytmConnected,
-                      '${ytmAccount.accountName ?? context.l10n.castConnected} • ${context.l10n.settingsTapToManage}',
-                      trailingBadge: context.l10n.settingsBadgeConnected,
-                      onTap: () => showYtmAccountDisconnectDialog(context),
-                    );
-                  }
-                },
-              );
-            }(),
+            if (getIt.isRegistered<YtmAccountService>())
+              () {
+                final ytmAccount = getIt<YtmAccountService>();
+                return ValueListenableBuilder<bool>(
+                  valueListenable: ytmAccount.loginState,
+                  builder: (context, isLoggedIn, _) {
+                    if (!isLoggedIn) {
+                      return _navTile(
+                        context,
+                        Icons.account_circle_outlined,
+                        context.l10n.connectYtmAccount,
+                        context.l10n.connectYtmSubtitle,
+                        onTap: () async {
+                          final ok = await YtmWebLoginSheet.show(context);
+                          if (ok == true && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(context.l10n.ytmConnected),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    } else {
+                      return _navTile(
+                        context,
+                        Icons.account_circle_rounded,
+                        context.l10n.ytmConnected,
+                        '${ytmAccount.accountName ?? context.l10n.castConnected} • ${context.l10n.settingsTapToManage}',
+                        trailingBadge: context.l10n.settingsBadgeConnected,
+                        onTap: () => showYtmAccountDisconnectDialog(context),
+                      );
+                    }
+                  },
+                );
+              }(),
             _divider(p),
             _navTile(
               context,

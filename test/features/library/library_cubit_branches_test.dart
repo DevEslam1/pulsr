@@ -89,9 +89,11 @@ void main() {
         .thenAnswer((_) => Stream.value(const Right([])));
     when(() => getArtists.watchArtists())
         .thenAnswer((_) => Stream.value(const Right([])));
-    when(() => getGenres.watchGenres())
+    when(() => getGenres.watchGenres(
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right([])));
-    when(() => getYears.watchYears())
+    when(() =>
+            getYears.watchYears(excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right([])));
     when(() => getFavorites.watchFavorites())
         .thenAnswer((_) => Stream.value(const Right([])));
@@ -193,6 +195,9 @@ void main() {
 
   test('selectAllSongs falls back when the repository query throws', () async {
     final repo = _Repo();
+    when(() => repo.watchDownloadedSongs(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) => Stream.value(const Right([])));
     when(() => repo.watchAllSongs(
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
@@ -248,6 +253,9 @@ void main() {
               duration: Duration(seconds: 1)),
         ]);
     final repo = _Repo();
+    when(() => repo.watchDownloadedSongs(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) => Stream.value(const Right([])));
     when(() => repo.importOnlineTracksAsFavorites(any()))
         .thenAnswer((_) async => const Left(DatabaseFailure('import failed')));
     getIt.registerSingleton<YtmAccountService>(account);

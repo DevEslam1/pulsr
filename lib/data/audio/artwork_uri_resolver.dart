@@ -1,6 +1,7 @@
 // lib/data/audio/artwork_uri_resolver.dart
 import 'dart:collection';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/utils/error_logger.dart';
@@ -186,6 +187,25 @@ class ArtworkUriResolver {
             ? song.remoteArtworkUrl
             : song.artworkUri;
     if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      if (remoteUrl.startsWith('assets/')) {
+        try {
+          final tempDir = await getTemporaryDirectory();
+          final cleanName =
+              remoteUrl.replaceAll('/', '_').replaceAll('\\', '_');
+          final file = File('${tempDir.path}/pulsr_asset_$cleanName');
+          if (!await file.exists() || (await file.length()) == 0) {
+            final data = await rootBundle.load(remoteUrl);
+            await file.writeAsBytes(
+              data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+              flush: true,
+            );
+          }
+          return Uri.file(file.path);
+        } catch (e, st) {
+          ErrorLogger.log('Failed to resolve asset artwork URI: $remoteUrl',
+              error: e, stackTrace: st, category: 'ArtworkUriResolver');
+        }
+      }
       final parsed = Uri.tryParse(remoteUrl);
       if (parsed != null &&
           parsed.hasScheme &&

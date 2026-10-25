@@ -248,6 +248,7 @@ class _NavTabItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double iconSize = isTablet ? 24.0 : 22.0;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
 
     return Semantics(
       selected: isSelected,
@@ -314,7 +315,7 @@ class _NavTabItem extends StatelessWidget {
                     )
                   : MediaQuery.withClampedTextScaling(
                       minScaleFactor: 0.8,
-                      maxScaleFactor: 1.15,
+                      maxScaleFactor: 1.4,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -366,7 +367,7 @@ class _NavTabItem extends StatelessWidget {
                               color: isSelected
                                   ? p.accent
                                   : p.textTertiary.withValues(alpha: 0.85),
-                              letterSpacing: AppTracking.label,
+                              letterSpacing: isRtl ? 0 : AppTracking.label,
                               fontFamily: Theme.of(context)
                                   .textTheme
                                   .bodySmall

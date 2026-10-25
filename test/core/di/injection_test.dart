@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/config/app_config.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -109,6 +110,9 @@ void main() {
     test('ready when the required singletons resolve synchronously', () {
       getIt.registerSingleton<PulsrAudioHandler>(_MockAudioHandler());
       getIt.registerSingleton<PlayerCubit>(_MockPlayerCubit());
+      if (AppConfig.ytmEnabled) {
+        getIt.registerSingleton<YtmDownloadCubit>(_MockYtmDownloadCubit());
+      }
 
       expect(appDependenciesReady, isTrue);
     });
@@ -123,6 +127,9 @@ void main() {
       final completer = Completer<PulsrAudioHandler>();
       getIt.registerSingletonAsync<PulsrAudioHandler>(() => completer.future);
       getIt.registerSingleton<PlayerCubit>(_MockPlayerCubit());
+      if (AppConfig.ytmEnabled) {
+        getIt.registerSingleton<YtmDownloadCubit>(_MockYtmDownloadCubit());
+      }
 
       expect(appDependenciesReady, isFalse);
 
@@ -137,6 +144,9 @@ void main() {
       getIt.registerSingletonAsync<PulsrAudioHandler>(() => completer.future);
       getIt.registerSingleton<PlayerCubit>(_MockPlayerCubit());
 
+      if (AppConfig.ytmEnabled) {
+        getIt.registerSingleton<YtmDownloadCubit>(_MockYtmDownloadCubit());
+      }
       final pending = ensureAppDependenciesReady();
       completer.complete(_MockAudioHandler());
 

@@ -14,7 +14,6 @@ import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
-import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/cached_artwork.dart';
@@ -711,7 +710,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${Formatters.formatTrackCount(songs.length).toUpperCase()} • ${_formatTotalDuration(totalDurationMs).toUpperCase()}',
+                  '${context.l10n.tracksCount(songs.length).toUpperCase()} • ${_formatTotalDuration(totalDurationMs).toUpperCase()}',
                   style: TextStyle(
                     fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w700,
@@ -1027,7 +1026,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         ),
         const SizedBox(height: 2),
         Text(
-          '${Formatters.formatTrackCount(songs.length)} • ${_formatTotalDuration(totalDurationMs)}',
+          '${context.l10n.tracksCount(songs.length)} • ${_formatTotalDuration(totalDurationMs)}',
           style: TextStyle(
             color: p.textSecondary,
             fontSize: AppFontSize.caption,
@@ -1127,7 +1126,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    Formatters.formatTrackCount(songs.length),
+                    context.l10n.tracksCount(songs.length),
                     style: TextStyle(
                       color: p.textTertiary,
                       fontSize: AppFontSize.caption,
@@ -1403,7 +1402,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                   ),
                                   const Spacer(),
                                   Text(
-                                    Formatters.formatTrackCount(songs.length),
+                                    context.l10n.tracksCount(songs.length),
                                     style: TextStyle(
                                       color: p.textTertiary,
                                       fontSize: AppFontSize.caption,

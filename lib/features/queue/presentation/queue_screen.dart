@@ -13,6 +13,7 @@ import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/playlist_suggestions_service.dart';
@@ -50,7 +51,9 @@ class QueueScreen extends StatelessWidget {
                         : Icons.all_inclusive,
                     color: isAutoplay ? p.accent : p.textTertiary,
                   ),
-                  tooltip: isAutoplay ? 'Autoplay: ON' : 'Autoplay: OFF',
+                  tooltip: isAutoplay
+                      ? context.l10n.queueAutoplayOn
+                      : context.l10n.queueAutoplayOff,
                   onPressed: () {
                     PulsrHaptics.selection();
                     context.read<PlayerCubit>().setAutoplayEnabled(!isAutoplay);
@@ -263,7 +266,6 @@ class QueueScreen extends StatelessWidget {
               prev.trackTiers != curr.trackTiers,
           builder: (context, state) {
             final queue = state.queue;
-            final currentSong = state.currentSong;
 
             if (queue.isEmpty) {
               return PulsrEmptyState(
@@ -301,7 +303,8 @@ class QueueScreen extends StatelessWidget {
                             leading: Icon(Icons.history_rounded,
                                 color: p.accent, size: 20),
                             title: Text(
-                              'Recently Played (${state.queueHistory.length})',
+                              context.l10n.queueRecentlyPlayed(
+                                  state.queueHistory.length),
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontWeight: FontWeight.w600,
@@ -346,7 +349,7 @@ class QueueScreen extends StatelessWidget {
                                     IconButton(
                                       icon: Icon(Icons.playlist_add_rounded,
                                           color: p.accent, size: 20),
-                                      tooltip: 'Add to queue',
+                                      tooltip: context.l10n.addToQueue,
                                       onPressed: () {
                                         PulsrHaptics.confirm();
                                         context
@@ -357,12 +360,18 @@ class QueueScreen extends StatelessWidget {
                                     IconButton(
                                       icon: Icon(Icons.play_arrow_rounded,
                                           color: p.accent, size: 22),
-                                      tooltip: 'Play',
+                                      tooltip: context.l10n.play,
                                       onPressed: () {
                                         PulsrHaptics.tap();
-                                        context
-                                            .read<PlayerCubit>()
-                                            .playSong(histSong);
+                                        final player =
+                                            context.read<PlayerCubit>();
+                                        final currentQueue = player.state.queue;
+                                        player.playSong(
+                                          histSong,
+                                          queue: currentQueue.isEmpty
+                                              ? null
+                                              : currentQueue,
+                                        );
                                       },
                                     ),
                                   ],
@@ -412,7 +421,7 @@ class QueueScreen extends StatelessWidget {
                     messenger.clearSnackBars();
                     messenger.showSnackBar(
                       SnackBar(
-                        content: Text(context.l10n.queue),
+                        content: Text(context.l10n.queueReordered),
                         duration: const Duration(seconds: 4),
                         action: SnackBarAction(
                           label: context.l10n.undo,
@@ -423,7 +432,7 @@ class QueueScreen extends StatelessWidget {
                   },
                   itemBuilder: (context, index) {
                     final song = queue[index];
-                    final isCurrent = song.id == currentSong?.id;
+                    final isCurrent = state.currentIndex == index;
 
                     return Container(
                       key: slotKeys[index],
@@ -565,9 +574,20 @@ class QueueScreen extends StatelessWidget {
                                   onPressed: () {
                                     PulsrHaptics.destructive();
                                     SoundFeedbackService.playWarning();
-                                    context
-                                        .read<PlayerCubit>()
-                                        .removeQueueItem(index);
+                                    final cubit = context.read<PlayerCubit>();
+                                    final prevQueue =
+                                        List<SongsTableData>.from(queue);
+                                    final prevIndex = state.currentIndex;
+                                    final prevPosition = state.position;
+                                    cubit.removeQueueItem(index);
+                                    PulsrToast.show(
+                                      context,
+                                      message: song.title,
+                                      actionLabel: context.l10n.undo,
+                                      onActionPressed: () => cubit.restoreQueue(
+                                          prevQueue, prevIndex,
+                                          initialPosition: prevPosition),
+                                    );
                                   },
                                 ),
                                 ReorderableDragStartListener(
@@ -597,7 +617,7 @@ class QueueScreen extends StatelessWidget {
                             onTap: () {
                               context
                                   .read<PlayerCubit>()
-                                  .playSong(song, queue: queue);
+                                  .skipToQueueItem(index);
                             },
                           ),
                         ),

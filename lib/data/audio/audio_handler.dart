@@ -2206,13 +2206,17 @@ class PulsrAudioHandler extends BaseAudioHandler
                   // ramp opens. Firing at `duration - crossfadeDuration` (base)
                   // opened the fade too late, so the outgoing track could reach
                   // ProcessingState.completed mid-fade (one-sided fade).
+                  // The margin is now measured: prepare time (EWMA) plus the
+                  // arbiter's 500 ms tail guard. A fixed 1.5 s margin truncated
+                  // every fade whose resolve ran long, because prepare ate the
+                  // margin and the arbiter then clamped the fade itself.
                   final effFade = _crossfadeManager.automixEnabled
                       ? (_crossfadeManager.duration > Duration.zero
                           ? _crossfadeManager.duration
                           : const Duration(seconds: 8))
                       : _crossfadeManager.effectiveFadeDuration(
                           trackId: _songs[nextIdx].id.toString());
-                  const settleMargin = Duration(milliseconds: 1500);
+                  final settleMargin = _crossfadeManager.triggerMargin;
                   if (duration > effFade + settleMargin &&
                       compensatedPos >= duration - effFade - settleMargin) {
                     _startCrossfade(nextIdx);

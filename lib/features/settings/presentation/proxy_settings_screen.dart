@@ -68,8 +68,6 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
   @override
   ({bool success, int latencyMs, String? error})? _testResult;
 
-  bool _loaded = false;
-
   @override
   void initState() {
     super.initState();
@@ -95,17 +93,24 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     }
   }
 
-  Future<void> _load() async {
-    if (_loaded) return;
-    _loaded = true;
+  Future<void>? _passwordLoad;
+  bool _passwordLoaded = false;
+
+  Future<void> _load() {
+    if (_passwordLoad != null) return _passwordLoad!;
+    return _passwordLoad = _loadPassword();
+  }
+
+  Future<void> _loadPassword() async {
     final cubit = context.read<SettingsCubit>();
     try {
       final pw = await cubit.getProxyPassword();
       if (mounted && _passwordController.text.isEmpty && pw.isNotEmpty) {
         _passwordController.text = pw;
       }
+      _passwordLoaded = true;
     } catch (_) {
-      // Ignore secure storage errors during initial load
+      // Keep _passwordLoaded false so Save cannot erase an unread secret.
     }
   }
 
@@ -175,8 +180,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     final port = int.tryParse(_portController.text.trim()) ?? 8080;
     final host = _hostController.text.trim();
     if (_enabled) {
-      final validationError =
-          validateProxyHostAndPort(host: host, port: port);
+      final validationError = validateProxyHostAndPort(host: host, port: port);
       if (validationError != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -188,6 +192,20 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
       }
     }
     final cubit = context.read<SettingsCubit>();
+    await _load();
+    if (!_passwordLoaded &&
+        cubit.state.hasProxyPassword &&
+        _passwordController.text.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.somethingWentWrong),
+            backgroundColor: context.palette.error,
+          ),
+        );
+      }
+      return;
+    }
 
     var saved = false;
     try {
@@ -787,11 +805,13 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
               Switch.adaptive(
                 value: _enabled,
                 onChanged: (val) {
+                  // The switch edits the form; Save performs validation and
+                  // applies it. Applying here used to bypass validation and
+                  // override unsaved host/port edits.
                   setState(() {
                     _enabled = val;
                     _testResult = null;
                   });
-                  context.read<SettingsCubit>().setProxyEnabled(val);
                 },
                 activeThumbColor: Colors.white,
                 activeTrackColor: p.accent,

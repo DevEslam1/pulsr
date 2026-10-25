@@ -8,7 +8,6 @@ import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/responsive/detail_scaffold.dart';
-import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_section_header.dart';
@@ -138,7 +137,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           const SizedBox(height: AppSpacing.xxs),
           Center(
             child: Text(
-              Formatters.formatTrackCount(artist.songCount),
+              context.l10n.tracksCount(artist.songCount),
               style: TextStyle(
                   color: p.textSecondary, fontSize: AppFontSize.bodySmall),
             ),
@@ -275,7 +274,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     children: [
                       PulsrSectionHeader(title: context.l10n.albums),
                       SizedBox(
-                        height: 175,
+                        height: 175 +
+                            (MediaQuery.textScalerOf(context)
+                                        .scale(1.0)
+                                        .clamp(1.0, 2.0) -
+                                    1.0) *
+                                35,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           addAutomaticKeepAlives: false,
@@ -311,8 +315,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                             fontSize: AppFontSize.bodySmall)),
                                     const SizedBox(height: AppSpacing.s2),
                                     Text(
-                                        Formatters.formatTrackCount(
-                                            album.songCount),
+                                        context.l10n
+                                            .tracksCount(album.songCount),
                                         style: TextStyle(
                                             color: p.textSecondary,
                                             fontSize: AppFontSize.caption)),

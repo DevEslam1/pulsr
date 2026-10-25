@@ -321,10 +321,13 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                             onPanStart: (d) => _onPlatterPanStart(d, vinylSize),
                             onPanUpdate: (d) =>
                                 _onPlatterPanUpdate(d, vinylSize),
-                            onPanEnd: (_) => _onPlatterPanEnd(
-                              state.duration.inMilliseconds,
-                              state.position.inMilliseconds,
-                            ),
+                            onPanEnd: (_) {
+                              final current = widget.props.cubit.state;
+                              _onPlatterPanEnd(
+                                current.duration.inMilliseconds,
+                                current.position.inMilliseconds,
+                              );
+                            },
                             onPanCancel: () {
                               setState(() {
                                 _isScrubbing = false;

@@ -93,9 +93,11 @@ void main() {
         .thenAnswer((_) => Stream.value(const Right([])));
     when(() => getArtists.watchArtists())
         .thenAnswer((_) => Stream.value(const Right([])));
-    when(() => getGenres.watchGenres())
+    when(() => getGenres.watchGenres(
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right([])));
-    when(() => getYears.watchYears())
+    when(() =>
+            getYears.watchYears(excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right([])));
     when(() => getFavorites.watchFavorites())
         .thenAnswer((_) => favorites.stream);
@@ -105,6 +107,9 @@ void main() {
         .thenAnswer((_) async => const Right([]));
     when(() => folders.toggleExcludeFolder(any()))
         .thenAnswer((_) async => const Right(null));
+    when(() => repo.watchDownloadedSongs(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) => Stream.value(const Right([])));
     when(() => repo.getSongsByIds(any()))
         .thenAnswer((_) async => const Right([]));
     when(() => repo.deleteSongs(any()))
@@ -434,6 +439,24 @@ void main() {
       await settle();
       await cubit.selectAllSongs();
       expect(cubit.state.selectedSongIds, {1, 2});
+      await cubit.close();
+    });
+
+    test('selectSongs selects only the supplied ids', () async {
+      final cubit = create();
+      await settle();
+      cubit.selectSongs(const [7, 9]);
+      expect(cubit.state.selectedSongIds, {7, 9});
+      expect(cubit.state.isMultiSelectMode, isTrue);
+      await cubit.close();
+    });
+
+    test('selectSongs with no ids clears selection', () async {
+      final cubit = create();
+      await settle();
+      cubit.selectSongs(const []);
+      expect(cubit.state.selectedSongIds, isEmpty);
+      expect(cubit.state.isMultiSelectMode, isFalse);
       await cubit.close();
     });
 

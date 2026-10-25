@@ -31,6 +31,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(createTestSong(id: -1));
     registerFallbackValue(<SongsTableData>[]);
+    registerFallbackValue(<String>[]);
   });
 
   setUp(() {
@@ -40,7 +41,9 @@ void main() {
     when(() => player.playSong(any(), queue: any(named: 'queue')))
         .thenAnswer((_) async {});
     recents = StreamController<Result<List<SongsTableData>>>.broadcast();
-    when(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
+    when(() => getSongs.watchRecentlyPlayed(
+            limit: any(named: 'limit'),
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => recents.stream);
     when(() => getSongs.clearRecentlyPlayed())
         .thenAnswer((_) async => const Right(null));
@@ -88,7 +91,9 @@ void main() {
 
     await tester.tap(find.text('Retry'));
     await tester.pump();
-    verify(() => getSongs.watchRecentlyPlayed(limit: any(named: 'limit')))
+    verify(() => getSongs.watchRecentlyPlayed(
+            limit: any(named: 'limit'),
+            excludedFolders: any(named: 'excludedFolders')))
         .called(greaterThanOrEqualTo(2));
   });
 
@@ -163,6 +168,7 @@ void main() {
 
     await tester.tap(find.textContaining('Load More History'));
     await tester.pump();
-    verify(() => getSongs.watchRecentlyPlayed(limit: 200)).called(1);
+    verify(() => getSongs.watchRecentlyPlayed(
+        limit: 200, excludedFolders: any(named: 'excludedFolders'))).called(1);
   });
 }

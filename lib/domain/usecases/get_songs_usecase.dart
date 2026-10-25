@@ -36,33 +36,63 @@ class GetSongsUseCase {
     );
   }
 
-  Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20}) {
+  Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({
+    int limit = 20,
+    List<String> excludedFolders = const [],
+  }) {
     final validatedLimit = limit.clamp(1, 500);
-    return _repository.watchRecentlyPlayed(limit: validatedLimit);
+    return _repository.watchRecentlyPlayed(
+      limit: validatedLimit,
+      excludedFolders: excludedFolders,
+    );
   }
 
-  Future<Result<List<SongsTableData>>> getRecentlyPlayed({int limit = 20}) {
+  Future<Result<List<SongsTableData>>> getRecentlyPlayed({
+    int limit = 20,
+    List<String> excludedFolders = const [],
+  }) {
     final validatedLimit = limit.clamp(1, 500);
-    return _repository.getRecentlyPlayed(limit: validatedLimit);
+    return _repository.getRecentlyPlayed(
+      limit: validatedLimit,
+      excludedFolders: excludedFolders,
+    );
   }
 
   Future<Result<void>> clearRecentlyPlayed() {
     return _repository.clearRecentlyPlayed();
   }
 
-  Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int? limit = 20}) {
+  Stream<Result<List<SongsTableData>>> watchRecentlyAdded({
+    int? limit = 20,
+    List<String> excludedFolders = const [],
+  }) {
     final validatedLimit = (limit != null && limit < 0) ? 0 : limit;
-    return _repository.watchRecentlyAdded(limit: validatedLimit);
+    return _repository.watchRecentlyAdded(
+      limit: validatedLimit,
+      excludedFolders: excludedFolders,
+    );
   }
 
-  Future<Result<List<SongsTableData>>> getRecentlyAdded({int? limit = 20}) {
+  Future<Result<List<SongsTableData>>> getRecentlyAdded({
+    int? limit = 20,
+    List<String> excludedFolders = const [],
+  }) {
     final validatedLimit = (limit != null && limit < 0) ? 0 : limit;
-    return _repository.getRecentlyAdded(limit: validatedLimit);
+    return _repository.getRecentlyAdded(
+      limit: validatedLimit,
+      excludedFolders: excludedFolders,
+    );
   }
 
-  Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30}) {
+  Stream<Result<List<SongsTableData>>> watchTopPlayed({
+    int limit = 30,
+    List<String> excludedFolders = const [],
+  }) {
     final validatedLimit = limit.clamp(1, 500);
-    return _repository.watchTopPlayed(limit: validatedLimit);
+    return _repository.watchTopPlayed(
+      limit: validatedLimit,
+      excludedFolders: excludedFolders,
+    );
   }
 
   Future<Result<List<SongsTableData>>> getAllSongs({
@@ -70,6 +100,7 @@ class GetSongsUseCase {
     bool ascending = true,
     int? limit,
     int? offset,
+    List<String> excludedFolders = const [],
   }) {
     final validatedLimit = (limit != null && limit < 0) ? 0 : limit;
     final validatedOffset = offset != null ? (offset < 0 ? 0 : offset) : null;
@@ -79,6 +110,7 @@ class GetSongsUseCase {
       ascending: ascending,
       limit: validatedLimit,
       offset: validatedOffset,
+      excludedFolders: excludedFolders,
     );
   }
 }

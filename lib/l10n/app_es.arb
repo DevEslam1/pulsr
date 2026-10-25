@@ -19,7 +19,9 @@
   "trackCount": "{count, plural, =1{1 pista} other{{count} pistas}}",
   "@trackCount": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "decades": "Décadas",
@@ -28,21 +30,31 @@
   "libraryTabsReorder": "{active} de {total} pestañas • Arrastra para reordenar",
   "@libraryTabsReorder": {
     "placeholders": {
-      "active": { "type": "int" },
-      "total": { "type": "int" }
+      "active": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "libraryTabsLongPress": "{active} de {total} pestañas • Mantén pulsado para organizar",
   "@libraryTabsLongPress": {
     "placeholders": {
-      "active": { "type": "int" },
-      "total": { "type": "int" }
+      "active": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "libraryInactiveTabs": "Inactivas ({count})",
   "@libraryInactiveTabs": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "whatsNew": "Novedades",
@@ -72,14 +84,20 @@
   "songRemovedFromPlaylist": "{title} eliminada de {playlist}",
   "@songRemovedFromPlaylist": {
     "placeholders": {
-      "title": { "type": "String" },
-      "playlist": { "type": "String" }
+      "title": {
+        "type": "String"
+      },
+      "playlist": {
+        "type": "String"
+      }
     }
   },
   "playlistDeleted": "Se eliminó {name}",
   "@playlistDeleted": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "voiceSearch": "Búsqueda por voz",
@@ -88,13 +106,17 @@
   "noLocalSongsMatch": "Ninguna canción local coincide con \"{query}\"",
   "@noLocalSongsMatch": {
     "placeholders": {
-      "query": { "type": "String" }
+      "query": {
+        "type": "String"
+      }
     }
   },
   "noOnlineSongsMatch": "Ninguna canción en línea coincide con \"{query}\"",
   "@noOnlineSongsMatch": {
     "placeholders": {
-      "query": { "type": "String" }
+      "query": {
+        "type": "String"
+      }
     }
   },
   "professionalMode": "Modo profesional",
@@ -128,16 +150,26 @@
   "queueReorderSemantics": "Reordenar {title}. Posición {index} de {count}",
   "@queueReorderSemantics": {
     "placeholders": {
-      "title": { "type": "String" },
-      "index": { "type": "int" },
-      "count": { "type": "int" }
+      "title": {
+        "type": "String"
+      },
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
     }
   },
   "songByArtist": "{title} de {artist}",
   "@songByArtist": {
     "placeholders": {
-      "title": { "type": "String" },
-      "artist": { "type": "String" }
+      "title": {
+        "type": "String"
+      },
+      "artist": {
+        "type": "String"
+      }
     }
   },
   "customDurationMinutes": "Duración personalizada (minutos).",
@@ -861,8 +893,8 @@
   "rcApplyAndVerify": "Aplicar y verificar",
   "rcResidual": "Varianza residual",
   "rcImprovement": "Mejora",
-  "rcTargetGatePassed": "Dentro del objetivo \u00b10.5 dB",
-  "rcTargetGateFailed": "Fuera del objetivo \u00b10.5 dB",
+  "rcTargetGatePassed": "Dentro del objetivo ±0.5 dB",
+  "rcTargetGateFailed": "Fuera del objetivo ±0.5 dB",
   "fetchMissingArtworkTitle": "¿Obtener portadas faltantes?",
   "fetchMissingArtworkBody": "Pulsr buscará en línea álbumes sin portada y guardará los resultados en tu biblioteca. Esto requiere conexión a internet.",
   "fetchArtwork": "Obtener portadas",
@@ -4161,7 +4193,7 @@
   "dacRateSwitchResample": "¿Remuestrear a {target} kHz para una salida bit-perfect?",
   "dacRateSwitchRemember": "Cambiar automáticamente siempre en el futuro",
   "dacRateSwitchConfirm": "Cambiar ({target} k)",
-  "miniPlayerSwipeHint": "Desliza a la izquierda/derecha para saltar",
+  "miniPlayerSwipeHint": "Desliza para saltar · arriba/abajo para el estilo",
   "phoneSpeaker": "Altavoz del teléfono",
   "usbDacNoneAttached": "DAC USB: Ninguno conectado",
   "directPlaybackNotReported": "REPRODUCCIÓN DIRECTA: No reportada",
@@ -4200,10 +4232,22 @@
   "dockStyleNavTopDesc": "El mini reproductor asoma detrás de la barra de navegación",
   "dockStyleHint": "Mantén pulsado el mini reproductor para cambiar el estilo del dock",
   "whatsNewSubtitle": "Mira las novedades de la v{version}",
-  "@whatsNewSubtitle": {"placeholders": {"version": {"type": "String"}}},
+  "@whatsNewSubtitle": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "studioMoreInStudio": "Más en modo Estudio",
   "studioControlsAvailable": "{count} controles de estudio disponibles",
-  "@studioControlsAvailable": {"placeholders": {"count": {"type": "int"}}},
+  "@studioControlsAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "studioSwitchCta": "Cambiar a Estudio",
   "studioExplainerTitle": "Qué añade el modo Estudio",
   "studioExplainerBody": "Salida Bit-Perfect, la suite DSP completa, perfiles de dispositivo, automatización y el backend proxy. Puedes volver cuando quieras.",
@@ -4211,7 +4255,13 @@
   "badgeOn": "SÍ",
   "keepBestQualityForAll": "Conservar la mejor calidad para todo",
   "selectedHighestQuality": "Se seleccionó la mejor calidad para {count} grupos",
-  "@selectedHighestQuality": {"placeholders": {"count": {"type": "int"}}},
+  "@selectedHighestQuality": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "enterSearchValue": "Introduce un valor de búsqueda…",
   "radioSearchHint": "Busca emisora, género o URL…",
   "webSessionInterruptedTitle": "Sesión web interrumpida",
@@ -4517,11 +4567,98 @@
   "quranRepeatRange": "Repetir rango",
   "quranRepeatOff": "Repetir: Apagado",
   "batchCappedTracks": "{count, plural, =1{1 pista omitida (límite del lote)} other{{count} pistas omitidas (límite del lote)}}",
-  "@batchCappedTracks": {"description": "Sufijo del aviso de descarga por lotes para pistas no encoladas por el límite", "placeholders": {"count": {"type": "int"}}},
+  "@batchCappedTracks": {
+    "description": "Sufijo del aviso de descarga por lotes para pistas no encoladas por el límite",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "batchFailedTracks": "{count, plural, =1{1 pista falló} other{{count} pistas fallaron}}",
-  "@batchFailedTracks": {"description": "Sufijo del aviso de descarga por lotes para pistas fallidas", "placeholders": {"count": {"type": "int"}}},
+  "@batchFailedTracks": {
+    "description": "Sufijo del aviso de descarga por lotes para pistas fallidas",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "batchFailedTracksWithError": "{count, plural, =1{1 pista falló ({error})} other{{count} pistas fallaron ({error})}}",
-  "@batchFailedTracksWithError": {"description": "Sufijo del aviso de descarga por lotes para pistas fallidas con el primer error", "placeholders": {"count": {"type": "int"}, "error": {"type": "String"}}},
+  "@batchFailedTracksWithError": {
+    "description": "Sufijo del aviso de descarga por lotes para pistas fallidas con el primer error",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "batchSkippedLocalTracks": "{count, plural, =1{1 pista local omitida} other{{count} pistas locales omitidas}}",
-  "@batchSkippedLocalTracks": {"description": "Sufijo del aviso de descarga por lotes para pistas locales ya disponibles", "placeholders": {"count": {"type": "int"}}}
+  "@batchSkippedLocalTracks": {
+    "description": "Sufijo del aviso de descarga por lotes para pistas locales ya disponibles",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "queueRecentlyPlayed": "Reproducido recientemente ({count})",
+  "queueAutoplayOn": "Reproducción automática: ACTIVADA",
+  "queueAutoplayOff": "Reproducción automática: DESACTIVADA",
+  "queueReordered": "Cola reordenada",
+  "downloadsProgressSummary": "Descargando {active} • {completed}/{total} completadas",
+  "downloadsRequeued": "{count} en cola de nuevo",
+  "partyListenTogether": "Escuchar juntos",
+  "partyServerSettings": "Ajustes del servidor",
+  "partyServerConfiguration": "Configuración del servidor",
+  "partyServerUrl": "URL del servidor",
+  "partyResetDefault": "Restablecer",
+  "partySyncDescription": "Sincroniza música entre varios dispositivos en tiempo real.",
+  "partyDisplayNameHint": "Tu nombre visible (opcional)",
+  "partyCreateNew": "Crear nueva fiesta",
+  "partyOrJoinByCode": "O ÚNETE CON UN CÓDIGO",
+  "partyJoin": "Unirse",
+  "partyRoomCode": "CÓDIGO DE SALA",
+  "partyCopyInvite": "Copiar invitación",
+  "partyShareInvite": "Compartir invitación",
+  "partySyncedRtt": "Sincronizado (RTT: {rtt} ms)",
+  "partySynchronizingClock": "Sincronizando reloj...",
+  "partyHost": "ANFITRIÓN",
+  "partyMembers": "Miembros ({count}/{max})",
+  "partyHostMember": "Anfitrión",
+  "partyLeave": "Salir de la fiesta",
+  "partyUnableReconnect": "No se pudo reconectar a la fiesta. Revisa tu conexión.",
+  "partyShareText": "Únete a mi fiesta de escucha de Pulsr: {link}",
+  "partyShareSubject": "Pulsr Party {code}",
+  "radioDuplicateUrl": "Ya existe una emisora con esta URL.",
+  "lyricsTrackChanged": "La pista cambió. Vuelve a abrir el editor de letras para esta pista.",
+  "lyricsTranslationUnavailable": "La traducción no está disponible ahora.",
+  "discardChangesTitle": "¿Descartar los cambios?",
+  "discardChangesBody": "Se perderán los cambios sin guardar.",
+  "onboardingPageIndicator": "Página {index} de {count}",
+  "smartFieldLabel": "Campo",
+  "smartOperatorLabel": "Operador",
+  "abLoopPointA": "Punto de bucle A {time}",
+  "abLoopSetA": "Establecer punto de bucle A",
+  "abLoopPointB": "Punto de bucle B {time}",
+  "abLoopSetB": "Establecer punto de bucle B",
+  "playerNoPlayableTracks": "No hay pistas reproducibles en la cola",
+  "discard": "Descartar",
+  "reorderSongs": "Reordenar canciones",
+  "reorderFailed": "No se pudo guardar el nuevo orden",
+  "reorderInstructions": "Arrastra para reordenar. Selecciona pistas para moverlas en bloque.",
+  "moveToTop": "Mover al inicio",
+  "moveToBottom": "Mover al final",
+  "moveToPosition": "Mover a posición",
+  "enterPosition": "Ingresar posición (1 - {total})",
+  "position": "Posición",
+  "reorderDone": "Listo",
+  "customOrder": "Orden personalizado",
+  "cachedCopy": "En caché",
+  "onlineCacheProgress": "Guardando biblioteca… {done}/{total}",
+  "canvasEffects": "Efectos Canvas",
+  "canvasEffectsSubtitle": "Carátula animada en el reproductor"
 }

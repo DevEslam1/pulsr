@@ -246,7 +246,7 @@ void main() {
 
       when(() => useCases.deletePlaylist(any()))
           .thenAnswer((_) async => const Left(DatabaseFailure('blocked')));
-      await cubit.deletePlaylist(1);
+      expect(await cubit.deletePlaylist(1), isFalse);
       expect(cubit.state.errorMessage, 'blocked');
       await cubit.close();
     });

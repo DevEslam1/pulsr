@@ -103,6 +103,10 @@ class _AuthSheetState extends State<AuthSheet> {
     final p = context.palette;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final systemBottomInset = MediaQuery.paddingOf(context).bottom;
+    final ytmAccount =
+        AppConfig.ytmEnabled && getIt.isRegistered<YtmAccountService>()
+            ? getIt<YtmAccountService>()
+            : null;
 
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {
@@ -493,7 +497,7 @@ class _AuthSheetState extends State<AuthSheet> {
                           ),
                         ),
 
-                        if (AppConfig.ytmEnabled) ...[
+                        if (ytmAccount != null) ...[
                           const SizedBox(height: AppSpacing.xs),
                           Row(
                             children: [
@@ -516,10 +520,8 @@ class _AuthSheetState extends State<AuthSheet> {
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           ValueListenableBuilder<bool>(
-                            valueListenable:
-                                getIt<YtmAccountService>().loginState,
+                            valueListenable: ytmAccount.loginState,
                             builder: (context, isLoggedIn, _) {
-                              final ytmAccount = getIt<YtmAccountService>();
                               return OutlinedButton.icon(
                                 onPressed: () async {
                                   if (isLoggedIn) {
@@ -567,7 +569,7 @@ class _AuthSheetState extends State<AuthSheet> {
                               );
                             },
                           ),
-                          if (!getIt<YtmAccountService>().loginState.value) ...[
+                          if (!ytmAccount.loginState.value) ...[
                             const SizedBox(height: AppSpacing.xs),
                             TextButton.icon(
                               onPressed: () async {

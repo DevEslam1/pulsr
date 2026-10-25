@@ -39,7 +39,9 @@ void main() {
     when(() => cubit.switchQueueSlot(any())).thenAnswer((_) async {});
     when(() => cubit.reorderQueue(any(), any())).thenAnswer((_) async {});
     when(() => cubit.removeQueueItem(any())).thenAnswer((_) async {});
-    when(() => cubit.restoreQueue(any(), any())).thenAnswer((_) async {});
+    when(() => cubit.restoreQueue(any(), any(),
+            initialPosition: any(named: 'initialPosition')))
+        .thenAnswer((_) async {});
     when(() => cubit.playNext(any())).thenAnswer((_) async {});
     when(() => cubit.addToQueue(any())).thenAnswer((_) async {});
     when(() => cubit.playSong(any(),
@@ -141,7 +143,8 @@ void main() {
     await tester.tap(find.text(l10n.undo));
     await tester.pump();
 
-    verify(() => cubit.restoreQueue(any(), any())).called(1);
+    verify(() => cubit.restoreQueue(any(), any(),
+        initialPosition: any(named: 'initialPosition'))).called(1);
   });
 
   testWidgets('the currently playing row exposes a remove affordance',

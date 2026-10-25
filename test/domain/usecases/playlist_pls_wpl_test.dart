@@ -19,6 +19,7 @@ class _FakeRepository implements IMusicRepository {
     bool ascending = true,
     int? limit,
     int? offset,
+    List<String> excludedFolders = const [],
   }) async =>
       Right(songs);
 

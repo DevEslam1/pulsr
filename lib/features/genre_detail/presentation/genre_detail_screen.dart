@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
-import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/widgets/async_state_builder.dart';
@@ -125,7 +124,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                 const SizedBox(height: AppSpacing.xxs),
                 Center(
                   child: Text(
-                    Formatters.formatTrackCount(songs.length),
+                    context.l10n.tracksCount(songs.length),
                     style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.bodySmall),

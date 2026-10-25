@@ -1,6 +1,7 @@
 // lib/features/radio/presentation/radio_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/services/radio_station_store.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -31,6 +32,8 @@ class _RadioScreenState extends State<RadioScreen> {
   final RadioStationStore _store = RadioStationStore();
   final TextEditingController _searchController = TextEditingController();
   List<RadioStation> _stations = const [];
+  bool _loading = true;
+  bool _loadFailed = false;
   String _searchQuery = '';
   String _selectedGenre = 'All';
 
@@ -44,7 +47,12 @@ class _RadioScreenState extends State<RadioScreen> {
       }
     });
     _store.ready.then((_) {
-      if (mounted) setState(() => _stations = _store.list);
+      if (!mounted) return;
+      setState(() {
+        _stations = _store.list;
+        _loading = false;
+        _loadFailed = _store.loadFailed;
+      });
     });
   }
 
@@ -56,6 +64,16 @@ class _RadioScreenState extends State<RadioScreen> {
 
   void _refresh() {
     if (mounted) setState(() => _stations = _store.list);
+  }
+
+  Future<void> _reload() async {
+    await _store.load();
+    if (!mounted) return;
+    setState(() {
+      _stations = _store.list;
+      _loading = false;
+      _loadFailed = _store.loadFailed;
+    });
   }
 
   List<String> get _availableGenres {
@@ -121,7 +139,7 @@ class _RadioScreenState extends State<RadioScreen> {
     if (collision) {
       PulsrToast.show(
         context,
-        message: 'A station with this URL already exists.',
+        message: context.l10n.radioDuplicateUrl,
         isError: true,
       );
       return;
@@ -271,404 +289,471 @@ class _RadioScreenState extends State<RadioScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: PulsrLayoutMetrics.contentConstraints(context),
-          child: _stations.isEmpty
-              ? RefreshIndicator(
-                  onRefresh: () async => _refresh(),
-                  color: p.accent,
-                  backgroundColor: p.surfaceContainer,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: SizedBox(
-                      height: MediaQuery.of(context).size.height -
-                          kToolbarHeight -
-                          100,
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.xl),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 76,
-                                height: 76,
-                                decoration: BoxDecoration(
-                                  color:
-                                      p.accentContainer.withValues(alpha: 0.35),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: p.accent.withValues(alpha: 0.25),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                alignment: Alignment.center,
-                                child: Icon(Icons.radio_rounded,
-                                    size: 38, color: p.accent),
-                              ),
-                              const SizedBox(height: AppSpacing.s20),
-                              Text(
-                                context.l10n.radioEmptyTitle,
-                                style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontSize: AppFontSize.title,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                context.l10n.radioEmptySubtitle,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.bodySmall,
-                                  height: 1.45,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.lg),
-                              FilledButton.icon(
-                                onPressed: _showAddDialog,
-                                icon: const Icon(Icons.add_rounded, size: 20),
-                                label: Text(
-                                  context.l10n.radioAddStation,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700),
-                                ),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: p.accent,
-                                  foregroundColor: p.onAccent,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 22, vertical: AppSpacing.sm),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppRadii.r14All,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.s10),
-                              OutlinedButton.icon(
-                                onPressed: _importCurated,
-                                icon:
-                                    const Icon(Icons.explore_rounded, size: 18),
-                                label: Text(context.l10n.radioCuratedBrowse),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: p.accent,
-                                  side: BorderSide(
-                                      color: p.accent.withValues(alpha: 0.5)),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.s20,
-                                      vertical: AppSpacing.sm),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppRadii.r14All,
-                                  ),
-                                ),
-                              ),
-                            ],
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _loadFailed && _stations.isEmpty
+                  ? RefreshIndicator(
+                      onRefresh: _reload,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height -
+                                kToolbarHeight -
+                                140,
+                            child: PulsrEmptyState(
+                              icon: Icons.error_outline_rounded,
+                              title: context.l10n.somethingWentWrong,
+                              subtitle: context.l10n.radioEmptySubtitle,
+                              primaryActionLabel: context.l10n.retry,
+                              onPrimaryAction: _reload,
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ),
-                  ),
-                )
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                          AppSpacing.md,
-                          AppSpacing.sm,
-                          AppSpacing.md,
-                          AppSpacing.xs),
-                      child: TextField(
-                        controller: _searchController,
-                        style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.bodySmall),
-                        decoration: InputDecoration(
-                          hintText: context.l10n.radioSearchHint,
-                          hintStyle: TextStyle(
-                              color: p.textTertiary,
-                              fontSize: AppFontSize.bodySmall),
-                          prefixIcon: Icon(Icons.search_rounded,
-                              color: p.textSecondary, size: 20),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  constraints: const BoxConstraints(
-                                      minWidth: AppSpacing.minTouchTarget,
-                                      minHeight: AppSpacing.minTouchTarget),
-                                  icon: Icon(Icons.close_rounded,
-                                      color: p.textSecondary, size: 18),
-                                  tooltip: context.l10n.clear,
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : null,
-                          filled: true,
-                          fillColor:
-                              p.surfaceContainerHigh.withValues(alpha: 0.5),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.xs),
-                          border: OutlineInputBorder(
-                            borderRadius: AppRadii.r12All,
-                            borderSide: BorderSide(color: p.hairline),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: AppRadii.r12All,
-                            borderSide: BorderSide(color: p.hairline),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: AppRadii.r12All,
-                            borderSide: BorderSide(color: p.accent, width: 1.5),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (availableGenres.length > 2)
-                      SizedBox(
-                        height: 38,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md),
-                          itemCount: availableGenres.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: AppSpacing.xs),
-                          itemBuilder: (context, idx) {
-                            final g = availableGenres[idx];
-                            final isSelected = _selectedGenre == g;
-                            return FilterChip(
-                              label: Text(g == 'All' ? context.l10n.all : g),
-                              selected: isSelected,
-                              selectedColor: p.accent.withValues(alpha: 0.2),
-                              checkmarkColor: p.accent,
-                              labelStyle: TextStyle(
-                                color: isSelected ? p.accent : p.textSecondary,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                fontSize: AppFontSize.caption,
-                              ),
-                              side: BorderSide(
-                                color: isSelected
-                                    ? p.accent.withValues(alpha: 0.4)
-                                    : p.hairline,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppRadii.r12All,
-                              ),
-                              onSelected: (_) {
-                                setState(() => _selectedGenre = g);
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Expanded(
-                      child: filtered.isEmpty
-                          ? RefreshIndicator(
-                              onRefresh: () async => _refresh(),
-                              color: p.accent,
-                              backgroundColor: p.surfaceContainer,
-                              child: SingleChildScrollView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                child: SizedBox(
-                                  height: 350,
-                                  child: PulsrEmptyState(
-                                    icon: Icons.search_off_rounded,
-                                    title: context.l10n
-                                        .radioNoStationsMatch(_searchQuery),
-                                    subtitle:
-                                        context.l10n.radioNoStationsMatchDesc,
+                    )
+                  : _stations.isEmpty
+                      ? RefreshIndicator(
+                          onRefresh: _reload,
+                          color: p.accent,
+                          backgroundColor: p.surfaceContainer,
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: SizedBox(
+                              height: MediaQuery.of(context).size.height -
+                                  kToolbarHeight -
+                                  100,
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.xl),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 76,
+                                        height: 76,
+                                        decoration: BoxDecoration(
+                                          color: p.accentContainer
+                                              .withValues(alpha: 0.35),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: p.accent
+                                                .withValues(alpha: 0.25),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Icon(Icons.radio_rounded,
+                                            size: 38, color: p.accent),
+                                      ),
+                                      const SizedBox(height: AppSpacing.s20),
+                                      Text(
+                                        context.l10n.radioEmptyTitle,
+                                        style: TextStyle(
+                                          color: p.textPrimary,
+                                          fontSize: AppFontSize.title,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        context.l10n.radioEmptySubtitle,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.bodySmall,
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.lg),
+                                      FilledButton.icon(
+                                        onPressed: _showAddDialog,
+                                        icon: const Icon(Icons.add_rounded,
+                                            size: 20),
+                                        label: Text(
+                                          context.l10n.radioAddStation,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w700),
+                                        ),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: p.accent,
+                                          foregroundColor: p.onAccent,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 22,
+                                              vertical: AppSpacing.sm),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: AppRadii.r14All,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.s10),
+                                      OutlinedButton.icon(
+                                        onPressed: _importCurated,
+                                        icon: const Icon(Icons.explore_rounded,
+                                            size: 18),
+                                        label: Text(
+                                            context.l10n.radioCuratedBrowse),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: p.accent,
+                                          side: BorderSide(
+                                              color: p.accent
+                                                  .withValues(alpha: 0.5)),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.s20,
+                                              vertical: AppSpacing.sm),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: AppRadii.r14All,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: () async => _refresh(),
-                              color: p.accent,
-                              backgroundColor: p.surfaceContainer,
-                              child: ListView.separated(
-                                padding: EdgeInsets.only(
-                                    top: AppSpacing.xs,
-                                    bottom: PulsrLayoutMetrics.scrollBottom(
-                                        context)),
-                                itemCount: filtered.length,
-                                separatorBuilder: (_, __) => Divider(
-                                  height: 1,
-                                  indent: 72,
-                                  endIndent: 16,
-                                  color: p.hairline,
-                                ),
-                                itemBuilder: (context, index) {
-                                  final station = filtered[index];
-                                  return StaggeredReveal(
-                                    index: index,
-                                    groupKey: filtered.length,
-                                    child:
-                                        BlocBuilder<PlayerCubit, PlayerState>(
-                                      buildWhen: (prev, curr) =>
-                                          prev.currentSong?.path !=
-                                              curr.currentSong?.path ||
-                                          prev.currentSong?.album !=
-                                              curr.currentSong?.album ||
-                                          prev.isPlaying != curr.isPlaying,
-                                      builder: (context, playerState) {
-                                        final isCurrent =
-                                            playerState.currentSong?.path ==
-                                                station.url;
-                                        final isPlaying =
-                                            isCurrent && playerState.isPlaying;
-                                        final icyNowPlaying = isCurrent
-                                            ? (playerState.currentSong?.album
-                                                    .trim() ??
-                                                '')
-                                            : '';
-
-                                        return ListTile(
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: AppSpacing.md,
-                                                  vertical: AppSpacing.xxs),
-                                          leading: _StationArtwork(
-                                            station: station,
-                                            isPlaying: isPlaying,
-                                          ),
-                                          title: Text(
-                                            station.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: isCurrent
-                                                  ? p.accent
-                                                  : p.textPrimary,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: AppFontSize.callout,
-                                            ),
-                                          ),
-                                          subtitle: Row(
-                                            children: [
-                                              if (station.genre != null &&
-                                                  station
-                                                      .genre!.isNotEmpty) ...[
-                                                Container(
-                                                  margin:
-                                                      const EdgeInsetsDirectional
-                                                          .only(end: 6),
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 1.5),
-                                                  decoration: BoxDecoration(
-                                                    color: p.accentContainer
-                                                        .withValues(
-                                                            alpha: 0.35),
-                                                    borderRadius:
-                                                        AppRadii.r6All,
-                                                  ),
-                                                  child: Text(
-                                                    station.genre!,
-                                                    style: TextStyle(
-                                                      color: p.accent,
-                                                      fontSize:
-                                                          AppFontSize.tiny,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                              Expanded(
-                                                child: Text(
-                                                  icyNowPlaying.isNotEmpty
-                                                      ? '♫ $icyNowPlaying'
-                                                      : station.url,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                      color: icyNowPlaying
-                                                              .isNotEmpty
-                                                          ? p.accent
-                                                          : p.textSecondary,
-                                                      fontWeight: icyNowPlaying
-                                                              .isNotEmpty
-                                                          ? FontWeight.w600
-                                                          : FontWeight.normal,
-                                                      fontSize:
-                                                          AppFontSize.label),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          trailing: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              IconButton(
-                                                constraints:
-                                                    const BoxConstraints(
-                                                        minWidth: AppSpacing
-                                                            .minTouchTarget,
-                                                        minHeight: AppSpacing
-                                                            .minTouchTarget),
-                                                tooltip: context.l10n.radioEdit,
-                                                icon: Icon(Icons.edit_rounded,
-                                                    color: p.textSecondary,
-                                                    size: 22),
-                                                onPressed: () => _showAddDialog(
-                                                    initial: station),
-                                              ),
-                                              IconButton(
-                                                constraints:
-                                                    const BoxConstraints(
-                                                        minWidth: AppSpacing
-                                                            .minTouchTarget,
-                                                        minHeight: AppSpacing
-                                                            .minTouchTarget),
-                                                tooltip: isPlaying
-                                                    ? context.l10n.pause
-                                                    : context.l10n.radioPlay,
-                                                icon: Icon(
-                                                  isPlaying
-                                                      ? Icons
-                                                          .pause_circle_filled_rounded
-                                                      : Icons
-                                                          .play_circle_fill_rounded,
-                                                  color: p.accent,
-                                                  size: 32,
-                                                ),
-                                                onPressed: () {
-                                                  if (isCurrent) {
-                                                    playerCubit
-                                                        .togglePlayPause();
-                                                  } else {
-                                                    playerCubit
-                                                        .playRadioStation(
-                                                            station);
-                                                  }
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                          onTap: () {
-                                            if (isCurrent) {
-                                              playerCubit.togglePlayPause();
-                                            } else {
-                                              playerCubit
-                                                  .playRadioStation(station);
-                                            }
-                                          },
-                                          onLongPress: () =>
-                                              _showStationActions(station),
-                                        );
-                                      },
-                                    ),
-                                  );
-                                },
                               ),
                             ),
-                    ),
-                  ],
-                ),
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
+                                  AppSpacing.md,
+                                  AppSpacing.sm,
+                                  AppSpacing.md,
+                                  AppSpacing.xs),
+                              child: TextField(
+                                controller: _searchController,
+                                style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.bodySmall),
+                                decoration: InputDecoration(
+                                  hintText: context.l10n.radioSearchHint,
+                                  hintStyle: TextStyle(
+                                      color: p.textTertiary,
+                                      fontSize: AppFontSize.bodySmall),
+                                  prefixIcon: Icon(Icons.search_rounded,
+                                      color: p.textSecondary, size: 20),
+                                  suffixIcon: _searchQuery.isNotEmpty
+                                      ? IconButton(
+                                          constraints: const BoxConstraints(
+                                              minWidth:
+                                                  AppSpacing.minTouchTarget,
+                                              minHeight:
+                                                  AppSpacing.minTouchTarget),
+                                          icon: Icon(Icons.close_rounded,
+                                              color: p.textSecondary, size: 18),
+                                          tooltip: context.l10n.clear,
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            setState(() => _searchQuery = '');
+                                          },
+                                        )
+                                      : null,
+                                  filled: true,
+                                  fillColor: p.surfaceContainerHigh
+                                      .withValues(alpha: 0.5),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.md,
+                                      vertical: AppSpacing.xs),
+                                  border: OutlineInputBorder(
+                                    borderRadius: AppRadii.r12All,
+                                    borderSide: BorderSide(color: p.hairline),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: AppRadii.r12All,
+                                    borderSide: BorderSide(color: p.hairline),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: AppRadii.r12All,
+                                    borderSide:
+                                        BorderSide(color: p.accent, width: 1.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (availableGenres.length > 2)
+                              SizedBox(
+                                height: 38,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.md),
+                                  itemCount: availableGenres.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: AppSpacing.xs),
+                                  itemBuilder: (context, idx) {
+                                    final g = availableGenres[idx];
+                                    final isSelected = _selectedGenre == g;
+                                    return FilterChip(
+                                      label: Text(
+                                          g == 'All' ? context.l10n.all : g),
+                                      selected: isSelected,
+                                      selectedColor:
+                                          p.accent.withValues(alpha: 0.2),
+                                      checkmarkColor: p.accent,
+                                      labelStyle: TextStyle(
+                                        color: isSelected
+                                            ? p.accent
+                                            : p.textSecondary,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        fontSize: AppFontSize.caption,
+                                      ),
+                                      side: BorderSide(
+                                        color: isSelected
+                                            ? p.accent.withValues(alpha: 0.4)
+                                            : p.hairline,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: AppRadii.r12All,
+                                      ),
+                                      onSelected: (_) {
+                                        setState(() => _selectedGenre = g);
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Expanded(
+                              child: filtered.isEmpty
+                                  ? RefreshIndicator(
+                                      onRefresh: () async => _refresh(),
+                                      color: p.accent,
+                                      backgroundColor: p.surfaceContainer,
+                                      child: SingleChildScrollView(
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(),
+                                        child: SizedBox(
+                                          height: 350,
+                                          child: PulsrEmptyState(
+                                            icon: Icons.search_off_rounded,
+                                            title: context.l10n
+                                                .radioNoStationsMatch(
+                                                    _searchQuery),
+                                            subtitle: context
+                                                .l10n.radioNoStationsMatchDesc,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : RefreshIndicator(
+                                      onRefresh: () async => _refresh(),
+                                      color: p.accent,
+                                      backgroundColor: p.surfaceContainer,
+                                      child: ListView.separated(
+                                        padding: EdgeInsets.only(
+                                            top: AppSpacing.xs,
+                                            bottom:
+                                                PulsrLayoutMetrics.scrollBottom(
+                                                    context)),
+                                        itemCount: filtered.length,
+                                        separatorBuilder: (_, __) => Divider(
+                                          height: 1,
+                                          indent: 72,
+                                          endIndent: 16,
+                                          color: p.hairline,
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final station = filtered[index];
+                                          return StaggeredReveal(
+                                            index: index,
+                                            groupKey: filtered.length,
+                                            child: BlocBuilder<PlayerCubit,
+                                                PlayerState>(
+                                              buildWhen: (prev, curr) =>
+                                                  prev.currentSong?.path !=
+                                                      curr.currentSong?.path ||
+                                                  prev.currentSong?.album !=
+                                                      curr.currentSong?.album ||
+                                                  prev.isPlaying !=
+                                                      curr.isPlaying,
+                                              builder: (context, playerState) {
+                                                final isCurrent = playerState
+                                                        .currentSong?.path ==
+                                                    station.url;
+                                                final isPlaying = isCurrent &&
+                                                    playerState.isPlaying;
+                                                final icyNowPlaying = isCurrent
+                                                    ? (playerState
+                                                            .currentSong?.album
+                                                            .trim() ??
+                                                        '')
+                                                    : '';
+
+                                                return ListTile(
+                                                  contentPadding:
+                                                      const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal:
+                                                              AppSpacing.md,
+                                                          vertical:
+                                                              AppSpacing.xxs),
+                                                  leading: _StationArtwork(
+                                                    station: station,
+                                                    isPlaying: isPlaying,
+                                                  ),
+                                                  title: Text(
+                                                    station.name,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: isCurrent
+                                                          ? p.accent
+                                                          : p.textPrimary,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize:
+                                                          AppFontSize.callout,
+                                                    ),
+                                                  ),
+                                                  subtitle: Row(
+                                                    children: [
+                                                      if (station.genre !=
+                                                              null &&
+                                                          station.genre!
+                                                              .isNotEmpty) ...[
+                                                        Container(
+                                                          margin:
+                                                              const EdgeInsetsDirectional
+                                                                  .only(end: 6),
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal: 6,
+                                                                  vertical:
+                                                                      1.5),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: p
+                                                                .accentContainer
+                                                                .withValues(
+                                                                    alpha:
+                                                                        0.35),
+                                                            borderRadius:
+                                                                AppRadii.r6All,
+                                                          ),
+                                                          child: Text(
+                                                            station.genre!,
+                                                            style: TextStyle(
+                                                              color: p.accent,
+                                                              fontSize:
+                                                                  AppFontSize
+                                                                      .tiny,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                      Expanded(
+                                                        child: Text(
+                                                          icyNowPlaying
+                                                                  .isNotEmpty
+                                                              ? '♫ $icyNowPlaying'
+                                                              : station.url,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: TextStyle(
+                                                              color: icyNowPlaying
+                                                                      .isNotEmpty
+                                                                  ? p.accent
+                                                                  : p
+                                                                      .textSecondary,
+                                                              fontWeight: icyNowPlaying
+                                                                      .isNotEmpty
+                                                                  ? FontWeight
+                                                                      .w600
+                                                                  : FontWeight
+                                                                      .normal,
+                                                              fontSize:
+                                                                  AppFontSize
+                                                                      .label),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  trailing: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      IconButton(
+                                                        constraints: const BoxConstraints(
+                                                            minWidth: AppSpacing
+                                                                .minTouchTarget,
+                                                            minHeight: AppSpacing
+                                                                .minTouchTarget),
+                                                        tooltip: context
+                                                            .l10n.radioEdit,
+                                                        icon: Icon(
+                                                            Icons.edit_rounded,
+                                                            color:
+                                                                p.textSecondary,
+                                                            size: 22),
+                                                        onPressed: () =>
+                                                            _showAddDialog(
+                                                                initial:
+                                                                    station),
+                                                      ),
+                                                      IconButton(
+                                                        constraints: const BoxConstraints(
+                                                            minWidth: AppSpacing
+                                                                .minTouchTarget,
+                                                            minHeight: AppSpacing
+                                                                .minTouchTarget),
+                                                        tooltip: isPlaying
+                                                            ? context.l10n.pause
+                                                            : context
+                                                                .l10n.radioPlay,
+                                                        icon: Icon(
+                                                          isPlaying
+                                                              ? Icons
+                                                                  .pause_circle_filled_rounded
+                                                              : Icons
+                                                                  .play_circle_fill_rounded,
+                                                          color: p.accent,
+                                                          size: 32,
+                                                        ),
+                                                        onPressed: () {
+                                                          if (isCurrent) {
+                                                            playerCubit
+                                                                .togglePlayPause();
+                                                          } else {
+                                                            playerCubit
+                                                                .playRadioStation(
+                                                                    station);
+                                                          }
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  onTap: () {
+                                                    if (isCurrent) {
+                                                      playerCubit
+                                                          .togglePlayPause();
+                                                    } else {
+                                                      playerCubit
+                                                          .playRadioStation(
+                                                              station);
+                                                    }
+                                                  },
+                                                  onLongPress: () =>
+                                                      _showStationActions(
+                                                          station),
+                                                );
+                                              },
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                            ),
+                          ],
+                        ),
         ),
       ),
     ));
@@ -684,7 +769,14 @@ class _StationArtwork extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final artworkUrl = station.artworkUrl;
+    final artworkUrl = (station.artworkUrl != null &&
+            station.artworkUrl!.isNotEmpty)
+        ? station.artworkUrl
+        : RadioStationStore.resolveArtworkForStation(
+            id: station.id,
+            name: station.name,
+            url: station.url,
+          );
     if (artworkUrl == null || artworkUrl.isEmpty) {
       return Container(
         width: 44,
@@ -716,8 +808,8 @@ class _StationArtwork extends StatelessWidget {
           fallbackIcon: Icons.radio_rounded,
         ),
         if (isPlaying)
-          Positioned(
-            right: -2,
+          PositionedDirectional(
+            end: -2,
             bottom: -2,
             child: Container(
               padding: const EdgeInsets.all(3),
@@ -753,6 +845,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
   late final TextEditingController _urlController;
   late final TextEditingController _genreController;
   String? _urlError;
+  String? _artworkUrl;
 
   bool get _isEditing => widget.initial != null;
 
@@ -762,6 +855,12 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     _nameController = TextEditingController(text: widget.initial?.name ?? '');
     _urlController = TextEditingController(text: widget.initial?.url ?? '');
     _genreController = TextEditingController(text: widget.initial?.genre ?? '');
+    _artworkUrl = widget.initial?.artworkUrl ??
+        RadioStationStore.resolveArtworkForStation(
+          id: widget.initial?.id,
+          name: widget.initial?.name,
+          url: widget.initial?.url,
+        );
   }
 
   @override
@@ -770,6 +869,16 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     _urlController.dispose();
     _genreController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked != null) {
+        setState(() => _artworkUrl = picked.path);
+      }
+    } catch (_) {}
   }
 
   /// Returns a user-facing reason the URL is invalid, or null when valid.
@@ -799,14 +908,36 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     }
     final name = _nameController.text.trim();
     final genre = _genreController.text.trim();
+    final effectiveArt = _artworkUrl ??
+        RadioStationStore.resolveArtworkForStation(
+          name: name,
+          url: url,
+        );
     Navigator.of(context, rootNavigator: true).pop(
       RadioStation.create(
         name: name,
         url: url,
         genre: genre.isNotEmpty ? genre : null,
-        artworkUrl: widget.initial?.artworkUrl,
+        artworkUrl: effectiveArt,
         lastPlayed: widget.initial?.lastPlayed,
       ),
+    );
+  }
+
+  Widget _buildPresetChip(String label, String assetPath) {
+    final isSelected = _artworkUrl == assetPath;
+    final p = context.palette;
+    return ChoiceChip(
+      avatar: ClipOval(
+        child: Image.asset(assetPath, width: 18, height: 18, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 14)),
+      ),
+      label: Text(label, style: const TextStyle(fontSize: 11)),
+      selected: isSelected,
+      onSelected: (val) {
+        setState(() => _artworkUrl = val ? assetPath : null);
+      },
+      selectedColor: p.accent.withValues(alpha: 0.25),
     );
   }
 
@@ -823,9 +954,84 @@ class _AddStationDialogState extends State<_AddStationDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        borderRadius: AppRadii.r16All,
+                        color: p.surfaceContainerHigh,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _artworkUrl != null && _artworkUrl!.isNotEmpty
+                          ? CachedArtwork(
+                              id: 0,
+                              remoteUrl: _artworkUrl,
+                              size: 68,
+                              borderRadius: 16,
+                              fallbackIcon: Icons.radio_rounded,
+                            )
+                          : Icon(Icons.radio_rounded, color: p.accent, size: 36),
+                    ),
+                  ),
+                  PositionedDirectional(
+                    end: -4,
+                    bottom: -4,
+                    child: GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: p.accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.camera_alt_rounded,
+                            color: p.onAccent, size: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s10),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xxs,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildPresetChip('القرآن - القاهرة', RadioStationStore.quranCairoArtwork),
+                _buildPresetChip('المنشاوي', RadioStationStore.minshawiArtwork),
+                _buildPresetChip('عبد الباسط', RadioStationStore.abdulBasitArtwork),
+                _buildPresetChip('مصطفى إسماعيل', RadioStationStore.mustafaIsmailArtwork),
+                if (_artworkUrl != null)
+                  ActionChip(
+                    avatar: const Icon(Icons.clear_rounded, size: 14),
+                    label: const Text('إلغاء الصورة', style: TextStyle(fontSize: 11)),
+                    onPressed: () => setState(() => _artworkUrl = null),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s14),
             TextField(
               controller: _nameController,
               textInputAction: TextInputAction.next,
+              onChanged: (text) {
+                if (_artworkUrl == null || _artworkUrl!.startsWith('assets/Pictures/')) {
+                  final detected = RadioStationStore.resolveArtworkForStation(
+                    name: text,
+                    url: _urlController.text,
+                  );
+                  if (detected != _artworkUrl) {
+                    setState(() => _artworkUrl = detected);
+                  }
+                }
+              },
               style:
                   TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
