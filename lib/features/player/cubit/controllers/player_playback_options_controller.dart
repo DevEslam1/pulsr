@@ -10,6 +10,7 @@ import '../../../../core/services/earbud_optimization_service.dart';
 import '../../../../data/services/hires_audio_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/lrc_parser.dart';
+import '../../../../core/utils/song_classification.dart';
 import '../../../../data/audio/ab_loop_manager.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/audio/per_song_eq_store.dart';

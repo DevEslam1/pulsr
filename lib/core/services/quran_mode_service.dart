@@ -33,7 +33,7 @@ class QuranModeService {
     final name = prefs.getString(_keyStyle);
     return QuranReciterStyle.values.firstWhere(
       (s) => s.name == name,
-      orElse: () => QuranReciterStyle.murattal,
+      orElse: () => QuranReciterStyle.mujawwad,
     );
   }
 

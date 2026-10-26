@@ -226,6 +226,14 @@ class YtmErrorClassifier {
     // specific verdict: YouTube's bot interstitial can arrive as a 403, and
     // invalidating the poToken beats rotating the network path there.
 
+    // 0. Age restriction / mature content (MUST run before bot challenge: "sign in to confirm your age")
+    if (errStr.contains('confirm your age') ||
+        errStr.contains('age-restricted') ||
+        errStr.contains('age restricted') ||
+        errStr.contains('inappropriate for some users')) {
+      return _mapSignal(YtmBlockSignal.signInRequired, null, traceId);
+    }
+
     // 1. Bot challenges / verification
     if (errStr.contains('not a bot') ||
         // Narrowed from the bare `confirm you`, which also matched benign
@@ -233,7 +241,7 @@ class YtmErrorClassifier {
         // real "confirm you're not a robot" interstitial are covered.
         errStr.contains("confirm you're") ||
         errStr.contains('confirm you’re') ||
-        errStr.contains('sign in to confirm') ||
+        errStr.contains('sign in to confirm you') ||
         errStr.contains('recaptcha') ||
         errStr.contains('bot_block') ||
         errStr.contains('botguard') ||
@@ -396,6 +404,13 @@ class YtmErrorClassifier {
       return _mapSignal(codeStatusSignal, details, traceId);
     }
 
+    if (combined.contains('confirm your age') ||
+        combined.contains('age-restricted') ||
+        combined.contains('age restricted') ||
+        combined.contains('inappropriate for some users')) {
+      return _mapSignal(YtmBlockSignal.signInRequired, details, traceId);
+    }
+
     if (_botWordPattern.hasMatch(combined) ||
         combined.contains('recaptcha') ||
         combined.contains('botguard') ||
@@ -403,7 +418,7 @@ class YtmErrorClassifier {
         // VPN exit reputation blocks — YouTube returns these in the detail
         // text of an EXTRACTOR_ERROR. Without this check they fell through
         // to rotateIdentity instead of the correct invalidatePoTokenAndRetry.
-        combined.contains('sign in to confirm') ||
+        combined.contains('sign in to confirm you') ||
         combined.contains("confirm you're not") ||
         combined.contains('confirm you’re not') ||
         combined.contains('not a bot') ||

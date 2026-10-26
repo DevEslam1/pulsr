@@ -96,4 +96,85 @@ void main() {
       expect(isDownloadedOnlineTrack(_song(remoteId: 'v1')), isTrue);
     });
   });
+
+  group('isQuranTrack', () {
+    test('null song returns false', () {
+      expect(isQuranTrack(null), isFalse);
+    });
+
+    test('regular pop song returns false', () {
+      final song = _song(
+        id: 1,
+        path: '/music/billie_jean.mp3',
+        source: SongSource.local,
+      ).copyWith(
+        title: 'Billie Jean',
+        artist: 'Michael Jackson',
+        album: 'Thriller',
+      );
+      expect(isQuranTrack(song), isFalse);
+    });
+
+    test('Quran radio station by name / genre returns true', () {
+      final stationSong = _song(
+        id: -1,
+        path: 'https://stream.radiojar.com/hussary',
+        source: SongSource.radio,
+      ).copyWith(
+        title: 'إذاعة الشيخ محمود خليل الحصري',
+        artist: 'Quran',
+      );
+      expect(isQuranTrack(stationSong), isTrue);
+    });
+
+    test('Cairo Quran radio returns true', () {
+      final stationSong = _song(
+        id: -2,
+        path: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
+        source: SongSource.radio,
+      ).copyWith(
+        title: 'إذاعة القرآن الكريم من القاهرة',
+        artist: 'Islamic',
+      );
+      expect(isQuranTrack(stationSong), isTrue);
+    });
+
+    test('Minshawi recitation with diacritics returns true', () {
+      final song = _song(
+        id: 10,
+        path: '/storage/quran/minshawi_rahman.mp3',
+        source: SongSource.local,
+      ).copyWith(
+        title: 'سُورَةُ الرَّحْمَنِ - الشَّيْخِ مُحَمَّد صِدِّيق المِنْشَاوِي',
+        artist: 'محمد صديق المنشاوي',
+        album: 'المصحف المجود',
+      );
+      expect(isQuranTrack(song), isTrue);
+    });
+
+    test('Abdulbasit Tajweed recitation returns true', () {
+      final song = _song(
+        id: 11,
+        path: 'ytmusic://abdulbasit123',
+        source: SongSource.youtube,
+      ).copyWith(
+        title: 'Surah Maryam',
+        artist: 'Abdulbasit Abdulsamad',
+        album: 'Mujawwad',
+      );
+      expect(isQuranTrack(song), isTrue);
+    });
+
+    test('BBC News radio returns false', () {
+      final newsSong = _song(
+        id: -3,
+        path: 'https://stream.live.vc.bbcmedia.co.uk/bbc_world_service',
+        source: SongSource.radio,
+      ).copyWith(
+        title: 'BBC World Service',
+        artist: 'News',
+      );
+      expect(isQuranTrack(newsSong), isFalse);
+    });
+  });
 }

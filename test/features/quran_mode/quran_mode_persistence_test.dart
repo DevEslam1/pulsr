@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
+import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/core/services/earbud_optimization_service.dart';
 import 'package:pulsr/core/services/hires_audio_service.dart';
 import 'package:pulsr/core/services/quran_mode_service.dart';
@@ -288,6 +289,155 @@ void main() {
       expect(state.isQuranModeEnabled, isFalse);
       expect(handler.preampValues, isEmpty);
     });
+
+    test('enabling Quran Mode defaults to Mujawwad (Tajweed) preset', () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = QuranModeService();
+      final handler = _QuranAudioHandler();
+      var state = const PlayerState();
+      final controller = _controller(
+        handler: handler,
+        getState: () => state,
+        emit: (s) => state = s,
+        service: service,
+      );
+
+      await controller.setQuranModeEnabled(true);
+      expect(state.isQuranModeEnabled, isTrue);
+      expect(state.quranReciterStyle, QuranReciterStyle.mujawwad);
+      expect(await service.getStyle(), QuranReciterStyle.mujawwad);
+    });
+
+    test(
+        'track change automatically activates Quran Mode for Quran recitations and deactivates for music',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = QuranModeService();
+      final handler = _QuranAudioHandler();
+      var state = const PlayerState();
+      final controller = _controller(
+        handler: handler,
+        getState: () => state,
+        emit: (s) => state = s,
+        service: service,
+      );
+
+      final quranSong = SongsTableData(
+        id: -1,
+        title: 'إذاعة الشيخ محمود خليل الحصري',
+        artist: 'Quran',
+        album: '',
+        durationMs: 0,
+        path: 'https://stream.radiojar.com/hussary',
+        source: SongSource.radio,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        isDownloaded: false,
+      );
+
+      // Track change to Quran recitation:
+      await controller.onCurrentSongChanged(quranSong);
+      expect(state.isQuranModeEnabled, isTrue);
+      expect(state.quranReciterStyle, QuranReciterStyle.mujawwad);
+
+      // User changes style to tarawih:
+      await controller.setQuranReciterStyle(QuranReciterStyle.tarawih);
+      expect(state.quranReciterStyle, QuranReciterStyle.tarawih);
+      expect(await service.getStyle(), QuranReciterStyle.tarawih);
+
+      // Track change to pop music:
+      final popSong = SongsTableData(
+        id: 99,
+        title: 'Pop Song',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 200000,
+        path: '/music/song.mp3',
+        source: SongSource.local,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        isDownloaded: false,
+      );
+      await controller.onCurrentSongChanged(popSong);
+      expect(state.isQuranModeEnabled, isFalse);
+
+      // Track change back to Quran:
+      await controller.onCurrentSongChanged(quranSong);
+      expect(state.isQuranModeEnabled, isTrue);
+      // Persisted user choice (tarawih) is kept!
+      expect(state.quranReciterStyle, QuranReciterStyle.tarawih);
+    });
+
+    test(
+        'switching from Quran radio to local/online music restores user music EQ preset and DSP settings',
+        () async {
+      final rockPreset =
+          EqPreset.defaultPresets.firstWhere((p) => p.name == 'Rock');
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.eqPresetName: 'Rock',
+        PrefsKeys.eqEnabled: true,
+      });
+      final service = QuranModeService();
+      final handler = _QuranAudioHandler();
+      var state = PlayerState(
+        dsp: DspSlice(
+          eqPreset: rockPreset,
+          isEqEnabled: true,
+        ),
+      );
+      final controller = _controller(
+        handler: handler,
+        getState: () => state,
+        emit: (s) => state = s,
+        service: service,
+      );
+
+      final quranSong = SongsTableData(
+        id: -1,
+        title: 'إذاعة القرآن الكريم من القاهرة',
+        artist: 'Islamic',
+        album: '',
+        durationMs: 0,
+        path: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
+        source: SongSource.radio,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        isDownloaded: false,
+      );
+
+      // Play Quran radio:
+      await controller.onCurrentSongChanged(quranSong);
+      expect(state.isQuranModeEnabled, isTrue);
+      expect(state.eqPreset.name, contains('Quran'));
+
+      // Play local / online music:
+      final normalMusicSong = SongsTableData(
+        id: 101,
+        title: 'Normal Music Song',
+        artist: 'Singer',
+        album: 'Album',
+        durationMs: 180000,
+        path: '/storage/music/song.mp3',
+        source: SongSource.local,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        isDownloaded: false,
+      );
+      await controller.onCurrentSongChanged(normalMusicSong);
+
+      // Must be deactivated and exact user EQ preset restored!
+      expect(state.isQuranModeEnabled, isFalse);
+      expect(state.isEqEnabled, isTrue);
+      expect(state.eqPreset.name, 'Rock');
+    });
   });
 
   group('Quran Mode regular profile actions', () {
@@ -366,6 +516,7 @@ void main() {
       final controller = _controller(
           handler: handler, getState: () => state, emit: (s) => state = s);
       await controller.setQuranModeEnabled(true);
+      await controller.setQuranReciterStyle(QuranReciterStyle.murattal);
       expect(state.isSaturationEnabled, isFalse);
       await controller.setQuranWarmth(1.0);
       expect(state.isSaturationEnabled, isTrue);
@@ -626,6 +777,7 @@ void main() {
       );
 
       await controller.setQuranModeEnabled(true);
+      await controller.setQuranReciterStyle(QuranReciterStyle.murattal);
 
       // Base Murattal gains:
       // [-2.0, -1.5, -1.0, 0.5, 1.5, 2.5, 3.5, 2.5, 0.5, -1.5]

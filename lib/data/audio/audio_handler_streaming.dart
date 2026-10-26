@@ -129,7 +129,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
           '[AudioHandler] Resolution failed while paused — stopping loop.');
       return;
     }
-    if (info.recoveryAction == YtmRecoveryAction.skipToNextTrack) {
+    if (info.recoveryAction == YtmRecoveryAction.skipToNextTrack ||
+        info.recoveryAction == YtmRecoveryAction.showLoginPrompt) {
       // Already 2 rapid gaps means 3rd song in your loop → pause instead of skip
       if (_consecutiveFailures >= 2) {
         _consecutiveFailures = 0;
@@ -137,7 +138,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         _broadcastState(_activePlayer.playbackEvent);
         return;
       }
-      debugPrint('[AudioHandler] Track blocked/unavailable. Skipping to next.');
+      debugPrint(
+          '[AudioHandler] Track blocked/unavailable or requires login. Skipping to next.');
       // Count the skip. Previously this branch never incremented, so the
       // `>= 2` guard above could not trip and a queue of unavailable tracks
       // was skipped through indefinitely.

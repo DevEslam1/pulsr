@@ -27,12 +27,13 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
-import '../../../sheets/song_info_sheet.dart';
+import '../../../sheets/song_options_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_quality_sheet.dart';
+import '../widgets/quran_mode_badge.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
@@ -1206,14 +1207,14 @@ class PlayerTopBar extends StatelessWidget {
           if (showMore)
             circleButton(
               icon: Icons.more_horiz_rounded,
-              semanticLabel: context.l10n.songInfo,
+              semanticLabel: context.l10n.moreOptions,
               iconSize: isTablet ? 24 : 22,
               onTap: () {
                 HapticFeedback.lightImpact();
                 if (onMore != null) {
                   onMore!();
                 } else if (song != null) {
-                  SongInfoSheet.show(context, song: song);
+                  SongOptionsSheet.show(context, song: song);
                 }
               },
             )
@@ -1423,6 +1424,10 @@ class PlayerTrackHeader extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     qualityBadge,
+                    if (props.state.isQuranModeEnabled) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      const QuranModeBadge(compact: true),
+                    ],
                     if (extraBadge != null) ...[
                       const SizedBox(width: AppSpacing.xs),
                       extraBadge!,

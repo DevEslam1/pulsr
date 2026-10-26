@@ -49,7 +49,7 @@ void main() {
       PreconnectedSocketPool().clear();
 
       preResolver = StreamPreResolver(
-        resolveUrl: (videoId, {quality = 'high'}) async {
+        resolveUrl: (videoId, {quality = 'high', title, artist}) async {
           resolvedVideoIds.add(videoId);
           return YtmStream(
             videoId: videoId,
@@ -184,7 +184,7 @@ void main() {
         () async {
       urlCache.put('vid2', 'https://googlevideo.com/high.m4a', quality: 'high');
       preResolver = StreamPreResolver(
-        resolveUrl: (videoId, {quality = 'high'}) async {
+        resolveUrl: (videoId, {quality = 'high', title, artist}) async {
           resolvedVideoIds.add('$videoId:$quality');
           return YtmStream(
             videoId: videoId,
@@ -285,7 +285,7 @@ void main() {
         'multi-item window: pre-resolves upcoming 3 items when preResolveWindowSize is 3',
         () async {
       final multiPreResolver = StreamPreResolver(
-        resolveUrl: (videoId, {quality = 'high'}) async {
+        resolveUrl: (videoId, {quality = 'high', title, artist}) async {
           resolvedVideoIds.add(videoId);
           return YtmStream(
             videoId: videoId,
@@ -329,7 +329,7 @@ void main() {
         'window size provider overrides the static pre-resolve window per plan',
         () async {
       final providerPreResolver = StreamPreResolver(
-        resolveUrl: (videoId, {quality = 'high'}) async {
+        resolveUrl: (videoId, {quality = 'high', title, artist}) async {
           resolvedVideoIds.add(videoId);
           return YtmStream(
             videoId: videoId,

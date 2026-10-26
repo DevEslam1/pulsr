@@ -120,7 +120,7 @@ void main() {
 
       int resolveCallCount = 0;
       final resolver = StreamPreResolver(
-        resolveUrl: (videoId, {quality = 'high'}) async {
+        resolveUrl: (videoId, {quality = 'high', title, artist}) async {
           resolveCallCount++;
           return YtmStream(
             videoId: videoId,

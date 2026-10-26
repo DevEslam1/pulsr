@@ -7,7 +7,7 @@ import '../../core/services/ytm_url_cache.dart';
 import '../../domain/models/ytm_track.dart';
 
 typedef StreamUrlResolver = Future<YtmStream> Function(String videoId,
-    {String quality});
+    {String quality, String? title, String? artist});
 
 /// DNS warm-up pool for edge hosts about to be opened by the platform player.
 ///
@@ -307,7 +307,9 @@ class StreamPreResolver {
     final token = Object();
     _activeResolutionTokens[videoId] = token;
 
-    resolveUrl(videoId, quality: quality).then((stream) {
+    resolveUrl(videoId,
+            quality: quality, title: song.title, artist: song.artist)
+        .then((stream) {
       if (_disposed || !identical(_activeResolutionTokens[videoId], token)) {
         return;
       }

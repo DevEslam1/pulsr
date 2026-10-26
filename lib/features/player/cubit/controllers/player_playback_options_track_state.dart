@@ -56,6 +56,7 @@ extension PlayerPlaybackOptionsTrackState on PlayerPlaybackOptionsController {
       }
     }
     _syncAbLoopFromHandler();
+    await handleTrackChangeQuranMode(song);
     await _applyPerSongEqForTrack(song);
   }
 

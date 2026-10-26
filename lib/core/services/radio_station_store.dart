@@ -24,13 +24,35 @@ class RadioStationStore {
   static const String mustafaIsmailArtwork =
       'assets/Pictures/mustafa_ismail.jpg';
   static const String abdulBasitArtwork = 'assets/Pictures/abdulbasit.jpg';
+  static const String hussaryArtwork = 'assets/Pictures/hussary.jpg';
+  static const String tarteelArtwork = 'assets/Pictures/quran_tarteel.jpg';
+  static const String lofiArtwork = 'assets/Pictures/radio_lofi.jpg';
+  static const String ambientArtwork = 'assets/Pictures/radio_ambient.jpg';
+  static const String paradiseArtwork = 'assets/Pictures/radio_paradise.jpg';
+  static const String classicArtwork = 'assets/Pictures/radio_classic.jpg';
+  static const String jazzArtwork = 'assets/Pictures/radio_jazz.jpg';
+  static const String electroArtwork = 'assets/Pictures/radio_electro.jpg';
+  static const String rockArtwork = 'assets/Pictures/radio_rock.jpg';
+  static const String indieArtwork = 'assets/Pictures/radio_indie.jpg';
+  static const String newsArtwork = 'assets/Pictures/radio_news.jpg';
 
   static const Map<String, String> _curatedArtwork = {
     'cur-quran-cairo': quranCairoArtwork,
     'cur-quran-cairo-backup': quranCairoArtwork,
+    'cur-quran-hussary': hussaryArtwork,
     'cur-quran-minshawi': minshawiArtwork,
     'cur-quran-mustafa': mustafaIsmailArtwork,
     'cur-quran-abdulbasit': abdulBasitArtwork,
+    'cur-quran-tarteel': tarteelArtwork,
+    'cur-lofi': lofiArtwork,
+    'cur-ambient': ambientArtwork,
+    'cur-paradise': paradiseArtwork,
+    'cur-classic': classicArtwork,
+    'cur-jazz': jazzArtwork,
+    'cur-electro': electroArtwork,
+    'cur-rock': rockArtwork,
+    'cur-indie': indieArtwork,
+    'cur-news': newsArtwork,
   };
 
   /// Resolves matching curated Sheikh/station artwork from assets by ID, URL, or name keywords.
@@ -52,6 +74,16 @@ class RadioStationStore {
         lowerName.contains('القرآن الكريم') ||
         lowerName.contains('القران الكريم')) {
       return quranCairoArtwork;
+    }
+
+    // Hussary
+    if (lowerId == 'cur-quran-hussary' ||
+        lowerUrl.contains('hussary') ||
+        lowerUrl.contains('alhussary') ||
+        lowerName.contains('الحصري') ||
+        lowerName.contains('حصري') ||
+        lowerName.contains('hussary')) {
+      return hussaryArtwork;
     }
 
     // Minshawi
@@ -86,11 +118,148 @@ class RadioStationStore {
       return mustafaIsmailArtwork;
     }
 
+    // Quran Tarateel
+    if (lowerId == 'cur-quran-tarteel' ||
+        lowerUrl.contains('tarteel') ||
+        lowerUrl.contains('tarateel') ||
+        lowerName.contains('تراتيل')) {
+      return tarteelArtwork;
+    }
+
+    // Lofi
+    if (lowerId == 'cur-lofi' ||
+        lowerUrl.contains('groovesalad') ||
+        lowerName.contains('lofi') ||
+        lowerName.contains('lo-fi')) {
+      return lofiArtwork;
+    }
+
+    // Ambient / Drone Zone
+    if (lowerId == 'cur-ambient' ||
+        lowerUrl.contains('dronezone') ||
+        lowerName.contains('ambient') ||
+        lowerName.contains('drone zone')) {
+      return ambientArtwork;
+    }
+
+    // Radio Paradise
+    if (lowerId == 'cur-paradise' ||
+        lowerUrl.contains('radioparadise') ||
+        lowerName.contains('paradise')) {
+      return paradiseArtwork;
+    }
+
+    // Classical Folk
+    if (lowerId == 'cur-classic' ||
+        lowerUrl.contains('thistle') ||
+        lowerName.contains('classic') ||
+        lowerName.contains('folk')) {
+      return classicArtwork;
+    }
+
+    // Smooth Jazz
+    if (lowerId == 'cur-jazz' ||
+        lowerUrl.contains('sonicuniverse') ||
+        lowerName.contains('jazz')) {
+      return jazzArtwork;
+    }
+
+    // Electronic / DEF CON
+    if (lowerId == 'cur-electro' ||
+        lowerUrl.contains('defcon') ||
+        lowerName.contains('electronic') ||
+        lowerName.contains('def con')) {
+      return electroArtwork;
+    }
+
+    // Classic Rock 70s
+    if (lowerId == 'cur-rock' ||
+        lowerUrl.contains('seventies') ||
+        lowerName.contains('rock') ||
+        lowerName.contains('70s')) {
+      return rockArtwork;
+    }
+
+    // Indie Pop Rocks
+    if (lowerId == 'cur-indie' ||
+        lowerUrl.contains('indiepop') ||
+        lowerName.contains('indie')) {
+      return indieArtwork;
+    }
+
+    // BBC News
+    if (lowerId == 'cur-news' ||
+        lowerUrl.contains('bbc') ||
+        lowerName.contains('bbc') ||
+        lowerName.contains('news')) {
+      return newsArtwork;
+    }
+
     if (id != null && _curatedArtwork.containsKey(id)) {
       return _curatedArtwork[id];
     }
 
     return null;
+  }
+
+  /// Checks whether a station is a Quran or recitation station.
+  static bool isQuranStation(RadioStation station) {
+    final genre = (station.genre ?? '').toLowerCase().trim();
+    if (genre == 'quran' || genre.contains('قرآن') || genre.contains('قران')) {
+      return true;
+    }
+    final id = station.id.toLowerCase();
+    if (id.startsWith('cur-quran')) return true;
+    final name = station.name.toLowerCase();
+    if (name.contains('قرآن') ||
+        name.contains('قران') ||
+        name.contains('quran') ||
+        name.contains('المنشاوي') ||
+        name.contains('منشاوي') ||
+        name.contains('عبد الباسط') ||
+        name.contains('عبدالباسط') ||
+        name.contains('الحصري') ||
+        name.contains('حصري') ||
+        name.contains('مصطفى إسماعيل') ||
+        name.contains('تراتيل')) {
+      return true;
+    }
+    final url = station.url.toLowerCase();
+    if (url.contains('qurango.net') || url.contains('quran')) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Partitions and sorts stations so that Quran stations are ALWAYS displayed first.
+  static List<RadioStation> sortWithQuranFirst(Iterable<RadioStation> stations) {
+    final quran = <RadioStation>[];
+    final others = <RadioStation>[];
+    for (final s in stations) {
+      if (isQuranStation(s)) {
+        quran.add(s);
+      } else {
+        others.add(s);
+      }
+    }
+    const curatedOrder = [
+      'cur-quran-cairo',
+      'cur-quran-cairo-backup',
+      'cur-quran-hussary',
+      'cur-quran-minshawi',
+      'cur-quran-abdulbasit',
+      'cur-quran-mustafa',
+      'cur-quran-tarteel',
+    ];
+    quran.sort((a, b) {
+      final idxA = curatedOrder.indexOf(a.id);
+      final idxB = curatedOrder.indexOf(b.id);
+      if (idxA != -1 && idxB != -1) return idxA.compareTo(idxB);
+      if (idxA != -1) return -1;
+      if (idxB != -1) return 1;
+      return 0;
+    });
+    return [...quran, ...others];
   }
 
   static final List<RadioStation> _stations = [];
@@ -107,8 +276,8 @@ class RadioStationStore {
     ready = load();
   }
 
-  /// Stations in display order (most recently added first).
-  List<RadioStation> get list => List.unmodifiable(_stations);
+  /// Stations in display order: Quran stations ALWAYS first, then other stations.
+  List<RadioStation> get list => List.unmodifiable(sortWithQuranFirst(_stations));
 
   Future<void> add(RadioStation station) async {
     if (!RadioStation.isHttpUrl(station.url)) return;
@@ -125,6 +294,9 @@ class RadioStationStore {
     _stations.removeWhere(
         (s) => s.id == effectiveStation.id || s.url == effectiveStation.url);
     _stations.insert(0, effectiveStation);
+    final sorted = sortWithQuranFirst(_stations);
+    _stations.clear();
+    _stations.addAll(sorted);
     if (_stations.length > maxEntries) {
       _stations.removeRange(maxEntries, _stations.length);
     }
@@ -157,6 +329,9 @@ class RadioStationStore {
     _stations.removeWhere((s) =>
         s.id == effectiveUpdated.id || s.url == effectiveUpdated.url);
     _stations.insert(0, effectiveUpdated);
+    final sorted = sortWithQuranFirst(_stations);
+    _stations.clear();
+    _stations.addAll(sorted);
     if (_stations.length > maxEntries) {
       _stations.removeRange(maxEntries, _stations.length);
     }
@@ -183,10 +358,13 @@ class RadioStationStore {
       _stations.removeWhere(
           (s) => s.id == effectiveStation.id || s.url == effectiveStation.url);
       _stations.insert(0, effectiveStation);
-      if (_stations.length > maxEntries) {
-        _stations.removeRange(maxEntries, _stations.length);
-      }
       accepted++;
+    }
+    final sorted = sortWithQuranFirst(_stations);
+    _stations.clear();
+    _stations.addAll(sorted);
+    if (_stations.length > maxEntries) {
+      _stations.removeRange(maxEntries, _stations.length);
     }
     if (accepted > 0) await persist();
     return accepted;
@@ -217,6 +395,7 @@ class RadioStationStore {
         _stations.clear();
         return;
       }
+
       final decoded = jsonDecode(raw);
       if (decoded is! List) return;
       _stations.clear();
@@ -245,6 +424,11 @@ class RadioStationStore {
         }
         if (_stations.length >= maxEntries) break;
       }
+
+      final sorted = sortWithQuranFirst(_stations);
+      _stations.clear();
+      _stations.addAll(sorted);
+
       if (migrated) {
         await persist();
       }
@@ -317,14 +501,8 @@ class RadioStationStore {
             id: 'cur-quran-hussary',
             name: 'إذاعة الشيخ محمود خليل الحصري',
             url: 'https://backup.qurango.net/radio/mahmoud_khalil_alhussary',
-            genre: 'Quran'),
-        RadioStation(
-            id: 'cur-quran-abdulbasit',
-            name: 'إذاعة الشيخ عبد الباسط عبد الصمد (مجود)',
-            url:
-                'https://backup.qurango.net/radio/abdulbasit_abdulsamad_mojawwad',
             genre: 'Quran',
-            artworkUrl: abdulBasitArtwork),
+            artworkUrl: hussaryArtwork),
         RadioStation(
             id: 'cur-quran-minshawi',
             name: 'إذاعة الشيخ محمد صديق المنشاوي (مجود)',
@@ -332,6 +510,13 @@ class RadioStationStore {
                 'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
             genre: 'Quran',
             artworkUrl: minshawiArtwork),
+        RadioStation(
+            id: 'cur-quran-abdulbasit',
+            name: 'إذاعة الشيخ عبد الباسط عبد الصمد (مجود)',
+            url:
+                'https://backup.qurango.net/radio/abdulbasit_abdulsamad_mojawwad',
+            genre: 'Quran',
+            artworkUrl: abdulBasitArtwork),
         RadioStation(
             id: 'cur-quran-mustafa',
             name: 'إذاعة الشيخ مصطفى إسماعيل',
@@ -342,52 +527,62 @@ class RadioStationStore {
             id: 'cur-quran-tarteel',
             name: 'إذاعة تراتيل القرآن الكريم',
             url: 'https://backup.qurango.net/radio/tarateel',
-            genre: 'Quran'),
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
         RadioStation(
             id: 'cur-lofi',
             name: 'Lofi Hip Hop',
             url: 'https://ice1.somafm.com/groovesalad-128-mp3',
-            genre: 'Chill'),
+            genre: 'Chill',
+            artworkUrl: lofiArtwork),
         RadioStation(
             id: 'cur-ambient',
             name: 'Drone Zone (Ambient)',
             url: 'https://ice1.somafm.com/dronezone-128-mp3',
-            genre: 'Ambient'),
+            genre: 'Ambient',
+            artworkUrl: ambientArtwork),
         RadioStation(
             id: 'cur-paradise',
             name: 'Radio Paradise (Eclectic HQ)',
             url: 'https://stream.radioparadise.com/mp3-320',
-            genre: 'Eclectic'),
+            genre: 'Eclectic',
+            artworkUrl: paradiseArtwork),
         RadioStation(
             id: 'cur-classic',
             name: 'Classical Folk',
             url: 'https://ice1.somafm.com/thistle-128-mp3',
-            genre: 'Classical'),
+            genre: 'Classical',
+            artworkUrl: classicArtwork),
         RadioStation(
             id: 'cur-jazz',
             name: 'Smooth Jazz',
             url: 'https://ice1.somafm.com/sonicuniverse-128-mp3',
-            genre: 'Jazz'),
+            genre: 'Jazz',
+            artworkUrl: jazzArtwork),
         RadioStation(
             id: 'cur-electro',
             name: 'DEF CON Radio (Electronic)',
             url: 'https://ice1.somafm.com/defcon-128-mp3',
-            genre: 'Electronic'),
+            genre: 'Electronic',
+            artworkUrl: electroArtwork),
         RadioStation(
             id: 'cur-rock',
             name: 'Classic Rock 70s',
             url: 'https://ice1.somafm.com/seventies-128-mp3',
-            genre: 'Rock'),
+            genre: 'Rock',
+            artworkUrl: rockArtwork),
         RadioStation(
             id: 'cur-indie',
             name: 'Indie Pop Rocks',
             url: 'https://ice1.somafm.com/indiepop-128-mp3',
-            genre: 'Indie'),
+            genre: 'Indie',
+            artworkUrl: indieArtwork),
         RadioStation(
             id: 'cur-news',
             name: 'BBC World Service',
             url: 'https://stream.live.vc.bbcmedia.co.uk/bbc_world_service',
-            genre: 'News'),
+            genre: 'News',
+            artworkUrl: newsArtwork),
       ];
 
   /// Adds curated stations missing from the user list. Returns added count.
@@ -412,6 +607,9 @@ class RadioStationStore {
         added++;
       }
     }
+    final sorted = sortWithQuranFirst(_stations);
+    _stations.clear();
+    _stations.addAll(sorted);
     if (added > 0) await persist();
     return added;
   }

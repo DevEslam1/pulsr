@@ -1785,8 +1785,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
 
     _streamPreResolver = StreamPreResolver(
-      resolveUrl: (videoId, {quality = 'high'}) =>
-          _ytmService.resolveStream(videoId, quality: quality),
+      resolveUrl: (videoId, {quality = 'high', title, artist}) =>
+          _ytmService.resolveStream(videoId,
+              quality: quality, title: title, artist: artist),
       urlCache: getIt.isRegistered<YtmUrlCache>()
           ? getIt<YtmUrlCache>()
           : YtmUrlCache(),

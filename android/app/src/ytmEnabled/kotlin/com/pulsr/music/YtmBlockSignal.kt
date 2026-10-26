@@ -93,8 +93,6 @@ enum class YtmBlockSignal(val code: String) {
             "live event has ended",
             "live stream offline",
             "premieres in",
-            "confirm your age",
-            "age-restricted",
             "not available on this app"
         )
 
@@ -233,10 +231,15 @@ enum class YtmBlockSignal(val code: String) {
                 return GeoBlocked
             }
 
-            // 5. Sign In Required (legitimate auth requirement without bot flags)
+            // 5. Sign In Required (legitimate auth requirement or age restriction without bot flags)
             if (status == "LOGIN_REQUIRED" ||
                 combinedReasons.contains("login_required") ||
                 combinedReasons.contains("sign in to access") ||
+                combinedReasons.contains("confirm your age") ||
+                combinedReasons.contains("age-restricted") ||
+                combinedReasons.contains("inappropriate for some users") ||
+                combinedReasons.contains("sign in to confirm") ||
+                combinedReasons.contains("please sign in") ||
                 combinedReasons.contains("authentication required")) {
                 return SignInRequired
             }

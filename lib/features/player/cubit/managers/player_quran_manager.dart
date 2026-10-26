@@ -48,6 +48,19 @@ class PlayerQuranManager {
     }
   }
 
+  /// Returns the persisted reciter style, falling back to Mujawwad.
+  Future<QuranReciterStyle> getStyle() async {
+    final service = _service;
+    if (service == null) return QuranReciterStyle.mujawwad;
+    try {
+      return await service.getStyle();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to get Quran reciter style',
+          error: e, stackTrace: st, category: 'PlayerQuranManager');
+      return QuranReciterStyle.mujawwad;
+    }
+  }
+
   /// Persists the reciter style. Returns false when the write failed.
   Future<bool> setStyle(QuranReciterStyle style) async {
     final service = _service;

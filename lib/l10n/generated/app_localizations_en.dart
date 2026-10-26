@@ -123,7 +123,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get twoPaneSelectItem => 'Select an item to view details';
 
   @override
-  String get leAudioRequiresBle => 'LE Audio codecs (LC3 / Opus) require a Bluetooth LE Audio connection.';
+  String get leAudioRequiresBle =>
+      'LE Audio codecs (LC3 / Opus) require a Bluetooth LE Audio connection.';
 
   @override
   String get castEntireQueue => 'Cast Entire Queue';
@@ -132,7 +133,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roomAveragingTitle => '3-Point Room Averaging';
 
   @override
-  String get roomAveragingSubtitle => 'Measures Center, 1m Left, and 1m Right for robust correction';
+  String get roomAveragingSubtitle =>
+      'Measures Center, 1m Left, and 1m Right for robust correction';
 
   @override
   String get roomPositionCenter => 'Center';
@@ -200,7 +202,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get professionalMode => 'Professional Mode';
 
   @override
-  String get professionalModeUnlocked => 'Advanced DSP, bit-perfect streaming, and pro audio controls unlocked.';
+  String get professionalModeUnlocked =>
+      'Advanced DSP, bit-perfect streaming, and pro audio controls unlocked.';
 
   @override
   String get quickDspControls => 'Quick DSP Controls';
@@ -257,7 +260,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get expCrossfadeTitle => 'Playback & Crossfade';
 
   @override
-  String get expCrossfadePro => 'Fine-grained 0-12s curve & latency calibration';
+  String get expCrossfadePro =>
+      'Fine-grained 0-12s curve & latency calibration';
 
   @override
   String get expCrossfadeNormal => 'Standard 3s smooth crossfade';
@@ -408,7 +412,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noResultsFound => 'No music found';
 
   @override
-  String get noResultsSubtitle => 'Try a different search term or check spelling';
+  String get noResultsSubtitle =>
+      'Try a different search term or check spelling';
 
   @override
   String get nowPlaying => 'Now Playing';
@@ -549,7 +554,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsUiSoundEffects => 'UI Sound Effects';
 
   @override
-  String get settingsUiSoundEffectsSubtitle => 'Play subtle audio feedback for interactions';
+  String get settingsUiSoundEffectsSubtitle =>
+      'Play subtle audio feedback for interactions';
 
   @override
   String get lyricsTranslate => 'Translate lyrics';
@@ -567,7 +573,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noSongsFound => 'No Songs Found';
 
   @override
-  String get noSongsSubtitle => 'Scan your local storage to find all offline music files.';
+  String get noSongsSubtitle =>
+      'Scan your local storage to find all offline music files.';
 
   @override
   String get rescanLibrary => 'Rescan Media Library';
@@ -585,7 +592,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get permissionRequired => 'Permission Required';
 
   @override
-  String get audioAccessRequired => 'Audio access is required to display your music library.';
+  String get audioAccessRequired =>
+      'Audio access is required to display your music library.';
 
   @override
   String get grantAccess => 'Grant Access';
@@ -594,13 +602,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openSettings => 'Open Settings';
 
   @override
-  String get privacyGuarantee => '100% Offline • Zero Telemetry • Local Storage';
+  String get privacyGuarantee =>
+      '100% Offline • Zero Telemetry • Local Storage';
 
   @override
   String get onboardingTitle => 'Private & Offline';
 
   @override
-  String get onboardingSubtitle => 'Your music never leaves your device. No ads, no tracking, no accounts.';
+  String get onboardingSubtitle =>
+      'Your music never leaves your device. No ads, no tracking, no accounts.';
 
   @override
   String get createPlaylist => 'New Playlist';
@@ -618,13 +628,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deletePlaylist => 'Delete Playlist';
 
   @override
-  String get deletePlaylistPrompt => 'Are you sure you want to delete this playlist?';
+  String get deletePlaylistPrompt =>
+      'Are you sure you want to delete this playlist?';
 
   @override
   String get emptyPlaylists => 'No playlists created yet';
 
   @override
-  String get emptyPlaylistsSubtitle => 'Create custom or smart playlists to organize your tracks';
+  String get emptyPlaylistsSubtitle =>
+      'Create custom or smart playlists to organize your tracks';
 
   @override
   String get playlistName => 'Playlist Name';
@@ -822,7 +834,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resumeAfterInterruption => 'Resume After Interruption';
 
   @override
-  String get resumeAfterInterruptionSubtitle => 'Resume after phone calls & notifications';
+  String get resumeAfterInterruptionSubtitle =>
+      'Resume after phone calls & notifications';
 
   @override
   String get waveformSeekBar => 'Waveform Seek Bar';
@@ -867,7 +880,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hiddenFolders => 'Excluded Folders';
 
   @override
-  String get hiddenFoldersSubtitle => 'Manage excluded and hidden music folders';
+  String get hiddenFoldersSubtitle =>
+      'Manage excluded and hidden music folders';
 
   @override
   String get networkAndProxy => 'Network & Proxy';
@@ -936,7 +950,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudSync => 'Cloud Sync & Backup';
 
   @override
-  String get cloudSyncSubtitle => 'Sync favorites, playlists, and settings across devices';
+  String get cloudSyncSubtitle =>
+      'Sync favorites, playlists, and settings across devices';
 
   @override
   String get signInWithGoogle => 'Sign In with Google';
@@ -978,10 +993,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get batteryOptimization => 'Battery Optimization';
 
   @override
-  String get batteryOptimizationSubtitle => 'Allow unrestricted background playback';
+  String get batteryOptimizationSubtitle =>
+      'Allow unrestricted background playback';
 
   @override
-  String get batteryOptimizationPrompt => 'Disable battery restrictions for uninterrupted playback';
+  String get batteryOptimizationPrompt =>
+      'Disable battery restrictions for uninterrupted playback';
 
   @override
   String get requestWhitelist => 'Disable Restrictions';
@@ -1069,7 +1086,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get deleteSongConfirmation => 'Are you sure you want to permanently delete this song from your device?';
+  String get deleteSongConfirmation =>
+      'Are you sure you want to permanently delete this song from your device?';
 
   @override
   String deleteMultipleConfirmation(int count) {
@@ -1146,13 +1164,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seekLabel => 'Seek';
 
   @override
-  String get homeOfflineNotice => 'Offline mode — online streaming is disabled in Settings.';
+  String get homeOfflineNotice =>
+      'Offline mode — online streaming is disabled in Settings.';
 
   @override
   String get homePermissionNeeded => 'Permission Needed';
 
   @override
-  String get homePermissionSubtitle => 'Grant audio or storage permission so Pulsr can index and play your offline music collection with bit-perfect quality.';
+  String get homePermissionSubtitle =>
+      'Grant audio or storage permission so Pulsr can index and play your offline music collection with bit-perfect quality.';
 
   @override
   String get homeGrantPermission => 'Grant Permission';
@@ -1166,7 +1186,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get homeScanningStorageSubtitle => 'Searching device directories for audio files...';
+  String get homeScanningStorageSubtitle =>
+      'Searching device directories for audio files...';
 
   @override
   String get jumpToCategory => 'Jump to Category';
@@ -1226,16 +1247,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authUseCodeSignIn => 'Having trouble? Use code sign-in instead';
 
   @override
-  String get castAndroidOnly => 'Casting is available on Android only in this build.';
+  String get castAndroidOnly =>
+      'Casting is available on Android only in this build.';
 
   @override
-  String get castDirectDeviceMode => 'Direct device mode: casts the current track. Queue and remote volume need the Cast SDK.';
+  String get castDirectDeviceMode =>
+      'Direct device mode: casts the current track. Queue and remote volume need the Cast SDK.';
 
   @override
   String get playbackPresetsTitle => 'Playback presets';
 
   @override
-  String get playbackPresetsSubtitle => 'One-tap tuning for quality, balance or data saving';
+  String get playbackPresetsSubtitle =>
+      'One-tap tuning for quality, balance or data saving';
 
   @override
   String get playbackPresetMaxQuality => 'Max Quality';
@@ -1281,7 +1305,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectYtmAccount => 'Connect YouTube Music Account';
 
   @override
-  String get connectYtmSubtitle => 'Sign in to auto-sync your Liked Music library';
+  String get connectYtmSubtitle =>
+      'Sign in to auto-sync your Liked Music library';
 
   @override
   String get ytmConnected => 'YouTube Music Connected';
@@ -1290,13 +1315,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openYtmWeb => 'Open YouTube Music Web';
 
   @override
-  String get openYtmWebSubtitle => 'Browse web player, explore charts, library & playlists';
+  String get openYtmWebSubtitle =>
+      'Browse web player, explore charts, library & playlists';
 
   @override
   String get offlineOnlyMode => 'Offline Only Mode';
 
   @override
-  String get offlineOnlySubtitle => 'Disable online features, streaming & web queries';
+  String get offlineOnlySubtitle =>
+      'Disable online features, streaming & web queries';
 
   @override
   String get wifiOnlyMode => 'Wi-Fi Only Mode';
@@ -1329,7 +1356,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privacyAndData => 'Privacy & Data';
 
   @override
-  String get privacyGuaranteeSubtitle => '100% offline. Zero telemetry, zero tracking.';
+  String get privacyGuaranteeSubtitle =>
+      '100% offline. Zero telemetry, zero tracking.';
 
   @override
   String get aboutAppSubtitle => 'Version 1.0.0 • Pure Offline Sound';
@@ -1363,7 +1391,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noDownloadsYet => 'No Downloads Yet';
 
   @override
-  String get noDownloadsYetSubtitle => 'Download your favorite songs from YouTube Music to listen offline anywhere.';
+  String get noDownloadsYetSubtitle =>
+      'Download your favorite songs from YouTube Music to listen offline anywhere.';
 
   @override
   String get offlineDownloads => 'Offline Downloads';
@@ -1384,7 +1413,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noLocalFavorites => 'No Local Favorites';
 
   @override
-  String get noLocalFavoritesSubtitle => 'Tap the heart icon on any of your local tracks to add them here.';
+  String get noLocalFavoritesSubtitle =>
+      'Tap the heart icon on any of your local tracks to add them here.';
 
   @override
   String get noOnlineFavorites => 'No Online Favorites';
@@ -1396,7 +1426,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noFoldersFound => 'No Folders Found';
 
   @override
-  String get noFoldersSubtitle => 'Scan device storage to discover music directories and organize by path.';
+  String get noFoldersSubtitle =>
+      'Scan device storage to discover music directories and organize by path.';
 
   @override
   String get playNext => 'Play Next';
@@ -1532,7 +1563,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hideCustomFolder => 'Hide Custom Folder';
 
   @override
-  String get hideFolderDesc => 'Enter the full directory path you want to hide from your music library:';
+  String get hideFolderDesc =>
+      'Enter the full directory path you want to hide from your music library:';
 
   @override
   String get hideFolder => 'Hide Folder';
@@ -1541,25 +1573,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirmRestore => 'Confirm Restore';
 
   @override
-  String get confirmRestoreDesc => 'Are you sure you want to restore backup data from this file?';
+  String get confirmRestoreDesc =>
+      'Are you sure you want to restore backup data from this file?';
 
   @override
-  String get existingLibraryUpdateNotice => 'Existing library matching tracks will be updated.';
+  String get existingLibraryUpdateNotice =>
+      'Existing library matching tracks will be updated.';
 
   @override
   String get audioVisualizerPermission => 'Audio Visualizer Permission';
 
   @override
-  String get audioVisualizerPermissionDesc => 'The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process frequency data.';
+  String get audioVisualizerPermissionDesc =>
+      'The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process frequency data.';
 
   @override
   String get useSimulation => 'Use Simulation';
 
   @override
-  String get visualizerSimulationNotice => 'Visualizer permission denied — showing a simulated animation instead.';
+  String get visualizerSimulationNotice =>
+      'Visualizer permission denied — showing a simulated animation instead.';
 
   @override
-  String get visualizerCpuFallbackBadge => 'CPU fallback — GPU visualiser unavailable';
+  String get visualizerCpuFallbackBadge =>
+      'CPU fallback — GPU visualiser unavailable';
 
   @override
   String get ytmAccount => 'YouTube Music Account';
@@ -1574,7 +1611,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ytdlpServerConfig => 'yt-dlp Server Config';
 
   @override
-  String get ytdlpServerDesc => 'Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.';
+  String get ytdlpServerDesc =>
+      'Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.';
 
   @override
   String get downloadsTitle => 'Downloads';
@@ -1583,7 +1621,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noDownloadsTitle => 'No downloads yet';
 
   @override
-  String get noDownloadsSubtitle => 'Songs downloaded for offline playback will appear here.';
+  String get noDownloadsSubtitle =>
+      'Songs downloaded for offline playback will appear here.';
 
   @override
   String get statusQueued => 'Queued';
@@ -1616,13 +1655,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadErrorStorage => 'Storage full — free up space and retry';
 
   @override
-  String get downloadErrorPermission => 'Storage permission denied. Please grant permission in Settings.';
+  String get downloadErrorPermission =>
+      'Storage permission denied. Please grant permission in Settings.';
 
   @override
-  String get downloadErrorInterrupted => 'Download was interrupted. Tap to resume.';
+  String get downloadErrorInterrupted =>
+      'Download was interrupted. Tap to resume.';
 
   @override
-  String get downloadErrorDisabled => 'Downloads are disabled or unavailable in this build.';
+  String get downloadErrorDisabled =>
+      'Downloads are disabled or unavailable in this build.';
 
   @override
   String get downloadErrorTransition => 'Invalid download state transition.';
@@ -1634,37 +1676,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadErrorNetwork => 'No connection. Check your network.';
 
   @override
-  String get downloadErrorBotChallenge => 'YouTube verification triggered. Retrying…';
+  String get downloadErrorBotChallenge =>
+      'YouTube verification triggered. Retrying…';
 
   @override
   String get downloadErrorUnavailable => 'This track is unavailable.';
 
   @override
-  String get downloadWifiOnly => 'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.';
+  String get downloadWifiOnly =>
+      'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.';
 
   @override
-  String get downloadOfflineOnly => 'Offline Only Mode is active. Turn it off in Settings to download.';
+  String get downloadOfflineOnly =>
+      'Offline Only Mode is active. Turn it off in Settings to download.';
 
   @override
   String get settingsDownloadConcurrent => 'Concurrent downloads';
 
   @override
-  String get settingsDownloadConcurrentSubtitle => 'Maximum tracks downloading at the same time (1-5).';
+  String get settingsDownloadConcurrentSubtitle =>
+      'Maximum tracks downloading at the same time (1-5).';
 
   @override
   String get settingsDownloadLocation => 'Download location';
 
   @override
-  String get settingsDownloadLocationUnsupported => 'Custom download locations are not supported yet. Files are saved to the Music folder.';
+  String get settingsDownloadLocationUnsupported =>
+      'Custom download locations are not supported yet. Files are saved to the Music folder.';
 
   @override
-  String get downloadErrorAlreadyQueued => 'This song is already in the download queue.';
+  String get downloadErrorAlreadyQueued =>
+      'This song is already in the download queue.';
 
   @override
-  String get downloadErrorCorrupt => 'Downloaded file was corrupted or incomplete. Please retry.';
+  String get downloadErrorCorrupt =>
+      'Downloaded file was corrupted or incomplete. Please retry.';
 
   @override
-  String get downloadErrorInvalidTransition => 'Invalid download state transition.';
+  String get downloadErrorInvalidTransition =>
+      'Invalid download state transition.';
 
   @override
   String get downloadErrorTimeout => 'Download timed out. Please retry.';
@@ -1673,7 +1723,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspEnginePreference => 'DSP Engine Preference';
 
   @override
-  String get dspEnginePreferenceSubtitle => 'Choose real-time DSP engine or OEM system sound effects';
+  String get dspEnginePreferenceSubtitle =>
+      'Choose real-time DSP engine or OEM system sound effects';
 
   @override
   String get dspEngineNative => 'Native Studio DSP (Zero Latency)';
@@ -1735,19 +1786,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspLoudnessTitle => 'Loudness Contour';
 
   @override
-  String get dspLoudnessSubtitle => 'Fletcher–Munson volume-linked tone compensation';
+  String get dspLoudnessSubtitle =>
+      'Fletcher–Munson volume-linked tone compensation';
 
   @override
   String get dspLoudnessIntensity => 'Intensity';
 
   @override
-  String get dspLoudnessReplayGainNote => 'Complements ReplayGain: ReplayGain levels loudness across tracks, while this contour adapts tone to your listening volume.';
+  String get dspLoudnessReplayGainNote =>
+      'Complements ReplayGain: ReplayGain levels loudness across tracks, while this contour adapts tone to your listening volume.';
 
   @override
   String get dspSubCrossoverTitle => 'Subwoofer Crossover';
 
   @override
-  String get dspSubCrossoverSubtitle => 'Bass redirection into a summed mono sub tap';
+  String get dspSubCrossoverSubtitle =>
+      'Bass redirection into a summed mono sub tap';
 
   @override
   String get dspSubCrossoverCorner => 'Crossover Corner';
@@ -1756,13 +1810,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspSubCrossoverSubLevel => 'Sub Level';
 
   @override
-  String get dspSubCrossoverNote => 'Bass redirection: a low-passed mono sum is added to both channels — this is not true multichannel LFE routing.';
+  String get dspSubCrossoverNote =>
+      'Bass redirection: a low-passed mono sum is added to both channels — this is not true multichannel LFE routing.';
 
   @override
   String get dspDynamicEqTitle => 'Dynamic EQ';
 
   @override
-  String get dspDynamicEqSubtitle => 'Cuts resonances only when band energy exceeds the threshold';
+  String get dspDynamicEqSubtitle =>
+      'Cuts resonances only when band energy exceeds the threshold';
 
   @override
   String get dspDynamicEqFrequency => 'Band Frequency';
@@ -1789,7 +1845,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rcTitle => 'Room Correction';
 
   @override
-  String get rcSubtitle => 'Measure your room with a short tone sweep and fit an EQ that flattens the response';
+  String get rcSubtitle =>
+      'Measure your room with a short tone sweep and fit an EQ that flattens the response';
 
   @override
   String get rcStart => 'Start measurement';
@@ -1798,7 +1855,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rcMeasuring => 'Measuring - stay quiet...';
 
   @override
-  String get rcResult => 'Measured response (top) and fitted correction (bottom)';
+  String get rcResult =>
+      'Measured response (top) and fitted correction (bottom)';
 
   @override
   String get rcApply => 'Apply';
@@ -1807,13 +1865,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rcDiscard => 'Discard';
 
   @override
-  String get rcMicNeeded => 'Microphone permission is required for the measurement';
+  String get rcMicNeeded =>
+      'Microphone permission is required for the measurement';
 
   @override
-  String get rcQuietHint => 'Keep the room quiet and let the sweep play out loud at your normal listening level';
+  String get rcQuietHint =>
+      'Keep the room quiet and let the sweep play out loud at your normal listening level';
 
   @override
-  String get rcKeepPlayerPaused => 'Music playback stays paused while Room Correction is active';
+  String get rcKeepPlayerPaused =>
+      'Music playback stays paused while Room Correction is active';
 
   @override
   String get rcApplied => 'Room Correction preset applied';
@@ -1836,7 +1897,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get deviceProfilesSubtitle => 'Sound settings remembered per output device';
+  String get deviceProfilesSubtitle =>
+      'Sound settings remembered per output device';
 
   @override
   String get autoDeviceSwitch => 'Auto-switch on device change';
@@ -1882,7 +1944,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get smartAudioTitle => 'Smart Audio';
 
   @override
-  String get smartAudioSubtitle => 'Automatically tune the sound to your headphones and track';
+  String get smartAudioSubtitle =>
+      'Automatically tune the sound to your headphones and track';
 
   @override
   String get smartAudioModeLabel => 'Mode';
@@ -1894,10 +1957,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get smartAudioManual => 'Manual';
 
   @override
-  String get smartAudioAutoDesc => 'Detect the connected headphones, apply the matching AutoEQ correction, and use the highest output quality the device supports';
+  String get smartAudioAutoDesc =>
+      'Detect the connected headphones, apply the matching AutoEQ correction, and use the highest output quality the device supports';
 
   @override
-  String get smartAudioManualDesc => 'Keep your EQ, effects and output quality exactly as you set them';
+  String get smartAudioManualDesc =>
+      'Keep your EQ, effects and output quality exactly as you set them';
 
   @override
   String smartAudioDetectedDevice(String device) {
@@ -1910,16 +1975,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get smartAudioNoMatch => 'No headphone correction matched for this device';
+  String get smartAudioNoMatch =>
+      'No headphone correction matched for this device';
 
   @override
-  String get smartAudioAutoCatchAllHint => 'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode';
+  String get smartAudioAutoCatchAllHint =>
+      'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode';
 
   @override
   String get smartAudioAutoDacTitle => 'Auto-Select USB DAC & Bit-Perfect';
 
   @override
-  String get smartAudioAutoDacSubtitle => 'Automatically routes audio to connected USB DACs and engages Bit-Perfect mode for maximum bit-exact quality.';
+  String get smartAudioAutoDacSubtitle =>
+      'Automatically routes audio to connected USB DACs and engages Bit-Perfect mode for maximum bit-exact quality.';
 
   @override
   String get experienceModeTitle => 'Experience Mode';
@@ -1934,10 +2002,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get experienceModeProfessional => 'Professional';
 
   @override
-  String get experienceModeNormalDesc => 'Smart and simple — Pulsr tunes the sound to your headphones and picks the best quality automatically';
+  String get experienceModeNormalDesc =>
+      'Smart and simple — Pulsr tunes the sound to your headphones and picks the best quality automatically';
 
   @override
-  String get experienceModeProfessionalDesc => 'Full control over every DSP stage, output format and diagnostic option';
+  String get experienceModeProfessionalDesc =>
+      'Full control over every DSP stage, output format and diagnostic option';
 
   @override
   String get undo => 'Undo';
@@ -1956,7 +2026,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String downloadTileSemantics(String title, String artist, String status, String progress) {
+  String downloadTileSemantics(
+      String title, String artist, String status, String progress) {
     return '$title $artist $status $progress';
   }
 
@@ -1969,13 +2040,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get systemEffectsTitle => 'System Audio Effects (Dolby Atmos / DAP)';
 
   @override
-  String get systemEffectsSubtitleBypassed => '✓ Bypassed: System effects disabled on output-mix session';
+  String get systemEffectsSubtitleBypassed =>
+      '✓ Bypassed: System effects disabled on output-mix session';
 
   @override
-  String get systemEffectsSubtitleActive => 'Active: OEM sound effects are processing audio';
+  String get systemEffectsSubtitleActive =>
+      'Active: OEM sound effects are processing audio';
 
   @override
-  String get systemEffectsSubtitleUnsupported => 'No OEM Dolby/DAP detected on this device';
+  String get systemEffectsSubtitleUnsupported =>
+      'No OEM Dolby/DAP detected on this device';
 
   @override
   String get systemEffectsAuto => 'Auto';
@@ -2009,7 +2083,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetToDefault30s => 'Reset to default (30s)';
 
   @override
-  String get autoFilteringVoiceMemos => 'Auto-filtering voice memos • Custom paths';
+  String get autoFilteringVoiceMemos =>
+      'Auto-filtering voice memos • Custom paths';
 
   @override
   String get manageExcludedDirectories => 'Manage excluded directories';
@@ -2029,13 +2104,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeMissingFiles => 'Remove missing files';
 
   @override
-  String get removeMissingFilesSubtitle => 'Delete indexed tracks whose files no longer exist';
+  String get removeMissingFilesSubtitle =>
+      'Delete indexed tracks whose files no longer exist';
 
   @override
   String get removeMissingFilesConfirmTitle => 'Remove missing files?';
 
   @override
-  String get removeMissingFilesConfirmBody => 'This permanently deletes indexed tracks whose files no longer exist on disk.';
+  String get removeMissingFilesConfirmBody =>
+      'This permanently deletes indexed tracks whose files no longer exist on disk.';
 
   @override
   String get remove => 'Remove';
@@ -2142,43 +2219,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePage => 'Home Page';
 
   @override
-  String get homePageSubtitle => 'Personalized recommendations, mixes & quick picks';
+  String get homePageSubtitle =>
+      'Personalized recommendations, mixes & quick picks';
 
   @override
   String get youtubeWeb => 'YouTube Web';
 
   @override
-  String get youtubeWebSubtitle => 'Browse all music videos & playlists (no geo-restrictions)';
+  String get youtubeWebSubtitle =>
+      'Browse all music videos & playlists (no geo-restrictions)';
 
   @override
   String get exploreAndCharts => 'Explore & Charts';
 
   @override
-  String get exploreAndChartsSubtitle => 'Trending songs, top global charts & music videos';
+  String get exploreAndChartsSubtitle =>
+      'Trending songs, top global charts & music videos';
 
   @override
   String get yourLibrary => 'Your Library';
 
   @override
-  String get yourLibrarySubtitle => 'Saved playlists, albums, songs & subscribed artists';
+  String get yourLibrarySubtitle =>
+      'Saved playlists, albums, songs & subscribed artists';
 
   @override
   String get likedMusic => 'Liked Music';
 
   @override
-  String get likedMusicSubtitle => 'Thumbed-up songs synced with your Google account';
+  String get likedMusicSubtitle =>
+      'Thumbed-up songs synced with your Google account';
 
   @override
   String get newReleases => 'New Releases';
 
   @override
-  String get newReleasesSubtitle => 'Latest album drops, EPs and trending single releases';
+  String get newReleasesSubtitle =>
+      'Latest album drops, EPs and trending single releases';
 
   @override
   String get listeningHistory => 'Listening History';
 
   @override
-  String get listeningHistorySubtitle => 'Recently played tracks and stations on your account';
+  String get listeningHistorySubtitle =>
+      'Recently played tracks and stations on your account';
 
   @override
   String get bySongs => 'By Songs';
@@ -2201,7 +2285,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get musicWillStopEndOfTrack => 'Music will stop at the end of this track';
+  String get musicWillStopEndOfTrack =>
+      'Music will stop at the end of this track';
 
   @override
   String musicWillStopAfterSongs(int count) {
@@ -2215,7 +2300,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get musicWillStopEndOfQueue => 'Music will stop at the end of the queue';
+  String get musicWillStopEndOfQueue =>
+      'Music will stop at the end of the queue';
 
   @override
   String musicWillStopIn(int minutes, int seconds) {
@@ -2226,7 +2312,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rcStackWithHeadphoneEq => 'Stack with headphone AutoEQ';
 
   @override
-  String get rcStackWithHeadphoneEqSubtitle => 'Combine this room correction with the selected headphone profile.';
+  String get rcStackWithHeadphoneEqSubtitle =>
+      'Combine this room correction with the selected headphone profile.';
 
   @override
   String get rcMeasuredResponse => 'Measured Response';
@@ -2238,7 +2325,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rcVerify => 'Verify correction';
 
   @override
-  String get rcVerifyHint => 'Re-measure with the correction active to confirm the room is flattened.';
+  String get rcVerifyHint =>
+      'Re-measure with the correction active to confirm the room is flattened.';
 
   @override
   String get rcVerifying => 'Verifying correction - stay quiet...';
@@ -2271,7 +2359,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fetchMissingArtworkTitle => 'Fetch Missing Artwork?';
 
   @override
-  String get fetchMissingArtworkBody => 'Pulsr will look up albums without artwork online and save the results to your library. This needs an internet connection.';
+  String get fetchMissingArtworkBody =>
+      'Pulsr will look up albums without artwork online and save the results to your library. This needs an internet connection.';
 
   @override
   String get fetchArtwork => 'Fetch Artwork';
@@ -2374,7 +2463,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get radioEmptyTitle => 'No radio stations yet';
 
   @override
-  String get radioEmptySubtitle => 'Add a stream URL or import an .m3u playlist to start listening.';
+  String get radioEmptySubtitle =>
+      'Add a stream URL or import an .m3u playlist to start listening.';
 
   @override
   String get radioStationName => 'Station name';
@@ -2431,7 +2521,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get radioCuratedUpToDate => 'All curated stations are already in your list';
+  String get radioCuratedUpToDate =>
+      'All curated stations are already in your list';
 
   @override
   String get radioCuratedTitle => 'Curated Stations';
@@ -2452,7 +2543,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get radioUrlMalformed => 'That URL could not be parsed';
 
   @override
-  String get radioUrlScheme => 'Only http:// and https:// streams are supported';
+  String get radioUrlScheme =>
+      'Only http:// and https:// streams are supported';
 
   @override
   String get radioUrlNoHost => 'The URL is missing a host name';
@@ -2461,46 +2553,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRebuildSearchIndexTitle => 'Rebuild search index';
 
   @override
-  String get settingsRebuildSearchIndexSubtitle => 'Fix missing search results by rebuilding the full-text index';
+  String get settingsRebuildSearchIndexSubtitle =>
+      'Fix missing search results by rebuilding the full-text index';
 
   @override
   String get settingsSearchIndexRebuilt => 'Search index rebuilt';
 
   @override
-  String get settingsSearchIndexRebuildFailed => 'Could not rebuild the search index';
+  String get settingsSearchIndexRebuildFailed =>
+      'Could not rebuild the search index';
 
   @override
   String get followTrackSampleRateTitle => 'Follow track sample rate';
 
   @override
-  String get followTrackSampleRateSubtitle => 'Reconfigure the output to each track\'s native rate; de-duplicated and skipped on Bluetooth';
+  String get followTrackSampleRateSubtitle =>
+      'Reconfigure the output to each track\'s native rate; de-duplicated and skipped on Bluetooth';
 
   @override
-  String get followTrackSampleRateBluetooth => 'Skipped on Bluetooth — the codec/AVRCP link owns the sample rate';
+  String get followTrackSampleRateBluetooth =>
+      'Skipped on Bluetooth — the codec/AVRCP link owns the sample rate';
 
   @override
-  String get followTrackRequiresBitPerfect => 'Requires Bit-Perfect output — the track rate is only pushed on the exclusive USB path';
+  String get followTrackRequiresBitPerfect =>
+      'Requires Bit-Perfect output — the track rate is only pushed on the exclusive USB path';
 
   @override
   String get strictBitPerfectTitle => 'Strict bit-perfect (no resample)';
 
   @override
-  String get strictBitPerfectSubtitle => 'Forces Bit-Perfect + DSP bypass and follows each track\'s rate so the DAC gets the exact source samples';
+  String get strictBitPerfectSubtitle =>
+      'Forces Bit-Perfect + DSP bypass and follows each track\'s rate so the DAC gets the exact source samples';
 
   @override
-  String get strictBitPerfectBluetooth => 'Unavailable: Bluetooth transcodes — strict bit-perfect needs a USB DAC';
+  String get strictBitPerfectBluetooth =>
+      'Unavailable: Bluetooth transcodes — strict bit-perfect needs a USB DAC';
 
   @override
-  String get strictBitPerfectActive => 'Strict bit-perfect is ON: EQ, ReplayGain, effects and crossfade are muted so the exact source samples reach the DAC';
+  String get strictBitPerfectActive =>
+      'Strict bit-perfect is ON: EQ, ReplayGain, effects and crossfade are muted so the exact source samples reach the DAC';
 
   @override
   String get dsdOutputModeTitle => 'DSD output';
 
   @override
-  String get dsdOutputModeSubtitle => 'How DSF/DFF files reach the DAC: PCM decode, or native DSD streamed as DSD over PCM';
+  String get dsdOutputModeSubtitle =>
+      'How DSF/DFF files reach the DAC: PCM decode, or native DSD streamed as DSD over PCM';
 
   @override
-  String get dsdDopRequiresUsbDac => 'Requires a connected USB DAC that supports DSD over PCM (DoP)';
+  String get dsdDopRequiresUsbDac =>
+      'Requires a connected USB DAC that supports DSD over PCM (DoP)';
 
   @override
   String get dsdOutputPcm => 'PCM';
@@ -2578,7 +2680,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get audioDelayHelp => 'Positive delays audio (e.g. slow Bluetooth/video).';
+  String get audioDelayHelp =>
+      'Positive delays audio (e.g. slow Bluetooth/video).';
 
   @override
   String get themeExported => 'Theme exported to share sheet';
@@ -2599,7 +2702,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationPermissionTitle => 'Show playback controls';
 
   @override
-  String get notificationPermissionRationale => 'Allow notifications so Pulsr can show playback controls on your lock screen and in the notification shade.';
+  String get notificationPermissionRationale =>
+      'Allow notifications so Pulsr can show playback controls on your lock screen and in the notification shade.';
 
   @override
   String get notificationPermissionAllow => 'Allow';
@@ -2608,13 +2712,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationPermissionNotNow => 'Not now';
 
   @override
-  String get onboardingNotificationDenied => 'Notifications are off. You can enable them later in Settings.';
+  String get onboardingNotificationDenied =>
+      'Notifications are off. You can enable them later in Settings.';
 
   @override
-  String get onboardingScanFailed => 'Could not scan your library. You can retry from Settings.';
+  String get onboardingScanFailed =>
+      'Could not scan your library. You can retry from Settings.';
 
   @override
-  String get onboardingPermissionRationale => 'Without audio access your library will be empty. You can continue with limited access and grant permission later from Settings.';
+  String get onboardingPermissionRationale =>
+      'Without audio access your library will be empty. You can continue with limited access and grant permission later from Settings.';
 
   @override
   String get continueLimitedAccess => 'Continue with limited access';
@@ -2626,7 +2733,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get albumNotFoundHint => 'Album not found — open it from the library.';
 
   @override
-  String get artistNotFoundHint => 'Artist not found — open it from the library.';
+  String get artistNotFoundHint =>
+      'Artist not found — open it from the library.';
 
   @override
   String get genreNotFoundHint => 'Genre not found — open it from the library.';
@@ -2635,7 +2743,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get yearNotFoundHint => 'Year not found — open it from the library.';
 
   @override
-  String get playlistNotFoundHint => 'Playlist not found — open it from the library.';
+  String get playlistNotFoundHint =>
+      'Playlist not found — open it from the library.';
 
   @override
   String get folderNotFound => 'Folder not found';
@@ -2650,7 +2759,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get couldNotLoadFolderSongs => 'Could not load folder songs';
 
   @override
-  String get libraryReadError => 'Something went wrong while reading your library.';
+  String get libraryReadError =>
+      'Something went wrong while reading your library.';
 
   @override
   String get folderExcluded => 'Folder excluded from library scan';
@@ -2752,7 +2862,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gotIt => 'Got it';
 
   @override
-  String get eqResetNotice => 'All Equalizer & DSP settings restored to defaults';
+  String get eqResetNotice =>
+      'All Equalizer & DSP settings restored to defaults';
 
   @override
   String get saveCustomEqPreset => 'Save Custom EQ Preset';
@@ -2842,7 +2953,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loudnessContour => 'Loudness Contour';
 
   @override
-  String get loudnessContourDesc => 'Equal-loudness bass/treble lift at low volume';
+  String get loudnessContourDesc =>
+      'Equal-loudness bass/treble lift at low volume';
 
   @override
   String get tpdfDither => 'TPDF Dither';
@@ -2914,7 +3026,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get volumeBoost => 'Volume Boost';
 
   @override
-  String get highBoostWarn => 'High boost may cause audio distortion or hearing fatigue.';
+  String get highBoostWarn =>
+      'High boost may cause audio distortion or hearing fatigue.';
 
   @override
   String get appliedTuningProfile => 'Applied Tuning Profile';
@@ -2929,7 +3042,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activeLabel => 'Active';
 
   @override
-  String get allDspBypassed => 'All DSP is bypassed by Bit-Perfect. Disable it in Settings to re-enable.';
+  String get allDspBypassed =>
+      'All DSP is bypassed by Bit-Perfect. Disable it in Settings to re-enable.';
 
   @override
   String get spatialAudio => 'Spatial Audio';
@@ -2962,7 +3076,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crossfeedAlgorithm => 'Crossfeed Algorithm';
 
   @override
-  String get bs2bActive => 'Authentic BS2B IIR crossfeed network (low-pass + high-boost biquads) active.';
+  String get bs2bActive =>
+      'Authentic BS2B IIR crossfeed network (low-pass + high-boost biquads) active.';
 
   @override
   String get customDelayLine => 'Custom Delay-Line';
@@ -2998,10 +3113,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get multibandWarmth => 'Multiband Warmth';
 
   @override
-  String get bassMonoDesc => 'Forces low bass to mono, eliminates headphone phase cancellation';
+  String get bassMonoDesc =>
+      'Forces low bass to mono, eliminates headphone phase cancellation';
 
   @override
-  String get antiPopDesc => 'Soft-limits transient bass bursts to protect speakers';
+  String get antiPopDesc =>
+      'Soft-limits transient bass bursts to protect speakers';
 
   @override
   String get ditherDesc => 'Bit-depth dithering (auto-skipped on Bluetooth)';
@@ -3016,31 +3133,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get acousticCalibModel => 'Acoustic Calibration Model';
 
   @override
-  String get notAppliedWarn => 'Not applied by the audio engine on this device/session - this control may have no audible effect.';
+  String get notAppliedWarn =>
+      'Not applied by the audio engine on this device/session - this control may have no audible effect.';
 
   @override
   String get hwFxUnavailable => 'Hardware Effects Unavailable';
 
   @override
-  String get hwFxDesc => 'Hardware AudioFX, Equalizer, Virtualizer and DynamicsProcessing are supported on Android devices.';
+  String get hwFxDesc =>
+      'Hardware AudioFX, Equalizer, Virtualizer and DynamicsProcessing are supported on Android devices.';
 
   @override
-  String get systemFxActive => 'System-level audio enhancement is active on your device. Running Pulsr DSP on top may cause double-processing. Consider disabling system Dolby/OEM effects or using Bit-Perfect output.';
+  String get systemFxActive =>
+      'System-level audio enhancement is active on your device. Running Pulsr DSP on top may cause double-processing. Consider disabling system Dolby/OEM effects or using Bit-Perfect output.';
 
   @override
   String get pasteJsonPreset => 'Paste a JSON preset string below:';
 
   @override
-  String get centerFreqHelp => 'Set the center frequency (Hz) for each band. Values must be strictly ascending between 10 Hz and 30 kHz.';
+  String get centerFreqHelp =>
+      'Set the center frequency (Hz) for each band. Values must be strictly ascending between 10 Hz and 30 kHz.';
 
   @override
-  String get roomMeasureHelp => 'Measure your room, then export the correction as a convolution impulse response.';
+  String get roomMeasureHelp =>
+      'Measure your room, then export the correction as a convolution impulse response.';
 
   @override
-  String get dspDisabledBp => 'DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or Bypass DSP in Settings to re-enable.';
+  String get dspDisabledBp =>
+      'DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or Bypass DSP in Settings to re-enable.';
 
   @override
-  String get saturationBandDesc => 'Restricts saturation to the mid band for clean sub-bass.';
+  String get saturationBandDesc =>
+      'Restricts saturation to the mid band for clean sub-bass.';
 
   @override
   String get matchLogic => 'MATCH LOGIC';
@@ -3109,7 +3233,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveToPulsr => 'Save to Pulsr';
 
   @override
-  String get fetchingYtmTracks => 'Fetching playlist tracks from YouTube Music...';
+  String get fetchingYtmTracks =>
+      'Fetching playlist tracks from YouTube Music...';
 
   @override
   String get ytmHeader => 'YOUTUBE MUSIC';
@@ -3121,7 +3246,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importYtmFav => 'Import YouTube Music Favorites';
 
   @override
-  String get pastePlaylistLink => 'Paste a playlist link or Liked playlist from YouTube Music';
+  String get pastePlaylistLink =>
+      'Paste a playlist link or Liked playlist from YouTube Music';
 
   @override
   String get noFavToDownload => 'No favorite songs to download.';
@@ -3130,13 +3256,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncingYtm => 'Syncing YouTube Music Liked Songs...';
 
   @override
-  String get sessionExpired => 'YouTube Music session expired. Please sign in again.';
+  String get sessionExpired =>
+      'YouTube Music session expired. Please sign in again.';
 
   @override
   String get libLoadFailed => 'Could not load your library.';
 
   @override
-  String get scanPrompt => 'Scan your device storage to load your audio tracks.';
+  String get scanPrompt =>
+      'Scan your device storage to load your audio tracks.';
 
   @override
   String get noMusicYet => 'No Music Loaded Yet';
@@ -3151,7 +3279,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noRecentSongs => 'No recently played songs';
 
   @override
-  String get recentEmptyHint => 'Play your favorite music and it will appear here.';
+  String get recentEmptyHint =>
+      'Play your favorite music and it will appear here.';
 
   @override
   String get songInfo => 'Song info';
@@ -3175,16 +3304,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reciterDesc => 'Vocal-optimized recitation profiles';
 
   @override
-  String get sibilanceDesc => 'Sibilance is tamed with a high-shelf EQ cut. Spectral noise and breath reduction are not available in the current audio engine.';
+  String get sibilanceDesc =>
+      'Sibilance is tamed with a high-shelf EQ cut. Spectral noise and breath reduction are not available in the current audio engine.';
 
   @override
   String get compressorTitle => 'Multiband Compressor';
 
   @override
-  String get compressorDesc => 'Native 4-band compressor with Linkwitz-Riley crossovers. Tames each frequency band independently before the limiter.';
+  String get compressorDesc =>
+      'Native 4-band compressor with Linkwitz-Riley crossovers. Tames each frequency band independently before the limiter.';
 
   @override
-  String get compressorLimitDesc => 'Ratio, Attack and Make-up Gain need the Android DynamicsProcessing engine.';
+  String get compressorLimitDesc =>
+      'Ratio, Attack and Make-up Gain need the Android DynamicsProcessing engine.';
 
   @override
   String get resetStudioDefaults => 'Reset to Studio Defaults';
@@ -3193,7 +3325,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get studioCompressor => 'Studio Dynamics Compressor';
 
   @override
-  String get studioCompressorDesc => 'Studio-grade lookahead dynamics processing and peak brickwall limiting.';
+  String get studioCompressorDesc =>
+      'Studio-grade lookahead dynamics processing and peak brickwall limiting.';
 
   @override
   String get bytecodeJit => 'Bytecode JIT';
@@ -3238,13 +3371,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspViperDdcDemoTitle => 'Demo / Placeholder Profiles';
 
   @override
-  String get dspViperDdcDemoNote => 'Bundled profiles are illustrative. Load a real .vdc file for measured correction.';
+  String get dspViperDdcDemoNote =>
+      'Bundled profiles are illustrative. Load a real .vdc file for measured correction.';
 
   @override
   String get bookmarkLabel => 'Bookmark';
 
   @override
-  String get bookmarkHint => 'Bookmarks are available for the track currently playing.';
+  String get bookmarkHint =>
+      'Bookmarks are available for the track currently playing.';
 
   @override
   String get defaultGlobalEq => 'Default (Global EQ)';
@@ -3268,7 +3403,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trackVolumeOffset => 'Track Volume Offset';
 
   @override
-  String get bpmXfadeDesc => 'Used by BPM-synced crossfade to align fades to the beat. Range 40-240.';
+  String get bpmXfadeDesc =>
+      'Used by BPM-synced crossfade to align fades to the beat. Range 40-240.';
 
   @override
   String get rgOff => 'Off';
@@ -3292,7 +3428,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspInspectorDebug => 'DSP Signal Inspector & Debug';
 
   @override
-  String get bpResolved => 'Resolved: Bit-Perfect bypass disabled - ReplayGain is adjustable again';
+  String get bpResolved =>
+      'Resolved: Bit-Perfect bypass disabled - ReplayGain is adjustable again';
 
   @override
   String get replayGainTitle => 'ReplayGain Loudness Normalization';
@@ -3307,7 +3444,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importJsonViz => 'Import JSON Visualizer Preset';
 
   @override
-  String get loadJsonVizDesc => 'Load a Custom visualizer preset (.json) from storage';
+  String get loadJsonVizDesc =>
+      'Load a Custom visualizer preset (.json) from storage';
 
   @override
   String get loadMilkDesc => 'Load a Winamp/Milkdrop preset file from storage';
@@ -3322,7 +3460,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectPlayerTheme => 'Select Player Theme';
 
   @override
-  String get aboutBlurb => 'An audiophile-grade local music player with bit-perfect output, a full DSP chain, per-device profiles and automation.';
+  String get aboutBlurb =>
+      'An audiophile-grade local music player with bit-perfect output, a full DSP chain, per-device profiles and automation.';
 
   @override
   String get accentPalette => 'Accent Color Palette';
@@ -3487,7 +3626,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scrobblerSaved => 'Scrobbler credentials saved securely.';
 
   @override
-  String get usbPermDenied => 'USB permission denied - hardware volume unavailable';
+  String get usbPermDenied =>
+      'USB permission denied - hardware volume unavailable';
 
   @override
   String get hwVolume => 'Hardware Volume';
@@ -3517,13 +3657,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importProxies => 'Import Proxies';
 
   @override
-  String get importProxiesDesc => 'Import your proxy list (.txt) or paste lines in IP:PORT:USER:PASS format.';
+  String get importProxiesDesc =>
+      'Import your proxy list (.txt) or paste lines in IP:PORT:USER:PASS format.';
 
   @override
-  String get pasteOrPick => 'Paste proxy lines or pick a text file. Lines will be parsed automatically.';
+  String get pasteOrPick =>
+      'Paste proxy lines or pick a text file. Lines will be parsed automatically.';
 
   @override
-  String get bypassHostsDesc => 'Requests matching these hosts will connect directly without routing through proxy.';
+  String get bypassHostsDesc =>
+      'Requests matching these hosts will connect directly without routing through proxy.';
 
   @override
   String get pasteClipboard => 'Paste Clipboard';
@@ -3568,13 +3711,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fetchingAccount => 'Fetching account playlists...';
 
   @override
-  String get noAccountPlaylists => 'No playlists found in your YouTube Music library.';
+  String get noAccountPlaylists =>
+      'No playlists found in your YouTube Music library.';
 
   @override
   String get selectPlaylistHint => 'Select a playlist to view tracks';
 
   @override
-  String get signInToSync => 'Sign in to sync your Liked Music library and account playlists.';
+  String get signInToSync =>
+      'Sign in to sync your Liked Music library and account playlists.';
 
   @override
   String get suggestedForYou => 'SUGGESTED FOR YOU';
@@ -3598,10 +3743,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importBackup => 'Import Backup';
 
   @override
-  String get backupExportDesc => 'Save favorites, playlists, history & settings to JSON';
+  String get backupExportDesc =>
+      'Save favorites, playlists, history & settings to JSON';
 
   @override
-  String get backupImportDesc => 'Restore favorites, playlists, history & settings from JSON file';
+  String get backupImportDesc =>
+      'Restore favorites, playlists, history & settings from JSON file';
 
   @override
   String get backupTooLarge => 'Backup file too large (max 10 MB)';
@@ -3616,13 +3763,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearCacheReset => 'Clear Cache & Reset';
 
   @override
-  String get cookiesCleared => 'Cookies and cache cleared. Reloading YouTube Music...';
+  String get cookiesCleared =>
+      'Cookies and cache cleared. Reloading YouTube Music...';
 
   @override
   String get forceEgypt => 'Force Egypt Mode';
 
   @override
-  String get googleBlockHelp => 'If Google blocks embedded browser login on this device, you can paste your raw cookie string directly:';
+  String get googleBlockHelp =>
+      'If Google blocks embedded browser login on this device, you can paste your raw cookie string directly:';
 
   @override
   String get importCookiesToken => 'Import Cookies / Token Manually';
@@ -3631,10 +3780,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importCookiesManual => 'Import Cookies Manually';
 
   @override
-  String get loginDetected => 'Login detected! Tap the green \"Done\" button to complete setup.';
+  String get loginDetected =>
+      'Login detected! Tap the green \"Done\" button to complete setup.';
 
   @override
-  String get confirmAccount => 'Make sure you sign into the correct Google account. Tap \"Done\" once logged in.';
+  String get confirmAccount =>
+      'Make sure you sign into the correct Google account. Tap \"Done\" once logged in.';
 
   @override
   String get openYtmWebDirect => 'Open YouTube Music web directly';
@@ -3643,16 +3794,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openYtWeb => 'Open YouTube Web';
 
   @override
-  String get completeSignInFirst => 'Please complete sign in on YouTube Music first.';
+  String get completeSignInFirst =>
+      'Please complete sign in on YouTube Music first.';
 
   @override
   String get googleTvSignIn => 'Sign in with Google TV (no captcha)';
 
   @override
-  String get googleBlockTip => 'Tip: if Google continues to block in-app sign-in on this device, paste your cookies from your browser using the button above.';
+  String get googleBlockTip =>
+      'Tip: if Google continues to block in-app sign-in on this device, paste your cookies from your browser using the button above.';
 
   @override
-  String get ipOutsideYtm => 'Your network IP is outside YouTube Music Web support. Force Egypt mode or switch to YouTube Web (never geo-blocked).';
+  String get ipOutsideYtm =>
+      'Your network IP is outside YouTube Music Web support. Force Egypt mode or switch to YouTube Web (never geo-blocked).';
 
   @override
   String get ytmRestricted => 'YouTube Music is restricted in your region';
@@ -3772,7 +3926,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearPoolTitle => 'Clear Proxy Pool?';
 
   @override
-  String get milkRendererDesc => 'Winamp/Milkdrop preset renderer (built-in or imported .milk file)';
+  String get milkRendererDesc =>
+      'Winamp/Milkdrop preset renderer (built-in or imported .milk file)';
 
   @override
   String get includedLabel => 'Included';
@@ -3800,7 +3955,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get outputPathDiag => 'OUTPUT PATH DIAGNOSTICS';
 
   @override
-  String get dsdPcmNote => 'DSD files decode to PCM; native DSD streaming is not supported yet';
+  String get dsdPcmNote =>
+      'DSD files decode to PCM; native DSD streaming is not supported yet';
 
   @override
   String get targetSampleRate => 'TARGET OUTPUT SAMPLE RATE';
@@ -3827,7 +3983,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get armedLabel => 'ARMED';
 
   @override
-  String get bpGuardrails => 'Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.';
+  String get bpGuardrails =>
+      'Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.';
 
   @override
   String get btAudioCodec => 'BLUETOOTH AUDIO CODEC';
@@ -3857,7 +4014,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changeBtCodec => 'Change Bluetooth Codec';
 
   @override
-  String get nearbyPermDesc => 'Nearby Devices permission needed to read and control codec settings.';
+  String get nearbyPermDesc =>
+      'Nearby Devices permission needed to read and control codec settings.';
 
   @override
   String get grantBtPerm => 'Grant Bluetooth Permission';
@@ -3866,7 +4024,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leAudio => 'LE AUDIO';
 
   @override
-  String get lc3Negotiation => 'Android negotiates the LC3 stream with your earbuds. Codec, sample rate and bit depth are not app-adjustable on LE Audio.';
+  String get lc3Negotiation =>
+      'Android negotiates the LC3 stream with your earbuds. Codec, sample rate and bit depth are not app-adjustable on LE Audio.';
 
   @override
   String get connectingBt => 'Connecting to Bluetooth stack...';
@@ -3875,7 +4034,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bitPerfectMode => 'Bit-Perfect Mode';
 
   @override
-  String get ytmSessionExpired => 'YouTube Music session expired. Sign in again to keep streaming.';
+  String get ytmSessionExpired =>
+      'YouTube Music session expired. Sign in again to keep streaming.';
 
   @override
   String get noOnlineMetadata => 'No matching online metadata found.';
@@ -3902,7 +4062,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudStorageStatus => 'Cloud Storage Status';
 
   @override
-  String get cloudBackupDesc => 'Encrypted bidirectional Firestore backup across all your devices.';
+  String get cloudBackupDesc =>
+      'Encrypted bidirectional Firestore backup across all your devices.';
 
   @override
   String get whatGetsSynced => 'What gets synced';
@@ -3911,22 +4072,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudSyncFavoritesLabel => 'Sync favorites';
 
   @override
-  String get cloudSyncFavoritesDesc => 'Upload and restore liked songs across devices';
+  String get cloudSyncFavoritesDesc =>
+      'Upload and restore liked songs across devices';
 
   @override
   String get cloudSyncPlaylistsLabel => 'Sync playlists';
 
   @override
-  String get cloudSyncPlaylistsDesc => 'Upload and restore your playlists across devices';
+  String get cloudSyncPlaylistsDesc =>
+      'Upload and restore your playlists across devices';
 
   @override
-  String get syncItemsPrefix => 'Favorites, playlists, play history and library metadata are ';
+  String get syncItemsPrefix =>
+      'Favorites, playlists, play history and library metadata are ';
 
   @override
   String get autoFilterVoiceNotes => 'Auto-Filter Voice Notes & Messengers';
 
   @override
-  String get autoFilterVoiceNotesDesc => 'Automatically ignores WhatsApp audio, voice notes, Telegram, Call Recordings, and sound recorder files.';
+  String get autoFilterVoiceNotesDesc =>
+      'Automatically ignores WhatsApp audio, voice notes, Telegram, Call Recordings, and sound recorder files.';
 
   @override
   String get shortAudioFilterDesc => 'Ignore short clips and sound effects';
@@ -3953,7 +4118,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get universalScrobblingEngine => 'Universal Scrobbling Engine';
 
   @override
-  String get scrobblingServicesDesc => 'Connected to Last.fm, ListenBrainz, Libre.fm, and Custom Webhooks.';
+  String get scrobblingServicesDesc =>
+      'Connected to Last.fm, ListenBrainz, Libre.fm, and Custom Webhooks.';
 
   @override
   String get last7DaysActivity => 'Last 7 Days Activity';
@@ -3968,7 +4134,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get amoledLabel => 'AMOLED';
 
   @override
-  String get settingsSearchHint => 'Try searching for \"equalizer\", \"dark mode\", \"crossfade\", \"proxy\", \"cache\", or \"scrobble\".';
+  String get settingsSearchHint =>
+      'Try searching for \"equalizer\", \"dark mode\", \"crossfade\", \"proxy\", \"cache\", or \"scrobble\".';
 
   @override
   String get bitPerfectLabel => 'BIT-PERFECT';
@@ -3977,7 +4144,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get automationRules => 'Automation Rules';
 
   @override
-  String get automationRulesDesc => 'Apply a settings profile automatically when a device event fires.';
+  String get automationRulesDesc =>
+      'Apply a settings profile automatically when a device event fires.';
 
   @override
   String get noAutomationRules => 'No automation rules configured.';
@@ -3986,7 +4154,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playbackStopsScreenOff => 'Playback stops when screen is off?';
 
   @override
-  String get batteryExemptionDesc => 'Some device manufacturers aggressively stop background playback. Granting battery exemption ensures uninterrupted music playback.';
+  String get batteryExemptionDesc =>
+      'Some device manufacturers aggressively stop background playback. Granting battery exemption ensures uninterrupted music playback.';
 
   @override
   String get deviceGuide => 'Device Guide';
@@ -4001,7 +4170,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickDiscovery => 'QUICK DISCOVERY';
 
   @override
-  String get ytmSearchDesc => 'Stream and download millions of songs from YouTube Music, ad-free.';
+  String get ytmSearchDesc =>
+      'Stream and download millions of songs from YouTube Music, ad-free.';
 
   @override
   String get popularSearches => 'POPULAR SEARCHES';
@@ -4031,7 +4201,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get linearPhaseFir => 'Linear-phase FIR';
 
   @override
-  String get linearPhaseOnDesc => 'Constant delay, exact phase (pre-ringing possible)';
+  String get linearPhaseOnDesc =>
+      'Constant delay, exact phase (pre-ringing possible)';
 
   @override
   String get linearPhaseOffDesc => 'Minimum-phase, zero extra delay (default)';
@@ -4043,7 +4214,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mbcPerBandTitle => 'Per-band dynamics';
 
   @override
-  String get mbcPerBandSubtitle => 'Threshold, ratio and make-up gain for each of the 4 LR4 bands.';
+  String get mbcPerBandSubtitle =>
+      'Threshold, ratio and make-up gain for each of the 4 LR4 bands.';
 
   @override
   String get mbcBandLow => 'Band 1 · Low';
@@ -4064,7 +4236,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get presetAcousticTargets => 'Preset Acoustic Targets';
 
   @override
-  String get devOptionsBtCodec => 'Opens Developer Options -> Bluetooth Audio Codec';
+  String get devOptionsBtCodec =>
+      'Opens Developer Options -> Bluetooth Audio Codec';
 
   @override
   String get autoEqDatabase => 'AutoEQ 2.0 Database';
@@ -4090,13 +4263,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noDspStages => 'No DSP stages reported from platform engine.';
 
   @override
-  String get dolbyHijackDesc => 'Dolby Atmos is hijacking the HAL session. Native limiter/crossfeed still run, but EQ needs HAL. Fix: tap below to switch to OEM (lets system handle EQ) or disable Dolby in system Sound settings, then restart track.';
+  String get dolbyHijackDesc =>
+      'Dolby Atmos is hijacking the HAL session. Native limiter/crossfeed still run, but EQ needs HAL. Fix: tap below to switch to OEM (lets system handle EQ) or disable Dolby in system Sound settings, then restart track.';
 
   @override
-  String get switchedToOem => 'Switched DSP Preference -> OEM. Restart track to attach.';
+  String get switchedToOem =>
+      'Switched DSP Preference -> OEM. Restart track to attach.';
 
   @override
-  String get switchPrefFailed => 'Failed to switch preference - change in Settings -> Audio';
+  String get switchPrefFailed =>
+      'Failed to switch preference - change in Settings -> Audio';
 
   @override
   String get fixSwitchOem => 'Fix: Switch to OEM';
@@ -4108,7 +4284,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get retryAttach => 'Retry Attach';
 
   @override
-  String get placeLrcHint => 'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.';
+  String get placeLrcHint =>
+      'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.';
 
   @override
   String get searchLyrics => 'Search Lyrics';
@@ -4123,13 +4300,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingHeading => 'Your Music, Your Privacy';
 
   @override
-  String get onboardingPrivacyDesc => '100% offline local playback. No accounts, no cloud dependencies, zero tracking, and absolute privacy for your music collection.';
+  String get onboardingPrivacyDesc =>
+      '100% offline local playback. No accounts, no cloud dependencies, zero tracking, and absolute privacy for your music collection.';
 
   @override
   String get onboardingPowerful => 'Powerful Playback';
 
   @override
-  String get onboardingPowerfulDesc => 'Tailor your sound with a 10-band graphic equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.';
+  String get onboardingPowerfulDesc =>
+      'Tailor your sound with a 10-band graphic equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.';
 
   @override
   String get onboardingThemes => '4 DISTINCT PLAYER THEMES';
@@ -4138,7 +4317,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingBeautiful => 'Beautiful & Personal';
 
   @override
-  String get onboardingBeautifulDesc => 'Express your style with real-time dynamic color extraction from album art and switch between 4 unique player themes.';
+  String get onboardingBeautifulDesc =>
+      'Express your style with real-time dynamic color extraction from album art and switch between 4 unique player themes.';
 
   @override
   String get artworkWall => 'Album Artwork Wall';
@@ -4153,7 +4333,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioQualityTiers => 'Audio Quality Tiers';
 
   @override
-  String get noPlayHistory => 'No play history recorded yet. Listen to tracks to track your top hits!';
+  String get noPlayHistory =>
+      'No play history recorded yet. Listen to tracks to track your top hits!';
 
   @override
   String get downloadsLabel => 'DOWNLOADS';
@@ -4174,7 +4355,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get couldNotLoadGenre => 'Could not load genre songs';
 
   @override
-  String get syncAcrossDevices => 'Sync your favorites & playlists across devices';
+  String get syncAcrossDevices =>
+      'Sync your favorites & playlists across devices';
 
   @override
   String get continueWithGoogle => 'Continue with Google';
@@ -4222,10 +4404,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waveformLabel => 'WAVEFORM';
 
   @override
-  String get usbBpFailed => 'USB bit-perfect streaming could not start (unsupported DAC or claim failed)';
+  String get usbBpFailed =>
+      'USB bit-perfect streaming could not start (unsupported DAC or claim failed)';
 
   @override
-  String get cloudSyncItemsDesc => 'Favorites, playlists, play history and library metadata are synced in both directions. DSP presets and app settings stay on this device.';
+  String get cloudSyncItemsDesc =>
+      'Favorites, playlists, play history and library metadata are synced in both directions. DSP presets and app settings stay on this device.';
 
   @override
   String get dspCopyJsonReport => 'Copy JSON Report';
@@ -4239,7 +4423,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get dspBitPerfectDirectPassThrough => 'Bit-Perfect Direct Pass-Through';
+  String get dspBitPerfectDirectPassThrough =>
+      'Bit-Perfect Direct Pass-Through';
 
   @override
   String dspAudioEffectSessionActive(int sessionId) {
@@ -4247,10 +4432,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get dspSessionPendingPlayTrack => 'Session Pending — Play a track to attach';
+  String get dspSessionPendingPlayTrack =>
+      'Session Pending — Play a track to attach';
 
   @override
-  String get dspHalDetachedDolbyNativeDsp => 'HAL Detached (Dolby) — Native DSP Active';
+  String get dspHalDetachedDolbyNativeDsp =>
+      'HAL Detached (Dolby) — Native DSP Active';
 
   @override
   String get dspAudioEffectSessionDetached => 'AudioEffect Session Detached';
@@ -4399,43 +4586,53 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsSearchPlaceholder => 'Search settings, sound, appearance...';
+  String get settingsSearchPlaceholder =>
+      'Search settings, sound, appearance...';
 
   @override
-  String get settingsCategoryAudioSubtitle => 'Equalizer, DSP, Hi-Res, ReplayGain';
+  String get settingsCategoryAudioSubtitle =>
+      'Equalizer, DSP, Hi-Res, ReplayGain';
 
   @override
-  String get settingsCategoryPlaybackSubtitle => 'Crossfade, gapless, sleep timer, skip';
+  String get settingsCategoryPlaybackSubtitle =>
+      'Crossfade, gapless, sleep timer, skip';
 
   @override
-  String get settingsCategoryAppearanceSubtitle => 'Theme mode, accent colors, visualizer';
+  String get settingsCategoryAppearanceSubtitle =>
+      'Theme mode, accent colors, visualizer';
 
   @override
-  String get settingsCategoryGesturesSubtitle => 'Mini-player swipes, artwork double-tap';
+  String get settingsCategoryGesturesSubtitle =>
+      'Mini-player swipes, artwork double-tap';
 
   @override
   String get settingsCategoryProfiles => 'Profiles & Rules';
 
   @override
-  String get settingsCategoryProfilesSubtitle => 'Hardware DAC mappings, trigger rules';
+  String get settingsCategoryProfilesSubtitle =>
+      'Hardware DAC mappings, trigger rules';
 
   @override
-  String get settingsCategoryLibrarySubtitle => 'Folders, hidden media, duration filter';
+  String get settingsCategoryLibrarySubtitle =>
+      'Folders, hidden media, duration filter';
 
   @override
   String get settingsCategoryOnline => 'Network & YTM';
 
   @override
-  String get settingsCategoryOnlineSubtitle => 'Audio quality, streaming cache, proxy';
+  String get settingsCategoryOnlineSubtitle =>
+      'Audio quality, streaming cache, proxy';
 
   @override
-  String get settingsCategoryStorageSubtitle => 'Disk usage, cached artwork, cleanup';
+  String get settingsCategoryStorageSubtitle =>
+      'Disk usage, cached artwork, cleanup';
 
   @override
   String get settingsCategoryPrivacy => 'Privacy & Backup';
 
   @override
-  String get settingsCategoryPrivacySubtitle => 'Offline guarantee, scrobbling, backups';
+  String get settingsCategoryPrivacySubtitle =>
+      'Offline guarantee, scrobbling, backups';
 
   @override
   String get settingsCategoryAbout => 'About';
@@ -4452,25 +4649,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAutomationTitle => 'Automation';
 
   @override
-  String get settingsSmartAudioSectionSubtitle => 'Automatic headphone correction and best-quality output';
+  String get settingsSmartAudioSectionSubtitle =>
+      'Automatic headphone correction and best-quality output';
 
   @override
-  String get settingsQuranModeSubtitle => 'Vocal EQ, mosque ambience, memorization speed';
+  String get settingsQuranModeSubtitle =>
+      'Vocal EQ, mosque ambience, memorization speed';
 
   @override
-  String get settingsDeviceProfilesSectionSubtitle => 'Per-output DAC and Bluetooth profile mappings';
+  String get settingsDeviceProfilesSectionSubtitle =>
+      'Per-output DAC and Bluetooth profile mappings';
 
   @override
-  String get settingsAutomationSectionSubtitle => 'Trigger profiles automatically on hardware events';
+  String get settingsAutomationSectionSubtitle =>
+      'Trigger profiles automatically on hardware events';
 
   @override
-  String get settingsAutomationTileSubtitle => 'Apply profiles on headphone plug, Bluetooth or charge events';
+  String get settingsAutomationTileSubtitle =>
+      'Apply profiles on headphone plug, Bluetooth or charge events';
 
   @override
-  String get settingsStorageSectionSubtitle => 'Manage disk usage and audio cache';
+  String get settingsStorageSectionSubtitle =>
+      'Manage disk usage and audio cache';
 
   @override
-  String get settingsAboutSectionSubtitle => 'Version info, licenses and architecture';
+  String get settingsAboutSectionSubtitle =>
+      'Version info, licenses and architecture';
 
   @override
   String settingsAboutVersionSubtitle(String version) {
@@ -4478,37 +4682,43 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsAppearanceSectionSubtitle => 'Theme, accent colors, visualizer and player UI style';
+  String get settingsAppearanceSectionSubtitle =>
+      'Theme, accent colors, visualizer and player UI style';
 
   @override
   String get settingsAutoDarkModeTitle => 'Auto Dark Mode by Time';
 
   @override
-  String get settingsAutoDarkModeSubtitle => 'Follow a 7 PM – 6 AM day/night schedule';
+  String get settingsAutoDarkModeSubtitle =>
+      'Follow a 7 PM – 6 AM day/night schedule';
 
   @override
   String get settingsHighContrastTitle => 'High Contrast';
 
   @override
-  String get settingsHighContrastSubtitle => 'Boost contrast with an AMOLED-friendly palette';
+  String get settingsHighContrastSubtitle =>
+      'Boost contrast with an AMOLED-friendly palette';
 
   @override
   String get settingsDimWhitePointTitle => 'Dim White Point';
 
   @override
-  String get settingsDimWhitePointSubtitle => 'Soften bright text for easier night listening';
+  String get settingsDimWhitePointSubtitle =>
+      'Soften bright text for easier night listening';
 
   @override
   String get settingsReduceMotionTitle => 'Reduce Motion';
 
   @override
-  String get settingsReduceMotionSubtitle => 'Snap animations instead of tweening them';
+  String get settingsReduceMotionSubtitle =>
+      'Snap animations instead of tweening them';
 
   @override
   String get settingsLiquidGlassTitle => 'Liquid Glass Tint';
 
   @override
-  String get settingsLiquidGlassSubtitle => 'Adjust refraction between Ultra Clear (0%) and Tinted (100%)';
+  String get settingsLiquidGlassSubtitle =>
+      'Adjust refraction between Ultra Clear (0%) and Tinted (100%)';
 
   @override
   String get settingsBadgeStyle => 'STYLE';
@@ -4520,13 +4730,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsBadgePalette => 'PALETTE';
 
   @override
-  String get settingsGesturesSectionSubtitle => 'Configure swipe and double-tap gestures across mini-player and artwork';
+  String get settingsGesturesSectionSubtitle =>
+      'Configure swipe and double-tap gestures across mini-player and artwork';
 
   @override
-  String get settingsLibrarySectionSubtitle => 'Device media indexing, exclusion rules and cleanup';
+  String get settingsLibrarySectionSubtitle =>
+      'Device media indexing, exclusion rules and cleanup';
 
   @override
-  String get settingsOnlineSectionSubtitle => 'Online streams, downloads, proxy routing and quality settings';
+  String get settingsOnlineSectionSubtitle =>
+      'Online streams, downloads, proxy routing and quality settings';
 
   @override
   String get settingsTapToManage => 'Tap to manage';
@@ -4535,34 +4748,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsBadgeConnected => 'CONNECTED';
 
   @override
-  String get settingsDownloadsSubtitle => 'View and manage offline tracks and downloads';
+  String get settingsDownloadsSubtitle =>
+      'View and manage offline tracks and downloads';
 
   @override
   String get settingsProxyEnabled => 'Enabled';
 
   @override
-  String get settingsProxyDisabledHint => 'Disabled • Tap to configure HTTP / SOCKS5';
+  String get settingsProxyDisabledHint =>
+      'Disabled • Tap to configure HTTP / SOCKS5';
 
   @override
-  String get settingsPrivacySectionSubtitle => 'Data sovereignty, database backups and scrobbler integrations';
+  String get settingsPrivacySectionSubtitle =>
+      'Data sovereignty, database backups and scrobbler integrations';
 
   @override
   String get settingsScrobblingTitle => 'Scrobbling (Last.fm & ListenBrainz)';
 
   @override
-  String get settingsScrobblingSubtitle => 'Direct API scrobbling and Now Playing metadata broadcast';
+  String get settingsScrobblingSubtitle =>
+      'Direct API scrobbling and Now Playing metadata broadcast';
 
   @override
   String get settingsScrobbleStatsTitle => 'Scrobble Stats';
 
   @override
-  String get settingsScrobbleStatsSubtitle => 'Listening history and scrobble analytics overview';
+  String get settingsScrobbleStatsSubtitle =>
+      'Listening history and scrobble analytics overview';
 
   @override
   String get settingsCloudBackupDashboard => 'Cloud Backup Dashboard';
 
   @override
-  String get settingsCloudBackupDashboardSubtitle => 'Manage synchronized devices and cloud backup snapshots';
+  String get settingsCloudBackupDashboardSubtitle =>
+      'Manage synchronized devices and cloud backup snapshots';
 
   @override
   String settingsNoSettingsFound(String query) {
@@ -4573,7 +4792,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCloudSyncCompleted => 'Cloud backup & sync completed!';
 
   @override
-  String get settingsCloudSyncFailed => 'Sync failed. Please check internet connection.';
+  String get settingsCloudSyncFailed =>
+      'Sync failed. Please check internet connection.';
 
   @override
   String get settingsNeverLabel => 'Never';
@@ -4601,7 +4821,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsSearchDirectoriesHint => 'Search directories by name or path...';
+  String get settingsSearchDirectoriesHint =>
+      'Search directories by name or path...';
 
   @override
   String settingsNoDirectoriesMatch(String query) {
@@ -4609,7 +4830,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsNoAudioFolders => 'No audio folders discovered yet. Scan storage to populate.';
+  String get settingsNoAudioFolders =>
+      'No audio folders discovered yet. Scan storage to populate.';
 
   @override
   String get settingsUnhide => 'Unhide';
@@ -4644,19 +4866,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsArtworkSwipeDisabled => 'Disabled';
 
   @override
-  String get settingsArtworkSwipeIgnoreDesc => 'Ignore horizontal swipe on album artwork';
+  String get settingsArtworkSwipeIgnoreDesc =>
+      'Ignore horizontal swipe on album artwork';
 
   @override
   String get settingsArtworkSwipeNextPrev => 'Next / Previous Track';
 
   @override
-  String get settingsArtworkSwipeNextPrevDesc => 'Swipe left for next track, swipe right for previous track';
+  String get settingsArtworkSwipeNextPrevDesc =>
+      'Swipe left for next track, swipe right for previous track';
 
   @override
   String get settingsAudioNormalization => 'Audio normalization';
 
   @override
-  String get settingsAudioNormalizationSubtitle => 'Even out loudness for tracks without ReplayGain tags';
+  String get settingsAudioNormalizationSubtitle =>
+      'Even out loudness for tracks without ReplayGain tags';
 
   @override
   String get settingsAudioOutputDevice => 'Audio Output Device';
@@ -4665,13 +4890,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAuthenticationOptional => 'AUTHENTICATION (OPTIONAL)';
 
   @override
-  String get settingsBitPerfectBtUnavailable => 'Unavailable: Bluetooth transcodes — use USB / wired DAC';
+  String get settingsBitPerfectBtUnavailable =>
+      'Unavailable: Bluetooth transcodes — use USB / wired DAC';
 
   @override
   String get settingsBitPerfectUsb => 'Bit-Perfect USB Pass-Through';
 
   @override
-  String get settingsBitPerfectUsbDesc => 'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)';
+  String get settingsBitPerfectUsbDesc =>
+      'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)';
 
   @override
   String get settingsBluetoothCodecTitle => 'Bluetooth Codec';
@@ -4699,19 +4926,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsBluetoothHiRes => 'Bluetooth Hi-Res (best-effort)';
 
   @override
-  String get settingsBluetoothHiResDesc => 'Keeps the float path on, dithers at the codec depth and matches the codec rate. Improves quality, but Bluetooth is lossy and can never be bit-perfect';
+  String get settingsBluetoothHiResDesc =>
+      'Keeps the float path on, dithers at the codec depth and matches the codec rate. Improves quality, but Bluetooth is lossy and can never be bit-perfect';
 
   @override
   String get settingsBpmSyncCrossfade => 'BPM-Synced Crossfade';
 
   @override
-  String get settingsBpmSyncCrossfadeDesc => 'Aligns the crossfade duration to the nearest 2/4/8/16/32 beats of the incoming track when its BPM is known (set per track in Song Info); otherwise the configured duration is used';
+  String get settingsBpmSyncCrossfadeDesc =>
+      'Aligns the crossfade duration to the nearest 2/4/8/16/32 beats of the incoming track when its BPM is known (set per track in Song Info); otherwise the configured duration is used';
 
   @override
   String get settingsBypassDspBitPerfect => 'Bypass DSP in Bit-Perfect Mode';
 
   @override
-  String get settingsBypassDspBitPerfectDesc => 'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC';
+  String get settingsBypassDspBitPerfectDesc =>
+      'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC';
 
   @override
   String get settingsBypassList => 'Bypass List (comma-separated)';
@@ -4738,25 +4968,30 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsCastNoSdkDesc => 'Cast sessions require the Play Services Cast SDK (only in the dev/ytm builds). Device discovery is shown here.';
+  String get settingsCastNoSdkDesc =>
+      'Cast sessions require the Play Services Cast SDK (only in the dev/ytm builds). Device discovery is shown here.';
 
   @override
-  String get settingsCastSdkDesc => 'Uses Google\'s Default Media Receiver. Local files are served over your LAN; remote artwork/URLs are cast directly.';
+  String get settingsCastSdkDesc =>
+      'Uses Google\'s Default Media Receiver. Local files are served over your LAN; remote artwork/URLs are cast directly.';
 
   @override
   String get settingsColorSourceArtwork => 'Album Artwork';
 
   @override
-  String get settingsColorSourceArtworkDesc => 'Adapt colors from the current track\'s album art (changes per song)';
+  String get settingsColorSourceArtworkDesc =>
+      'Adapt colors from the current track\'s album art (changes per song)';
 
   @override
   String get settingsColorSourceCustom => 'Custom Accent';
 
   @override
-  String get settingsColorSourceCustomDesc => 'Use the fixed accent color you pick in settings';
+  String get settingsColorSourceCustomDesc =>
+      'Use the fixed accent color you pick in settings';
 
   @override
-  String get settingsColorSourceSystemDesc => 'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices';
+  String get settingsColorSourceSystemDesc =>
+      'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices';
 
   @override
   String get settingsColorSourceWallpaper => 'Material You (Wallpaper)';
@@ -4767,7 +5002,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsConnectedDeviceQuality => 'Connected device & audio quality';
+  String get settingsConnectedDeviceQuality =>
+      'Connected device & audio quality';
 
   @override
   String get settingsConnectionFailed => 'Connection Failed';
@@ -4788,13 +5024,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDoubleTapDisabled => 'Disabled';
 
   @override
-  String get settingsDoubleTapFavoriteDesc => 'Add or remove active song from favorites';
+  String get settingsDoubleTapFavoriteDesc =>
+      'Add or remove active song from favorites';
 
   @override
   String get settingsDoubleTapIgnoreDesc => 'Ignore double-tap gesture';
 
   @override
-  String get settingsDoubleTapLyricsDesc => 'Show or hide synchronized lyrics overlay';
+  String get settingsDoubleTapLyricsDesc =>
+      'Show or hide synchronized lyrics overlay';
 
   @override
   String get settingsDoubleTapToggleFavorite => 'Toggle Favorite';
@@ -4803,16 +5041,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDoubleTapToggleLyrics => 'Toggle Lyrics Overlay';
 
   @override
-  String get settingsDspAutoDesc => 'Automatically bypass OEM sound effects when DSP active';
+  String get settingsDspAutoDesc =>
+      'Automatically bypass OEM sound effects when DSP active';
 
   @override
-  String get settingsDspInspectorDesc => 'Inspect live active DSP stages, HAL effects & engine state';
+  String get settingsDspInspectorDesc =>
+      'Inspect live active DSP stages, HAL effects & engine state';
 
   @override
-  String get settingsDspNativeDesc => '64-bit float, zero-latency real-time native DSP';
+  String get settingsDspNativeDesc =>
+      '64-bit float, zero-latency real-time native DSP';
 
   @override
-  String get settingsDspOemDesc => 'System / vendor-level sound effects (Dolby, Dirac, etc.)';
+  String get settingsDspOemDesc =>
+      'System / vendor-level sound effects (Dolby, Dirac, etc.)';
 
   @override
   String get settingsDuckLevel => 'Duck level';
@@ -4821,16 +5063,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDuckOnNavigation => 'Duck on navigation';
 
   @override
-  String get settingsDuckOnNavigationSubtitle => 'Lower music instead of pausing for prompts';
+  String get settingsDuckOnNavigationSubtitle =>
+      'Lower music instead of pausing for prompts';
 
   @override
-  String get settingsDvcDesc => 'Pins the Android media stream to maximum and applies volume in the native float DSP path, for higher dynamic range and lower distortion at low volumes. Unavailable during Bit-Perfect playback and on the AAudio Direct output path';
+  String get settingsDvcDesc =>
+      'Pins the Android media stream to maximum and applies volume in the native float DSP path, for higher dynamic range and lower distortion at low volumes. Unavailable during Bit-Perfect playback and on the AAudio Direct output path';
 
   @override
   String get settingsDvcTitle => 'Direct Volume Control (DVC)';
 
   @override
-  String get settingsEnableBitPerfectFirst => 'Enable Bit-Perfect USB Pass-Through first';
+  String get settingsEnableBitPerfectFirst =>
+      'Enable Bit-Perfect USB Pass-Through first';
 
   @override
   String get settingsEnglishNative => 'English (US/UK)';
@@ -4842,22 +5087,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsExclusiveUsb => 'Exclusive USB Interface';
 
   @override
-  String get settingsExclusiveUsbDesc => 'Claims the AudioStreaming interface when the kernel driver releases it. Non-forced: never detaches Android\'s audio driver';
+  String get settingsExclusiveUsbDesc =>
+      'Claims the AudioStreaming interface when the kernel driver releases it. Non-forced: never detaches Android\'s audio driver';
 
   @override
   String get settingsExportSessionLogs => 'Export audio session logs';
 
   @override
-  String get settingsExportSessionLogsDesc => 'Share the on-device JSONL log of your recent playback sessions';
+  String get settingsExportSessionLogsDesc =>
+      'Share the on-device JSONL log of your recent playback sessions';
 
   @override
   String get settingsExtendedSpeedRange => 'Extended speed range';
 
   @override
-  String get settingsExtendedSpeedRangeSubtitle => 'Allow 0.1x–8.0x playback speed (default 0.25x–4.0x)';
+  String get settingsExtendedSpeedRangeSubtitle =>
+      'Allow 0.1x–8.0x playback speed (default 0.25x–4.0x)';
 
   @override
-  String get settingsFloatDspDesc => 'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit';
+  String get settingsFloatDspDesc =>
+      'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit';
 
   @override
   String get settingsFloatDspPath => '24/32-bit Float DSP Path';
@@ -4872,7 +5121,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsHedgedStreaming => 'Hedged streaming';
 
   @override
-  String get settingsHedgedStreamingSubtitle => 'Race two resolvers, take the fastest URL';
+  String get settingsHedgedStreamingSubtitle =>
+      'Race two resolvers, take the fastest URL';
 
   @override
   String get settingsHttpLabel => 'HTTP';
@@ -4910,7 +5160,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMasterAudioEngine => 'Master Audio Engine';
 
   @override
-  String get settingsNoneSelectedAutoSkip => 'None selected — auto-skip disabled';
+  String get settingsNoneSelectedAutoSkip =>
+      'None selected — auto-skip disabled';
 
   @override
   String get settingsNonMusicLabel => 'Non-music sections';
@@ -4942,13 +5193,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPerAlbumEqMemory => 'Per-album EQ memory';
 
   @override
-  String get settingsPerAlbumEqMemorySubtitle => 'Restore EQ snapshot per album/artist';
+  String get settingsPerAlbumEqMemorySubtitle =>
+      'Restore EQ snapshot per album/artist';
 
   @override
-  String get settingsPerTrackFormatDesc => 'Hi-res first: requests each track\'s native sample rate / bit depth from the output device (device-capped). Bit-Perfect keeps its exclusive format. Turn off to use one manual output format';
+  String get settingsPerTrackFormatDesc =>
+      'Hi-res first: requests each track\'s native sample rate / bit depth from the output device (device-capped). Bit-Perfect keeps its exclusive format. Turn off to use one manual output format';
 
   @override
-  String get settingsPerTrackFormatNegotiation => 'Per-Track Output Format Negotiation';
+  String get settingsPerTrackFormatNegotiation =>
+      'Per-Track Output Format Negotiation';
 
   @override
   String get settingsPortHint => 'e.g. 8080';
@@ -4963,49 +5217,58 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPreampWithRg => 'Preamp (With RG tag)';
 
   @override
-  String get settingsPrivacyControlBody => 'Cloud sync and remote metadata can be disabled. Automation rules and device profiles are stored locally.';
+  String get settingsPrivacyControlBody =>
+      'Cloud sync and remote metadata can be disabled. Automation rules and device profiles are stored locally.';
 
   @override
   String get settingsPrivacyControlTitle => 'You stay in control';
 
   @override
-  String get settingsPrivacyNoTrackersBody => 'Pure (Play Store) builds ship without the INTERNET permission, analytics SDKs or advertising identifiers.';
+  String get settingsPrivacyNoTrackersBody =>
+      'Pure (Play Store) builds ship without the INTERNET permission, analytics SDKs or advertising identifiers.';
 
   @override
   String get settingsPrivacyNoTrackersTitle => 'No trackers in Pure';
 
   @override
-  String get settingsPrivacyOfflineBody => 'Your library, playback and settings live on this device. Nothing is uploaded unless you explicitly sign in for cloud sync.';
+  String get settingsPrivacyOfflineBody =>
+      'Your library, playback and settings live on this device. Nothing is uploaded unless you explicitly sign in for cloud sync.';
 
   @override
   String get settingsPrivacyOfflineTitle => 'Offline-first';
 
   @override
-  String get settingsPrivacyPermissionsBody => 'Storage/media access is used only to scan and play your local audio. Bluetooth and notification access are requested only for connected-audio features and playback controls.';
+  String get settingsPrivacyPermissionsBody =>
+      'Storage/media access is used only to scan and play your local audio. Bluetooth and notification access are requested only for connected-audio features and playback controls.';
 
   @override
   String get settingsPrivacyPermissionsTitle => 'Permissions are purposeful';
 
   @override
-  String get settingsProxyActiveDesc => 'Traffic routes through configured proxy';
+  String get settingsProxyActiveDesc =>
+      'Traffic routes through configured proxy';
 
   @override
-  String get settingsProxyHttpDesc => 'Routes standard HTTP & HTTPS web and stream extraction traffic.';
+  String get settingsProxyHttpDesc =>
+      'Routes standard HTTP & HTTPS web and stream extraction traffic.';
 
   @override
   String get settingsProxyInactiveDesc => 'Direct connection (proxy disabled)';
 
   @override
-  String get settingsProxySocksDesc => 'Routes network packets via SOCKS5 (recommended for Tor, Clash, Shadowsocks). Note: SOCKS5 applies on the native stream layer; in-app Dart API calls (search, artwork, lyrics) fall back to DIRECT when SOCKS5 is active.';
+  String get settingsProxySocksDesc =>
+      'Routes network packets via SOCKS5 (recommended for Tor, Clash, Shadowsocks). Note: SOCKS5 applies on the native stream layer; in-app Dart API calls (search, artwork, lyrics) fall back to DIRECT when SOCKS5 is active.';
 
   @override
   String get settingsQualityHigh => 'High (~160+ kbps • Best)';
 
   @override
-  String get settingsQualityHighDownloadDesc => 'Highest quality audio files (~160+ kbps M4A)';
+  String get settingsQualityHighDownloadDesc =>
+      'Highest quality audio files (~160+ kbps M4A)';
 
   @override
-  String get settingsQualityHighStreamDesc => 'Highest available bitrate (~160+ kbps) for crystal clear sound';
+  String get settingsQualityHighStreamDesc =>
+      'Highest available bitrate (~160+ kbps) for crystal clear sound';
 
   @override
   String get settingsQualityLow => 'Low (~64 kbps • Data Saver)';
@@ -5014,16 +5277,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsQualityLowDownloadDesc => 'Smallest file size (~64 kbps)';
 
   @override
-  String get settingsQualityLowStreamDesc => 'Reduced data usage (~64 kbps) for slow connections';
+  String get settingsQualityLowStreamDesc =>
+      'Reduced data usage (~64 kbps) for slow connections';
 
   @override
   String get settingsQualityMedium => 'Medium (~128 kbps)';
 
   @override
-  String get settingsQualityMediumDownloadDesc => 'Standard file size and quality (~128 kbps M4A)';
+  String get settingsQualityMediumDownloadDesc =>
+      'Standard file size and quality (~128 kbps M4A)';
 
   @override
-  String get settingsQualityMediumStreamDesc => 'Standard bitrate (~128 kbps) with balanced data usage';
+  String get settingsQualityMediumStreamDesc =>
+      'Standard bitrate (~128 kbps) with balanced data usage';
 
   @override
   String get settingsRaiseVolume => 'Raise playback volume';
@@ -5032,7 +5298,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRemoveProxy => 'Remove proxy';
 
   @override
-  String get settingsReplayGainDesc => 'Track / album gain from tags, applied during playback';
+  String get settingsReplayGainDesc =>
+      'Track / album gain from tags, applied during playback';
 
   @override
   String get settingsRequiresUacDac => 'Requires a UAC DAC with volume control';
@@ -5047,7 +5314,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsResamplerQuality => 'Resampler Quality';
 
   @override
-  String get settingsResamplerQualityDesc => 'Android handles playback sample-rate conversion. Native sinc quality controls are unavailable for this output path.';
+  String get settingsResamplerQualityDesc =>
+      'Android handles playback sample-rate conversion. Native sinc quality controls are unavailable for this output path.';
 
   @override
   String get settingsResamplerStandard => 'Standard (16-tap)';
@@ -5074,19 +5342,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsSearchAccentColorSubtitle => 'Custom color accent palette for buttons and active highlights';
+  String get settingsSearchAccentColorSubtitle =>
+      'Custom color accent palette for buttons and active highlights';
 
   @override
   String get settingsSearchAccentColorTitle => 'Accent Color';
 
   @override
-  String get settingsSearchBitPerfectSubtitle => 'Direct USB DAC hardware sample-rate matching';
+  String get settingsSearchBitPerfectSubtitle =>
+      'Direct USB DAC hardware sample-rate matching';
 
   @override
   String get settingsSearchBitPerfectTitle => 'Bit-Perfect & Hi-Res Output';
 
   @override
-  String get settingsSearchCacheSubtitle => 'Clear cached cover artwork and stream chunks';
+  String get settingsSearchCacheSubtitle =>
+      'Clear cached cover artwork and stream chunks';
 
   @override
   String get settingsSearchCacheTitle => 'Artwork & Audio Cache';
@@ -5107,16 +5378,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSearchCategoryStorage => 'Storage';
 
   @override
-  String get settingsSearchCrossfadeSubtitle => 'Seamless transitions and crossfade seconds slider';
+  String get settingsSearchCrossfadeSubtitle =>
+      'Seamless transitions and crossfade seconds slider';
 
   @override
   String get settingsSearchCrossfadeTitle => 'Crossfade & Gapless';
 
   @override
-  String get settingsSearchEqualizerSubtitle => '10-band equalizer, bass boost, virtualizer, reverb';
+  String get settingsSearchEqualizerSubtitle =>
+      '10-band equalizer, bass boost, virtualizer, reverb';
 
   @override
-  String get settingsSearchHiddenFoldersSubtitle => 'Exclude voice memos, ringtones, and specific directories';
+  String get settingsSearchHiddenFoldersSubtitle =>
+      'Exclude voice memos, ringtones, and specific directories';
 
   @override
   String get settingsSearchHighContrastTitle => 'High Contrast Mode';
@@ -5125,40 +5399,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSearchNowPlayingThemeTitle => 'Now Playing Theme Style';
 
   @override
-  String get settingsSearchPrivacySubtitle => 'Offline-first principles and permissions explanations';
+  String get settingsSearchPrivacySubtitle =>
+      'Offline-first principles and permissions explanations';
 
   @override
   String get settingsSearchPrivacyTitle => 'Privacy Guarantee';
 
   @override
-  String get settingsSearchProxySubtitle => 'HTTP & SOCKS5 proxy routing with latency checks';
+  String get settingsSearchProxySubtitle =>
+      'HTTP & SOCKS5 proxy routing with latency checks';
 
   @override
-  String get settingsSearchQualitySubtitle => 'Bitrate preferences for online streaming and saved files';
+  String get settingsSearchQualitySubtitle =>
+      'Bitrate preferences for online streaming and saved files';
 
   @override
   String get settingsSearchQualityTitle => 'Streaming & Download Audio Quality';
 
   @override
-  String get settingsSearchRescanSubtitle => 'Discover newly downloaded songs and update metadata';
+  String get settingsSearchRescanSubtitle =>
+      'Discover newly downloaded songs and update metadata';
 
   @override
   String get settingsSearchRescanTitle => 'Rescan Device Storage';
 
   @override
-  String get settingsSearchScrobblingSubtitle => 'Track listening history and broadcast Now Playing status';
+  String get settingsSearchScrobblingSubtitle =>
+      'Track listening history and broadcast Now Playing status';
 
   @override
-  String get settingsSearchSleepTimerSubtitle => 'Automatically stop playback after duration or end of track';
+  String get settingsSearchSleepTimerSubtitle =>
+      'Automatically stop playback after duration or end of track';
 
   @override
-  String get settingsSearchSwipeSubtitle => 'Left & Right swipe actions (Skip, Previous, Volume)';
+  String get settingsSearchSwipeSubtitle =>
+      'Left & Right swipe actions (Skip, Previous, Volume)';
 
   @override
   String get settingsSearchSwipeTitle => 'Mini-Player Swipe Gestures';
 
   @override
-  String get settingsSearchThemeModeSubtitle => 'System Default, Light, Dark, or AMOLED high contrast';
+  String get settingsSearchThemeModeSubtitle =>
+      'System Default, Light, Dark, or AMOLED high contrast';
 
   @override
   String get settingsSearchThemeModeTitle => 'Theme Mode';
@@ -5179,7 +5461,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSessionDiagnostics => 'Session Audio Diagnostics';
 
   @override
-  String get settingsSessionDiagnosticsDesc => 'Records one log per track: route type, Bluetooth codec, negotiated sample rate / bit depth, interruptions and dropout counts';
+  String get settingsSessionDiagnosticsDesc =>
+      'Records one log per track: route type, Bluetooth codec, negotiated sample rate / bit depth, interruptions and dropout counts';
 
   @override
   String get settingsSessionLogsShareText => 'Pulsr audio session logs';
@@ -5197,13 +5480,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSpeakerBluetooth => 'Speaker + Bluetooth';
 
   @override
-  String get settingsSpeakerBluetoothSubtitle => 'Best-effort simultaneous output (falls back gracefully)';
+  String get settingsSpeakerBluetoothSubtitle =>
+      'Best-effort simultaneous output (falls back gracefully)';
 
   @override
   String get settingsSponsorBlock => 'SponsorBlock';
 
   @override
-  String get settingsSponsorBlockSubtitle => 'Auto-skip sponsor and non-music segments in YouTube tracks';
+  String get settingsSponsorBlockSubtitle =>
+      'Auto-skip sponsor and non-music segments in YouTube tracks';
 
   @override
   String get settingsSponsorLabel => 'Sponsors';
@@ -5217,7 +5502,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsStreamingClaimed => 'Streaming interface claimed exclusively';
+  String get settingsStreamingClaimed =>
+      'Streaming interface claimed exclusively';
 
   @override
   String get settingsSwipeAdjustVolume => 'Adjust Volume';
@@ -5238,7 +5524,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSwipeNextTrack => 'Next Track';
 
   @override
-  String get settingsSwipePrevDesc => 'Skip to the previous song or restart track';
+  String get settingsSwipePrevDesc =>
+      'Skip to the previous song or restart track';
 
   @override
   String get settingsSwipePreviousTrack => 'Previous Track';
@@ -5259,7 +5546,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTestingAll => 'Testing All...';
 
   @override
-  String get settingsTestingProxyConnectivity => 'Testing Proxy Connectivity...';
+  String get settingsTestingProxyConnectivity =>
+      'Testing Proxy Connectivity...';
 
   @override
   String get settingsTestLatency => 'Test latency';
@@ -5268,70 +5556,82 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsThemeCardGlass => 'Card Glass Overlay';
 
   @override
-  String get settingsThemeCardGlassDesc => 'Full-bleed background artwork with frosted glass controls';
+  String get settingsThemeCardGlassDesc =>
+      'Full-bleed background artwork with frosted glass controls';
 
   @override
   String get settingsThemeClassicStandard => 'Classic Standard';
 
   @override
-  String get settingsThemeClassicStandardDesc => 'Traditional high-definition layout with ambient glow';
+  String get settingsThemeClassicStandardDesc =>
+      'Traditional high-definition layout with ambient glow';
 
   @override
   String get settingsThemeFullBleed => 'Full-Bleed Waveform';
 
   @override
-  String get settingsThemeFullBleedDesc => 'Full screen audio-reactive glowing waveform visualizer backdrop';
+  String get settingsThemeFullBleedDesc =>
+      'Full screen audio-reactive glowing waveform visualizer backdrop';
 
   @override
   String get settingsThemeKaraoke => 'Karaoke Lyrics Immersion';
 
   @override
-  String get settingsThemeKaraokeDesc => 'Magnified synchronized lyrics-first karaoke player interface';
+  String get settingsThemeKaraokeDesc =>
+      'Magnified synchronized lyrics-first karaoke player interface';
 
   @override
   String get settingsThemeMinimalist => 'Minimalist Waveform';
 
   @override
-  String get settingsThemeMinimalistDesc => 'Spacious studio focus on dynamic audio waveform visualizer';
+  String get settingsThemeMinimalistDesc =>
+      'Spacious studio focus on dynamic audio waveform visualizer';
 
   @override
   String get settingsThemeRetroCassette => 'Retro Cassette Deck';
 
   @override
-  String get settingsThemeRetroCassetteDesc => 'Vintage cassette tape with spinning spools & magnetic tape counter';
+  String get settingsThemeRetroCassetteDesc =>
+      'Vintage cassette tape with spinning spools & magnetic tape counter';
 
   @override
   String get settingsThemeVinylCircle => 'Vinyl Circle (Spinning)';
 
   @override
-  String get settingsThemeVinylCircleDesc => 'Centered circular artwork with continuous spinning animation';
+  String get settingsThemeVinylCircleDesc =>
+      'Centered circular artwork with continuous spinning animation';
 
   @override
   String get settingsThemeCdTurntable => 'CD Turntable';
 
   @override
-  String get settingsThemeCdTurntableDesc => 'Rotating iridescent CD with central album artwork & animated stylus stick';
+  String get settingsThemeCdTurntableDesc =>
+      'Rotating iridescent CD with central album artwork & animated stylus stick';
 
   @override
   String get settingsThemeVinylTurntable => 'Vinyl Turntable Studio';
 
   @override
-  String get settingsThemeVinylTurntableDesc => 'True vinyl record with realistic grooves, center label & tonearm';
+  String get settingsThemeVinylTurntableDesc =>
+      'True vinyl record with realistic grooves, center label & tonearm';
 
   @override
   String get settingsTurnOffGapless => 'Turn off Gapless';
 
   @override
-  String get settingsTurnOffGaplessEnableCrossfade => 'Turn off Gapless & enable Crossfade';
+  String get settingsTurnOffGaplessEnableCrossfade =>
+      'Turn off Gapless & enable Crossfade';
 
   @override
-  String get settingsUnavailableAaudio => 'Unavailable while AAudio Direct output is enabled';
+  String get settingsUnavailableAaudio =>
+      'Unavailable while AAudio Direct output is enabled';
 
   @override
   String get settingsUnknownConnectionFailure => 'Unknown connection failure';
 
   @override
-  String get settingsUsbBitPerfectStreaming => 'USB Bit-Perfect Streaming (Experimental)';
+  String get settingsUsbBitPerfectStreaming =>
+      'USB Bit-Perfect Streaming (Experimental)';
 
   @override
   String get settingsUsbDacHardwareVolume => 'USB DAC Hardware Volume';
@@ -5342,13 +5642,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsUsbHwVolumeGrant => 'Grant USB access to control the DAC\'s hardware volume directly';
+  String get settingsUsbHwVolumeGrant =>
+      'Grant USB access to control the DAC\'s hardware volume directly';
 
   @override
-  String get settingsUsbStreamingActive => 'Raw UAC2 isochronous streaming is active';
+  String get settingsUsbStreamingActive =>
+      'Raw UAC2 isochronous streaming is active';
 
   @override
-  String get settingsUsbStreamingDesc => 'Claims the DAC exclusively and streams processed PCM directly over USB isochronous URBs. Unvalidated on hardware; falls back safely if the claim or endpoint setup fails';
+  String get settingsUsbStreamingDesc =>
+      'Claims the DAC exclusively and streams processed PCM directly over USB isochronous URBs. Unvalidated on hardware; falls back safely if the claim or endpoint setup fails';
 
   @override
   String get settingsUsernameLabel => 'Username';
@@ -5381,13 +5684,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsVisualizerWaveSmooth => 'Wave (Smooth Line Spectrum)';
 
   @override
-  String get settingsVizBarDesc => 'Classic vertical frequency bars with smooth height animation';
+  String get settingsVizBarDesc =>
+      'Classic vertical frequency bars with smooth height animation';
 
   @override
-  String get settingsVizCircularDesc => 'Futuristic radial frequency bars surrounding album centerpiece';
+  String get settingsVizCircularDesc =>
+      'Futuristic radial frequency bars surrounding album centerpiece';
 
   @override
-  String get settingsVizCustomDesc => 'User-authored JSON preset: bars / wave / radial / particles / lissajous';
+  String get settingsVizCustomDesc =>
+      'User-authored JSON preset: bars / wave / radial / particles / lissajous';
 
   @override
   String get settingsVizLabelBar => 'BAR';
@@ -5411,25 +5717,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsVizLabelParticles => 'PARTICLES';
 
   @override
-  String get settingsVizParticlesDesc => 'GPU particle field pulsing with bass energy';
+  String get settingsVizParticlesDesc =>
+      'GPU particle field pulsing with bass energy';
 
   @override
   String get settingsVizLabelTerrain => 'TERRAIN 3D';
 
   @override
-  String get settingsVizTerrainDesc => '3D audio terrain landscape sculpted by the spectrum';
+  String get settingsVizTerrainDesc =>
+      '3D audio terrain landscape sculpted by the spectrum';
 
   @override
   String get settingsVizLabelAlbumReactive => 'ALBUM REACTIVE';
 
   @override
-  String get settingsVizAlbumReactiveDesc => 'Album artwork that breathes with the music';
+  String get settingsVizAlbumReactiveDesc =>
+      'Album artwork that breathes with the music';
 
   @override
-  String get settingsVizOffDesc => 'Disable audio visualizer spectrum animation';
+  String get settingsVizOffDesc =>
+      'Disable audio visualizer spectrum animation';
 
   @override
-  String get settingsVizWaveDesc => 'Smooth continuous Bézier waveform line with ambient gradient fill';
+  String get settingsVizWaveDesc =>
+      'Smooth continuous Bézier waveform line with ambient gradient fill';
 
   @override
   String settingsAboutTitle(String title) {
@@ -5449,19 +5760,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAdaptiveQuality => 'Adaptive quality';
 
   @override
-  String get settingsAdaptiveQualitySubtitle => 'Step bitrate down/up mid-track on stalls';
+  String get settingsAdaptiveQualitySubtitle =>
+      'Step bitrate down/up mid-track on stalls';
 
   @override
   String get settingsAaudioBufferSize => 'AAudio Buffer Size';
 
   @override
-  String get settingsAaudioBufferSizeDesc => 'Stream buffer capacity hint in milliseconds. Lower = lower latency (wired), higher = more stall resistance';
+  String get settingsAaudioBufferSizeDesc =>
+      'Stream buffer capacity hint in milliseconds. Lower = lower latency (wired), higher = more stall resistance';
 
   @override
   String get settingsAaudioDirect => 'AAudio Direct Output (Bit-Perfect)';
 
   @override
-  String get settingsAaudioDirectDesc => 'Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players';
+  String get settingsAaudioDirectDesc =>
+      'Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players';
 
   @override
   String get dspAboutBassBoost => 'About Bass Boost';
@@ -5533,7 +5847,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspBlockedBitPerfect => 'Blocked: Bit-Perfect bypass active';
 
   @override
-  String get dspBluetoothCompensationDesc => 'Lossy Bluetooth gets a small presence compensation and a shorter reverb tail.';
+  String get dspBluetoothCompensationDesc =>
+      'Lossy Bluetooth gets a small presence compensation and a shorter reverb tail.';
 
   @override
   String get dspCodec => 'Codec';
@@ -5608,7 +5923,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspFileSizeDuration => 'File Size & Duration';
 
   @override
-  String get dspFirLoaded => 'Room-correction FIR loaded into the convolution stage.';
+  String get dspFirLoaded =>
+      'Room-correction FIR loaded into the convolution stage.';
 
   @override
   String get dspFirRejected => 'The audio engine rejected the FIR export.';
@@ -5617,7 +5933,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspFreqRange10To30k => 'Frequencies must stay within 10-30000 Hz.';
 
   @override
-  String get dspFreqStrictlyAscending => 'Frequencies must be strictly ascending.';
+  String get dspFreqStrictlyAscending =>
+      'Frequencies must be strictly ascending.';
 
   @override
   String get dspHardwareEndpoint => 'HARDWARE ENDPOINT';
@@ -5656,7 +5973,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspMosqueAmbience => 'Mosque Ambience';
 
   @override
-  String get dspMosqueAmbienceDesc => 'Convolution reverb for a hall-like space';
+  String get dspMosqueAmbienceDesc =>
+      'Convolution reverb for a hall-like space';
 
   @override
   String get dspMuteBand => 'Mute band';
@@ -5680,7 +5998,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspOutputDriver => 'OUTPUT DRIVER';
 
   @override
-  String get dspPresetImportInvalid => 'Failed to import preset: invalid JSON format';
+  String get dspPresetImportInvalid =>
+      'Failed to import preset: invalid JSON format';
 
   @override
   String get dspPresetImported => 'EQ Preset imported successfully!';
@@ -5752,10 +6071,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspResetVolumeBoost => 'Reset Volume Boost (Off)';
 
   @override
-  String get dspSearchHeadphones => 'Search headphones (Sony, Sennheiser, Apple...)';
+  String get dspSearchHeadphones =>
+      'Search headphones (Sony, Sennheiser, Apple...)';
 
   @override
-  String get dspSearchHeadphonesHint => 'Search headphones (e.g. AirPods, Sony, Moondrop)...';
+  String get dspSearchHeadphonesHint =>
+      'Search headphones (e.g. AirPods, Sony, Moondrop)...';
 
   @override
   String get dspSlider1Label => 'slider1 (Rate / Drive)';
@@ -5821,10 +6142,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspVocalWarmthDesc => 'Harmonic richness on the reciter\'s voice';
 
   @override
-  String get dspWiredCompensationDesc => 'Wired / USB output is left untouched by hardware compensation.';
+  String get dspWiredCompensationDesc =>
+      'Wired / USB output is left untouched by hardware compensation.';
 
   @override
-  String get browseAccountConnectedDone => 'Account connected! Tap \"Done\" to finish.';
+  String get browseAccountConnectedDone =>
+      'Account connected! Tap \"Done\" to finish.';
 
   @override
   String get browseAcoustic => 'Acoustic';
@@ -5842,28 +6165,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseAlarmSound => 'Alarm sound';
 
   @override
-  String get browseAllLikedSongsDownloadedOffline => 'All liked songs are already downloaded offline.';
+  String get browseAllLikedSongsDownloadedOffline =>
+      'All liked songs are already downloaded offline.';
 
   @override
-  String get browseAllOnlineLikedDownloaded => 'All online liked songs are already downloaded or in progress.';
+  String get browseAllOnlineLikedDownloaded =>
+      'All online liked songs are already downloaded or in progress.';
 
   @override
-  String get browseAllOnlineTracksDownloaded => 'All online tracks are already downloaded or in progress.';
+  String get browseAllOnlineTracksDownloaded =>
+      'All online tracks are already downloaded or in progress.';
 
   @override
-  String get browseAllSongsOffline => 'All songs in this list are already offline local tracks.';
+  String get browseAllSongsOffline =>
+      'All songs in this list are already offline local tracks.';
 
   @override
-  String get browseAllTracksAlreadyDownloaded => 'All tracks are already downloaded or local';
+  String get browseAllTracksAlreadyDownloaded =>
+      'All tracks are already downloaded or local';
 
   @override
   String get browseAllTracksFrom => 'All tracks from';
 
   @override
-  String get browseAllTracksOfflineLocal => 'All tracks in this playlist are already offline local files.';
+  String get browseAllTracksOfflineLocal =>
+      'All tracks in this playlist are already offline local files.';
 
   @override
-  String get browseAlreadyDownloadedOffline => 'are already downloaded offline.';
+  String get browseAlreadyDownloadedOffline =>
+      'are already downloaded offline.';
 
   @override
   String get browseAlreadyHaveAccount => 'Already have an account? Sign In';
@@ -5922,7 +6252,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseClearHistoryFailed => 'Failed to clear history';
 
   @override
-  String get browseClearListeningHistoryMessage => 'This will remove all tracks from your Recently Played history. Your actual audio files and playlists will not be affected.';
+  String get browseClearListeningHistoryMessage =>
+      'This will remove all tracks from your Recently Played history. Your actual audio files and playlists will not be affected.';
 
   @override
   String get browseClearListeningHistoryTitle => 'Clear Listening History?';
@@ -5931,7 +6262,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseClearPlayHistory => 'Clear Play History';
 
   @override
-  String get browseClearPlayHistoryMessage => 'This will reset your recently played list and listening history. Your song files and playlists will not be affected.';
+  String get browseClearPlayHistoryMessage =>
+      'This will reset your recently played list and listening history. Your song files and playlists will not be affected.';
 
   @override
   String get browseClearPlayHistoryTitle => 'Clear Play History?';
@@ -5949,13 +6281,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseConnect => 'Connect';
 
   @override
-  String get browseConnectToSync => 'Connect account to sync Liked Music automatically';
+  String get browseConnectToSync =>
+      'Connect account to sync Liked Music automatically';
 
   @override
-  String get browseCookiesRejected => 'YouTube rejected these cookies — they have expired or belong to a signed-out session';
+  String get browseCookiesRejected =>
+      'YouTube rejected these cookies — they have expired or belong to a signed-out session';
 
   @override
-  String get browseCookieVerifyOffline => 'Could not reach YouTube to verify — the cookies are saved, try again when back online';
+  String get browseCookieVerifyOffline =>
+      'Could not reach YouTube to verify — the cookies are saved, try again when back online';
 
   @override
   String get browseCopied => 'copied';
@@ -5970,7 +6305,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseCouldNotLoadTopTracks => 'Could not load top tracks.';
 
   @override
-  String get browseCouldNotLoadTracks => 'Could not load tracks for this playlist. Please check your internet connection or URL.';
+  String get browseCouldNotLoadTracks =>
+      'Could not load tracks for this playlist. Please check your internet connection or URL.';
 
   @override
   String get browseCreateCloudAccount => 'Create Cloud Account';
@@ -6003,10 +6339,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseDownloadAllLikedSongs => 'Download All Liked Songs';
 
   @override
-  String get browseDownloadAllOfflineActive => 'Download all offline (3 active downloads)';
+  String get browseDownloadAllOfflineActive =>
+      'Download all offline (3 active downloads)';
 
   @override
-  String get browseDownloadAllOnlineFavorites => 'Download All Online Favorites';
+  String get browseDownloadAllOnlineFavorites =>
+      'Download All Online Favorites';
 
   @override
   String get browseDownloadOffline => 'Download offline';
@@ -6042,13 +6380,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseExplore => 'Explore';
 
   @override
-  String get browseFailedLoadFeed => 'Failed to load feed. Check connection and retry.';
+  String get browseFailedLoadFeed =>
+      'Failed to load feed. Check connection and retry.';
 
   @override
   String get browseFailedToFetch => 'Failed to fetch';
 
   @override
-  String get browseFailedToLoadAccountPlaylists => 'Failed to load account playlists';
+  String get browseFailedToLoadAccountPlaylists =>
+      'Failed to load account playlists';
 
   @override
   String get browseFetching => 'Fetching';
@@ -6096,7 +6436,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseGoogleBlocking => 'Google is blocking this sign-in';
 
   @override
-  String get browseGoogleBlockingBody => 'Google blocks sign-in inside embedded browsers for some accounts, and the automatic retries (clearing cookies and switching the browser identity) didn\'t get past it.\n\nUse the reliable option below to sign in with Google TV: approve on your own browser and Google never sees an embedded WebView, so there is no captcha. Pulsr will sync your library and playlists; playback keeps working as usual.';
+  String get browseGoogleBlockingBody =>
+      'Google blocks sign-in inside embedded browsers for some accounts, and the automatic retries (clearing cookies and switching the browser identity) didn\'t get past it.\n\nUse the reliable option below to sign in with Google TV: approve on your own browser and Google never sees an embedded WebView, so there is no captcha. Pulsr will sync your library and playlists; playback keeps working as usual.';
 
   @override
   String get browseHipHop => 'Hip-Hop';
@@ -6120,7 +6461,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseJazz => 'Jazz';
 
   @override
-  String get browseLatestTracksSubtitle => 'Latest tracks played on this device';
+  String get browseLatestTracksSubtitle =>
+      'Latest tracks played on this device';
 
   @override
   String get browseLibraryStats => 'Library Stats';
@@ -6150,7 +6492,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseMahraganat => 'Mahraganat';
 
   @override
-  String get browseMissingSessionCookies => 'Missing session cookies — the paste needs an SAPISID and a __Secure-3PSID (or 1PSID)';
+  String get browseMissingSessionCookies =>
+      'Missing session cookies — the paste needs an SAPISID and a __Secure-3PSID (or 1PSID)';
 
   @override
   String get browseMoreOptions => 'More options';
@@ -6162,7 +6505,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseMostPlayedTracks => 'Most Played Tracks';
 
   @override
-  String get browseMostPlayedTracksSubtitle => 'Your all-time favorites leaderboard';
+  String get browseMostPlayedTracksSubtitle =>
+      'Your all-time favorites leaderboard';
 
   @override
   String get browseNoArtistsFound => 'No Artists Found';
@@ -6195,7 +6539,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseNoTracksFound => 'No Tracks Found';
 
   @override
-  String get browseNoTracksInFolder => 'No playable audio tracks found in this directory.';
+  String get browseNoTracksInFolder =>
+      'No playable audio tracks found in this directory.';
 
   @override
   String get browseNoTracksInGenre => 'No tracks found in this genre.';
@@ -6204,10 +6549,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseNoTracksInYear => 'No tracks found for this year.';
 
   @override
-  String get browseNoTracksMatchSmartRules => 'No tracks match the rules for this smart playlist.';
+  String get browseNoTracksMatchSmartRules =>
+      'No tracks match the rules for this smart playlist.';
 
   @override
-  String get browseNoTracksPrivateLiked => 'No tracks found. If this is your private Liked Music, please ensure you are signed in or tap \"Sync\".';
+  String get browseNoTracksPrivateLiked =>
+      'No tracks found. If this is your private Liked Music, please ensure you are signed in or tap \"Sync\".';
 
   @override
   String get browseNotSet => 'Not set';
@@ -6222,13 +6569,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseOauthAccessDenied => 'Access was denied on the Google page.';
 
   @override
-  String get browseOauthExpired => 'The code expired before it was approved. Try again.';
+  String get browseOauthExpired =>
+      'The code expired before it was approved. Try again.';
 
   @override
   String get browseOauthGoogleError => 'Google returned an error';
 
   @override
-  String get browseOauthStartFailed => 'Could not start the Google sign-in. Check your connection.';
+  String get browseOauthStartFailed =>
+      'Could not start the Google sign-in. Check your connection.';
 
   @override
   String get browseOfflinePlaylist => 'Offline playlist';
@@ -6252,7 +6601,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browsePasteFromClipboard => 'Paste from clipboard';
 
   @override
-  String get browsePastePlaylistLinkHint => 'Paste a YouTube or YouTube Music playlist link.';
+  String get browsePastePlaylistLinkHint =>
+      'Paste a YouTube or YouTube Music playlist link.';
 
   @override
   String get browsePersonalized => 'Personalized';
@@ -6300,7 +6650,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseRecommendedForYou => 'Recommended For You';
 
   @override
-  String get browseRecommendedYtmTitle => '✨ Recommended For You (YouTube Music)';
+  String get browseRecommendedYtmTitle =>
+      '✨ Recommended For You (YouTube Music)';
 
   @override
   String get browseRefresh => 'Refresh';
@@ -6321,7 +6672,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseRenamePlaylist => 'Rename Playlist';
 
   @override
-  String get browseRequiresModifySettings => 'directly, Android requires the \"Modify system settings\" permission.';
+  String get browseRequiresModifySettings =>
+      'directly, Android requires the \"Modify system settings\" permission.';
 
   @override
   String get browseRock => 'Rock';
@@ -6333,16 +6685,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseRockMetal => 'Rock & Metal';
 
   @override
-  String get browseScanForAlbums => 'Scan your media library to view your albums.';
+  String get browseScanForAlbums =>
+      'Scan your media library to view your albums.';
 
   @override
-  String get browseScanForArtists => 'Scan your media library to view all artists.';
+  String get browseScanForArtists =>
+      'Scan your media library to view all artists.';
 
   @override
-  String get browseScanForGenres => 'Scan your media library to view all song genres.';
+  String get browseScanForGenres =>
+      'Scan your media library to view all song genres.';
 
   @override
-  String get browseScanForYears => 'Scan your media library to view release years.';
+  String get browseScanForYears =>
+      'Scan your media library to view release years.';
 
   @override
   String get browseSearchFailed => 'Search Failed';
@@ -6396,7 +6752,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseSyncingLikedSongs => 'Syncing liked songs…';
 
   @override
-  String get browseSyncPullSubtitle => 'Tap sync below to pull your latest YouTube Music Liked Songs library.';
+  String get browseSyncPullSubtitle =>
+      'Tap sync below to pull your latest YouTube Music Liked Songs library.';
 
   @override
   String get browseTapToPlayOrDownload => 'Tap to play or download';
@@ -6486,7 +6843,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseYoutubeWeb => 'YouTube Web';
 
   @override
-  String get browseYtmSearchScreenDesc => 'Stream and download songs from YouTube Music, ad-free.';
+  String get browseYtmSearchScreenDesc =>
+      'Stream and download songs from YouTube Music, ad-free.';
 
   @override
   String dspPreampClipWarning(String preamp, String boost) {
@@ -6547,7 +6905,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errIrRejected => 'Impulse response rejected by the audio engine';
 
   @override
-  String get errLocalMatchStreaming => 'Local match unavailable, streaming online';
+  String get errLocalMatchStreaming =>
+      'Local match unavailable, streaming online';
 
   @override
   String errPlayFailed(String title) {
@@ -6579,22 +6938,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errYtmGeneric => 'Something went wrong with YouTube Music.';
 
   @override
-  String get errYtmRegionRestricted => 'This track is restricted in your region.';
+  String get errYtmRegionRestricted =>
+      'This track is restricted in your region.';
 
   @override
   String get errYtmUnavailable => 'This track is unavailable.';
 
   @override
-  String get errYtmSessionExpired => 'YouTube session expired. Tap to reconnect.';
+  String get errYtmSessionExpired =>
+      'YouTube session expired. Tap to reconnect.';
 
   @override
-  String get errYtmNotInBuild => 'YouTube Music is not available in this build.';
+  String get errYtmNotInBuild =>
+      'YouTube Music is not available in this build.';
 
   @override
   String get errYtmProxyAuth => 'Backend proxy authentication failed.';
 
   @override
-  String get errYtmSigFail => 'Signature deciphering unavailable for this format.';
+  String get errYtmSigFail =>
+      'Signature deciphering unavailable for this format.';
 
   @override
   String get errYtmBusy => 'YouTube is busy. Cooling down.';
@@ -6606,7 +6969,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errYtmExtractFail => 'Stream extraction failed. Switching route.';
 
   @override
-  String get errYtmVerify => 'YouTube needs verification. Trying alternate route.';
+  String get errYtmVerify =>
+      'YouTube needs verification. Trying alternate route.';
 
   @override
   String get errSignInFailed => 'Sign in failed. Please try again.';
@@ -6666,7 +7030,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eqUnlockStudioConsole => 'Unlock Studio DSP Console';
 
   @override
-  String get eqUnlockStudioDesc => 'Access 10/32/64 parametric bands, room correction, limiter & spatializer';
+  String get eqUnlockStudioDesc =>
+      'Access 10/32/64 parametric bands, room correction, limiter & spatializer';
 
   @override
   String get queueConfirmDelete => 'Confirm Delete';
@@ -6715,61 +7080,72 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetWeeklyDoseTitle => 'Reset Weekly Sound Dose?';
 
   @override
-  String get resetWeeklyDoseDesc => 'This will reset your accumulated acoustic exposure counter to 0% and lift safety attenuation. Only reset if starting a new monitoring week or switching listening environments.';
+  String get resetWeeklyDoseDesc =>
+      'This will reset your accumulated acoustic exposure counter to 0% and lift safety attenuation. Only reset if starting a new monitoring week or switching listening environments.';
 
   @override
   String get resetDoseAction => 'Reset Dose';
 
   @override
-  String get weeklyDoseResetSnackbar => 'Weekly sound dose has been reset to 0.0%';
+  String get weeklyDoseResetSnackbar =>
+      'Weekly sound dose has been reset to 0.0%';
 
   @override
   String get headphoneSafetyTitle => 'Headphone Safety & Dose';
 
   @override
-  String get headphoneSafetyStandard => 'WHO-ITU H.870 / EN 62368-1 Acoustic Standard';
+  String get headphoneSafetyStandard =>
+      'WHO-ITU H.870 / EN 62368-1 Acoustic Standard';
 
   @override
   String get headphoneSafetyToggleTitle => 'Automatic Safety Attenuation';
 
   @override
-  String get headphoneSafetyToggleDesc => 'When weekly dose reaches 100%, smoothly engage a lookahead safety limiter to clamp output peak to -6 dBFS.';
+  String get headphoneSafetyToggleDesc =>
+      'When weekly dose reaches 100%, smoothly engage a lookahead safety limiter to clamp output peak to -6 dBFS.';
 
   @override
   String get weeklySoundAllowance => 'Weekly Sound Allowance';
 
   @override
-  String get safetyLimiterActiveDesc => 'Safety Limiter Active (-6 dBFS ceiling engaged to prevent hearing damage)';
+  String get safetyLimiterActiveDesc =>
+      'Safety Limiter Active (-6 dBFS ceiling engaged to prevent hearing damage)';
 
   @override
-  String get highSoundDoseWarning => 'High sound dose: Consider reducing volume to protect hearing';
+  String get highSoundDoseWarning =>
+      'High sound dose: Consider reducing volume to protect hearing';
 
   @override
-  String get optimalExposureDesc => 'Optimal exposure: Safe listening levels within 40-hour allowance';
+  String get optimalExposureDesc =>
+      'Optimal exposure: Safe listening levels within 40-hour allowance';
 
   @override
   String get latencySyncDiagnostics => 'Latency & Sync Diagnostics';
 
   @override
-  String get latencySyncDiagnosticsDesc => 'Real-time output and processing delay metrics reported directly from native hardware sinks.';
+  String get latencySyncDiagnosticsDesc =>
+      'Real-time output and processing delay metrics reported directly from native hardware sinks.';
 
   @override
   String get dspPipelineDelay => 'DSP Pipeline Delay';
 
   @override
-  String get dspPipelineDelayDesc => 'Lookahead Limiter + Resampler group delay + Reverb partitioned delay';
+  String get dspPipelineDelayDesc =>
+      'Lookahead Limiter + Resampler group delay + Reverb partitioned delay';
 
   @override
   String get usbBufferedDelay => 'USB Hardware Buffered Delay';
 
   @override
-  String get usbBufferedDelayDesc => 'Ring buffer occupancy + URB kernel queue slack';
+  String get usbBufferedDelayDesc =>
+      'Ring buffer occupancy + URB kernel queue slack';
 
   @override
   String get totalMonitoredLatency => 'Total Monitored Latency';
 
   @override
-  String get totalMonitoredLatencyDesc => 'Sum of active digital processing & hardware buffering';
+  String get totalMonitoredLatencyDesc =>
+      'Sum of active digital processing & hardware buffering';
 
   @override
   String get directUsbExclusivePath => 'Direct USB Exclusive Path';
@@ -6826,16 +7202,20 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get bpDirectActiveUsb => 'Hardware direct pass-through active on USB DAC';
+  String get bpDirectActiveUsb =>
+      'Hardware direct pass-through active on USB DAC';
 
   @override
-  String get bpDirectActiveWired => 'Hardware direct pass-through active (wired direct)';
+  String get bpDirectActiveWired =>
+      'Hardware direct pass-through active (wired direct)';
 
   @override
-  String get bpPassThroughArmed => 'Pass-through armed • Engages automatically when capable DAC is connected';
+  String get bpPassThroughArmed =>
+      'Pass-through armed • Engages automatically when capable DAC is connected';
 
   @override
-  String get bpBypassesAndroidMixer => 'Bypasses Android mixer & DSP for bit-matched output (USB needs Android 14+, wired needs direct)';
+  String get bpBypassesAndroidMixer =>
+      'Bypasses Android mixer & DSP for bit-matched output (USB needs Android 14+, wired needs direct)';
 
   @override
   String settingsResultsCount(int count) {
@@ -6858,10 +7238,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspPitchDownSemitone => 'Pitch -1 semitone';
 
   @override
-  String get dspPitchMeterUnavailable => 'Vocal pitch detection isn\'t available on this build.';
+  String get dspPitchMeterUnavailable =>
+      'Vocal pitch detection isn\'t available on this build.';
 
   @override
-  String get castNoLocalItems => 'Nothing castable here — only local files can be cast.';
+  String get castNoLocalItems =>
+      'Nothing castable here — only local files can be cast.';
 
   @override
   String settingsCastingQueueTo(String device) {
@@ -6905,7 +7287,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dockStyleTitle => 'Dock style';
 
   @override
-  String get dockStyleSubtitle => 'Choose how the mini player and navigation bar stack';
+  String get dockStyleSubtitle =>
+      'Choose how the mini player and navigation bar stack';
 
   @override
   String get dockStyleDefault => 'Side by side';
@@ -6917,22 +7300,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dockStyleSystem => 'Floating pill';
 
   @override
-  String get dockStyleSystemDesc => 'A floating media pill above the navigation bar';
+  String get dockStyleSystemDesc =>
+      'A floating media pill above the navigation bar';
 
   @override
   String get dockStyleMiniTop => 'Mini player in front';
 
   @override
-  String get dockStyleMiniTopDesc => 'Navigation bar peeks behind the mini player';
+  String get dockStyleMiniTopDesc =>
+      'Navigation bar peeks behind the mini player';
 
   @override
   String get dockStyleNavTop => 'Navigation in front';
 
   @override
-  String get dockStyleNavTopDesc => 'Mini player peeks behind the navigation bar';
+  String get dockStyleNavTopDesc =>
+      'Mini player peeks behind the navigation bar';
 
   @override
-  String get dockStyleHint => 'Long-press the mini player to change its dock style';
+  String get dockStyleHint =>
+      'Long-press the mini player to change its dock style';
 
   @override
   String whatsNewSubtitle(String version) {
@@ -6954,7 +7341,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get studioExplainerTitle => 'What Studio mode adds';
 
   @override
-  String get studioExplainerBody => 'Bit-Perfect output, the full DSP suite, device profiles, automation and the proxy backend. You can switch back anytime.';
+  String get studioExplainerBody =>
+      'Bit-Perfect output, the full DSP suite, device profiles, automation and the proxy backend. You can switch back anytime.';
 
   @override
   String get alphabetIndexLabel => 'Alphabet index';
@@ -6980,13 +7368,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get webSessionInterruptedTitle => 'Web Session Interrupted';
 
   @override
-  String get webSessionInterruptedDesc => 'The web view handle was detached or reclaimed by the system. Tap below to reload the session.';
+  String get webSessionInterruptedDesc =>
+      'The web view handle was detached or reclaimed by the system. Tap below to reload the session.';
 
   @override
   String get onboardingGesturesTitle => 'Gestures & shortcuts';
 
   @override
-  String get onboardingGesturesDesc => 'A few swipes and taps make Pulsr feel effortless.';
+  String get onboardingGesturesDesc =>
+      'A few swipes and taps make Pulsr feel effortless.';
 
   @override
   String get onboardingGestureSwipeUpTitle => 'Swipe up';
@@ -6998,7 +7388,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingGestureSwipeDownTitle => 'Swipe down';
 
   @override
-  String get onboardingGestureSwipeDownDesc => 'Restacks the mini player and navigation';
+  String get onboardingGestureSwipeDownDesc =>
+      'Restacks the mini player and navigation';
 
   @override
   String get onboardingGestureDoubleTapTitle => 'Double-tap artwork';
@@ -7033,10 +7424,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get headsetKeepNotification => 'Keep notification when paused';
 
   @override
-  String get headsetKeepNotificationOnDesc => 'Controls stay in the shade after pause (restart required).';
+  String get headsetKeepNotificationOnDesc =>
+      'Controls stay in the shade after pause (restart required).';
 
   @override
-  String get headsetKeepNotificationOffDesc => 'Notification is removed on pause to save battery.';
+  String get headsetKeepNotificationOffDesc =>
+      'Notification is removed on pause to save battery.';
 
   @override
   String get headsetSinglePress => 'Single press';
@@ -7051,13 +7444,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get headsetMultiPressWindow => 'Multi-press window';
 
   @override
-  String get headsetMultiPressWindowDesc => 'How long presses are grouped into double/triple.';
+  String get headsetMultiPressWindowDesc =>
+      'How long presses are grouped into double/triple.';
 
   @override
   String get headsetSeekStep => 'Seek step';
 
   @override
-  String get headsetSeekStepDesc => 'Used when a press is mapped to seek forward/back.';
+  String get headsetSeekStepDesc =>
+      'Used when a press is mapped to seek forward/back.';
 
   @override
   String get headsetActionPlayPause => 'Play / pause';
@@ -7103,7 +7498,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get radioNoStationsMatchDesc => 'Try searching by a different genre or station URL';
+  String get radioNoStationsMatchDesc =>
+      'Try searching by a different genre or station URL';
 
   @override
   String get radioErrorEnterUrl => 'Please enter a URL';
@@ -7155,25 +7551,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get whatsNewBitPerfectTitle => 'Bit-Perfect & Hi-Res Output';
 
   @override
-  String get whatsNewBitPerfectDesc => 'Direct USB DAC streaming, hardware volume control, and native DSD/DoP playback.';
+  String get whatsNewBitPerfectDesc =>
+      'Direct USB DAC streaming, hardware volume control, and native DSD/DoP playback.';
 
   @override
   String get whatsNewProDspTitle => 'Pro Studio DSP Suite';
 
   @override
-  String get whatsNewProDspDesc => 'Arbitrary response parametric EQ, multiband compressor, lookahead limiter, and binaural crossfeed.';
+  String get whatsNewProDspDesc =>
+      'Arbitrary response parametric EQ, multiband compressor, lookahead limiter, and binaural crossfeed.';
 
   @override
   String get whatsNewThemesTitle => 'Adaptive Player Themes';
 
   @override
-  String get whatsNewThemesDesc => '8 handcrafted player themes with full phone landscape, tablet two-pane, and AMOLED optimization.';
+  String get whatsNewThemesDesc =>
+      '8 handcrafted player themes with full phone landscape, tablet two-pane, and AMOLED optimization.';
 
   @override
   String get whatsNewAccessibilityTitle => 'Accessibility & Fluid Gestures';
 
   @override
-  String get whatsNewAccessibilityDesc => 'WCAG 2.1 AA contrast compliance, dynamic type 2.0x support, and full screen-reader semantics.';
+  String get whatsNewAccessibilityDesc =>
+      'WCAG 2.1 AA contrast compliance, dynamic type 2.0x support, and full screen-reader semantics.';
 
   @override
   String get proxyInvalidHostFormat => 'Invalid proxy host format';
@@ -7188,13 +7588,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eqMacroMidTitle => 'Vocal & Presence';
 
   @override
-  String get eqMacroMidDesc => 'Lead vocals & acoustic presence (500 Hz – 2 kHz)';
+  String get eqMacroMidDesc =>
+      'Lead vocals & acoustic presence (500 Hz – 2 kHz)';
 
   @override
   String get eqMacroTrebleTitle => 'Clarity & Air';
 
   @override
-  String get eqMacroTrebleDesc => 'Treble shimmer & spatial detail (4 kHz – 16 kHz)';
+  String get eqMacroTrebleDesc =>
+      'Treble shimmer & spatial detail (4 kHz – 16 kHz)';
 
   @override
   String get eqIrCustomLoaded => 'Custom (Loaded)';
@@ -7212,16 +7614,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingPersonalizeTitle => 'Make it yours';
 
   @override
-  String get onboardingPersonalizeDesc => 'Pick an accent now — you can change it anytime in Settings.';
+  String get onboardingPersonalizeDesc =>
+      'Pick an accent now — you can change it anytime in Settings.';
 
   @override
   String get featureInfoBitPerfectTitle => 'Bit-Perfect USB Pass-Through';
 
   @override
-  String get featureInfoBitPerfectSubtitle => 'Direct hardware streaming to USB / wired DAC';
+  String get featureInfoBitPerfectSubtitle =>
+      'Direct hardware streaming to USB / wired DAC';
 
   @override
-  String get featureInfoBitPerfectDescription => 'Bypasses Android AudioFlinger resampler and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the DAC via AudioMixerAttributes (API 34) for USB, or via direct/offload for wired. No software volume or DSP is applied. Requires Android 14+ for USB, or a wired device that advertises FLOAT/24-bit & hi-res rates. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).';
+  String get featureInfoBitPerfectDescription =>
+      'Bypasses Android AudioFlinger resampler and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the DAC via AudioMixerAttributes (API 34) for USB, or via direct/offload for wired. No software volume or DSP is applied. Requires Android 14+ for USB, or a wired device that advertises FLOAT/24-bit & hi-res rates. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).';
 
   @override
   String get featureInfoBypassDspTitle => 'Bypass DSP in Bit-Perfect Mode';
@@ -7230,52 +7635,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String get featureInfoBypassDspSubtitle => 'Uncolored, pure bitstream to DAC';
 
   @override
-  String get featureInfoBypassDspDescription => 'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).';
+  String get featureInfoBypassDspDescription =>
+      'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).';
 
   @override
-  String get featureInfoFollowTrackSampleRateTitle => 'Follow Track Sample Rate';
+  String get featureInfoFollowTrackSampleRateTitle =>
+      'Follow Track Sample Rate';
 
   @override
-  String get featureInfoFollowTrackSampleRateSubtitle => 'Reconfigure the output to each track\'s native rate';
+  String get featureInfoFollowTrackSampleRateSubtitle =>
+      'Reconfigure the output to each track\'s native rate';
 
   @override
-  String get featureInfoFollowTrackSampleRateDescription => 'On every track change, requests the track\'s own sample rate from the output device so no software resampling is needed. De-duplicated so tracks that share a rate do not trigger redundant native reconfiguration. Skipped on Bluetooth, where the AVRCP/codec link owns the rate. The device may still cap the rate; the negotiated format is shown in Output Path Diagnostics.';
+  String get featureInfoFollowTrackSampleRateDescription =>
+      'On every track change, requests the track\'s own sample rate from the output device so no software resampling is needed. De-duplicated so tracks that share a rate do not trigger redundant native reconfiguration. Skipped on Bluetooth, where the AVRCP/codec link owns the rate. The device may still cap the rate; the negotiated format is shown in Output Path Diagnostics.';
 
   @override
-  String get featureInfoStrictBitPerfectTitle => 'Strict Bit-Perfect (No Resample)';
+  String get featureInfoStrictBitPerfectTitle =>
+      'Strict Bit-Perfect (No Resample)';
 
   @override
-  String get featureInfoStrictBitPerfectSubtitle => 'Exact source bits, no resampler — DSP stages off';
+  String get featureInfoStrictBitPerfectSubtitle =>
+      'Exact source bits, no resampler — DSP stages off';
 
   @override
-  String get featureInfoStrictBitPerfectDescription => 'Forces Bit-Perfect output and the DSP bypass, then follows each track\'s native sample rate so the DAC receives the exact source samples without resampling. Because it is strict, EQ, ReplayGain, Virtualizer/Dynamics and Crossfade cannot run: they would alter the bitstream. Requires a path that reports exclusive bit-perfect support (USB DAC on Android 14+); otherwise the toggle is disabled with the platform reason.';
+  String get featureInfoStrictBitPerfectDescription =>
+      'Forces Bit-Perfect output and the DSP bypass, then follows each track\'s native sample rate so the DAC receives the exact source samples without resampling. Because it is strict, EQ, ReplayGain, Virtualizer/Dynamics and Crossfade cannot run: they would alter the bitstream. Requires a path that reports exclusive bit-perfect support (USB DAC on Android 14+); otherwise the toggle is disabled with the platform reason.';
 
   @override
   String get featureInfoEqualizerTitle => '10 / 32-Band Parametric EQ';
 
   @override
-  String get featureInfoEqualizerSubtitle => '±15 dB per band, Q=1.414, flat by default';
+  String get featureInfoEqualizerSubtitle =>
+      '±15 dB per band, Q=1.414, flat by default';
 
   @override
-  String get featureInfoEqualizerDescription => 'Native C++ biquad cascade (32 bands max, 8 channels). Uses single bulk JNI hop (≈1 ms) with zero-cost bypass when disabled. Interpolates AutoEQ profiles log-frequency wise. Cannot be active with Bit-Perfect bypass (would re-sample and alter bits).';
+  String get featureInfoEqualizerDescription =>
+      'Native C++ biquad cascade (32 bands max, 8 channels). Uses single bulk JNI hop (≈1 ms) with zero-cost bypass when disabled. Interpolates AutoEQ profiles log-frequency wise. Cannot be active with Bit-Perfect bypass (would re-sample and alter bits).';
 
   @override
   String get featureInfoBassBoostTitle => 'Bass Enhancer';
 
   @override
-  String get featureInfoBassBoostSubtitle => 'Shelving low-end gain (part of EQ engine)';
+  String get featureInfoBassBoostSubtitle =>
+      'Shelving low-end gain (part of EQ engine)';
 
   @override
-  String get featureInfoBassBoostDescription => 'Adds a low-shelf lift below ~150 Hz via the native EQ biquad chain. Shares the same processing stage as the graphic EQ, so it is disabled while Bit-Perfect bypass is active. Keep moderate to avoid masking detail.';
+  String get featureInfoBassBoostDescription =>
+      'Adds a low-shelf lift below ~150 Hz via the native EQ biquad chain. Shares the same processing stage as the graphic EQ, so it is disabled while Bit-Perfect bypass is active. Keep moderate to avoid masking detail.';
 
   @override
   String get featureInfoCrossfeedTitle => 'Headphone Crossfeed';
 
   @override
-  String get featureInfoCrossfeedSubtitle => '200–700 µs delay, –15 to –6 dB bleed';
+  String get featureInfoCrossfeedSubtitle =>
+      '200–700 µs delay, –15 to –6 dB bleed';
 
   @override
-  String get featureInfoCrossfeedDescription => 'Chu Moy / Linkwitz blend that makes headphones sound like speakers (reduces hard L/R separation). Adds ~0.05 ms latency. Disabled during Bit-Perfect.';
+  String get featureInfoCrossfeedDescription =>
+      'Chu Moy / Linkwitz blend that makes headphones sound like speakers (reduces hard L/R separation). Adds ~0.05 ms latency. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoLimiterTitle => 'Lookahead Brickwall Limiter';
@@ -7284,52 +7702,63 @@ class AppLocalizationsEn extends AppLocalizations {
   String get featureInfoLimiterSubtitle => 'True-peak, 0.5–20 ms lookahead';
 
   @override
-  String get featureInfoLimiterDescription => 'Adaptive true-peak limiter with 4× oversample. Protects against clipping when EQ boosts. Adds ~5 ms latency. Final stage before DAC. Disabled during Bit-Perfect.';
+  String get featureInfoLimiterDescription =>
+      'Adaptive true-peak limiter with 4× oversample. Protects against clipping when EQ boosts. Adds ~5 ms latency. Final stage before DAC. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoReverbTitle => 'Convolution Reverb';
 
   @override
-  String get featureInfoReverbSubtitle => '8 rooms (RT60 0.35–5 s), cross-channel crosstalk, or custom IR';
+  String get featureInfoReverbSubtitle =>
+      '8 rooms (RT60 0.35–5 s), cross-channel crosstalk, or custom IR';
 
   @override
-  String get featureInfoReverbDescription => 'Partitioned convolution (512-frame blocks) against a synthesized room impulse or custom impulse response you load. Features adjustable cross-channel crosstalk for authentic binaural IRS stereo spatialization. Zero heap allocations in audio loop. Needs the native DSP path; disabled during Bit-Perfect.';
+  String get featureInfoReverbDescription =>
+      'Partitioned convolution (512-frame blocks) against a synthesized room impulse or custom impulse response you load. Features adjustable cross-channel crosstalk for authentic binaural IRS stereo spatialization. Zero heap allocations in audio loop. Needs the native DSP path; disabled during Bit-Perfect.';
 
   @override
   String get featureInfoPannerTitle => 'Stereo Balance & Mono Mix';
 
   @override
-  String get featureInfoPannerSubtitle => '–1.0 Left … +1.0 Right, mono collapse';
+  String get featureInfoPannerSubtitle =>
+      '–1.0 Left … +1.0 Right, mono collapse';
 
   @override
-  String get featureInfoPannerDescription => 'Constant-power panner + mono downmix (L+R / 2). Useful for hearing asymmetry. Collapses soundstage when mono ON. Disabled during Bit-Perfect.';
+  String get featureInfoPannerDescription =>
+      'Constant-power panner + mono downmix (L+R / 2). Useful for hearing asymmetry. Collapses soundstage when mono ON. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoResamplerTitle => 'Polyphase Sinc Resampler';
 
   @override
-  String get featureInfoResamplerSubtitle => '32 phases × 32 taps (polyphase engine)';
+  String get featureInfoResamplerSubtitle =>
+      '32 phases × 32 taps (polyphase engine)';
 
   @override
-  String get featureInfoResamplerDescription => 'Polyphase sinc interpolation engine. The in-stream playback path keeps the source frame count, so track→device rate conversion is performed by the platform output (AudioTrack); the polyphase engine is applied internally by the convolution reverb wet path above 48 kHz. Disabled during Bit-Perfect (direct 1:1 stream).';
+  String get featureInfoResamplerDescription =>
+      'Polyphase sinc interpolation engine. The in-stream playback path keeps the source frame count, so track→device rate conversion is performed by the platform output (AudioTrack); the polyphase engine is applied internally by the convolution reverb wet path above 48 kHz. Disabled during Bit-Perfect (direct 1:1 stream).';
 
   @override
   String get featureInfoVirtualizerTitle => 'Soundstage Widening (Virtualizer)';
 
   @override
-  String get featureInfoVirtualizerSubtitle => 'Android Virtualizer stereo expansion';
+  String get featureInfoVirtualizerSubtitle =>
+      'Android Virtualizer stereo expansion';
 
   @override
-  String get featureInfoVirtualizerDescription => 'Expands stereo field via AudioEffect Virtualizer (0–1000 mB). On devices with Hardware Spatializer, Spatializer takes precedence and Virtualizer is bypassed. Disabled during Bit-Perfect.';
+  String get featureInfoVirtualizerDescription =>
+      'Expands stereo field via AudioEffect Virtualizer (0–1000 mB). On devices with Hardware Spatializer, Spatializer takes precedence and Virtualizer is bypassed. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoSpatializerTitle => 'Hardware Spatializer';
 
   @override
-  String get featureInfoSpatializerSubtitle => 'Android Spatializer API + head tracking';
+  String get featureInfoSpatializerSubtitle =>
+      'Android Spatializer API + head tracking';
 
   @override
-  String get featureInfoSpatializerDescription => 'Uses AudioManager.spatializer when available (Android 12L+). Provides true spatial audio if device supports it; otherwise emulates via Virtualizer. Mutually managed with Virtualizer.';
+  String get featureInfoSpatializerDescription =>
+      'Uses AudioManager.spatializer when available (Android 12L+). Provides true spatial audio if device supports it; otherwise emulates via Virtualizer. Mutually managed with Virtualizer.';
 
   @override
   String get featureInfoDynamicsTitle => 'Studio Dynamics & MBC';
@@ -7338,34 +7767,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get featureInfoDynamicsSubtitle => '3-band MBC + limiter presets';
 
   @override
-  String get featureInfoDynamicsDescription => 'DynamicsProcessing multiband compressor (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). Controls transients and loudness. Disabled during Bit-Perfect.';
+  String get featureInfoDynamicsDescription =>
+      'DynamicsProcessing multiband compressor (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). Controls transients and loudness. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoRoomCorrectionTitle => 'Room Correction Wizard';
 
   @override
-  String get featureInfoRoomCorrectionSubtitle => 'Stepped-sine measurement + EQ fit';
+  String get featureInfoRoomCorrectionSubtitle =>
+      'Stepped-sine measurement + EQ fit';
 
   @override
-  String get featureInfoRoomCorrectionDescription => 'Plays a short tone sweep through your speakers, records it with the microphone and fits a Room Correction EQ preset that flattens the measured response (clamped to the +/-15 dB EQ range with adjacent-band smoothing). Applied through the normal EQ pipeline, so it participates in Bit-Perfect bypass like any EQ preset. Not a replacement for acoustic treatment.';
+  String get featureInfoRoomCorrectionDescription =>
+      'Plays a short tone sweep through your speakers, records it with the microphone and fits a Room Correction EQ preset that flattens the measured response (clamped to the +/-15 dB EQ range with adjacent-band smoothing). Applied through the normal EQ pipeline, so it participates in Bit-Perfect bypass like any EQ preset. Not a replacement for acoustic treatment.';
 
   @override
   String get featureInfoDsdNativeTitle => 'DSD (PCM Decode / DoP Output)';
 
   @override
-  String get featureInfoDsdNativeSubtitle => 'PCM by default — DoP only with a compatible USB DAC';
+  String get featureInfoDsdNativeSubtitle =>
+      'PCM by default — DoP only with a compatible USB DAC';
 
   @override
-  String get featureInfoDsdNativeDescription => 'DSD files (DSF/DFF) decode to PCM through the native DSD decoder by default and follow the normal DSP pipeline. When the user selects DoP output and a USB DAC that can carry it is connected, the raw DSD bitstream is framed as DSD over PCM (alternating 0x05/0xFA markers) at DSD rate / 16 (DSD64 → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 → 705.6 kHz) so the DAC streams native DSD, in 24-bit or zero-padded 32-bit containers (selectable for DACs that require 32-bit USB frames). DoP is never enabled automatically and stays unavailable when no compatible USB DAC is detected. Direct native-DSD streaming that bypasses DoP is not implemented in this build, so native-DSD capability is never claimed beyond the detected USB DAC.';
+  String get featureInfoDsdNativeDescription =>
+      'DSD files (DSF/DFF) decode to PCM through the native DSD decoder by default and follow the normal DSP pipeline. When the user selects DoP output and a USB DAC that can carry it is connected, the raw DSD bitstream is framed as DSD over PCM (alternating 0x05/0xFA markers) at DSD rate / 16 (DSD64 → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 → 705.6 kHz) so the DAC streams native DSD, in 24-bit or zero-padded 32-bit containers (selectable for DACs that require 32-bit USB frames). DoP is never enabled automatically and stays unavailable when no compatible USB DAC is detected. Direct native-DSD streaming that bypasses DoP is not implemented in this build, so native-DSD capability is never claimed beyond the detected USB DAC.';
 
   @override
   String get featureInfoMqaTitle => 'MQA (Master Quality Authenticated)';
 
   @override
-  String get featureInfoMqaSubtitle => 'Detected — core unfold only, no authenticated rendering';
+  String get featureInfoMqaSubtitle =>
+      'Detected — core unfold only, no authenticated rendering';
 
   @override
-  String get featureInfoMqaDescription => 'MQA-encoded files are detected from their signature and labeled \"MQA\" in the quality sheet. Core unfold is handled by the in-app decoder; full authenticated/native MQA rendering is not available in this build, so MQA status is never silently reported as plain lossless and authenticated MQA output is never claimed.';
+  String get featureInfoMqaDescription =>
+      'MQA-encoded files are detected from their signature and labeled \"MQA\" in the quality sheet. Core unfold is handled by the in-app decoder; full authenticated/native MQA rendering is not available in this build, so MQA status is never silently reported as plain lossless and authenticated MQA output is never claimed.';
 
   @override
   String get featureInfoGaplessTitle => 'Gapless Playback';
@@ -7374,34 +7810,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get featureInfoGaplessSubtitle => 'ConcatenatingAudioSource, zero gap';
 
   @override
-  String get featureInfoGaplessDescription => 'Joins consecutive tracks sample-accurate with no silence. Ideal for live albums. Mutually exclusive with Crossfade — enabling one forces the other OFF.';
+  String get featureInfoGaplessDescription =>
+      'Joins consecutive tracks sample-accurate with no silence. Ideal for live albums. Mutually exclusive with Crossfade — enabling one forces the other OFF.';
 
   @override
   String get featureInfoCrossfadeTitle => 'Crossfade';
 
   @override
-  String get featureInfoCrossfadeSubtitle => '0–12 s overlapping dual-player fade';
+  String get featureInfoCrossfadeSubtitle =>
+      '0–12 s overlapping dual-player fade';
 
   @override
-  String get featureInfoCrossfadeDescription => 'Fades out current track while fading in next via dual ExoPlayer. Requires disabling Gapless (cannot be gapless and crossfading simultaneously).';
+  String get featureInfoCrossfadeDescription =>
+      'Fades out current track while fading in next via dual ExoPlayer. Requires disabling Gapless (cannot be gapless and crossfading simultaneously).';
 
   @override
   String get featureInfoReplayGainTitle => 'ReplayGain Normalization';
 
   @override
-  String get featureInfoReplayGainSubtitle => 'Track / album gain tags in native pre-gain';
+  String get featureInfoReplayGainSubtitle =>
+      'Track / album gain tags in native pre-gain';
 
   @override
-  String get featureInfoReplayGainDescription => 'Bit-transparent native pre-gain driven by Track/Album Gain tags (20 ms smoothing, 0.5 dB inter-sample headroom, clipping-safe). The Dart mixer then carries only user volume so the gain is never applied twice; DoP and non-Android fall back to Dart math. Conflicts with Bit-Perfect bypass (any gain would alter bits). Set to Off for true exclusive.';
+  String get featureInfoReplayGainDescription =>
+      'Bit-transparent native pre-gain driven by Track/Album Gain tags (20 ms smoothing, 0.5 dB inter-sample headroom, clipping-safe). The Dart mixer then carries only user volume so the gain is never applied twice; DoP and non-Android fall back to Dart math. Conflicts with Bit-Perfect bypass (any gain would alter bits). Set to Off for true exclusive.';
 
   @override
   String get featureInfoOemTitle => 'OEM Audio Warning';
 
   @override
-  String get featureInfoOemSubtitle => 'Dolby / Dirac / SoundAlive double-processing';
+  String get featureInfoOemSubtitle =>
+      'Dolby / Dirac / SoundAlive double-processing';
 
   @override
-  String get featureInfoOemDescription => 'System-level effects (Dolby Atmos, Xiaomi Sound, Dirac) run outside the app. Running Pulsr DSP on top causes double-EQ and clipping. Use DSP Preference = Native or disable system effects for cleanest sound.';
+  String get featureInfoOemDescription =>
+      'System-level effects (Dolby Atmos, Xiaomi Sound, Dirac) run outside the app. Running Pulsr DSP on top causes double-EQ and clipping. Use DSP Preference = Native or disable system effects for cleanest sound.';
 
   @override
   String get featureInfoVolumeBoostTitle => 'Volume Boost';
@@ -7410,97 +7853,123 @@ class AppLocalizationsEn extends AppLocalizations {
   String get featureInfoVolumeBoostSubtitle => 'LoudnessEnhancer +10 dB';
 
   @override
-  String get featureInfoVolumeBoostDescription => 'Hardware LoudnessEnhancer gain (0–1000 mB). Capped at +6 dB combined with headphone preamp to avoid clipping. Disabled during Bit-Perfect bypass (hardware DAC volume only).';
+  String get featureInfoVolumeBoostDescription =>
+      'Hardware LoudnessEnhancer gain (0–1000 mB). Capped at +6 dB combined with headphone preamp to avoid clipping. Disabled during Bit-Perfect bypass (hardware DAC volume only).';
 
   @override
   String get featureInfoSaturationTitle => 'Harmonic Saturation / Exciter';
 
   @override
-  String get featureInfoSaturationSubtitle => 'Tape, Vacuum Tube (2nd harmonic), or Analog Class-A with 4× sinc oversampling';
+  String get featureInfoSaturationSubtitle =>
+      'Tape, Vacuum Tube (2nd harmonic), or Analog Class-A with 4× sinc oversampling';
 
   @override
-  String get featureInfoSaturationDescription => 'Generates rich analog warmth and harmonic density. Offers 3 selectable color profiles: Tape (smooth odd-order saturation), Vacuum Tube (asymmetric 6J1 triode with warm even 2nd harmonics), and Analog Class-A (full vintage transformer response). Features 4× polyphase sinc anti-aliasing and DC blocking. Disabled during Bit-Perfect.';
+  String get featureInfoSaturationDescription =>
+      'Generates rich analog warmth and harmonic density. Offers 3 selectable color profiles: Tape (smooth odd-order saturation), Vacuum Tube (asymmetric 6J1 triode with warm even 2nd harmonics), and Analog Class-A (full vintage transformer response). Features 4× polyphase sinc anti-aliasing and DC blocking. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoStereoWidthTitle => '3-Band Stereo Imager & Bass Mono';
 
   @override
-  String get featureInfoStereoWidthSubtitle => 'Multiband width + sub-bass mono phase protection';
+  String get featureInfoStereoWidthSubtitle =>
+      'Multiband width + sub-bass mono phase protection';
 
   @override
-  String get featureInfoStereoWidthDescription => 'Mid/Side multiband stereo imager utilizing phase-linear Linkwitz-Riley crossovers. Features dedicated low (<160 Hz), mid (160 Hz–2.5 kHz), and high (>2.5 kHz) width controls. Sub-bass mono isolation eliminates stereo low-end phase cancellation and comb filtering. Disabled during Bit-Perfect.';
+  String get featureInfoStereoWidthDescription =>
+      'Mid/Side multiband stereo imager utilizing phase-linear Linkwitz-Riley crossovers. Features dedicated low (<160 Hz), mid (160 Hz–2.5 kHz), and high (>2.5 kHz) width controls. Sub-bass mono isolation eliminates stereo low-end phase cancellation and comb filtering. Disabled during Bit-Perfect.';
 
   @override
-  String get featureInfoLoudnessContourTitle => 'Loudness Contour (Fletcher–Munson)';
+  String get featureInfoLoudnessContourTitle =>
+      'Loudness Contour (Fletcher–Munson)';
 
   @override
-  String get featureInfoLoudnessContourSubtitle => 'Volume-linked bass & treble compensation';
+  String get featureInfoLoudnessContourSubtitle =>
+      'Volume-linked bass & treble compensation';
 
   @override
-  String get featureInfoLoudnessContourDescription => 'Equal-loudness approximation: as playback volume decreases, a gentle low-shelf (~100 Hz) and smaller high-shelf (~8 kHz) lift is applied, vanishing at full volume. Gain-domain but complementary to ReplayGain — ReplayGain levels tracks to a common target, while this contour adapts tone to the listening level; both can be ON together. Disabled during Bit-Perfect.';
+  String get featureInfoLoudnessContourDescription =>
+      'Equal-loudness approximation: as playback volume decreases, a gentle low-shelf (~100 Hz) and smaller high-shelf (~8 kHz) lift is applied, vanishing at full volume. Gain-domain but complementary to ReplayGain — ReplayGain levels tracks to a common target, while this contour adapts tone to the listening level; both can be ON together. Disabled during Bit-Perfect.';
 
   @override
-  String get featureInfoSubCrossoverTitle => 'Subwoofer Crossover (Bass Redirection)';
+  String get featureInfoSubCrossoverTitle =>
+      'Subwoofer Crossover (Bass Redirection)';
 
   @override
-  String get featureInfoSubCrossoverSubtitle => '60–150 Hz Linkwitz-Riley, Bass Mono + Anti-Pop limiting';
+  String get featureInfoSubCrossoverSubtitle =>
+      '60–150 Hz Linkwitz-Riley, Bass Mono + Anti-Pop limiting';
 
   @override
-  String get featureInfoSubCrossoverDescription => 'Bass redirection for stereo rigs: a 4th-order Linkwitz-Riley low-pass mono sum is mixed into both channels. Features Bass Mono side-channel subtraction to keep sub-bass punchy and mono-centered, plus tanh anti-pop soft-limiting to eliminate clicks. Disabled during Bit-Perfect.';
+  String get featureInfoSubCrossoverDescription =>
+      'Bass redirection for stereo rigs: a 4th-order Linkwitz-Riley low-pass mono sum is mixed into both channels. Features Bass Mono side-channel subtraction to keep sub-bass punchy and mono-centered, plus tanh anti-pop soft-limiting to eliminate clicks. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoDynamicEqTitle => 'Dynamic EQ (Cut & Boost)';
 
   @override
-  String get featureInfoDynamicEqSubtitle => 'Multi-mode dynamic filters (Peaking, Low-Shelf, High-Shelf)';
+  String get featureInfoDynamicEqSubtitle =>
+      'Multi-mode dynamic filters (Peaking, Low-Shelf, High-Shelf)';
 
   @override
-  String get featureInfoDynamicEqDescription => 'Per-band dynamic equalization supporting both Cut (resonance taming) and Boost (transient expansion) modes. Selectable between Peaking biquad, Low-Shelf, and High-Shelf dynamic responses with smooth soft-knee detection. Disabled during Bit-Perfect.';
+  String get featureInfoDynamicEqDescription =>
+      'Per-band dynamic equalization supporting both Cut (resonance taming) and Boost (transient expansion) modes. Selectable between Peaking biquad, Low-Shelf, and High-Shelf dynamic responses with smooth soft-knee detection. Disabled during Bit-Perfect.';
 
   @override
-  String get featureInfoMultibandCompressorTitle => 'Native 4-Band Multiband Compressor';
+  String get featureInfoMultibandCompressorTitle =>
+      'Native 4-Band Multiband Compressor';
 
   @override
-  String get featureInfoMultibandCompressorSubtitle => 'Phase-aligned Linkwitz-Riley 4th order crossovers, zero-latency C++';
+  String get featureInfoMultibandCompressorSubtitle =>
+      'Phase-aligned Linkwitz-Riley 4th order crossovers, zero-latency C++';
 
   @override
-  String get featureInfoMultibandCompressorDescription => 'Professional 4-band studio mastering compressor built directly into the C++ native DSP engine. Uses Linkwitz-Riley 4th order (LR4) crossovers for exact flat magnitude summation with zero phase distortion. Features independent threshold, ratio, attack, release, soft-knee, and makeup gain per band. Replaces fragile HAL compressor paths. Disabled during Bit-Perfect.';
+  String get featureInfoMultibandCompressorDescription =>
+      'Professional 4-band studio mastering compressor built directly into the C++ native DSP engine. Uses Linkwitz-Riley 4th order (LR4) crossovers for exact flat magnitude summation with zero phase distortion. Features independent threshold, ratio, attack, release, soft-knee, and makeup gain per band. Replaces fragile HAL compressor paths. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoDynamicBassTitle => 'Dynamic Bass (Dynamic System)';
 
   @override
-  String get featureInfoDynamicBassSubtitle => 'Envelope-adaptive sub-bass punch & headphone virtualization';
+  String get featureInfoDynamicBassSubtitle =>
+      'Envelope-adaptive sub-bass punch & headphone virtualization';
 
   @override
-  String get featureInfoDynamicBassDescription => 'Modeled on ViPER4Android’s famous Dynamic System. Restores physical weight and tactile punch for headphones by dynamically expanding quiet bass passages and soft-saturating loud peaks. Features Mid-Side sub-bass extraction, psychoacoustic harmonic synthesis, and 9 classic headphone device calibration presets. Disabled during Bit-Perfect.';
+  String get featureInfoDynamicBassDescription =>
+      'Modeled on ViPER4Android’s famous Dynamic System. Restores physical weight and tactile punch for headphones by dynamically expanding quiet bass passages and soft-saturating loud peaks. Features Mid-Side sub-bass extraction, psychoacoustic harmonic synthesis, and 9 classic headphone device calibration presets. Disabled during Bit-Perfect.';
 
   @override
-  String get featureInfoViperDdcTitle => 'ViPER-DDC (Digital Dynamic Correction)';
+  String get featureInfoViperDdcTitle =>
+      'ViPER-DDC (Digital Dynamic Correction)';
 
   @override
-  String get featureInfoViperDdcSubtitle => 'Hardware headphone timbre & frequency linearization';
+  String get featureInfoViperDdcSubtitle =>
+      'Hardware headphone timbre & frequency linearization';
 
   @override
-  String get featureInfoViperDdcDescription => 'Loads authentic ViPER-DDC (.vdc) correction profiles. Implements high-order Second-Order Sections (SOS) Direct Form II stereo filtering with real-time sample rate adaptation (44.1 kHz / 48 kHz). Precisely neutralizes earphone-specific resonances. Disabled during Bit-Perfect.';
+  String get featureInfoViperDdcDescription =>
+      'Loads authentic ViPER-DDC (.vdc) correction profiles. Implements high-order Second-Order Sections (SOS) Direct Form II stereo filtering with real-time sample rate adaptation (44.1 kHz / 48 kHz). Precisely neutralizes earphone-specific resonances. Disabled during Bit-Perfect.';
 
   @override
   String get featureInfoArbitraryEqTitle => 'Arbitrary Response EQ (GraphicEq)';
 
   @override
-  String get featureInfoArbitraryEqSubtitle => 'EqualizerAPO graphic response curve parser & 512-tap FIR filter';
+  String get featureInfoArbitraryEqSubtitle =>
+      'EqualizerAPO graphic response curve parser & 512-tap FIR filter';
 
   @override
-  String get featureInfoArbitraryEqDescription => 'Parses standard EqualizerAPO \"GraphicEq: <freq> <gain>; ...\" curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 512-tap windowed FIR impulse response for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.';
+  String get featureInfoArbitraryEqDescription =>
+      'Parses standard EqualizerAPO \"GraphicEq: <freq> <gain>; ...\" curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 512-tap windowed FIR impulse response for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.';
 
   @override
-  String get featureInfoLiveProgTitle => 'Live Programmable DSP (EEL Scripting)';
+  String get featureInfoLiveProgTitle =>
+      'Live Programmable DSP (EEL Scripting)';
 
   @override
-  String get featureInfoLiveProgSubtitle => 'Real-time custom audio DSP bytecode VM';
+  String get featureInfoLiveProgSubtitle =>
+      'Real-time custom audio DSP bytecode VM';
 
   @override
-  String get featureInfoLiveProgDescription => 'Write custom audio DSP algorithms in Jesusonic / EEL scripting syntax right on your phone. Code compiles directly to safe, zero-latency bytecode executed per-sample inside the high-priority native audio thread. Supports @init, @sample, sliders 1..8, and comprehensive transcendental math functions. Disabled during Bit-Perfect.';
+  String get featureInfoLiveProgDescription =>
+      'Write custom audio DSP algorithms in Jesusonic / EEL scripting syntax right on your phone. Code compiles directly to safe, zero-latency bytecode executed per-sample inside the high-priority native audio thread. Supports @init, @sample, sliders 1..8, and comprehensive transcendental math functions. Disabled during Bit-Perfect.';
 
   @override
   String get conflictWithAllDspBypassDsp => 'All DSP when “Bypass DSP” is ON';
@@ -7509,7 +7978,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get conflictWithBitPerfect => 'Bit-Perfect bypass';
 
   @override
-  String get conflictWithEqReplayGainEffectsCrossfade => 'EQ / ReplayGain / Effects / Crossfade';
+  String get conflictWithEqReplayGainEffectsCrossfade =>
+      'EQ / ReplayGain / Effects / Crossfade';
 
   @override
   String get conflictWithCrossfade => 'Crossfade (>0 s)';
@@ -7521,28 +7991,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get conflictWithResampler => 'Bit-Perfect bypass / Direct';
 
   @override
-  String get conflictWithVirtualizer => 'Bit-Perfect bypass, Hardware Spatializer';
+  String get conflictWithVirtualizer =>
+      'Bit-Perfect bypass, Hardware Spatializer';
 
   @override
-  String get conflictAaudioDirect => 'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
+  String get conflictAaudioDirect =>
+      'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
 
   @override
-  String get conflictDsdDop => 'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
+  String get conflictDsdDop =>
+      'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
 
   @override
-  String get conflictDspBitPerfectBypass => 'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
+  String get conflictDspBitPerfectBypass =>
+      'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
 
   @override
-  String get conflictBtBitPerfectUnsupported => 'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
+  String get conflictBtBitPerfectUnsupported =>
+      'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
 
   @override
-  String get conflictRequiresAndroid14 => 'Requires Android 14+ for USB bit-perfect output.';
+  String get conflictRequiresAndroid14 =>
+      'Requires Android 14+ for USB bit-perfect output.';
 
   @override
-  String get conflictExclusiveRequiresUsbDac => 'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
+  String get conflictExclusiveRequiresUsbDac =>
+      'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
 
   @override
-  String get conflictNoMixerAttributes => 'This USB DAC does not advertise an exclusive mixer configuration.';
+  String get conflictNoMixerAttributes =>
+      'This USB DAC does not advertise an exclusive mixer configuration.';
 
   @override
   String conflictGaplessNeedsZeroCrossfade(String crossfadeSeconds) {
@@ -7550,39 +8028,50 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get conflictCrossfadeNeedsGaplessOff => 'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.';
+  String get conflictCrossfadeNeedsGaplessOff =>
+      'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.';
 
   @override
-  String get conflictStrictBitPerfectActive => 'Strict bit-perfect is ON: EQ, ReplayGain, Virtualizer/Dynamics and Crossfade are muted so the exact source samples reach the DAC. Turn Strict bit-perfect off to re-enable them.';
+  String get conflictStrictBitPerfectActive =>
+      'Strict bit-perfect is ON: EQ, ReplayGain, Virtualizer/Dynamics and Crossfade are muted so the exact source samples reach the DAC. Turn Strict bit-perfect off to re-enable them.';
 
   @override
-  String get conflictCrossfadeBitPerfectBypass => 'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
+  String get conflictCrossfadeBitPerfectBypass =>
+      'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
 
   @override
-  String get conflictSpeedBitPerfectBypass => 'Disabled: Bit-Perfect bypass is ON — changing speed or pitch resamples the audio and would alter the exclusive bitstream. Reset to 1.0× or turn off Bit-Perfect.';
+  String get conflictSpeedBitPerfectBypass =>
+      'Disabled: Bit-Perfect bypass is ON — changing speed or pitch resamples the audio and would alter the exclusive bitstream. Reset to 1.0× or turn off Bit-Perfect.';
 
   @override
-  String get conflictSilenceSkipBitPerfectBypass => 'Disabled: Bit-Perfect bypass is ON — silence skipping edits the sample stream. Turn off Bit-Perfect (or its DSP bypass) to use it.';
+  String get conflictSilenceSkipBitPerfectBypass =>
+      'Disabled: Bit-Perfect bypass is ON — silence skipping edits the sample stream. Turn off Bit-Perfect (or its DSP bypass) to use it.';
 
   @override
-  String get conflictNoDeviceDetected => 'Cannot enable: no output device detected yet. Connect a USB DAC and retry.';
+  String get conflictNoDeviceDetected =>
+      'Cannot enable: no output device detected yet. Connect a USB DAC and retry.';
 
   @override
-  String get conflictNoExclusiveMixer => 'Cannot enable: this output path does not expose exclusive bit-perfect mixer attributes.';
+  String get conflictNoExclusiveMixer =>
+      'Cannot enable: this output path does not expose exclusive bit-perfect mixer attributes.';
 
   @override
-  String get conflictAaudioDirectCrossfade => 'Disabled: AAudio Direct is ON — crossfade is applied in the ExoPlayer DSP chain it bypasses. Turn AAudio Direct off to use crossfade.';
+  String get conflictAaudioDirectCrossfade =>
+      'Disabled: AAudio Direct is ON — crossfade is applied in the ExoPlayer DSP chain it bypasses. Turn AAudio Direct off to use crossfade.';
 
   @override
-  String get conflictOemDoubleProcessing => 'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.';
+  String get conflictOemDoubleProcessing =>
+      'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.';
 
   @override
-  String conflictVolumeBoostClipping(String preampDb, String boostDb, String totalDb) {
+  String conflictVolumeBoostClipping(
+      String preampDb, String boostDb, String totalDb) {
     return 'Clipping risk: EQ preamp ($preampDb dB) + boost (+$boostDb dB) = +$totalDb dB > 6 dB headroom.';
   }
 
   @override
-  String get conflictHighBoostDistortion => 'High boost may cause distortion or hearing fatigue.';
+  String get conflictHighBoostDistortion =>
+      'High boost may cause distortion or hearing fatigue.';
 
   @override
   String get swipeToPlayNextFavoriteHint => 'Swipe to play next / favorite';
@@ -7619,7 +8108,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bitPerfectConflictTitle => 'Disable these to use Bit-Perfect?';
 
   @override
-  String get bitPerfectConflictBody => 'Bit-Perfect sends the original, unaltered audio to your USB DAC. These features change the sound and are not compatible:';
+  String get bitPerfectConflictBody =>
+      'Bit-Perfect sends the original, unaltered audio to your USB DAC. These features change the sound and are not compatible:';
 
   @override
   String get bitPerfectDisableAndEnable => 'Disable & enable';
@@ -7640,13 +8130,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAdvancedAudioTitle => 'Advanced';
 
   @override
-  String get settingsAdvancedAudioDesc => 'Low-level buffer, float path and negotiation';
+  String get settingsAdvancedAudioDesc =>
+      'Low-level buffer, float path and negotiation';
 
   @override
   String get settingsAccessibilityAndComfort => 'Accessibility & Comfort';
 
   @override
-  String get settingsAccessibilityAndComfortSubtitle => 'Contrast, motion, visual comfort and sound effects';
+  String get settingsAccessibilityAndComfortSubtitle =>
+      'Contrast, motion, visual comfort and sound effects';
 
   @override
   String get settingsWizardTitle => 'Audio Setup Wizard';
@@ -7655,52 +8147,62 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsWizardStep1Title => 'Output Type';
 
   @override
-  String get settingsWizardStep1Subtitle => 'Select your primary listening hardware';
+  String get settingsWizardStep1Subtitle =>
+      'Select your primary listening hardware';
 
   @override
   String get settingsWizardStep2Title => 'Audio Priority';
 
   @override
-  String get settingsWizardStep2Subtitle => 'Choose how audio processing is prioritized';
+  String get settingsWizardStep2Subtitle =>
+      'Choose how audio processing is prioritized';
 
   @override
   String get settingsWizardStep3Title => 'Track Transitions';
 
   @override
-  String get settingsWizardStep3Subtitle => 'Choose gapless playback or crossfade';
+  String get settingsWizardStep3Subtitle =>
+      'Choose gapless playback or crossfade';
 
   @override
   String get settingsWizardFidelity => 'Maximum Fidelity';
 
   @override
-  String get settingsWizardFidelityDesc => 'Direct bit-perfect streaming with all DSP bypassed';
+  String get settingsWizardFidelityDesc =>
+      'Direct bit-perfect streaming with all DSP bypassed';
 
   @override
   String get settingsWizardBalanced => 'Balanced';
 
   @override
-  String get settingsWizardBalancedDesc => 'Smooth playback, loudness normalization and rich EQ';
+  String get settingsWizardBalancedDesc =>
+      'Smooth playback, loudness normalization and rich EQ';
 
   @override
   String get settingsWizardDataSaver => 'Save Data';
 
   @override
-  String get settingsWizardDataSaverDesc => 'Lower streaming bitrate and efficient buffering';
+  String get settingsWizardDataSaverDesc =>
+      'Lower streaming bitrate and efficient buffering';
 
   @override
   String get settingsWizardApply => 'Apply Setup';
 
   @override
-  String get dockStyleDefaultBestFor => 'Best for balanced one-handed navigation and full controls';
+  String get dockStyleDefaultBestFor =>
+      'Best for balanced one-handed navigation and full controls';
 
   @override
-  String get dockStyleSystemBestFor => 'Best for compact screens and maximum content visibility';
+  String get dockStyleSystemBestFor =>
+      'Best for compact screens and maximum content visibility';
 
   @override
-  String get dockStyleMiniTopBestFor => 'Best for active music listening and quick playback access';
+  String get dockStyleMiniTopBestFor =>
+      'Best for active music listening and quick playback access';
 
   @override
-  String get dockStyleNavTopBestFor => 'Best for deep library exploration and playlist browsing';
+  String get dockStyleNavTopBestFor =>
+      'Best for deep library exploration and playlist browsing';
 
   @override
   String get dockStylePreviewBadge => 'Live Preview';
@@ -7778,7 +8280,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutFavorite => 'Toggle Favorite';
 
   @override
-  String get shortcutFavoriteDesc => 'Add or remove current track from favorites';
+  String get shortcutFavoriteDesc =>
+      'Add or remove current track from favorites';
 
   @override
   String get shortcutHelp => 'Shortcuts Guide';
@@ -7813,7 +8316,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unifiedFavoritesHeader => 'Favorites Collection';
 
   @override
-  String get unifiedFavoritesHeaderSubtitle => 'All your starred and liked tracks in one place';
+  String get unifiedFavoritesHeaderSubtitle =>
+      'All your starred and liked tracks in one place';
 
   @override
   String get unifiedFavoritesViewAll => 'Open Full Favorites';
@@ -7822,13 +8326,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get folderPersistentExcludedBadge => 'Excluded from scan';
 
   @override
-  String get audioQualityCapabilityProbe => 'Capability probe only; hardware output format is not measured.';
+  String get audioQualityCapabilityProbe =>
+      'Capability probe only; hardware output format is not measured.';
 
   @override
-  String get audioQualityOutputSwitchUnavailable => 'Output switch unavailable for this playback engine.';
+  String get audioQualityOutputSwitchUnavailable =>
+      'Output switch unavailable for this playback engine.';
 
   @override
-  String get audioQualityFormatFollowsEngine => 'Format follows the playback engine. Manual conversion is unavailable.';
+  String get audioQualityFormatFollowsEngine =>
+      'Format follows the playback engine. Manual conversion is unavailable.';
 
   @override
   String get upNext => 'UP NEXT';
@@ -7843,13 +8350,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compactView => 'Compact view';
 
   @override
-  String get bootConfigurationError => 'Pulsr cannot start with this configuration';
+  String get bootConfigurationError =>
+      'Pulsr cannot start with this configuration';
 
   @override
   String get bootStartupFailed => 'Pulsr could not finish starting up';
 
   @override
-  String get bootStartupFailedMessage => 'Playback components did not become ready in time. Retrying usually fixes a slow cold start.';
+  String get bootStartupFailedMessage =>
+      'Playback components did not become ready in time. Retrying usually fixes a slow cold start.';
 
   @override
   String get dspResyncAction => 'Resync DSP';
@@ -7893,7 +8402,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quranNoMetadataTitle => 'No Quran Metadata';
 
   @override
-  String get quranNoMetadataDesc => 'This track has no verified Quran metadata (Surah/Ayah). Verse tracking and bookmarking are isolated from regular music.';
+  String get quranNoMetadataDesc =>
+      'This track has no verified Quran metadata (Surah/Ayah). Verse tracking and bookmarking are isolated from regular music.';
 
   @override
   String quranBookmarkSaved(String surah, int ayah) {
@@ -7979,7 +8489,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get queueReordered => 'Queue reordered';
 
   @override
-  String downloadsProgressSummary(Object active, Object completed, Object total) {
+  String downloadsProgressSummary(
+      Object active, Object completed, Object total) {
     return 'Downloading $active • $completed/$total completed';
   }
 
@@ -8004,7 +8515,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get partyResetDefault => 'Reset Default';
 
   @override
-  String get partySyncDescription => 'Synchronize music across multiple devices in real-time.';
+  String get partySyncDescription =>
+      'Synchronize music across multiple devices in real-time.';
 
   @override
   String get partyDisplayNameHint => 'Your display name (optional)';
@@ -8050,7 +8562,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get partyLeave => 'Leave Party';
 
   @override
-  String get partyUnableReconnect => 'Unable to reconnect to the party. Check your connection.';
+  String get partyUnableReconnect =>
+      'Unable to reconnect to the party. Check your connection.';
 
   @override
   String partyShareText(Object link) {
@@ -8066,10 +8579,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get radioDuplicateUrl => 'A station with this URL already exists.';
 
   @override
-  String get lyricsTrackChanged => 'The playing track changed. Reopen the lyrics editor for this track.';
+  String get lyricsTrackChanged =>
+      'The playing track changed. Reopen the lyrics editor for this track.';
 
   @override
-  String get lyricsTranslationUnavailable => 'Translation is unavailable right now.';
+  String get lyricsTranslationUnavailable =>
+      'Translation is unavailable right now.';
 
   @override
   String get discardChangesTitle => 'Discard changes?';
@@ -8117,7 +8632,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reorderFailed => 'Couldn\'t save the new order';
 
   @override
-  String get reorderInstructions => 'Drag to reorder. Select tracks to move them in bulk.';
+  String get reorderInstructions =>
+      'Drag to reorder. Select tracks to move them in bulk.';
 
   @override
   String get moveToTop => 'Move to top';

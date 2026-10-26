@@ -23,8 +23,16 @@ extension EqualizerRestoreOps on EqualizerManager {
       } else {
         eqBandCount = 10;
       }
-      final presetName = prefs.getString(PrefsKeys.eqPresetName) ?? 'Flat';
-      final gainsJson = prefs.getString(PrefsKeys.eqGains);
+      final rawPresetName = prefs.getString(PrefsKeys.eqPresetName);
+      final isPersistedQuran =
+          rawPresetName != null && rawPresetName.startsWith('Quran');
+      var presetName = rawPresetName ?? 'Flat';
+      if (isPersistedQuran) {
+        presetName = 'Flat';
+        isEnabled = false;
+      }
+      final gainsJson =
+          isPersistedQuran ? null : prefs.getString(PrefsKeys.eqGains);
       final bass = prefs.getDouble(PrefsKeys.eqBassBoost) ?? 0.0;
       volumeBoost = prefs.getDouble(PrefsKeys.eqVolumeBoost) ?? 0.0;
 

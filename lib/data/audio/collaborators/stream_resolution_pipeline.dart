@@ -109,7 +109,10 @@ class StreamResolutionPipeline {
       } catch (_) {}
 
       Future<YtmStream> doResolve() => ytmService.resolveStream(videoId,
-          quality: effectiveQuality, forceRefresh: forceRefresh);
+          quality: effectiveQuality,
+          forceRefresh: forceRefresh,
+          title: song.title,
+          artist: song.artist);
       // The native extractor already hedges its top two clients and bounds each
       // call, so racing a second independent chain here only doubled native
       // load for no tail-latency gain. One chain; the extractor owns the hedge.

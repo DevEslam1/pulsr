@@ -37,7 +37,7 @@ void main() {
       resolvedVideoIds = [];
 
       preResolver = StreamPreResolver(
-        resolveUrl: (videoId, {quality = 'high'}) async {
+        resolveUrl: (videoId, {quality = 'high', title, artist}) async {
           resolvedVideoIds.add(videoId);
           return YtmStream(
             videoId: videoId,

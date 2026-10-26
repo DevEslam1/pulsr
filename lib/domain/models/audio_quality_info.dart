@@ -86,6 +86,29 @@ class AudioQualityInfo {
 
     final path = song.path.toLowerCase();
 
+    // Internet Radio live stream
+    final bool isRadio = song.source == SongSource.radio ||
+        path.startsWith('radio://') ||
+        ((path.startsWith('http://') || path.startsWith('https://')) &&
+            (path.contains('/radio') || path.contains('radio.')));
+    if (isRadio) {
+      final kbps = explicitBitrateKbps ?? song.bitrateKbps;
+      return AudioQualityInfo(
+        format: 'RADIO',
+        codecName: 'Internet Radio Stream',
+        bitrateKbps: kbps,
+        sampleRate: 'Live Stream',
+        bitDepth: 'Live',
+        channels: 'Stereo',
+        tier: AudioQualityTier.standardQuality,
+        tierLabel: 'Live Radio',
+        shortBadgeLabel: 'Radio',
+        description: 'Live internet radio stream',
+        badgeColor: AppColors.qualityBadgeSky,
+        icon: Icons.radio_rounded,
+      );
+    }
+
     // YouTube Music online streaming track (not yet downloaded)
     if ((song.source == SongSource.youtube || path.startsWith('ytmusic://')) &&
         song.isDownloaded != true) {

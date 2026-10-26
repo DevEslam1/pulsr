@@ -629,7 +629,8 @@ class YtDownloadService {
         });
       }
 
-      var stream = await _resolveDownloadStream(videoId, quality);
+      var stream = await _resolveDownloadStream(videoId, quality,
+          title: song.title, artist: song.artist);
 
       // Pre-download storage check (BUG-06)
       try {
@@ -916,7 +917,10 @@ class YtDownloadService {
   }
 
   Future<YtmStream> resolveDownloadStream(String videoId,
-      [String quality = 'high', bool forceRefresh = false]) async {
+      [String quality = 'high',
+      bool forceRefresh = false,
+      String? title,
+      String? artist]) async {
     if (forceRefresh && getIt.isRegistered<YtmUrlCache>()) {
       // Nothing used to evict the entry, so the "transparent re-resolution"
       // after a 403 read the same dead URL straight back out of the cache and
@@ -928,7 +932,11 @@ class YtDownloadService {
     // Prefer M4A (AAC) for downloads: universally supported by all music players & car stereos,
     // enables metadata/cover-art embedding, and avoids Android MediaStore .webm.oga mangling.
     final native = await _ytmService.resolveStream(videoId,
-        quality: quality, forceRefresh: forceRefresh, preferM4a: true);
+        quality: quality,
+        forceRefresh: forceRefresh,
+        preferM4a: true,
+        title: title,
+        artist: artist);
     final resolved = native.withResolvedExpiry();
     _resolvedStreams[videoId] =
         resolved; // FIX-A05/C05: Store resolved stream for duration lookup
@@ -944,8 +952,8 @@ class YtDownloadService {
   }
 
   Future<YtmStream> _resolveDownloadStream(String videoId, String quality,
-          {bool forceRefresh = false}) =>
-      resolveDownloadStream(videoId, quality, forceRefresh);
+          {bool forceRefresh = false, String? title, String? artist}) =>
+      resolveDownloadStream(videoId, quality, forceRefresh, title, artist);
 
   /// Downloads the audio into [dest], re-resolving when the URL is the problem.
   /// Returns the stream the bytes actually came from — its container decides the
@@ -977,7 +985,9 @@ class YtDownloadService {
           debugPrint(
               '[YtDownloadService] Stream for $videoId cannot outlive the download, re-resolving...');
           currentStream = await _resolveDownloadStream(videoId, quality,
-              forceRefresh: true);
+              forceRefresh: true,
+              title: task.song.title,
+              artist: task.song.artist);
         }
 
         await _downloadFileResilient(
@@ -1066,8 +1076,10 @@ class YtDownloadService {
           await _ytmService.invalidatePoToken();
           await _ytmService.ensurePoTokenReady();
         }
-        currentStream =
-            await _resolveDownloadStream(videoId, quality, forceRefresh: true);
+        currentStream = await _resolveDownloadStream(videoId, quality,
+            forceRefresh: true,
+            title: task.song.title,
+            artist: task.song.artist);
       }
     }
   }

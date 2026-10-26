@@ -1802,8 +1802,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     when (e.signal) {
                         YtmBlockSignal.RateLimited,
                         YtmBlockSignal.NetworkUnavailable,
-                        YtmBlockSignal.Interrupted,
-                        YtmBlockSignal.VideoGone -> {
+                        YtmBlockSignal.Interrupted -> {
                             Log.w(TAG, "Native Innertube stream extraction failed with terminal signal ${e.signal.name} for $videoId. Skipping NewPipe fallback.")
                             throw e
                         }

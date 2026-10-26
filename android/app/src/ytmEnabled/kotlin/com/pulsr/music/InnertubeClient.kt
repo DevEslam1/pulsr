@@ -444,10 +444,10 @@ internal class InnertubeClient(
                             )
                             // FIX #2 & #11: Only increment global breaker if this thread actually sets the short circuit!
                             if (shortCircuit.compareAndSet(null, exc)) {
-                                globalBlockSignal.set(winningSignal)
                                 if (winningSignal == YtmBlockSignal.IpBlocked ||
                                     winningSignal == YtmBlockSignal.BotChallenge ||
                                     winningSignal == YtmBlockSignal.PoTokenInvalid) {
+                                    globalBlockSignal.set(winningSignal)
                                     egressBlockBreaker.onBlock()
                                 }
                             }

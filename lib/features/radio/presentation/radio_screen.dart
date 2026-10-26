@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/services/radio_station_store.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/search_algorithm_utils.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
@@ -85,6 +86,9 @@ class _RadioScreenState extends State<RadioScreen> {
       }
     }
     final list = set.toList()..sort();
+    if (list.remove('Quran')) {
+      return ['All', 'Quran', ...list];
+    }
     return ['All', ...list];
   }
 
@@ -104,10 +108,13 @@ class _RadioScreenState extends State<RadioScreen> {
         }
       }
       if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        final matchesName = s.name.toLowerCase().contains(query);
-        final matchesGenre = s.genre?.toLowerCase().contains(query) ?? false;
-        final matchesUrl = s.url.toLowerCase().contains(query);
+        final query = SearchAlgorithmUtils.normalize(_searchQuery);
+        final matchesName =
+            SearchAlgorithmUtils.normalize(s.name).contains(query);
+        final matchesGenre = s.genre != null &&
+            SearchAlgorithmUtils.normalize(s.genre!).contains(query);
+        final matchesUrl =
+            s.url.toLowerCase().contains(_searchQuery.toLowerCase());
         if (!matchesName && !matchesGenre && !matchesUrl) return false;
       }
       return true;
@@ -1006,9 +1013,11 @@ class _AddStationDialogState extends State<_AddStationDialog> {
               alignment: WrapAlignment.center,
               children: [
                 _buildPresetChip('القرآن - القاهرة', RadioStationStore.quranCairoArtwork),
+                _buildPresetChip('الحصري', RadioStationStore.hussaryArtwork),
                 _buildPresetChip('المنشاوي', RadioStationStore.minshawiArtwork),
                 _buildPresetChip('عبد الباسط', RadioStationStore.abdulBasitArtwork),
                 _buildPresetChip('مصطفى إسماعيل', RadioStationStore.mustafaIsmailArtwork),
+                _buildPresetChip('تراتيل', RadioStationStore.tarteelArtwork),
                 if (_artworkUrl != null)
                   ActionChip(
                     avatar: const Icon(Icons.clear_rounded, size: 14),

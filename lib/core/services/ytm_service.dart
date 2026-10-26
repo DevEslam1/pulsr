@@ -79,8 +79,11 @@ class YtmException implements Exception {
       code == 'YTM_RECAPTCHA' ||
       code == 'RECAPTCHA_REQUIRED' ||
       (details != null &&
+          !details!.toLowerCase().contains('age') &&
+          !details!.toLowerCase().contains('inappropriate') &&
           (_botWord.hasMatch(details!) ||
-              details!.contains('Sign in to confirm')));
+              details!.contains('Sign in to confirm you') ||
+              details!.contains('Sign in to confirm that you')));
 
   /// YouTube is rate-limiting this IP. Waiting helps; rotating identity does not.
   bool get isThrottled =>
@@ -1192,6 +1195,118 @@ class YtmService {
   /// their own — which doubled native thread-pool pressure.
   final Map<String, Future<YtmStream>> _inFlightStreamResolves = {};
 
+  /// Cache of original video IDs mapped to discovered working alternative video IDs
+  /// for age-restricted / unplayable content.
+  final Map<String, String> _alternateVideoIds = {};
+
+  /// Resolves an alternative playable stream for a track when the primary
+  /// [originalVideoId] is age-restricted, region-blocked, or unplayable.
+  Future<YtmStream?> resolveAlternateStream(
+    String title,
+    String? artist, {
+    String? originalVideoId,
+    String quality = 'high',
+    bool preferM4a = false,
+  }) async {
+    final cleanTitle = title
+        .replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleanTitle.isEmpty) return null;
+
+    final cleanArtist = (artist ?? '')
+        .replaceAll(RegExp(r'- Topic$', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    // 1. Check if we already found and cached a working alternate ID for this video
+    if (originalVideoId != null && originalVideoId.isNotEmpty) {
+      final cachedAltId = _alternateVideoIds[originalVideoId];
+      if (cachedAltId != null && cachedAltId != originalVideoId) {
+        try {
+          final stream = await resolveStream(
+            cachedAltId,
+            quality: quality,
+            preferM4a: preferM4a,
+          );
+          if (stream.url.trim().isNotEmpty) {
+            return stream;
+          }
+        } catch (_) {
+          _alternateVideoIds.remove(originalVideoId);
+        }
+      }
+    }
+
+    // 2. Build search queries
+    final queryList = <String>[
+      if (cleanArtist.isNotEmpty) '$cleanArtist $cleanTitle' else cleanTitle,
+      if (cleanArtist.isNotEmpty) '$cleanArtist $cleanTitle audio' else '$cleanTitle audio',
+      if (cleanArtist.isNotEmpty) '$cleanArtist $title' else title,
+    ];
+
+    final testedIds = <String>{
+      if (originalVideoId != null && originalVideoId.isNotEmpty) originalVideoId,
+    };
+
+    for (final q in queryList) {
+      try {
+        final tracks = await searchWithFallback(q, limit: 6);
+        for (final cand in tracks) {
+          final candId = cand.videoId;
+          if (candId.isEmpty || testedIds.contains(candId)) continue;
+          testedIds.add(candId);
+
+          try {
+            final stream = await resolveStream(
+              candId,
+              quality: quality,
+              preferM4a: preferM4a,
+            );
+            if (stream.url.trim().isNotEmpty) {
+              if (originalVideoId != null && originalVideoId.isNotEmpty) {
+                _alternateVideoIds[originalVideoId] = candId;
+                final urlCache = getIt.isRegistered<YtmUrlCache>()
+                    ? getIt<YtmUrlCache>()
+                    : null;
+                final cacheQuality = preferM4a ? '$quality:m4a' : quality;
+                urlCache?.putStream(stream, quality: cacheQuality);
+              }
+              debugPrint(
+                  '[YTM_SERVICE] Alternate track resolved: "$originalVideoId" -> "$candId" (${cand.title})');
+              return stream;
+            }
+          } catch (_) {
+            continue;
+          }
+        }
+      } catch (e) {
+        debugPrint('[YTM_SERVICE] Alternate track search failed for "$q": $e');
+      }
+    }
+    return null;
+  }
+
+  static bool _isPlayabilityOrRestrictedError(Object error) {
+    if (error is YtmException) {
+      if (error.isAuth || error.isUnavailable) return true;
+      final code = error.code.toUpperCase();
+      if (code == 'SIGN_IN_REQUIRED' ||
+          code == 'LOGIN_REQUIRED' ||
+          code == 'AGE_RESTRICTED' ||
+          code == 'VIDEO_GONE' ||
+          code == 'CONTENT_GONE' ||
+          code == 'YTM_UNAVAILABLE' ||
+          code == 'UNPLAYABLE') {
+        return true;
+      }
+    }
+    final info = YtmErrorClassifier.classify(error);
+    return info.signal == YtmBlockSignal.signInRequired ||
+        info.signal == YtmBlockSignal.videoGone ||
+        info.signal == YtmBlockSignal.geoBlocked;
+  }
+
   /// Resolves audio stream using multi-tier fallback:
   /// (1) Direct authenticated account stream (if logged in)
   /// (2) Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
@@ -1208,23 +1323,54 @@ class YtmService {
       {String quality = 'high',
       bool forceRefresh = false,
       bool coalesce = true,
-      bool preferM4a = false}) {
+      bool preferM4a = false,
+      String? title,
+      String? artist}) {
     if (forceRefresh) {
       return _resolveStreamInner(videoId,
-          quality: quality, forceRefresh: true, preferM4a: preferM4a);
+          quality: quality,
+          forceRefresh: true,
+          preferM4a: preferM4a,
+          title: title,
+          artist: artist);
     }
     if (!coalesce) {
       return _resolveStreamInner(videoId,
-          quality: quality, forceRefresh: false, preferM4a: preferM4a);
+          quality: quality,
+          forceRefresh: false,
+          preferM4a: preferM4a,
+          title: title,
+          artist: artist);
     }
     final key = '$videoId:${quality.toLowerCase()}${preferM4a ? ":m4a" : ""}';
     final existing = _inFlightStreamResolves[key];
     if (existing != null) {
+      if (title != null && title.trim().isNotEmpty) {
+        return existing
+            .timeout(_defaultResolveTimeout + const Duration(seconds: 5))
+            .catchError((Object e) async {
+          if (_isPlayabilityOrRestrictedError(e)) {
+            final alt = await resolveAlternateStream(
+              title,
+              artist,
+              originalVideoId: videoId,
+              quality: quality,
+              preferM4a: preferM4a,
+            );
+            if (alt != null) return alt;
+          }
+          throw e;
+        });
+      }
       return existing
           .timeout(_defaultResolveTimeout + const Duration(seconds: 5));
     }
     final fut = _resolveStreamInner(videoId,
-        quality: quality, forceRefresh: false, preferM4a: preferM4a);
+        quality: quality,
+        forceRefresh: false,
+        preferM4a: preferM4a,
+        title: title,
+        artist: artist);
     _inFlightStreamResolves[key] = fut;
     return fut.whenComplete(() {
       if (identical(_inFlightStreamResolves[key], fut)) {
@@ -1236,7 +1382,27 @@ class YtmService {
   Future<YtmStream> _resolveStreamInner(String videoId,
       {String quality = 'high',
       bool forceRefresh = false,
-      bool preferM4a = false}) async {
+      bool preferM4a = false,
+      String? title,
+      String? artist}) async {
+    if (!forceRefresh && _alternateVideoIds.containsKey(videoId)) {
+      final altId = _alternateVideoIds[videoId];
+      if (altId != null && altId != videoId) {
+        try {
+          return await _resolveStreamInner(
+            altId,
+            quality: quality,
+            forceRefresh: false,
+            preferM4a: preferM4a,
+            title: title,
+            artist: artist,
+          );
+        } catch (_) {
+          _alternateVideoIds.remove(videoId);
+        }
+      }
+    }
+
     // Check Task 2 in-memory URL cache first
     final urlCache =
         getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
@@ -1623,10 +1789,25 @@ class YtmService {
       recordError(e);
     }
 
-    // All engines failed: surface the first classified engine error so the
-    // UI/recovery layer sees the real cause (bot/rate/auth) with its mapped
-    // recovery action, not a generic dead-end.
+    // All engines failed: if title is present and error is playability/restriction, attempt alternative track
     final err = firstError;
+    if (title != null &&
+        title.trim().isNotEmpty &&
+        (err == null || _isPlayabilityOrRestrictedError(err))) {
+      debugPrint(
+          '[YTM_SERVICE] Direct stream resolution unplayable for "$videoId" ($title). Attempting alternative stream resolution...');
+      final altStream = await resolveAlternateStream(
+        title,
+        artist,
+        originalVideoId: videoId,
+        quality: quality,
+        preferM4a: preferM4a,
+      );
+      if (altStream != null) {
+        return altStream;
+      }
+    }
+
     if (err is YtmException) throw err;
     if (err != null) throw err;
     throw const YtmException(
@@ -1660,7 +1841,16 @@ class YtmService {
           error: e, stackTrace: st, category: 'YTM');
     }
 
+    final effectiveAndroidVersion =
+        androidVersion == '19.44.38' ? '21.26.364' : androidVersion;
     final List<_DartPlayerClient> clients = [
+      (
+        name: 'ANDROID',
+        version: effectiveAndroidVersion,
+        clientNameId: '3',
+        ua: 'com.google.android.youtube/$effectiveAndroidVersion (Linux; U; Android 11; en_US) gzip',
+        host: 'https://www.youtube.com',
+      ),
       (
         name: 'ANDROID_VR',
         version: androidVrVersion,
@@ -1669,23 +1859,16 @@ class YtmService {
         host: 'https://www.youtube.com',
       ),
       (
-        name: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-        version: '2.0',
-        clientNameId: '85',
-        ua: 'Mozilla/5.0 (PlayStation 4 5.55) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/11.0 Safari/605.1.15',
-        host: 'https://www.youtube.com',
-      ),
-      (
-        name: 'ANDROID',
-        version: androidVersion,
-        clientNameId: '3',
-        ua: 'com.google.android.youtube/$androidVersion (Linux; U; Android 14; en_US) gzip',
+        name: 'TVHTML5_SIMPLY',
+        version: '1.0',
+        clientNameId: '75',
+        ua: 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko)',
         host: 'https://www.youtube.com',
       ),
     ];
 
     Future<YtmStream> attempt(_DartPlayerClient client) async {
-      final isEmbed = client.name == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
+      final isEmbed = client.name.contains('EMBED');
       final clientContext = <String, dynamic>{
         'client': {
           'clientName': client.name,

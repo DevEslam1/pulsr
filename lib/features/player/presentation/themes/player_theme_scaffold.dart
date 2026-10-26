@@ -12,7 +12,7 @@ import '../../../../data/db/app_database.dart';
 import '../../cubit/player_cubit.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
-import '../../../sheets/song_info_sheet.dart';
+import '../../../sheets/song_options_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
@@ -341,10 +341,10 @@ class PlayerHeaderBar extends StatelessWidget {
                 minHeight: AppSpacing.minTouchTarget),
             icon: const Icon(Icons.more_vert_rounded, size: 22),
             color: p.textPrimary,
-            tooltip: 'Options',
+            tooltip: context.l10n.moreOptions,
             onPressed: () {
               if (song != null) {
-                SongInfoSheet.show(context, song: song);
+                SongOptionsSheet.show(context, song: song);
               }
             },
           ),

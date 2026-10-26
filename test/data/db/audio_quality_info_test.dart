@@ -203,5 +203,26 @@ void main() {
       expect(info.shortBadgeLabel, 'AAC • 128k');
       expect(info.tier, AudioQualityTier.highQuality);
     });
+
+    test('a live radio station is classified as RADIO with clean badge label', () {
+      final info = AudioQualityInfo.fromSong(_song(
+        path: 'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
+        source: SongSource.radio,
+      ));
+      expect(info.format, 'RADIO');
+      expect(info.shortBadgeLabel, 'Radio');
+      expect(info.tierLabel, 'Live Radio');
+      expect(info.codecName, 'Internet Radio Stream');
+      expect(info.sampleRate, 'Live Stream');
+      expect(info.bitDepth, 'Live');
+    });
+
+    test('an http radio stream path without SongSource.radio is also detected as radio', () {
+      final info = AudioQualityInfo.fromSong(_song(
+        path: 'https://stream.radiojar.com/radio.mp3',
+      ));
+      expect(info.format, 'RADIO');
+      expect(info.shortBadgeLabel, 'Radio');
+    });
   });
 }
