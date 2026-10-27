@@ -2073,7 +2073,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                           ),
                           Text(
                             '${sampleRateHz > 0 ? _sampleRateLabel(sampleRateHz) : "Rate unknown"}'
-                            '${bitDepth > 0 ? " / $bitDepth-bit" : " / Depth unknown"}',
+                            '${bitDepth > 0 ? " / $bitDepth-bit" : " / Depth unknown"}'
+                            '${outputDevice?.btEstimatedBitrateKbps != null ? " · ~${outputDevice!.btEstimatedBitrateKbps} kbps" : ""}',
                             style: TextStyle(
                               fontSize: AppFontSize.label,
                               color: p.textSecondary,

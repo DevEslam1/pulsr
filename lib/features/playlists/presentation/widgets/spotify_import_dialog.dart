@@ -6,6 +6,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../data/services/spotify_importer_service.dart';
 
@@ -186,7 +187,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
                 backgroundColor: p.surfaceContainer,
                 color: p.accent,
                 minHeight: 6,
-                borderRadius: BorderRadius.circular(3),
+                borderRadius: AppRadii.circular(3),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
@@ -309,7 +310,8 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         return [
           TextButton(
             onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel,
+                style: TextStyle(color: p.textSecondary)),
           ),
           FilledButton(
             onPressed: _startImport,
@@ -318,7 +320,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               foregroundColor: p.onAccent,
               shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
-            child: const Text('Import',
+            child: Text(context.l10n.importAction,
                 style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ];
@@ -335,7 +337,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               foregroundColor: p.onAccent,
               shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
-            child: const Text('Done',
+            child: Text(context.l10n.done,
                 style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ];
@@ -344,7 +346,8 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         return [
           TextButton(
             onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel,
+                style: TextStyle(color: p.textSecondary)),
           ),
           FilledButton(
             onPressed: () {
@@ -357,7 +360,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               foregroundColor: p.onAccent,
               shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
-            child: const Text('Retry',
+            child: Text(context.l10n.retry,
                 style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ];

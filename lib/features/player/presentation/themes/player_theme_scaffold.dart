@@ -1,6 +1,7 @@
 // lib/features/player/presentation/themes/player_theme_scaffold.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -695,7 +696,7 @@ class PlayerThemeScaffold extends StatelessWidget {
           horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
       child: Material(
         color: p.warning.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadii.circular(12),
         child: ListTile(
           dense: true,
           leading: Icon(Icons.bookmark, color: p.warning),

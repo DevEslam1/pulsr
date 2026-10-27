@@ -36,6 +36,9 @@ test/golden/failures/
 /build/
 /coverage/
 .opencode/
+.zwork/
+docs/
+
 
 # Symbolication related
 app.*.symbols

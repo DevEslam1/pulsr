@@ -31,6 +31,8 @@ import '../../../data/audio/multi_output_router.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../data/services/usb_exclusive_service.dart';
+import '../../../domain/models/audio_output_info.dart';
+import '../../../data/services/device_profile_service.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'proxy_endpoint_validator.dart';
@@ -221,6 +223,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           !device.isUsbDac &&
           device.activeDeviceType != 'unknown';
       safeEmit(state.copyWith(currentOutputDevice: device));
+      unawaited(_applyPerDeviceBtLatency(device));
       // A DAC may have just been plugged/unplugged: re-probe DoP support so the
       // DSD output control enables/disables truthfully without a manual refresh.
       unawaited(_refreshDopSupport());

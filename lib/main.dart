@@ -128,12 +128,18 @@ Future<void> main() async {
     return;
   }
 
-  // Initialize in-memory SettingsCache and ArtworkCacheManager
+  // Initialize in-memory SettingsCache synchronously enough for the first
+  // frame. Artwork and UI-sound init are not needed to paint the shell, so they
+  // run behind the first frame instead of adding path_provider/prefs awaits to
+  // the cold-start critical path.
   try {
     await SettingsCache().init();
-    await ArtworkCacheManager().init();
-    await SoundFeedbackService.init();
   } catch (_) {}
+  unawaited(ArtworkCacheManager().init().catchError((e, st) {
+    ErrorLogger.log('ArtworkCacheManager init failed',
+        error: e, stackTrace: st, category: 'Startup');
+  }));
+  unawaited(SoundFeedbackService.init());
 
   // Rehydrate the GPU budget before first frame (persisted by SettingsCubit).
   try {
@@ -178,7 +184,8 @@ Future<void> main() async {
   );
 
   try {
-    await configureDependencies().timeout(const Duration(seconds: 15));
+    await configureDependencies(warmUpAsync: false)
+        .timeout(const Duration(seconds: 15));
   } catch (e, st) {
     ErrorLogger.log('DI configureDependencies failed or timed out',
         error: e, stackTrace: st, category: 'Startup');
@@ -433,6 +440,11 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     final ready = await ensureAppDependenciesReady();
     _bootstrapInFlight = false;
     if (!mounted) return;
+    if (ready) {
+      // The router can only be built once MediaScannerService is resolvable.
+      // With the deferred warm-up this is the first point where that is true.
+      _router ??= _createRouterSafely();
+    }
     setState(() {
       _dependenciesReady = ready;
       _bootstrapFailed = !ready;

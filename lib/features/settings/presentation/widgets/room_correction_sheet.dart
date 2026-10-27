@@ -1206,7 +1206,7 @@ class _ResponsePainter extends CustomPainter {
     final fit = gains.take(response.length).toList();
     final maxAbs = response.fold<double>(6.0, (m, v) => math.max(m, v.abs()));
     final gridPaint = Paint()
-      ..color = const Color(0x33888888)
+      ..color = AppColors.chartNeutral
       ..strokeWidth = 1;
     canvas.drawLine(Offset(0, mid), Offset(size.width, mid), gridPaint);
 

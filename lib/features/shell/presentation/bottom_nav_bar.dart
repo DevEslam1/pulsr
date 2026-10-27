@@ -359,7 +359,7 @@ class _NavTabItem extends StatelessWidget {
                             style: TextStyle(
                               fontSize: isTablet
                                   ? AppFontSize.label
-                                  : AppFontSize.tiny,
+                                  : AppFontSize.caption,
                               height: 1.1,
                               fontWeight: isSelected
                                   ? FontWeight.w800

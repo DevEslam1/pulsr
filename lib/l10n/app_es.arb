@@ -4135,7 +4135,7 @@
   "errYtmPlaybackFailed": "Falló la reproducción. Inténtalo de nuevo.",
   "errYtmGeneric": "Algo salió mal con YouTube Music.",
   "errYtmRegionRestricted": "Esta pista está restringida en tu región.",
-"errYtmAgeRestricted": "Esta pista tiene restricción de edad (+18) y no se puede reproducir aquí.",
+"errYtmAgeRestricted": "Esta pista tiene restricción de edad (+18) en YouTube. Inicia sesión con una cuenta verificada o prueba otra subida.",
 "errYtmStreamFailed": "No se pudo cargar la emisión. Actualizando el enlace…",
 "errYtmStreamExpired": "El enlace de emisión caducó. Actualizando…",
   "errYtmUnavailable": "Esta pista no está disponible.",
@@ -4674,5 +4674,11 @@
   "cachedCopy": "En caché",
   "onlineCacheProgress": "Guardando biblioteca… {done}/{total}",
   "canvasEffects": "Efectos Canvas",
-  "canvasEffectsSubtitle": "Carátula animada en el reproductor"
+  "canvasEffectsSubtitle": "Carátula animada en el reproductor",
+  "saveImage": "Guardar imagen",
+  "discordAccountDisconnected": "Cuenta de Discord desconectada",
+  "lyricsShareTitle": "Compartir tarjeta de letras",
+  "lyricsShareLimitHint": "Puedes seleccionar hasta 6 líneas para la tarjeta de historia.",
+  "lyricsShareSelectionCount": "{count}/6 líneas",
+  "lyricsSharePickHint": "Selecciona de 1 a 6 líneas para crear una tarjeta 9:16."
 }

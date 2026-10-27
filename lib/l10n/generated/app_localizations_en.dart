@@ -6978,7 +6978,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errYtmAgeRestricted =>
-      'This track is age-restricted (+18) and can\'t be played here.';
+      'This track is age-restricted (+18) on YouTube. Sign in with an age-verified account or try another upload.';
 
   @override
   String get errYtmStreamFailed =>
@@ -8717,4 +8717,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get canvasEffectsSubtitle => 'Animated artwork motion in the player';
+
+  @override
+  String get saveImage => 'Save Image';
+
+  @override
+  String get discordAccountDisconnected => 'Discord account disconnected';
+
+  @override
+  String get lyricsShareTitle => 'Share Lyrics Card';
+
+  @override
+  String get lyricsShareLimitHint =>
+      'You can select up to 6 lines for the story card.';
+
+  @override
+  String lyricsShareSelectionCount(Object count) {
+    return '$count/6 lines';
+  }
+
+  @override
+  String get lyricsSharePickHint =>
+      'Select 1 to 6 lines to create a 9:16 story card.';
 }

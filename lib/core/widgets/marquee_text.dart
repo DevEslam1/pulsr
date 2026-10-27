@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../motion/pulsr_motion.dart';
+import 'pulsr_scroll_edge_fade.dart';
 
 /// {@category DesignSystem}
 /// A widget that displays text normally when it fits within the parent bounds,
@@ -20,7 +21,7 @@ class MarqueeText extends StatefulWidget {
     required this.text,
     this.style,
     this.textAlign = TextAlign.center,
-    this.pauseDuration = const Duration(seconds: 2),
+    this.pauseDuration = const Duration(milliseconds: 1400),
     this.velocity = 30.0,
     this.scrollSpeed,
     this.blankSpace = 48.0,
@@ -242,7 +243,12 @@ class _MarqueeTextState extends State<MarqueeText> {
           );
         }
 
-        return marquee;
+        // Fade the clipped edge instead of cutting a glyph in half before the
+        // marquee starts. The 1.4 s pause is still enough to read the opening.
+        return PulsrScrollEdgeFade(
+          extent: 32,
+          child: marquee,
+        );
       },
     );
   }

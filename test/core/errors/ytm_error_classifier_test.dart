@@ -52,6 +52,27 @@ void main() {
       expect(YtmErrorClassifier.classify(error).message, contains('+18'));
     });
 
+    test('the two tracks in PLeJ2ovI_SQw4 are age-gated, not session expiry',
+        () {
+      // DuQGokwsWF8 ("Go Fuck Yourself") and F3T70bRdfVA ("2FUKKINCOCKY")
+      // both answer LOGIN_REQUIRED / "Sign in to confirm your age" on YouTube.
+      for (final videoId in ['DuQGokwsWF8', 'F3T70bRdfVA']) {
+        final error = YtmException(
+          'AGE_RESTRICTED',
+          'Sign in to confirm your age',
+          videoId,
+        );
+        final info = YtmErrorClassifier.classify(error);
+
+        expect(error.isAgeRestricted, isTrue, reason: videoId);
+        expect(error.isAuth, isFalse, reason: videoId);
+        expect(info.signal, YtmBlockSignal.ageRestricted, reason: videoId);
+        expect(info.recoveryAction, YtmRecoveryAction.skipToNextTrack,
+            reason: videoId);
+        expect(info.message, contains('age-verified'), reason: videoId);
+      }
+    });
+
     test('does not mistake robot track titles or age walls for a bot challenge',
         () {
       expect(

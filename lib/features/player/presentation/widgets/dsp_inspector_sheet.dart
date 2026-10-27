@@ -12,6 +12,7 @@ import '../../../../core/telemetry/dsp_reliability_tracker.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../domain/models/audio_output_info.dart';
+import '../../../../domain/services/output_path_verdict.dart';
 import '../../../../domain/models/dsp_debug_report.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
@@ -729,6 +730,18 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                 isDspActive ? context.l10n.dspStatOn : context.l10n.dspStatOff,
                 isHighlight: isDspActive,
               ),
+              if (currentOutputDevice != null)
+                Builder(builder: (_) {
+                  final v = OutputPathVerdict.of(currentOutputDevice,
+                      dspActive: isDspActive || isEqEnabled);
+                  return _buildStatChip(
+                    p,
+                    'PATH',
+                    '${v.label} · ${v.detail}',
+                    isHighlight: v.quality == OutputPathQuality.bitPerfect,
+                    isWarning: v.isLossy,
+                  );
+                }),
               _buildStatChip(
                 p,
                 'CODEC',
@@ -813,7 +826,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                     child: Text(
                       context.l10n.dspResetCounters,
                       style: TextStyle(
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
                         color: p.textSecondary,
                       ),

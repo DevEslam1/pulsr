@@ -303,7 +303,11 @@ class SettingsHeroCard extends StatelessWidget {
                                 );
                           final stacked = (user != null &&
                                   constraints.maxWidth < 320) ||
-                              (user == null && constraints.maxWidth < 270) ||
+                              // The cloud card's 16px title needs ~160px next to
+                              // the 50px avatar and the Sign In button. Below
+                              // this width the row cannot fit it without
+                              // ellipsising the primary label.
+                              (user == null && constraints.maxWidth < 360) ||
                               MediaQuery.textScalerOf(context).scale(14) > 18;
                           final body = stacked
                               ? Column(

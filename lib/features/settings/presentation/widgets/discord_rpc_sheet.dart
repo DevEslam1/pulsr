@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
@@ -85,8 +86,8 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
         _statusError = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Discord account disconnected'),
+        SnackBar(
+          content: Text(context.l10n.discordAccountDisconnected),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -139,12 +140,12 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF5865F2).withValues(alpha: 0.15),
+                        color: AppColors.discordBlurple.withValues(alpha: 0.15),
                         borderRadius: AppRadii.r12All,
                       ),
                       child: const Icon(
                         Icons.discord_rounded,
-                        color: Color(0xFF5865F2),
+                        color: AppColors.discordBlurple,
                         size: 26,
                       ),
                     ),
@@ -246,14 +247,14 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                       color: p.surfaceContainer,
                       borderRadius: AppRadii.r16All,
                       border: Border.all(
-                        color: const Color(0xFF5865F2).withValues(alpha: 0.3),
+                        color: AppColors.discordBlurple.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
                       children: [
                         CircleAvatar(
                           radius: 22,
-                          backgroundColor: const Color(0xFF5865F2),
+                          backgroundColor: AppColors.discordBlurple,
                           backgroundImage: user.avatarUrl != null
                               ? NetworkImage(user.avatarUrl!)
                               : null,
@@ -380,7 +381,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                             side: BorderSide(
                                 color: p.error.withValues(alpha: 0.5)),
                           ),
-                          child: const Text('Disconnect'),
+                          child: Text(context.l10n.disconnect),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -388,7 +389,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                     Expanded(
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF5865F2),
+                          backgroundColor: AppColors.discordBlurple,
                           foregroundColor: Colors.white,
                         ),
                         onPressed: _isSaving ? null : _saveToken,

@@ -176,7 +176,7 @@ Never call `BorderRadius.circular(<literal>)`.
 
 | Token | ms | Use |
 |---|---|---|
-| `instant` | 90 | icon tint / selection feedback |
+| `instant` | 80 | icon tint / selection feedback |
 | `fast` | 150 | press states, small fades |
 | `standard` | 250 | standard transitions |
 | `slow` | 400 | sheets, hero, artwork |
@@ -248,7 +248,10 @@ Center(child: ConstrainedBox(
   both consume it.
 - **Settings** is a primary destination (`settingsDestinationIndex`) and is also
   still reachable from the Home header gear.
-- **Library tabs — 5:** Songs · Downloaded · Albums · Artists · Favorites.
+- **Library tabs — 4 by default:** Songs · Albums · Artists · Favorites.
+  Downloaded, Folders, Genres and Years are opt-in via **Manage tabs** (and
+  deep links can open them directly); the bar stays scrollable so five or more
+  tabs never overflow a phone width.
   Folders · Genres · Years live behind the "Jump to Category" sheet.
 - **Deep links:** album/artist/playlist resolve from `?id=` via
   `EntityByIdLoader<T>` — never require a typed `extra` for a shareable page.

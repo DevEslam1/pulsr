@@ -608,6 +608,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         var depth = 0
         var isRateLimited = false
         var isBotChallenge = false
+        var isAgeRestricted = false
         var isIpBlocked = false
         var isProxyAuth = false
         var isNetwork = false
@@ -652,6 +653,23 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 isRateLimited = true
                 break
             }
+            // Age walls often say "verify your age" / "sign in to confirm your
+            // age". This must run before the bot phrases: the next branch's
+            // broad "sign in to confirm" used to turn +18 content into a
+            // process-wide BOT_CHALLENGE cooldown.
+            if (msg.contains("confirm your age") ||
+                msg.contains("confirm you're 18") ||
+                msg.contains("confirm you are 18") ||
+                msg.contains("age-restricted") ||
+                msg.contains("age restricted") ||
+                msg.contains("age verification") ||
+                msg.contains("inappropriate for some users") ||
+                msg.contains("mature content") ||
+                msg.contains("over 18")
+            ) {
+                isAgeRestricted = true
+                break
+            }
             if (HTTP_407_REGEX.containsMatchIn(msg) || msg.contains("proxy authentication")) {
                 isProxyAuth = true
                 break
@@ -660,7 +678,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 isIpBlocked = true
             }
             if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha") ||
-                msg.contains("bot_block") || msg.contains("botguard") || msg.contains("sign in to confirm") ||
+                msg.contains("bot_block") || msg.contains("botguard") || msg.contains("sign in to confirm you") ||
                 msg.contains("confirm you're") || msg.contains("confirm you’re") || msg.contains("automated queries") ||
                 msg.contains("unusual traffic") || msg.contains("device check") || msg.contains("verify you're human")
             ) {
@@ -681,6 +699,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         if (innertubeSignal != null) return innertubeSignal
         if (isLiveUnsupported) return "LIVE_UNSUPPORTED"
         if (isRateLimited) return "RATE_LIMITED"
+        if (isAgeRestricted) return "AGE_RESTRICTED"
         if (isBotChallenge) return "BOT_CHALLENGE"
         if (isProxyAuth) return "PROXY_AUTH_REQUIRED"
         if (isIpBlocked) return "IP_BLOCKED"

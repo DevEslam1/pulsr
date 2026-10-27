@@ -7016,7 +7016,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get errYtmAgeRestricted =>
-      'Esta pista tiene restricción de edad (+18) y no se puede reproducir aquí.';
+      'Esta pista tiene restricción de edad (+18) en YouTube. Inicia sesión con una cuenta verificada o prueba otra subida.';
 
   @override
   String get errYtmStreamFailed =>
@@ -8784,4 +8784,26 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get canvasEffectsSubtitle => 'Carátula animada en el reproductor';
+
+  @override
+  String get saveImage => 'Guardar imagen';
+
+  @override
+  String get discordAccountDisconnected => 'Cuenta de Discord desconectada';
+
+  @override
+  String get lyricsShareTitle => 'Compartir tarjeta de letras';
+
+  @override
+  String get lyricsShareLimitHint =>
+      'Puedes seleccionar hasta 6 líneas para la tarjeta de historia.';
+
+  @override
+  String lyricsShareSelectionCount(Object count) {
+    return '$count/6 líneas';
+  }
+
+  @override
+  String get lyricsSharePickHint =>
+      'Selecciona de 1 a 6 líneas para crear una tarjeta 9:16.';
 }

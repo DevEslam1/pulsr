@@ -29,7 +29,7 @@ mixin CategoryFilterBarSection
 
     return SizedBox(
       height: AppSpacing.minTouchTarget,
-      child: _ScrollEdgeFade(
+      child: PulsrScrollEdgeFade(
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),

@@ -878,7 +878,7 @@ class YtmErrorClassifier {
       case YtmBlockSignal.ageRestricted:
         return YtmErrorInfo(
           message:
-              'This track is age-restricted (+18) and cannot be played here.',
+              'This track is age-restricted (+18) on YouTube. Sign in with an age-verified account or try another upload.',
           recoveryAction: YtmRecoveryAction.skipToNextTrack,
           signal: signal,
           traceId: traceId,

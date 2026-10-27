@@ -453,7 +453,10 @@ class AudioQualityInfo {
               ? 'MQA (core unfold)'
               : tierLabel,
       shortBadgeLabel: !isLosslessFormat && calculatedBitrate == null
-          ? '$formatLabel • bitrate unknown'
+          // A missing bitrate is not a quality tier. Showing
+          // "MP3 • bitrate unknown" on every Now Playing screen is noise;
+          // the format alone is honest and readable.
+          ? formatLabel
           : isMqa
               ? 'MQA'
               : shortBadgeLabel,

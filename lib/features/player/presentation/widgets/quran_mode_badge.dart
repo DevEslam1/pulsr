@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/quran_mode_badge.dart
 import 'package:flutter/material.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../../core/theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -18,7 +19,7 @@ class QuranModeBadge extends StatelessWidget {
     this.onTap,
   });
 
-  static const Color badgeColor = Color(0xFF10B981); // Emerald Green
+  static const Color badgeColor = AppColors.quranEmerald;
 
   @override
   Widget build(BuildContext context) {

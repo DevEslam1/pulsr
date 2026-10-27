@@ -106,7 +106,7 @@ class HeroMixCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: p.accent.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius: AppRadii.circular(999),
                                 border: Border.all(
                                   color: p.accent.withValues(alpha: 0.26),
                                   width: 0.8,

@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/db/app_database.dart';
@@ -254,7 +255,7 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
           if (_controller != null && _controller!.value.isInitialized)
             AnimatedOpacity(
               opacity: showVideo ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 400),
+              duration: context.motionMs(400),
               curve: Curves.easeInOut,
               child: ClipRect(
                 child: LayoutBuilder(
@@ -328,7 +329,7 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
           if (_controller != null && _controller!.value.isInitialized)
             AnimatedOpacity(
               opacity: showVideo ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 400),
+              duration: context.motionMs(400),
               curve: Curves.easeInOut,
               child: FittedBox(
                 fit: BoxFit.cover,
@@ -385,7 +386,7 @@ class CanvasToggleChip extends StatelessWidget {
         },
         borderRadius: AppRadii.r20All,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 240),
+          duration: context.motionMs(240),
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 8 : 10,
             vertical: compact ? 3 : 5,

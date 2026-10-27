@@ -6928,7 +6928,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errYtmAgeRestricted =>
-      'هذا المقطع مقيّد بالعمر (+18) ولا يمكن تشغيله هنا.';
+      'هذا المقطع مقيّد بالعمر (+18) على يوتيوب. سجّل الدخول بحساب موثّق العمر أو جرّب نسخة أخرى.';
 
   @override
   String get errYtmStreamFailed => 'تعذّر تحميل البث. جارٍ تحديث الرابط…';
@@ -8660,4 +8660,25 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get canvasEffectsSubtitle => 'حركة فنية متحركة في المشغل';
+
+  @override
+  String get saveImage => 'حفظ الصورة';
+
+  @override
+  String get discordAccountDisconnected => 'تم فصل حساب ديسكورد';
+
+  @override
+  String get lyricsShareTitle => 'مشاركة بطاقة الكلمات';
+
+  @override
+  String get lyricsShareLimitHint =>
+      'يمكنك اختيار ما يصل إلى 6 أسطر لبطاقة القصة.';
+
+  @override
+  String lyricsShareSelectionCount(Object count) {
+    return '$count/6 أسطر';
+  }
+
+  @override
+  String get lyricsSharePickHint => 'اختر من 1 إلى 6 أسطر لإنشاء بطاقة 9:16.';
 }

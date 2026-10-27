@@ -33,6 +33,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
   DateTime _chartDate = DateTime.now();
   List<MapEntry<String, int>> _topArtists = [];
   bool _isLoading = true;
+  bool _statsLoadFailed = false;
 
   @override
   void initState() {
@@ -48,11 +49,16 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
 
       // Load top artists from music repository play counts
       List<SongsTableData> allSongs = [];
+      var statsLoadFailed = false;
       try {
         if (getIt.isRegistered<IMusicRepository>()) {
           final repo = getIt<IMusicRepository>();
           final songsRes = await repo.getAllSongs();
-          allSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+          if (songsRes.isLeft()) {
+            statsLoadFailed = true;
+          } else {
+            allSongs = songsRes.getRight().toNullable() ?? const [];
+          }
         }
       } catch (e, st) {
         ErrorLogger.log(
@@ -101,6 +107,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
           _last7DaysScrobbles = days;
           _chartDate = now;
           _topArtists = sortedArtists.take(5).toList();
+          _statsLoadFailed = statsLoadFailed;
           _isLoading = false;
         });
       }
@@ -170,6 +177,37 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                         AppSpacing.s20,
                         PulsrLayoutMetrics.scrollBottom(context)),
                     children: [
+                      if (_statsLoadFailed)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: p.error.withValues(alpha: 0.12),
+                            borderRadius: AppRadii.r12All,
+                            border: Border.all(
+                                color: p.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline_rounded,
+                                  color: p.error, size: 20),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: Text(
+                                  context.l10n.somethingWentWrong,
+                                  style: TextStyle(
+                                    color: p.error,
+                                    fontSize: AppFontSize.bodySmall,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _loadStats,
+                                child: Text(context.l10n.retry),
+                              ),
+                            ],
+                          ),
+                        ),
                       // Overview Card
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.s18),

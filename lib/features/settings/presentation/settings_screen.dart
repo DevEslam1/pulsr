@@ -23,6 +23,7 @@ import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_search_field.dart';
+import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/pulsr_slider.dart';
 import '../../../core/widgets/pulsr_switch.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';

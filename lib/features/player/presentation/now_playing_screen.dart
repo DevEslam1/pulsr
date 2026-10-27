@@ -135,10 +135,24 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           canvasAsBackdrop: c.state.canvasAsBackdrop,
         ));
 
+    // Only the skeuomorphic themes paint the transport position into their
+    // artwork (mechanical counter, platter ring, VU progress). The other five
+    // themes get position from PlayerSeekBar's own selector, so rebuilding the
+    // whole screen every second for them is pure waste.
+    final needsPositionTick = switch (settingsConfig.playerThemeMode) {
+      PlayerThemeMode.circle ||
+      PlayerThemeMode.vinyl ||
+      PlayerThemeMode.cassette ||
+      PlayerThemeMode.cd =>
+        true,
+      _ => false,
+    };
+
     return BlocConsumer<PlayerCubit, PlayerState>(
       buildWhen: (prev, curr) =>
           prev.differsFromBeyondPosition(curr) ||
-          prev.position.inSeconds != curr.position.inSeconds,
+          (needsPositionTick &&
+              prev.position.inSeconds != curr.position.inSeconds),
       listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
       listener: (context, state) {
         final song = state.currentSong;

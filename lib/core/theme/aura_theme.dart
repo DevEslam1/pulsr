@@ -754,6 +754,33 @@ class AuraTheme {
             fontSize: AppFontSize.bodySmall,
             fontWeight: FontWeight.w700),
       ),
+      // Material SegmentedButton is still used by a handful of dense settings
+      // rows. Give it the same surface, radius and type as the canonical
+      // PulsrSegmentedControl so the two never read as different products.
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((states) =>
+              states.contains(WidgetState.selected)
+                  ? p.accent
+                  : p.surfaceContainer),
+          foregroundColor: WidgetStateProperty.resolveWith((states) =>
+              states.contains(WidgetState.selected)
+                  ? p.onAccent
+                  : p.textSecondary),
+          overlayColor:
+              WidgetStatePropertyAll(p.accent.withValues(alpha: 0.08)),
+          side: WidgetStatePropertyAll(BorderSide(color: p.hairline)),
+          shape: const WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: AppRadii.r12All)),
+          textStyle: WidgetStatePropertyAll(TextStyle(
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            fontSize: AppFontSize.bodySmall,
+            fontWeight: FontWeight.w700,
+          )),
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: p.surface,
         modalBackgroundColor: p.surface,

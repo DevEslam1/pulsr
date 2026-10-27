@@ -508,7 +508,7 @@ class _CassetteTapeCounter extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               decoration: BoxDecoration(
                 color: const Color(0xFF14161C),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: AppRadii.circular(2),
               ),
               clipBehavior: Clip.hardEdge,
               alignment: Alignment.center,
@@ -578,8 +578,27 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
-    if (widget.isPlaying) {
-      _vuController.repeat(reverse: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncVu();
+  }
+
+  void _syncVu() {
+    final shouldSpin = widget.isPlaying && context.motionEnabled;
+    if (shouldSpin) {
+      if (!_vuController.isAnimating) {
+        _vuController.repeat(reverse: true);
+      }
+    } else if (_vuController.isAnimating) {
+      _vuController.stop();
+      if (context.motionEnabled) {
+        _vuController.animateTo(0.0, duration: context.motionMs(300));
+      } else {
+        _vuController.value = 0.0;
+      }
     }
   }
 
@@ -587,13 +606,7 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
   void didUpdateWidget(covariant _CassetteStereoVuMeter oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isPlaying != oldWidget.isPlaying) {
-      if (widget.isPlaying) {
-        _vuController.repeat(reverse: true);
-      } else {
-        _vuController.stop();
-        _vuController.animateTo(0.0,
-            duration: const Duration(milliseconds: 300));
-      }
+      _syncVu();
     }
   }
 
@@ -686,7 +699,7 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
           padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.0),
           decoration: BoxDecoration(
             color: Colors.black87,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: AppRadii.circular(2),
             border: Border.all(color: Colors.white12, width: 0.6),
           ),
           child: Row(
@@ -712,7 +725,7 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
                 margin: const EdgeInsets.symmetric(horizontal: 0.5),
                 decoration: BoxDecoration(
                   color: segColor,
-                  borderRadius: BorderRadius.circular(0.8),
+                  borderRadius: AppRadii.circular(0.8),
                   boxShadow: (isLit || isPeak)
                       ? [
                           BoxShadow(

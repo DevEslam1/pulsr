@@ -114,7 +114,7 @@ class _PlayerControlsState extends State<PlayerControls> {
     final p = context.palette;
     final l10n = context.l10n;
     final onPrimaryColor = widget.primaryColor.computeLuminance() > 0.5
-        ? const Color(0xFF101223)
+        ? AppColors.controlInk
         : Colors.white;
 
     final shuffleLabel =
@@ -219,7 +219,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 enabled: widget.hasPrevious,
                 child: TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: 0, end: _prevNudgeX),
-                  duration: const Duration(milliseconds: 180),
+                  duration: context.motionMs(180),
                   curve: Curves.easeOutBack,
                   builder: (context, dx, child) => Transform.translate(
                     offset: Offset(dx, 0),
@@ -240,7 +240,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                                 widget.onPrevious();
                               }
                             : null,
-                        borderRadius: BorderRadius.circular(30),
+                        borderRadius: AppRadii.circular(30),
                         child: Container(
                           width: resolvedSideSize,
                           height: resolvedSideSize,
@@ -412,7 +412,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 enabled: widget.hasNext,
                 child: TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: 0, end: _nextNudgeX),
-                  duration: const Duration(milliseconds: 180),
+                  duration: context.motionMs(180),
                   curve: Curves.easeOutBack,
                   builder: (context, dx, child) => Transform.translate(
                     offset: Offset(dx, 0),
@@ -433,7 +433,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                                 widget.onNext();
                               }
                             : null,
-                        borderRadius: BorderRadius.circular(30),
+                        borderRadius: AppRadii.circular(30),
                         child: Container(
                           width: resolvedSideSize,
                           height: resolvedSideSize,

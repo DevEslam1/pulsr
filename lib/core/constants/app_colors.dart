@@ -154,6 +154,24 @@ abstract class AppColors {
   static const Color specularStrong = Color(0x24FFFFFF);
   static const Color highlightSoft = Color(0x0AFFFFFF);
 
+  // Integration brand accents.
+  static const Color discordBlurple = Color(0xFF5865F2);
+  static const Color quranEmerald = Color(0xFF10B981);
+
+  // Player-control ink used when the active colour is too bright for white.
+  static const Color controlInk = Color(0xFF101223);
+
+  // Lyrics share-card poster palette (exact values preserved so the exported
+  // bitmap looks identical). These are artwork colours, not semantic UI.
+  static const Color posterScrimStrong = Color(0xCC08080C);
+  static const Color posterScrimDeep = Color(0xDD0D0D14);
+  static const Color posterScrimFull = Color(0xF208080C);
+  static const Color posterSurface = Color(0xFF101018);
+  static const Color posterSurfaceAlt = Color(0xFF161524);
+  static const Color posterInk = Color(0xFF09090E);
+  static const Color posterThumb = Color(0xFF222230);
+  static const Color chartNeutral = Color(0x33888888);
+
   static Color scrimAt(double alpha) =>
       const Color(0xFF000000).withValues(alpha: alpha);
 

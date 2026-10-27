@@ -20,7 +20,9 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/song_classification.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/pulsr_artwork_header.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
+import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
@@ -663,17 +665,20 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ],
                 )
               : AppBar(
-                  backgroundColor: p.background,
+                  backgroundColor: Colors.transparent,
                   elevation: 0,
                   scrolledUnderElevation: 0,
-                  titleSpacing: AppSpacing.md,
-                  title: Text(
-                    context.l10n.navLibrary,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.6,
-                    ),
+                  toolbarHeight: 116,
+                  titleSpacing: 0,
+                  flexibleSpace: PulsrArtworkHeader(
+                    height: 116,
+                    title: context.l10n.navLibrary,
+                    subtitle:
+                        '${context.l10n.songsCount(state.songs.length)} · '
+                        '${context.l10n.albumsCount(state.albums.length)}',
+                    albumIds: [
+                      for (final album in state.albums.take(4)) album.id
+                    ],
                   ),
                   actions: [
                     IconButton(
@@ -724,41 +729,48 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     const SizedBox(width: AppSpacing.xs),
                   ],
-                  bottom: TabBar(
-                    key: ValueKey(
-                        "library_tab_bar_${_activeTabs.map((t) => t.name).join('_')}"),
-                    controller: _tabController,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    indicatorSize: TabBarIndicatorSize.label,
-                    indicatorColor: p.accent,
-                    indicatorWeight: 3.0,
-                    indicator: UnderlineTabIndicator(
-                      borderSide: BorderSide(
-                        color: p.accent,
-                        width: 3.0,
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(kTextTabBarHeight),
+                    child: PulsrScrollEdgeFade(
+                      enabled: true,
+                      child: TabBar(
+                        key: ValueKey(
+                            "library_tab_bar_${_activeTabs.map((t) => t.name).join('_')}"),
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                        indicatorSize: TabBarIndicatorSize.label,
+                        indicatorColor: p.accent,
+                        indicatorWeight: 3.0,
+                        indicator: UnderlineTabIndicator(
+                          borderSide: BorderSide(
+                            color: p.accent,
+                            width: 3.0,
+                          ),
+                          borderRadius: AppRadii.circular(1.5),
+                        ),
+                        dividerColor: p.hairline.withValues(alpha: 0.18),
+                        dividerHeight: 1.0,
+                        splashBorderRadius: AppRadii.r6All,
+                        labelColor: p.accent,
+                        unselectedLabelColor: p.textSecondary,
+                        labelStyle: const TextStyle(
+                          fontSize: AppFontSize.bodySmall,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontSize: AppFontSize.bodySmall,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -0.2,
+                        ),
+                        physics: const BouncingScrollPhysics(),
+                        tabs: _activeTabs
+                            .map((tab) => _buildTabItem(context, tab, state, p))
+                            .toList(),
                       ),
-                      borderRadius: BorderRadius.circular(1.5),
                     ),
-                    dividerColor: p.hairline.withValues(alpha: 0.18),
-                    dividerHeight: 1.0,
-                    splashBorderRadius: AppRadii.r6All,
-                    labelColor: p.accent,
-                    unselectedLabelColor: p.textSecondary,
-                    labelStyle: const TextStyle(
-                      fontSize: AppFontSize.callout,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
-                    ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontSize: AppFontSize.callout,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -0.2,
-                    ),
-                    physics: const BouncingScrollPhysics(),
-                    tabs: _activeTabs
-                        .map((tab) => _buildTabItem(context, tab, state, p))
-                        .toList(),
                   ),
                 ),
           body: Center(

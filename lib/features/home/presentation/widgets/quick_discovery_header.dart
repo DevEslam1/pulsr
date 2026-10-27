@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'discovery_chip.dart';
 
@@ -82,24 +83,27 @@ class QuickDiscoveryHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsetsDirectional.only(
-                start: Adaptive.pagePadding(context),
-                end: AppSpacing.sm,
+            child: PulsrScrollEdgeFade(
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsetsDirectional.only(
+                  start: Adaptive.pagePadding(context),
+                  end: AppSpacing.sm,
+                ),
+                itemCount: items.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: AppSpacing.s8),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return DiscoveryChip(
+                    icon: item.icon,
+                    label: item.label,
+                    iconColor: p.accent,
+                    onTap: item.onTap,
+                  );
+                },
               ),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return DiscoveryChip(
-                  icon: item.icon,
-                  label: item.label,
-                  iconColor: p.accent,
-                  onTap: item.onTap,
-                );
-              },
             ),
           ),
           // "More" stays pinned so the overflow tools are always one tap away
@@ -115,6 +119,7 @@ class QuickDiscoveryHeader extends StatelessWidget {
                 label: context.l10n.browseMoreTools,
                 iconColor: p.textSecondary,
                 onTap: onMore,
+                compact: true,
               ),
             ),
           ),

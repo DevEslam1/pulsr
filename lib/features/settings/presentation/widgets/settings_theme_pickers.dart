@@ -636,7 +636,7 @@ class _ThemeMockupCard extends StatelessWidget {
                     height: 38,
                     decoration: BoxDecoration(
                       color: p.textPrimary,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: AppRadii.circular(2),
                     ),
                   ),
                 ),

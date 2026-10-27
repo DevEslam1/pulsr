@@ -8,6 +8,7 @@ import 'package:flutter_lyric/flutter_lyric.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/lrc_parser.dart';
 import '../../../../data/lyrics/lyrics_offset_store.dart';
@@ -688,7 +689,7 @@ class _LyricsViewState extends State<LyricsView> {
       fadeRange: FadeRange(top: 36, bottom: 36),
       selectLineResumeDuration: const Duration(seconds: 2),
       activeLineResumeDuration: const Duration(seconds: 4),
-      scrollDuration: const Duration(milliseconds: 300),
+      scrollDuration: context.motionMs(300),
       enableSwitchAnimation: true,
     );
 

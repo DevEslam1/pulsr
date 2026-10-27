@@ -231,4 +231,39 @@ class DeviceProfileService {
           return false;
         }
       });
+
+  static const String _keyBtLatency = 'setting_bt_latency_by_device';
+
+  /// Per-device Bluetooth latency offset (ms), or null when never calibrated.
+  /// Earbuds differ wildly (80-300 ms), so one global value is always wrong
+  /// for somebody's second pair.
+  Future<int?> btLatencyFor(String deviceKey) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyBtLatency);
+      if (raw == null) return null;
+      final decoded = json.decode(raw) as Map<String, dynamic>;
+      return (decoded[deviceKey] as num?)?.toInt();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read per-device BT latency',
+          error: e, stackTrace: st, category: 'DeviceProfileService');
+      return null;
+    }
+  }
+
+  Future<void> rememberBtLatency(String deviceKey, int offsetMs) =>
+      _prefsMutex.protect(() async {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final raw = prefs.getString(_keyBtLatency);
+          final map = raw == null
+              ? <String, dynamic>{}
+              : Map<String, dynamic>.from(json.decode(raw) as Map);
+          map[deviceKey] = offsetMs;
+          await prefs.setString(_keyBtLatency, json.encode(map));
+        } catch (e, st) {
+          ErrorLogger.log('Failed to save per-device BT latency',
+              error: e, stackTrace: st, category: 'DeviceProfileService');
+        }
+      });
 }

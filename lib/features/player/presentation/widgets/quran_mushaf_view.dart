@@ -6,6 +6,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../../domain/models/quran_metadata.dart';
 import '../../../../domain/models/quran_surah.dart';
@@ -71,7 +72,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
           .clamp(0.0, _scrollController.position.maxScrollExtent);
       _scrollController.animateTo(
         target,
-        duration: const Duration(milliseconds: 300),
+        duration: context.motionMs(300),
         curve: Curves.easeOutCubic,
       );
     });
@@ -303,7 +304,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                     }
                   },
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
+                    duration: context.motionMs(250),
                     curve: Curves.easeOutCubic,
                     padding: const EdgeInsets.all(AppSpacing.s12),
                     decoration: BoxDecoration(

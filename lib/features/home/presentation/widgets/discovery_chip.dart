@@ -12,12 +12,17 @@ class DiscoveryChip extends StatelessWidget {
   final Color iconColor;
   final VoidCallback onTap;
 
+  /// A denser variant for pinned actions (e.g. "More tools") where horizontal
+  /// space is at a premium on phones. The tap target stays 48 dp.
+  final bool compact;
+
   const DiscoveryChip({
     super.key,
     required this.icon,
     required this.label,
     required this.iconColor,
     required this.onTap,
+    this.compact = false,
   });
 
   @override
@@ -33,8 +38,9 @@ class DiscoveryChip extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
         child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+          padding: EdgeInsets.symmetric(
+              horizontal: compact ? AppSpacing.s8 : AppSpacing.s10,
+              vertical: AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
             borderRadius: AppRadii.r14All,
@@ -43,13 +49,13 @@ class DiscoveryChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 15, color: iconColor),
-              const SizedBox(width: AppSpacing.s6),
+              Icon(icon, size: compact ? 14 : 15, color: iconColor),
+              SizedBox(width: compact ? AppSpacing.xxs : AppSpacing.s6),
               Text(
                 label,
                 style: TextStyle(
                   color: p.textPrimary,
-                  fontSize: AppFontSize.label,
+                  fontSize: compact ? AppFontSize.caption : AppFontSize.label,
                   fontWeight: FontWeight.w600,
                 ),
               ),

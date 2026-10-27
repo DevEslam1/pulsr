@@ -185,8 +185,13 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
           _clearLoadingMore();
           return SectionError(onRetry: () => setState(() {}));
         }
+        final result = snapshot.data;
+        if (result != null && result.isLeft()) {
+          _clearLoadingMore();
+          return SectionError(onRetry: () => setState(() {}));
+        }
         final songs =
-            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+            result?.getRight().toNullable() ?? const <SongsTableData>[];
 
         // First frame before drift emits: show a lightweight skeleton instead
         // of flashing the "No music yet / Scan Storage" empty state.

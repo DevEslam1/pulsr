@@ -350,7 +350,7 @@ class _PartySheetState extends State<PartySheet> {
               child: Text(
                 context.l10n.partyOrJoinByCode,
                 style: TextStyle(
-                  fontSize: AppFontSize.tiny,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w700,
                   color: p.textSecondary,
                   letterSpacing: 1.0,

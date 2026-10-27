@@ -525,7 +525,7 @@ class QueueScreen extends StatelessWidget {
                                         horizontal: 4, vertical: 1),
                                     decoration: BoxDecoration(
                                       color: p.accent.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(4),
+                                      borderRadius: AppRadii.circular(4),
                                     ),
                                     child: Text(
                                       'AUTOPLAY',

@@ -562,7 +562,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                             activeColor: p.accent,
                             checkColor: p.onAccent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r6),
+                              borderRadius: AppRadii.circular(AppRadii.r6),
                             ),
                           ),
                           Container(

@@ -4704,7 +4704,7 @@
   "errYtmPlaybackFailed": "Playback failed. Please try again.",
   "errYtmGeneric": "Something went wrong with YouTube Music.",
   "errYtmRegionRestricted": "This track is restricted in your region.",
-  "errYtmAgeRestricted": "This track is age-restricted (+18) and can't be played here.",
+  "errYtmAgeRestricted": "This track is age-restricted (+18) on YouTube. Sign in with an age-verified account or try another upload.",
   "errYtmStreamFailed": "Stream failed to load. Refreshing the link…",
   "errYtmStreamExpired": "Stream link expired. Refreshing…",
   "errYtmUnavailable": "This track is unavailable.",
@@ -6238,5 +6238,11 @@
   "canvasEffectsSubtitle": "Animated artwork motion in the player",
   "@canvasEffectsSubtitle": {
     "description": "Subtitle explaining the Canvas effects toggle"
-  }
+  },
+  "saveImage": "Save Image",
+  "discordAccountDisconnected": "Discord account disconnected",
+  "lyricsShareTitle": "Share Lyrics Card",
+  "lyricsShareLimitHint": "You can select up to 6 lines for the story card.",
+  "lyricsShareSelectionCount": "{count}/6 lines",
+  "lyricsSharePickHint": "Select 1 to 6 lines to create a 9:16 story card."
 }

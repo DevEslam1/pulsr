@@ -1,41 +1,5 @@
 part of '../settings_screen.dart';
 
-/// Fades the trailing edge of horizontally scrolling content so clipped
-/// items read as scrollable instead of broken. LTR fades the right edge,
-/// RTL fades the left edge.
-class _ScrollEdgeFade extends StatelessWidget {
-  const _ScrollEdgeFade({required this.child});
-
-  final Widget child;
-
-  /// Width of the faded strip in logical pixels.
-  static const double extent = 28;
-
-  @override
-  Widget build(BuildContext context) {
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (rect) {
-        final fade = rect.width <= 0
-            ? 1.0
-            : (extent / rect.width).clamp(0.0, 1.0).toDouble();
-        return LinearGradient(
-          begin: isRtl ? Alignment.centerRight : Alignment.centerLeft,
-          end: isRtl ? Alignment.centerLeft : Alignment.centerRight,
-          colors: const [
-            Color(0xFFFFFFFF),
-            Color(0xFFFFFFFF),
-            Color(0x00FFFFFF),
-          ],
-          stops: [0.0, 1.0 - fade, 1.0],
-        ).createShader(rect);
-      },
-      child: child,
-    );
-  }
-}
-
 mixin SettingsSectionPrimitives on State<SettingsScreen> {
   Widget _section(
     BuildContext context,

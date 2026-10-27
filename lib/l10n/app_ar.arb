@@ -4135,7 +4135,7 @@
   "errYtmPlaybackFailed": "فشل التشغيل. حاول مجددًا.",
   "errYtmGeneric": "حدث خطأ في YouTube Music.",
   "errYtmRegionRestricted": "هذا المسار مقيد في منطقتك.",
-"errYtmAgeRestricted": "هذا المقطع مقيّد بالعمر (+18) ولا يمكن تشغيله هنا.",
+"errYtmAgeRestricted": "هذا المقطع مقيّد بالعمر (+18) على يوتيوب. سجّل الدخول بحساب موثّق العمر أو جرّب نسخة أخرى.",
 "errYtmStreamFailed": "تعذّر تحميل البث. جارٍ تحديث الرابط…",
 "errYtmStreamExpired": "انتهت صلاحية رابط البث. جارٍ التحديث…",
   "errYtmUnavailable": "هذا المسار غير متاح.",
@@ -4674,5 +4674,11 @@
   "cachedCopy": "محفوظة محليًا",
   "onlineCacheProgress": "جارٍ حفظ المكتبة… {done}/{total}",
   "canvasEffects": "تأثيرات كانفس",
-  "canvasEffectsSubtitle": "حركة فنية متحركة في المشغل"
+  "canvasEffectsSubtitle": "حركة فنية متحركة في المشغل",
+  "saveImage": "حفظ الصورة",
+  "discordAccountDisconnected": "تم فصل حساب ديسكورد",
+  "lyricsShareTitle": "مشاركة بطاقة الكلمات",
+  "lyricsShareLimitHint": "يمكنك اختيار ما يصل إلى 6 أسطر لبطاقة القصة.",
+  "lyricsShareSelectionCount": "{count}/6 أسطر",
+  "lyricsSharePickHint": "اختر من 1 إلى 6 أسطر لإنشاء بطاقة 9:16."
 }

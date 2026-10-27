@@ -179,6 +179,8 @@ class AudioOutputInfo {
   final int? btBitDepth; // 16 / 24 / 32
   final int?
       btLdacQualityMode; // 0=Best Effort, 1=Mobile, 2=Standard, 3=Maximum (990kbps)
+  /// Nominal (not measured) bitrate of the negotiated codec, null if unknown.
+  final int? btEstimatedBitrateKbps;
   final bool canConfigureBluetooth;
   final bool btCodecConnected; // true when codec status was read successfully
   final bool
@@ -220,6 +222,7 @@ class AudioOutputInfo {
     this.btSampleRateHz,
     this.btBitDepth,
     this.btLdacQualityMode,
+    this.btEstimatedBitrateKbps,
     this.canConfigureBluetooth = false,
     this.btCodecConnected = false,
     this.btA2dpPresent = false,
@@ -287,6 +290,7 @@ class AudioOutputInfo {
       btSampleRateHz: (map['btSampleRateHz'] as num?)?.toInt(),
       btBitDepth: (map['btBitDepth'] as num?)?.toInt(),
       btLdacQualityMode: (map['btLdacQualityMode'] as num?)?.toInt(),
+      btEstimatedBitrateKbps: (map['btEstimatedBitrateKbps'] as num?)?.toInt(),
       canConfigureBluetooth: map['canConfigureBluetooth'] == true,
       btCodecConnected: (map['btCodecConnected'] as bool?) ?? false,
       btA2dpPresent: (map['btA2dpPresent'] as bool?) ?? false,
@@ -348,6 +352,7 @@ class AudioOutputInfo {
       'btSampleRateHz': btSampleRateHz,
       'btBitDepth': btBitDepth,
       'btLdacQualityMode': btLdacQualityMode,
+      'btEstimatedBitrateKbps': btEstimatedBitrateKbps,
       'canConfigureBluetooth': canConfigureBluetooth,
       'btCodecConnected': btCodecConnected,
       'btA2dpPresent': btA2dpPresent,
@@ -388,6 +393,7 @@ class AudioOutputInfo {
     int? btSampleRateHz,
     int? btBitDepth,
     int? btLdacQualityMode,
+    int? btEstimatedBitrateKbps,
     bool? canConfigureBluetooth,
     bool? btCodecConnected,
     bool? btA2dpPresent,
@@ -430,6 +436,8 @@ class AudioOutputInfo {
       btSampleRateHz: btSampleRateHz ?? this.btSampleRateHz,
       btBitDepth: btBitDepth ?? this.btBitDepth,
       btLdacQualityMode: btLdacQualityMode ?? this.btLdacQualityMode,
+      btEstimatedBitrateKbps:
+          btEstimatedBitrateKbps ?? this.btEstimatedBitrateKbps,
       canConfigureBluetooth:
           canConfigureBluetooth ?? this.canConfigureBluetooth,
       btCodecConnected: btCodecConnected ?? this.btCodecConnected,
@@ -477,6 +485,7 @@ class AudioOutputInfo {
           btSampleRateHz == other.btSampleRateHz &&
           btBitDepth == other.btBitDepth &&
           btLdacQualityMode == other.btLdacQualityMode &&
+          btEstimatedBitrateKbps == other.btEstimatedBitrateKbps &&
           canConfigureBluetooth == other.canConfigureBluetooth &&
           btCodecConnected == other.btCodecConnected &&
           btA2dpPresent == other.btA2dpPresent &&
@@ -516,6 +525,7 @@ class AudioOutputInfo {
         btSampleRateHz,
         btBitDepth,
         btLdacQualityMode,
+        btEstimatedBitrateKbps,
         canConfigureBluetooth,
         btCodecConnected,
         btA2dpPresent,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/error_message_resolver.dart';
@@ -11,8 +12,11 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
+import '../../../core/widgets/pulsr_artwork_header.dart';
+import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_chip.dart';
 import '../../../core/widgets/pulsr_progress.dart';
+import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -357,11 +361,14 @@ class _SearchViewState extends State<_SearchView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(pad, 16, pad, 0),
-                  child: Text(
-                    context.l10n.search,
-                    style: Theme.of(context).textTheme.headlineMedium,
+                PulsrArtworkHeader(
+                  height: 96,
+                  title: context.l10n.search,
+                  albumIds: context.select<PlayerCubit, List<int>>(
+                    (c) => [
+                      for (final song in c.state.queueHistory.take(4))
+                        if (song.albumId != null) song.albumId!,
+                    ],
                   ),
                 ),
                 if (showOnline) ...[
@@ -401,7 +408,7 @@ class _SearchViewState extends State<_SearchView> {
 
   Widget _buildSearchField(BuildContext context, PulsrPalette p, int tab) {
     OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadii.circular(16),
           borderSide: BorderSide(color: c, width: w),
         );
 
@@ -495,42 +502,46 @@ class _SearchViewState extends State<_SearchView> {
         final cubit = context.read<SearchCubit>();
         return SizedBox(
           height: AppSpacing.minTouchTarget + (AppSpacing.xs * 2),
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding:
-                EdgeInsets.symmetric(horizontal: pad, vertical: AppSpacing.xs),
-            children: [
-              for (final filter in SearchCubit.filterOptions)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
-                  child: _buildChip(context, state, filter, p),
-                ),
-              if (state.query.trim().isNotEmpty)
-                ValueListenableBuilder<List<String>>(
-                  valueListenable: cubit.savedSearches,
-                  builder: (context, _, __) {
-                    final saved =
-                        cubit.isSaved(state.query, state.selectedFilter);
-                    return PulsrChip(
-                      icon: saved
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_add_outlined,
-                      label: context.l10n.saveSearch,
-                      variant: PulsrChipVariant.action,
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        if (saved) {
-                          cubit.removeSavedSearch(SearchCubit.encodeSavedSearch(
-                              state.query.trim(), state.selectedFilter));
-                        } else {
-                          cubit.saveCurrentSearch();
-                        }
-                      },
-                    );
-                  },
-                ),
-            ],
+          child: PulsrScrollEdgeFade(
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(
+                  horizontal: pad, vertical: AppSpacing.xs),
+              children: [
+                for (final filter in SearchCubit.filterOptions)
+                  Padding(
+                    padding:
+                        const EdgeInsetsDirectional.only(end: AppSpacing.xs),
+                    child: _buildChip(context, state, filter, p),
+                  ),
+                if (state.query.trim().isNotEmpty)
+                  ValueListenableBuilder<List<String>>(
+                    valueListenable: cubit.savedSearches,
+                    builder: (context, _, __) {
+                      final saved =
+                          cubit.isSaved(state.query, state.selectedFilter);
+                      return PulsrChip(
+                        icon: saved
+                            ? Icons.bookmark_rounded
+                            : Icons.bookmark_add_outlined,
+                        label: context.l10n.saveSearch,
+                        variant: PulsrChipVariant.action,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          if (saved) {
+                            cubit.removeSavedSearch(
+                                SearchCubit.encodeSavedSearch(
+                                    state.query.trim(), state.selectedFilter));
+                          } else {
+                            cubit.saveCurrentSearch();
+                          }
+                        },
+                      );
+                    },
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -639,7 +650,7 @@ class _SuggestionsCard extends StatelessWidget {
       color: p.surfaceContainer,
       elevation: 6,
       shadowColor: Colors.black54,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: AppRadii.circular(16),
       clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -800,6 +811,7 @@ class _StartPage extends StatelessWidget {
                 );
               },
             ),
+          if (tab != 2) _buildRecentlyPlayed(context, p),
           _label(
               tab == 2
                   ? context.l10n.popularSearches
@@ -825,6 +837,66 @@ class _StartPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRecentlyPlayed(BuildContext context, PulsrPalette p) {
+    final recent = context.select<PlayerCubit, List<SongsTableData>>(
+      (c) => c.state.queueHistory.take(8).toList(),
+    );
+    if (recent.isEmpty) return const SizedBox.shrink();
+    final player = context.read<PlayerCubit>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _label(context.l10n.recentlyPlayed, p),
+        const SizedBox(height: AppSpacing.xs),
+        SizedBox(
+          height: 106,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: recent.length,
+            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+            itemBuilder: (context, index) {
+              final song = recent[index];
+              return SizedBox(
+                width: 78,
+                child: InkWell(
+                  borderRadius: AppRadii.r12All,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    player.playSong(song, queue: recent);
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CachedArtwork(
+                        id: song.id,
+                        type: ArtworkType.AUDIO,
+                        size: 72,
+                        borderRadius: 14,
+                      ),
+                      const SizedBox(height: AppSpacing.s6),
+                      Text(
+                        song.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+      ],
     );
   }
 
@@ -856,7 +928,7 @@ class _RecentRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: AppRadii.circular(12),
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
@@ -1103,7 +1175,7 @@ class _EntityRail extends StatelessWidget {
         itemBuilder: (context, i) {
           final name = names[i];
           return InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: AppRadii.circular(12),
             onTap: () => onTap(name),
             child: SizedBox(
               width: 76,
@@ -1115,7 +1187,7 @@ class _EntityRail extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.15),
                       shape: round ? BoxShape.circle : BoxShape.rectangle,
-                      borderRadius: round ? null : BorderRadius.circular(16),
+                      borderRadius: round ? null : AppRadii.circular(16),
                       border: Border.all(
                         color: p.accent.withValues(alpha: 0.28),
                         width: 1.0,

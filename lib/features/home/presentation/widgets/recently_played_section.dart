@@ -201,8 +201,13 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
           _clearLoadingMore();
           return SectionError(onRetry: () => setState(() {}));
         }
+        final result = snapshot.data;
+        if (result != null && result.isLeft()) {
+          _clearLoadingMore();
+          return SectionError(onRetry: () => setState(() {}));
+        }
         final songs =
-            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+            result?.getRight().toNullable() ?? const <SongsTableData>[];
 
         // First frame: the drift stream has not emitted yet. Render a skeleton
         // instead of collapsing (which caused a visible empty-library flash).

@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/core/utils/l10n_extensions.dart';
 import 'package:pulsr/core/utils/error_logger.dart';
 import 'package:pulsr/core/widgets/pulsr_bottom_sheet.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -76,9 +78,9 @@ class LyricsShareCardRenderer {
         const Offset(0, 0),
         const Offset(0, cardHeight),
         [
-          const Color(0xCC08080C),
-          const Color(0xDD0D0D14),
-          const Color(0xF208080C),
+          AppColors.posterScrimStrong,
+          AppColors.posterScrimDeep,
+          AppColors.posterScrimFull,
         ],
         [0.0, 0.5, 1.0],
       );
@@ -89,9 +91,9 @@ class LyricsShareCardRenderer {
         const Offset(0, 0),
         const Offset(cardWidth, cardHeight),
         [
-          const Color(0xFF101018),
-          const Color(0xFF161524),
-          const Color(0xFF09090E),
+          AppColors.posterSurface,
+          AppColors.posterSurfaceAlt,
+          AppColors.posterInk,
         ],
         [0.0, 0.5, 1.0],
       );
@@ -282,7 +284,7 @@ class LyricsShareCardRenderer {
       );
       canvas.restore();
     } else {
-      final thumbPaint = Paint()..color = const Color(0xFF222230);
+      final thumbPaint = Paint()..color = AppColors.posterThumb;
       canvas.drawRRect(thumbRect, thumbPaint);
       final iconPainter = TextPainter(
         text: TextSpan(
@@ -419,8 +421,8 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
           _selectedIndices.add(idx);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('You can select up to 6 lines for the story card.'),
+            SnackBar(
+              content: Text(context.l10n.lyricsShareLimitHint),
               duration: Duration(seconds: 2),
             ),
           );
@@ -530,7 +532,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Share Lyrics Card',
+                context.l10n.lyricsShareTitle,
                 style: TextStyle(
                   fontSize: AppFontSize.titleLarge,
                   fontWeight: FontWeight.w800,
@@ -538,7 +540,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
                 ),
               ),
               Text(
-                '${_selectedIndices.length}/6 lines',
+                context.l10n.lyricsShareSelectionCount(_selectedIndices.length),
                 style: TextStyle(
                   fontSize: AppFontSize.label,
                   fontWeight: FontWeight.w700,
@@ -549,7 +551,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Select 1 to 6 lines to create a 9:16 story card.',
+            context.l10n.lyricsSharePickHint,
             style: TextStyle(
               fontSize: AppFontSize.bodySmall,
               color: p.textSecondary,
@@ -603,7 +605,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
                 child: OutlinedButton.icon(
                   onPressed: _isGenerating ? null : _saveImage,
                   icon: const Icon(Icons.download_rounded, size: 20),
-                  label: const Text('Save Image'),
+                  label: Text(context.l10n.saveImage),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: widget.activeColor,
                     padding:
@@ -627,7 +629,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
                           ),
                         )
                       : const Icon(Icons.share_rounded, size: 20),
-                  label: const Text('Share'),
+                  label: Text(context.l10n.share),
                   style: FilledButton.styleFrom(
                     backgroundColor: widget.activeColor,
                     foregroundColor: Colors.black,

@@ -31,7 +31,7 @@ final Completer<void> _initializationReady = Completer<void>();
 Future<void> get initializationReady => _initializationReady.future;
 
 @InjectableInit()
-Future<void> configureDependencies() async {
+Future<void> configureDependencies({bool warmUpAsync = true}) async {
   try {
     getIt.init();
     if (!getIt.isRegistered<DiscordRpcService>()) {
@@ -44,6 +44,12 @@ Future<void> configureDependencies() async {
     }
     if (!getIt.isRegistered<QuranRepository>()) {
       getIt.registerLazySingleton<QuranRepository>(() => QuranRepositoryImpl());
+    }
+    if (!warmUpAsync) {
+      // The root widget is already on screen and its bootstrap gate awaits
+      // ensureAppDependenciesReady(). Skipping the eager 12 s audio-handler
+      // warm-up here is what moves the first frame ahead of the audio graph.
+      return;
     }
     // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
     // StateError (audio handler -> player cubit -> download cubit -> intents).

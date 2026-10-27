@@ -12566,7 +12566,7 @@ abstract class AppLocalizations {
   /// No description provided for @errYtmAgeRestricted.
   ///
   /// In en, this message translates to:
-  /// **'This track is age-restricted (+18) and can\'t be played here.'**
+  /// **'This track is age-restricted (+18) on YouTube. Sign in with an age-verified account or try another upload.'**
   String get errYtmAgeRestricted;
 
   /// No description provided for @errYtmStreamFailed.
@@ -15468,6 +15468,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Animated artwork motion in the player'**
   String get canvasEffectsSubtitle;
+
+  /// No description provided for @saveImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Image'**
+  String get saveImage;
+
+  /// No description provided for @discordAccountDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Discord account disconnected'**
+  String get discordAccountDisconnected;
+
+  /// No description provided for @lyricsShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Lyrics Card'**
+  String get lyricsShareTitle;
+
+  /// No description provided for @lyricsShareLimitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can select up to 6 lines for the story card.'**
+  String get lyricsShareLimitHint;
+
+  /// No description provided for @lyricsShareSelectionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}/6 lines'**
+  String lyricsShareSelectionCount(Object count);
+
+  /// No description provided for @lyricsSharePickHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select 1 to 6 lines to create a 9:16 story card.'**
+  String get lyricsSharePickHint;
 }
 
 class _AppLocalizationsDelegate

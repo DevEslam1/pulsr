@@ -95,6 +95,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         override fun run() {
             if (eventSink == null) return
             val current = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
+            // Codec renegotiation (LDAC<->SBC, rate/depth change) does not alter
+            // the device list, so fold it into the signature to push it promptly.
+            val codecSig = try { bluetoothCodecSignature() } catch (_: Throwable) { "" }
             val deviceSignature = try {
                 audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
                     ?.map { "${it.id}:${it.type}" }
@@ -102,7 +105,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     ?.joinToString(",")
             } catch (_: Throwable) { null } ?: ""
             val direct = if (UsbExclusivePlugin.directStreamingActive) 1 else 0
-            val signature = "${current[0]}:${current[1]}:${current[2]}|$direct|$deviceSignature"
+            val signature = "${current[0]}:${current[1]}:${current[2]}|$direct|$deviceSignature|$codecSig"
             if (signature != lastRouteSignature) {
                 lastRouteSignature = signature
                 notifyDeviceChange()
@@ -543,7 +546,39 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> "aptX HD"
         codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC   -> "LDAC"
         lc3CodecType != -1 && codecType == lc3CodecType -> "LC3"
-        else -> "Unknown ($codecType)"
+        // SOURCE_CODEC_TYPE_OPUS (hidden constant) is 6 on Android 13+.
+        Build.VERSION.SDK_INT >= 33 && codecType == 6 -> "Opus"
+        // Vendor codecs (LHDC, etc.) use OEM-assigned ids with no stable
+        // public constant, so report them honestly instead of guessing.
+        else -> "Vendor codec ($codecType)"
+    }
+
+    /**
+     * Typical negotiated bitrate (kbps) for a codec, or null when it cannot be
+     * derived honestly (variable/vendor). Values are nominal, not measured.
+     */
+    private fun estimatedBitrateKbps(codecType: Int, ldacMode: Int?): Int? = when {
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC -> when (ldacMode) {
+            3 -> 990
+            2 -> 660
+            1 -> 330
+            else -> null
+        }
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> 576
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX -> 352
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC -> 256
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC -> 328
+        else -> null
+    }
+
+    /** Cheap change-detection key for the active codec (empty when no A2DP). */
+    private fun bluetoothCodecSignature(): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !codecControlAvailable) return ""
+        val hasA2dp = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            ?.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP } == true
+        if (!hasA2dp) return ""
+        val info = getBluetoothCodecInfo()
+        return "${info["codecName"]}/${info["sampleRateHz"]}/${info["bitDepth"]}/${info["ldacQualityMode"]}"
     }
 
     /** Maps codec name string to BluetoothCodecConfig codec type int, or -1 when unknown. */
@@ -560,14 +595,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     /** Maps BluetoothCodecConfig sample rate flag to Hz, or 0 when unknown. */
-    private fun codecSampleRateToHz(flag: Int): Int = when (flag) {
+    private fun codecSampleRateToHz(flag: Int): Int? = when (flag) {
         BluetoothCodecConfig.SAMPLE_RATE_44100 -> 44100
         BluetoothCodecConfig.SAMPLE_RATE_48000 -> 48000
         BluetoothCodecConfig.SAMPLE_RATE_88200 -> 88200
         BluetoothCodecConfig.SAMPLE_RATE_96000 -> 96000
         BluetoothCodecConfig.SAMPLE_RATE_176400 -> 176400
         BluetoothCodecConfig.SAMPLE_RATE_192000 -> 192000
-        else -> 0
+        else -> null
     }
 
     /** Maps Hz to BluetoothCodecConfig sample rate flag. */
@@ -582,11 +617,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     /** Maps BluetoothCodecConfig bits-per-sample flag to int bit depth. */
-    private fun codecBitsToDepth(bits: Int): Int = when (bits) {
+    private fun codecBitsToDepth(bits: Int): Int? = when (bits) {
         BluetoothCodecConfig.BITS_PER_SAMPLE_16 -> 16
         BluetoothCodecConfig.BITS_PER_SAMPLE_24 -> 24
         BluetoothCodecConfig.BITS_PER_SAMPLE_32 -> 32
-        else -> 16
+        // Unknown must stay unknown: defaulting to 16 misreports Hi-Res links.
+        else -> null
     }
 
     /** Maps bit depth to BluetoothCodecConfig bits-per-sample flag. */
@@ -746,6 +782,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     else -> null
                 }
             } else null
+            val ldacRaw: Int? = if (current.codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC) {
+                current.codecSpecific1.toLong().toInt() and 0xFF
+            } else null
 
             val sampleRateFlags = listOf(
                 BluetoothCodecConfig.SAMPLE_RATE_44100,
@@ -769,19 +808,22 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 "sampleRateHz" to codecSampleRateToHz(current.sampleRate),
                 "bitDepth" to codecBitsToDepth(current.bitsPerSample),
                 "ldacQualityMode" to ldacMode,
+                // Raw mode byte so the UI can explain values we can't map.
+                "ldacQualityRaw" to ldacRaw,
+                "estimatedBitrateKbps" to estimatedBitrateKbps(current.codecType, ldacMode),
                 "supportedCodecs" to localCaps.map { cap -> codecTypeName(cap.codecType) }.distinct(),
                 "selectableCodecs" to selectableCaps.map { cap -> codecTypeName(cap.codecType) }.distinct(),
                 "selectableSampleRates" to selectableCaps
                     .filter { cap -> cap.codecType == current.codecType }
                     .flatMap { cfg ->
                         sampleRateFlags.filter { flag -> (cfg.sampleRate and flag) != 0 }
-                            .map { flag -> codecSampleRateToHz(flag) }
+                            .mapNotNull { flag -> codecSampleRateToHz(flag) }
                     }.distinct(),
                 "selectableBitDepths" to selectableCaps
                     .filter { cap -> cap.codecType == current.codecType }
                     .flatMap { cfg ->
                         bitDepthFlags.filter { flag -> (cfg.bitsPerSample and flag) != 0 }
-                            .map { flag -> codecBitsToDepth(flag) }
+                            .mapNotNull { flag -> codecBitsToDepth(flag) }
                     }.distinct()
             )
         } catch (e: Exception) {
@@ -1651,6 +1693,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             result["btSampleRateHz"] = btCodec["sampleRateHz"]
             result["btBitDepth"] = btCodec["bitDepth"]
             result["btLdacQualityMode"] = btCodec["ldacQualityMode"]
+            result["btEstimatedBitrateKbps"] = btCodec["estimatedBitrateKbps"]
             result["btCodecConnected"] = btCodec["connected"] as? Boolean ?: false
             result["btA2dpPresent"] = btCodec["a2dpPresent"] as? Boolean ?: true
             result["btReason"] = btCodec["reason"] as? String
@@ -1663,6 +1706,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             result["btSampleRateHz"] = null
             result["btBitDepth"] = null
             result["btLdacQualityMode"] = null
+            result["btEstimatedBitrateKbps"] = null
             result["btCodecConnected"] = false
             result["btA2dpPresent"] = false
             result["btReason"] = if (bleAnyPresent) "le_audio_not_configurable" else "no_device_connected"

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
@@ -268,7 +269,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                         widget.onOpenNowPlaying,
                                                     child: ClipRRect(
                                                       borderRadius:
-                                                          BorderRadius.circular(
+                                                          AppRadii.circular(
                                                               isShortHeight
                                                                   ? AppRadii.r8
                                                                   : AppRadii
@@ -519,7 +520,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                         child:
                                                                             AnimatedContainer(
                                                                           duration:
-                                                                              const Duration(milliseconds: 180),
+                                                                              context.motionMs(180),
                                                                           width: isShortHeight
                                                                               ? 30
                                                                               : 36,
@@ -658,7 +659,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                       child:
                                                                           AnimatedContainer(
                                                                         duration:
-                                                                            const Duration(milliseconds: 180),
+                                                                            context.motionMs(180),
                                                                         width: isShortHeight
                                                                             ? 40
                                                                             : 48,
@@ -701,7 +702,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                           child:
                                                                               AnimatedSwitcher(
                                                                             duration:
-                                                                                const Duration(milliseconds: 160),
+                                                                                context.motionMs(160),
                                                                             transitionBuilder: (child, anim) =>
                                                                                 ScaleTransition(
                                                                               scale: anim,
@@ -711,7 +712,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                                 Icon(
                                                                               state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                                                                               key: ValueKey<bool>(state.isPlaying),
-                                                                              color: activeColor.computeLuminance() > 0.5 ? const Color(0xFF101223) : Colors.white,
+                                                                              color: activeColor.computeLuminance() > 0.5 ? AppColors.controlInk : Colors.white,
                                                                               size: isShortHeight ? 22 : 26,
                                                                             ),
                                                                           ),
@@ -837,7 +838,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                         child:
                                                                             AnimatedContainer(
                                                                           duration:
-                                                                              const Duration(milliseconds: 180),
+                                                                              context.motionMs(180),
                                                                           width: isShortHeight
                                                                               ? 30
                                                                               : 36,

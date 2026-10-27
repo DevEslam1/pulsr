@@ -607,7 +607,7 @@ class _GraphicSpectrumHudState extends State<_GraphicSpectrumHud> {
                           margin: const EdgeInsets.symmetric(vertical: 0.6),
                           decoration: BoxDecoration(
                             color: segColor,
-                            borderRadius: BorderRadius.circular(0.8),
+                            borderRadius: AppRadii.circular(0.8),
                             boxShadow: isPeak
                                 ? [
                                     BoxShadow(

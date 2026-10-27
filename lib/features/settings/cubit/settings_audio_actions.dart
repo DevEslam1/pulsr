@@ -793,7 +793,36 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.bluetoothLatencyOffsetMs, clamped);
+    final device = state.currentOutputDevice;
+    if (device != null && device.isBluetooth) {
+      _lastBtLatencyDeviceKey = DeviceProfileService.deviceKeyFromInfo(device);
+      await _deviceProfileService
+          .rememberBtLatency(_lastBtLatencyDeviceKey!, clamped);
+    }
   }
+
+  String? _lastBtLatencyDeviceKey;
+
+  DeviceProfileService get _deviceProfileService =>
+      getIt.isRegistered<DeviceProfileService>()
+          ? getIt<DeviceProfileService>()
+          : DeviceProfileService();
+
+  /// Restores the latency calibrated for this specific Bluetooth device when
+  /// it becomes the active output. Devices never calibrated keep the current
+  /// (global) value.
+  Future<void> _applyPerDeviceBtLatency(AudioOutputInfo device) async {
+    if (!device.isBluetooth) return;
+    final key = DeviceProfileService.deviceKeyFromInfo(device);
+    if (key == _lastBtLatencyDeviceKey) return;
+    _lastBtLatencyDeviceKey = key;
+    final saved = await _deviceProfileService.btLatencyFor(key);
+    if (saved == null || isClosed) return;
+    final clamped = saved.clamp(0, 500);
+    if (clamped == state.bluetoothLatencyOffsetMs) return;
+    safeEmit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
+  }
+
 
   /// Toggles per-session audio telemetry. The logger reads this flag on every
   /// call, so disabling takes effect immediately with no re-wiring.
