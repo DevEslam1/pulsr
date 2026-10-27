@@ -184,7 +184,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                           button: true,
                           label: '${album.title}, ${album.artist}',
                           child: InkWell(
-                            onTap: () => context.push('/album', extra: album),
+                            onTap: () => context.push('/album?id=${album.id}',
+                                extra: album),
                             borderRadius: AppRadii.r14All,
                             child: Container(
                               decoration: BoxDecoration(

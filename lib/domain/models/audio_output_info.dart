@@ -256,8 +256,7 @@ class AudioOutputInfo {
       bitDepth: (map['bitDepth'] as num?)?.toInt() ?? 0,
       isBitPerfectActive: (map['isBitPerfectActive'] as bool?) ?? false,
       isBitPerfectSupported: (map['isBitPerfectSupported'] as bool?) ?? false,
-      isDirectRouteFallback:
-          (map['isDirectRouteFallback'] as bool?) ?? false,
+      isDirectRouteFallback: (map['isDirectRouteFallback'] as bool?) ?? false,
       supportedSampleRates: rates.isNotEmpty ? rates : const <int>[],
       availableDevices: devices,
       targetSampleRate: (map['targetSampleRate'] as num?)?.toInt() ?? 0,

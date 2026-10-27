@@ -58,6 +58,7 @@ import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
 import 'dsd_decoder_helper.dart';
 import '../../core/services/ytm_url_cache.dart';
+import '../../features/player/cubit/queue_slot_codec.dart';
 import 'collaborators/float_output_controller.dart';
 import 'collaborators/aaudio_output_controller.dart';
 import 'collaborators/playback_volume_controller.dart';
@@ -577,6 +578,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       _adaptiveBufferEngine.releaseForce();
     });
   }
+
   @override
   final StreamController<Duration> _positionSubject =
       StreamController<Duration>.broadcast();
@@ -1169,6 +1171,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     final prefs = _cachedPrefs;
     final bitPerfect = (prefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
         (prefs?.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+    final hardwareVolume =
+        (prefs?.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false) &&
+            (_hiResAudioService?.currentOutputInfo?.isUsbDac ?? false);
     _volumeController?.updateSettings(
       userVolume: _volume,
       replayGainMode: prefs?.getString(PrefsKeys.replayGainMode) ?? 'off',
@@ -1181,6 +1186,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       dvcEnabled: _dvcEnabled,
       isDopActive: AudioQualityInfo.dsdDopActive,
       bitPerfectBypass: bitPerfect,
+      hardwareVolumeActive: hardwareVolume,
     );
   }
 
@@ -1213,7 +1219,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (prefs == null) return _volume;
     final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
         (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
-    if (bitPerfect) return _volume;
+    if (bitPerfect) {
+      final hardwareVolume =
+          (prefs.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false) &&
+              (_hiResAudioService?.currentOutputInfo?.isUsbDac ?? false);
+      return hardwareVolume ? 1.0 : _volume;
+    }
     if (_nativeRgActive && Platform.isAndroid) {
       final perSongDb = _perSongVolumeDbFor(song);
       if (_dvcEnabled) {
@@ -1801,9 +1812,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       // Warm as deep as the live buffer bucket allows (minimal=1, standard=2,
       // generous=3), except on metered connections where the scheduler's
       // data-cost policy caps it at the single next track.
-      windowSizeProvider: () => _preloadScheduler.isMeteredCached
-          ? 1
-          : _preloadCountForCurrentBucket,
+      windowSizeProvider: () =>
+          _preloadScheduler.isMeteredCached ? 1 : _preloadCountForCurrentBucket,
     );
 
     _formatDecoder = FormatAwareDecoder(
@@ -2065,7 +2075,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                           _loadSongPaused(0, initialPosition: Duration.zero));
                     }
                   } else {
-                    unawaited(skipToNext().catchError((Object e, StackTrace st) {
+                    unawaited(
+                        skipToNext().catchError((Object e, StackTrace st) {
                       ErrorLogger.log('Auto-advance skipToNext failed',
                           error: e, stackTrace: st, category: 'AudioHandler');
                     }));

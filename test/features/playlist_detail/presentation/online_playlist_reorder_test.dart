@@ -143,8 +143,9 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    verify(() => useCases.renameOnlinePlaylist(
-        'PL1', 'My New Holy Quran Playlist')).called(1);
+    verify(() =>
+            useCases.renameOnlinePlaylist('PL1', 'My New Holy Quran Playlist'))
+        .called(1);
     expect(find.text('My New Holy Quran Playlist'), findsWidgets);
   });
 

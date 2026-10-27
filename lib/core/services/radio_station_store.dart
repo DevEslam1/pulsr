@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/radio_station.dart';
 import '../utils/error_logger.dart';
@@ -232,7 +233,8 @@ class RadioStationStore {
   }
 
   /// Partitions and sorts stations so that Quran stations are ALWAYS displayed first.
-  static List<RadioStation> sortWithQuranFirst(Iterable<RadioStation> stations) {
+  static List<RadioStation> sortWithQuranFirst(
+      Iterable<RadioStation> stations) {
     final quran = <RadioStation>[];
     final others = <RadioStation>[];
     for (final s in stations) {
@@ -263,6 +265,16 @@ class RadioStationStore {
   }
 
   static final List<RadioStation> _stations = [];
+
+  /// Single-writer guard for the process-static station list.
+  ///
+  /// Every mutation is a read-modify-write over [_stations] followed by a
+  /// persist pass. Without serialisation two concurrent adds could each compute
+  /// their list from the same snapshot and the later persist would drop the
+  /// earlier station. The constructor's initial [load] takes the same lock, so
+  /// a mutation queued before the disk read finishes can never be erased by it.
+  final Mutex _writeMutex = Mutex();
+
   late final Future<void> ready;
   bool _loadFailed = false;
   bool get loadFailed => _loadFailed;
@@ -277,30 +289,35 @@ class RadioStationStore {
   }
 
   /// Stations in display order: Quran stations ALWAYS first, then other stations.
-  List<RadioStation> get list => List.unmodifiable(sortWithQuranFirst(_stations));
+  List<RadioStation> get list =>
+      List.unmodifiable(sortWithQuranFirst(_stations));
 
   Future<void> add(RadioStation station) async {
     if (!RadioStation.isHttpUrl(station.url)) return;
-    final effectiveStation =
-        (station.artworkUrl == null || station.artworkUrl!.isEmpty)
-            ? station.copyWith(
-                artworkUrl: resolveArtworkForStation(
-                  id: station.id,
-                  name: station.name,
-                  url: station.url,
-                ),
-              )
-            : station;
-    _stations.removeWhere(
-        (s) => s.id == effectiveStation.id || s.url == effectiveStation.url);
-    _stations.insert(0, effectiveStation);
-    final sorted = sortWithQuranFirst(_stations);
-    _stations.clear();
-    _stations.addAll(sorted);
-    if (_stations.length > maxEntries) {
-      _stations.removeRange(maxEntries, _stations.length);
-    }
-    await persist();
+    await ready;
+    await _writeMutex.protect(() async {
+      final effectiveStation =
+          (station.artworkUrl == null || station.artworkUrl!.isEmpty)
+              ? station.copyWith(
+                  artworkUrl: resolveArtworkForStation(
+                    id: station.id,
+                    name: station.name,
+                    url: station.url,
+                  ),
+                )
+              : station;
+      _stations.removeWhere(
+          (s) => s.id == effectiveStation.id || s.url == effectiveStation.url);
+      _stations.insert(0, effectiveStation);
+      final sorted = sortWithQuranFirst(_stations);
+      _stations
+        ..clear()
+        ..addAll(sorted);
+      if (_stations.length > maxEntries) {
+        _stations.removeRange(maxEntries, _stations.length);
+      }
+      await _persistLocked();
+    });
   }
 
   /// True when a station other than [exceptId] already uses [url]. Callers use
@@ -315,75 +332,94 @@ class RadioStationStore {
   /// Returns false (touching nothing) when [updated] is not a valid URL.
   Future<bool> replace(RadioStation previous, RadioStation updated) async {
     if (!RadioStation.isHttpUrl(updated.url)) return false;
-    final effectiveUpdated =
-        (updated.artworkUrl == null || updated.artworkUrl!.isEmpty)
-            ? updated.copyWith(
-                artworkUrl: resolveArtworkForStation(
-                  id: updated.id,
-                  name: updated.name,
-                  url: updated.url,
-                ),
-              )
-            : updated;
-    _stations.removeWhere((s) => s.id == previous.id);
-    _stations.removeWhere((s) =>
-        s.id == effectiveUpdated.id || s.url == effectiveUpdated.url);
-    _stations.insert(0, effectiveUpdated);
-    final sorted = sortWithQuranFirst(_stations);
-    _stations.clear();
-    _stations.addAll(sorted);
-    if (_stations.length > maxEntries) {
-      _stations.removeRange(maxEntries, _stations.length);
-    }
-    await persist();
-    return true;
+    await ready;
+    return _writeMutex.protect(() async {
+      final effectiveUpdated =
+          (updated.artworkUrl == null || updated.artworkUrl!.isEmpty)
+              ? updated.copyWith(
+                  artworkUrl: resolveArtworkForStation(
+                    id: updated.id,
+                    name: updated.name,
+                    url: updated.url,
+                  ),
+                )
+              : updated;
+      _stations.removeWhere((s) => s.id == previous.id);
+      _stations.removeWhere(
+          (s) => s.id == effectiveUpdated.id || s.url == effectiveUpdated.url);
+      _stations.insert(0, effectiveUpdated);
+      final sorted = sortWithQuranFirst(_stations);
+      _stations
+        ..clear()
+        ..addAll(sorted);
+      if (_stations.length > maxEntries) {
+        _stations.removeRange(maxEntries, _stations.length);
+      }
+      await _persistLocked();
+      return true;
+    });
   }
 
   /// Adds many stations with a single persist pass. Returns the number of
   /// accepted (valid `http(s)`) stations.
   Future<int> addAll(Iterable<RadioStation> stations) async {
-    var accepted = 0;
-    for (final station in stations) {
-      if (!RadioStation.isHttpUrl(station.url)) continue;
-      final effectiveStation =
-          (station.artworkUrl == null || station.artworkUrl!.isEmpty)
-              ? station.copyWith(
-                  artworkUrl: resolveArtworkForStation(
-                    id: station.id,
-                    name: station.name,
-                    url: station.url,
-                  ),
-                )
-              : station;
-      _stations.removeWhere(
-          (s) => s.id == effectiveStation.id || s.url == effectiveStation.url);
-      _stations.insert(0, effectiveStation);
-      accepted++;
-    }
-    final sorted = sortWithQuranFirst(_stations);
-    _stations.clear();
-    _stations.addAll(sorted);
-    if (_stations.length > maxEntries) {
-      _stations.removeRange(maxEntries, _stations.length);
-    }
-    if (accepted > 0) await persist();
-    return accepted;
+    final valid = stations
+        .where((station) => RadioStation.isHttpUrl(station.url))
+        .toList(growable: false);
+    if (valid.isEmpty) return 0;
+    await ready;
+    return _writeMutex.protect(() async {
+      var accepted = 0;
+      for (final station in valid) {
+        final effectiveStation =
+            (station.artworkUrl == null || station.artworkUrl!.isEmpty)
+                ? station.copyWith(
+                    artworkUrl: resolveArtworkForStation(
+                      id: station.id,
+                      name: station.name,
+                      url: station.url,
+                    ),
+                  )
+                : station;
+        _stations.removeWhere((s) =>
+            s.id == effectiveStation.id || s.url == effectiveStation.url);
+        _stations.insert(0, effectiveStation);
+        accepted++;
+      }
+      final sorted = sortWithQuranFirst(_stations);
+      _stations
+        ..clear()
+        ..addAll(sorted);
+      if (_stations.length > maxEntries) {
+        _stations.removeRange(maxEntries, _stations.length);
+      }
+      if (accepted > 0) await _persistLocked();
+      return accepted;
+    });
   }
 
   Future<void> remove(String id) async {
-    final before = _stations.length;
-    _stations.removeWhere((s) => s.id == id);
-    if (_stations.length != before) await persist();
+    await ready;
+    await _writeMutex.protect(() async {
+      final before = _stations.length;
+      _stations.removeWhere((s) => s.id == id);
+      if (_stations.length != before) await _persistLocked();
+    });
   }
 
   Future<void> markPlayed(String id, int timestampMs) async {
-    final index = _stations.indexWhere((s) => s.id == id);
-    if (index == -1) return;
-    _stations[index] = _stations[index].copyWith(lastPlayed: timestampMs);
-    await persist();
+    await ready;
+    await _writeMutex.protect(() async {
+      final index = _stations.indexWhere((s) => s.id == id);
+      if (index == -1) return;
+      _stations[index] = _stations[index].copyWith(lastPlayed: timestampMs);
+      await _persistLocked();
+    });
   }
 
-  Future<void> load() async {
+  Future<void> load() => _writeMutex.protect(_loadFromDisk);
+
+  Future<void> _loadFromDisk() async {
     _loadFailed = false;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -430,7 +466,7 @@ class RadioStationStore {
       _stations.addAll(sorted);
 
       if (migrated) {
-        await persist();
+        await _persistLocked();
       }
     } catch (e, st) {
       _loadFailed = true;
@@ -470,6 +506,11 @@ class RadioStationStore {
   }
 
   Future<void> persist() async {
+    await ready;
+    await _writeMutex.protect(_persistLocked);
+  }
+
+  Future<void> _persistLocked() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
@@ -587,31 +628,35 @@ class RadioStationStore {
 
   /// Adds curated stations missing from the user list. Returns added count.
   Future<int> importCurated() async {
-    for (var i = 0; i < _stations.length; i++) {
-      final migrated = _migrateLegacyStation(_stations[i]);
-      if (migrated != null) {
-        _stations[i] = migrated;
+    await ready;
+    return _writeMutex.protect(() async {
+      for (var i = 0; i < _stations.length; i++) {
+        final migrated = _migrateLegacyStation(_stations[i]);
+        if (migrated != null) {
+          _stations[i] = migrated;
+        }
       }
-    }
-    final existingUrls = _stations.map((s) => s.url).toSet();
-    final existingIds = _stations.map((s) => s.id).toSet();
-    var added = 0;
-    for (final s in curatedDirectory()) {
-      // Respect the same cap as add()/load so importing onto a near-full
-      // user list can't push the store past maxEntries.
-      if (_stations.length >= maxEntries) break;
-      if (!existingUrls.contains(s.url) && !existingIds.contains(s.id)) {
-        _stations.add(s);
-        existingUrls.add(s.url);
-        existingIds.add(s.id);
-        added++;
+      final existingUrls = _stations.map((s) => s.url).toSet();
+      final existingIds = _stations.map((s) => s.id).toSet();
+      var added = 0;
+      for (final s in curatedDirectory()) {
+        // Respect the same cap as add()/load so importing onto a near-full
+        // user list can't push the store past maxEntries.
+        if (_stations.length >= maxEntries) break;
+        if (!existingUrls.contains(s.url) && !existingIds.contains(s.id)) {
+          _stations.add(s);
+          existingUrls.add(s.url);
+          existingIds.add(s.id);
+          added++;
+        }
       }
-    }
-    final sorted = sortWithQuranFirst(_stations);
-    _stations.clear();
-    _stations.addAll(sorted);
-    if (added > 0) await persist();
-    return added;
+      final sorted = sortWithQuranFirst(_stations);
+      _stations
+        ..clear()
+        ..addAll(sorted);
+      if (added > 0) await _persistLocked();
+      return added;
+    });
   }
 
   /// Extracts the absolute `http(s)://` stream URLs from `.m3u` / `.m3u8`  /// playlist content, mirroring the line parser used for local playlists:

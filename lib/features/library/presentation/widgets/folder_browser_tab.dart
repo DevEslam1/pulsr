@@ -210,7 +210,9 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                         ),
                       ),
                       child: ListTile(
-                        onTap: () => context.push('/folder', extra: folder),
+                        onTap: () => context.push(
+                            '/folder?path=${Uri.encodeComponent(folder.path)}&name=${Uri.encodeComponent(folder.name)}',
+                            extra: folder),
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadii.r16All,
                         ),

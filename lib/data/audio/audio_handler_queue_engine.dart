@@ -44,54 +44,100 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
       final queueItems =
           queueRes.fold((l) => <QueueItemsTableData>[], (r) => r);
-      if (queueItems.isEmpty) return;
-
-      // Batch query songs instead of N+1 synchronous disk checks (Issue #18)
-      final songIds = queueItems.map((q) => q.songId).toList();
-      final songsRes = await _repository.getSongsByIds(songIds);
-      if (isStale()) return;
-
-      final songsMap = {
-        for (final s in songsRes.fold((l) => <SongsTableData>[], (r) => r))
-          s.id: s
-      };
 
       final List<SongsTableData> songs = [];
       int targetIndex = 0;
       int savedPositionMs = 0;
 
-      for (int i = 0; i < queueItems.length; i++) {
-        final item = queueItems[i];
-        final song = songsMap[item.songId];
-        if (song != null) {
-          songs.add(song);
-          if (item.isCurrent) {
-            targetIndex = songs.length - 1;
-            // Fall back to the per-song position when the queue row carries
-            // none (e.g. saved before the position refresh existed), so a cold
-            // resume does not silently restart the track from 0.
-            savedPositionMs =
-                item.positionMs > 0 ? item.positionMs : song.lastPositionMs;
-            try {
-              final crashSnapshot = await PositionCrashGuard.readSnapshot();
-              if (crashSnapshot != null &&
-                  crashSnapshot.songId == item.songId) {
-                final preferCrash =
-                    await PositionCrashGuard.shouldPreferCrashGuard(
-                        savedPositionMs);
-                if (preferCrash || crashSnapshot.positionMs > savedPositionMs) {
-                  savedPositionMs = crashSnapshot.positionMs;
+      if (queueItems.isNotEmpty) {
+        // Batch query songs instead of N+1 synchronous disk checks (Issue #18)
+        final songIds = queueItems.map((q) => q.songId).toList();
+        final songsRes = await _repository.getSongsByIds(songIds);
+        if (isStale()) return;
+
+        final songsMap = {
+          for (final s in songsRes.fold((l) => <SongsTableData>[], (r) => r))
+            s.id: s
+        };
+
+        for (int i = 0; i < queueItems.length; i++) {
+          final item = queueItems[i];
+          final song = songsMap[item.songId];
+          if (song != null) {
+            songs.add(song);
+            if (item.isCurrent) {
+              targetIndex = songs.length - 1;
+              // Fall back to the per-song position when the queue row carries
+              // none (e.g. saved before the position refresh existed), so a cold
+              // resume does not silently restart the track from 0.
+              savedPositionMs =
+                  item.positionMs > 0 ? item.positionMs : song.lastPositionMs;
+              try {
+                final crashSnapshot = await PositionCrashGuard.readSnapshot();
+                if (crashSnapshot != null &&
+                    crashSnapshot.songId == item.songId) {
+                  final preferCrash =
+                      await PositionCrashGuard.shouldPreferCrashGuard(
+                          savedPositionMs);
+                  if (preferCrash ||
+                      crashSnapshot.positionMs > savedPositionMs) {
+                    savedPositionMs = crashSnapshot.positionMs;
+                  }
+                } else {
+                  final recovery = await _readCrashPositionRecovery();
+                  if (recovery != null && recovery['songId'] == item.songId) {
+                    final recPos =
+                        (recovery['positionMs'] as num?)?.toInt() ?? 0;
+                    if (recPos > savedPositionMs) {
+                      savedPositionMs = recPos;
+                    }
+                  }
                 }
-              } else {
-                final recovery = await _readCrashPositionRecovery();
-                if (recovery != null && recovery['songId'] == item.songId) {
-                  final recPos = (recovery['positionMs'] as num?)?.toInt() ?? 0;
-                  if (recPos > savedPositionMs) {
-                    savedPositionMs = recPos;
+              } catch (_) {}
+            }
+          }
+        }
+      }
+
+      // If SQLite queue was empty (e.g. online-only tracks or fresh boot),
+      // fallback to persisted active queue slot from SharedPreferences.
+      if (songs.isEmpty) {
+        final rawSlots = prefs.getString(PrefsKeys.queueSlots);
+        if (rawSlots != null && rawSlots.isNotEmpty) {
+          try {
+            final data = QueueSlotCodec.decodeDocument(jsonDecode(rawSlots));
+            if (data != null) {
+              final activeSlot =
+                  QueueSlotCodec.activeSlotFrom(data['activeSlot']) ?? 0;
+              final rawSlot = data['$activeSlot'];
+              if (rawSlot is Map) {
+                final decoded = QueueSlotCodec.decodeSlot(
+                    Map<String, dynamic>.from(rawSlot), 500);
+                if (decoded != null && decoded.songIds.isNotEmpty) {
+                  final dbSongsRes =
+                      await _repository.getSongsByIds(decoded.songIds);
+                  final dbMap = {
+                    for (final s
+                        in dbSongsRes.fold((l) => <SongsTableData>[], (r) => r))
+                      s.id: s
+                  };
+                  final slotSongs = QueueSlotCodec.mergeInPersistedOrder(
+                      decoded.songIds, dbMap, decoded.onlineSongsById);
+                  if (slotSongs.isNotEmpty) {
+                    songs.addAll(slotSongs);
+                    targetIndex =
+                        decoded.currentIndex.clamp(0, songs.length - 1);
+                    savedPositionMs = decoded.positionMs;
                   }
                 }
               }
-            } catch (_) {}
+            }
+          } catch (e, st) {
+            ErrorLogger.log(
+                'Failed to fallback to queue slots in restoreLastPlaybackSession',
+                error: e,
+                stackTrace: st,
+                category: 'AudioHandler');
           }
         }
       }
@@ -127,7 +173,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             );
           }
         }
-        if (_playGeneration != restoreGen) return;
+        if (_songs.isEmpty || _activePlayer.playing) return;
         _broadcastState(_activePlayer.playbackEvent);
         _positionSubject.add(pos);
       }
@@ -1141,10 +1187,17 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           try {
             return await _resolveAudioSource(queuedSong, tag);
           } catch (e, st) {
-            // Online rows keep the original behaviour (the error classifier
-            // below handles them). A broken local decoder path degrades to a
-            // plain source so only that track can fail, not the whole queue.
-            if (queuedSong.source == SongSource.youtube) rethrow;
+            // Online rows keep the original behaviour when preloading (the error
+            // classifier handles them). On cold-start session restore (!preload),
+            // degrade to a plain source so an offline device or expired stream URL
+            // does not abort restoring the user's queue.
+            if (queuedSong.source == SongSource.youtube) {
+              if (preload) rethrow;
+              ErrorLogger.log(
+                  'Gapless child online resolve failed for "${queuedSong.title}" during cold restore; using plain source',
+                  category: 'AudioHandler');
+              return _createAudioSource(queuedSong, tag);
+            }
             ErrorLogger.log(
                 'Gapless child resolve failed for "${queuedSong.title}"; '
                 'using plain source',
@@ -1189,6 +1242,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         // Restored queue, not playing yet: park the correct level so a later
         // play() doesn't inherit a faded-out 0 from a previous switch.
         await _activePlayer.setVolume(targetVolume);
+        if (_playGeneration != generation) return;
+        _broadcastState(_activePlayer.playbackEvent);
+        if (initialPosition != null) {
+          _positionSubject.add(initialPosition);
+        }
       } else {
         await _activePlayer.setVolume(targetVolume);
         // FIX-#2b: Re-check generation after the async setVolume — same race
@@ -1261,12 +1319,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         return;
       }
       final info = YtmErrorClassifier.classify(e);
-      final String errorMessage;
-      if (e is PlayerException && e.message != null && e.message!.isNotEmpty) {
-        errorMessage = e.message!;
-      } else {
-        errorMessage = info.message;
-      }
+      final errorMessage = YtmErrorClassifier.displayMessage(e);
       _errorSubject.add(errorMessage);
       ErrorLogger.log('Error loading gapless queue for ${song.title}',
           error: e, stackTrace: st, category: 'AudioHandler');
@@ -1548,12 +1601,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         return;
       }
       final info = YtmErrorClassifier.classify(e);
-      final String errorMessage;
-      if (e is PlayerException && e.message != null && e.message!.isNotEmpty) {
-        errorMessage = e.message!;
-      } else {
-        errorMessage = info.message;
-      }
+      final errorMessage = YtmErrorClassifier.displayMessage(e);
       _errorSubject.add(errorMessage);
       ErrorLogger.log('Error playing song ${song.title} (${song.path})',
           error: e, stackTrace: st, category: 'AudioHandler');

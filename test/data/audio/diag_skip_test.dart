@@ -1,4 +1,4 @@
-﻿// TEMP diagnostic: press Next while the player is still preparing a source.
+// TEMP diagnostic: press Next while the player is still preparing a source.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
@@ -76,6 +76,7 @@ void main() {
 
     expect(handler!.mediaItem.value?.title, 'Track 2');
     expect(platform.players.values.any((p) => p.playing), isTrue,
-        reason: 'Next during preparation must start the successor, not park it');
+        reason:
+            'Next during preparation must start the successor, not park it');
   }, timeout: const Timeout(Duration(seconds: 40)));
 }

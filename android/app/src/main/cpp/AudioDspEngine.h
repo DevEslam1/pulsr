@@ -13,6 +13,7 @@
 #include "StereoWidth.h"
 #include "LoudnessContour.h"
 #include "SubCrossover.h"
+#include "ChannelManager.h"
 #include "DynamicEQ.h"
 #include "MultibandCompressor.h"
 #include "DynamicBass.h"
@@ -50,6 +51,7 @@ enum DspStageMask {
     STAGE_ARBITRARY_EQ = 1 << 15,
     STAGE_LIVE_PROG = 1 << 16,
     STAGE_HEADPHONE_SAFETY = 1 << 17,
+    STAGE_CHANNEL_MANAGER = 1 << 18,
 };
 
 enum class DspPerformanceProfile {
@@ -138,6 +140,7 @@ public:
     StereoWidth& stereoWidth() { return stereoWidth_; }
     LoudnessContour& loudnessContour() { return loudnessContour_; }
     SubCrossover& subCrossover() { return subCrossover_; }
+  ChannelManager& channelManager() { return channelManager_; }
     DynamicEQ& dynamicEq() { return dynamicEq_; }
     MultibandCompressor& multibandCompressor() { return multibandCompressor_; }
     DynamicBass& dynamicBass() { return dynamicBass_; }
@@ -347,6 +350,7 @@ private:
     StereoWidth stereoWidth_;
     LoudnessContour loudnessContour_;
     SubCrossover subCrossover_;
+  ChannelManager channelManager_;
     DynamicEQ dynamicEq_;
     MultibandCompressor multibandCompressor_;
     DynamicBass dynamicBass_;

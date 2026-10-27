@@ -204,9 +204,11 @@ void main() {
       expect(info.tier, AudioQualityTier.highQuality);
     });
 
-    test('a live radio station is classified as RADIO with clean badge label', () {
+    test('a live radio station is classified as RADIO with clean badge label',
+        () {
       final info = AudioQualityInfo.fromSong(_song(
-        path: 'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
+        path:
+            'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
         source: SongSource.radio,
       ));
       expect(info.format, 'RADIO');
@@ -217,7 +219,9 @@ void main() {
       expect(info.bitDepth, 'Live');
     });
 
-    test('an http radio stream path without SongSource.radio is also detected as radio', () {
+    test(
+        'an http radio stream path without SongSource.radio is also detected as radio',
+        () {
       final info = AudioQualityInfo.fromSong(_song(
         path: 'https://stream.radiojar.com/radio.mp3',
       ));

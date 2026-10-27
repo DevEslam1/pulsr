@@ -36,8 +36,8 @@ void main() {
   group('ensureSongPersisted', () {
     test('persists an in-memory YouTube track without favoriting it', () async {
       final song = track.toSongData();
-      final id = (await repo.ensureSongPersisted(song))
-          .getOrElse((failure) => -999);
+      final id =
+          (await repo.ensureSongPersisted(song)).getOrElse((failure) => -999);
       expect(id, song.id);
 
       final row = await (db.select(db.songsTable)
@@ -52,10 +52,10 @@ void main() {
 
     test('is idempotent for repeated adds of the same track', () async {
       final song = track.toSongData();
-      final first = (await repo.ensureSongPersisted(song))
-          .getOrElse((failure) => -999);
-      final second = (await repo.ensureSongPersisted(song))
-          .getOrElse((failure) => -999);
+      final first =
+          (await repo.ensureSongPersisted(song)).getOrElse((failure) => -999);
+      final second =
+          (await repo.ensureSongPersisted(song)).getOrElse((failure) => -999);
       expect(second, first);
 
       final rows = await (db.select(db.songsTable)
@@ -100,8 +100,8 @@ void main() {
         lastPositionMs: 0,
         source: SongSource.local,
       );
-      final id = (await repo.ensureSongPersisted(stale))
-          .getOrElse((failure) => -999);
+      final id =
+          (await repo.ensureSongPersisted(stale)).getOrElse((failure) => -999);
       expect(id, 500);
     });
 

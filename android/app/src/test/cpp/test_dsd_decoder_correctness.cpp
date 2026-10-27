@@ -94,6 +94,29 @@ int main() {
         std::cout << "  ✓ 5Hz DC Blocker verified (residual DC = " << avgDc << ")." << std::endl;
     }
 
+    // 4. DSD512 Native Decode (22.5792 MHz -> 768 kHz PCM)
+    {
+        decoder.configure(DsdDecoder::DsdRate::DSD512, 768000,
+                          DsdDecoder::DsdBitOrder::LSB_FIRST);
+        assert(std::abs(decoder.getDecimationRatio() -
+                        (22579200.0 / 768000.0)) < 1e-4);
+
+        const int numDsdBytes = 141120; // 0.05 s at DSD512
+        std::vector<uint8_t> dsdL(numDsdBytes, 0x69);
+        std::vector<uint8_t> dsdR(numDsdBytes, 0x69);
+        const int maxFrames = decoder.getExpectedPcmFrames(numDsdBytes);
+        std::vector<float> pcmOut(maxFrames * 2);
+
+        const int frames = decoder.decodeDsdBytes(
+            dsdL.data(), dsdR.data(), numDsdBytes, pcmOut.data(), maxFrames);
+        assert(frames > 0);
+        for (int i = 0; i < frames * 2; ++i) {
+            assert(!std::isnan(pcmOut[i]) && !std::isinf(pcmOut[i]));
+        }
+        std::cout << "  ✓ DSD512 -> 768kHz decode verified (" << frames
+                  << " PCM frames)." << std::endl;
+    }
+
     std::cout << "[PASS] DSD Decoder tests successfully passed!" << std::endl;
     return 0;
 }

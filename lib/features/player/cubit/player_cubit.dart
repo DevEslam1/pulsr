@@ -90,6 +90,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   int _lastScrobbledPlayGen = -1;
   final AsyncGuard _mediaItemGuard = AsyncGuard();
   final AsyncGuard _queueSyncGuard = AsyncGuard();
+
+  /// True once the engine has emitted a non-empty queue. Before that an empty
+  /// queue is a cold-start artefact; afterwards it is an intentional clear and
+  /// must be honoured.
+  bool _hasSeenNonEmptyHandlerQueue = false;
   // BUG-2 FIX: replaced the boolean _isSponsorBlockSeeking with a generation
   // counter. The old boolean was reset prematurely because whenComplete() fired
   // on the Future.value() that PlayerSeekThrottle returns for throttled seeks,
@@ -537,6 +542,18 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         if (_audioHandler.playbackState.valueOrNull?.processingState ==
                 AudioProcessingState.idle ||
             _audioHandler.queue.valueOrNull?.isEmpty == true) {
+          // Cold-start race guard: if the cubit already has a restored queue/currentSong
+          // while the audio handler is still idle/uninitialised, do not wipe the restored track.
+          final handlerQueue = _audioHandler.queue.valueOrNull;
+          final isIdle =
+              _audioHandler.playbackState.valueOrNull?.processingState ==
+                  AudioProcessingState.idle;
+          if (isIdle &&
+              !_hasSeenNonEmptyHandlerQueue &&
+              (handlerQueue == null || handlerQueue.isEmpty) &&
+              state.queue.isNotEmpty) {
+            return;
+          }
           if (state.currentSong != null) {
             safeEmit(state.copyWith(
               playback: state.playback.copyWith(
@@ -655,7 +672,18 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     });
 
     autoSub(_audioHandler.queue, (mediaItems) async {
+      if (mediaItems.isNotEmpty) {
+        _hasSeenNonEmptyHandlerQueue = true;
+      }
       if (mediaItems.isEmpty) {
+        final isIdle =
+            _audioHandler.playbackState.valueOrNull?.processingState ==
+                AudioProcessingState.idle;
+        if (isIdle && !_hasSeenNonEmptyHandlerQueue && state.queue.isNotEmpty) {
+          // Cold-start race guard: audioHandler.queue starts at [] before session restoration
+          // or slot loading completes. Do not wipe a valid restored queue.
+          return;
+        }
         if (state.queue.isNotEmpty || state.currentSong != null) {
           safeEmit(state.copyWith(
             playback: state.playback.copyWith(

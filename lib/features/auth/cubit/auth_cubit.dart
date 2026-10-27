@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/services/auth_failure.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/cloud_sync_service.dart';
 import '../../../core/services/sound_feedback_service.dart';
@@ -179,6 +180,10 @@ class AuthCubit extends PulsrCubit<AuthState> {
 
   @visibleForTesting
   static String mapAuthError(Object e) {
+    // A typed failure already carries the exact user-facing message; do not
+    // re-parse it through the legacy string ladder.
+    if (e is AuthFailure) return e.userMessage;
+
     // Prefer the typed Firebase error code over parsing `toString()`; the
     // message wording is not a stable API and the code is exhaustive.
     if (e is FirebaseAuthException) {
@@ -255,6 +260,11 @@ class AuthCubit extends PulsrCubit<AuthState> {
     }
     return 'Sign-in failed. Please try again.';
   }
+
+  /// The structured form of [mapAuthError], for callers that need the recovery
+  /// action (retry vs edit credentials vs continue offline) rather than just
+  /// the sentence.
+  static AuthFailure classifyAuthError(Object e) => AuthFailure.fromAny(e);
 
   Future<void> syncNow() async {
     final currentUser = state.user;

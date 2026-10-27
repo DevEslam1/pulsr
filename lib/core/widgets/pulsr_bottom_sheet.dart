@@ -254,15 +254,14 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                 borderRadius: effectiveBorderRadius,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black
-                        .withValues(alpha: p.isDark ? 0.40 : 0.12),
+                    color:
+                        Colors.black.withValues(alpha: p.isDark ? 0.40 : 0.12),
                     blurRadius: 24,
                     spreadRadius: 0,
                     offset: const Offset(0, -4),
                   ),
                   BoxShadow(
-                    color: p.accent
-                        .withValues(alpha: p.isDark ? 0.08 : 0.04),
+                    color: p.accent.withValues(alpha: p.isDark ? 0.08 : 0.04),
                     blurRadius: 18,
                     spreadRadius: -2,
                     offset: const Offset(0, 2),

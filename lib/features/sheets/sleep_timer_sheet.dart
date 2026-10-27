@@ -135,8 +135,9 @@ class SleepTimerSheet extends StatelessWidget {
                                   : remainingTracks != null
                                       ? (remainingTracks == 1
                                           ? context.l10n.musicWillStopEndOfTrack
-                                          : context.l10n.musicWillStopAfterSongs(
-                                              remainingTracks))
+                                          : context.l10n
+                                              .musicWillStopAfterSongs(
+                                                  remainingTracks))
                                       : context.l10n.musicWillStopIn(
                                           (sleepTimerRemaining?.inMinutes ?? 0),
                                           (sleepTimerRemaining?.inSeconds ??

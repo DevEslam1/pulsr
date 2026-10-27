@@ -86,4 +86,3 @@ List<T> moveSelectedToPosition<T>({
   remaining.insertAll(destination, moving);
   return remaining;
 }
-

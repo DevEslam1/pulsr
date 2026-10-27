@@ -1988,12 +1988,21 @@ class MusicRepository implements IMusicRepository {
     try {
       await _db.transaction(() async {
         await _db.delete(_db.queueItemsTable).go();
+        if (songIds.isEmpty) return;
+        final existingRows = await (_db.selectOnly(_db.songsTable)
+              ..addColumns([_db.songsTable.id])
+              ..where(_db.songsTable.id.isIn(songIds)))
+            .get();
+        final existingIds =
+            existingRows.map((r) => r.read(_db.songsTable.id)!).toSet();
         await _db.batch((batch) {
           for (int i = 0; i < songIds.length; i++) {
+            final id = songIds[i];
+            if (!existingIds.contains(id)) continue;
             batch.insert(
               _db.queueItemsTable,
               QueueItemsTableCompanion.insert(
-                songId: songIds[i],
+                songId: id,
                 orderIndex: i,
                 isCurrent: Value(i == currentIndex),
                 positionMs: Value(i == currentIndex ? positionMs : 0),

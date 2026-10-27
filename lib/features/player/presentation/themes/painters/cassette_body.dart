@@ -367,34 +367,35 @@ class _CassetteBody extends StatelessWidget {
             child: RotationTransition(
               turns: spoolController,
               child: RepaintBoundary(
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFF0F1F5),
-                  border: Border.all(color: const Color(0xFFB0B4C4), width: 3),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black45,
-                      blurRadius: 6,
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFF0F1F5),
+                    border:
+                        Border.all(color: const Color(0xFFB0B4C4), width: 3),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black45,
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF0C0E14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: CustomPaint(painter: _SpoolTeethPainter()),
                     ),
-                  ],
-                ),
-                child: Center(
-                  child: Container(
-                    width: 22,
-                    height: 22,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF0C0E14),
-                      shape: BoxShape.circle,
-                    ),
-                    child: CustomPaint(painter: _SpoolTeethPainter()),
                   ),
                 ),
               ),
             ),
-          ),
           ),
         ],
       ),

@@ -315,7 +315,9 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
                           color: p.textPrimary,
                           fontWeight: FontWeight.w600),
                     ),
-                    onPressed: () => context.push('/genre', extra: g),
+                    onPressed: () => context.push(
+                        '/genre?name=${Uri.encodeComponent(g.name)}',
+                        extra: g),
                   ),
                 );
               }).toList(),
@@ -389,7 +391,9 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
                           color: p.textPrimary,
                           fontWeight: FontWeight.w600),
                     ),
-                    onPressed: () => context.push('/genre', extra: g),
+                    onPressed: () => context.push(
+                        '/genre?name=${Uri.encodeComponent(g.name)}',
+                        extra: g),
                   ),
                 );
               }).toList(),

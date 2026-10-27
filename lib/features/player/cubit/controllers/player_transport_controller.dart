@@ -160,6 +160,7 @@ class PlayerTransportController {
       }
     }
   }
+
   Future<void> previous() async {
     _seekThrottle.cancelPending();
     final state = _getState();
@@ -387,8 +388,7 @@ class PlayerTransportController {
   Future<void> rewind([Duration step = const Duration(seconds: 10)]) async {
     final state = _getState();
     // BUG-7 FIX: clamp to Duration.zero at source so a negative value is never
-    // passed to seek(), making the intent explicit rather than relying on the
-    // throttle's isNegative check as a silent side-effect.
+    // passed to seek(); the throttle's isNegative check is the backstop.
     var target = state.position - step;
     if (target < Duration.zero) target = Duration.zero;
     await seek(target);

@@ -167,9 +167,8 @@ class _PulsrSliderState extends State<PulsrSlider>
   void _onDragEnd(double dx, double width, TextDirection direction) {
     setState(() => _isDragging = false);
     _expandController.reverse();
-    final val = _tapSeekPending
-        ? _tapSeekValue
-        : _calculateValue(dx, width, direction);
+    final val =
+        _tapSeekPending ? _tapSeekValue : _calculateValue(dx, width, direction);
     _tapSeekPending = false;
     _lastDivisionTick = null;
     widget.onChangeEnd?.call(val);

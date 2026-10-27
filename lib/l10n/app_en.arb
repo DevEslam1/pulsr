@@ -1216,6 +1216,12 @@
   "radioNoStreamsFound": "No http(s) stream URLs found",
   "radioPlay": "Play",
   "radioCuratedBrowse": "Browse curated stations",
+  "radioDirectoryBrowse": "Browse radio directory",
+  "radioDirectoryHint": "Search stations by name",
+  "radioDirectoryEmpty": "No stations found",
+  "radioDirectoryError": "Couldn't load the radio directory",
+  "radioDirectoryAdded": "Added",
+  "radioDirectoryUnreachable": "Couldn't reach this stream. Try another station.",
   "radioCuratedAdded": "{count} curated stations added",
   "@radioCuratedAdded": {
     "placeholders": {
@@ -2949,7 +2955,11 @@
   "@armedLabel": {
     "description": "tranche7 quality"
   },
-  "bpGuardrails": "Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.",
+  "bpGuardrails": "Bit-Perfect Guardrails Active: DSP processing & ReplayGain bypassed. Use the USB DAC hardware volume when enabled for attenuation.",
+  "bpChainVerified": "Bit-perfect chain verified",
+  "bpChainResampled": "Platform resample detected",
+  "bpChainDepthReduced": "Bit depth truncated",
+  "bpChainInactive": "Bit-Perfect armed but not active",
   "@bpGuardrails": {
     "description": "tranche7 quality"
   },
@@ -4517,6 +4527,7 @@
   "browseNoChangesToSave": "No Changes to Save",
   "browseNoGenresFound": "No Genres Found",
   "browseNoRecommendations": "No recommendations right now.",
+  "ytmCachedResults": "Showing saved results from an earlier search.",
   "browseNoResultsFound": "No Results Found",
   "browseNoSongsInLibrary": "No songs in library",
   "browseNoSongsMatch": "No songs match",
@@ -4693,6 +4704,9 @@
   "errYtmPlaybackFailed": "Playback failed. Please try again.",
   "errYtmGeneric": "Something went wrong with YouTube Music.",
   "errYtmRegionRestricted": "This track is restricted in your region.",
+  "errYtmAgeRestricted": "This track is age-restricted (+18) and can't be played here.",
+  "errYtmStreamFailed": "Stream failed to load. Refreshing the link…",
+  "errYtmStreamExpired": "Stream link expired. Refreshing…",
   "errYtmUnavailable": "This track is unavailable.",
   "errYtmSessionExpired": "YouTube session expired. Tap to reconnect.",
   "errYtmNotInBuild": "YouTube Music is not available in this build.",

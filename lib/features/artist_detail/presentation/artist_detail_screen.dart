@@ -295,8 +295,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                   end: AppSpacing.s14),
                               child: InkWell(
                                 borderRadius: AppRadii.r16All,
-                                onTap: () =>
-                                    context.push('/album', extra: album),
+                                onTap: () => context.push(
+                                    '/album?id=${album.id}',
+                                    extra: album),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [

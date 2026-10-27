@@ -476,9 +476,8 @@ class AppHttpOverrides extends HttpOverrides {
 
       if (method == 'CONNECT') {
         final colonIdx = requestTarget.lastIndexOf(':');
-        final targetHost = colonIdx > 0
-            ? requestTarget.substring(0, colonIdx)
-            : requestTarget;
+        final targetHost =
+            colonIdx > 0 ? requestTarget.substring(0, colonIdx) : requestTarget;
         final targetPort = colonIdx > 0
             ? (int.tryParse(requestTarget.substring(colonIdx + 1)) ?? 443)
             : 443;

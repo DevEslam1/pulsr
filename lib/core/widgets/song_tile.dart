@@ -101,8 +101,7 @@ class SongTile extends StatelessWidget {
                 final showIndex = !isTileUltraNarrow && index != null;
                 final showArtworkInTile =
                     showArtwork && (!isTileMicro || availableWidth >= 70);
-                final showDurationInTile =
-                    !isTileNarrow && song.durationMs > 0;
+                final showDurationInTile = !isTileNarrow && song.durationMs > 0;
                 final showTrailingInTile = !isTileUltraNarrow &&
                     (trailing != null || onMorePressed != null);
 
@@ -134,8 +133,7 @@ class SongTile extends StatelessWidget {
                               child: Text(
                                 '${index! + 1}',
                                 style: TextStyle(
-                                  color:
-                                      isActive ? p.accent : p.textTertiary,
+                                  color: isActive ? p.accent : p.textTertiary,
                                   fontWeight: FontWeight.w700,
                                   fontSize: isCompact
                                       ? AppFontSize.label
@@ -159,9 +157,7 @@ class SongTile extends StatelessWidget {
                                     ),
                                     child: Icon(Icons.check_rounded,
                                         color: p.onAccent,
-                                        size: effectiveArtwork > 36
-                                            ? 24
-                                            : 18),
+                                        size: effectiveArtwork > 36 ? 24 : 18),
                                   )
                                 : Stack(
                                     fit: StackFit.expand,
@@ -173,9 +169,8 @@ class SongTile extends StatelessWidget {
                                         albumId: song.albumId,
                                         type: ArtworkType.AUDIO,
                                         size: effectiveArtwork,
-                                        borderRadius: effectiveArtwork > 36
-                                            ? 13
-                                            : 8,
+                                        borderRadius:
+                                            effectiveArtwork > 36 ? 13 : 8,
                                       ),
                                       if (isActive)
                                         Container(

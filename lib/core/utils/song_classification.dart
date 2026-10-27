@@ -149,4 +149,3 @@ bool isQuranTrack(SongsTableData? song) {
 
   return false;
 }
-

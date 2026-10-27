@@ -366,7 +366,9 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                         minHeight: AppSpacing.minTouchTarget,
                                       ),
                                       onPressed: () {
-                                        context.push('/folder', extra: item);
+                                        context.push(
+                                            '/folder?path=${Uri.encodeComponent(item.path)}&name=${Uri.encodeComponent(item.name)}',
+                                            extra: item);
                                       },
                                     ),
                                   Icon(Icons.chevron_right_rounded,

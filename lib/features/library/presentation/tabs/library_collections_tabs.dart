@@ -62,8 +62,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       groupKey: '${state.sortBy}-${state.ascending}',
                       child: InkWell(
                         borderRadius: AppRadii.r18All,
-                        onTap: () =>
-                            context.pushDebounced('/album', extra: album),
+                        onTap: () => context.pushDebounced(
+                            '/album?id=${album.id}',
+                            extra: album),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -142,8 +143,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                     fontSize: AppFontSize.label)),
                             trailing: Icon(Icons.chevron_right_rounded,
                                 color: p.textTertiary),
-                            onTap: () =>
-                                context.pushDebounced('/album', extra: album),
+                            onTap: () => context.pushDebounced(
+                                '/album?id=${album.id}',
+                                extra: album),
                           ),
                         ),
                       ));
@@ -213,8 +215,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       groupKey: '${state.sortBy}-${state.ascending}',
                       child: InkWell(
                         borderRadius: AppRadii.r18All,
-                        onTap: () =>
-                            context.pushDebounced('/artist', extra: artist),
+                        onTap: () => context.pushDebounced(
+                            '/artist?id=${artist.id}',
+                            extra: artist),
                         child: Column(
                           children: [
                             Expanded(
@@ -286,8 +289,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                     fontSize: AppFontSize.label)),
                             trailing: Icon(Icons.chevron_right_rounded,
                                 color: p.textTertiary),
-                            onTap: () =>
-                                context.pushDebounced('/artist', extra: artist),
+                            onTap: () => context.pushDebounced(
+                                '/artist?id=${artist.id}',
+                                extra: artist),
                           ),
                         ),
                       ));
@@ -362,7 +366,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       title: g.name,
                       subtitle: context.l10n.tracksCount(g.songCount),
                       color: p.accent,
-                      onTap: () => context.pushDebounced('/genre', extra: g),
+                      onTap: () => context.pushDebounced(
+                          '/genre?name=${Uri.encodeComponent(g.name)}',
+                          extra: g),
                     );
                   },
                 ),
@@ -434,7 +440,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
           title: '${y.year}',
           subtitle: context.l10n.tracksCount(y.songCount),
           color: AppColors.skyBlue,
-          onTap: () => context.pushDebounced('/year', extra: y),
+          onTap: () => context.pushDebounced('/year?year=${y.year}', extra: y),
         );
       },
     );

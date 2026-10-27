@@ -23,19 +23,47 @@ enum class YtmBlockSignal(val code: String) {
     NetworkUnavailable("YTM_NETWORK"),
     SignatureDecipherFailed("SIGNATURE_DECIPHER_FAILED"),
     SabrEnforced("SABR_ENFORCED"),
-    Interrupted("INTERRUPTED");
+    Interrupted("INTERRUPTED"),
+    AgeRestricted("AGE_RESTRICTED");
 
     companion object {
         private val BOT_SUBSTRINGS = listOf(
             "not a bot",
-            "robot",
+            "not a robot",
+            "confirm you're not",
+            "confirm you are not",
+            "confirm that you're not",
+            "confirm that you are not",
+            "verify you're not",
+            "verify you are not",
             "recaptcha",
-            "confirm you're not a bot",
-            "confirm that you're not a bot",
             "automated queries",
             "unusual traffic",
             "botguard",
-            "verification required"
+            "bot check",
+            "login_required_bot_check",
+            "bot_block"
+        )
+
+        /**
+         * +18 / mature-content wording. Must run before BOT_SUBSTRINGS: an age
+         * interstitial often says "verify your age", which a bare
+         * "verification required" rule used to swallow as a bot challenge.
+         */
+        private val AGE_SUBSTRINGS = listOf(
+            "confirm your age",
+            "confirm you are 18",
+            "confirm you're 18",
+            "confirm that you are 18",
+            "age-restricted",
+            "age restricted",
+            "age verification",
+            "age check required",
+            "inappropriate for some users",
+            "mature content",
+            "adults only",
+            "over 18",
+            "18+"
         )
 
         private val GEO_SUBSTRINGS = listOf(
@@ -109,11 +137,26 @@ enum class YtmBlockSignal(val code: String) {
             "sockettimeoutexception",
             "no route to host",
             "network is unreachable",
-            "failed to connect to",
-            "econnrefused",
-            "ehostunreach",
-            "enonetwork",
             "network unavailable",
+            "network error",
+            "bad connection",
+            "failed to connect to",
+            "unable to resolve host",
+            "connection reset",
+            "connection closed",
+            "connection aborted",
+            "connection refused",
+            "broken pipe",
+            "unexpected end of stream",
+            "sslhandshakeexception",
+            "handshake failed",
+            "timed out",
+            "econnreset",
+            "econnrefused",
+            "etimedout",
+            "ehostunreach",
+            "enetunreach",
+            "eai_again",
             "ytm_network"
         )
 
@@ -193,6 +236,16 @@ enum class YtmBlockSignal(val code: String) {
                 return SignatureDecipherFailed
             }
 
+            // 0.9 Age restriction (+18). Runs before the bot check because an
+            // age wall can say "verify your age", and before SignInRequired so
+            // the UI does not report a false session expiry for one track.
+            if (AGE_SUBSTRINGS.any { combinedReasons.contains(it) } ||
+                status == "AGE_CHECK_REQUIRED" ||
+                status == "AGE_VERIFICATION_REQUIRED"
+            ) {
+                return AgeRestricted
+            }
+
             // 1. Bot Challenge (highest priority detection)
             if (BOT_SUBSTRINGS.any { combinedReasons.contains(it) } ||
                 status.contains("BOT") ||
@@ -231,13 +284,10 @@ enum class YtmBlockSignal(val code: String) {
                 return GeoBlocked
             }
 
-            // 5. Sign In Required (legitimate auth requirement or age restriction without bot flags)
+            // 5. Sign In Required (legitimate auth requirement; age is handled above)
             if (status == "LOGIN_REQUIRED" ||
                 combinedReasons.contains("login_required") ||
                 combinedReasons.contains("sign in to access") ||
-                combinedReasons.contains("confirm your age") ||
-                combinedReasons.contains("age-restricted") ||
-                combinedReasons.contains("inappropriate for some users") ||
                 combinedReasons.contains("sign in to confirm") ||
                 combinedReasons.contains("please sign in") ||
                 combinedReasons.contains("authentication required")) {

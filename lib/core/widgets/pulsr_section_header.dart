@@ -82,10 +82,7 @@ class PulsrSectionHeader extends StatelessWidget {
                                 fontWeight: FontWeight.w800,
                                 color: p.textPrimary,
                               )
-                            : Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
+                            : Theme.of(context).textTheme.labelSmall?.copyWith(
                                   color: p.textTertiary,
                                   letterSpacing: AppTracking.wide,
                                   fontWeight: FontWeight.w700,
@@ -126,11 +123,12 @@ class PulsrSectionHeader extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 160),
               child: TextButton(
                 onPressed: onAction,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
-                minimumSize: const Size(44, 44),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                  minimumSize: const Size(44, 44),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 child: Text(
                   actionLabel!,
                   maxLines: 1,

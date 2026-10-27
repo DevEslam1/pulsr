@@ -203,8 +203,7 @@ abstract class IMusicRepository {
 
   Future<Result<void>> reorderOnlinePlaylistTracks(
       String playlistId, List<String> orderedVideoIds);
-  Future<Result<void>> renameOnlinePlaylist(
-      String playlistId, String newTitle);
+  Future<Result<void>> renameOnlinePlaylist(String playlistId, String newTitle);
   Future<Result<void>> removeOnlinePlaylist(String playlistId);
   Future<Result<void>> clearOnlineLibraryCache();
 

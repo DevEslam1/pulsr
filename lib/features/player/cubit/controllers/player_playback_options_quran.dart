@@ -113,10 +113,10 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     }
   }
 
-  Future<QuranRestoreSnapshot> _captureQuranRestoreSnapshot(PlayerState s) async {
+  Future<QuranRestoreSnapshot> _captureQuranRestoreSnapshot(
+      PlayerState s) async {
     final isQuran = s.eqPreset.name.startsWith('Quran');
-    final eqPreset =
-        isQuran ? await _resolveSavedMusicPreset(s) : s.eqPreset;
+    final eqPreset = isQuran ? await _resolveSavedMusicPreset(s) : s.eqPreset;
     final isEqEnabled =
         isQuran ? await _resolveSavedEqEnabled(s) : s.isEqEnabled;
 
@@ -201,7 +201,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       if (enabled) {
         final currentSnapshot =
             _quranManager.restoreSnapshot ?? await loadQuranSnapshot();
-        final snapshot = currentSnapshot ?? await _captureQuranRestoreSnapshot(s);
+        final snapshot =
+            currentSnapshot ?? await _captureQuranRestoreSnapshot(s);
         _quranManager.setRestoreSnapshot(snapshot);
         if (currentSnapshot == null) {
           await _persistQuranSnapshot(snapshot);
@@ -424,14 +425,14 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
   Future<bool> _restoreFromSnapshot(QuranRestoreSnapshot snapshot,
       {int? expectedGen}) async {
     final s = _getState();
-    final resolvedEqPreset =
-        (snapshot.eqPreset == null || snapshot.eqPreset!.name.startsWith('Quran'))
-            ? await _resolveSavedMusicPreset(s)
-            : snapshot.eqPreset!;
-    final resolvedEqEnabled =
-        (snapshot.eqPreset == null || snapshot.eqPreset!.name.startsWith('Quran'))
-            ? await _resolveSavedEqEnabled(s)
-            : snapshot.isEqEnabled;
+    final resolvedEqPreset = (snapshot.eqPreset == null ||
+            snapshot.eqPreset!.name.startsWith('Quran'))
+        ? await _resolveSavedMusicPreset(s)
+        : snapshot.eqPreset!;
+    final resolvedEqEnabled = (snapshot.eqPreset == null ||
+            snapshot.eqPreset!.name.startsWith('Quran'))
+        ? await _resolveSavedEqEnabled(s)
+        : snapshot.isEqEnabled;
     _emit(s.copyWith(
       dsp: s.dsp.copyWith(
         isQuranModeEnabled: false,

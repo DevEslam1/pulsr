@@ -310,7 +310,7 @@ class _SearchViewState extends State<_SearchView> {
           (a) => (a?.name as String?)?.toLowerCase() == name.toLowerCase(),
           orElse: () => null);
       if (match != null) {
-        context.push('/artist', extra: match);
+        context.push('/artist?id=${match.id}', extra: match);
         return;
       }
     } catch (_) {
@@ -329,7 +329,7 @@ class _SearchViewState extends State<_SearchView> {
           (a) => (a?.title as String?)?.toLowerCase() == name.toLowerCase(),
           orElse: () => null);
       if (match != null) {
-        context.push('/album', extra: match);
+        context.push('/album?id=${match.id}', extra: match);
         return;
       }
     } catch (_) {

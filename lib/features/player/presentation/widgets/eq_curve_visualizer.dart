@@ -368,10 +368,15 @@ class _CatmullRomEqPainter extends CustomPainter {
         );
         for (int m = 0; m < fMarkers.length; m++) {
           final f = fMarkers[m];
-          final x = ((math.log(f) - math.log(20.0)) / (math.log(20000.0) - math.log(20.0))) * size.width;
+          final x = ((math.log(f) - math.log(20.0)) /
+                  (math.log(20000.0) - math.log(20.0))) *
+              size.width;
           tp.text = TextSpan(text: fLabels[m], style: markerStyle);
           tp.layout();
-          tp.paint(canvas, Offset((x - tp.width / 2).clamp(24.0, size.width - 24.0), size.height - tp.height - 1));
+          tp.paint(
+              canvas,
+              Offset((x - tp.width / 2).clamp(24.0, size.width - 24.0),
+                  size.height - tp.height - 1));
         }
       }
     }

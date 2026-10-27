@@ -455,9 +455,19 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
         if (error instanceof ExoPlaybackException) {
             final ExoPlaybackException exoError = (ExoPlaybackException)error;
+            String errorMessage = exoError.getMessage();
             switch (exoError.type) {
             case ExoPlaybackException.TYPE_SOURCE:
-                Log.e(TAG, "TYPE_SOURCE: " + exoError.getSourceException().getMessage());
+                // ExoPlayer's own message is the literal "Source error"; the
+                // actionable verdict (HTTP 403, DNS failure, timeout) lives on
+                // the source cause. Forward it so the Dart classifier can pick
+                // the right remedy instead of seeing an opaque string.
+                final Throwable sourceError = exoError.getSourceException();
+                final String causeMessage = sourceError.getMessage();
+                errorMessage = "Source error: " + (causeMessage == null || causeMessage.isEmpty()
+                        ? sourceError.getClass().getSimpleName()
+                        : causeMessage);
+                Log.e(TAG, "TYPE_SOURCE: " + errorMessage, sourceError);
                 break;
 
             case ExoPlaybackException.TYPE_RENDERER:
@@ -472,7 +482,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 Log.e(TAG, "default ExoPlaybackException: " + exoError.getUnexpectedException().getMessage());
             }
             // TODO: send both errorCode and type
-            sendError(exoError.type, exoError.getMessage(), mapOf("index", currentIndex));
+            sendError(exoError.type, errorMessage, mapOf("index", currentIndex));
         } else {
             Log.e(TAG, "default PlaybackException: " + error.getMessage());
             sendError(error.errorCode, error.getMessage(), mapOf("index", currentIndex));

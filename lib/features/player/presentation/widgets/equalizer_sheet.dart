@@ -152,6 +152,12 @@ bool _eqPresetRebuildEquals(EqPreset x, EqPreset y) {
 class EqualizerSheet extends StatefulWidget {
   const EqualizerSheet({super.key});
 
+  /// Test-only override for the host gate. `Platform.isAndroid` cannot be
+  /// injected in a widget test; setting this to `true` mounts the real Android
+  /// 3-tab shell so its layout and controls are covered.
+  @visibleForTesting
+  static bool? debugForceAndroidSurface;
+
   static Future<void> show(BuildContext context) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
@@ -240,7 +246,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    if (!Platform.isAndroid) {
+    if (!(EqualizerSheet.debugForceAndroidSurface ?? Platform.isAndroid)) {
       return Material(
         color: p.surface,
         borderRadius:

@@ -939,6 +939,12 @@
   "radioNoStreamsFound": "لم يتم العثور على روابط بث http(s)",
   "radioPlay": "تشغيل",
   "radioCuratedBrowse": "تصفح المحطات المختارة",
+  "radioDirectoryBrowse": "تصفح دليل الراديو",
+  "radioDirectoryHint": "ابحث عن المحطات بالاسم",
+  "radioDirectoryEmpty": "لم يتم العثور على محطات",
+  "radioDirectoryError": "تعذر تحميل دليل الراديو",
+  "radioDirectoryAdded": "تمت الإضافة",
+"radioDirectoryUnreachable": "تعذّر الوصول إلى هذا البث. جرّب محطة أخرى.",
   "radioCuratedAdded": "تمت إضافة {count} محطة مختارة",
   "@radioCuratedAdded": {
     "placeholders": {
@@ -2627,7 +2633,11 @@
   "@armedLabel": {
     "description": "tranche7 quality"
   },
-  "bpGuardrails": "الحماية نشطة: تم تجاوز DSP. اضبط الصوت من DAC",
+  "bpGuardrails": "الحماية نشطة: تم تجاوز DSP وReplayGain. استخدم مستوى صوت DAC عند تفعيله.",
+"bpChainVerified": "سلسلة بت-بيرفكت مُتحقّقة",
+"bpChainResampled": "تم كشف إعادة أخذ عينات من النظام",
+"bpChainDepthReduced": "تم تقليل عمق البِت",
+"bpChainInactive": "وضع بت-بيرفكت مُفعّل لكنه غير نشط",
   "@bpGuardrails": {
     "description": "tranche7 quality"
   },
@@ -3993,6 +4003,7 @@
   "browseNoChangesToSave": "لا توجد تغييرات للحفظ",
   "browseNoGenresFound": "لا توجد أنواع",
   "browseNoRecommendations": "لا توجد توصيات الآن.",
+"ytmCachedResults": "تُعرض نتائج محفوظة من بحث سابق.",
   "browseNoResultsFound": "لا توجد نتائج",
   "browseNoSongsInLibrary": "لا توجد أغانٍ في المكتبة",
   "browseNoSongsMatch": "لا توجد أغانٍ تطابق",
@@ -4124,6 +4135,9 @@
   "errYtmPlaybackFailed": "فشل التشغيل. حاول مجددًا.",
   "errYtmGeneric": "حدث خطأ في YouTube Music.",
   "errYtmRegionRestricted": "هذا المسار مقيد في منطقتك.",
+"errYtmAgeRestricted": "هذا المقطع مقيّد بالعمر (+18) ولا يمكن تشغيله هنا.",
+"errYtmStreamFailed": "تعذّر تحميل البث. جارٍ تحديث الرابط…",
+"errYtmStreamExpired": "انتهت صلاحية رابط البث. جارٍ التحديث…",
   "errYtmUnavailable": "هذا المسار غير متاح.",
   "errYtmSessionExpired": "انتهت جلسة YouTube. انقر لإعادة الاتصال.",
   "errYtmNotInBuild": "YouTube Music غير متاح في هذا الإصدار.",

@@ -31,7 +31,8 @@ void main() {
     JustAudioPlatform.instance = originalPlatform;
   });
 
-  test('app moves to next song when crossfade triggers near end of track', () async {
+  test('app moves to next song when crossfade triggers near end of track',
+      () async {
     handler = await buildTestHandler(repository: repo, ytmService: ytm);
     handler!.setGaplessEnabled(false);
     handler!.setCrossfadeDuration(const Duration(milliseconds: 500));

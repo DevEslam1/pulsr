@@ -6,11 +6,17 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:injectable/injectable.dart';
 import '../config/app_config.dart';
 import '../utils/error_logger.dart';
+import 'auth_failure.dart';
 
 @lazySingleton
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   bool _googleSignInInitialized = false;
+
+  /// A sign-in that never resolves leaves the auth sheet spinning forever.
+  /// Thirty seconds is long enough for a slow mobile network and short enough
+  /// that the user gets a retry affordance in the same interaction.
+  static const Duration _operationTimeout = Duration(seconds: 30);
 
   bool _isFirebaseAvailable = false;
   bool get isFirebaseAvailable => _isFirebaseAvailable;
@@ -42,7 +48,7 @@ class AuthService {
   Future<void> _performInitialize() async {
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp();
+        await Firebase.initializeApp().timeout(_operationTimeout);
       }
       _isFirebaseAvailable = true;
     } catch (e, st) {
@@ -53,7 +59,7 @@ class AuthService {
 
     if (!_googleSignInInitialized) {
       try {
-        await _googleSignIn.initialize();
+        await _googleSignIn.initialize().timeout(_operationTimeout);
         _googleSignInInitialized = true;
       } catch (e, st) {
         ErrorLogger.log('GoogleSignIn init failed',
@@ -66,17 +72,19 @@ class AuthService {
     try {
       if (!_isFirebaseAvailable) await initialize();
       if (!_isFirebaseAvailable) {
-        throw Exception('Firebase is not available on this device');
+        throw AuthFailure.unavailable(
+            StateError('Firebase is not available on this device'));
       }
 
       if (!_googleSignInInitialized) {
-        await _googleSignIn.initialize();
+        await _googleSignIn.initialize().timeout(_operationTimeout);
         _googleSignInInitialized = true;
       }
 
       final GoogleSignInAccount googleUser;
       try {
-        googleUser = await _googleSignIn.authenticate(scopeHint: ['email']);
+        googleUser = await _googleSignIn
+            .authenticate(scopeHint: ['email']).timeout(_operationTimeout);
       } on GoogleSignInException catch (e) {
         if (e.code == GoogleSignInExceptionCode.canceled) {
           return null;
@@ -86,19 +94,18 @@ class AuthService {
 
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final authz = await googleUser.authorizationClient
-          .authorizationForScopes(['email']);
+          .authorizationForScopes(['email']).timeout(_operationTimeout);
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: authz?.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithCredential(credential)
+          .timeout(_operationTimeout);
       return userCredential.user;
     } catch (e, st) {
-      ErrorLogger.log('Google Sign-In failed',
-          error: e, stackTrace: st, category: 'AuthService');
-      rethrow;
+      throw _fail('Google Sign-In failed', e, st);
     }
   }
 
@@ -106,19 +113,19 @@ class AuthService {
     try {
       if (!_isFirebaseAvailable) await initialize();
       if (!_isFirebaseAvailable) {
-        throw Exception('Firebase is not available on this device');
+        throw AuthFailure.unavailable(
+            StateError('Firebase is not available on this device'));
       }
 
-      final UserCredential cred =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final UserCredential cred = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          )
+          .timeout(_operationTimeout);
       return cred.user;
     } catch (e, st) {
-      ErrorLogger.log('Email Sign-In failed',
-          error: e, stackTrace: st, category: 'AuthService');
-      rethrow;
+      throw _fail('Email Sign-In failed', e, st);
     }
   }
 
@@ -126,19 +133,19 @@ class AuthService {
     try {
       if (!_isFirebaseAvailable) await initialize();
       if (!_isFirebaseAvailable) {
-        throw Exception('Firebase is not available on this device');
+        throw AuthFailure.unavailable(
+            StateError('Firebase is not available on this device'));
       }
 
-      final UserCredential cred =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final UserCredential cred = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          )
+          .timeout(_operationTimeout);
       return cred.user;
     } catch (e, st) {
-      ErrorLogger.log('Email Sign-Up failed',
-          error: e, stackTrace: st, category: 'AuthService');
-      rethrow;
+      throw _fail('Email Sign-Up failed', e, st);
     }
   }
 
@@ -146,14 +153,22 @@ class AuthService {
     try {
       if (!_isFirebaseAvailable) await initialize();
       if (!_isFirebaseAvailable) {
-        throw Exception('Firebase is not available on this device');
+        throw AuthFailure.unavailable(
+            StateError('Firebase is not available on this device'));
       }
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email.trim());
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(email: email.trim())
+          .timeout(_operationTimeout);
     } catch (e, st) {
-      ErrorLogger.log('Password reset failed',
-          error: e, stackTrace: st, category: 'AuthService');
-      rethrow;
+      throw _fail('Password reset failed', e, st);
     }
+  }
+
+  /// Logs once and rethrows as a typed failure, preserving the original cause.
+  AuthFailure _fail(String operation, Object error, StackTrace stackTrace) {
+    ErrorLogger.log(operation,
+        error: error, stackTrace: stackTrace, category: 'AuthService');
+    return AuthFailure.fromAny(error, stackTrace);
   }
 
   Future<void> signOut() async {

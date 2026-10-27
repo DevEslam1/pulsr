@@ -311,6 +311,31 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
             );
           },
         ),
+        if (cubit.showingCachedResults)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.sm, AppSpacing.xxs, AppSpacing.sm, AppSpacing.xxs),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: p.textSecondary.withValues(alpha: 0.08),
+              borderRadius: AppRadii.r10All,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.history_rounded, size: 16, color: p.textSecondary),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    context.l10n.ytmCachedResults,
+                    style: TextStyle(
+                        fontSize: AppFontSize.label, color: p.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: RefreshIndicator(
             color: p.accent,

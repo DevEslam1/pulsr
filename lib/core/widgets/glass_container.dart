@@ -187,9 +187,8 @@ class GlassContainer extends StatelessWidget {
             boxShadow: effectiveShadow,
           );
 
-    final Widget paddedChild = padding != null
-        ? Padding(padding: padding!, child: child)
-        : child;
+    final Widget paddedChild =
+        padding != null ? Padding(padding: padding!, child: child) : child;
 
     final Widget decoratedContent = Container(
       decoration: decoration,
@@ -244,8 +243,8 @@ class GlassContainer extends StatelessWidget {
       blurred = ClipPath(
         clipper: ShapeBorderClipper(shape: shape!),
         child: BackdropFilter(
-          filter: ImageFilter.blur(
-              sigmaX: effectiveSigma, sigmaY: effectiveSigma),
+          filter:
+              ImageFilter.blur(sigmaX: effectiveSigma, sigmaY: effectiveSigma),
           child: decoratedContent,
         ),
       );
@@ -253,8 +252,8 @@ class GlassContainer extends StatelessWidget {
       blurred = ClipRRect(
         borderRadius: effectiveRadius ?? BorderRadius.zero,
         child: BackdropFilter(
-          filter: ImageFilter.blur(
-              sigmaX: effectiveSigma, sigmaY: effectiveSigma),
+          filter:
+              ImageFilter.blur(sigmaX: effectiveSigma, sigmaY: effectiveSigma),
           child: decoratedContent,
         ),
       );

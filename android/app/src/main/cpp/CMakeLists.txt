@@ -60,6 +60,7 @@ set(DSP_CORE_SOURCES
     StereoWidth.cpp
     LoudnessContour.cpp
     SubCrossover.cpp
+    ChannelManager.cpp
     DynamicEQ.cpp
     MultibandCompressor.cpp
     DynamicBass.cpp

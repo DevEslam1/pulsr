@@ -176,6 +176,15 @@ struct SubCrossoverParamSet {
     bool enabled = false;
 };
 
+struct ChannelManagerParamSet {
+    bool enabled = false;
+    int channelCount = 2;
+    // Per-channel trim in dB and delay in ms. Index 0 = first interleaved
+    // channel. The engine clamps channelCount to 2..8.
+    float trimDb[8] = {};
+    float delayMs[8] = {};
+};
+
 struct DynamicEqBandParam {
     double frequency = 1000.0;
     double q = 2.0;
@@ -373,6 +382,7 @@ struct DspParamSnapshot {
     StereoWidthParamSet stereoWidth;
     LoudnessContourParamSet loudness;
     SubCrossoverParamSet subCrossover;
+  ChannelManagerParamSet channelManager;
     DynamicEqParamSet dynamicEq;
     MultibandCompressorParamSet multibandCompressor;
     DynamicBassParamSet dynamicBass;

@@ -19,7 +19,11 @@ int main() {
     limiter.reset();
 
     // 1. Latency Invariant
-    assert(limiter.getLatencyFrames() == static_cast<int>(5.0 * 0.001 * 48000.0));
+    // The reported latency includes the 12-tap true-peak FIR group delay,
+    // not just the lookahead window.
+    assert(limiter.getLatencyFrames() ==
+           static_cast<int>(5.0 * 0.001 * 48000.0) +
+               LookaheadLimiter::FILTER_DELAY);
     std::cout << "  ✓ Lookahead latency exactness verified (" << limiter.getLatencyFrames() << " frames)." << std::endl;
 
     // 2. +6dBFS Sine Input True-Peak Ceiling Test

@@ -62,6 +62,7 @@ set(DSP_SRCS
     ${MAIN_CPP}/StereoWidth.cpp
     ${MAIN_CPP}/LoudnessContour.cpp
     ${MAIN_CPP}/SubCrossover.cpp
+    ${MAIN_CPP}/ChannelManager.cpp
     ${MAIN_CPP}/DynamicEQ.cpp
     ${MAIN_CPP}/MultibandCompressor.cpp
     ${MAIN_CPP}/DynamicBass.cpp
@@ -104,4 +105,5 @@ pulsr_add_test(test_sinc_resampler ${MAIN_CPP}/SincResampler.cpp)
 pulsr_add_test(test_dop_framer)
 pulsr_add_test(test_resampler_polyphase ${MAIN_CPP}/SincResampler.cpp)
 
+pulsr_add_test(test_channel_manager ${MAIN_CPP}/ChannelManager.cpp)
 pulsr_add_test(test_dsp_effects ${DSP_SRCS})

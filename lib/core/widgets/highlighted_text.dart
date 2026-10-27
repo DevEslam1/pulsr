@@ -43,8 +43,8 @@ class PulsrHighlightedText extends StatelessWidget {
 
     for (final match in matches) {
       if (match.start > start) {
-        spans.add(
-            TextSpan(text: text.substring(start, match.start), style: baseStyle));
+        spans.add(TextSpan(
+            text: text.substring(start, match.start), style: baseStyle));
       }
       spans.add(TextSpan(
         text: text.substring(match.start, match.end),

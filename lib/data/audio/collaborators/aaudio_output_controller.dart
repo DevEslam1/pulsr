@@ -23,18 +23,20 @@ import '../output_format_negotiation.dart';
 Future<bool> pushAaudioOutputToPlayers(
   bool enabled, {
   bool preferExclusive = true,
+
   /// Explicit buffer size in milliseconds. When non-null, this value is used
   /// directly and [route] is ignored. Preserves existing call sites that
   /// supply a numeric buffer.
   int? targetBufferMs,
+
   /// Route-aware default when [targetBufferMs] is null.
   /// Defaults to [OutputRoute.bluetooth] (150 ms) for backward compatibility.
   OutputRoute route = OutputRoute.bluetooth,
   Iterable<AudioPlayer> players = const [],
 }) async {
   // Explicit override wins; fall back to route-derived default.
-  final int bufferMs = targetBufferMs ??
-      (route == OutputRoute.bluetooth ? 150 : 8);
+  final int bufferMs =
+      targetBufferMs ?? (route == OutputRoute.bluetooth ? 150 : 8);
 
   var applied = true;
   for (final player in players) {
@@ -51,4 +53,3 @@ Future<bool> pushAaudioOutputToPlayers(
   }
   return applied;
 }
-

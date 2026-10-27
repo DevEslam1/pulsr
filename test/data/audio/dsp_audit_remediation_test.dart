@@ -71,10 +71,10 @@ void main() {
 
     test('2. OptimizedDspPipeline orders Saturation before Convolution Reverb',
         () {
-      final saturationIdx =
-          OptimizedDspPipeline.pipelineOrder.indexOf(DspStage.harmonicSaturation);
-      final reverbIdx =
-          OptimizedDspPipeline.pipelineOrder.indexOf(DspStage.convolutionReverb);
+      final saturationIdx = OptimizedDspPipeline.pipelineOrder
+          .indexOf(DspStage.harmonicSaturation);
+      final reverbIdx = OptimizedDspPipeline.pipelineOrder
+          .indexOf(DspStage.convolutionReverb);
 
       expect(saturationIdx, greaterThan(-1));
       expect(reverbIdx, greaterThan(-1));
@@ -82,7 +82,8 @@ void main() {
           reason: 'Harmonic saturation must precede convolution reverb');
     });
 
-    test('3. DspSlice.isDspActive & isDspEffectsActive track multiband compressor',
+    test(
+        '3. DspSlice.isDspActive & isDspEffectsActive track multiband compressor',
         () {
       const sliceOff = DspSlice(isMultibandCompressorEnabled: false);
       expect(sliceOff.isDspActive, isFalse);
@@ -100,7 +101,8 @@ void main() {
       expect(state.isDspActive, isTrue);
     });
 
-    test('4. DspRollbackPolicy reconciles multiband compressor & arbitrary linear phase',
+    test(
+        '4. DspRollbackPolicy reconciles multiband compressor & arbitrary linear phase',
         () {
       const prev = DspSlice(
         isMultibandCompressorEnabled: false,
@@ -144,8 +146,8 @@ void main() {
     test('6. OptimizedDspPipeline orders Multiband Compressor properly', () {
       final dynEqIdx =
           OptimizedDspPipeline.pipelineOrder.indexOf(DspStage.dynamicEq);
-      final mbcIdx =
-          OptimizedDspPipeline.pipelineOrder.indexOf(DspStage.multibandCompressor);
+      final mbcIdx = OptimizedDspPipeline.pipelineOrder
+          .indexOf(DspStage.multibandCompressor);
       final pannerIdx =
           OptimizedDspPipeline.pipelineOrder.indexOf(DspStage.stereoPanner);
 

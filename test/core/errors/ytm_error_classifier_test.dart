@@ -1,7 +1,7 @@
 // test/core/errors/ytm_error_classifier_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:pulsr/core/errors/ytm_error_classifier.dart';
-import 'package:pulsr/core/services/ytm_service.dart';
 
 void main() {
   group('YtmErrorClassifier Tests', () {
@@ -11,6 +11,96 @@ void main() {
 
       expect(info.message, contains('No connection'));
       expect(info.recoveryAction, equals(YtmRecoveryAction.retryWithBackoff));
+    });
+
+    test('recognises common bad-connection wording as transport failure', () {
+      for (final text in [
+        'Bad connection',
+        'SocketException: Connection reset by peer',
+        'unexpected end of stream',
+        'SSLHandshakeException: handshake failed',
+        'Unable to resolve host music.youtube.com',
+        'java.net.SocketTimeoutException: timed out',
+      ]) {
+        final info = YtmErrorClassifier.classify(Exception(text));
+        expect(info.signal, YtmBlockSignal.networkUnavailable, reason: text);
+        expect(info.message, contains('No connection'), reason: text);
+      }
+    });
+
+    test(
+        'detects age-restricted (+18) content without claiming a session expired',
+        () {
+      final info = YtmErrorClassifier.classify(
+        Exception(
+            'This video may be inappropriate for some users. Sign in to confirm your age.'),
+      );
+
+      expect(info.signal, YtmBlockSignal.ageRestricted);
+      expect(info.recoveryAction, YtmRecoveryAction.skipToNextTrack);
+      expect(info.message, contains('age-restricted'));
+      expect(info.message, isNot(contains('session expired')));
+    });
+
+    test('age-restricted codes are unavailable but not an auth failure', () {
+      const error = YtmException('AGE_RESTRICTED');
+
+      expect(error.signal, YtmBlockSignal.ageRestricted);
+      expect(error.isAgeRestricted, isTrue);
+      expect(error.isUnavailable, isTrue);
+      expect(error.isAuth, isFalse);
+      expect(YtmErrorClassifier.classify(error).message, contains('+18'));
+    });
+
+    test('does not mistake robot track titles or age walls for a bot challenge',
+        () {
+      expect(
+        YtmErrorClassifier.classify(Exception('Robot Rock - Daft Punk')).signal,
+        isNot(YtmBlockSignal.botChallenge),
+      );
+      expect(
+        YtmErrorClassifier.classify(Exception('Age verification required'))
+            .signal,
+        YtmBlockSignal.ageRestricted,
+      );
+      expect(
+        YtmErrorClassifier.classify(Exception('verification required')).signal,
+        isNot(YtmBlockSignal.botChallenge),
+      );
+    });
+
+    test(
+        'a generic ExoPlayer source error gets actionable copy and re-resolves',
+        () {
+      final error = PlayerException(0, 'Source error', null);
+      final info = YtmErrorClassifier.classify(error);
+
+      expect(info.message, isNot(contains('Source error')));
+      expect(info.message, contains('Stream failed'));
+      expect(YtmErrorClassifier.isUrlBurned(error), isTrue);
+      expect(YtmErrorClassifier.displayMessage(error), info.message);
+    });
+
+    test('a source error carrying HTTP 403 is an expired link, not a bot block',
+        () {
+      final error =
+          PlayerException(0, 'Source error: Invalid response code: 403', null);
+      final info = YtmErrorClassifier.classify(error);
+
+      expect(info.message, contains('Stream link expired'));
+      expect(info.signal, isNot(YtmBlockSignal.botChallenge));
+      expect(YtmErrorClassifier.isUrlBurned(error), isTrue);
+    });
+
+    test(
+        'a source error carrying a reset is a transport retry, not a burned URL',
+        () {
+      final error =
+          PlayerException(0, 'Source error: Connection reset by peer', null);
+      final info = YtmErrorClassifier.classify(error);
+
+      expect(info.signal, YtmBlockSignal.networkUnavailable);
+      expect(YtmErrorClassifier.isUrlBurned(error), isFalse);
     });
 
     test('classifies bot blocked errors correctly', () {

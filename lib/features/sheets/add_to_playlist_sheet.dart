@@ -346,8 +346,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                               if (useTwoColumns) {
                                 return GridView.builder(
                                   shrinkWrap: true,
-                                  physics:
-                                      const NeverScrollableScrollPhysics(),
+                                  physics: const NeverScrollableScrollPhysics(),
                                   gridDelegate:
                                       const SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: 2,
@@ -436,8 +435,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                   color: p.accentContainer,
                   borderRadius: AppRadii.r10All,
                 ),
-                child: Icon(Icons.queue_music_rounded,
-                    color: p.accent, size: 20),
+                child:
+                    Icon(Icons.queue_music_rounded, color: p.accent, size: 20),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(

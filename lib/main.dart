@@ -575,6 +575,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
         minDurationSec: settings.minDurationSec,
         minSizeKb: prefs.getInt('setting_min_file_size_kb') ?? 0,
         autoHideSystemMedia: settings.autoHideSystemMedia,
+        incremental: true,
       );
     } catch (e, st) {
       ErrorLogger.log('Resume media scan failed',

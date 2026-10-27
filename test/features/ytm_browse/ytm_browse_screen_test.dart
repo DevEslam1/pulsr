@@ -128,4 +128,45 @@ void main() {
     // The error/empty retry actions keep using the non-forced load.
     verify(() => mockBrowse.getHomeFeed(force: false)).called(1);
   });
+
+  testWidgets('keeps the feed and shows a retry banner when a refresh fails',
+      (tester) async {
+    var calls = 0;
+    when(() => mockBrowse.getHomeFeed(force: any(named: 'force')))
+        .thenAnswer((_) async {
+      calls++;
+      if (calls == 1) {
+        return const [
+          YtmBrowseSection(title: 'Top Charts & Trending', items: [
+            YtmBrowseItem(
+              id: 'dQw4w9WgXcQ',
+              title: 'Never Gonna Give You Up',
+              subtitle: 'Rick Astley',
+              type: 'song',
+            ),
+          ]),
+        ];
+      }
+      throw Exception('offline');
+    });
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    expect(find.text('Top Charts & Trending'), findsOneWidget);
+
+    await tester.tap(find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byIcon(Icons.refresh_rounded),
+    ));
+    await tester.pumpAndSettle();
+
+    // The previous feed stays usable; the failure is a retry strip, not a
+    // full-screen error that throws the content away.
+    expect(find.text('Top Charts & Trending'), findsOneWidget);
+    expect(
+      find.text('No connection. Check your network.'),
+      findsOneWidget,
+    );
+    expect(find.text('Retry'), findsWidgets);
+  });
 }

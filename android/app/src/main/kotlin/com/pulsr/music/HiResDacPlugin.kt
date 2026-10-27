@@ -124,6 +124,18 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
     }
 
+    /**
+     * Route callbacks arrive in bursts (USB attach + A2DP connect + mixer
+     * reconfiguration). Emitting every intermediate topology made the UI flap
+     * between "speaker" and "DAC" and could briefly arm Bit-Perfect on the
+     * wrong sink. Coalesce them so only the settled route is published.
+     */
+    private val deviceChangeDebounce = Runnable { notifyDeviceChange() }
+    private fun scheduleDeviceChange() {
+        probeHandler.removeCallbacks(deviceChangeDebounce)
+        probeHandler.postDelayed(deviceChangeDebounce, 200L)
+    }
+
     private var bitPerfectRequested: Boolean = false
     @Volatile private var directRouteFallbackActive: Boolean = false
     private var mixerAttributesApplied: Boolean = false
@@ -205,12 +217,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     // the Bit-Perfect switch disabled after a capable USB DAC
                     // was plugged in.
                     lastBitPerfectReason = null
-                    notifyDeviceChange()
+                    scheduleDeviceChange()
                 }
 
                 override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
                     lastBitPerfectReason = null
-                    notifyDeviceChange()
+                    scheduleDeviceChange()
                 }
             }
             audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
@@ -226,11 +238,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                             try { applyBitPerfectMode(false) } catch (_: Exception) {}
                         }
                         lastBitPerfectReason = null
-                        notifyDeviceChange()
+                        scheduleDeviceChange()
                     }
                     UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
                         lastBitPerfectReason = null
-                        notifyDeviceChange()
+                        scheduleDeviceChange()
                     }
                 }
             }
@@ -1366,6 +1378,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 "dsd64" to false,
                 "dsd128" to false,
                 "dsd256" to false,
+                "dsd512" to false,
                 "dop" to false,
                 "nativeDac" to false,
                 "isUac2" to false,
@@ -1379,6 +1392,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val hasDsd64Carrier = rates.contains(176400)
         val hasDsd128Carrier = rates.contains(352800)
         val hasDsd256Carrier = rates.contains(705600)
+        // DSD512 is decoded to 768 kHz PCM natively; there is no standard
+        // 1411.2 kHz DoP carrier, so this flag describes the PCM output path.
+        val hasDsd512Pcm = rates.contains(768000)
         val prefs = context.getSharedPreferences("pulsr_dac_prefs", Context.MODE_PRIVATE)
         val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             usbDac.address.takeIf { it.isNotBlank() } ?: "default"
@@ -1393,6 +1409,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             "dsd64" to hasDsd64Carrier,
             "dsd128" to hasDsd128Carrier,
             "dsd256" to hasDsd256Carrier,
+            "dsd512" to hasDsd512Pcm,
             // A USB DAC is present; DoP is reported possible if UAC2 or sample rates detected
             "dop" to (isUac2 || rates.isNotEmpty()),
             "nativeDac" to true,

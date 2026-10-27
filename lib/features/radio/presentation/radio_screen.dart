@@ -20,6 +20,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import 'widgets/radio_directory_sheet.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 
 class RadioScreen extends StatefulWidget {
@@ -267,6 +268,14 @@ class _RadioScreenState extends State<RadioScreen> {
         leading: const PulsrBackButton(),
         title: Text(context.l10n.radioTitle),
         actions: [
+          IconButton(
+            constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget),
+            tooltip: context.l10n.radioDirectoryBrowse,
+            icon: const Icon(Icons.public_rounded),
+            onPressed: () => RadioDirectorySheet.show(context, store: _store),
+          ),
           IconButton(
             constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
@@ -776,14 +785,14 @@ class _StationArtwork extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final artworkUrl = (station.artworkUrl != null &&
-            station.artworkUrl!.isNotEmpty)
-        ? station.artworkUrl
-        : RadioStationStore.resolveArtworkForStation(
-            id: station.id,
-            name: station.name,
-            url: station.url,
-          );
+    final artworkUrl =
+        (station.artworkUrl != null && station.artworkUrl!.isNotEmpty)
+            ? station.artworkUrl
+            : RadioStationStore.resolveArtworkForStation(
+                id: station.id,
+                name: station.name,
+                url: station.url,
+              );
     if (artworkUrl == null || artworkUrl.isEmpty) {
       return Container(
         width: 44,
@@ -936,7 +945,10 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     final p = context.palette;
     return ChoiceChip(
       avatar: ClipOval(
-        child: Image.asset(assetPath, width: 18, height: 18, fit: BoxFit.cover,
+        child: Image.asset(assetPath,
+            width: 18,
+            height: 18,
+            fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 14)),
       ),
       label: Text(label, style: const TextStyle(fontSize: 11)),
@@ -984,7 +996,8 @@ class _AddStationDialogState extends State<_AddStationDialog> {
                               borderRadius: 16,
                               fallbackIcon: Icons.radio_rounded,
                             )
-                          : Icon(Icons.radio_rounded, color: p.accent, size: 36),
+                          : Icon(Icons.radio_rounded,
+                              color: p.accent, size: 36),
                     ),
                   ),
                   PositionedDirectional(
@@ -1012,16 +1025,20 @@ class _AddStationDialogState extends State<_AddStationDialog> {
               runSpacing: AppSpacing.xxs,
               alignment: WrapAlignment.center,
               children: [
-                _buildPresetChip('القرآن - القاهرة', RadioStationStore.quranCairoArtwork),
+                _buildPresetChip(
+                    'القرآن - القاهرة', RadioStationStore.quranCairoArtwork),
                 _buildPresetChip('الحصري', RadioStationStore.hussaryArtwork),
                 _buildPresetChip('المنشاوي', RadioStationStore.minshawiArtwork),
-                _buildPresetChip('عبد الباسط', RadioStationStore.abdulBasitArtwork),
-                _buildPresetChip('مصطفى إسماعيل', RadioStationStore.mustafaIsmailArtwork),
+                _buildPresetChip(
+                    'عبد الباسط', RadioStationStore.abdulBasitArtwork),
+                _buildPresetChip(
+                    'مصطفى إسماعيل', RadioStationStore.mustafaIsmailArtwork),
                 _buildPresetChip('تراتيل', RadioStationStore.tarteelArtwork),
                 if (_artworkUrl != null)
                   ActionChip(
                     avatar: const Icon(Icons.clear_rounded, size: 14),
-                    label: const Text('إلغاء الصورة', style: TextStyle(fontSize: 11)),
+                    label: const Text('إلغاء الصورة',
+                        style: TextStyle(fontSize: 11)),
                     onPressed: () => setState(() => _artworkUrl = null),
                   ),
               ],
@@ -1031,7 +1048,8 @@ class _AddStationDialogState extends State<_AddStationDialog> {
               controller: _nameController,
               textInputAction: TextInputAction.next,
               onChanged: (text) {
-                if (_artworkUrl == null || _artworkUrl!.startsWith('assets/Pictures/')) {
+                if (_artworkUrl == null ||
+                    _artworkUrl!.startsWith('assets/Pictures/')) {
                   final detected = RadioStationStore.resolveArtworkForStation(
                     name: text,
                     url: _urlController.text,

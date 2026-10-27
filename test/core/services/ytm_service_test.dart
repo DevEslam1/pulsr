@@ -302,7 +302,8 @@ void main() {
           if (vid == 'restricted123') {
             throw PlatformException(
               code: 'SIGN_IN_REQUIRED',
-              message: 'This video may be inappropriate for some users. Sign in to confirm your age.',
+              message:
+                  'This video may be inappropriate for some users. Sign in to confirm your age.',
             );
           } else if (vid == 'alternate456') {
             return {
@@ -341,6 +342,51 @@ void main() {
       // Subsequent resolve of original ID should use the remembered mapping
       final cachedStream = await service.resolveStream('restricted123');
       expect(cachedStream.videoId, equals('alternate456'));
+    });
+
+    test('resolveStream treats a native AGE_RESTRICTED as restricted, not auth',
+        () async {
+      _mockChannel((call) async {
+        if (call.method == 'resolveStream') {
+          final vid = call.arguments['videoId'];
+          if (vid == 'age18Restricted') {
+            throw PlatformException(
+              code: 'AGE_RESTRICTED',
+              message: 'Sign in to confirm your age',
+            );
+          } else if (vid == 'cleanVersion1') {
+            return {
+              'videoId': 'cleanVersion1',
+              'url': 'https://example.com/clean.m4a',
+              'mimeType': 'audio/mp4',
+              'container': 'm4a',
+              'bitrateKbps': 128,
+              'durationMs': 180000,
+            };
+          }
+        } else if (call.method == 'search') {
+          return [
+            {
+              'videoId': 'cleanVersion1',
+              'title': 'Explicit Hit Song',
+              'artist': 'Artist Name',
+              'duration': 180,
+            }
+          ];
+        }
+        return null;
+      });
+
+      final service = YtmService();
+      service.debugClearBotCooldown();
+      final stream = await service.resolveStream(
+        'age18Restricted',
+        title: 'Explicit Hit Song',
+        artist: 'Artist Name',
+      );
+
+      expect(stream.videoId, equals('cleanVersion1'));
+      expect(stream.url, equals('https://example.com/clean.m4a'));
     });
 
     test('isWifiConnected returns true or false from channel', () async {

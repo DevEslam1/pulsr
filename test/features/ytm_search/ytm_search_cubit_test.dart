@@ -594,4 +594,80 @@ void main() {
       expect(cubit.hasMore, isFalse);
     });
   });
+
+  group('offline search cache', () {
+    test(
+        'a repeated query falls back to saved results when the search is empty',
+        () async {
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
+
+      final cubit = build();
+      cubit.onQueryChanged('rick');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+      expect(cubit.showingCachedResults, isFalse);
+
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => const []);
+      await cubit.retry();
+      await pumpEventQueue();
+
+      expect(cubit.state.results.single.title, 'Hit');
+      expect(cubit.state.errorMessage, isNull);
+      expect(cubit.showingCachedResults, isTrue);
+    });
+
+    test('a thrown search also serves saved results', () async {
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
+
+      final cubit = build();
+      cubit.onQueryChanged('rick');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      when(() => service.searchWithFallback(any()))
+          .thenThrow(Exception('offline'));
+      await cubit.retry();
+      await pumpEventQueue();
+
+      expect(cubit.state.results.single.title, 'Hit');
+      expect(cubit.showingCachedResults, isTrue);
+    });
+
+    test('no cache leaves the ordinary no-results state', () async {
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => const []);
+
+      final cubit = build();
+      cubit.onQueryChanged('never-seen');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      expect(cubit.state.results, isEmpty);
+      expect(cubit.state.errorMessage, isNull);
+      expect(cubit.showingCachedResults, isFalse);
+    });
+
+    test('changing the query drops the saved-results flag', () async {
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
+
+      final cubit = build();
+      cubit.onQueryChanged('rick');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => const []);
+      await cubit.retry();
+      await pumpEventQueue();
+      expect(cubit.showingCachedResults, isTrue);
+
+      cubit.onQueryChanged('other');
+      expect(cubit.showingCachedResults, isFalse);
+      cubit.clearQuery();
+    });
+  });
 }

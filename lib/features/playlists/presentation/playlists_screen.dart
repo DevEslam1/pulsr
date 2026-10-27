@@ -42,6 +42,7 @@ import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
 import 'widgets/spotify_import_dialog.dart';
+import 'widgets/playlist_suggestion_card.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -146,7 +147,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     if (context.isTwoPanePlaylist) {
       setState(() => _selectedPlaylist = pl);
     } else {
-      context.push('/playlist', extra: pl);
+      context.push('/playlist?id=${pl.id}', extra: pl);
     }
   }
 
@@ -452,7 +453,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     if (url != null && url.isNotEmpty && context.mounted) {
       cubit.fetchOnlinePlaylistByUrl(url);
       context.push(
-        '/online-playlist',
+        '/online-playlist?id=${Uri.encodeComponent(url)}',
         extra: OnlinePlaylistDetailArgs(playlistId: url),
       );
     }
@@ -694,7 +695,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, index) {
                   final suggestion = _suggestions[index];
-                  return _SuggestionCard(
+                  return PlaylistSuggestionCard(
                     suggestion: suggestion,
                     onTap: () => _createPlaylistFromSuggestion(suggestion),
                   );
@@ -1202,7 +1203,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
 
                 if (isLoggedIn && online.isCachingLibrary)
                   Padding(
-                    padding: EdgeInsets.fromLTRB(
+                    padding: EdgeInsetsDirectional.fromSTEB(
                       Adaptive.pagePadding(context),
                       AppSpacing.xs,
                       Adaptive.pagePadding(context),
@@ -1270,7 +1271,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       onDownload: () =>
                           _downloadLikedSongs(context, online.likedTracks),
                       onPlay: () => context.push(
-                        '/online-playlist',
+                        '/online-playlist?id=VLLM&title=${Uri.encodeComponent(context.l10n.likedMusic)}&kind=${OnlineLibraryKind.liked}',
                         extra: OnlinePlaylistDetailArgs(
                           playlistId: 'VLLM',
                           title: context.l10n.likedMusic,
@@ -1395,8 +1396,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           final pl = online.accountPlaylists[i];
                           return _AccountPlaylistCard(
                             playlist: pl,
-                            onTap: () =>
-                                context.push('/online-playlist', extra: pl),
+                            onTap: () => context.push(
+                                '/online-playlist?id=${Uri.encodeComponent(pl.playlistId)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.account}',
+                                extra: pl),
                             onDownload: () =>
                                 _downloadAccountPlaylist(context, pl),
                           );
@@ -1477,8 +1479,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           final pl = online.customPlaylists[i];
                           return _OnlinePlaylistCard(
                             entry: pl,
-                            onTap: () =>
-                                context.push('/online-playlist', extra: pl),
+                            onTap: () => context.push(
+                                '/online-playlist?id=${Uri.encodeComponent(pl.id)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.custom}',
+                                extra: pl),
                             onDownload: () =>
                                 _downloadCustomPlaylist(context, pl),
                             onRemove: () =>
@@ -2048,72 +2051,6 @@ class _PlaylistHeroCard extends StatelessWidget {
                   Icon(Icons.play_arrow_rounded, color: colors.first, size: 26),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SuggestionCard extends StatelessWidget {
-  final PlaylistSuggestion suggestion;
-  final VoidCallback onTap;
-
-  const _SuggestionCard({required this.suggestion, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return Semantics(
-      button: true,
-      label: suggestion.title,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadii.r16All,
-        child: Container(
-          width: 230,
-          padding: const EdgeInsets.all(AppSpacing.s14),
-          decoration: BoxDecoration(
-            color: p.surfaceContainer,
-            borderRadius: AppRadii.r16All,
-            border: Border.all(color: p.hairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.auto_awesome_rounded, color: p.accent, size: 18),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      suggestion.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: AppFontSize.bodySmall,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                suggestion.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: p.textSecondary, fontSize: AppFontSize.label),
-              ),
-              const Spacer(),
-              Text(
-                context.l10n.tapToCreate(suggestion.songs.length),
-                style: TextStyle(
-                    color: p.textTertiary, fontSize: AppFontSize.caption),
-              ),
-            ],
-          ),
         ),
       ),
     );

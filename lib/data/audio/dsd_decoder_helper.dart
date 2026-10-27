@@ -48,6 +48,7 @@ class DsdDacCapabilities {
   final bool dsd64;
   final bool dsd128;
   final bool dsd256;
+  final bool dsd512;
   final bool dop;
   final bool nativeDac;
 
@@ -55,6 +56,7 @@ class DsdDacCapabilities {
     required this.dsd64,
     required this.dsd128,
     required this.dsd256,
+    this.dsd512 = false,
     required this.dop,
     required this.nativeDac,
   });
@@ -80,13 +82,14 @@ class DsdDacCapabilities {
     if (dsdRate <= 64) return dsd64;
     if (dsdRate <= 128) return dsd128;
     if (dsdRate <= 256) return dsd256;
+    if (dsdRate <= 512) return dsd512;
     return false;
   }
 
   @override
   String toString() =>
       'DsdDacCapabilities(dsd64: $dsd64, dsd128: $dsd128, dsd256: $dsd256, '
-      'dop: $dop, nativeDac: $nativeDac)';
+      'dsd512: $dsd512, dop: $dop, nativeDac: $nativeDac)';
 }
 
 /// Streams in-memory WAV data produced by decoding DSD (DSF/DFF) files.
@@ -139,6 +142,7 @@ class DsdDecoderHelper {
         dsd64: map['dsd64'] == true,
         dsd128: map['dsd128'] == true,
         dsd256: map['dsd256'] == true,
+        dsd512: map['dsd512'] == true,
         dop: map['dop'] == true,
         nativeDac: map['nativeDac'] == true,
       );
@@ -249,7 +253,8 @@ class DsdDecoderHelper {
     }
 
     final targetSampleRate = switch (dsdRate) {
-      >= 256 => 705600, // DSD256 and above
+      >= 512 => 768000, // DSD512
+      >= 256 => 705600, // DSD256
       >= 128 => 352800, // DSD128
       _ => 176400, // DSD64
     };

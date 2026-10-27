@@ -5,7 +5,8 @@ void main() {
   group('PlaybackAnalytics underrun healing', () {
     test('widens buffer after 3 underruns, not before', () {
       var widened = 0;
-      final a = PlaybackAnalytics(onIncreaseBufferSizeRequested: () => widened++);
+      final a =
+          PlaybackAnalytics(onIncreaseBufferSizeRequested: () => widened++);
       a.recordBufferUnderrun();
       a.recordBufferUnderrun();
       expect(widened, 0);

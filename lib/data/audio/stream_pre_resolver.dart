@@ -243,8 +243,7 @@ class StreamPreResolver {
     if (queue.isEmpty || currentIndex < 0) return;
 
     final repeatQueue = repeatQueueProvider?.call() ?? false;
-    final requestedWindow =
-        windowSizeProvider?.call() ?? preResolveWindowSize;
+    final requestedWindow = windowSizeProvider?.call() ?? preResolveWindowSize;
     final window = requestedWindow < 1
         ? 1
         : (requestedWindow > defaultPreResolveCount

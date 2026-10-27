@@ -250,7 +250,8 @@ void main() {
       await tester.tap(find.text('Show Error'));
       await tester.pump();
       expect(find.text(message), findsOneWidget);
-      expect(identical(tester.element(find.text(message)), firstElement), isTrue);
+      expect(
+          identical(tester.element(find.text(message)), firstElement), isTrue);
       expect(hapticCalls, hasLength(1));
 
       // The refresh restarted the 2.2s countdown at ~1.5s, so the banner must

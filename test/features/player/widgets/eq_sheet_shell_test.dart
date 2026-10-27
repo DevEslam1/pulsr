@@ -18,6 +18,7 @@ import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/audio/equalizer_manager.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -163,6 +164,36 @@ void main() {
       expect(find.byType(Slider), findsNothing);
       expect(find.byType(Switch), findsNothing);
       expect(find.byIcon(Icons.equalizer_rounded), findsOneWidget);
+    });
+  });
+
+  group('EqualizerSheet Android surface (injected platform)', () {
+    testWidgets('mounts the full 3-tab shell and disposes cleanly',
+        (tester) async {
+      EqualizerSheet.debugForceAndroidSurface = true;
+      addTearDown(() => EqualizerSheet.debugForceAndroidSurface = null);
+
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: stubPlayerCubit(),
+        settingsCubit: stubSettingsCubit(
+            state: const SettingsState(
+                experienceMode: ExperienceMode.professional)),
+        child: const EqualizerSheet(),
+      ));
+      await tester.pump();
+
+      expect(find.byType(TabBar), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      expect(find.byType(EqualizerSheet), findsNothing);
+
+      EqualizerSheet.debugForceAndroidSurface = null;
     });
   });
 

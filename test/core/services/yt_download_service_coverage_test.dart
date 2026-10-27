@@ -236,6 +236,8 @@ void main() {
           quality: any(named: 'quality'),
           forceRefresh: any(named: 'forceRefresh'),
           preferM4a: any(named: 'preferM4a'),
+          title: any(named: 'title'),
+          artist: any(named: 'artist'),
         )).thenAnswer((_) async => _stream());
 
     scanner = MockMediaScanner();
@@ -309,6 +311,8 @@ void main() {
           quality: any(named: 'quality'),
           forceRefresh: any(named: 'forceRefresh'),
           preferM4a: any(named: 'preferM4a'),
+          title: any(named: 'title'),
+          artist: any(named: 'artist'),
         )).thenThrow(const YtmException('YTM_NETWORK'));
 
     final result = await service.download(_song(videoId: 'vidNet000001'));
@@ -442,6 +446,8 @@ void main() {
           quality: any(named: 'quality'),
           forceRefresh: any(named: 'forceRefresh'),
           preferM4a: any(named: 'preferM4a'),
+          title: any(named: 'title'),
+          artist: any(named: 'artist'),
         )).thenAnswer((_) async {
       resolveCalls++;
       if (resolveCalls == 1) {
@@ -468,6 +474,8 @@ void main() {
           quality: any(named: 'quality'),
           forceRefresh: true,
           preferM4a: any(named: 'preferM4a'),
+          title: any(named: 'title'),
+          artist: any(named: 'artist'),
         )).called(greaterThanOrEqualTo(1));
   });
 

@@ -24,6 +24,7 @@ class PlaybackVolumeController {
   bool _nativeRgActive = false;
   bool _dvcEnabled = false;
   bool _bitPerfectBypass = false;
+  bool _hardwareVolumeActive = false;
 
   Completer<void>? _transitionCompleter;
   bool _isDisposed = false;
@@ -44,6 +45,7 @@ class PlaybackVolumeController {
   bool get nativeRgActive => _nativeRgActive;
   bool get dvcEnabled => _dvcEnabled;
   bool get bitPerfectBypass => _bitPerfectBypass;
+  bool get hardwareVolumeActive => _hardwareVolumeActive;
   bool get isDisposed => _isDisposed;
   bool get hasActiveTransitionTimer => _isTransitionActive && !_isDisposed;
 
@@ -57,6 +59,13 @@ class PlaybackVolumeController {
 
   void setBitPerfectBypass(bool bypass) {
     _bitPerfectBypass = bypass;
+  }
+
+  /// True when the USB DAC's own UAC volume stage is the active attenuation
+  /// control. In that configuration software volume must stay at unity so the
+  /// same attenuation is not applied twice (and the bitstream stays exact).
+  void setHardwareVolumeActive(bool active) {
+    _hardwareVolumeActive = active;
   }
 
   /// Mirrors [PulsrAudioHandler.isNativeRgActive]: when true the native DSP
@@ -87,6 +96,7 @@ class PlaybackVolumeController {
     bool? dvcEnabled,
     bool? isDopActive,
     bool? bitPerfectBypass,
+    bool? hardwareVolumeActive,
   }) {
     if (userVolume != null) _userVolume = userVolume.clamp(0.0, 1.0);
     if (replayGainMode != null) _replayGainMode = replayGainMode;
@@ -98,6 +108,9 @@ class PlaybackVolumeController {
     if (dvcEnabled != null) _dvcEnabled = dvcEnabled;
     if (isDopActive != null) _isDopActive = isDopActive;
     if (bitPerfectBypass != null) _bitPerfectBypass = bitPerfectBypass;
+    if (hardwareVolumeActive != null) {
+      _hardwareVolumeActive = hardwareVolumeActive;
+    }
   }
 
   /// Calculates target volume for [song] with current ReplayGain, ducking, and per-song offset.
@@ -110,8 +123,13 @@ class PlaybackVolumeController {
     // to avoid corrupting 0x05 / 0xFA marker bits into white noise.
     if (_isDopActive) return 1.0;
 
-    // Strict Bit-Perfect: bypass ReplayGain completely to preserve exact PCM samples
-    if (_bitPerfectBypass) return _userVolume;
+    // Strict Bit-Perfect: bypass ReplayGain completely to preserve exact PCM
+    // samples. When the DAC's hardware volume is the active control, software
+    // volume must be unity; otherwise a -20 dB slider would silently attenuate
+    // the "bit-perfect" stream.
+    if (_bitPerfectBypass) {
+      return _hardwareVolumeActive ? 1.0 : _userVolume;
+    }
 
     final effectiveUserVolume = _dvcEnabled ? 1.0 : _userVolume;
     final baseVolume =

@@ -64,8 +64,8 @@ void main() {
       test('MigrationValidationResult exposes schema audit status', () {
         const valResult = MigrationValidationResult(
           isValid: true,
-          currentVersion: 11,
-          expectedVersion: 11,
+          currentVersion: 12,
+          expectedVersion: 12,
           missingTables: [],
           missingColumns: [],
           missingIndexes: [],
@@ -76,7 +76,7 @@ void main() {
         expect(valResult.missingTables, isEmpty);
         expect(valResult.missingColumns, isEmpty);
         expect(valResult.missingIndexes, isEmpty);
-        expect(valResult.toString(), contains('version: 11/11'));
+        expect(valResult.toString(), contains('version: 12/12'));
       });
     });
 

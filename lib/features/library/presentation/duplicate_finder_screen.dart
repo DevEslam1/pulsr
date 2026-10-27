@@ -207,8 +207,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               .map((g) => DuplicateGroup(
                     key: g.key,
                     reason: g.reason,
-                    songs:
-                        g.songs.where((s) => !ids.contains(s.id)).toList(),
+                    songs: g.songs.where((s) => !ids.contains(s.id)).toList(),
                   ))
               .where((g) => g.songs.length > 1)
               .toList();
@@ -217,8 +216,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         });
         if (!mounted) return;
         PulsrToast.show(context,
-            message: l10n.songsDeleted,
-            icon: Icons.delete_outline_rounded);
+            message: l10n.songsDeleted, icon: Icons.delete_outline_rounded);
       },
     );
   }

@@ -305,7 +305,15 @@ std::vector<float> ArbitraryResponseEq::synthesizeFirKernel(
 }
 
 void ArbitraryResponseEq::synthesizeFir() {
-    firFilter_ = synthesizeFirKernel(nodes_, linearPhase_, sampleRate_);
+    // Use the scratch-buffer synthesizers, not synthesizeFirKernel(): the
+    // latter allocates two vectors (filter + spectrum) and is only safe for
+    // off-thread preparation. This path runs from applyPreparedNodes on the
+    // audio thread.
+    if (linearPhase_) {
+        synthesizeLinearPhaseFir();
+    } else {
+        synthesizeMinPhaseFir();
+    }
     hasResponse_ = !nodes_.empty();
     firSynthesizedRate_ = sampleRate_;
 }

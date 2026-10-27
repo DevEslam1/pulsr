@@ -60,6 +60,20 @@ class MiniPlayerState extends State<MiniPlayer> {
   @visibleForTesting
   ValueNotifier<bool> get isInteractingNotifier => _isInteracting;
   bool _swipeInFlight = false;
+
+  /// Bounded post-frame retries while the PageView catches up with a queue
+  /// whose length just changed. Each retry costs one frame.
+  int _pageSyncRetries = 0;
+  static const int _maxPageSyncRetries = 4;
+
+  /// Invalidates post-frame retries belonging to an older sync request, so a
+  /// rapid skip burst can never drag the carousel back to a previous track.
+  int _pageSyncGeneration = 0;
+
+  /// Upper bound for a swipe-triggered transport call. A hung skip used to
+  /// leave [_swipeInFlight] set forever, which stopped every later carousel
+  /// sync until the app was restarted.
+  static const Duration _swipeLatchTimeout = Duration(seconds: 10);
   Timer? _verticalSwipeTimer;
   double _verticalDragDy = 0.0;
   double _horizontalDragDx = 0.0;
@@ -83,22 +97,32 @@ class MiniPlayerState extends State<MiniPlayer> {
     if (_swipeInFlight) return;
     _swipeInFlight = true;
     try {
+      // A transport call that never completes must not latch [_swipeInFlight]
+      // and freeze the carousel for the rest of the session.
       switch (action) {
         case MiniPlayerSwipeAction.next:
           HapticFeedback.selectionClick();
-          await cubit.next();
+          await cubit.next().timeout(_swipeLatchTimeout);
           break;
         case MiniPlayerSwipeAction.prev:
           HapticFeedback.selectionClick();
-          await cubit.previous();
+          await cubit.previous().timeout(_swipeLatchTimeout);
           break;
         case MiniPlayerSwipeAction.volume:
           HapticFeedback.selectionClick();
-          await cubit.adjustVolume(swipedLeft ? -0.05 : 0.05);
+          await cubit
+              .adjustVolume(swipedLeft ? -0.05 : 0.05)
+              .timeout(_swipeLatchTimeout);
           break;
         case MiniPlayerSwipeAction.none:
           break;
       }
+    } on TimeoutException catch (e, st) {
+      ErrorLogger.log('MiniPlayer swipe action timed out',
+          error: e, stackTrace: st, category: 'MiniPlayer');
+    } catch (e, st) {
+      ErrorLogger.log('MiniPlayer swipe action failed',
+          error: e, stackTrace: st, category: 'MiniPlayer');
     } finally {
       if (mounted) {
         setState(() {
@@ -159,6 +183,7 @@ class MiniPlayerState extends State<MiniPlayer> {
     _controllerDisposed = true;
     _pendingSyncIndex = null;
     _pendingQueueLength = null;
+    _pageSyncRetries = 0;
     _isInteracting.removeListener(_onInteractionChanged);
     _isInteracting.dispose();
     _verticalSwipeTimer?.cancel();
@@ -194,12 +219,17 @@ class MiniPlayerState extends State<MiniPlayer> {
 
   void _syncPageController(int targetIndex, int queueLength) {
     if (_controllerDisposed || !mounted) return;
+    final generation = ++_pageSyncGeneration;
     try {
       final controller = _pageController;
-      if (queueLength == 0 || controller == null || _controllerDisposed) return;
+      if (queueLength == 0 || controller == null || _controllerDisposed) {
+        _pageSyncRetries = 0;
+        return;
+      }
       final safeIndex = targetIndex.clamp(0, queueLength - 1);
       // Never fight an in-progress user gesture or in-flight skip.
       if (_isInteracting.value || _swipeInFlight) {
+        _pageSyncRetries = 0;
         _pendingSyncIndex = safeIndex;
         _pendingQueueLength = queueLength;
         return;
@@ -210,38 +240,40 @@ class MiniPlayerState extends State<MiniPlayer> {
         _schedulePostFrameSync();
         return;
       }
-      final maxPage = controller.position.viewportDimension > 0
-          ? (controller.position.maxScrollExtent /
-                  controller.position.viewportDimension)
-              .round()
-          : queueLength - 1;
+      final currentPage = controller.page?.round();
 
-      // If the scroll position has not yet laid out the new queue size (e.g. queue
-      // was just replaced or enlarged), maxPage is still based on the old extent.
-      // Defer to post-frame so PageView has laid out with the new itemCount first.
-      if (safeIndex > maxPage) {
-        _pendingSyncIndex = safeIndex;
-        _pendingQueueLength = queueLength;
-        _schedulePostFrameSync();
+      // The PageView applies a new queue length to its sliver one frame before
+      // the sliver re-estimates maxScrollExtent: Flutter skips the layout pass
+      // when only the child count changed, so right after the queue grows
+      // maxScrollExtent still reports the old, shorter queue. The previous
+      // guard refused to jump past that stale extent and deferred to a
+      // post-frame retry — but that retry could never succeed, because the
+      // jump itself is what makes the sliver lay out and refresh the extent.
+      // The carousel therefore stayed on the previous song until the app was
+      // restarted. Jump anyway, then confirm after layout and retry a bounded
+      // number of frames in case the position clamped to the extent it did
+      // know about.
+      if (currentPage == safeIndex) {
+        _pageSyncRetries = 0;
+        _pendingSyncIndex = null;
+        _pendingQueueLength = null;
         return;
       }
 
       _pendingSyncIndex = null;
       _pendingQueueLength = null;
 
-      final currentPage = controller.page?.round();
-      if (currentPage != safeIndex) {
-        try {
-          if (!_controllerDisposed) {
-            controller.jumpToPage(safeIndex);
-          }
-        } catch (e, st) {
-          if (e is! FlutterError) {
-            ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
-                error: e, stackTrace: st, category: 'MiniPlayer');
-          }
+      try {
+        if (!_controllerDisposed) {
+          controller.jumpToPage(safeIndex);
+        }
+      } catch (e, st) {
+        if (e is! FlutterError) {
+          ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
+              error: e, stackTrace: st, category: 'MiniPlayer');
         }
       }
+      _verifyPageSync(safeIndex, queueLength, generation);
     } catch (e, st) {
       if (e is! FlutterError) {
         ErrorLogger.log('MiniPlayer PageController sync failed',
@@ -250,10 +282,38 @@ class MiniPlayerState extends State<MiniPlayer> {
     }
   }
 
+  /// Confirms a carousel jump survived layout and retries a bounded number of
+  /// frames otherwise. See [_syncPageController] for why the jump is attempted
+  /// before the PageView reports the new extent.
+  void _verifyPageSync(int targetIndex, int queueLength, int generation) {
+    if (_controllerDisposed || !mounted) return;
+    if (_pageSyncRetries >= _maxPageSyncRetries) {
+      _pageSyncRetries = 0;
+      return;
+    }
+    _pageSyncRetries++;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _controllerDisposed) return;
+      if (generation != _pageSyncGeneration) return;
+      final controller = _pageController;
+      if (controller == null || !controller.hasClients) return;
+      if (controller.page?.round() == targetIndex) {
+        _pageSyncRetries = 0;
+        return;
+      }
+      _syncPageController(targetIndex, queueLength);
+    });
+  }
+
   /// A swipe landed on [page]: skip to the new item and safely resync
   Future<void> _completeSwipe(int page, PlayerCubit cubit) async {
     try {
-      await cubit.skipToQueueItem(page);
+      // A skip that never completes must not latch [_swipeInFlight]: that
+      // freezes every later carousel sync until the app is restarted.
+      await cubit.skipToQueueItem(page).timeout(_swipeLatchTimeout);
+    } on TimeoutException catch (e, st) {
+      ErrorLogger.log('MiniPlayer swipe skip timed out',
+          error: e, stackTrace: st, category: 'MiniPlayer');
     } catch (e, st) {
       ErrorLogger.log('MiniPlayer swipe failed',
           error: e, stackTrace: st, category: 'MiniPlayer');

@@ -271,6 +271,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     // Auto-update online playlists & liked songs in background on every restart
     if (AppConfig.ytmEnabled && getIt.isRegistered<YtmAccountService>()) {
       final account = getIt<YtmAccountService>();
+      _wasYtmLoggedIn = account.isLoggedIn;
       account.loginState.removeListener(_onYtmLoginStateChanged);
       account.loginState.addListener(_onYtmLoginStateChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -284,11 +285,18 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     }
   }
 
+  bool _wasYtmLoggedIn = false;
+
   void _onYtmLoginStateChanged() {
     if (_disposed || isClosed) return;
-    if (getIt.isRegistered<YtmAccountService>() &&
-        !getIt<YtmAccountService>().isLoggedIn) {
-      clearOnlinePlaylists();
+    if (!getIt.isRegistered<YtmAccountService>()) return;
+    final isNowLoggedIn = getIt<YtmAccountService>().isLoggedIn;
+    final previouslyLoggedIn = _wasYtmLoggedIn;
+    _wasYtmLoggedIn = isNowLoggedIn;
+    // Only clear account-specific playlists on an actual logout transition.
+    // Never wipe custom playlists or clear on cold start when already unauthenticated.
+    if (previouslyLoggedIn && !isNowLoggedIn) {
+      clearAccountOnlinePlaylists();
     }
   }
 
@@ -1249,6 +1257,20 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final updated = List<OnlinePlaylistEntry>.from(onlineState.customPlaylists)
       ..add(entry);
     _setOnlineState((s) => s.copyWith(customPlaylists: updated));
+    unawaited(_saveOnlineCache());
+  }
+
+  /// Resets account-specific online playlist state (liked + account playlists)
+  /// while preserving user-added custom playlists.
+  void clearAccountOnlinePlaylists() {
+    _setOnlineState((current) => current.copyWith(
+          likedTracks: const [],
+          likedStatus: YtmFetchStatus.idle,
+          likedError: null,
+          accountPlaylists: const [],
+          accountStatus: YtmFetchStatus.idle,
+          accountError: null,
+        ));
     unawaited(_saveOnlineCache());
   }
 

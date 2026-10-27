@@ -12,7 +12,8 @@ public:
     enum class DsdRate {
         DSD64 = 64,    // 2.8224 MHz (64 * 44.1 kHz)
         DSD128 = 128,  // 5.6448 MHz
-        DSD256 = 256   // 11.2896 MHz
+        DSD256 = 256,  // 11.2896 MHz
+        DSD512 = 512   // 22.5792 MHz
     };
 
     enum class DsdBitOrder {

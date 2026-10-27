@@ -27,11 +27,14 @@ class AppConfig {
               defaultValue: bool.fromEnvironment('ytm',
                   defaultValue: bool.fromEnvironment('-ytm',
                       defaultValue: bool.fromEnvironment('--ytm',
-                          defaultValue: String.fromEnvironment('FLAVOR') == 'ytm' ||
+                          defaultValue: String.fromEnvironment('FLAVOR') ==
+                                  'ytm' ||
                               String.fromEnvironment('flavor') == 'ytm' ||
                               String.fromEnvironment('ENABLE_YTM') == '1' ||
-                              String.fromEnvironment('ENABLE_YTM') == 'enabled' ||
-                              String.fromEnvironment('ENABLE_YTM') == 'enebeld' ||
+                              String.fromEnvironment('ENABLE_YTM') ==
+                                  'enabled' ||
+                              String.fromEnvironment('ENABLE_YTM') ==
+                                  'enebeld' ||
                               String.fromEnvironment('YTM') == '1' ||
                               String.fromEnvironment('YTM') == 'enabled' ||
                               String.fromEnvironment('ytm') == '1' ||
@@ -44,7 +47,8 @@ class AppConfig {
                               String.fromEnvironment('--ytm') == 'true' ||
                               String.fromEnvironment('--ytm') == '1' ||
                               String.fromEnvironment('--ytm') == 'enabled' ||
-                              String.fromEnvironment('--ytm') == 'enebeld'))))));
+                              String.fromEnvironment('--ytm') ==
+                                  'enebeld'))))));
 
   /// In-app voice search. There is no on-device speech recognizer wired up, so
   /// the mic affordance is hidden entirely unless this is explicitly enabled

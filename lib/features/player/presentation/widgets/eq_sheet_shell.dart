@@ -1267,13 +1267,17 @@ extension _EqSheetShell on _EqualizerSheetState {
                           color: !isStudio ? p.onAccent : p.textSecondary,
                         ),
                         const SizedBox(width: AppSpacing.s6),
-                        Text(
-                          context.l10n.eqModeEssential,
-                          style: TextStyle(
-                            fontSize: AppFontSize.label,
-                            fontWeight:
-                                !isStudio ? FontWeight.w800 : FontWeight.w600,
-                            color: !isStudio ? p.onAccent : p.textSecondary,
+                        Flexible(
+                          child: Text(
+                            context.l10n.eqModeEssential,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              fontWeight:
+                                  !isStudio ? FontWeight.w800 : FontWeight.w600,
+                              color: !isStudio ? p.onAccent : p.textSecondary,
+                            ),
                           ),
                         ),
                       ],
@@ -1313,13 +1317,17 @@ extension _EqSheetShell on _EqualizerSheetState {
                           color: isStudio ? p.onAccent : p.textSecondary,
                         ),
                         const SizedBox(width: AppSpacing.s6),
-                        Text(
-                          context.l10n.eqModeStudioPro,
-                          style: TextStyle(
-                            fontSize: AppFontSize.label,
-                            fontWeight:
-                                isStudio ? FontWeight.w800 : FontWeight.w600,
-                            color: isStudio ? p.onAccent : p.textSecondary,
+                        Flexible(
+                          child: Text(
+                            context.l10n.eqModeStudioPro,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              fontWeight:
+                                  isStudio ? FontWeight.w800 : FontWeight.w600,
+                              color: isStudio ? p.onAccent : p.textSecondary,
+                            ),
                           ),
                         ),
                       ],
@@ -3550,10 +3558,14 @@ extension _EqSheetShell on _EqualizerSheetState {
               ),
             ],
           );
-          if (constraints.maxWidth < 360) {
-            return FittedBox(fit: BoxFit.scaleDown, child: row);
-          }
-          return row;
+          // The four device chips need ~500 px at natural size. Scale the
+          // whole row down whenever the sheet is narrower; the previous
+          // `< 360` threshold still overflowed on 374–500 px surfaces.
+          return FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.center,
+            child: row,
+          );
         },
       ),
     );

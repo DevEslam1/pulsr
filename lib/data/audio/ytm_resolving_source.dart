@@ -16,7 +16,6 @@ import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import 'adaptive_buffer_engine.dart';
 import '../../core/services/ytm_cache_manager.dart';
-import '../../core/services/ytm_service.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../domain/models/ytm_track.dart';
@@ -258,7 +257,11 @@ class YtmResolvingSource extends StreamAudioSource {
         info.signal == YtmBlockSignal.videoGone ||
         info.signal == YtmBlockSignal.signInRequired ||
         info.signal == YtmBlockSignal.poTokenInvalid ||
-        info.signal == YtmBlockSignal.geoBlocked;
+        info.signal == YtmBlockSignal.geoBlocked ||
+        // Age-restricted tracks and cancellations never resolve on a retry;
+        // latching them stops ExoPlayer's proxy retry spiral.
+        info.signal == YtmBlockSignal.ageRestricted ||
+        info.signal == YtmBlockSignal.interrupted;
   }
 
   /// Whether the stream URL itself is dead, as opposed to the connection to it.

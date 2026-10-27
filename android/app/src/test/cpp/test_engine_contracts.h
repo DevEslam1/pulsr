@@ -66,7 +66,8 @@ void runEngineCommandContractsTest() {
     // Reset smoothed DVC so only the safety limiter contributes delay.
     engine->reset();
     engine->processInterleaved(pcm.data(), 512, 2);
-    assert(engine->getPipelineLatencyFrames() == 480); // 5ms at 96kHz
+    assert(engine->getPipelineLatencyFrames() ==
+           480 + LookaheadLimiter::FILTER_DELAY); // 5ms at 96kHz + true-peak FIR
     params->headphoneSafety.enabled = false;
     params->resampler.enabled = true;
     params->resampler.inRate = 44100;

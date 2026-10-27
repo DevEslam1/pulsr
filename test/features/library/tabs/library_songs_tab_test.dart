@@ -211,8 +211,7 @@ void main() {
     expect(find.byType(SongTile), findsOneWidget);
   });
 
-  testWidgets(
-      'downloaded tab shows downloads outside the loaded 500-row page',
+  testWidgets('downloaded tab shows downloads outside the loaded 500-row page',
       (tester) async {
     disableAnimations(tester);
     setSurface(tester);

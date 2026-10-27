@@ -110,8 +110,8 @@ class PulsrDialogHelper {
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           ),
-          child: Text(cancel,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          child:
+              Text(cancel, style: const TextStyle(fontWeight: FontWeight.w600)),
         ),
         FilledButton(
           onPressed: () {

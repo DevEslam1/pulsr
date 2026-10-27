@@ -35,11 +35,19 @@ class YtmBrowseItem {
 }
 
 class YtmBrowseSection {
+  static const String chartsId = 'charts';
+  static const String newReleasesId = 'newReleases';
+  static const String moodsId = 'moods';
+
+  /// Stable key for a section, used by per-section refresh. Empty for callers
+  /// that only render a section and never refresh it (tests, previews).
+  final String id;
   final String title;
   final String? subtitle;
   final List<YtmBrowseItem> items;
 
   const YtmBrowseSection({
+    this.id = '',
     required this.title,
     this.subtitle,
     required this.items,
@@ -63,6 +71,10 @@ class YtmBrowseService {
 
   YtmBrowseService(this._ytmService, {YtmClockFn? clock})
       : _now = clock ?? DateTime.now;
+
+  /// When the feed currently held in memory was fetched, or null when nothing
+  /// is cached. The screen renders this as a "last updated" stamp.
+  DateTime? get lastFetchTime => _lastFetchTime;
 
   /// Clears in-memory browse feed cache upon network/region changes.
   ///
@@ -123,16 +135,19 @@ class YtmBrowseService {
 
       final rawSections = [
         YtmBrowseSection(
+          id: YtmBrowseSection.chartsId,
           title: 'Top Charts & Trending',
           subtitle: 'Most played tracks right now',
           items: charts,
         ),
         YtmBrowseSection(
+          id: YtmBrowseSection.newReleasesId,
           title: 'New Releases',
           subtitle: 'Fresh albums & singles',
           items: newReleases,
         ),
         YtmBrowseSection(
+          id: YtmBrowseSection.moodsId,
           title: 'Moods & Genres',
           subtitle: 'Popular tracks from YouTube Music moods & genres',
           items: moods,
@@ -168,6 +183,55 @@ class YtmBrowseService {
       if (!completer.isCompleted) completer.completeError(e, st);
       if (identical(_pendingFeed, completer)) _pendingFeed = null;
       return completer.future;
+    }
+  }
+
+  /// Refetches one section without touching the rest of the feed.
+  ///
+  /// A section that failed during the concurrent first load leaves a hole the
+  /// user cannot fill without reloading everything (and losing the sections
+  /// that did load). This fetches just that feed and replaces its slot in the
+  /// in-memory cache.
+  Future<YtmBrowseSection> refreshSection(YtmBrowseSection section) async {
+    final id =
+        section.id.isNotEmpty ? section.id : _sectionIdForTitle(section.title);
+    if (id.isEmpty) {
+      throw ArgumentError.value(section.title, 'section', 'Unknown section');
+    }
+
+    final items = switch (id) {
+      YtmBrowseSection.chartsId => await _getTrendingCharts(strict: true),
+      YtmBrowseSection.newReleasesId => await _getNewReleases(strict: true),
+      YtmBrowseSection.moodsId => await _getMoodsAndGenres(strict: true),
+      _ => throw ArgumentError.value(id, 'section', 'Unknown section id'),
+    };
+
+    final refreshed = YtmBrowseSection(
+      id: id,
+      title: section.title,
+      subtitle: section.subtitle,
+      items: items,
+    );
+    final cached = _cachedSections;
+    if (cached != null) {
+      _cachedSections = List<YtmBrowseSection>.unmodifiable([
+        for (final existing in cached)
+          if (existing.id == id) refreshed else existing,
+      ]);
+    }
+    return refreshed;
+  }
+
+  String _sectionIdForTitle(String title) {
+    switch (title) {
+      case 'Top Charts & Trending':
+        return YtmBrowseSection.chartsId;
+      case 'New Releases':
+        return YtmBrowseSection.newReleasesId;
+      case 'Moods & Genres':
+        return YtmBrowseSection.moodsId;
+      default:
+        return '';
     }
   }
 

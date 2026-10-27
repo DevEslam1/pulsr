@@ -184,6 +184,7 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     stereoWidth_.setSampleRate(sampleRate);
     loudnessContour_.setSampleRate(sampleRate);
     subCrossover_.setSampleRate(sampleRate);
+    channelManager_.setSampleRate(sampleRate);
     dynamicEq_.setSampleRate(sampleRate);
     multibandCompressor_.setSampleRate(sampleRate);
     dynamicBass_.prepare(sampleRate);
@@ -757,6 +758,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             stereoWidth_.setSampleRate(sr);
             loudnessContour_.setSampleRate(sr);
             subCrossover_.setSampleRate(sr);
+    channelManager_.setSampleRate(sr);
             dynamicEq_.setSampleRate(sr);
             multibandCompressor_.setSampleRate(sr);
             dynamicBass_.prepare(sr);
@@ -775,6 +777,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         stereoWidth_.applyParams(snapshot->stereoWidth);
         loudnessContour_.applyParams(snapshot->loudness);
         subCrossover_.applyParams(snapshot->subCrossover);
+        channelManager_.applyParams(snapshot->channelManager);
         dynamicEq_.applyParams(snapshot->dynamicEq);
         multibandCompressor_.applyParams(snapshot->multibandCompressor);
         dynamicBass_.setParams(
@@ -1082,6 +1085,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                     }
                 }
             }
+        }
+
+        // 9c. Multichannel trim/delay (2-8 channels). Runs before the limiter
+        // so a boosted surround channel is still caught by the brickwall.
+        if (stages & STAGE_CHANNEL_MANAGER) {
+            channelManager_.processInterleaved(buffer, frames, channels);
         }
 
         // 10. Lookahead Limiter Stage — inserted only when net gain > 0dB or enabled by config

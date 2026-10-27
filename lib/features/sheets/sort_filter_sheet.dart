@@ -59,8 +59,7 @@ class SortFilterSheet extends StatelessWidget {
       'lastPlayed',
     };
     final isSelected = currentSort == key;
-    final newAsc =
-        isSelected ? !ascending : !descendingFirst.contains(key);
+    final newAsc = isSelected ? !ascending : !descendingFirst.contains(key);
     HapticFeedback.selectionClick();
     onApply(key, newAsc);
     Navigator.pop(context);
@@ -81,9 +80,7 @@ class SortFilterSheet extends StatelessWidget {
           label: context.l10n.artist,
           icon: Icons.person_outline_rounded),
       _SortOptionSpec(
-          key: 'album',
-          label: context.l10n.albums,
-          icon: Icons.album_outlined),
+          key: 'album', label: context.l10n.albums, icon: Icons.album_outlined),
       _SortOptionSpec(
           key: 'dateAdded',
           label: context.l10n.recentlyAdded,
@@ -169,8 +166,8 @@ class SortFilterSheet extends StatelessWidget {
             if (useTwoColumns) {
               return GridView.builder(
                 shrinkWrap: true,
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.s20),
+                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
+                    AppSpacing.sm, AppSpacing.md, AppSpacing.s20),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   mainAxisExtent: 54,
@@ -260,8 +257,7 @@ class SortFilterSheet extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isSelected ? p.accent : p.textPrimary,
-                    fontWeight:
-                        isSelected ? FontWeight.w800 : FontWeight.w600,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                     fontSize: AppFontSize.body,
                   ),
                 ),

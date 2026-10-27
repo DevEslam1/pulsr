@@ -134,11 +134,11 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                               child: Container(
                                 decoration: BoxDecoration(
                                   borderRadius: AppRadii.circular(
-                                       resolveCustomRadius(context, 20)),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.16),
-                                      width: 1.2,
-                                    ),
+                                      resolveCustomRadius(context, 20)),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                    width: 1.2,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
                                       color:

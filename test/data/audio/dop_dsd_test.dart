@@ -190,5 +190,19 @@ void main() {
       expect(dsd64Only.supportsRate(256), isFalse);
       expect(dsd64Only.supportsRate(512), isFalse);
     });
+
+    test('DSD512 is a native PCM capability, not a DoP carrier', () {
+      const dsd512Native = DsdDacCapabilities(
+        dsd64: false,
+        dsd128: false,
+        dsd256: false,
+        dsd512: true,
+        dop: true,
+        nativeDac: true,
+      );
+      expect(dsd512Native.supportsRate(512), isTrue);
+      expect(dsd512Native.canUseDop, isFalse);
+      expect(DopEncoder.dopPcmSampleRate(512), 0);
+    });
   });
 }

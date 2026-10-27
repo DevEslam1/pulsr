@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
+import '../../../core/services/ytm_search_cache.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/ytm_track.dart';
@@ -17,7 +18,14 @@ import 'ytm_search_state.dart';
 @injectable
 class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   final YtmService _service;
+  final YtmSearchCache _cache;
   Timer? _debounceTimer;
+
+  /// True while [state.results] came from [YtmSearchCache] instead of the
+  /// network. The screen shows a neutral "saved results" strip; the results
+  /// themselves stay fully playable/downloadable.
+  bool _showingCachedResults = false;
+  bool get showingCachedResults => _showingCachedResults;
 
   int _generation = 0;
   // FIX-C7: Latch to prevent concurrent bot-block retries
@@ -65,8 +73,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     historyNotifier.value = List.unmodifiable(list.take(10));
   }
 
-  YtmSearchCubit({required YtmService service})
+  YtmSearchCubit({required YtmService service, YtmSearchCache? cache})
       : _service = service,
+        _cache = cache ?? YtmSearchCache(),
         super(const YtmSearchState()) {
     _loadHistory();
   }
@@ -175,6 +184,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     _bumpGeneration();
     _debounceTimer?.cancel();
     _resetPaging();
+    _showingCachedResults = false;
     if (query.trim().isEmpty) {
       safeEmit(const YtmSearchState());
       return;
@@ -189,6 +199,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     _debounceTimer?.cancel();
     _bumpGeneration();
     _resetPaging();
+    _showingCachedResults = false;
     safeEmit(const YtmSearchState());
   }
 
@@ -292,6 +303,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     }
 
     _resetPaging();
+    _showingCachedResults = false;
     safeEmit(state.copyWith(isLoading: true, errorMessage: null));
     try {
       final videoId = FileIntentHandler.extractYouTubeVideoId(query);
@@ -324,6 +336,24 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
       final results = await _service.searchWithFallback(query);
       if (effectiveGeneration != _generation || isClosed) return;
+      _showingCachedResults = false;
+
+      if (results.isEmpty) {
+        // Emit the live "no results" answer immediately: the cache lookup is
+        // best-effort and must never hold the UI on a spinner. If a saved
+        // answer exists, it replaces the empty state a beat later.
+        _nextLimit = _searchPageSize;
+        _hasMore = false;
+        safeEmit(state.copyWith(
+          results: const [],
+          isLoading: false,
+          loadMoreFailed: false,
+          errorMessage: null,
+        ));
+        unawaited(_maybeShowCached(query, effectiveGeneration));
+        return;
+      }
+
       _nextLimit = _searchPageSize;
       _hasMore = results.length >= _searchPageSize &&
           _searchPageSize < _maxSearchLimit;
@@ -332,7 +362,10 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           isLoading: false,
           loadMoreFailed: false,
           errorMessage: null));
-      if (results.isNotEmpty) unawaited(_saveToHistory(query));
+      if (results.isNotEmpty) {
+        unawaited(_saveToHistory(query));
+        unawaited(_cache.write(query, results));
+      }
       // Speculative warm: the first [_warmTopN] hits are the taps users make
       // most often. Resolving each stream URL now (one background player
       // request) turns that tap into a cache hit (~62ms) instead of a full
@@ -414,13 +447,36 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           : errorInfo.message;
       safeEmit(
           state.copyWith(isLoading: false, results: [], errorMessage: msg));
+      // Only a transport failure is answered from the cache. A bot/geo/rate
+      // verdict must stay visible: cached cards would play, then fail again.
+      if (e.isNetwork ||
+          errorInfo.signal == YtmBlockSignal.networkUnavailable) {
+        unawaited(_maybeShowCached(query, effectiveGeneration));
+      }
     } catch (e) {
       // FIX-C04: Ensure generation guard precedes emit
       if (effectiveGeneration != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
       safeEmit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
+      unawaited(_maybeShowCached(query, effectiveGeneration));
     }
+  }
+
+  /// Replaces an empty live answer with the last saved one, when available.
+  /// Runs after the empty state is already on screen, so a slow preferences
+  /// read can never delay it.
+  Future<void> _maybeShowCached(String query, int generation) async {
+    final cached = await _cache.read(query);
+    if (isClosed || generation != _generation) return;
+    if (cached.isEmpty) return;
+    _showingCachedResults = true;
+    safeEmit(state.copyWith(
+      results: List<YtmTrack>.unmodifiable(cached),
+      isLoading: false,
+      loadMoreFailed: false,
+      errorMessage: null,
+    ));
   }
 
   @override

@@ -2543,6 +2543,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get radioCuratedBrowse => 'Explorar emisoras seleccionadas';
 
   @override
+  String get radioDirectoryBrowse => 'Explorar directorio de radio';
+
+  @override
+  String get radioDirectoryHint => 'Buscar emisoras por nombre';
+
+  @override
+  String get radioDirectoryEmpty => 'No se encontraron emisoras';
+
+  @override
+  String get radioDirectoryError => 'No se pudo cargar el directorio de radio';
+
+  @override
+  String get radioDirectoryAdded => 'Añadida';
+
+  @override
+  String get radioDirectoryUnreachable =>
+      'No se pudo acceder a esta emisión. Prueba otra emisora.';
+
+  @override
   String radioCuratedAdded(int count) {
     return '$count emisoras seleccionadas añadidas';
   }
@@ -3983,7 +4002,19 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get bpGuardrails =>
-      'Protecciones activas: DSP omitido. Ajusta con el DAC.';
+      'Protecciones activas: DSP y ReplayGain omitidos. Usa el volumen del DAC cuando esté activo.';
+
+  @override
+  String get bpChainVerified => 'Cadena bit-perfect verificada';
+
+  @override
+  String get bpChainResampled => 'Se detectó remuestreo del sistema';
+
+  @override
+  String get bpChainDepthReduced => 'Profundidad de bits truncada';
+
+  @override
+  String get bpChainInactive => 'Bit-Perfect armado pero inactivo';
 
   @override
   String get btAudioCodec => 'CODEC BLUETOOTH';
@@ -6549,6 +6580,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'No hay recomendaciones en este momento.';
 
   @override
+  String get ytmCachedResults =>
+      'Se muestran resultados guardados de una búsqueda anterior.';
+
+  @override
   String get browseNoResultsFound => 'No se encontraron resultados';
 
   @override
@@ -6978,6 +7013,18 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get errYtmRegionRestricted =>
       'Esta pista está restringida en tu región.';
+
+  @override
+  String get errYtmAgeRestricted =>
+      'Esta pista tiene restricción de edad (+18) y no se puede reproducir aquí.';
+
+  @override
+  String get errYtmStreamFailed =>
+      'No se pudo cargar la emisión. Actualizando el enlace…';
+
+  @override
+  String get errYtmStreamExpired =>
+      'El enlace de emisión caducó. Actualizando…';
 
   @override
   String get errYtmUnavailable => 'Esta pista no está disponible.';

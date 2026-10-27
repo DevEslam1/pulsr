@@ -31,6 +31,49 @@ void main() {
     expect((jsonDecode(raw!) as List).length, 2);
   });
 
+  test('an add issued before the initial load finishes is not erased',
+      () async {
+    final store = RadioStationStore();
+    final station =
+        RadioStation.create(name: 'Early', url: 'https://early.example/live');
+
+    // Deliberately do not await ready: the mutation must queue behind the disk
+    // read instead of racing it and being cleared by the load.
+    await store.add(station);
+
+    expect(store.list.single.url, station.url);
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+        jsonDecode(prefs.getString(RadioStationStore.prefsKey)!), hasLength(1));
+  });
+
+  test('concurrent mutations are serialized without losing a station',
+      () async {
+    final store = RadioStationStore();
+    await store.ready;
+    final stations = List.generate(
+      6,
+      (i) => RadioStation.create(
+          name: 'Station $i', url: 'https://s$i.example/live'),
+    );
+
+    await Future.wait([
+      for (final station in stations) store.add(station),
+      store.remove('does-not-exist'),
+    ]);
+
+    expect(store.list, hasLength(stations.length));
+    expect(
+      store.list.map((s) => s.url).toSet(),
+      stations.map((s) => s.url).toSet(),
+    );
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      jsonDecode(prefs.getString(RadioStationStore.prefsKey)!),
+      hasLength(stations.length),
+    );
+  });
+
   test('addAll skips invalid URLs but persists the rest', () async {
     final store = RadioStationStore();
     await store.ready;
@@ -103,7 +146,8 @@ void main() {
     await store.importCurated();
 
     // Verify first stations are all Quran stations
-    final quranCount = store.list.where(RadioStationStore.isQuranStation).length;
+    final quranCount =
+        store.list.where(RadioStationStore.isQuranStation).length;
     expect(quranCount, 7);
     for (var i = 0; i < quranCount; i++) {
       expect(RadioStationStore.isQuranStation(store.list[i]), isTrue,
@@ -154,7 +198,8 @@ void main() {
     expect(
       RadioStationStore.resolveArtworkForStation(
         name: 'إذاعة الشيخ محمد صديق المنشاوي (مجود)',
-        url: 'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
+        url:
+            'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
       ),
       RadioStationStore.minshawiArtwork,
     );

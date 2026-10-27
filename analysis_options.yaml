@@ -17,6 +17,9 @@ analyzer:
     - macos/**
     - linux/**
     - third_party/**
+    # Scratch is an experiment area (WIP copies, one-off probes); it is not
+    # compiled into the app and must not gate `flutter analyze`.
+    - scratch/**
 include: package:flutter_lints/flutter.yaml
 
 linter:

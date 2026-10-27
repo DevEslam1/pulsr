@@ -1672,9 +1672,16 @@ class YtmAccountService {
 
       if (nextRes.statusCode == 200) {
         final json = jsonDecode(nextRes.body) as Map<String, dynamic>;
-        final panel = json['contents']
-            ?['singleColumnMusicWatchNextResultsRenderer']
-            ?['playlist']?['playlistPanelRenderer'];
+        final contents = json['contents'];
+        final singleColumn = contents is Map<String, dynamic>
+            ? contents['singleColumnMusicWatchNextResultsRenderer']
+            : null;
+        final playlistNode = singleColumn is Map<String, dynamic>
+            ? singleColumn['playlist']
+            : null;
+        final panel = playlistNode is Map<String, dynamic>
+            ? playlistNode['playlistPanelRenderer']
+            : null;
         if (panel is Map<String, dynamic>) {
           if (panel['title'] is String &&
               (panel['title'] as String).trim().isNotEmpty) {

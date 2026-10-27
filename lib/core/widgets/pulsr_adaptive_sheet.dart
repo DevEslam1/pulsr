@@ -268,9 +268,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
           ),
           borderRadius: effectiveBorderRadius,
           border: Border.all(
-            color: p.isDark
-                ? Colors.white.withValues(alpha: 0.10)
-                : p.hairline,
+            color: p.isDark ? Colors.white.withValues(alpha: 0.10) : p.hairline,
             width: 1.0,
           ),
           boxShadow: [

@@ -1435,7 +1435,8 @@ internal class InnertubeClient(
                     e.signal == YtmBlockSignal.ClientDeprecated ||
                     e.signal == YtmBlockSignal.SabrEnforced ||
                     e.signal == YtmBlockSignal.SignatureDecipherFailed ||
-                    e.signal == YtmBlockSignal.GeoBlocked
+                    e.signal == YtmBlockSignal.GeoBlocked ||
+                    e.signal == YtmBlockSignal.AgeRestricted
                 ) {
                     throw e
                 }
@@ -1799,6 +1800,7 @@ internal class InnertubeClient(
             YtmBlockSignal.SignInRequired          -> 2
             YtmBlockSignal.ClientDeprecated        -> 2
             YtmBlockSignal.GeoBlocked              -> 2
+            YtmBlockSignal.AgeRestricted           -> 2
             YtmBlockSignal.VideoGone               -> 1
             YtmBlockSignal.NetworkUnavailable      -> 0
             null                                   -> -1

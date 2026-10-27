@@ -363,8 +363,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                                   },
                                   onLongPress: () =>
                                       cubit.toggleSongSelection(song.id),
-                                  onMorePressed: () =>
-                                      SongOptionsSheet.show(context, song: song, isFavoriteScreen: true),
+                                  onMorePressed: () => SongOptionsSheet.show(
+                                      context,
+                                      song: song,
+                                      isFavoriteScreen: true),
                                 ),
                               ));
                         },

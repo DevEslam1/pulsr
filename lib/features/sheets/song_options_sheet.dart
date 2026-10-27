@@ -242,7 +242,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
       }
       if (context.mounted) {
         if (targetAlbum != null) {
-          context.push('/album', extra: targetAlbum);
+          context.push('/album?id=${targetAlbum.id}', extra: targetAlbum);
         } else {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -277,7 +277,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
       }
       if (context.mounted) {
         if (targetArtist != null) {
-          context.push('/artist', extra: targetArtist);
+          context.push('/artist?id=${targetArtist.id}', extra: targetArtist);
         } else {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(

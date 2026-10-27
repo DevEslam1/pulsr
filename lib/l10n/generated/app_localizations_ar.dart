@@ -2539,6 +2539,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String get radioCuratedBrowse => 'تصفح المحطات المختارة';
 
   @override
+  String get radioDirectoryBrowse => 'تصفح دليل الراديو';
+
+  @override
+  String get radioDirectoryHint => 'ابحث عن المحطات بالاسم';
+
+  @override
+  String get radioDirectoryEmpty => 'لم يتم العثور على محطات';
+
+  @override
+  String get radioDirectoryError => 'تعذر تحميل دليل الراديو';
+
+  @override
+  String get radioDirectoryAdded => 'تمت الإضافة';
+
+  @override
+  String get radioDirectoryUnreachable =>
+      'تعذّر الوصول إلى هذا البث. جرّب محطة أخرى.';
+
+  @override
   String radioCuratedAdded(int count) {
     return 'تمت إضافة $count محطة مختارة';
   }
@@ -3963,7 +3982,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get armedLabel => 'مجهز';
 
   @override
-  String get bpGuardrails => 'الحماية نشطة: تم تجاوز DSP. اضبط الصوت من DAC';
+  String get bpGuardrails =>
+      'الحماية نشطة: تم تجاوز DSP وReplayGain. استخدم مستوى صوت DAC عند تفعيله.';
+
+  @override
+  String get bpChainVerified => 'سلسلة بت-بيرفكت مُتحقّقة';
+
+  @override
+  String get bpChainResampled => 'تم كشف إعادة أخذ عينات من النظام';
+
+  @override
+  String get bpChainDepthReduced => 'تم تقليل عمق البِت';
+
+  @override
+  String get bpChainInactive => 'وضع بت-بيرفكت مُفعّل لكنه غير نشط';
 
   @override
   String get btAudioCodec => 'كودك البلوتوث';
@@ -6470,6 +6502,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseNoRecommendations => 'لا توجد توصيات الآن.';
 
   @override
+  String get ytmCachedResults => 'تُعرض نتائج محفوظة من بحث سابق.';
+
+  @override
   String get browseNoResultsFound => 'لا توجد نتائج';
 
   @override
@@ -6890,6 +6925,16 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errYtmRegionRestricted => 'هذا المسار مقيد في منطقتك.';
+
+  @override
+  String get errYtmAgeRestricted =>
+      'هذا المقطع مقيّد بالعمر (+18) ولا يمكن تشغيله هنا.';
+
+  @override
+  String get errYtmStreamFailed => 'تعذّر تحميل البث. جارٍ تحديث الرابط…';
+
+  @override
+  String get errYtmStreamExpired => 'انتهت صلاحية رابط البث. جارٍ التحديث…';
 
   @override
   String get errYtmUnavailable => 'هذا المسار غير متاح.';

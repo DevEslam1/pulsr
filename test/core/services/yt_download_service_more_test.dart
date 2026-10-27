@@ -298,6 +298,8 @@ void main() {
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).thenAnswer((_) async => stream());
 
       final resolved =

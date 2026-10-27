@@ -487,8 +487,8 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                         side: BorderSide(color: p.hairline),
                       ),
                       onPressed: () => _shareSong(context),
-                      icon: Icon(Icons.share_rounded,
-                          size: 19, color: p.accent),
+                      icon:
+                          Icon(Icons.share_rounded, size: 19, color: p.accent),
                       label: Text(
                         context.l10n.share,
                         style: TextStyle(
@@ -545,8 +545,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 48),
-                    backgroundColor:
-                        p.surfaceContainer.withValues(alpha: 0.65),
+                    backgroundColor: p.surfaceContainer.withValues(alpha: 0.65),
                     padding:
                         const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                     shape: RoundedRectangleBorder(

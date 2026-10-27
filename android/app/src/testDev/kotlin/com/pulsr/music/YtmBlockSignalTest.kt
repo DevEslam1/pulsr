@@ -3,6 +3,7 @@ package com.pulsr.music
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -41,6 +42,66 @@ class YtmBlockSignalTest {
         assertEquals(
             YtmBlockSignal.NetworkUnavailable,
             YtmBlockSignal.parse(0, "network unavailable")
+        )
+    }
+
+    @Test
+    fun testConnectionPhrasesAreNetworkUnavailable() {
+        assertEquals(
+            YtmBlockSignal.NetworkUnavailable,
+            YtmBlockSignal.parse(0, "java.net.SocketException: Connection reset by peer")
+        )
+        assertEquals(
+            YtmBlockSignal.NetworkUnavailable,
+            YtmBlockSignal.parse(0, "Bad connection")
+        )
+        assertEquals(
+            YtmBlockSignal.NetworkUnavailable,
+            YtmBlockSignal.parse(0, "unexpected end of stream")
+        )
+        assertEquals(
+            YtmBlockSignal.NetworkUnavailable,
+            YtmBlockSignal.parse(0, "SSLHandshakeException: handshake failed")
+        )
+    }
+
+    @Test
+    fun testAgeRestrictedSignal() {
+        val loginRequired = JSONObject().apply { put("status", "LOGIN_REQUIRED") }
+        assertEquals(
+            YtmBlockSignal.AgeRestricted,
+            YtmBlockSignal.parse(
+                200,
+                "This video may be inappropriate for some users. Sign in to confirm your age.",
+                loginRequired
+            )
+        )
+        assertEquals(
+            YtmBlockSignal.AgeRestricted,
+            YtmBlockSignal.parse(200, "Age verification required")
+        )
+
+        val ageCheck = JSONObject().apply { put("status", "AGE_CHECK_REQUIRED") }
+        assertEquals(
+            YtmBlockSignal.AgeRestricted,
+            YtmBlockSignal.parse(200, "", ageCheck)
+        )
+    }
+
+    @Test
+    fun testBotDetectionDoesNotMatchTrackTitlesOrAgeWalls() {
+        assertNotEquals(
+            YtmBlockSignal.BotChallenge,
+            YtmBlockSignal.parse(200, "Robot Rock - Daft Punk")
+        )
+        val loginRequired = JSONObject().apply { put("status", "LOGIN_REQUIRED") }
+        assertNotEquals(
+            YtmBlockSignal.BotChallenge,
+            YtmBlockSignal.parse(200, "verification required", loginRequired)
+        )
+        assertEquals(
+            YtmBlockSignal.AgeRestricted,
+            YtmBlockSignal.parse(200, "age verification required", loginRequired)
         )
     }
 
@@ -222,7 +283,7 @@ class YtmBlockSignalTest {
             YtmBlockSignal.IpBlocked -> 5
             YtmBlockSignal.SignatureDecipherFailed -> 4
             YtmBlockSignal.SabrEnforced -> 3
-            YtmBlockSignal.SignInRequired, YtmBlockSignal.ClientDeprecated, YtmBlockSignal.GeoBlocked -> 2
+            YtmBlockSignal.SignInRequired, YtmBlockSignal.ClientDeprecated, YtmBlockSignal.GeoBlocked, YtmBlockSignal.AgeRestricted -> 2
             YtmBlockSignal.VideoGone -> 1
             YtmBlockSignal.NetworkUnavailable -> 0
         }

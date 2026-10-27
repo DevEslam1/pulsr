@@ -111,7 +111,8 @@ class PlaylistUseCases {
     return _repository.reorderOnlinePlaylistTracks(playlistId, orderedVideoIds);
   }
 
-  Future<Result<void>> renameOnlinePlaylist(String playlistId, String newTitle) {
+  Future<Result<void>> renameOnlinePlaylist(
+      String playlistId, String newTitle) {
     return _repository.renameOnlinePlaylist(playlistId, newTitle);
   }
 

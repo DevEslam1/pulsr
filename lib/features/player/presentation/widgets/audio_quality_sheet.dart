@@ -8,6 +8,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
+import '../../../../data/audio/bit_perfect_chain.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../data/services/hires_audio_service.dart';
@@ -625,14 +626,16 @@ class AudioQualitySheet extends StatelessWidget {
     final hasExplicitCurrent = devices.any((d) => d.isCurrent);
     final hasExplicitPreferred = devices.any((d) => d.isPreferred);
     final fallbackTarget = !hasExplicitCurrent && !hasExplicitPreferred
-        ? devices.where((d) =>
-            outputDevice?.deviceName != null &&
-            outputDevice!.deviceName.isNotEmpty &&
-            outputDevice.deviceName != 'Default Audio Output' &&
-            outputDevice.deviceName != 'Output route unverified' &&
-            d.name.trim().toLowerCase() ==
-                outputDevice.deviceName.trim().toLowerCase()).firstOrNull ??
-          devices.firstOrNull
+        ? devices
+                .where((d) =>
+                    outputDevice?.deviceName != null &&
+                    outputDevice!.deviceName.isNotEmpty &&
+                    outputDevice.deviceName != 'Default Audio Output' &&
+                    outputDevice.deviceName != 'Output route unverified' &&
+                    d.name.trim().toLowerCase() ==
+                        outputDevice.deviceName.trim().toLowerCase())
+                .firstOrNull ??
+            devices.firstOrNull
         : null;
 
     return Column(
@@ -989,12 +992,16 @@ class AudioQualitySheet extends StatelessWidget {
               children: [
                 const Icon(Icons.lock_rounded, color: goldAccent, size: 13),
                 const SizedBox(width: AppSpacing.s6),
-                Text(
-                  'Exclusive mixer • ${_outputStreamDescription(outputDevice)}',
-                  style: const TextStyle(
-                    color: goldAccent,
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Text(
+                    'Exclusive mixer • ${_outputStreamDescription(outputDevice)}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: goldAccent,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -1077,12 +1084,16 @@ class AudioQualitySheet extends StatelessWidget {
               children: [
                 const Icon(Icons.lock_rounded, color: goldAccent, size: 13),
                 const SizedBox(width: AppSpacing.s6),
-                Text(
-                  'Exclusive mixer • ${_outputStreamDescription(outputDevice)}',
-                  style: const TextStyle(
-                    color: goldAccent,
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Text(
+                    'Exclusive mixer • ${_outputStreamDescription(outputDevice)}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: goldAccent,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -1418,6 +1429,10 @@ class AudioQualitySheet extends StatelessWidget {
     final bool isDsd = info.format.toUpperCase().contains('DSD') ||
         info.codecName.toUpperCase().contains('DSD');
 
+    // Read before the try below: the chain verdict needs the source format,
+    // not just the display strings in [info].
+    SongsTableData? currentSong;
+
     final String sourceLabel = isDsd
         ? 'DSD Stream (${info.format})'
         : (info.bitDepth.isNotEmpty && info.bitDepth != 'Unknown'
@@ -1433,6 +1448,7 @@ class AudioQualitySheet extends StatelessWidget {
     var reverbOn = settingsState?.reverbEnabled == true;
     try {
       final ps = context.read<PlayerCubit>().state;
+      currentSong = ps.currentSong;
       eqOn = ps.isEqEnabled;
       limiterOn = ps.isLimiterEnabled;
       crossfeedOn = ps.isCrossfeedEnabled;
@@ -1451,12 +1467,40 @@ class AudioQualitySheet extends StatelessWidget {
         : (activeStages.isEmpty
             ? 'None (Clean Path)'
             : activeStages.join(' + '));
-    const String resamplerLabel =
-        'Platform conversion • not measured by this app';
-    final String driverLabel = settingsState?.aaudioOutputEnabled == true
+    final assessment = assessBitPerfectChain(
+      requested: settingsState?.bitPerfectOutput == true,
+      active: outputDevice?.isBitPerfectActive == true,
+      sourceSampleRate: currentSong?.sampleRate ?? 0,
+      sourceBitDepth: currentSong?.bitDepth ?? 0,
+      outputSampleRate: outputDevice?.sampleRate ?? 0,
+      outputBitDepth: outputDevice?.bitDepth ?? 0,
+      isDsdDop: AudioQualityInfo.dsdDopActive,
+      failureReason: outputDevice?.bitPerfectFailureReason,
+    );
+    final resamplerLabel = switch (assessment.verdict) {
+      BitPerfectChainVerdict.verified =>
+        '${_sampleRateLabel(assessment.outputSampleRate)} / '
+            '${assessment.outputBitDepth}-bit • ${context.l10n.bpChainVerified}',
+      BitPerfectChainVerdict.resampled =>
+        '${_sampleRateLabel(assessment.sourceSampleRate)} → '
+            '${_sampleRateLabel(assessment.outputSampleRate)} • '
+            '${context.l10n.bpChainResampled}',
+      BitPerfectChainVerdict.depthReduced =>
+        '${assessment.sourceBitDepth}-bit → '
+            '${assessment.outputBitDepth}-bit • '
+            '${context.l10n.bpChainDepthReduced}',
+      BitPerfectChainVerdict.inactive => context.l10n.bpChainInactive,
+      BitPerfectChainVerdict.notRequested ||
+      BitPerfectChainVerdict.unverified =>
+        'Platform conversion • not measured by this app',
+    };
+    final resamplerColor = assessment.isProblem
+        ? p.warning
+        : (assessment.isVerified ? p.success : p.textSecondary);
+    final driverLabel = settingsState?.aaudioOutputEnabled == true
         ? 'AAudio • ${_outputStreamDescription(outputDevice)}'
         : 'Media3 AudioTrack • ${_outputStreamDescription(outputDevice)}';
-    final String dacLabel = outputDevice?.deviceName ??
+    final dacLabel = outputDevice?.deviceName ??
         (outputDevice?.isUsbDac == true ? 'USB Hi-Res DAC' : 'Internal DAC');
 
     return Container(
@@ -1507,6 +1551,34 @@ class AudioQualitySheet extends StatelessWidget {
               ),
             ),
           ],
+          if (assessment.isProblem)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: p.warning.withValues(alpha: 0.12),
+                borderRadius: AppRadii.r8All,
+                border: Border.all(color: p.warning.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: p.warning, size: 16),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      _chainWarningText(context, assessment),
+                      style: TextStyle(
+                        color: p.warning,
+                        fontSize: AppFontSize.tiny,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _SignalChainNode(
             step: 1,
             title: context.l10n.dspSourceFile,
@@ -1533,9 +1605,9 @@ class AudioQualitySheet extends StatelessWidget {
             title: context.l10n.dspResamplingEngine,
             detail: resamplerLabel,
             icon: Icons.transform_rounded,
-            color: isBitPerfect ? p.textTertiary : p.success,
+            color: resamplerColor,
             p: p,
-            isDimmed: isBitPerfect,
+            isDimmed: isBitPerfect && !assessment.isProblem,
           ),
           _SignalChainConnector(p: p),
           _SignalChainNode(
@@ -1550,19 +1622,45 @@ class AudioQualitySheet extends StatelessWidget {
           _SignalChainNode(
             step: 5,
             title: context.l10n.dspHardwareEndpoint,
-            detail: '$dacLabel • hardware format not verified',
+            detail: assessment.isVerified
+                ? '$dacLabel • ${_sampleRateLabel(assessment.outputSampleRate)} / '
+                    '${assessment.outputBitDepth}-bit reported by platform'
+                : '$dacLabel • hardware format not verified',
             icon: outputDevice?.isUsbDac == true
                 ? Icons.usb_rounded
                 : Icons.speaker_rounded,
-            color: outputDevice?.isUsbDac == true
+            color: assessment.isVerified
                 ? AppColors.dacGold
-                : activeColor,
+                : (assessment.isProblem ? p.warning : activeColor),
             p: p,
             isLast: true,
           ),
         ],
       ),
     );
+  }
+
+  String _chainWarningText(
+      BuildContext context, BitPerfectChainAssessment assessment) {
+    switch (assessment.verdict) {
+      case BitPerfectChainVerdict.resampled:
+        return '${context.l10n.bpChainResampled}: '
+            '${_sampleRateLabel(assessment.sourceSampleRate)} → '
+            '${_sampleRateLabel(assessment.outputSampleRate)}';
+      case BitPerfectChainVerdict.depthReduced:
+        return '${context.l10n.bpChainDepthReduced}: '
+            '${assessment.sourceBitDepth}-bit → '
+            '${assessment.outputBitDepth}-bit';
+      case BitPerfectChainVerdict.inactive:
+        final reason = assessment.reasonCode;
+        return reason == null
+            ? context.l10n.bpChainInactive
+            : '${context.l10n.bpChainInactive} ($reason)';
+      case BitPerfectChainVerdict.verified:
+      case BitPerfectChainVerdict.notRequested:
+      case BitPerfectChainVerdict.unverified:
+        return '';
+    }
   }
 }
 
@@ -1754,7 +1852,14 @@ String _outputStreamDescription(AudioOutputInfo? output) {
   if (output == null || output.sampleRate <= 0 || output.bitDepth <= 0) {
     return 'App stream format unverified';
   }
-  return 'App stream: ${_sampleRateLabel(output.sampleRate)} / ${output.bitDepth}-bit ${output.pcmEncoding == 4 ? "float" : "PCM"}';
+  final frames = output.nativeFramesPerBuffer ?? 0;
+  final nativeRate = output.nativeSampleRate ?? 0;
+  final bufferMs = (frames > 0 && nativeRate > 0)
+      ? (frames / nativeRate * 1000).toStringAsFixed(1)
+      : null;
+  return 'App stream: ${_sampleRateLabel(output.sampleRate)} / ${output.bitDepth}-bit '
+      '${output.pcmEncoding == 4 ? "float" : "PCM"}'
+      '${bufferMs == null ? '' : ' • buffer ~$bufferMs ms'}';
 }
 
 String _sampleRateLabel(int rate) {

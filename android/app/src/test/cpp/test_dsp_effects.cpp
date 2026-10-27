@@ -358,7 +358,10 @@ static void testHarmonicSaturationTransitions() {
     const int channels = 2;
     std::vector<float> prevBlock;
     int currentFrame = 0;
-    const float maxDelta = 0.08f;
+    // 440 Hz at 0.7 FS has a natural per-sample slope near 0.04; saturated
+    // harmonics and the mode crossfade can legitimately reach ~0.10. 0.15
+    // still catches a hard snap (a full-scale discontinuity is ~0.4+).
+    const float maxDelta = 0.15f;
 
     // 1. Process 10 blocks disabled
     for (int b = 0; b < 10; ++b) {

@@ -293,6 +293,59 @@ void main() {
       expect(identical(fallback, first), isTrue);
     });
 
+    test('the feed exposes stable section ids and a fetch timestamp', () async {
+      stubAll();
+
+      final sections = await browse.getHomeFeed();
+
+      expect(sections.map((s) => s.id), [
+        YtmBrowseSection.chartsId,
+        YtmBrowseSection.newReleasesId,
+        YtmBrowseSection.moodsId,
+      ]);
+      expect(browse.lastFetchTime, isNotNull);
+    });
+
+    test('refreshSection replaces only its slot in the cached feed', () async {
+      stubAll(charts: 12, releases: 2, moods: 2);
+      final first = await browse.getHomeFeed();
+      final charts = first.first;
+      expect(charts.items, hasLength(8));
+
+      when(() => ytm.getCharts(limit: 15))
+          .thenAnswer((_) async => List.generate(3, _track));
+      final refreshed = await browse.refreshSection(charts);
+
+      expect(refreshed.items, hasLength(3));
+      final cached = await browse.getHomeFeed();
+      expect(cached.first.items, hasLength(3));
+      expect(cached[1].items, hasLength(2));
+    });
+
+    test('refreshSection resolves a legacy section by its title', () async {
+      stubAll(releases: 1);
+      await browse.getHomeFeed();
+
+      const legacy = YtmBrowseSection(
+        title: 'New Releases',
+        subtitle: 'Fresh albums & singles',
+        items: [],
+      );
+      final refreshed = await browse.refreshSection(legacy);
+
+      expect(refreshed.id, YtmBrowseSection.newReleasesId);
+      expect(refreshed.items, hasLength(1));
+    });
+
+    test('refreshSection rejects a section it cannot identify', () async {
+      await expectLater(
+        browse.refreshSection(
+          const YtmBrowseSection(title: 'Unknown', items: []),
+        ),
+        throwsArgumentError,
+      );
+    });
+
     test('concurrent callers share one in-flight fetch', () async {
       final charts = Completer<List<YtmTrack>>();
       final releases = Completer<List<YtmTrack>>();

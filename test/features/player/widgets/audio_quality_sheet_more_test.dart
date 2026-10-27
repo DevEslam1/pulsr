@@ -570,6 +570,39 @@ void main() {
     expect(find.text(_l10n(tester).armedLabel), findsWidgets);
   });
 
+  testWidgets('active bit-perfect with an OS resample shows a warning',
+      (tester) async {
+    final player = stubPlayerCubit(
+      state: const PlayerState(
+        playback: PlaybackSlice(currentSong: testSong),
+      ),
+    );
+    final settings = stubSettingsCubit(
+      state: const SettingsState().copyWith(
+        currentOutputDevice: AudioOutputInfo(
+          deviceName: 'Topping D90',
+          isUsbDac: true,
+          // The source is 96 kHz; the output reports 48 kHz.
+          sampleRate: 48000,
+          bitDepth: 24,
+          isBitPerfectActive: true,
+        ),
+        bitPerfectOutput: true,
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+
+    expect(find.textContaining(_l10n(tester).bpChainResampled), findsWidgets);
+    expect(find.textContaining('96 kHz'), findsWidgets);
+    expect(find.textContaining('48 kHz'), findsWidgets);
+  });
+
   testWidgets('DSD source and active DSP stages render in the signal chain',
       (tester) async {
     const dsdSong = SongsTableData(

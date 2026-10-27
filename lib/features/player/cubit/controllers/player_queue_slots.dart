@@ -129,10 +129,59 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         // restore window (cold-start race): that would swap the live queue out
         // for stale restored data.
         if (restoredSlot != null && _getState().queue.isEmpty) {
-          final s = _getState();
-          _emit(s.copyWith(
-            queueSlice: s.queueSlice.copyWith(activeQueueSlot: restoredSlot),
-          ));
+          final slotData = _queueSlots[restoredSlot];
+          if (slotData != null) {
+            final targetSongs = slotData.songsFrom(_slotLookupCache);
+            final validSongs = targetSongs.where((s) => !s.isMissing).toList();
+            if (validSongs.isNotEmpty) {
+              final safeIdx =
+                  slotData.currentIndex.clamp(0, validSongs.length - 1);
+              final song = validSongs[safeIdx];
+              final s = _getState();
+              _emit(s.copyWith(
+                queueSlice: s.queueSlice.copyWith(
+                  activeQueueSlot: restoredSlot,
+                  queue: List<SongsTableData>.unmodifiable(validSongs),
+                  currentIndex: safeIdx,
+                ),
+                playback: s.playback.copyWith(
+                  currentSong: song,
+                  duration: Duration(milliseconds: song.durationMs),
+                  position: slotData.position,
+                  playbackSpeed: slotData.speed,
+                  isPlaying: false,
+                ),
+              ));
+              if (_audioHandler.queue.valueOrNull?.isEmpty ?? true) {
+                try {
+                  await _audioHandler.setSpeed(slotData.speed);
+                  await _audioHandler.loadQueue(
+                    validSongs,
+                    initialIndex: safeIdx,
+                    initialPosition: slotData.position,
+                    autoPlay: false,
+                  );
+                } catch (e, st) {
+                  ErrorLogger.log(
+                      'Failed to load restored queue into audioHandler',
+                      error: e,
+                      stackTrace: st,
+                      category: 'PlayerQueueController');
+                }
+              }
+            } else {
+              final s = _getState();
+              _emit(s.copyWith(
+                queueSlice:
+                    s.queueSlice.copyWith(activeQueueSlot: restoredSlot),
+              ));
+            }
+          } else {
+            final s = _getState();
+            _emit(s.copyWith(
+              queueSlice: s.queueSlice.copyWith(activeQueueSlot: restoredSlot),
+            ));
+          }
         }
       }
     } catch (e, st) {

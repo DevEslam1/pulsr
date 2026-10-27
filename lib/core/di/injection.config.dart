@@ -43,6 +43,7 @@ import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
 import 'package:pulsr/core/services/ytm_browse_service.dart' as _i222;
 import 'package:pulsr/core/services/ytm_cache_manager.dart' as _i498;
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart' as _i169;
+import 'package:pulsr/core/services/ytm_search_cache.dart' as _i1004;
 import 'package:pulsr/core/services/ytm_service.dart' as _i391;
 import 'package:pulsr/core/services/ytm_url_cache.dart' as _i492;
 import 'package:pulsr/core/telemetry/clock.dart' as _i622;
@@ -165,6 +166,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i498.YtmCacheManager>(() => _i498.YtmCacheManager());
     gh.lazySingleton<_i169.YtmClientVersionResolver>(
         () => _i169.YtmClientVersionResolver());
+    gh.lazySingleton<_i1004.YtmSearchCache>(() => _i1004.YtmSearchCache());
     gh.lazySingleton<_i391.YtmService>(
       () => _i391.YtmService(),
       dispose: (i) => i.dispose(),
@@ -187,6 +189,10 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i42.WidgetService>(() => _i42.WidgetService());
     gh.singleton<_i632.ISmartPlaylistEngine>(
         () => _i399.SmartPlaylistEngine(gh<_i682.AppDatabase>()));
+    gh.factory<_i171.YtmSearchCubit>(() => _i171.YtmSearchCubit(
+          service: gh<_i391.YtmService>(),
+          cache: gh<_i1004.YtmSearchCache>(),
+        ));
     gh.lazySingleton<_i133.LyricsRepository>(() => _i133.LyricsRepository(
           lrclibService: gh<_i621.LrclibService>(),
           ytmAccountService: gh<_i631.YtmAccountService>(),
@@ -210,8 +216,6 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i222.YtmBrowseService.create(gh<_i391.YtmService>()));
     gh.singleton<_i320.IMusicRepository>(
         () => _i627.MusicRepository(gh<_i682.AppDatabase>()));
-    gh.factory<_i171.YtmSearchCubit>(
-        () => _i171.YtmSearchCubit(service: gh<_i391.YtmService>()));
     gh.lazySingleton<_i880.QuranRepository>(() => _i992.QuranRepositoryImpl());
     gh.lazySingleton<_i621.LrclibService>(
         () => _i621.LrclibService(client: gh<_i497.HttpClient>()));

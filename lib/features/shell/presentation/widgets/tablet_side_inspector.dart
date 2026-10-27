@@ -183,9 +183,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
         color: p.surfaceContainer,
         border: BorderDirectional(
           start: BorderSide(
-            color: _isDragging
-                ? p.accent.withValues(alpha: 0.6)
-                : p.hairline,
+            color: _isDragging ? p.accent.withValues(alpha: 0.6) : p.hairline,
             width: _isDragging ? 1.5 : 1.0,
           ),
         ),

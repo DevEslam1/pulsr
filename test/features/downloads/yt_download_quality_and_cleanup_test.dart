@@ -197,6 +197,8 @@ void main() {
               quality: any(named: 'quality'),
               forceRefresh: any(named: 'forceRefresh'),
               preferM4a: any(named: 'preferM4a'),
+              title: any(named: 'title'),
+              artist: any(named: 'artist'),
             ))
         .thenAnswer((invocation) async =>
             streamFor(invocation.positionalArguments[0] as String));
@@ -287,6 +289,8 @@ void main() {
             quality: 'low',
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).called(1);
     });
 
@@ -309,6 +313,8 @@ void main() {
             quality: 'medium',
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).called(1);
     });
   });

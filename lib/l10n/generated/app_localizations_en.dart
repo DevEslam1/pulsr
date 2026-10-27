@@ -2516,6 +2516,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get radioCuratedBrowse => 'Browse curated stations';
 
   @override
+  String get radioDirectoryBrowse => 'Browse radio directory';
+
+  @override
+  String get radioDirectoryHint => 'Search stations by name';
+
+  @override
+  String get radioDirectoryEmpty => 'No stations found';
+
+  @override
+  String get radioDirectoryError => 'Couldn\'t load the radio directory';
+
+  @override
+  String get radioDirectoryAdded => 'Added';
+
+  @override
+  String get radioDirectoryUnreachable =>
+      'Couldn\'t reach this stream. Try another station.';
+
+  @override
   String radioCuratedAdded(int count) {
     return '$count curated stations added';
   }
@@ -3984,7 +4003,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bpGuardrails =>
-      'Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.';
+      'Bit-Perfect Guardrails Active: DSP processing & ReplayGain bypassed. Use the USB DAC hardware volume when enabled for attenuation.';
+
+  @override
+  String get bpChainVerified => 'Bit-perfect chain verified';
+
+  @override
+  String get bpChainResampled => 'Platform resample detected';
+
+  @override
+  String get bpChainDepthReduced => 'Bit depth truncated';
+
+  @override
+  String get bpChainInactive => 'Bit-Perfect armed but not active';
 
   @override
   String get btAudioCodec => 'BLUETOOTH AUDIO CODEC';
@@ -6521,6 +6552,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseNoRecommendations => 'No recommendations right now.';
 
   @override
+  String get ytmCachedResults =>
+      'Showing saved results from an earlier search.';
+
+  @override
   String get browseNoResultsFound => 'No Results Found';
 
   @override
@@ -6940,6 +6975,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errYtmRegionRestricted =>
       'This track is restricted in your region.';
+
+  @override
+  String get errYtmAgeRestricted =>
+      'This track is age-restricted (+18) and can\'t be played here.';
+
+  @override
+  String get errYtmStreamFailed =>
+      'Stream failed to load. Refreshing the link…';
+
+  @override
+  String get errYtmStreamExpired => 'Stream link expired. Refreshing…';
 
   @override
   String get errYtmUnavailable => 'This track is unavailable.';

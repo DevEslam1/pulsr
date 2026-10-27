@@ -8,6 +8,7 @@
 // tests pin that degradation path — the exact behaviour the app relies on when
 // Firebase is unavailable on a device.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/services/auth_failure.dart';
 import 'package:pulsr/core/services/auth_service.dart';
 
 void main() {
@@ -44,33 +45,38 @@ void main() {
       expect(events, [null]);
     });
 
-    test('signInWithGoogle throws a plain Exception', () async {
+    test('signInWithGoogle throws a typed unavailable failure', () async {
       await expectLater(
         service.signInWithGoogle(),
-        throwsA(isA<Exception>()),
+        throwsA(
+          isA<AuthFailure>()
+              .having((f) => f.kind, 'kind', AuthFailureKind.notConfigured)
+              .having((f) => f.recovery, 'recovery',
+                  AuthRecoveryAction.continueOffline),
+        ),
       );
       // The failure must not falsely flip availability to true.
       expect(service.isFirebaseAvailable, isFalse);
     });
 
-    test('signInWithEmail throws a plain Exception', () async {
+    test('signInWithEmail throws a typed unavailable failure', () async {
       await expectLater(
         service.signInWithEmail('a@b.com', 'secret'),
-        throwsA(isA<Exception>()),
+        throwsA(isA<AuthFailure>()),
       );
     });
 
-    test('signUpWithEmail throws a plain Exception', () async {
+    test('signUpWithEmail throws a typed unavailable failure', () async {
       await expectLater(
         service.signUpWithEmail('a@b.com', 'secret'),
-        throwsA(isA<Exception>()),
+        throwsA(isA<AuthFailure>()),
       );
     });
 
-    test('sendPasswordResetEmail throws a plain Exception', () async {
+    test('sendPasswordResetEmail throws a typed unavailable failure', () async {
       await expectLater(
         service.sendPasswordResetEmail('a@b.com'),
-        throwsA(isA<Exception>()),
+        throwsA(isA<AuthFailure>()),
       );
     });
 

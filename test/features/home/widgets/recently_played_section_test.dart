@@ -216,8 +216,8 @@ void main() {
         (tester) async {
       stubRecentlyPlayed(Right<AppFailure, List<SongsTableData>>(_songs(50)));
       when(() => getSongs.getRecentlyPlayed(limit: any(named: 'limit')))
-          .thenAnswer((_) async => const Left<AppFailure,
-              List<SongsTableData>>(DatabaseFailure('boom')));
+          .thenAnswer((_) async => const Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('boom')));
 
       await tester.pumpWidget(
         wrap(RecentlyPlayedSection(getSongsUseCase: getSongs, isTablet: false)),

@@ -58,8 +58,7 @@ void main() {
       WidgetTester tester, List<SongsTableData> songs) async {
     when(() => repo.getExcludedFolderPaths())
         .thenAnswer((_) async => const Right([]));
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders')))
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) async => Right(songs));
     await tester.pumpWidget(
       MultiBlocProvider(
@@ -237,8 +236,7 @@ void main() {
       (tester) async {
     when(() => repo.getExcludedFolderPaths())
         .thenAnswer((_) async => const Right([]));
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders')))
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) async => throw Exception('db down'));
 
     await tester.pumpWidget(
@@ -263,15 +261,15 @@ void main() {
     expect(find.text('Your library is cleanly organized.'), findsNothing);
 
     // Retry recovers to the real (empty) result.
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders')))
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) async => const Right([]));
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
     expect(find.text('No Duplicates Found!'), findsOneWidget);
   });
 
-  testWidgets('bulk cleanup deletes every non-kept duplicate after confirmation',
+  testWidgets(
+      'bulk cleanup deletes every non-kept duplicate after confirmation',
       (tester) async {
     when(() => repo.deleteSongs(any(that: equals([2]))))
         .thenAnswer((_) async => const Right(null));

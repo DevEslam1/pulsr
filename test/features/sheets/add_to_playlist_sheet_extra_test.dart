@@ -66,7 +66,8 @@ void main() {
 
   setUp(() {
     useCases = MockPlaylistUseCases();
-    when(() => useCases.ensureSongPersisted(any())).thenAnswer((invocation) async {
+    when(() => useCases.ensureSongPersisted(any()))
+        .thenAnswer((invocation) async {
       final song = invocation.positionalArguments.first as SongsTableData;
       return Right(song.id);
     });
@@ -288,8 +289,8 @@ void main() {
   testWidgets('batch mode persists every song before adding', (tester) async {
     when(() => useCases.watchPlaylists())
         .thenAnswer((_) => Stream.value(Right([playlist])));
-    when(() => useCases.ensureSongPersisted(any())).thenAnswer(
-        (invocation) async {
+    when(() => useCases.ensureSongPersisted(any()))
+        .thenAnswer((invocation) async {
       final song = invocation.positionalArguments.first as SongsTableData;
       return Right(song.id == 102 ? 202 : song.id);
     });

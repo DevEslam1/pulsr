@@ -86,8 +86,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                           center: Alignment.center,
                           radius: 0.85,
                           colors: [
-                            activeColor.withValues(
-                                alpha: isDark ? 0.24 : 0.14),
+                            activeColor.withValues(alpha: isDark ? 0.24 : 0.14),
                             Colors.transparent,
                           ],
                         ),
@@ -181,7 +180,8 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.scrimAt(isDark ? 0.62 : 0.22),
+                                  color:
+                                      AppColors.scrimAt(isDark ? 0.62 : 0.22),
                                   blurRadius: 32,
                                   spreadRadius: 4,
                                   offset: const Offset(0, 14),
@@ -195,29 +195,29 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                                 ),
                               ],
                             ),
-                          child: song != null
-                              ? CachedArtwork(
-                                  id: song.id,
-                                  albumId: song.albumId,
-                                  remoteUrl:
-                                      song.remoteArtworkUrl ?? song.artworkUri,
-                                  type: ArtworkType.AUDIO,
-                                  size: double.infinity,
-                                  borderRadius: 28,
-                                  highQuality: true,
-                                )
-                              : Container(
-                                  decoration: BoxDecoration(
-                                    color: p.surfaceContainer,
-                                    borderRadius: AppRadii.r28All,
+                            child: song != null
+                                ? CachedArtwork(
+                                    id: song.id,
+                                    albumId: song.albumId,
+                                    remoteUrl: song.remoteArtworkUrl ??
+                                        song.artworkUri,
+                                    type: ArtworkType.AUDIO,
+                                    size: double.infinity,
+                                    borderRadius: 28,
+                                    highQuality: true,
+                                  )
+                                : Container(
+                                    decoration: BoxDecoration(
+                                      color: p.surfaceContainer,
+                                      borderRadius: AppRadii.r28All,
+                                    ),
+                                    child: Icon(
+                                      Icons.music_note_rounded,
+                                      size: 96,
+                                      color: textSubtitleColor.withValues(
+                                          alpha: 0.4),
+                                    ),
                                   ),
-                                  child: Icon(
-                                    Icons.music_note_rounded,
-                                    size: 96,
-                                    color: textSubtitleColor.withValues(
-                                        alpha: 0.4),
-                                  ),
-                                ),
                           ),
                         ),
                       ),

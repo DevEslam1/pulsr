@@ -460,6 +460,9 @@ void stubDefaultYtm(MockYtmService ytm) {
         any(),
         quality: any(named: 'quality'),
         forceRefresh: any(named: 'forceRefresh'),
+        preferM4a: any(named: 'preferM4a'),
+        title: any(named: 'title'),
+        artist: any(named: 'artist'),
       )).thenAnswer((inv) async {
     final videoId = inv.positionalArguments.first as String;
     return YtmStream(

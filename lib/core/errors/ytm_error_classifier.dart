@@ -1,5 +1,134 @@
 // lib/core/errors/ytm_error_classifier.dart
-import '../services/ytm_service.dart';
+import 'package:just_audio/just_audio.dart';
+
+/// A failed YTM call with structured block signal and trace ID.
+class YtmException implements Exception {
+  final String code;
+  final String? details;
+  final String? traceId;
+
+  const YtmException(this.code, [this.details, this.traceId]);
+
+  /// A bare `bot` substring also matches "bottleneck", "sabotage" and "robots".
+  static final RegExp _botWord = RegExp(r'\bbots?\b', caseSensitive: false);
+
+  YtmBlockSignal? get signal {
+    // Prefer the explicit machine code (e.g. native BOT_CHALLENGE with a
+    // human message like "All clients LOGIN_REQUIRED"): classifying the free
+    // text first would misread it as signInRequired and route auth-recovery
+    // instead of bot-recovery.
+    final explicit = YtmBlockSignal.fromCode(code);
+    if (explicit != null) return explicit;
+    return YtmErrorClassifier.classifyCode(code, details, traceId).signal;
+  }
+
+  /// The device could not reach YouTube at all. Retrying later may work;
+  /// retrying the rest of the queue now will not.
+  ///
+  /// Deliberately excludes [YtmBlockSignal.ipBlocked]: a 403 is a *response*,
+  /// so the route works and only the identity is refused. Folding the two
+  /// together made every offline blip take the 180s IP-block cooldown.
+  bool get isNetwork =>
+      signal == YtmBlockSignal.networkUnavailable ||
+      code == 'YTM_NETWORK' ||
+      code == 'YTM_TIMEOUT' ||
+      code == 'YTM_OFFLINE';
+
+  bool get isOffline => isNetwork;
+
+  /// YouTube has flagged the IP / client as automated and wants attestation.
+  ///
+  /// Throttling ([isThrottled]) is not included: callers respond to a bot block
+  /// by minting a fresh poToken and retrying at once, which is the worst
+  /// possible reaction to a 429. A bare `LOGIN_REQUIRED` is not included
+  /// either — that is the normal playabilityStatus of a private or
+  /// members-only track, and treating it as a bot block imposed a 90s global
+  /// cooldown every time one appeared in a queue.
+  bool get isBotBlocked =>
+      signal == YtmBlockSignal.botChallenge ||
+      signal == YtmBlockSignal.poTokenInvalid ||
+      code == 'BOT_CHALLENGE' ||
+      code == 'PO_TOKEN_INVALID' ||
+      code == 'YTM_PO_TOKEN_INVALID' ||
+      code == 'YTM_BOT_BLOCKED' ||
+      code == 'YTM_RECAPTCHA' ||
+      code == 'RECAPTCHA_REQUIRED' ||
+      (details != null &&
+          !details!.toLowerCase().contains('age') &&
+          !details!.toLowerCase().contains('inappropriate') &&
+          (_botWord.hasMatch(details!) ||
+              details!.contains('Sign in to confirm you') ||
+              details!.contains('Sign in to confirm that you')));
+
+  /// YouTube is rate-limiting this IP. Waiting helps; rotating identity does not.
+  bool get isThrottled =>
+      signal == YtmBlockSignal.rateLimited ||
+      code == 'RATE_LIMITED' ||
+      code == 'YTM_429';
+
+  /// YouTube answered, but refused this IP / route.
+  bool get isIpBlocked =>
+      signal == YtmBlockSignal.ipBlocked || code == 'IP_BLOCKED';
+
+  /// The track is age-restricted (+18). This is a property of the track, not
+  /// the account: prompting for a fresh login cannot make it playable.
+  bool get isAgeRestricted =>
+      signal == YtmBlockSignal.ageRestricted || code == 'AGE_RESTRICTED';
+
+  /// A cooperative cancellation (thread/coroutine interrupted), not a network
+  /// verdict and not a reason to rotate identity or cool down.
+  bool get isInterrupted =>
+      signal == YtmBlockSignal.interrupted || code == 'INTERRUPTED';
+
+  /// A failure that a retry of the same resolve chain cannot fix. Distinct
+  /// from [isFatal]: an age-restricted or unavailable track should be skipped,
+  /// not pause playback for the whole queue.
+  bool get isTerminalResolveFailure =>
+      isDisabled || isBotBlocked || isThrottled || isAuth || isAgeRestricted;
+
+  /// Session has expired or authentication is invalid.
+  bool get isAuth =>
+      signal == YtmBlockSignal.signInRequired ||
+      code == 'SIGN_IN_REQUIRED' ||
+      code == 'YTM_AUTH' ||
+      code == 'LOGIN_REQUIRED' ||
+      (details != null && details!.toLowerCase().contains('unauthenticated'));
+
+  /// Fatal error where looping / skipping the queue will only worsen the block.
+  bool get isFatal =>
+      isNetwork || isDisabled || isBotBlocked || isThrottled || isAuth;
+
+  /// This one video cannot be played, but others still can.
+  bool get isUnavailable =>
+      signal == YtmBlockSignal.videoGone ||
+      signal == YtmBlockSignal.geoBlocked ||
+      signal == YtmBlockSignal.ageRestricted ||
+      code == 'VIDEO_GONE' ||
+      code == 'GEO_BLOCKED' ||
+      code == 'AGE_RESTRICTED' ||
+      code == 'YTM_UNAVAILABLE';
+
+  /// The build has no extractor compiled in.
+  bool get isDisabled => code == 'YTM_DISABLED' || code == 'YTM_UNSUPPORTED';
+
+  /// HTTP status code representing this error for audio proxy responses (e.g. 404/410 aborts ExoPlayer retries).
+  int get httpStatusCode {
+    return switch (signal) {
+      YtmBlockSignal.videoGone => 410,
+      YtmBlockSignal.botChallenge || YtmBlockSignal.ipBlocked => 403,
+      YtmBlockSignal.ageRestricted => 403,
+      YtmBlockSignal.signInRequired => 401,
+      YtmBlockSignal.rateLimited => 429,
+      YtmBlockSignal.geoBlocked => 451,
+      YtmBlockSignal.interrupted => 499,
+      _ => 404,
+    };
+  }
+
+  @override
+  String toString() =>
+      'YtmException($code${traceId != null ? ' [trace=$traceId]' : ''}${details == null ? '' : ': $details'})';
+}
 
 /// Discrete signals corresponding to Kotlin YtmBlockSignal.
 ///
@@ -19,7 +148,15 @@ enum YtmBlockSignal {
   videoGone,
   networkUnavailable,
   signatureDecipherFailed,
-  sabrEnforced;
+  sabrEnforced,
+
+  /// The track is age-restricted (+18). Distinct from [signInRequired] so the
+  /// UI does not tell a signed-in user their session expired for a video that
+  /// simply cannot be played without age verification.
+  ageRestricted,
+
+  /// A cooperative cancellation (thread/coroutine interrupted).
+  interrupted;
 
   /// Machine code for this signal (`botChallenge` → `BOT_CHALLENGE`), the
   /// inverse of [fromCode] for codes the app constructs itself. `name`
@@ -38,6 +175,8 @@ enum YtmBlockSignal {
         YtmBlockSignal.networkUnavailable => 'YTM_NETWORK',
         YtmBlockSignal.signatureDecipherFailed => 'SIGNATURE_DECIPHER_FAILED',
         YtmBlockSignal.sabrEnforced => 'SABR_ENFORCED',
+        YtmBlockSignal.ageRestricted => 'AGE_RESTRICTED',
+        YtmBlockSignal.interrupted => 'INTERRUPTED',
       };
 
   static YtmBlockSignal? fromCode(String code) {
@@ -65,6 +204,13 @@ enum YtmBlockSignal {
         return YtmBlockSignal.poTokenInvalid;
       case 'SABR_ENFORCED':
         return YtmBlockSignal.sabrEnforced;
+      case 'AGE_RESTRICTED':
+      case 'AGE_CHECK_REQUIRED':
+      case 'AGE_VERIFICATION_REQUIRED':
+        return YtmBlockSignal.ageRestricted;
+      case 'INTERRUPTED':
+      case 'INTERRUPTED_IO':
+        return YtmBlockSignal.interrupted;
       case 'CLIENT_DEPRECATED':
       case 'YTM_400':
         return YtmBlockSignal.clientDeprecated;
@@ -72,7 +218,6 @@ enum YtmBlockSignal {
       case 'YTM_GEO_BLOCKED':
         return YtmBlockSignal.geoBlocked;
       case 'SIGN_IN_REQUIRED':
-      case 'AGE_RESTRICTED':
       case 'LOGIN_REQUIRED':
       case 'YTM_AUTH':
         return YtmBlockSignal.signInRequired;
@@ -187,6 +332,104 @@ class YtmErrorClassifier {
   static bool _isServerError(int? status) =>
       status != null && status >= 500 && status <= 599;
 
+  /// Transport wording that means "the route failed", not "YouTube refused
+  /// this identity". Kept in one place so the classifier, the free-text
+  /// fallback and the URL-burn verdict cannot drift apart.
+  static const List<String> _networkPhrases = [
+    'socketexception',
+    'sockettimeoutexception',
+    'connectexception',
+    'timeoutexception',
+    'httpexception',
+    'handshakeexception',
+    'sslhandshakeexception',
+    'connection closed',
+    'connection reset',
+    'connection refused',
+    'connection aborted',
+    'connection failed',
+    'connection error',
+    'connection timed out',
+    'timed out',
+    'bad connection',
+    'failed host lookup',
+    'unable to resolve host',
+    'network is unreachable',
+    'network unavailable',
+    'network error',
+    'no route to host',
+    'broken pipe',
+    'unexpected end of stream',
+    'software caused connection abort',
+    'econnreset',
+    'econnrefused',
+    'etimedout',
+    'enetunreach',
+    'ehostunreach',
+    'eai_again',
+    'ytm_network',
+    'ytm_offline',
+  ];
+
+  static bool _isNetworkText(String text) => _networkPhrases.any(text.contains);
+
+  /// +18 and mature-content wording. Some of these also contain the word
+  /// "confirm" / "verify", so this must be checked before the bot phrases.
+  static const List<String> _agePhrases = [
+    'confirm your age',
+    'confirm you are 18',
+    "confirm you're 18",
+    'confirm that you are 18',
+    'age-restricted',
+    'age restricted',
+    'age verification',
+    'age verification required',
+    'age check required',
+    'inappropriate for some users',
+    'mature content',
+    'adults only',
+    'over 18',
+    '18+',
+  ];
+
+  static bool _isAgeText(String text) => _agePhrases.any(text.contains);
+
+  /// Explicit bot-interstitial wording. Deliberately excludes a bare `robot`
+  /// (which matched track/artist names like "Robot Rock") and a bare
+  /// `verification required` (which also describes age verification).
+  static const List<String> _botPhrases = [
+    'not a bot',
+    'not a robot',
+    "confirm you're not",
+    "confirm you’re not",
+    'confirm you are not',
+    'confirm that you are not',
+    'verify you are not',
+    "verify you're not",
+    'recaptcha',
+    'botguard',
+    'bot_block',
+    'bot check',
+    'login_required_bot_check',
+    'unusual traffic',
+    'automated queries',
+  ];
+
+  static bool _isBotText(String text) =>
+      _botWordPattern.hasMatch(text) || _botPhrases.any(text.contains);
+
+  /// A [PlayerException] whose message says nothing about the underlying
+  /// cause. ExoPlayer reports every source failure as the literal "Source
+  /// error" unless the just_audio bridge forwards the cause.
+  static bool _isGenericPlayerMessage(String? message) {
+    final text = message?.trim().toLowerCase() ?? '';
+    return text.isEmpty ||
+        text == 'source error' ||
+        text == 'playback failed' ||
+        text == 'unknown error' ||
+        text == 'player error';
+  }
+
   static YtmErrorInfo _networkInfo(String? traceId) => YtmErrorInfo(
         message: 'No connection. Check your network.',
         recoveryAction: YtmRecoveryAction.retryWithBackoff,
@@ -209,10 +452,43 @@ class YtmErrorClassifier {
   /// in — while a burned URL treated as a blip retries the dead URL until the
   /// attempts run out.
   static bool isUrlBurned(Object error) {
+    if (error is PlayerException) {
+      final message = error.message?.toLowerCase() ?? '';
+      // just_audio's Android bridge reports ExoPlaybackException.type: 0 is a
+      // source failure, 1 renderer, 2 unexpected. Only a source failure can
+      // spend the URL; a renderer error is a decoder problem.
+      if (error.code == 0) {
+        final status = _httpStatusIn(message);
+        if (status != null) return _burnedStatuses.contains(status);
+        if (_isNetworkText(message)) return false;
+        // A bare "Source error" is most often an expired/failed URL. Treat it
+        // as burned so the source re-resolves instead of replaying it.
+        return true;
+      }
+      return false;
+    }
     final status = _httpStatusIn(error.toString());
     if (status != null) return _burnedStatuses.contains(status);
     final signal = classify(error).signal;
     return signal != null && signal != YtmBlockSignal.networkUnavailable;
+  }
+
+  /// User-facing text for [error].
+  ///
+  /// A raw `PlayerException.message` is only safe when it names a concrete
+  /// cause; ExoPlayer's literal "Source error" / "Playback failed" is not.
+  static String displayMessage(Object error) {
+    final info = classify(error);
+    if (error is PlayerException) {
+      final raw = error.message?.trim() ?? '';
+      if (raw.isEmpty ||
+          raw.toLowerCase().startsWith('source error') ||
+          _isGenericPlayerMessage(raw)) {
+        return info.message;
+      }
+      return raw;
+    }
+    return info.message;
   }
 
   static YtmErrorInfo classify(Object error, [String? traceId]) {
@@ -220,33 +496,56 @@ class YtmErrorClassifier {
       return classifyCode(error.code, error.details, traceId ?? error.traceId);
     }
 
-    final errStr = error.toString().toLowerCase();
+    if (error is PlayerException) {
+      final raw = error.message?.trim().toLowerCase() ?? '';
+      if (error.code == 0) {
+        final status = _httpStatusIn(raw);
+        if (status != null && _burnedStatuses.contains(status)) {
+          // A googlevideo URL that starts 403ing mid-track is an expired link,
+          // not a bot challenge: re-resolve it instead of rotating identity.
+          return YtmErrorInfo(
+            message: 'Stream link expired. Refreshing…',
+            recoveryAction: YtmRecoveryAction.retryWithBackoff,
+            traceId: traceId,
+          );
+        }
+        if (_isNetworkText(raw)) return _networkInfo(traceId);
+        if (_isAgeText(raw)) {
+          return _mapSignal(YtmBlockSignal.ageRestricted, null, traceId);
+        }
+        if (_isBotText(raw)) {
+          return _mapSignal(YtmBlockSignal.botChallenge, null, traceId);
+        }
+      }
+      if (_isGenericPlayerMessage(error.message)) {
+        // ExoPlayer reports TYPE_SOURCE as "Source error" and discards the
+        // underlying 403/timeout/DNS message. Never show that literal string.
+        return YtmErrorInfo(
+          message: error.code == 0
+              ? 'Stream failed to load. Refreshing the link…'
+              : 'Playback failed. Please try again.',
+          recoveryAction: YtmRecoveryAction.retryWithBackoff,
+          traceId: traceId,
+        );
+      }
+    }
+
+    final errStr = error is PlayerException
+        ? '${error.message ?? ''} ${error.toString()}'.toLowerCase()
+        : error.toString().toLowerCase();
 
     // Phrase checks run before the HTTP status because they are the more
     // specific verdict: YouTube's bot interstitial can arrive as a 403, and
     // invalidating the poToken beats rotating the network path there.
 
-    // 0. Age restriction / mature content (MUST run before bot challenge: "sign in to confirm your age")
-    if (errStr.contains('confirm your age') ||
-        errStr.contains('age-restricted') ||
-        errStr.contains('age restricted') ||
-        errStr.contains('inappropriate for some users')) {
-      return _mapSignal(YtmBlockSignal.signInRequired, null, traceId);
+    // 0. Age restriction / mature content (MUST run before bot challenge:
+    // "sign in to confirm your age" is not a bot interstitial).
+    if (_isAgeText(errStr)) {
+      return _mapSignal(YtmBlockSignal.ageRestricted, null, traceId);
     }
 
     // 1. Bot challenges / verification
-    if (errStr.contains('not a bot') ||
-        // Narrowed from the bare `confirm you`, which also matched benign
-        // "confirm your email/subscription" text; both apostrophe forms of the
-        // real "confirm you're not a robot" interstitial are covered.
-        errStr.contains("confirm you're") ||
-        errStr.contains('confirm you’re') ||
-        errStr.contains('sign in to confirm you') ||
-        errStr.contains('recaptcha') ||
-        errStr.contains('bot_block') ||
-        errStr.contains('botguard') ||
-        errStr.contains('unusual traffic') ||
-        errStr.contains('automated queries')) {
+    if (_isBotText(errStr)) {
       return YtmErrorInfo(
         message: 'YouTube needs verification. Trying alternate route…',
         recoveryAction: YtmRecoveryAction.invalidatePoTokenAndRetry,
@@ -315,16 +614,7 @@ class YtmErrorClassifier {
 
     // 6. Transport failure. Reported as its own signal so no caller mistakes an
     // offline blip for a block and imposes a multi-minute cooldown on it.
-    if (errStr.contains('socketexception') ||
-        errStr.contains('timeoutexception') ||
-        errStr.contains('httpexception') ||
-        errStr.contains('handshakeexception') ||
-        errStr.contains('connection closed') ||
-        errStr.contains('connection reset') ||
-        errStr.contains('connection refused') ||
-        errStr.contains('failed host lookup') ||
-        errStr.contains('network is unreachable') ||
-        errStr.contains('software caused connection abort')) {
+    if (_isNetworkText(errStr)) {
       return _networkInfo(traceId);
     }
 
@@ -404,29 +694,11 @@ class YtmErrorClassifier {
       return _mapSignal(codeStatusSignal, details, traceId);
     }
 
-    if (combined.contains('confirm your age') ||
-        combined.contains('age-restricted') ||
-        combined.contains('age restricted') ||
-        combined.contains('inappropriate for some users')) {
-      return _mapSignal(YtmBlockSignal.signInRequired, details, traceId);
+    if (_isAgeText(combined)) {
+      return _mapSignal(YtmBlockSignal.ageRestricted, details, traceId);
     }
 
-    if (_botWordPattern.hasMatch(combined) ||
-        combined.contains('recaptcha') ||
-        combined.contains('botguard') ||
-        combined.contains('unusual traffic') ||
-        // VPN exit reputation blocks — YouTube returns these in the detail
-        // text of an EXTRACTOR_ERROR. Without this check they fell through
-        // to rotateIdentity instead of the correct invalidatePoTokenAndRetry.
-        combined.contains('sign in to confirm you') ||
-        combined.contains("confirm you're not") ||
-        combined.contains('confirm you’re not') ||
-        combined.contains('not a bot') ||
-        combined.contains('automated queries') ||
-        combined.contains('bot_block')) {
-      // Dropped the bare `confirm you` catch-all: the narrower phrases above
-      // cover the real interstitial without misrouting benign "confirm your
-      // email/subscription" text into a poToken invalidation.
+    if (_isBotText(combined)) {
       return _mapSignal(YtmBlockSignal.botChallenge, details, traceId);
     }
     if (combined.contains('too many requests') ||
@@ -451,6 +723,9 @@ class YtmErrorClassifier {
     }
     if (combined.contains('proxy')) {
       return _mapSignal(YtmBlockSignal.ipBlocked, details, traceId);
+    }
+    if (_isNetworkText(combined)) {
+      return _networkInfo(traceId);
     }
     if (combined.contains('login_required') ||
         combined.contains('unauthenticated') ||
@@ -509,14 +784,7 @@ class YtmErrorClassifier {
   /// structured check has declined. Returns null when the text says nothing.
   static YtmErrorInfo? _classifyFreeText(String detailLower, String? traceId) {
     if (detailLower.isEmpty) return null;
-    if (detailLower.contains('socketexception') ||
-        detailLower.contains('timeoutexception') ||
-        detailLower.contains('handshakeexception') ||
-        detailLower.contains('connection closed') ||
-        detailLower.contains('connection reset') ||
-        detailLower.contains('connection refused') ||
-        detailLower.contains('failed host lookup') ||
-        detailLower.contains('network is unreachable')) {
+    if (_isNetworkText(detailLower)) {
       return _networkInfo(traceId);
     }
     final status = _httpStatusIn(detailLower);
@@ -604,6 +872,21 @@ class YtmErrorClassifier {
         return YtmErrorInfo(
           message: 'YouTube format restriction encountered. Rotating route…',
           recoveryAction: YtmRecoveryAction.rotateIdentity,
+          signal: signal,
+          traceId: traceId,
+        );
+      case YtmBlockSignal.ageRestricted:
+        return YtmErrorInfo(
+          message:
+              'This track is age-restricted (+18) and cannot be played here.',
+          recoveryAction: YtmRecoveryAction.skipToNextTrack,
+          signal: signal,
+          traceId: traceId,
+        );
+      case YtmBlockSignal.interrupted:
+        return YtmErrorInfo(
+          message: 'Playback was interrupted.',
+          recoveryAction: YtmRecoveryAction.none,
           signal: signal,
           traceId: traceId,
         );

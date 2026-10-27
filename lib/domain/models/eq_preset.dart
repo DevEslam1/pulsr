@@ -353,7 +353,6 @@ class EqPreset {
         name: 'Bass Boost',
         gains: [6.5, 5.5, 3.0, 0.5, -0.5, 0.0, 0.5, 1.0, 1.5, 1.0],
         bassBoost: 0.35),
-
     EqPreset(
         name: 'Rock',
         gains: [4.5, 3.8, 2.0, -0.5, -1.2, -0.5, 1.5, 3.2, 3.8, 3.5],

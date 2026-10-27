@@ -130,7 +130,9 @@ void main() {
   for (final (name, category, size) in cases) {
     testWidgets('capture $name', (tester) async {
       await capture(tester, name, category: category, size: size);
-    }, skip: !autoUpdateGoldenFiles && !File('test/audit_captures/$name.png').existsSync());
+    },
+        skip: !autoUpdateGoldenFiles &&
+            !File('test/audit_captures/$name.png').existsSync());
   }
 
   testWidgets('capture phone_search_results', (tester) async {
@@ -165,5 +167,7 @@ void main() {
     );
     await tester.pumpWidget(const SizedBox.shrink());
     await cubit.close();
-  }, skip: !autoUpdateGoldenFiles && !File('test/audit_captures/phone_search_results.png').existsSync());
+  },
+      skip: !autoUpdateGoldenFiles &&
+          !File('test/audit_captures/phone_search_results.png').existsSync());
 }

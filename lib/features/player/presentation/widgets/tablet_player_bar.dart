@@ -366,29 +366,37 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                 height:
                                                                     AppSpacing
                                                                         .xxs),
-                                                            Row(
-                                                              mainAxisSize:
-                                                                  MainAxisSize
-                                                                      .min,
-                                                              children: [
-                                                                AudioQualityBadge(
-                                                                  song: song,
-                                                                  activeColor:
-                                                                      activeColor,
-                                                                  compact: true,
-                                                                  showDevice:
-                                                                      false,
-                                                                ),
-                                                                if (state
-                                                                    .isQuranModeEnabled) ...[
-                                                                  const SizedBox(
-                                                                      width: AppSpacing
-                                                                          .xs),
-                                                                  const QuranModeBadge(
-                                                                      compact:
-                                                                          true),
+                                                            FittedBox(
+                                                              fit: BoxFit
+                                                                  .scaleDown,
+                                                              alignment:
+                                                                  AlignmentDirectional
+                                                                      .centerStart,
+                                                              child: Row(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  AudioQualityBadge(
+                                                                    song: song,
+                                                                    activeColor:
+                                                                        activeColor,
+                                                                    compact:
+                                                                        true,
+                                                                    showDevice:
+                                                                        false,
+                                                                  ),
+                                                                  if (state
+                                                                      .isQuranModeEnabled) ...[
+                                                                    const SizedBox(
+                                                                        width: AppSpacing
+                                                                            .xs),
+                                                                    const QuranModeBadge(
+                                                                        compact:
+                                                                            true),
+                                                                  ],
                                                                 ],
-                                                              ],
+                                                              ),
                                                             ),
                                                           ],
                                                         ],

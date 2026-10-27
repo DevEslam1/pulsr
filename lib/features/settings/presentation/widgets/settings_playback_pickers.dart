@@ -463,8 +463,7 @@ void showDspPreferencePickerSheet(
 ) {
   final p = context.palette;
   final primaryColor = Theme.of(context).colorScheme.primary;
-  final cardColor =
-      Theme.of(context).cardTheme.color ?? p.surfaceContainer;
+  final cardColor = Theme.of(context).cardTheme.color ?? p.surfaceContainer;
   final outlineColor = Theme.of(context).colorScheme.outline;
   final textPrimary = p.textPrimary;
   final textSecondary = p.textSecondary;
@@ -605,8 +604,8 @@ void showDspPreferencePickerSheet(
                                               horizontal: 5, vertical: 1.5),
                                           decoration: BoxDecoration(
                                             color: isSelected
-                                                ? primaryColor
-                                                    .withValues(alpha: 0.18)
+                                                ? primaryColor.withValues(
+                                                    alpha: 0.18)
                                                 : p.surface,
                                             borderRadius: AppRadii.r6All,
                                           ),

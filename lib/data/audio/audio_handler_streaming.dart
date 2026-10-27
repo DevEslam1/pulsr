@@ -61,14 +61,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   void _handleStreamResolutionError(SongsTableData song, Object error) {
     final info = YtmErrorClassifier.classify(error);
-    final String errorMessage;
-    if (error is PlayerException &&
-        error.message != null &&
-        error.message!.isNotEmpty) {
-      errorMessage = error.message!;
-    } else {
-      errorMessage = info.message;
-    }
+    final errorMessage = YtmErrorClassifier.displayMessage(error);
     ErrorLogger.log(
       'Gapless stream resolution error on "${song.title}": $errorMessage ($error)',
       category: 'AudioHandler',

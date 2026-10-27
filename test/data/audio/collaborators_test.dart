@@ -350,6 +350,9 @@ void main() {
             any(),
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
+            preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).thenAnswer((_) async => YtmStream(
             videoId: 'abcdefghijk',
             url: 'https://stream.url/audio',
@@ -371,6 +374,10 @@ void main() {
             any(),
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
+            coalesce: any(named: 'coalesce'),
+            preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).called(2);
     });
   });

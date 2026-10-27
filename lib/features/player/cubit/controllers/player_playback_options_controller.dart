@@ -376,5 +376,4 @@ class PlayerPlaybackOptionsController {
       unawaited(applyOverride(song, eqPreset));
     }
   }
-
 }

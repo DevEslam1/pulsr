@@ -204,8 +204,7 @@ class _MarqueeTextState extends State<MarqueeText> {
         final maxScroll = textWidth - availableWidth + widget.blankSpace;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !context.motionEnabled) return;
-          if (_isScrolling &&
-              (_currentMaxScroll - maxScroll).abs() > 0.5) {
+          if (_isScrolling && (_currentMaxScroll - maxScroll).abs() > 0.5) {
             _stopScrolling();
             if (_scrollController.hasClients) {
               _scrollController.jumpTo(0.0);

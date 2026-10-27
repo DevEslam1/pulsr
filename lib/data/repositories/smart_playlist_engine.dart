@@ -521,10 +521,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       }
       final base = await _buildQuery(
         criteria,
-        allowedIds:
-            (narrowedIds != null && narrowedIds.length <= 900)
-                ? narrowedIds
-                : null,
+        allowedIds: (narrowedIds != null && narrowedIds.length <= 900)
+            ? narrowedIds
+            : null,
       ).get();
       return _postProcess(base, criteria, dartRules);
     }

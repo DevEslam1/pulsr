@@ -256,6 +256,8 @@ void main() {
           quality: any(named: 'quality'),
           forceRefresh: any(named: 'forceRefresh'),
           preferM4a: any(named: 'preferM4a'),
+          title: any(named: 'title'),
+          artist: any(named: 'artist'),
         )).thenAnswer((_) async => _stream());
 
     scanner = MockMediaScanner();
@@ -416,6 +418,8 @@ void main() {
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).thenAnswer((_) async => _stream(cookies: 'SAPISID=session'));
 
       final song = _song(
@@ -529,6 +533,8 @@ void main() {
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).thenAnswer((_) async => stream);
 
       final dest = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
@@ -578,6 +584,8 @@ void main() {
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).thenAnswer((_) async => stream);
 
       final dest = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
@@ -639,6 +647,8 @@ void main() {
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).thenAnswer((_) async => stream);
 
       final dest = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
@@ -854,6 +864,8 @@ void main() {
                 quality: any(named: 'quality'),
                 forceRefresh: any(named: 'forceRefresh'),
                 preferM4a: any(named: 'preferM4a'),
+                title: any(named: 'title'),
+                artist: any(named: 'artist'),
               ))
           .thenAnswer((_) async =>
               _stream(duration: const Duration(seconds: 1), bitrateKbps: 64));
@@ -869,6 +881,8 @@ void main() {
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).called(5);
       verify(() => ytm.invalidatePoToken()).called(greaterThanOrEqualTo(1));
     });
@@ -881,6 +895,8 @@ void main() {
             quality: any(named: 'quality'),
             forceRefresh: any(named: 'forceRefresh'),
             preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
           )).thenAnswer((invocation) async {
         final id = invocation.positionalArguments[0] as String;
         return _stream(videoId: id);

@@ -24,116 +24,9 @@ import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 
 import '../errors/ytm_error_classifier.dart';
+
+export '../errors/ytm_error_classifier.dart' show YtmException;
 import 'ytm_circuit_breaker.dart';
-
-/// A failed YTM call with structured block signal and trace ID.
-class YtmException implements Exception {
-  final String code;
-  final String? details;
-  final String? traceId;
-
-  const YtmException(this.code, [this.details, this.traceId]);
-
-  /// A bare `bot` substring also matches "bottleneck", "sabotage" and "robots".
-  static final RegExp _botWord = RegExp(r'\bbots?\b', caseSensitive: false);
-
-  YtmBlockSignal? get signal {
-    // Prefer the explicit machine code (e.g. native BOT_CHALLENGE with a
-    // human message like "All clients LOGIN_REQUIRED"): classifying the free
-    // text first would misread it as signInRequired and route auth-recovery
-    // instead of bot-recovery.
-    final explicit = YtmBlockSignal.fromCode(code);
-    if (explicit != null) return explicit;
-    return YtmErrorClassifier.classifyCode(code, details, traceId).signal;
-  }
-
-  /// The device could not reach YouTube at all. Retrying later may work;
-  /// retrying the rest of the queue now will not.
-  ///
-  /// Deliberately excludes [YtmBlockSignal.ipBlocked]: a 403 is a *response*,
-  /// so the route works and only the identity is refused. Folding the two
-  /// together made every offline blip take the 180s IP-block cooldown.
-  bool get isNetwork =>
-      signal == YtmBlockSignal.networkUnavailable ||
-      code == 'YTM_NETWORK' ||
-      code == 'YTM_TIMEOUT' ||
-      code == 'YTM_OFFLINE';
-
-  bool get isOffline => isNetwork;
-
-  /// YouTube has flagged the IP / client as automated and wants attestation.
-  ///
-  /// Throttling ([isThrottled]) is not included: callers respond to a bot block
-  /// by minting a fresh poToken and retrying at once, which is the worst
-  /// possible reaction to a 429. A bare `LOGIN_REQUIRED` is not included
-  /// either — that is the normal playabilityStatus of a private or
-  /// members-only track, and treating it as a bot block imposed a 90s global
-  /// cooldown every time one appeared in a queue.
-  bool get isBotBlocked =>
-      signal == YtmBlockSignal.botChallenge ||
-      signal == YtmBlockSignal.poTokenInvalid ||
-      code == 'BOT_CHALLENGE' ||
-      code == 'PO_TOKEN_INVALID' ||
-      code == 'YTM_PO_TOKEN_INVALID' ||
-      code == 'YTM_BOT_BLOCKED' ||
-      code == 'YTM_RECAPTCHA' ||
-      code == 'RECAPTCHA_REQUIRED' ||
-      (details != null &&
-          !details!.toLowerCase().contains('age') &&
-          !details!.toLowerCase().contains('inappropriate') &&
-          (_botWord.hasMatch(details!) ||
-              details!.contains('Sign in to confirm you') ||
-              details!.contains('Sign in to confirm that you')));
-
-  /// YouTube is rate-limiting this IP. Waiting helps; rotating identity does not.
-  bool get isThrottled =>
-      signal == YtmBlockSignal.rateLimited ||
-      code == 'RATE_LIMITED' ||
-      code == 'YTM_429';
-
-  /// YouTube answered, but refused this IP / route.
-  bool get isIpBlocked =>
-      signal == YtmBlockSignal.ipBlocked || code == 'IP_BLOCKED';
-
-  /// Session has expired or authentication is invalid.
-  bool get isAuth =>
-      signal == YtmBlockSignal.signInRequired ||
-      code == 'SIGN_IN_REQUIRED' ||
-      code == 'YTM_AUTH' ||
-      code == 'LOGIN_REQUIRED' ||
-      (details != null && details!.toLowerCase().contains('unauthenticated'));
-
-  /// Fatal error where looping / skipping the queue will only worsen the block.
-  bool get isFatal =>
-      isNetwork || isDisabled || isBotBlocked || isThrottled || isAuth;
-
-  /// This one video cannot be played, but others still can.
-  bool get isUnavailable =>
-      signal == YtmBlockSignal.videoGone ||
-      signal == YtmBlockSignal.geoBlocked ||
-      code == 'VIDEO_GONE' ||
-      code == 'GEO_BLOCKED' ||
-      code == 'YTM_UNAVAILABLE';
-
-  /// The build has no extractor compiled in.
-  bool get isDisabled => code == 'YTM_DISABLED' || code == 'YTM_UNSUPPORTED';
-
-  /// HTTP status code representing this error for audio proxy responses (e.g. 404/410 aborts ExoPlayer retries).
-  int get httpStatusCode {
-    return switch (signal) {
-      YtmBlockSignal.videoGone => 410,
-      YtmBlockSignal.botChallenge || YtmBlockSignal.ipBlocked => 403,
-      YtmBlockSignal.signInRequired => 401,
-      YtmBlockSignal.rateLimited => 429,
-      YtmBlockSignal.geoBlocked => 451,
-      _ => 404,
-    };
-  }
-
-  @override
-  String toString() =>
-      'YtmException($code${traceId != null ? ' [trace=$traceId]' : ''}${details == null ? '' : ': $details'})';
-}
 
 /// Descriptor for one client in the pure-Dart (desktop / native-fallback)
 /// InnerTube player chain.
@@ -1241,12 +1134,16 @@ class YtmService {
     // 2. Build search queries
     final queryList = <String>[
       if (cleanArtist.isNotEmpty) '$cleanArtist $cleanTitle' else cleanTitle,
-      if (cleanArtist.isNotEmpty) '$cleanArtist $cleanTitle audio' else '$cleanTitle audio',
+      if (cleanArtist.isNotEmpty)
+        '$cleanArtist $cleanTitle audio'
+      else
+        '$cleanTitle audio',
       if (cleanArtist.isNotEmpty) '$cleanArtist $title' else title,
     ];
 
     final testedIds = <String>{
-      if (originalVideoId != null && originalVideoId.isNotEmpty) originalVideoId,
+      if (originalVideoId != null && originalVideoId.isNotEmpty)
+        originalVideoId,
     };
 
     for (final q in queryList) {
@@ -1859,6 +1756,13 @@ class YtmService {
         host: 'https://www.youtube.com',
       ),
       (
+        name: 'WEB_EMBEDDED_PLAYER',
+        version: '1.20241009.01.00',
+        clientNameId: '56',
+        ua: 'Mozilla/5.0 (PlayStation; PlayStation 5/2.26) AppleWebKit/605.1.15 (KHTML, like Gecko)',
+        host: 'https://www.youtube.com',
+      ),
+      (
         name: 'TVHTML5_SIMPLY',
         version: '1.0',
         clientNameId: '75',
@@ -1919,7 +1823,7 @@ class YtmService {
             headers: headers,
             body: body,
           )
-          // FIX-C06: 12-second timeout per client in _resolveStreamDart
+          // FIX-C06: 12s timeout per client in _resolveStreamDart
           .timeout(const Duration(seconds: 12));
 
       if (response.statusCode != 200) {
@@ -2097,10 +2001,7 @@ class YtmService {
         // the whole chain 2x more triples thread-pool load and turns one
         // IP-flag into cascading timeouts. Fail fast to the next engine.
         final failure = YtmException(resolvedCode, e.message, traceId);
-        final isFatalCode = failure.isDisabled ||
-            failure.isBotBlocked ||
-            failure.isThrottled ||
-            failure.isAuth;
+        final isFatalCode = failure.isTerminalResolveFailure;
 
         if (attempt == maxRetries || isFatalCode) {
           ErrorLogger.log(

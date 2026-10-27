@@ -120,9 +120,12 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             snapshot.songs.isNotEmpty &&
             !isClosed &&
             state.songs.isEmpty) {
+          // Pre-populate cached songs for instant paint, but leave isLoading
+          // true until live database watchers emit their data to prevent
+          // other tabs (albums, artists, favorites) from prematurely showing
+          // an empty state.
           safeEmit(state.copyWith(
             songs: snapshot.songs,
-            isLoading: false,
           ));
         }
       } catch (e, st) {

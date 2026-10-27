@@ -522,18 +522,23 @@ GoRouter createRouter(MediaScannerService scannerService,
           final playlist = state.extra is PlaylistsTableData
               ? state.extra as PlaylistsTableData
               : null;
-          if (playlist == null) {
+          if (playlist != null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: Scaffold(
-                appBar: AppBar(),
-                body: Center(child: Text(context.l10n.playlistNotFoundHint)),
-              ),
+              child: ManagePlaylistScreen(playlist: playlist),
             );
           }
-          return _buildPulsrPageRoute(
-            key: state.pageKey,
-            child: ManagePlaylistScreen(playlist: playlist),
+          final id = state.uri.queryParameters['id'];
+          final parsedId = int.tryParse(id ?? '');
+          return _resolveById<PlaylistsTableData>(
+            pageKey: state.pageKey,
+            id: id,
+            fetchSingle:
+                parsedId != null ? () => repo.getPlaylistById(parsedId) : null,
+            watch: () => repo.watchPlaylists(),
+            match: (p) => p.id.toString() == id,
+            builder: (context, p) => ManagePlaylistScreen(playlist: p),
+            notFoundMessage: context.l10n.playlistNotFoundHint,
           );
         },
       ),
@@ -584,8 +589,23 @@ GoRouter createRouter(MediaScannerService scannerService,
         name: 'folder',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
-          final folder =
+          var folder =
               state.extra is FolderItem ? state.extra as FolderItem : null;
+          if (folder == null) {
+            final folderPath = state.uri.queryParameters['path'];
+            if (folderPath != null && folderPath.isNotEmpty) {
+              final folderName = state.uri.queryParameters['name'] ??
+                  folderPath
+                      .split(RegExp(r'[/\\]'))
+                      .lastWhere((s) => s.isNotEmpty, orElse: () => folderPath);
+              folder = FolderItem(
+                path: folderPath,
+                name: folderName,
+                songCount: 0,
+                isExcluded: false,
+              );
+            }
+          }
           if (folder == null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
@@ -709,8 +729,19 @@ GoRouter createRouter(MediaScannerService scannerService,
             } else {
               final id = state.uri.queryParameters['id'] ??
                   (extra is String ? extra : '');
+              final title = state.uri.queryParameters['title'];
+              final subtitle = state.uri.queryParameters['subtitle'];
+              final artworkUrl = state.uri.queryParameters['artworkUrl'];
+              final kind =
+                  state.uri.queryParameters['kind'] ?? OnlineLibraryKind.custom;
               content = OnlinePlaylistDetailScreen(
-                args: OnlinePlaylistDetailArgs(playlistId: id),
+                args: OnlinePlaylistDetailArgs(
+                  playlistId: id,
+                  title: title,
+                  subtitle: subtitle,
+                  artworkUrl: artworkUrl,
+                  kind: kind,
+                ),
               );
             }
             return _buildPulsrPageRoute(

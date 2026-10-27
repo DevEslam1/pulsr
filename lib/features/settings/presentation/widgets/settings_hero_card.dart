@@ -301,7 +301,8 @@ class SettingsHeroCard extends StatelessWidget {
                                     ),
                                   ],
                                 );
-                          final stacked = (user != null && constraints.maxWidth < 320) ||
+                          final stacked = (user != null &&
+                                  constraints.maxWidth < 320) ||
                               (user == null && constraints.maxWidth < 270) ||
                               MediaQuery.textScalerOf(context).scale(14) > 18;
                           final body = stacked

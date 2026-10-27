@@ -83,16 +83,64 @@ class WavFileInfo {
   }
 }
 
+/// Builds a deterministic 6-second stereo 44.1 kHz/16-bit PCM WAV.
+///
+/// The old test depended on `build/playback-startup-test.wav`, which is a
+/// build artifact and is absent on a clean checkout. Generating the fixture
+/// keeps the null/transparency assertions runnable everywhere.
+Uint8List _buildStereoWav({int seconds = 6, int sampleRate = 44100}) {
+  const channels = 2;
+  const bitsPerSample = 16;
+  final frames = seconds * sampleRate;
+  final dataBytes = frames * channels * (bitsPerSample ~/ 8);
+  final bytes = Uint8List(44 + dataBytes);
+  final data = ByteData.sublistView(bytes);
+
+  void ascii(int offset, String value) {
+    for (var i = 0; i < value.length; i++) {
+      bytes[offset + i] = value.codeUnitAt(i);
+    }
+  }
+
+  ascii(0, 'RIFF');
+  data.setUint32(4, 36 + dataBytes, Endian.little);
+  ascii(8, 'WAVE');
+  ascii(12, 'fmt ');
+  data.setUint32(16, 16, Endian.little);
+  data.setUint16(20, 1, Endian.little); // PCM
+  data.setUint16(22, channels, Endian.little);
+  data.setUint32(24, sampleRate, Endian.little);
+  data.setUint32(28, sampleRate * channels * 2, Endian.little);
+  data.setUint16(32, channels * 2, Endian.little);
+  data.setUint16(34, bitsPerSample, Endian.little);
+  ascii(36, 'data');
+  data.setUint32(40, dataBytes, Endian.little);
+
+  var offset = 44;
+  for (var i = 0; i < frames; i++) {
+    final t = i / sampleRate;
+    final left = (sin(2 * pi * 440 * t) * 0.25 * 32767).round();
+    final right = (sin(2 * pi * 880 * t) * 0.25 * 32767).round();
+    data.setInt16(offset, left, Endian.little);
+    data.setInt16(offset + 2, right, Endian.little);
+    offset += 4;
+  }
+  return bytes;
+}
+
 void main() {
   group('Real Audio File Bit-Perfect Null & Transparency Verification', () {
-    const realWavPath =
-        r'D:\Courses\Projectss\pulsr\build\playback-startup-test.wav';
+    const realWavPath = 'build/test_audio/playback-startup-test.wav';
     late File wavFile;
     late Uint8List wavFileRawBytes;
     late WavFileInfo wavInfo;
 
     setUpAll(() async {
       wavFile = File(realWavPath);
+      if (!await wavFile.exists()) {
+        await wavFile.parent.create(recursive: true);
+        await wavFile.writeAsBytes(_buildStereoWav());
+      }
       expect(await wavFile.exists(), isTrue,
           reason: 'Real WAV test audio file must exist');
       wavFileRawBytes = await wavFile.readAsBytes();

@@ -169,7 +169,6 @@ class MediaScannerService {
     }
   }
 
-
   static const List<String> systemIgnoredPathPatterns = [
     // WhatsApp
     '/whatsapp/media/whatsapp voice notes/',

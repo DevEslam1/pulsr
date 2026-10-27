@@ -4589,6 +4589,42 @@ abstract class AppLocalizations {
   /// **'Browse curated stations'**
   String get radioCuratedBrowse;
 
+  /// No description provided for @radioDirectoryBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse radio directory'**
+  String get radioDirectoryBrowse;
+
+  /// No description provided for @radioDirectoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search stations by name'**
+  String get radioDirectoryHint;
+
+  /// No description provided for @radioDirectoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No stations found'**
+  String get radioDirectoryEmpty;
+
+  /// No description provided for @radioDirectoryError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the radio directory'**
+  String get radioDirectoryError;
+
+  /// No description provided for @radioDirectoryAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added'**
+  String get radioDirectoryAdded;
+
+  /// No description provided for @radioDirectoryUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach this stream. Try another station.'**
+  String get radioDirectoryUnreachable;
+
   /// No description provided for @radioCuratedAdded.
   ///
   /// In en, this message translates to:
@@ -7190,8 +7226,32 @@ abstract class AppLocalizations {
   /// tranche7 quality
   ///
   /// In en, this message translates to:
-  /// **'Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.'**
+  /// **'Bit-Perfect Guardrails Active: DSP processing & ReplayGain bypassed. Use the USB DAC hardware volume when enabled for attenuation.'**
   String get bpGuardrails;
+
+  /// No description provided for @bpChainVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-perfect chain verified'**
+  String get bpChainVerified;
+
+  /// No description provided for @bpChainResampled.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform resample detected'**
+  String get bpChainResampled;
+
+  /// No description provided for @bpChainDepthReduced.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit depth truncated'**
+  String get bpChainDepthReduced;
+
+  /// No description provided for @bpChainInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect armed but not active'**
+  String get bpChainInactive;
 
   /// tranche7 quality
   ///
@@ -11711,6 +11771,12 @@ abstract class AppLocalizations {
   /// **'No recommendations right now.'**
   String get browseNoRecommendations;
 
+  /// No description provided for @ytmCachedResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing saved results from an earlier search.'**
+  String get ytmCachedResults;
+
   /// No description provided for @browseNoResultsFound.
   ///
   /// In en, this message translates to:
@@ -12496,6 +12562,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This track is restricted in your region.'**
   String get errYtmRegionRestricted;
+
+  /// No description provided for @errYtmAgeRestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'This track is age-restricted (+18) and can\'t be played here.'**
+  String get errYtmAgeRestricted;
+
+  /// No description provided for @errYtmStreamFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream failed to load. Refreshing the link…'**
+  String get errYtmStreamFailed;
+
+  /// No description provided for @errYtmStreamExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream link expired. Refreshing…'**
+  String get errYtmStreamExpired;
 
   /// No description provided for @errYtmUnavailable.
   ///

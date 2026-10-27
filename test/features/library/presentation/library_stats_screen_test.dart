@@ -81,25 +81,25 @@ void main() {
 
   testWidgets('renders populated metrics, leaders and artists', (tester) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([
-          song(
-              id: 1,
-              title: 'Hit One',
-              artist: 'ArtistA',
-              playCount: 5,
-              lastPlayed: now,
-              codec: 'FLAC',
-              fileSize: 100 * 1024 * 1024),
-          song(
-              id: 2,
-              title: 'Hit Two',
-              artist: 'ArtistB',
-              playCount: 3,
-              lastPlayed: now,
-              codec: 'MP3'),
-          song(id: 3, title: 'Silent', artist: 'ArtistA'),
-        ]));
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => Right([
+              song(
+                  id: 1,
+                  title: 'Hit One',
+                  artist: 'ArtistA',
+                  playCount: 5,
+                  lastPlayed: now,
+                  codec: 'FLAC',
+                  fileSize: 100 * 1024 * 1024),
+              song(
+                  id: 2,
+                  title: 'Hit Two',
+                  artist: 'ArtistB',
+                  playCount: 3,
+                  lastPlayed: now,
+                  codec: 'MP3'),
+              song(id: 3, title: 'Silent', artist: 'ArtistA'),
+            ]));
 
     await pump(tester, state: const LibraryState());
 
@@ -112,8 +112,7 @@ void main() {
 
   testWidgets('shows the no-history message for an unplayed library',
       (tester) async {
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders')))
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) async => Right([song(id: 1, title: 'Never')]));
 
     await pump(tester, state: const LibraryState());
@@ -126,13 +125,13 @@ void main() {
 
   testWidgets('lossless stats agree with the shared quality predicate',
       (tester) async {
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([
-          song(id: 1, codec: 'wav', bitDepth: 16),
-          song(id: 2, path: '/music/album.flac'),
-          song(id: 3, bitDepth: 24),
-          song(id: 4, codec: 'mp3', bitDepth: 16),
-        ]));
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => Right([
+              song(id: 1, codec: 'wav', bitDepth: 16),
+              song(id: 2, path: '/music/album.flac'),
+              song(id: 3, bitDepth: 24),
+              song(id: 4, codec: 'mp3', bitDepth: 16),
+            ]));
 
     await pump(tester, state: const LibraryState());
 
@@ -142,27 +141,27 @@ void main() {
 
   testWidgets('surfaces a failed full-library load with a retry',
       (tester) async {
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders')))
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) async => const Left(DatabaseFailure('db down')));
 
     await pump(tester, state: const LibraryState());
 
     expect(find.textContaining('Failed to fetch'), findsOneWidget);
 
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([]));
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => Right([]));
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
-    verify(() => repo.getAllSongs(
-        excludedFolders: any(named: 'excludedFolders'))).called(2);
+    verify(() =>
+            repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .called(2);
   });
 
   testWidgets('tapping a leaderboard track starts playback', (tester) async {
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([
-          song(id: 1, title: 'Play Me', artist: 'A', playCount: 9),
-        ]));
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => Right([
+              song(id: 1, title: 'Play Me', artist: 'A', playCount: 9),
+            ]));
 
     await pump(tester, state: const LibraryState());
 
@@ -173,15 +172,15 @@ void main() {
 
   testWidgets('changing the time range persists the preference',
       (tester) async {
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => Right([
-          song(
-              id: 1,
-              title: 'Recent',
-              artist: 'A',
-              playCount: 2,
-              lastPlayed: DateTime.now().millisecondsSinceEpoch),
-        ]));
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => Right([
+              song(
+                  id: 1,
+                  title: 'Recent',
+                  artist: 'A',
+                  playCount: 2,
+                  lastPlayed: DateTime.now().millisecondsSinceEpoch),
+            ]));
 
     await pump(tester, state: const LibraryState());
 
@@ -193,22 +192,22 @@ void main() {
   });
 
   testWidgets('the refresh action re-queries the library', (tester) async {
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => const Right([]));
 
     await pump(tester, state: const LibraryState());
 
     await tester.tap(find.byIcon(Icons.refresh_rounded));
     await tester.pumpAndSettle();
-    verify(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders')))
+    verify(() =>
+            repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
         .called(greaterThanOrEqualTo(2));
   });
 
   testWidgets('clearing play history confirms then calls the repository',
       (tester) async {
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => const Right([]));
     when(() => repo.clearRecentlyPlayed())
         .thenAnswer((_) async => const Right(null));
 
@@ -227,8 +226,7 @@ void main() {
   testWidgets('clearing history refreshes the visible recently-played section',
       (tester) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders')))
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) async => Right([
               song(
                   id: 1,
@@ -252,8 +250,8 @@ void main() {
   });
 
   testWidgets('a failed history clear reports the error', (tester) async {
-    when(() => repo.getAllSongs(
-            excludedFolders: any(named: 'excludedFolders'))).thenAnswer((_) async => const Right([]));
+    when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => const Right([]));
     when(() => repo.clearRecentlyPlayed())
         .thenAnswer((_) async => const Left(DatabaseFailure('locked')));
 

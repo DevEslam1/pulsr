@@ -93,6 +93,15 @@ String resolveUiErrorMessage(BuildContext context, String message) {
   if (message.startsWith('This track is restricted in your region')) {
     return l10n.errYtmRegionRestricted;
   }
+  if (message.startsWith('This track is age-restricted')) {
+    return l10n.errYtmAgeRestricted;
+  }
+  if (message.startsWith('Stream failed to load')) {
+    return l10n.errYtmStreamFailed;
+  }
+  if (message.startsWith('Stream link expired')) {
+    return l10n.errYtmStreamExpired;
+  }
   if (message.startsWith('This track is unavailable')) {
     return l10n.errYtmUnavailable;
   }

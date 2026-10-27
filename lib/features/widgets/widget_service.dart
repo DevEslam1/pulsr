@@ -217,8 +217,7 @@ class WidgetService {
 
   /// Non-blocking artwork resolve: fires in background, updates widget
   /// once complete.
-  Future<void> _resolveArtworkAsync(
-      SongsTableData song, int generation) async {
+  Future<void> _resolveArtworkAsync(SongsTableData song, int generation) async {
     try {
       final artPath = await _resolveArtworkPath(song).timeout(
         const Duration(seconds: 8),
