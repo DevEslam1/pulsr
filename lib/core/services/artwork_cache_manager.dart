@@ -55,8 +55,9 @@ class ArtworkCacheManager {
   Future<void> _performInit() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _maxCacheSizeMb = prefs.getInt(PrefsKeys.settingMaxCacheSizeMb) ??
+      final storedMb = prefs.getInt(PrefsKeys.settingMaxCacheSizeMb) ??
           defaultMaxCacheSizeMb;
+      _maxCacheSizeMb = storedMb.clamp(10, 2048);
       final tempDir = await getTemporaryDirectory();
       _cacheDir = Directory(p.join(tempDir.path, 'artwork_cache'));
       if (!await _cacheDir!.exists()) {
@@ -69,9 +70,10 @@ class ArtworkCacheManager {
   }
 
   Future<void> setMaxCacheSizeMb(int mb) async {
-    _maxCacheSizeMb = mb;
+    final clampedMb = mb.clamp(10, 2048);
+    _maxCacheSizeMb = clampedMb;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(PrefsKeys.settingMaxCacheSizeMb, mb);
+    await prefs.setInt(PrefsKeys.settingMaxCacheSizeMb, clampedMb);
     unawaited(_enforceDiskLimit());
   }
 

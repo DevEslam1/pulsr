@@ -102,6 +102,7 @@ private:
     std::atomic<int64_t> readOffset_{0}; // timeline carried across disconnect recovery
     mutable std::atomic<int32_t> lastXRunCount_{0};
     std::atomic<float> volume_{1.0f};
+    std::atomic<aaudio_result_t> lastWriteResult_{AAUDIO_OK};
     std::string lastError_;
     std::vector<uint8_t> volumeScratch_;
     std::chrono::steady_clock::time_point lastRecoveryAttempt_{};

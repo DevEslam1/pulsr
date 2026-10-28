@@ -60,10 +60,27 @@ String resolveUiErrorMessage(BuildContext context, String message) {
       return l10n.errLocalMatchStreaming;
   }
 
+  // Technical DSP/file failures: translate the template, keep the raw detail
+  // (exception text / parameter) verbatim.
+  for (final prefix in [
+    'Failed to set ',
+    'Failed to apply ',
+    'Failed to update ',
+    'Failed to load ',
+    'Failed to add dynamic EQ',
+    'Failed to remove dynamic EQ',
+  ]) {
+    if (message.startsWith(prefix)) {
+      final sep = message.indexOf(': ');
+      final detail = sep >= 0
+          ? message.substring(sep + 2)
+          : message.substring(prefix.length);
+      return l10n.errAudioSettingFailed(detail);
+    }
+  }
+
   // Song titles are data, not UI text: only the template is translated.
-  // The no-colon guard keeps DSP messages ('Failed to add dynamic EQ band:
-  // ...') out of the song-title branch.
-  if (message.startsWith('Failed to play ') && !message.contains(': ')) {
+  if (message.startsWith('Failed to play ')) {
     return l10n.errPlayFailed(message.substring('Failed to play '.length));
   }
   if (message.startsWith('Failed to add ') && !message.contains(': ')) {
@@ -201,25 +218,6 @@ String resolveUiErrorMessage(BuildContext context, String message) {
   if (message.startsWith('Download canceled') ||
       message.startsWith('Download cancelled')) {
     return l10n.downloadErrorInterrupted;
-  }
-
-  // Technical DSP/file failures: translate the template, keep the raw detail
-  // (exception text / parameter) verbatim.
-  for (final prefix in [
-    'Failed to set ',
-    'Failed to apply ',
-    'Failed to update ',
-    'Failed to load ',
-    'Failed to add ',
-    'Failed to remove ',
-  ]) {
-    if (message.startsWith(prefix)) {
-      final sep = message.indexOf(': ');
-      final detail = sep >= 0
-          ? message.substring(sep + 2)
-          : message.substring(prefix.length);
-      return l10n.errAudioSettingFailed(detail);
-    }
   }
 
   return message;

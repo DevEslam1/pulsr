@@ -4,16 +4,12 @@ import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
+import '../motion/pulsr_motion.dart';
 import '../responsive/pulsr_layout_metrics.dart';
 import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
 
 /// {@category DesignSystem}
-/// Standard, responsive search input field used across Settings, Library,
-/// Favorites, Recents, and Genre views.
-///
-/// Automatically uses [PulsrLayoutMetrics.fieldHeight] scaled by text zoom,
-/// supports debounce, clear action, autofocus, custom hints, and styling.
 class PulsrSearchField extends StatefulWidget {
   final TextEditingController? controller;
   final String? initialValue;
@@ -50,8 +46,11 @@ class PulsrSearchField extends StatefulWidget {
 
 class _PulsrSearchFieldState extends State<PulsrSearchField> {
   late TextEditingController _controller;
+  late FocusNode _focusNode;
   Timer? _debounceTimer;
   bool _ownsController = false;
+  bool _ownsFocusNode = false;
+  bool _isFocused = false;
   String _currentQuery = '';
 
   @override
@@ -63,8 +62,22 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
       _controller = TextEditingController(text: widget.initialValue ?? '');
       _ownsController = true;
     }
+    if (widget.focusNode != null) {
+      _focusNode = widget.focusNode!;
+    } else {
+      _focusNode = FocusNode();
+      _ownsFocusNode = true;
+    }
+    _isFocused = _focusNode.hasFocus;
     _currentQuery = _controller.text;
     _controller.addListener(_onControllerChanged);
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() {
+    if (mounted && _isFocused != _focusNode.hasFocus) {
+      setState(() => _isFocused = _focusNode.hasFocus);
+    }
   }
 
   void _onControllerChanged() {
@@ -98,14 +111,34 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
         oldWidget.initialValue != widget.initialValue) {
       _controller.text = widget.initialValue ?? '';
     }
+
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode?.removeListener(_onFocusChanged);
+      if (_ownsFocusNode) {
+        _focusNode.dispose();
+        _ownsFocusNode = false;
+      }
+      if (widget.focusNode != null) {
+        _focusNode = widget.focusNode!;
+      } else {
+        _focusNode = FocusNode();
+        _ownsFocusNode = true;
+      }
+      _isFocused = _focusNode.hasFocus;
+      _focusNode.addListener(_onFocusChanged);
+    }
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _controller.removeListener(_onControllerChanged);
+    _focusNode.removeListener(_onFocusChanged);
     if (_ownsController) {
       _controller.dispose();
+    }
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
     }
     super.dispose();
   }
@@ -145,66 +178,98 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final hasText = _currentQuery.isNotEmpty;
+    final active = _isFocused || hasText;
     final fieldHeight =
         widget.height ?? PulsrLayoutMetrics.fieldHeight(context);
 
-    Widget field = Container(
+    Widget field = AnimatedContainer(
+      duration: context.motionMs(180),
+      curve: Curves.easeOutCubic,
       height: fieldHeight,
       decoration: BoxDecoration(
-        color: p.surfaceContainer,
+        color: _isFocused ? p.surfaceContainerHigh : p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
         border: widget.showBorder
             ? Border.all(
-                color: hasText ? p.accent.withValues(alpha: 0.55) : p.hairline,
-                width: hasText ? 1.5 : 1.0,
+                color: _isFocused
+                    ? p.accent
+                    : (hasText ? p.accent.withValues(alpha: 0.45) : p.hairline),
+                width: _isFocused ? 1.5 : 1.0,
               )
             : null,
+        boxShadow: _isFocused
+            ? [
+                BoxShadow(
+                  color: p.accent.withValues(alpha: p.isDark ? 0.16 : 0.10),
+                  blurRadius: 12,
+                  spreadRadius: -2,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
-      child: TextField(
-        controller: _controller,
-        focusNode: widget.focusNode,
-        autofocus: widget.autofocus,
-        onChanged: _handleChanged,
-        onSubmitted: (value) {
-          _debounceTimer?.cancel();
-          widget.onChanged?.call(value);
-          widget.onSubmitted?.call(value);
-        },
-        style: TextStyle(
-          color: p.textPrimary,
-          fontSize: AppFontSize.body,
-          fontWeight: FontWeight.w600,
-        ),
-        decoration: InputDecoration(
-          hintText: widget.hintText,
-          hintStyle: TextStyle(
-            color: p.textTertiary,
-            fontSize: AppFontSize.bodySmall,
-            fontWeight: FontWeight.w400,
+      child: Center(
+        child: TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          autofocus: widget.autofocus,
+          textAlignVertical: TextAlignVertical.center,
+          onChanged: _handleChanged,
+          onSubmitted: (value) {
+            _debounceTimer?.cancel();
+            widget.onChanged?.call(value);
+            widget.onSubmitted?.call(value);
+          },
+          cursorColor: p.accent,
+          style: TextStyle(
+            color: p.textPrimary,
+            fontSize: AppFontSize.body,
+            fontWeight: FontWeight.w600,
           ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: hasText ? p.accent : p.textTertiary,
-            size: 20,
-          ),
-          suffixIcon: hasText
-              ? IconButton(
-                  constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
-                  icon: Icon(
-                    Icons.clear_rounded,
-                    color: p.textSecondary,
-                    size: 18,
-                  ),
-                  tooltip: context.l10n.clear,
-                  onPressed: _handleClear,
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.sm,
-            horizontal: AppSpacing.xs,
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: widget.hintText,
+            hintStyle: TextStyle(
+              color: p.textTertiary,
+              fontSize: AppFontSize.bodySmall,
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              color: active ? p.accent : p.textTertiary,
+              size: 20,
+            ),
+            suffixIcon: AnimatedSwitcher(
+              duration: context.motionMs(150),
+              child: hasText
+                  ? IconButton(
+                      key: const ValueKey('clear_btn'),
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      icon: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainerHigh,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: p.textSecondary,
+                          size: 14,
+                        ),
+                      ),
+                      tooltip: context.l10n.clear,
+                      onPressed: _handleClear,
+                    )
+                  : const SizedBox.shrink(key: ValueKey('empty_btn')),
+            ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.sm,
+              horizontal: AppSpacing.xs,
+            ),
           ),
         ),
       ),

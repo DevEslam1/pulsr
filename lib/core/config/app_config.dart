@@ -114,6 +114,7 @@ class AppConfig {
     if (lowerFlavor == 'ytm' || ytmEnabled) {
       return 'Pulsr Music';
     }
+    if (isProd) return 'Pulsr Music';
     // B-08 single source of truth: dev flavor's native label is "Pulsr Plus" (app/build.gradle.kts)
     // Align Dart title so launcher + in-app branding match. Prod stays "Pulsr Music".
     if (lowerFlavor == 'dev') return 'Pulsr Plus';
@@ -127,6 +128,12 @@ class AppConfig {
         lowerFlavor == 'prod' &&
         envName.toLowerCase() == 'dev') {
       throw StateError('CRITICAL: Production flavor cannot run with ENV=dev');
+    }
+    if (envName.toLowerCase() == 'prod' && lowerFlavor == 'dev') {
+      ErrorLogger.log(
+        'Warning: Running flavor "dev" with ENV=prod. Features may behave as production in development build.',
+        category: 'AppConfig',
+      );
     }
     // Play Store compliance: the dedicated "prod" flavor MUST NOT have YouTube Music enabled
     if (lowerFlavor == 'prod' && ytmEnabled) {

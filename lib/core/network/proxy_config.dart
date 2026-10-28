@@ -85,7 +85,7 @@ class ProxyConfig {
         : cleanHost;
     switch (type) {
       case AppProxyType.http:
-        return 'PROXY $formattedHost:$port; DIRECT';
+        return 'PROXY $formattedHost:$port';
       case AppProxyType.socks5:
         // Dart fallback cannot speak SOCKS — native extractor owns it.
         return 'DIRECT';
@@ -225,7 +225,8 @@ class ProxyEntry {
             pass = Uri.decodeComponent(userParts.sublist(1).join(':'));
           }
         }
-        final port = uri.port > 0 ? uri.port : 8080;
+        final defaultPort = detectedType == AppProxyType.socks5 ? 1080 : 8080;
+        final port = uri.port > 0 ? uri.port : defaultPort;
         return ProxyEntry(
           id: '${uri.host}:$port:${DateTime.now().microsecondsSinceEpoch}',
           host: uri.host,
@@ -243,6 +244,8 @@ class ProxyEntry {
       line = line.replaceFirst(RegExp(r'^[a-zA-Z0-9]+:\/\/'), '');
     }
 
+    final defaultPort = detectedType == AppProxyType.socks5 ? 1080 : 8080;
+
     // Handle user:pass@host:port format (host may be bracketed IPv6 [::1]).
     if (line.contains('@')) {
       final lastAtIndex = line.lastIndexOf('@');
@@ -254,19 +257,19 @@ class ProxyEntry {
       final pass = authTokens.length > 1 ? authTokens.sublist(1).join(':') : '';
 
       String host;
-      int port = 8080;
+      int port = defaultPort;
       final bracketed =
           RegExp(r'^\[(.+)\](?::(\d+))?$').firstMatch(serverPart.trim());
       if (bracketed != null) {
         host = bracketed.group(1)!.trim();
         final portStr = bracketed.group(2);
-        if (portStr != null) port = int.tryParse(portStr) ?? 8080;
+        if (portStr != null) port = int.tryParse(portStr) ?? defaultPort;
       } else {
         final serverTokens = serverPart.split(':');
         host = serverTokens[0].trim();
         port = serverTokens.length > 1
-            ? int.tryParse(serverTokens[1].trim()) ?? 8080
-            : 8080;
+            ? int.tryParse(serverTokens[1].trim()) ?? defaultPort
+            : defaultPort;
       }
 
       if (host.isNotEmpty) {
@@ -314,7 +317,8 @@ class ProxyEntry {
     if (parts.isEmpty) return null;
 
     final host = parts[0];
-    final port = parts.length > 1 ? (int.tryParse(parts[1]) ?? 8080) : 8080;
+    final port =
+        parts.length > 1 ? (int.tryParse(parts[1]) ?? defaultPort) : defaultPort;
     final username = parts.length > 2 ? parts[2] : '';
     final password = parts.length > 3 ? parts.sublist(3).join(':') : '';
 
@@ -345,7 +349,8 @@ class ProxyEntry {
     for (int i = 0; i < lines.length && results.length < 5000; i++) {
       final entry = parse(lines[i]);
       if (entry != null && entry.isValid) {
-        final key = '${entry.host}:${entry.port}:${entry.username}';
+        final key =
+            '${entry.type.name}:${entry.host.toLowerCase()}:${entry.port}:${entry.username}';
         if (!seen.contains(key)) {
           seen.add(key);
           results.add(entry.copyWith(

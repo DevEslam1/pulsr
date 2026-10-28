@@ -105,4 +105,6 @@ private:
     // and reuse spectrumScratch_/firFilter_ in place, so neither allocates.
     void synthesizeLinearPhaseFir();
     void synthesizeMinPhaseFir();
+
+    inline void processFrame(float inL, float inR, float& outL, float& outR, float currentEnabledMix, float crossfadeStep);
 };

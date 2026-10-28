@@ -35,12 +35,14 @@ public:
 
     void processInterleaved(float* buffer, int frames, int channels);
 
-    bool isEnabled() const { return params_.enabled; }
+    bool isEnabled() const { return params_.enabled || rampingDown_; }
+    bool isRamping() const { return rampingDown_; }
     int getChannelCount() const { return params_.channelCount; }
 
 private:
-    double sampleRate_ = 48000.0;
+    double sampleRate_ = 0.0;
     ChannelManagerParamSet params_{};
+    bool rampingDown_ = false;
 
     int delaySamples_[MAX_CHANNELS] = {};
     int maxDelaySamples_ = 1;

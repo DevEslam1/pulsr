@@ -122,14 +122,32 @@ class AudioEffectsPluginIntegrationTest {
         // Simulate 44.1 kHz track
         val resync44 = invoke("resyncForTrack", mapOf("sampleRate" to 44100.0, "channels" to 2))
         assertNotNull(resync44)
+        val status44 = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull(status44)
+        val isNative44 = status44?.get("isNativeDspLoaded") as? Boolean ?: false
+        if (isNative44) {
+            assertEquals(44100.0, (status44?.get("appliedSampleRate") as? Number)?.toDouble() ?: 0.0, 0.5)
+        }
 
         // Simulate route change to Hi-Res USB DAC at 96 kHz
         val resync96 = invoke("resyncForTrack", mapOf("sampleRate" to 96000.0, "channels" to 2))
         assertNotNull(resync96)
+        val status96 = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull(status96)
+        val isNative96 = status96?.get("isNativeDspLoaded") as? Boolean ?: false
+        if (isNative96) {
+            assertEquals(96000.0, (status96?.get("appliedSampleRate") as? Number)?.toDouble() ?: 0.0, 0.5)
+        }
 
         // Simulate route fallback back to 48 kHz
         val resync48 = invoke("resyncForTrack", mapOf("sampleRate" to 48000.0, "channels" to 2))
         assertNotNull(resync48)
+        val status48 = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull(status48)
+        val isNative48 = status48?.get("isNativeDspLoaded") as? Boolean ?: false
+        if (isNative48) {
+            assertEquals(48000.0, (status48?.get("appliedSampleRate") as? Number)?.toDouble() ?: 0.0, 0.5)
+        }
 
         // Tear down
         invoke("setAudioSessionId", mapOf("audioSessionId" to 0))
@@ -142,14 +160,28 @@ class AudioEffectsPluginIntegrationTest {
         // Headphone crossfeed on Bluetooth route
         invoke("setCrossfeedMode", mapOf("mode" to "headphone"))
         invoke("setCrossfeedEnabled", mapOf("enabled" to true))
+        val statusBt1 = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull(statusBt1)
+        @Suppress("UNCHECKED_CAST")
+        val stagesBt1 = statusBt1?.get("stages") as? List<Map<String, Any?>>
+        val cfStage1 = stagesBt1?.firstOrNull { it["name"] == "Bauer Binaural Crossfeed" }
+        assertEquals(true, cfStage1?.get("isEnabled"))
 
         // Route change to speaker
         invoke("setCrossfeedMode", mapOf("mode" to "speaker"))
+        val statusSpeaker = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull(statusSpeaker)
 
         // Reconnect Bluetooth
         invoke("setCrossfeedMode", mapOf("mode" to "headphone"))
         val crossfeedResult = invoke("setCrossfeedEnabled", mapOf("enabled" to true))
         assertNotNull(crossfeedResult)
+        val statusBt2 = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull(statusBt2)
+        @Suppress("UNCHECKED_CAST")
+        val stagesBt2 = statusBt2?.get("stages") as? List<Map<String, Any?>>
+        val cfStage2 = stagesBt2?.firstOrNull { it["name"] == "Bauer Binaural Crossfeed" }
+        assertEquals(true, cfStage2?.get("isEnabled"))
 
         // Clean tear down
         invoke("setAudioSessionId", mapOf("audioSessionId" to 0))
@@ -162,10 +194,22 @@ class AudioEffectsPluginIntegrationTest {
         // USB DAC connect: 192 kHz direct format resync
         val usbConnect = invoke("resyncForTrack", mapOf("sampleRate" to 192000.0, "channels" to 2))
         assertNotNull(usbConnect)
+        val statusUsb = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull(statusUsb)
+        val isNativeUsb = statusUsb?.get("isNativeDspLoaded") as? Boolean ?: false
+        if (isNativeUsb) {
+            assertEquals(192000.0, (statusUsb?.get("appliedSampleRate") as? Number)?.toDouble() ?: 0.0, 0.5)
+        }
 
         // USB DAC disconnect: fallback to built-in speaker at 48 kHz
         val usbDisconnect = invoke("resyncForTrack", mapOf("sampleRate" to 48000.0, "channels" to 2))
         assertNotNull(usbDisconnect)
+        val statusSpeaker = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull(statusSpeaker)
+        val isNativeSpeaker = statusSpeaker?.get("isNativeDspLoaded") as? Boolean ?: false
+        if (isNativeSpeaker) {
+            assertEquals(48000.0, (statusSpeaker?.get("appliedSampleRate") as? Number)?.toDouble() ?: 0.0, 0.5)
+        }
 
         // Tear down
         invoke("setAudioSessionId", mapOf("audioSessionId" to 0))

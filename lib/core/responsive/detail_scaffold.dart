@@ -115,7 +115,12 @@ class DetailScaffold extends StatelessWidget {
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsetsDirectional.all(AppSpacing.md),
+                    padding: EdgeInsetsDirectional.only(
+                      start: AppSpacing.md,
+                      end: AppSpacing.md,
+                      top: AppSpacing.md,
+                      bottom: PulsrLayoutMetrics.scrollBottom(context),
+                    ),
                     child: Center(child: hero),
                   ),
                 ),

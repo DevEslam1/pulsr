@@ -50,18 +50,27 @@ void main() {
       final targets = navigationTargets();
 
       // Tab branches are driven by the StatefulShell, not push/go; the
-      // splash screen is the router initialLocation.
-      const shellDriven = {
+      // splash screen is the router initialLocation; parameterized routes
+      // resolve external deep links/intents rather than in-app push/go calls.
+      const externalOrShellDriven = {
         '/splash',
         '/',
         '/library',
         '/search',
         '/playlists',
         '/settings',
+        '/album/:id',
+        '/artist/:id',
+        '/genre/:name',
+        '/year/:year',
+        '/playlist/:id',
       };
 
-      final orphans =
-          routes.difference(targets).difference(shellDriven).toList()..sort();
+      final orphans = routes
+          .difference(targets)
+          .difference(externalOrShellDriven)
+          .toList()
+        ..sort();
       expect(
         orphans,
         isEmpty,

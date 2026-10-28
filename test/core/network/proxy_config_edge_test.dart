@@ -80,7 +80,7 @@ void main() {
       );
       expect(
         raw.toFindProxyString(Uri.parse('https://example.com')),
-        'PROXY [::1]:8080; DIRECT',
+        'PROXY [::1]:8080',
       );
 
       const bracketed = ProxyConfig(
@@ -90,7 +90,7 @@ void main() {
       );
       expect(
         bracketed.toFindProxyString(Uri.parse('https://example.com')),
-        'PROXY [::1]:8080; DIRECT',
+        'PROXY [::1]:8080',
       );
     });
 
@@ -352,7 +352,7 @@ void main() {
       expect(entry.port, 80);
 
       final socks = ProxyEntry.parse('socks5://user@host.example');
-      expect(socks!.port, 8080);
+      expect(socks!.port, 1080);
     });
 
     test('parses user:pass@host:port and bracketed IPv6 forms', () {

@@ -1,13 +1,16 @@
+// lib/core/widgets/pulsr_icon_button.dart
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
+import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
 
 /// {@category DesignSystem}
 /// Circular icon button with a guaranteed 48dp minimum touch target,
-/// background tint, and badge integration.
-class PulsrIconButton extends StatelessWidget {
+/// hover highlight, background tint, and badge integration.
+class PulsrIconButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback? onPressed;
   final String? tooltip;
@@ -36,30 +39,46 @@ class PulsrIconButton extends StatelessWidget {
   });
 
   @override
+  State<PulsrIconButton> createState() => _PulsrIconButtonState();
+}
+
+class _PulsrIconButtonState extends State<PulsrIconButton> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final enabled = onPressed != null;
+    final enabled = widget.onPressed != null;
 
-    final effectiveIconColor =
-        iconColor ?? (enabled ? p.textSecondary : p.textTertiary);
+    final effectiveIconColor = widget.iconColor ??
+        (enabled
+            ? (_hovered ? p.textPrimary : p.textSecondary)
+            : p.textTertiary);
 
-    Widget button = Container(
-      width: size,
-      height: size,
+    final baseBg = widget.backgroundColor ?? Colors.transparent;
+    final effectiveBg = _hovered && enabled && widget.backgroundColor == null
+        ? (p.isDark ? AppColors.specularAt(0.08) : AppColors.scrimAt(0.06))
+        : baseBg;
+
+    Widget button = AnimatedContainer(
+      duration: context.motionMs(140),
+      curve: Curves.easeOutCubic,
+      width: widget.size,
+      height: widget.size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.transparent,
+        color: effectiveBg,
         shape: BoxShape.circle,
-        border: border,
+        border: widget.border,
       ),
       child: Icon(
-        icon,
-        size: iconSize,
+        widget.icon,
+        size: widget.iconSize,
         color: effectiveIconColor,
       ),
     );
 
-    if (badge != null) {
+    if (widget.badge != null) {
       button = Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
@@ -68,27 +87,32 @@ class PulsrIconButton extends StatelessWidget {
           PositionedDirectional(
             top: 2,
             end: 2,
-            child: badge!,
+            child: widget.badge!,
           ),
         ],
       );
     }
 
-    button = PulsrPressable(
-      onTap: onPressed,
-      focusBorderRadius: AppRadii.full,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: AppSpacing.minTouchTarget,
-          minHeight: AppSpacing.minTouchTarget,
+    button = MouseRegion(
+      onEnter: enabled ? (_) => setState(() => _hovered = true) : null,
+      onExit: enabled ? (_) => setState(() => _hovered = false) : null,
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: PulsrPressable(
+        onTap: widget.onPressed,
+        focusBorderRadius: AppRadii.full,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          child: Center(child: button),
         ),
-        child: Center(child: button),
       ),
     );
 
-    if (tooltip != null) {
+    if (widget.tooltip != null) {
       button = Tooltip(
-        message: tooltip!,
+        message: widget.tooltip!,
         child: button,
       );
     }
@@ -96,7 +120,7 @@ class PulsrIconButton extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
-      label: semanticLabel ?? tooltip,
+      label: widget.semanticLabel ?? widget.tooltip,
       child: button,
     );
   }

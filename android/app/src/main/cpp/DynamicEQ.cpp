@@ -58,10 +58,7 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
     const double newFreq = std::clamp(params.frequency, 20.0, sampleRate_ * 0.45);
     const double newQ = std::clamp(params.q, 0.1, 12.0);
     const int newFilterType = std::clamp(params.filterType, 0, 2);
-    const bool structureChanged =
-        std::abs(newFreq - band.frequency) > 1e-6 ||
-        std::abs(newQ - band.q) > 1e-6 ||
-        newFilterType != band.filterType;
+    const bool filterTypeChanged = (newFilterType != band.filterType);
 
     band.frequency = newFreq;
     band.q = newQ;
@@ -77,9 +74,9 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
     updateBandCache(band);
     band.lastCoeffGainDb = 1e9; // force recompute
 
-    // FIX M-8: only the band that actually changed is cleared, so untouched
-    // bands keep their filter continuity.
-    if (structureChanged) {
+    // Only clear filter state if the filter topology actually changed; frequency/Q
+    // changes update coefficients smoothly in-place without zeroing registers.
+    if (filterTypeChanged) {
         std::memset(band.dx1, 0, sizeof(band.dx1));
         std::memset(band.dx2, 0, sizeof(band.dx2));
         std::memset(band.dy1, 0, sizeof(band.dy1));
@@ -217,28 +214,48 @@ void DynamicEQ::process(float* L, float* R, int frames) {
         BandState& band = bands_[b];
         if (!band.enabled || !enabled_) {
             if (std::abs(band.currentGainDb) > 1e-4) {
-                const double rampStep = band.currentGainDb / frames;
+                const double decayCoeff = std::exp(-1.0 / (sampleRate_ * 0.010));
                 for (int i = 0; i < frames; ++i) {
                     double l = L[i];
                     double r = R[i];
                     if (!std::isfinite(l)) l = 0.0;
                     if (!std::isfinite(r)) r = 0.0;
-                    band.currentGainDb -= rampStep;
+                    band.currentGainDb *= decayCoeff;
+                    if (std::abs(band.currentGainDb) < 1e-4) {
+                        band.currentGainDb = 0.0;
+                    }
                     if (((i & 15) == 0 || i == frames - 1) &&
                         std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
                         computeBandCoeffs(band, band.currentGainDb);
                     }
-                    L[i] = static_cast<float>(band.b0 * l + band.b1 * band.x1[0] + band.b2 * band.x2[0]
-                                              - band.a1 * band.y1[0] - band.a2 * band.y2[0]);
-                    R[i] = static_cast<float>(band.b0 * r + band.b1 * band.x1[1] + band.b2 * band.x2[1]
-                                              - band.a1 * band.y1[1] - band.a2 * band.y2[1]);
+                    double yL = band.b0 * l + band.b1 * band.x1[0] + band.b2 * band.x2[0]
+                                - band.a1 * band.y1[0] - band.a2 * band.y2[0];
+                    double yR = band.b0 * r + band.b1 * band.x1[1] + band.b2 * band.x2[1]
+                                - band.a1 * band.y1[1] - band.a2 * band.y2[1];
+                    L[i] = static_cast<float>(yL);
+                    R[i] = static_cast<float>(yR);
                     band.x2[0] = band.x1[0]; band.x1[0] = l;
-                    band.y2[0] = band.y1[0]; band.y1[0] = L[i];
+                    band.y2[0] = band.y1[0]; band.y1[0] = yL;
                     band.x2[1] = band.x1[1]; band.x1[1] = r;
-                    band.y2[1] = band.y1[1]; band.y1[1] = R[i];
+                    band.y2[1] = band.y1[1]; band.y1[1] = yR;
                 }
+                if (std::abs(band.currentGainDb) <= 1e-4) {
+                    band.currentGainDb = 0.0;
+                    computeBandCoeffs(band, 0.0);
+                }
+            } else {
                 band.currentGainDb = 0.0;
                 computeBandCoeffs(band, 0.0);
+                for (int i = 0; i < frames; ++i) {
+                    float l = L[i];
+                    float r = R[i];
+                    if (!std::isfinite(l)) l = 0.0f;
+                    if (!std::isfinite(r)) r = 0.0f;
+                    band.x2[0] = band.x1[0]; band.x1[0] = l;
+                    band.y2[0] = band.y1[0]; band.y1[0] = l;
+                    band.x2[1] = band.x1[1]; band.x1[1] = r;
+                    band.y2[1] = band.y1[1]; band.y1[1] = r;
+                }
             }
             continue;
         }
@@ -268,6 +285,7 @@ void DynamicEQ::process(float* L, float* R, int frames) {
                 const double absBp = std::abs(bp);
                 const double coeff = (absBp > band.env[ch]) ? attackCoeff : releaseCoeff;
                 band.env[ch] += coeff * (absBp - band.env[ch]);
+                if (!std::isfinite(band.env[ch]) || band.env[ch] < 1e-25) band.env[ch] = 0.0;
                 if (band.env[ch] > envMax) envMax = band.env[ch];
             }
 
@@ -337,9 +355,12 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
         BandState& band = bands_[b];
         if (!band.enabled || !enabled_) {
             if (std::abs(band.currentGainDb) > 1e-4) {
-                const double rampStep = band.currentGainDb / frames;
+                const double decayCoeff = std::exp(-1.0 / (sampleRate_ * 0.010));
                 for (int i = 0; i < frames; ++i) {
-                    band.currentGainDb -= rampStep;
+                    band.currentGainDb *= decayCoeff;
+                    if (std::abs(band.currentGainDb) < 1e-4) {
+                        band.currentGainDb = 0.0;
+                    }
                     if (((i & 15) == 0 || i == frames - 1) &&
                         std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
                         computeBandCoeffs(band, band.currentGainDb);
@@ -356,8 +377,23 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                         buffer[i * channels + ch] = static_cast<float>(y);
                     }
                 }
+                if (std::abs(band.currentGainDb) <= 1e-4) {
+                    band.currentGainDb = 0.0;
+                    computeBandCoeffs(band, 0.0);
+                }
+            } else {
                 band.currentGainDb = 0.0;
                 computeBandCoeffs(band, 0.0);
+                for (int i = 0; i < frames; ++i) {
+                    for (int ch = 0; ch < chCount; ++ch) {
+                        float x = buffer[i * channels + ch];
+                        if (!std::isfinite(x)) x = 0.0f;
+                        band.x2[ch] = band.x1[ch];
+                        band.x1[ch] = x;
+                        band.y2[ch] = band.y1[ch];
+                        band.y1[ch] = x;
+                    }
+                }
             }
             continue;
         }
@@ -393,6 +429,7 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                 const double absBp = std::abs(bp);
                 const double coeff = (absBp > band.env[ch]) ? attackCoeff : releaseCoeff;
                 band.env[ch] += coeff * (absBp - band.env[ch]);
+                if (!std::isfinite(band.env[ch]) || band.env[ch] < 1e-25) band.env[ch] = 0.0;
                 if (band.env[ch] > envMax) envMax = band.env[ch];
             }
 

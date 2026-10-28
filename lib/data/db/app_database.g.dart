@@ -5716,43 +5716,49 @@ class $$SongsTableTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (playlistEntriesTableRefs)
-                    await $_getPrefetchedData<SongsTableData, $SongsTableTable,
-                            PlaylistEntriesTableData>(
+                    await $_getPrefetchedDataByColumns<
+                            SongsTableData,
+                            $SongsTableTable,
+                            PlaylistEntriesTableData,
+                            $PlaylistEntriesTableTable>(
                         currentTable: table,
                         referencedTable: $$SongsTableTableReferences
                             ._playlistEntriesTableRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$SongsTableTableReferences(db, table, p0)
                                 .playlistEntriesTableRefs,
-                        referencedItemsForCurrentItem: (item,
-                                referencedItems) =>
-                            referencedItems.where((e) => e.songId == item.id),
+                        currentColumn: 'id',
+                        referencedColumn: 'song_id',
                         typedResults: items),
                   if (playHistoryTableRefs)
-                    await $_getPrefetchedData<SongsTableData, $SongsTableTable,
-                            PlayHistoryTableData>(
+                    await $_getPrefetchedDataByColumns<
+                            SongsTableData,
+                            $SongsTableTable,
+                            PlayHistoryTableData,
+                            $PlayHistoryTableTable>(
                         currentTable: table,
                         referencedTable: $$SongsTableTableReferences
                             ._playHistoryTableRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$SongsTableTableReferences(db, table, p0)
                                 .playHistoryTableRefs,
-                        referencedItemsForCurrentItem: (item,
-                                referencedItems) =>
-                            referencedItems.where((e) => e.songId == item.id),
+                        currentColumn: 'id',
+                        referencedColumn: 'song_id',
                         typedResults: items),
                   if (queueItemsTableRefs)
-                    await $_getPrefetchedData<SongsTableData, $SongsTableTable,
-                            QueueItemsTableData>(
+                    await $_getPrefetchedDataByColumns<
+                            SongsTableData,
+                            $SongsTableTable,
+                            QueueItemsTableData,
+                            $QueueItemsTableTable>(
                         currentTable: table,
                         referencedTable: $$SongsTableTableReferences
                             ._queueItemsTableRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$SongsTableTableReferences(db, table, p0)
                                 .queueItemsTableRefs,
-                        referencedItemsForCurrentItem: (item,
-                                referencedItems) =>
-                            referencedItems.where((e) => e.songId == item.id),
+                        currentColumn: 'id',
+                        referencedColumn: 'song_id',
                         typedResults: items)
                 ];
               },
@@ -6393,17 +6399,19 @@ class $$PlaylistsTableTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (playlistEntriesTableRefs)
-                    await $_getPrefetchedData<PlaylistsTableData,
-                            $PlaylistsTableTable, PlaylistEntriesTableData>(
+                    await $_getPrefetchedDataByColumns<
+                            PlaylistsTableData,
+                            $PlaylistsTableTable,
+                            PlaylistEntriesTableData,
+                            $PlaylistEntriesTableTable>(
                         currentTable: table,
                         referencedTable: $$PlaylistsTableTableReferences
                             ._playlistEntriesTableRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$PlaylistsTableTableReferences(db, table, p0)
                                 .playlistEntriesTableRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.playlistId == item.id),
+                        currentColumn: 'id',
+                        referencedColumn: 'playlist_id',
                         typedResults: items)
                 ];
               },
@@ -7756,19 +7764,19 @@ class $$OnlinePlaylistsTableTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (onlinePlaylistEntriesTableRefs)
-                    await $_getPrefetchedData<
+                    await $_getPrefetchedDataByColumns<
                             OnlinePlaylistsTableData,
                             $OnlinePlaylistsTableTable,
-                            OnlinePlaylistEntriesTableData>(
+                            OnlinePlaylistEntriesTableData,
+                            $OnlinePlaylistEntriesTableTable>(
                         currentTable: table,
                         referencedTable: $$OnlinePlaylistsTableTableReferences
                             ._onlinePlaylistEntriesTableRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$OnlinePlaylistsTableTableReferences(db, table, p0)
                                 .onlinePlaylistEntriesTableRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.playlistId == item.playlistId),
+                        currentColumn: 'playlist_id',
+                        referencedColumn: 'playlist_id',
                         typedResults: items)
                 ];
               },

@@ -312,7 +312,7 @@ private:
     uint32_t ditherPrngState1_ = 0x12345678;
     uint32_t ditherPrngState2_ = 0x87654321;
     // Per-channel quantization error history for Lipshitz-Wannamaker E-weighted noise shaping
-    float ditherErrorHistory_[2][2] = {};
+    float ditherErrorHistory_[ChannelManager::MAX_CHANNELS][2] = {};
     double smoothedReplayGain_ = 1.0;
     double targetReplayGain_ = 1.0;
     // Direct Volume Control output gain, smoothed across a 20ms window.

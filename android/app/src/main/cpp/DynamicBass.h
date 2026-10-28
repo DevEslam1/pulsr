@@ -67,8 +67,7 @@ private:
     // Filter for Side channel low-band extraction
     Biquad yLpSide_;
 
-    // Filters for X-band acoustic response range [xLow, xHigh] Hz
-    Biquad xHpBass_;   // high-pass at xLow
+    // Filter for X-band acoustic response range [xLow, xHigh] Hz
     Biquad xLpBass_;   // low-pass at xHigh
 
     // Dynamic envelope follower

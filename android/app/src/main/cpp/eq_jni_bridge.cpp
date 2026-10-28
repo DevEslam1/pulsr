@@ -26,15 +26,22 @@ std::shared_mutex gEngineLifecycleMutex;
 // shared_mutex read-lock can still block and invert priority against the writer
 // in nativeDestroyEngine on the RT render thread. Instead the render path bumps
 // gRenderInFlight (a lock-free atomic RMW) around its engine use and checks
-// gEngineTeardown; nativeDestroyEngine sets gEngineTeardown then waits for
+// gTeardownEngineHandle; nativeDestroyEngine sets gTeardownEngineHandle then waits for
 // gRenderInFlight to drain to zero before `delete engine`. All four ops are
 // seq_cst so the arrive-then-check / set-then-wait pair forms a Dekker-style
 // StoreLoad handshake: destroy can never both observe zero in-flight renders AND
-// let a render proceed to touch the engine. The flag is process-global (one
-// destroy briefly gates all engines' renders), matching the old unique_lock,
-// which also excluded every shared-lock render regardless of engine.
+// let a render proceed to touch the engine. Scoped to the specific engine handle
+// being destroyed so concurrent renders on other engines continue unimpeded.
 std::atomic<int> gRenderInFlight{0};
-std::atomic<bool> gEngineTeardown{false};
+std::atomic<jlong> gTeardownEngineHandle{0};
+
+static inline double getEffectiveSampleRate() {
+    double sr = DspEngineRegistry::instance().getAppliedSampleRate();
+    if (sr <= 0.0) {
+        sr = AudioDspEngine::instance().getSampleRate();
+    }
+    return (sr > 0.0) ? sr : 48000.0;
+}
 
 // FIX M-4: Validate an arbitrary jint against the FilterType enum range
 // (0..7 == Peaking..AllPass, see DspParams.h) before casting. An out-of-range
@@ -168,6 +175,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
     if (types && jTypes) env->ReleaseIntArrayElements(jTypes, types, JNI_ABORT);
 
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        const int prevBandCount = snap.eq.bandCount;
         snap.eq.bandCount = static_cast<int>(count);
         for (int i = 0; i < count; ++i) {
             snap.eq.bands[i].frequency = vFreqs[i];
@@ -177,8 +185,8 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
             snap.eq.bands[i].enabled = true;
             // Preserve existing solo/mute states across bulk gain pushes so
             // moving multiple sliders or applying debounced edits does not drop solo/mute.
-            const bool prevSolo = (i < snap.eq.bandCount) ? snap.eq.bands[i].solo : false;
-            const bool prevMute = (i < snap.eq.bandCount) ? snap.eq.bands[i].mute : false;
+            const bool prevSolo = (i < prevBandCount) ? snap.eq.bands[i].solo : false;
+            const bool prevMute = (i < prevBandCount) ? snap.eq.bands[i].mute : false;
             snap.eq.bands[i].solo = prevSolo;
             snap.eq.bands[i].mute = prevMute;
         }
@@ -225,6 +233,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetCrossfeedParams(
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.crossfeed.delayUs = delayUs;
         snap.crossfeed.feedDb = feedDb;
+        snap.crossfeed.mode = CrossfeedMode::Custom;
     });
 }
 
@@ -233,6 +242,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetCrossfeedFcut(
         JNIEnv* /* env */, jobject /* thiz */, jdouble fcut) {
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.crossfeed.fcut = fcut;
+        snap.crossfeed.mode = CrossfeedMode::Custom;
     });
 }
 
@@ -267,9 +277,10 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbEnabled(
         JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
     auto current = AudioDspEngine::instance().getParams();
     std::shared_ptr<const PreparedIr> ir = nullptr;
+    const double effectiveSr = getEffectiveSampleRate();
     if (enabled && !current->reverb.preparedIr && current->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
         ir = PreparedIr::createSynthetic(
-            current->sampleRate, current->reverb.preset, static_cast<float>(current->reverb.damping));
+            effectiveSr, current->reverb.preset, static_cast<float>(current->reverb.damping));
     }
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.reverb.enabled = enabled;
@@ -300,10 +311,11 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPreset(
     if (preset < 0 || preset > static_cast<jint>(ReverbPreset::Custom)) return;
     auto current = AudioDspEngine::instance().getParams();
     std::shared_ptr<const PreparedIr> ir = nullptr;
+    const double effectiveSr = getEffectiveSampleRate();
     if (preset != static_cast<int>(ReverbPreset::Custom)) {
         // Switching to a synthetic preset — create it from current damping
         ir = PreparedIr::createSynthetic(
-            current->sampleRate, preset, static_cast<float>(current->reverb.damping));
+            effectiveSr, preset, static_cast<float>(current->reverb.damping));
     } else {
         // FIX C-3: Switching back to Custom — restore the last loaded custom IR
         ir = gLastCustomIr;
@@ -338,9 +350,10 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbDamping(
         JNIEnv* /* env */, jobject /* thiz */, jdouble damping) {
     auto current = AudioDspEngine::instance().getParams();
     std::shared_ptr<const PreparedIr> ir = nullptr;
+    const double effectiveSr = getEffectiveSampleRate();
     if (current->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
         ir = PreparedIr::createSynthetic(
-            current->sampleRate, current->reverb.preset, static_cast<float>(damping));
+            effectiveSr, current->reverb.preset, static_cast<float>(damping));
     }
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.reverb.damping = damping;
@@ -363,6 +376,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
         JNIEnv* env, jobject /* thiz */, jfloatArray irSamples, jint channels) {
     if (!irSamples) return JNI_FALSE;
     jsize len = env->GetArrayLength(irSamples);
+    if (channels < 1 || channels > 8 || len < channels) return JNI_FALSE;
     jfloat* data = env->GetFloatArrayElements(irSamples, nullptr);
     if (!data) return JNI_FALSE;
 
@@ -394,8 +408,9 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     }
 
     auto current = AudioDspEngine::instance().getParams();
-    const double targetCoreRate = (current && current->sampleRate > 0.0) ? std::min(current->sampleRate, 48000.0) : 48000.0;
-    auto customIr = PreparedIr::createCustom(current ? current->sampleRate : 48000.0, ir.data(), frames, channels, targetCoreRate);
+    const double effectiveSr = getEffectiveSampleRate();
+    const double targetCoreRate = std::min(effectiveSr, 48000.0);
+    auto customIr = PreparedIr::createCustom(effectiveSr, ir.data(), frames, channels, targetCoreRate);
 
     if (customIr) {
         gLastCustomIr = customIr; // FIX C-3: persist for Custom preset restore
@@ -449,10 +464,21 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerQuality(
     });
 }
 
+namespace {
+struct CachedDsdDecoder {
+    DsdDecoder decoder;
+    jint dsdRate = -1;
+    jint targetRate = -1;
+    jint bitOrder = -1;
+};
+thread_local CachedDsdDecoder sDecoderCache;
+} // namespace
+
 JNIEXPORT jfloatArray JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         JNIEnv* env, jobject /* thiz */,
-        jbyteArray dsdL, jbyteArray dsdR, jint byteCount, jint dsdRate, jint targetPcmSampleRate, jint bitOrder) {
+        jbyteArray dsdL, jbyteArray dsdR, jint byteCount, jint dsdRate, jint targetPcmSampleRate, jint bitOrder,
+        jboolean resetState) {
     if (!dsdL || !dsdR || byteCount <= 0) return nullptr;
     constexpr int kMaxDsdByteCount = 16 * 1024 * 1024; // 16 MB max per chunk
     if (byteCount > kMaxDsdByteCount) return nullptr;
@@ -472,14 +498,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         return nullptr;
     }
 
-    struct CachedDsdDecoder {
-        DsdDecoder decoder;
-        jint dsdRate = -1;
-        jint targetRate = -1;
-        jint bitOrder = -1;
-    };
-    static thread_local CachedDsdDecoder sDecoderCache;
-
     try {
         // bitOrder contract: 0 = LSB first (DSF), 1 = MSB first (DFF)
         auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
@@ -491,6 +509,8 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
             sDecoderCache.dsdRate = dsdRate;
             sDecoderCache.targetRate = targetPcmSampleRate;
             sDecoderCache.bitOrder = bitOrder;
+        } else if (resetState) {
+            sDecoderCache.decoder.reset();
         }
 
         int maxOutFrames = sDecoderCache.decoder.getExpectedPcmFrames(byteCount);
@@ -525,6 +545,13 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         env->ReleaseByteArrayElements(dsdR, rData, JNI_ABORT);
         return nullptr;
     }
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeResetDsdDecoder(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    sDecoderCache.decoder.reset();
+}
 }
 
 JNIEXPORT void JNICALL
@@ -932,7 +959,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDirectVolumeParams(
     double g = gainLinear;
     // Reject NaN/inf and clamp to a sane linear range. Negative gain is muted.
     if (!(g >= 0.0)) g = 0.0;
-    if (g > 4.0) g = 4.0;
+    if (g > 8.0) g = 8.0;
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.directVolume.enabled = enabled;
         snap.directVolume.gainLinear = g;
@@ -1088,6 +1115,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
             snap.arbitraryEq.graphicEqString.clear();
             snap.arbitraryEq.linearPhase = linearPhase;
             snap.arbitraryEq.parsedNodes = nullptr;
+            snap.arbitraryEq.preparedFilter = nullptr;
         });
         return JNI_TRUE;
     }
@@ -1099,8 +1127,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
         const bool ok = ArbitraryResponseEq::parseGraphicEq(content, nodes);
         if (ok) {
             auto parsed = std::make_shared<const std::vector<std::pair<double, double>>>(nodes);
-            const double currentSr = AudioDspEngine::instance().getSampleRate();
-            const double targetSr = (currentSr > 0.0) ? currentSr : 48000.0;
+            const double targetSr = getEffectiveSampleRate();
             auto fir = ArbitraryResponseEq::synthesizeFirKernel(nodes, linearPhase == JNI_TRUE, targetSr);
             auto prep = std::make_shared<const PreparedArbitraryEqFilter>(PreparedArbitraryEqFilter{
                 parsed,
@@ -1202,18 +1229,18 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeDestroyEngine(
         //      already counted and we wait for it; a render arriving later sees
         //      the flag and bails. Hence `delete engine` never races a render.
         std::unique_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
-        gEngineTeardown.store(true, std::memory_order_seq_cst);
+        gTeardownEngineHandle.store(engineHandle, std::memory_order_seq_cst);
         while (gRenderInFlight.load(std::memory_order_seq_cst) != 0) {
             std::this_thread::yield();
         }
         auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
         DspEngineRegistry::instance().unregisterEngine(engine);
         delete engine;
-        gEngineTeardown.store(false, std::memory_order_seq_cst);
+        gTeardownEngineHandle.store(0, std::memory_order_seq_cst);
     } catch (...) {
         // Re-open the render gate even if teardown threw, so a failed destroy
-        // cannot wedge every subsequent render into the reject path forever.
-        gEngineTeardown.store(false, std::memory_order_seq_cst);
+        // cannot wedge subsequent renders into the reject path forever.
+        gTeardownEngineHandle.store(0, std::memory_order_seq_cst);
     }
 }
 
@@ -1264,9 +1291,8 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     struct RenderGate {
         ~RenderGate() { gRenderInFlight.fetch_sub(1, std::memory_order_seq_cst); }
     } renderGate;
-    // A destroy is in progress: do not touch the engine. One silent block during
-    // the (rare) teardown window is preferable to blocking the RT thread.
-    if (gEngineTeardown.load(std::memory_order_seq_cst)) {
+    // If this specific engine is being destroyed, do not touch it.
+    if (gTeardownEngineHandle.load(std::memory_order_seq_cst) == engineHandle) {
         return 0;
     }
     auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);

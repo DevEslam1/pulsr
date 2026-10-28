@@ -60,6 +60,10 @@ private:
     float stage2RingR_[DECIMATION_TAPS * 2] = {};
     int stage2WriteIdx_ = 0;
 
+    // Previous Stage 2 output for linear interpolation
+    float prevDecimOutL_ = 0.0f;
+    float prevDecimOutR_ = 0.0f;
+
     // 5Hz DC blocker states
     float dcPrevInL_ = 0.0f, dcPrevOutL_ = 0.0f;
     float dcPrevInR_ = 0.0f, dcPrevOutR_ = 0.0f;

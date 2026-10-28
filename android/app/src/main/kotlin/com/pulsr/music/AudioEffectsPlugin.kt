@@ -424,7 +424,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetDitherBluetooth(isBluetooth: Boolean)
     private external fun nativeSetDitherBluetoothAllowed(allowed: Boolean)
     private external fun nativeSetBitPerfectParams(enabled: Boolean, isDop: Boolean)
-    private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
+    private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int, resetState: Boolean): FloatArray?
+    private external fun nativeResetDsdDecoder()
     private external fun nativeSetActiveStages(bitmask: Int)
     private external fun nativeSetCacheBudgetBytes(budgetBytes: Long)
     private external fun nativeGetAutoDegradedStages(): Int
@@ -1595,6 +1596,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "resyncForTrack" -> {
                     val sampleRate = call.argument<Double>("sampleRate") ?: 44100.0
                     val channels = call.argument<Int>("channels") ?: 2
+                    cachedDebugReport = null
                     if (isNativeDspLoaded) {
                         try {
                             nativeResyncForTrack(sampleRate, channels)
@@ -1877,7 +1879,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "setCrossfeedMode" -> {
-                    val mode = call.argument<Int>("mode") ?: 0
+                    val modeArg = call.argument<Any>("mode")
+                    val mode = when (modeArg) {
+                        is Number -> modeArg.toInt()
+                        "headphone", "default", "Bs2bDefault" -> 0
+                        "speaker", "cmoy", "Bs2bChuMoy" -> 1
+                        "meier", "Bs2bJanMeier" -> 2
+                        "custom", "Custom" -> 3
+                        else -> 0
+                    }
+                    cachedDebugReport = null
                     if (isNativeDspLoaded) {
                         try {
                             nativeSetCrossfeedMode(mode)
@@ -2930,7 +2941,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                     if (isNativeDspLoaded) {
                         try {
-                            val pcmFloats = nativeDecodeDsd(dsdL, dsdR, byteCount, dsdRate, targetRate, bitOrder)
+                            val resetState = call.argument<Boolean>("resetState") ?: false
+                            val pcmFloats = nativeDecodeDsd(dsdL, dsdR, byteCount, dsdRate, targetRate, bitOrder, resetState)
                             result.success(pcmFloats?.toList())
                         } catch (e: Exception) {
                             result.error("DSD_DECODE_ERROR", e.message, null)

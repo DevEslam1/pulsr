@@ -83,13 +83,10 @@ public:
     size_t getHistoryAllocatedBytes() const;
 
 private:
-    static constexpr int kMaxRetired = 256;
+    static constexpr int kMaxRetired = 512;
     std::shared_ptr<const PreparedIr> retiredRing_[kMaxRetired];
     std::atomic<int> retiredHead_{0};
     std::atomic<int> retiredTail_{0};
-    static constexpr int kMaxEmergencyOverflow = 256;
-    std::shared_ptr<const PreparedIr> overflowSlots_[kMaxEmergencyOverflow];
-    std::atomic<int> overflowCount_{0};
 
     void updatePreparedIr();
     void setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir);

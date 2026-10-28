@@ -56,29 +56,36 @@ class PulsrViewport {
   /// Factory resolving the viewport directly from the active [BuildContext].
   factory PulsrViewport.fromContext(BuildContext context,
       [BoxConstraints? constraints]) {
-    final size = MediaQuery.maybeSizeOf(context);
+    final screenSize = MediaQuery.maybeSizeOf(context);
     final width = (constraints != null && constraints.maxWidth.isFinite)
         ? constraints.maxWidth
-        : (size?.width ?? 390.0);
+        : (screenSize?.width ?? 390.0);
     final height = (constraints != null && constraints.maxHeight.isFinite)
         ? constraints.maxHeight
-        : (size?.height ?? 844.0);
+        : (screenSize?.height ?? 844.0);
 
     final orientation =
         width > height ? Orientation.landscape : Orientation.portrait;
     final sizeClass = PulsrBreakpoint.fromWidth(width);
-    final isShortHeight = height < PulsrBreakpoint.shortHeightThreshold &&
-        orientation == Orientation.landscape;
     final isUltraWide = width >= 1200.0;
 
     final hinge = PulsrBreakpoint.hinge(context);
     final hasHinge = hinge != null;
 
-    final smallestDim = math.min(width, height);
+    final physicalWidth = screenSize?.width ?? width;
+    final physicalHeight = screenSize?.height ?? height;
+    final physicalOrientation = physicalWidth > physicalHeight
+        ? Orientation.landscape
+        : Orientation.portrait;
+    final isShortHeight =
+        physicalHeight < PulsrBreakpoint.shortHeightThreshold &&
+            physicalOrientation == Orientation.landscape;
+
+    final smallestDim = math.min(physicalWidth, physicalHeight);
     final PulsrDeviceClass deviceClass;
     if (hasHinge) {
       deviceClass = PulsrDeviceClass.foldable;
-    } else if (width >= 1200.0) {
+    } else if (physicalWidth >= 1200.0) {
       deviceClass = PulsrDeviceClass.desktop;
     } else if (smallestDim >= 600.0) {
       deviceClass = PulsrDeviceClass.tablet;

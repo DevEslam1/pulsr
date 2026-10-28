@@ -642,6 +642,20 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
                     snapshot->reverb.preset,
                     static_cast<float>(snapshot->reverb.damping));
             }
+            if (snapshot->arbitraryEq.parsedNodes && !snapshot->arbitraryEq.parsedNodes->empty()) {
+                auto fir = ArbitraryResponseEq::synthesizeFirKernel(
+                    *snapshot->arbitraryEq.parsedNodes,
+                    snapshot->arbitraryEq.linearPhase,
+                    mySr);
+                mutableSnap->arbitraryEq.preparedFilter = std::make_shared<const PreparedArbitraryEqFilter>(
+                    PreparedArbitraryEqFilter{
+                        snapshot->arbitraryEq.parsedNodes,
+                        std::move(fir),
+                        snapshot->arbitraryEq.linearPhase,
+                        mySr
+                    }
+                );
+            }
         }
     }
     if (mutableSnap->reverb.preparedIr && mutableSnap->reverb.preparedIr->numPartitions > 0) {
@@ -731,6 +745,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         if (confirm == snapshot) break;
         snapshot = confirm;
     }
+    struct HazardGuard {
+        std::atomic<const DspParamSnapshot*>& hz;
+        ~HazardGuard() {
+            hz.store(nullptr, std::memory_order_release);
+        }
+    } hazardGuard{audioHazardPtr_};
     lastBlockBitPerfect_.store(snapshot && snapshot->bitPerfect.enabled, std::memory_order_relaxed);
     if (!snapshot) return frames;
 
@@ -859,20 +879,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // Net gain check for conditional limiter insertion
     const uint32_t rawStages = snapshot->activeStages;
     const uint32_t degraded = autoDegradedStages_.load();
-    // Stage masks change independently of parameter snapshots (including the
-    // thermal governor). Drive the reverb envelope from the effective mask,
-    // and keep processing its fade after that mask is cleared.
-    reverb_.setEnabled((rawStages & ~degraded & STAGE_REVERB) && snapshot->reverb.enabled);
     const uint32_t stages = rawStages & ~degraded;
-    // Mirror the reverb handling for the saturation stage. Its enable state was
-    // only refreshed inside applyParams() (on a snapshot-generation change), so
-    // a mask-only change — or a snapshot whose `saturation.enabled` flag lagged
-    // the stage bit — left HarmonicSaturation::enabled_ stale and the stage
-    // silent while reverb still ran. That is exactly the "Quran vocal warmth
-    // does nothing but mosque ambience works" symptom. Drive it from the
-    // effective mask (which already encodes the user toggle minus auto-degrade)
-    // so it is re-synced every block like reverb.
-    saturation_.setEnabled((stages & STAGE_SATURATION) != 0);
+
+    reverb_.setEnabled((stages & STAGE_REVERB) && snapshot->reverb.enabled);
+    saturation_.setEnabled((stages & STAGE_SATURATION) && snapshot->saturation.enabled);
+    arbitraryEq_.setEnabled((stages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled);
+    viperDdc_.setEnabled((stages & STAGE_VIPER_DDC) && snapshot->viperDdc.enabled);
+    multibandCompressor_.setEnabled((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled);
+    liveProg_.setEnabled((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled);
     bool hasNetPositiveGain = smoothedReplayGain_ > 1.001 || smoothedDirectVolume_ > 1.001;
     if (snapshot->directVolume.enabled && snapshot->directVolume.gainLinear > 1.001) {
         hasNetPositiveGain = true;
@@ -978,14 +992,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 1b. Arbitrary Response EQ (EqualizerAPO GraphicEq)
-        arbitraryEq_.setEnabled((stages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled);
         if ((stages & STAGE_ARBITRARY_EQ) || arbitraryEq_.isRamping()) {
             arbitraryEq_.processInterleaved(buffer, frames, channels);
             if (channels >= 2) blockLatency += arbitraryEq_.getLatencyFrames();
         }
 
         // 1c. ViPER-DDC (Digital Dynamic Correction)
-        viperDdc_.setEnabled((stages & STAGE_VIPER_DDC) && snapshot->viperDdc.enabled);
         if ((stages & STAGE_VIPER_DDC) || viperDdc_.isRamping()) {
             viperDdc_.processInterleaved(buffer, frames, channels);
         }
@@ -997,7 +1009,6 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 2b. Native Multiband Compressor Stage — 4-band LR4 dynamics (stereo channels 0 and 1)
-        multibandCompressor_.setEnabled((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled);
         if (((stages & STAGE_MULTIBAND_COMPRESSOR) || multibandCompressor_.isRamping()) && channels >= 2) {
             multibandCompressor_.processInterleaved(buffer, frames, channels);
         }
@@ -1015,20 +1026,18 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         // 5. Harmonic Saturation / Exciter Stage — 4x oversampled with anti-aliasing.
         //    Runs BEFORE reverb so harmonics are generated on the dry signal and
         //    the reverb tail is not re-saturated (which muddies the wet signal).
-        saturation_.setEnabled((stages & STAGE_SATURATION) && snapshot->saturation.enabled);
         if ((stages & STAGE_SATURATION) || saturation_.isRamping()) {
             saturation_.processInterleaved(buffer, frames, channels);
             blockLatency += saturation_.getLatencyFrames();
         }
 
         // 6. Convolution Reverb Stage (Stereo channels 0 and 1)
-        if (reverb_.isRamping() && channels >= 2) {
+        if ((((stages & STAGE_REVERB) && snapshot->reverb.enabled) || reverb_.isRamping()) && channels >= 2) {
             reverb_.processInterleaved(buffer, frames, channels);
             blockLatency += reverb_.getReverbLatencyFrames();
         }
 
         // 6b. Live Programmable DSP Stage
-        liveProg_.setEnabled((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled);
         if ((stages & STAGE_LIVE_PROG) || liveProg_.isRamping()) {
             liveProg_.processInterleaved(buffer, frames, channels);
         }
@@ -1089,7 +1098,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
 
         // 9c. Multichannel trim/delay (2-8 channels). Runs before the limiter
         // so a boosted surround channel is still caught by the brickwall.
-        if (stages & STAGE_CHANNEL_MANAGER) {
+        if ((stages & STAGE_CHANNEL_MANAGER) || channelManager_.isRamping()) {
             channelManager_.processInterleaved(buffer, frames, channels);
         }
 
@@ -1194,6 +1203,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // bit-transparent: no write touches the buffer.
     const bool ditherStageActive = (stages & STAGE_DITHER) != 0 &&
                                    snapshot->dither.enabled &&
+                                   snapshot->dither.targetBitDepth < 32 &&
                                    (!snapshot->dither.isBluetooth ||
                                     snapshot->dither.bluetoothEnabled);
     if (ditherStageActive) {
@@ -1202,33 +1212,37 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         const double maxQuant = scale - 1.0;
         const double minQuant = -scale;
         const bool useShaping = (sampleRate_ <= 48000.0);
+        const int maxShapedChannels = std::min(channels, ChannelManager::MAX_CHANNELS);
         for (int f = 0; f < frames; ++f) {
             for (int ch = 0; ch < channels; ++ch) {
                 const int idx = f * channels + ch;
                 float x = buffer[idx];
                 if (!std::isfinite(x)) continue;
 
-                const int chIdx = (ch < 2) ? ch : 0;
-                const double shapedError = useShaping
-                    ? (1.62 * ditherErrorHistory_[chIdx][0] - 0.82 * ditherErrorHistory_[chIdx][1])
-                    : (0.5 * ditherErrorHistory_[chIdx][0]);
+                double shapedError = 0.0;
+                if (ch < maxShapedChannels) {
+                    const double rawShaped = useShaping
+                        ? (1.62 * ditherErrorHistory_[ch][0] - 0.82 * ditherErrorHistory_[ch][1])
+                        : (0.5 * ditherErrorHistory_[ch][0]);
+                    shapedError = std::clamp(rawShaped, -0.49, 0.49);
+                }
                 const double scaledInput = static_cast<double>(x) * scale + shapedError;
                 const double dither = static_cast<double>(generateTpdf()); // TPDF (-1.0 .. +1.0 LSB)
-                const double quantScaled = std::round(scaledInput + dither);
+                const double quantInput = scaledInput + dither;
+                const double quantScaled = std::round(quantInput);
                 const double finalScaled = std::clamp(quantScaled, minQuant, maxQuant);
 
-                const double err = scaledInput - finalScaled;
-                ditherErrorHistory_[chIdx][1] = static_cast<float>(ditherErrorHistory_[chIdx][0]);
-                ditherErrorHistory_[chIdx][0] = static_cast<float>(std::clamp(err, -2.0, 2.0));
+                if (ch < maxShapedChannels) {
+                    const double err = quantInput - finalScaled;
+                    ditherErrorHistory_[ch][1] = ditherErrorHistory_[ch][0];
+                    ditherErrorHistory_[ch][0] = static_cast<float>(err);
+                }
 
                 buffer[idx] = static_cast<float>(finalScaled * invScale);
             }
         }
     } else {
-        ditherErrorHistory_[0][0] = 0.0f;
-        ditherErrorHistory_[0][1] = 0.0f;
-        ditherErrorHistory_[1][0] = 0.0f;
-        ditherErrorHistory_[1][1] = 0.0f;
+        std::memset(ditherErrorHistory_, 0, sizeof(ditherErrorHistory_));
     }
 
     // In-Engine RTF Nervous System Monitor (Signal-safe, Zero allocation, Zero mutex locks)
@@ -1351,45 +1365,34 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                     recoveryConsecutiveBlocks_ = 0;
                     // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> VIPER_DDC -> SATURATION -> DYNAMIC_BASS -> MULTIBAND_COMPRESSOR -> ARBITRARY_EQ -> LIVE_PROG -> REVERB
                     if (currentDegraded & STAGE_EQ) {
-                        eq_.reset();
                         recoverStageAutoDegrade(STAGE_EQ);
                     } else if (currentDegraded & STAGE_PANNER) {
-                        panner_.reset();
                         recoverStageAutoDegrade(STAGE_PANNER);
                     } else if (currentDegraded & STAGE_CROSSFEED) {
-                        crossfeed_.reset();
                         recoverStageAutoDegrade(STAGE_CROSSFEED);
                     } else if (currentDegraded & STAGE_WIDTH) {
-                        stereoWidth_.reset();
                         recoverStageAutoDegrade(STAGE_WIDTH);
                     } else if (currentDegraded & STAGE_CROSSOVER) {
-                        subCrossover_.reset();
                         recoverStageAutoDegrade(STAGE_CROSSOVER);
                     } else if (currentDegraded & STAGE_DYNEQ) {
-                        dynamicEq_.reset();
                         recoverStageAutoDegrade(STAGE_DYNEQ);
                     } else if (currentDegraded & STAGE_VIPER_DDC) {
-                        viperDdc_.reset();
                         recoverStageAutoDegrade(STAGE_VIPER_DDC);
                     } else if (currentDegraded & STAGE_SATURATION) {
-                        saturation_.reset();
                         recoverStageAutoDegrade(STAGE_SATURATION);
                     } else if (currentDegraded & STAGE_DYNAMIC_BASS) {
-                        dynamicBass_.reset();
                         recoverStageAutoDegrade(STAGE_DYNAMIC_BASS);
                     } else if (currentDegraded & STAGE_MULTIBAND_COMPRESSOR) {
-                        multibandCompressor_.reset();
                         recoverStageAutoDegrade(STAGE_MULTIBAND_COMPRESSOR);
                     } else if (currentDegraded & STAGE_ARBITRARY_EQ) {
-                        arbitraryEq_.reset();
                         recoverStageAutoDegrade(STAGE_ARBITRARY_EQ);
                     } else if (currentDegraded & STAGE_LIVE_PROG) {
-                        liveProg_.reset();
                         recoverStageAutoDegrade(STAGE_LIVE_PROG);
                     } else if (currentDegraded & STAGE_REVERB) {
-                        reverb_.reset();
                         recoverStageAutoDegrade(STAGE_REVERB);
                     }
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
                 }
             } else {
                 recoveryConsecutiveBlocks_ = 0;

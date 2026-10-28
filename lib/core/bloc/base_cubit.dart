@@ -104,7 +104,6 @@ abstract class PulsrCubit<S> extends Cubit<S> {
         }
       },
       onError: (Object e, StackTrace s) {
-        if (_closed || isClosed) return;
         if (cancelOnError == true) {
           if (isInitialized) {
             _subs.remove(sub);
@@ -112,6 +111,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
             completedSynchronously = true;
           }
         }
+        if (_closed || isClosed) return;
         if (onError != null) {
           onError(e, s);
         } else {
@@ -119,45 +119,40 @@ abstract class PulsrCubit<S> extends Cubit<S> {
         }
       },
       onDone: () {
-        if (_closed || isClosed) return;
         if (isInitialized) {
           _subs.remove(sub);
         } else {
           completedSynchronously = true;
         }
+        if (_closed || isClosed) return;
         onDone?.call();
       },
       cancelOnError: cancelOnError,
     );
     isInitialized = true;
 
-    if (completedSynchronously) {
+    if (_closed) {
+      // The cubit closed while an async or sync path was in flight:
+      // cleanly cancel the subscription instead of registering with disposed container.
+      sub.cancel();
       return sub;
     }
-    if (_closed) {
-      // The cubit closed while an async constructor path was still in flight:
-      // drop the late subscription instead of registering with a disposed
-      // container (which would throw).
-      sub.cancel();
+    if (completedSynchronously) {
       return sub;
     }
     _subs.add(sub);
     return sub;
   }
 
-  /// Removes a (typically just-cancelled) subscription from the composite.
-  /// Use this when a subscription is being REPLACED (refresh / re-subscribe
-  /// pattern): a bare `sub.cancel()` leaves the cancelled subscription
-  /// registered inside the [CompositeSubscription], so every re-subscribe
-  /// would inflate [activeSubscriptionCount] forever. Pair with an explicit
-  /// cancel before re-adding:
-  ///
-  ///     _albumsSub?.cancel();
-  ///     removeFromComposite(_albumsSub);
-  ///     _albumsSub = autoSub(...);
+  /// Removes a subscription from the composite, ensuring it is cleanly cancelled.
   void removeFromComposite(StreamSubscription<dynamic>? sub) {
-    if (sub == null || _closed) return;
-    _subs.remove(sub);
+    if (sub == null) return;
+    try {
+      sub.cancel();
+    } catch (_) {}
+    if (!_closed) {
+      _subs.remove(sub);
+    }
   }
 
   /// Reduces every [stream] event into a new state; the subscription is

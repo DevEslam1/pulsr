@@ -1,10 +1,13 @@
+// lib/core/widgets/pulsr_card.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../motion/pulsr_motion.dart';
+import '../performance/gpu_budget.dart';
 import '../theme/aura_theme.dart';
+import 'pulsr_pressable.dart';
 
 /// {@category DesignSystem}
 enum PulsrCardElevation {
@@ -14,24 +17,13 @@ enum PulsrCardElevation {
   high,
 }
 
-/// Visual presentation variant for [PulsrCard].
 enum PulsrCardVariant {
-  /// Standard solid container using `p.surfaceContainer`.
   filled,
-
-  /// Outlined container using transparent/subtle background and hairline border.
   outlined,
-
-  /// Prominent surface using `p.surfaceElevated` with soft elevation shadow.
   elevated,
-
-  /// Frosted glass surface using backdrop blur filter and translucent tint.
   glass,
 }
 
-/// Standardized universal surface container adhering to Pulsr design tokens:
-/// [AppRadii.card] (18), [p.surfaceContainer], [p.hairline] border,
-/// tokenized [PulsrElevation], and desktop hover effects.
 class PulsrCard extends StatefulWidget {
   final Widget child;
   final PulsrCardVariant variant;
@@ -80,9 +72,11 @@ class _PulsrCardState extends State<PulsrCard> {
     }
     switch (widget.variant) {
       case PulsrCardVariant.filled:
-        return p.surfaceContainer;
+        return _isHovered ? p.surfaceContainerHigh : p.surfaceContainer;
       case PulsrCardVariant.outlined:
-        return Colors.transparent;
+        return _isHovered
+            ? p.surfaceContainer.withValues(alpha: 0.45)
+            : Colors.transparent;
       case PulsrCardVariant.elevated:
         return p.surfaceElevated;
       case PulsrCardVariant.glass:
@@ -100,16 +94,25 @@ class _PulsrCardState extends State<PulsrCard> {
       case PulsrCardVariant.outlined:
         return p.hairline;
       case PulsrCardVariant.elevated:
-        return p.hairline;
+        return p.isDark ? AppColors.specularAt(0.10) : p.hairline;
       case PulsrCardVariant.glass:
-        return p.isDark ? AppColors.specularAt(0.15) : AppColors.scrimAt(0.08);
+        return p.isDark ? AppColors.specularAt(0.16) : AppColors.scrimAt(0.08);
     }
   }
 
   List<BoxShadow>? _resolveShadows(PulsrPalette p) {
     if (widget.boxShadow != null) return widget.boxShadow;
+    if (widget.selected) {
+      return [
+        BoxShadow(
+          color: p.accent.withValues(alpha: p.isDark ? 0.18 : 0.10),
+          blurRadius: 16,
+          spreadRadius: -2,
+          offset: const Offset(0, 4),
+        ),
+      ];
+    }
 
-    // Use variant-directed elevation if not manually set
     if (widget.elevation == PulsrCardElevation.none) {
       if (widget.variant == PulsrCardVariant.elevated) {
         return _isHovered
@@ -152,6 +155,36 @@ class _PulsrCardState extends State<PulsrCard> {
         ? Padding(padding: widget.padding!, child: widget.child)
         : widget.child;
 
+    final showTopSheen = widget.variant == PulsrCardVariant.elevated ||
+        widget.variant == PulsrCardVariant.glass;
+
+    if (showTopSheen) {
+      content = Stack(
+        children: [
+          PositionedDirectional(
+            top: 0,
+            start: 16,
+            end: 16,
+            height: 1.0,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.specularAt(0.0),
+                      AppColors.specularAt(p.isDark ? 0.32 : 0.60),
+                      AppColors.specularAt(0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          content,
+        ],
+      );
+    }
+
     final isTappable = widget.onTap != null || widget.onLongPress != null;
 
     if (isTappable) {
@@ -167,11 +200,13 @@ class _PulsrCardState extends State<PulsrCard> {
       );
     }
 
-    if (widget.variant == PulsrCardVariant.glass && context.motionEnabled) {
+    if (widget.variant == PulsrCardVariant.glass &&
+        context.motionEnabled &&
+        !GpuBudget.isGpuSaverActive) {
       content = ClipRRect(
         borderRadius: radius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: content,
         ),
       );
@@ -191,15 +226,24 @@ class _PulsrCardState extends State<PulsrCard> {
       child: content,
     );
 
-    if (widget.enableHoverScale && isTappable) {
+    if (isTappable) {
       card = MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
         child: AnimatedScale(
-          scale: _isHovered && context.motionEnabled ? 1.015 : 1.0,
+          scale: widget.enableHoverScale && _isHovered && context.motionEnabled
+              ? 1.012
+              : 1.0,
           duration: context.motionMs(180),
           curve: context.motionCurve(Curves.easeOutCubic),
-          child: card,
+          child: PulsrPressable(
+            pressedScale: 0.985,
+            focusBorderRadius: radius,
+            onTap: widget.onTap,
+            onLongPress: widget.onLongPress,
+            child: card,
+          ),
         ),
       );
     }

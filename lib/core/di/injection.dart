@@ -49,6 +49,7 @@ Future<void> configureDependencies({bool warmUpAsync = true}) async {
       // The root widget is already on screen and its bootstrap gate awaits
       // ensureAppDependenciesReady(). Skipping the eager 12 s audio-handler
       // warm-up here is what moves the first frame ahead of the audio graph.
+      validateDependencies(getIt);
       return;
     }
     // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
@@ -185,6 +186,9 @@ Future<bool> ensureAppDependenciesReady({
       _awaitDependency<PulsrAudioHandler>(),
       _awaitDependency<PlayerCubit>(),
       if (AppConfig.ytmEnabled) _awaitDependency<YtmDownloadCubit>(),
+      if (getIt.isRegistered<FileIntentHandler>())
+        _awaitDependency<FileIntentHandler>(),
+      _warmUpOverrideStores(),
     ]).timeout(timeout);
     return true;
   } catch (e, st) {

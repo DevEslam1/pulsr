@@ -147,6 +147,207 @@ static inline float shapeSample(float x, double k, float invNorm, int mode) {
     return std::tanh(xin) * invNorm;
 }
 
+inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& outL, float& outR,
+                                                   float currentEnabledMix, double k, float mix,
+                                                   float tilt, float hpCoeff, int mode, float invNorm) {
+    if (!std::isfinite(inL)) inL = 0.0f;
+    if (!std::isfinite(inR)) inR = 0.0f;
+
+    float satInL = inL;
+    float satInR = inR;
+    float subL = 0.0f;
+    float subR = 0.0f;
+
+    if (multiband_) {
+        double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
+        crossover_[0].process(inL, inR, outLpL, outLpR, outHpL, outHpR);
+        subL = static_cast<float>(outLpL);
+        subR = static_cast<float>(outLpR);
+        satInL = static_cast<float>(outHpL);
+        satInR = static_cast<float>(outHpR);
+    }
+
+    const float dryL = dryDelay_[0][dryDelayPos_];
+    const float dryR = dryDelay_[1][dryDelayPos_];
+    dryDelay_[0][dryDelayPos_] = satInL;
+    dryDelay_[1][dryDelayPos_] = satInR;
+
+    const float delayedSubL = subDelay_[0][dryDelayPos_];
+    const float delayedSubR = subDelay_[1][dryDelayPos_];
+    subDelay_[0][dryDelayPos_] = subL;
+    subDelay_[1][dryDelayPos_] = subR;
+
+    dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
+
+    for (int t = TAPS_PER_PHASE - 1; t > 0; --t) {
+        history_[0][t] = history_[0][t - 1];
+        history_[1][t] = history_[1][t - 1];
+    }
+    history_[0][0] = satInL;
+    history_[1][0] = satInR;
+
+    float dryTapL = dryL;
+    float dryTapR = dryR;
+    float subTapL = delayedSubL;
+    float subTapR = delayedSubR;
+    float wetL = dryL;
+    float wetR = dryR;
+
+    if (k > 1e-9) {
+        float& hpL = hpState_[0];
+        float& hpR = hpState_[1];
+
+        for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
+            float sub_sL = 0.0f;
+            float sub_sR = 0.0f;
+#if defined(PULSR_HAS_NEON)
+            float32x2_t vSub = vdup_n_f32(0.0f);
+            for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+                const float coeff = polyphase4x_[p][t];
+                float32x2_t vHist = { history_[0][t], history_[1][t] };
+                vSub = vfma_n_f32(vSub, vHist, coeff);
+            }
+            sub_sL = vget_lane_f32(vSub, 0);
+            sub_sR = vget_lane_f32(vSub, 1);
+#elif defined(PULSR_HAS_SSE)
+            __m128 vSub = _mm_setzero_ps();
+            for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+                const float coeff = polyphase4x_[p][t];
+                __m128 vHist = _mm_set_ps(0.0f, 0.0f, history_[1][t], history_[0][t]);
+                __m128 vC = _mm_set1_ps(coeff);
+                vSub = _mm_add_ps(vSub, _mm_mul_ps(vHist, vC));
+            }
+            alignas(16) float subArr[4];
+            _mm_store_ps(subArr, vSub);
+            sub_sL = subArr[0];
+            sub_sR = subArr[1];
+#else
+            for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+                const float coeff = polyphase4x_[p][t];
+                sub_sL += history_[0][t] * coeff;
+                sub_sR += history_[1][t] * coeff;
+            }
+#endif
+
+            float emphL = sub_sL;
+            float emphR = sub_sR;
+            if (tilt > 0.0f) {
+                hpL += hpCoeff * (sub_sL - hpL);
+                hpR += hpCoeff * (sub_sR - hpR);
+                if (!std::isfinite(hpL)) hpL = 0.0f;
+                if (!std::isfinite(hpR)) hpR = 0.0f;
+                emphL = sub_sL + tilt * (sub_sL - hpL);
+                emphR = sub_sR + tilt * (sub_sR - hpR);
+            }
+
+            const int dIdx = (decimIdx_ + p) % DECIM_HISTORY_LEN;
+            float shL = shapeSample(emphL, k, invNorm, mode);
+            float shR = shapeSample(emphR, k, invNorm, mode);
+            if (modeCrossfadeProgress_ < 1.0f) {
+                const float oldShL = shapeSample(emphL, k, invNorm, prevMode_);
+                const float oldShR = shapeSample(emphR, k, invNorm, prevMode_);
+                const float cfAngle = modeCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
+                const float oldW = std::cos(cfAngle);
+                const float newW = std::sin(cfAngle);
+                shL = oldW * oldShL + newW * shL;
+                shR = oldW * oldShR + newW * shR;
+            }
+            decimHistory_[0][dIdx] = shL;
+            decimHistory_[1][dIdx] = shR;
+        }
+        decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
+        if (modeCrossfadeProgress_ < 1.0f) {
+            const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+            modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
+        }
+
+        wetL = 0.0f;
+        wetR = 0.0f;
+#if defined(PULSR_HAS_NEON)
+        float32x2_t vWet = vdup_n_f32(0.0f);
+        for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
+            for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+                const int k_idx = t * OVERSAMPLE_FACTOR + p;
+                const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
+                float32x2_t vDecim = { decimHistory_[0][hIdx], decimHistory_[1][hIdx] };
+                vWet = vfma_n_f32(vWet, vDecim, polyphase4x_[p][t]);
+            }
+        }
+        wetL = vget_lane_f32(vWet, 0) * 0.25f;
+        wetR = vget_lane_f32(vWet, 1) * 0.25f;
+#elif defined(PULSR_HAS_SSE)
+        __m128 vWet = _mm_setzero_ps();
+        for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
+            for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+                const int k_idx = t * OVERSAMPLE_FACTOR + p;
+                const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
+                __m128 vDecim = _mm_set_ps(0.0f, 0.0f, decimHistory_[1][hIdx], decimHistory_[0][hIdx]);
+                __m128 vC = _mm_set1_ps(polyphase4x_[p][t]);
+                vWet = _mm_add_ps(vWet, _mm_mul_ps(vDecim, vC));
+            }
+        }
+        alignas(16) float wetArr[4];
+        _mm_store_ps(wetArr, vWet);
+        wetL = wetArr[0] * 0.25f;
+        wetR = wetArr[1] * 0.25f;
+#else
+        for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
+            for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+                const int k_idx = t * OVERSAMPLE_FACTOR + p;
+                const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
+                wetL += polyphase4x_[p][t] * decimHistory_[0][hIdx];
+                wetR += polyphase4x_[p][t] * decimHistory_[1][hIdx];
+            }
+        }
+        wetL *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
+        wetR *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
+#endif
+
+        if (mode != 0 || (modeCrossfadeProgress_ < 1.0f && prevMode_ != 0)) {
+            float yL = wetL - dcX_[0] + dcCoeff_ * dcY_[0];
+            float yR = wetR - dcX_[1] + dcCoeff_ * dcY_[1];
+            dcX_[0] = wetL;
+            dcX_[1] = wetR;
+            dcY_[0] = yL;
+            dcY_[1] = yR;
+            wetL = yL;
+            wetR = yR;
+        }
+
+        dryTapL = dryL;
+        dryTapR = dryR;
+        if (multiband_) {
+            subTapL = delayedSubL;
+            subTapR = delayedSubR;
+        }
+    }
+
+    if (!std::isfinite(wetL)) wetL = 0.0f;
+    if (!std::isfinite(wetR)) wetR = 0.0f;
+
+    const float midHighL = (1.0f - mix) * dryTapL + mix * wetL;
+    const float midHighR = (1.0f - mix) * dryTapR + mix * wetR;
+
+    const float fullOutL = multiband_ ? (subTapL + midHighL) : midHighL;
+    const float fullOutR = multiband_ ? (subTapR + midHighR) : midHighR;
+
+    float dryW, wetW;
+    if (currentEnabledMix >= 0.9999f) {
+        dryW = 0.0f;
+        wetW = 1.0f;
+    } else if (currentEnabledMix <= 0.0001f) {
+        dryW = 1.0f;
+        wetW = 0.0f;
+    } else {
+        const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
+        dryW = std::cos(angle);
+        wetW = std::sin(angle);
+    }
+
+    outL = dryW * inL + wetW * fullOutL;
+    outR = dryW * inR + wetW * fullOutR;
+}
+
 void HarmonicSaturation::process(float* L, float* R, int frames) {
     const float targetEnabledMix = enabled_ ? 1.0f : 0.0f;
     if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
@@ -170,219 +371,13 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
     const float hpCoeff = tiltHpCoeff_;
     const float invNorm = computeInvNorm(k);
     const int mode = mode_;
-    float& hpL = hpState_[0];
-    float& hpR = hpState_[1];
 
     for (int i = 0; i < frames; ++i) {
-        float inL = L[i];
-        float inR = R[i];
-        if (!std::isfinite(inL)) inL = 0.0f;
-        if (!std::isfinite(inR)) inR = 0.0f;
-
-        float satInL = inL;
-        float satInR = inR;
-        float subL = 0.0f;
-        float subR = 0.0f;
-
-        if (multiband_) {
-            double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
-            crossover_[0].process(inL, inR, outLpL, outLpR, outHpL, outHpR);
-            subL = static_cast<float>(outLpL);
-            subR = static_cast<float>(outLpR);
-            satInL = static_cast<float>(outHpL);
-            satInR = static_cast<float>(outHpR);
-        }
-
-        // FIX M-13: push current input into the dry delay line and read the tap
-        // delayed by DRY_DELAY frames (the oversampling FIR group delay).
-        const float dryL = dryDelay_[0][dryDelayPos_];
-        const float dryR = dryDelay_[1][dryDelayPos_];
-        dryDelay_[0][dryDelayPos_] = satInL;
-        dryDelay_[1][dryDelayPos_] = satInR;
-
-        const float delayedSubL = subDelay_[0][dryDelayPos_];
-        const float delayedSubR = subDelay_[1][dryDelayPos_];
-        subDelay_[0][dryDelayPos_] = subL;
-        subDelay_[1][dryDelayPos_] = subR;
-
-        dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
-
-        // Shift history buffers
-        for (int t = TAPS_PER_PHASE - 1; t > 0; --t) {
-            history_[0][t] = history_[0][t - 1];
-            history_[1][t] = history_[1][t - 1];
-        }
-        history_[0][0] = satInL;
-        history_[1][0] = satInR;
-
-        float wetL = satInL;
-        float wetR = satInR;
-        // FIX M-13: when the oversampler runs, wet is group-delayed, so mix the
-        // delay-matched dry; when it is bypassed (k<=0) wet is the current input,
-        // so the dry tap must stay undelayed to keep unity.
-        float dryTapL = satInL;
-        float dryTapR = satInR;
-        float subTapL = subL;
-        float subTapR = subR;
-
-        if (k > 1e-9) {
-            // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
-            for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                float sub_sL = 0.0f;
-                float sub_sR = 0.0f;
-#if defined(PULSR_HAS_NEON)
-                float32x2_t vSub = vdup_n_f32(0.0f);
-                for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const float coeff = polyphase4x_[p][t];
-                    float32x2_t vHist = { history_[0][t], history_[1][t] };
-                    vSub = vfma_n_f32(vSub, vHist, coeff);
-                }
-                sub_sL = vget_lane_f32(vSub, 0);
-                sub_sR = vget_lane_f32(vSub, 1);
-#elif defined(PULSR_HAS_SSE)
-                __m128 vSub = _mm_setzero_ps();
-                for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const float coeff = polyphase4x_[p][t];
-                    __m128 vHist = _mm_set_ps(0.0f, 0.0f, history_[1][t], history_[0][t]);
-                    __m128 vC = _mm_set1_ps(coeff);
-                    vSub = _mm_add_ps(vSub, _mm_mul_ps(vHist, vC));
-                }
-                alignas(16) float subArr[4];
-                _mm_store_ps(subArr, vSub);
-                sub_sL = subArr[0];
-                sub_sR = subArr[1];
-#else
-                for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const float coeff = polyphase4x_[p][t];
-                    sub_sL += history_[0][t] * coeff;
-                    sub_sR += history_[1][t] * coeff;
-                }
-#endif
-
-                float emphL = sub_sL;
-                float emphR = sub_sR;
-                if (tilt > 0.0f) {
-                    hpL += hpCoeff * (sub_sL - hpL);
-                    hpR += hpCoeff * (sub_sR - hpR);
-                    if (!std::isfinite(hpL)) hpL = 0.0f;
-                    if (!std::isfinite(hpR)) hpR = 0.0f;
-                    emphL = sub_sL + tilt * (sub_sL - hpL);
-                    emphR = sub_sR + tilt * (sub_sR - hpR);
-                }
-
-                // Store shaped outputs into decimation history ring buffer
-                const int dIdx = (decimIdx_ + p) % DECIM_HISTORY_LEN;
-                float shL = shapeSample(emphL, k, invNorm, mode);
-                float shR = shapeSample(emphR, k, invNorm, mode);
-                if (modeCrossfadeProgress_ < 1.0f) {
-                    const float oldShL = shapeSample(emphL, k, invNorm, prevMode_);
-                    const float oldShR = shapeSample(emphR, k, invNorm, prevMode_);
-                    const float cfAngle = modeCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
-                    const float oldW = std::cos(cfAngle);
-                    const float newW = std::sin(cfAngle);
-                    shL = oldW * oldShL + newW * shL;
-                    shR = oldW * oldShR + newW * shR;
-                }
-                decimHistory_[0][dIdx] = shL;
-                decimHistory_[1][dIdx] = shR;
-            }
-            decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
-            if (modeCrossfadeProgress_ < 1.0f) {
-                const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
-                modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
-            }
-
-            // Polyphase FIR decimation: convolve shaped history with the
-            // anti-aliasing prototype reconstructed from the polyphase bank.
-            wetL = 0.0f;
-            wetR = 0.0f;
-#if defined(PULSR_HAS_NEON)
-            float32x2_t vWet = vdup_n_f32(0.0f);
-            for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const int k_idx = t * OVERSAMPLE_FACTOR + p;
-                    const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
-                    float32x2_t vDecim = { decimHistory_[0][hIdx], decimHistory_[1][hIdx] };
-                    vWet = vfma_n_f32(vWet, vDecim, polyphase4x_[p][t]);
-                }
-            }
-            wetL = vget_lane_f32(vWet, 0) * 0.25f;
-            wetR = vget_lane_f32(vWet, 1) * 0.25f;
-#elif defined(PULSR_HAS_SSE)
-            __m128 vWet = _mm_setzero_ps();
-            for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const int k_idx = t * OVERSAMPLE_FACTOR + p;
-                    const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
-                    __m128 vDecim = _mm_set_ps(0.0f, 0.0f, decimHistory_[1][hIdx], decimHistory_[0][hIdx]);
-                    __m128 vC = _mm_set1_ps(polyphase4x_[p][t]);
-                    vWet = _mm_add_ps(vWet, _mm_mul_ps(vDecim, vC));
-                }
-            }
-            alignas(16) float wetArr[4];
-            _mm_store_ps(wetArr, vWet);
-            wetL = wetArr[0] * 0.25f;
-            wetR = wetArr[1] * 0.25f;
-#else
-            for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const int k_idx = t * OVERSAMPLE_FACTOR + p;
-                    const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
-                    wetL += polyphase4x_[p][t] * decimHistory_[0][hIdx];
-                    wetR += polyphase4x_[p][t] * decimHistory_[1][hIdx];
-                }
-            }
-            wetL *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-            wetR *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-#endif
-
-            // DC blocker for asymmetric modes
-            if (mode != 0 || (modeCrossfadeProgress_ < 1.0f && prevMode_ != 0)) {
-                float yL = wetL - dcX_[0] + dcCoeff_ * dcY_[0];
-                float yR = wetR - dcX_[1] + dcCoeff_ * dcY_[1];
-                dcX_[0] = wetL;
-                dcX_[1] = wetR;
-                dcY_[0] = yL;
-                dcY_[1] = yR;
-                wetL = yL;
-                wetR = yR;
-            }
-
-            // Align dry tap with wet delay, smoothly crossfading dry path
-            // during enable/disable so phase comb filtering does not occur.
-            dryTapL = currentEnabledMix * dryL + (1.0f - currentEnabledMix) * satInL;
-            dryTapR = currentEnabledMix * dryR + (1.0f - currentEnabledMix) * satInR;
-            if (multiband_) {
-                subTapL = currentEnabledMix * delayedSubL + (1.0f - currentEnabledMix) * subL;
-                subTapR = currentEnabledMix * delayedSubR + (1.0f - currentEnabledMix) * subR;
-            }
-        }
-
-        if (!std::isfinite(wetL)) wetL = 0.0f;
-        if (!std::isfinite(wetR)) wetR = 0.0f;
-
-        const float midHighL = (1.0f - mix) * dryTapL + mix * wetL;
-        const float midHighR = (1.0f - mix) * dryTapR + mix * wetR;
-
-        const float outL = multiband_ ? (subTapL + midHighL) : midHighL;
-        const float outR = multiband_ ? (subTapR + midHighR) : midHighR;
-
-        // Equal-power crossfading for wet/dry enable/disable
-        float dryW, wetW;
-        if (currentEnabledMix >= 0.9999f) {
-            dryW = 0.0f;
-            wetW = 1.0f;
-        } else if (currentEnabledMix <= 0.0001f) {
-            dryW = 1.0f;
-            wetW = 0.0f;
-        } else {
-            const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
-            dryW = std::cos(angle);
-            wetW = std::sin(angle);
-        }
-
-        L[i] = dryW * inL + wetW * outL;
-        R[i] = dryW * inR + wetW * outR;
+        float outL = 0.0f, outR = 0.0f;
+        processFrameStereo(L[i], R[i], outL, outR,
+                           currentEnabledMix, k, mix, tilt, hpCoeff, mode, invNorm);
+        L[i] = outL;
+        R[i] = outR;
         currentEnabledMix += mixStep;
     }
 }
@@ -412,215 +407,13 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
         const float hpCoeff = tiltHpCoeff_;
         const float invNorm = computeInvNorm(k);
         const int mode = mode_;
-        float& hpL = hpState_[0];
-        float& hpR = hpState_[1];
 
         for (int i = 0; i < frames; ++i) {
-            float inL = buffer[i * 2];
-            float inR = buffer[i * 2 + 1];
-            if (!std::isfinite(inL)) inL = 0.0f;
-            if (!std::isfinite(inR)) inR = 0.0f;
-
-            float satInL = inL;
-            float satInR = inR;
-            float subL = 0.0f;
-            float subR = 0.0f;
-
-            if (multiband_) {
-                double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
-                crossover_[0].process(inL, inR, outLpL, outLpR, outHpL, outHpR);
-                subL = static_cast<float>(outLpL);
-                subR = static_cast<float>(outLpR);
-                satInL = static_cast<float>(outHpL);
-                satInR = static_cast<float>(outHpR);
-            }
-
-            // FIX M-13: dry delay line (matches process()).
-            const float dryL = dryDelay_[0][dryDelayPos_];
-            const float dryR = dryDelay_[1][dryDelayPos_];
-            dryDelay_[0][dryDelayPos_] = satInL;
-            dryDelay_[1][dryDelayPos_] = satInR;
-
-            const float delayedSubL = subDelay_[0][dryDelayPos_];
-            const float delayedSubR = subDelay_[1][dryDelayPos_];
-            subDelay_[0][dryDelayPos_] = subL;
-            subDelay_[1][dryDelayPos_] = subR;
-
-            dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
-
-            // Shift history buffers
-            for (int t = TAPS_PER_PHASE - 1; t > 0; --t) {
-                history_[0][t] = history_[0][t - 1];
-                history_[1][t] = history_[1][t - 1];
-            }
-            history_[0][0] = satInL;
-            history_[1][0] = satInR;
-
-            float wetL = satInL;
-            float wetR = satInR;
-            float dryTapL = satInL;
-            float dryTapR = satInR;
-            float subTapL = subL;
-            float subTapR = subR;
-
-            if (k > 1e-9) {
-                // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
-                for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                    float subL = 0.0f;
-                    float subR = 0.0f;
-#if defined(PULSR_HAS_NEON)
-                    float32x2_t vSub = vdup_n_f32(0.0f);
-                    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const float coeff = polyphase4x_[p][t];
-                        float32x2_t vHist = { history_[0][t], history_[1][t] };
-                        vSub = vfma_n_f32(vSub, vHist, coeff);
-                    }
-                    subL = vget_lane_f32(vSub, 0);
-                    subR = vget_lane_f32(vSub, 1);
-#elif defined(PULSR_HAS_SSE)
-                    __m128 vSub = _mm_setzero_ps();
-                    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const float coeff = polyphase4x_[p][t];
-                        __m128 vHist = _mm_set_ps(0.0f, 0.0f, history_[1][t], history_[0][t]);
-                        __m128 vC = _mm_set1_ps(coeff);
-                        vSub = _mm_add_ps(vSub, _mm_mul_ps(vHist, vC));
-                    }
-                    alignas(16) float subArr[4];
-                    _mm_store_ps(subArr, vSub);
-                    subL = subArr[0];
-                    subR = subArr[1];
-#else
-                    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const float coeff = polyphase4x_[p][t];
-                        subL += history_[0][t] * coeff;
-                        subR += history_[1][t] * coeff;
-                    }
-#endif
-
-                    float emphL = subL;
-                    float emphR = subR;
-                    if (tilt > 0.0f) {
-                        hpL += hpCoeff * (subL - hpL);
-                        hpR += hpCoeff * (subR - hpR);
-                        if (!std::isfinite(hpL)) hpL = 0.0f;
-                        if (!std::isfinite(hpR)) hpR = 0.0f;
-                        emphL = subL + tilt * (subL - hpL);
-                        emphR = subR + tilt * (subR - hpR);
-                    }
-
-                    // Store shaped outputs into decimation history ring buffer
-                    const int dIdx = (decimIdx_ + p) % DECIM_HISTORY_LEN;
-                    float shL = shapeSample(emphL, k, invNorm, mode);
-                    float shR = shapeSample(emphR, k, invNorm, mode);
-                    if (modeCrossfadeProgress_ < 1.0f) {
-                        const float oldShL = shapeSample(emphL, k, invNorm, prevMode_);
-                        const float oldShR = shapeSample(emphR, k, invNorm, prevMode_);
-                        const float cfAngle = modeCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
-                        const float oldW = std::cos(cfAngle);
-                        const float newW = std::sin(cfAngle);
-                        shL = oldW * oldShL + newW * shL;
-                        shR = oldW * oldShR + newW * shR;
-                    }
-                    decimHistory_[0][dIdx] = shL;
-                    decimHistory_[1][dIdx] = shR;
-                }
-                decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
-                if (modeCrossfadeProgress_ < 1.0f) {
-                    const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
-                    modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
-                }
-
-                wetL = 0.0f;
-                wetR = 0.0f;
-#if defined(PULSR_HAS_NEON)
-                float32x2_t vWet = vdup_n_f32(0.0f);
-                for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const int k_idx = t * OVERSAMPLE_FACTOR + p;
-                        const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
-                        const float coeff = polyphase4x_[p][t];
-                        float32x2_t vDecim = { decimHistory_[0][hIdx], decimHistory_[1][hIdx] };
-                        vWet = vfma_n_f32(vWet, vDecim, coeff);
-                    }
-                }
-                wetL = vget_lane_f32(vWet, 0) * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-                wetR = vget_lane_f32(vWet, 1) * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-#elif defined(PULSR_HAS_SSE)
-                __m128 vWet = _mm_setzero_ps();
-                for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const int k_idx = t * OVERSAMPLE_FACTOR + p;
-                        const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
-                        const float coeff = polyphase4x_[p][t];
-                        __m128 vDecim = _mm_set_ps(0.0f, 0.0f, decimHistory_[1][hIdx], decimHistory_[0][hIdx]);
-                        __m128 vC = _mm_set1_ps(coeff);
-                        vWet = _mm_add_ps(vWet, _mm_mul_ps(vDecim, vC));
-                    }
-                }
-                alignas(16) float wetArr[4];
-                _mm_store_ps(wetArr, vWet);
-                wetL = wetArr[0] * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-                wetR = wetArr[1] * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-#else
-                for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
-                    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const int k_idx = t * OVERSAMPLE_FACTOR + p;
-                        const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
-                        wetL += polyphase4x_[p][t] * decimHistory_[0][hIdx];
-                        wetR += polyphase4x_[p][t] * decimHistory_[1][hIdx];
-                    }
-                }
-                wetL *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-                wetR *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-#endif
-
-                // DC blocker for asymmetric modes
-                if (mode != 0 || (modeCrossfadeProgress_ < 1.0f && prevMode_ != 0)) {
-                    float yL = wetL - dcX_[0] + dcCoeff_ * dcY_[0];
-                    float yR = wetR - dcX_[1] + dcCoeff_ * dcY_[1];
-                    dcX_[0] = wetL;
-                    dcX_[1] = wetR;
-                    dcY_[0] = yL;
-                    dcY_[1] = yR;
-                    wetL = yL;
-                    wetR = yR;
-                }
-
-                // Align dry tap with wet delay, smoothly crossfading dry path
-                // during enable/disable so phase comb filtering does not occur.
-                dryTapL = currentEnabledMix * dryL + (1.0f - currentEnabledMix) * satInL;
-                dryTapR = currentEnabledMix * dryR + (1.0f - currentEnabledMix) * satInR;
-                if (multiband_) {
-                    subTapL = currentEnabledMix * delayedSubL + (1.0f - currentEnabledMix) * subL;
-                    subTapR = currentEnabledMix * delayedSubR + (1.0f - currentEnabledMix) * subR;
-                }
-            }
-
-            if (!std::isfinite(wetL)) wetL = 0.0f;
-            if (!std::isfinite(wetR)) wetR = 0.0f;
-
-            const float midHighL = (1.0f - mix) * dryTapL + mix * wetL;
-            const float midHighR = (1.0f - mix) * dryTapR + mix * wetR;
-
-            const float outL = multiband_ ? (subTapL + midHighL) : midHighL;
-            const float outR = multiband_ ? (subTapR + midHighR) : midHighR;
-
-            // Equal-power crossfading for wet/dry enable/disable
-            float dryW, wetW;
-            if (currentEnabledMix >= 0.9999f) {
-                dryW = 0.0f;
-                wetW = 1.0f;
-            } else if (currentEnabledMix <= 0.0001f) {
-                dryW = 1.0f;
-                wetW = 0.0f;
-            } else {
-                const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
-                dryW = std::cos(angle);
-                wetW = std::sin(angle);
-            }
-
-            buffer[i * 2] = dryW * inL + wetW * outL;
-            buffer[i * 2 + 1] = dryW * inR + wetW * outR;
+            float outL = 0.0f, outR = 0.0f;
+            processFrameStereo(buffer[i * 2], buffer[i * 2 + 1], outL, outR,
+                               currentEnabledMix, k, mix, tilt, hpCoeff, mode, invNorm);
+            buffer[i * 2] = outL;
+            buffer[i * 2 + 1] = outR;
             currentEnabledMix += mixStep;
         }
         return;
@@ -680,9 +473,9 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
             }
             history_[ch][0] = inSample;
 
-            float wet = inSample;
-            float dryTap = inSample;
-            float subTap = subSample;
+            float wet = dryDelayed;
+            float dryTap = dryDelayed;
+            float subTap = delayedSub;
 
             if (k > 1e-9) {
                 // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
@@ -742,11 +535,10 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                     wet = y;
                 }
 
-                // Align dry tap with wet delay, smoothly crossfading dry path
-                // during enable/disable so phase comb filtering does not occur.
-                dryTap = currentEnabledMix * dryDelayed + (1.0f - currentEnabledMix) * inSample;
+                // Align dry tap with wet delay.
+                dryTap = dryDelayed;
                 if (multiband_) {
-                    subTap = currentEnabledMix * delayedSub + (1.0f - currentEnabledMix) * subSample;
+                    subTap = delayedSub;
                 }
             }
 

@@ -2,10 +2,10 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../performance/gpu_budget.dart';
 import '../theme/aura_theme.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// {@category DesignSystem}
 enum GlassTier {
@@ -36,22 +36,10 @@ class GlassContainer extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final Color? color;
   final GlassTier tier;
-
-  /// When false, no [BackdropFilter] is used — the container renders a
-  /// tinted translucent surface, avoiding a GPU-expensive blur pass on
-  /// low-end devices.
   final bool enableBlur;
-
   final List<BoxShadow>? boxShadow;
-
-  /// Whether to render a specular directional highlight along the top edge,
-  /// simulating light refraction through continuous curved liquid glass.
   final bool specularHighlight;
-
-  /// Optional tint factor (0.0 = ultra clear, 1.0 = deeply tinted).
   final double? tintFactor;
-
-  /// Whether this is configured with iOS 26/27 liquid glass defaults.
   final bool isLiquid;
 
   const GlassContainer({
@@ -73,8 +61,6 @@ class GlassContainer extends StatelessWidget {
             'Provide either border or shape, not both'),
         isLiquid = tier == GlassTier.liquid;
 
-  /// Factory constructor configured for iOS 26/27 refractive Liquid Glass.
-  /// Uses a higher blur sigma (24.0), specular top hairline, and squircle curvature.
   const GlassContainer.liquid({
     super.key,
     required this.child,
@@ -94,7 +80,6 @@ class GlassContainer extends StatelessWidget {
         tier = GlassTier.liquid,
         isLiquid = true;
 
-  /// Solid non-blurred surface tier avoiding backdrop filter passes entirely.
   const GlassContainer.solid({
     super.key,
     required this.child,
@@ -114,7 +99,6 @@ class GlassContainer extends StatelessWidget {
         specularHighlight = false,
         isLiquid = false;
 
-  /// Standardized glass container configured by [GlassPreset].
   GlassContainer.fromPreset({
     super.key,
     required this.child,
@@ -147,41 +131,58 @@ class GlassContainer extends StatelessWidget {
     final baseSurface = color ?? (p.isDark ? p.surface : p.surfaceContainer);
     final baseColor = baseSurface.withValues(alpha: effectiveAlpha);
 
-    // Layered border: subtle outer contour
     final effectiveBorder = border ??
         Border.all(
           color: (p.isDark ? Colors.white : Colors.black).withValues(
-              alpha: p.isDark
-                  ? (isLiquid ? 0.14 : 0.10)
-                  : (isLiquid ? 0.10 : 0.06)),
+            alpha:
+                p.isDark ? (isLiquid ? 0.15 : 0.09) : (isLiquid ? 0.10 : 0.06),
+          ),
           width: isLiquid ? 1.15 : 1.0,
         );
 
-    // Default liquid shadow adds ambient soft depth with a 120fps-friendly blur radius
     final effectiveShadow = boxShadow ??
         (isLiquid
             ? [
                 BoxShadow(
-                  color: AppColors.scrimAt(p.isDark ? 0.34 : 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 5),
+                  color: AppColors.scrimAt(p.isDark ? 0.38 : 0.09),
+                  blurRadius: 20,
+                  spreadRadius: -2,
+                  offset: const Offset(0, 8),
                 ),
                 BoxShadow(
-                  color: p.accent.withValues(alpha: p.isDark ? 0.05 : 0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 1),
+                  color: p.accent.withValues(alpha: p.isDark ? 0.06 : 0.025),
+                  blurRadius: 14,
+                  offset: const Offset(0, 2),
                 ),
               ]
             : null);
 
+    // Subtle directional surface sheen for liquid/standard glass tiers
+    final Gradient? surfaceGradient = tier == GlassTier.solid
+        ? null
+        : LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color.alphaBlend(
+                AppColors.specularAt(
+                    p.isDark ? (isLiquid ? 0.05 : 0.025) : 0.18),
+                baseColor,
+              ),
+              baseColor,
+            ],
+          );
+
     final decoration = shape != null
         ? ShapeDecoration(
-            color: baseColor,
+            color: surfaceGradient == null ? baseColor : null,
+            gradient: surfaceGradient,
             shape: shape!,
             shadows: effectiveShadow,
           )
         : BoxDecoration(
-            color: baseColor,
+            color: surfaceGradient == null ? baseColor : null,
+            gradient: surfaceGradient,
             borderRadius: effectiveRadius,
             border: effectiveBorder,
             boxShadow: effectiveShadow,
@@ -190,25 +191,29 @@ class GlassContainer extends StatelessWidget {
     final Widget paddedChild =
         padding != null ? Padding(padding: padding!, child: child) : child;
 
+    final showSpecular = specularHighlight || isLiquid;
+
     final Widget decoratedContent = Container(
       decoration: decoration,
-      child: specularHighlight
+      child: showSpecular
           ? Stack(
               children: [
                 PositionedDirectional(
                   top: 0,
-                  start: 8,
-                  end: 8,
+                  start: 12,
+                  end: 12,
                   height: 1.2,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.specularAt(0.0),
-                          AppColors.specularAt(p.isDark ? 0.45 : 0.75),
-                          AppColors.specularAt(0.0),
-                        ],
-                        stops: const [0.0, 0.5, 1.0],
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.specularAt(0.0),
+                            AppColors.specularAt(p.isDark ? 0.48 : 0.78),
+                            AppColors.specularAt(0.0),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
                       ),
                     ),
                   ),
@@ -219,8 +224,6 @@ class GlassContainer extends StatelessWidget {
           : paddedChild,
     );
 
-    // When blur is explicitly disabled or GPU-saving budget mode is active,
-    // skip the expensive BackdropFilter pass.
     if (!enableBlur || GpuBudget.isGpuSaverActive || blur <= 0) {
       if (shape != null) {
         return ClipPath(
@@ -234,8 +237,6 @@ class GlassContainer extends StatelessWidget {
       );
     }
 
-    // Clamp Gaussian blur kernel at 18.0 sigma to maintain 120fps <8.3ms frame budget
-    // while preserving full frosted refraction aesthetics.
     final effectiveSigma = math.min(blur, 18.0);
 
     Widget blurred;

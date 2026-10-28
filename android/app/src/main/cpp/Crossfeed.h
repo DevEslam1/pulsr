@@ -37,6 +37,10 @@ public:
     void processInterleaved(float* buffer, int frames, int channels = 2);
 
 private:
+    inline void processBs2bFrame(float inL, float inR, float& outL, float& outR);
+    inline void processCustomFrame(float l, float r, float& outL, float& outR,
+                                   float currentDelay, float feedLevel, float lpCoeff, float makeup);
+
     void initBs2b(double fcut, double feedDb);
     void clearCustomState();
 

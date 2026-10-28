@@ -262,7 +262,9 @@ extension GetItInjectableX on _i174.GetIt {
               db: gh<_i682.AppDatabase>(),
             ));
     gh.lazySingleton<_i968.ArtistBioService>(
-        () => _i968.ArtistBioService(gh<_i519.Client>()));
+      () => _i968.ArtistBioService(gh<_i519.Client>()),
+      dispose: (i) => i.dispose(),
+    );
     gh.lazySingleton<_i417.MissingArtworkService>(
         () => _i417.MissingArtworkService(gh<_i519.Client>()));
     gh.lazySingleton<_i912.SponsorBlockService>(

@@ -173,22 +173,19 @@ void main() {
       expect(await manager.getDiskCacheSizeBytes(), 8);
     });
 
-    test('a zero max size evicts every file in the background isolate',
+    test('setMaxCacheSizeMb clamps invalid and zero sizes to [10, 2048]',
         () async {
-      await manager.put('evict-1', _bytes(300, 1));
-      await manager.put('evict-2', _bytes(300, 2));
-      expect(await manager.getDiskCacheSizeBytes(), greaterThan(0));
-
       await manager.setMaxCacheSizeMb(0);
+      expect(manager.maxCacheSizeMb, 10);
 
-      var size = await manager.getDiskCacheSizeBytes();
-      final deadline = DateTime.now().add(const Duration(seconds: 10));
-      while (size > 0 && DateTime.now().isBefore(deadline)) {
-        await manager.setMaxCacheSizeMb(0);
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        size = await manager.getDiskCacheSizeBytes();
-      }
-      expect(size, 0);
+      await manager.setMaxCacheSizeMb(-5);
+      expect(manager.maxCacheSizeMb, 10);
+
+      await manager.setMaxCacheSizeMb(5000);
+      expect(manager.maxCacheSizeMb, 2048);
+
+      await manager.setMaxCacheSizeMb(50);
+      expect(manager.maxCacheSizeMb, 50);
     });
   });
 

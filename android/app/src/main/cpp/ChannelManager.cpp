@@ -38,6 +38,7 @@ void ChannelManager::resetChannelState(int channel) {
 }
 
 void ChannelManager::reset() {
+    rampingDown_ = false;
     for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
         targetGain_[ch] = 1.0f;
         currentGain_[ch] = 1.0f;
@@ -54,21 +55,51 @@ void ChannelManager::applyParams(const ChannelManagerParamSet& params) {
     params_ = params;
     params_.channelCount = std::clamp(params_.channelCount, 2, MAX_CHANNELS);
     if (!params_.enabled) {
-        if (wasEnabled) reset();
+        if (wasEnabled) {
+            const int rampFrames = std::max(
+                1, static_cast<int>(sampleRate_ * (RAMP_MS / 1000.0)));
+            bool anyRamp = false;
+            for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+                targetGain_[ch] = 1.0f;
+                if (std::abs(1.0f - currentGain_[ch]) > 1e-6f) {
+                    gainStep_[ch] = (1.0f - currentGain_[ch]) / static_cast<float>(rampFrames);
+                    rampRemaining_[ch] = rampFrames;
+                    anyRamp = true;
+                } else {
+                    currentGain_[ch] = 1.0f;
+                    gainStep_[ch] = 0.0f;
+                    rampRemaining_[ch] = 0;
+                }
+            }
+            rampingDown_ = anyRamp;
+            if (!rampingDown_) {
+                reset();
+            }
+        }
         return;
     }
+    rampingDown_ = false;
 
+    const bool justEnabled = (!wasEnabled && params_.enabled);
     const int rampFrames = std::max(
         1, static_cast<int>(sampleRate_ * (RAMP_MS / 1000.0)));
     for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
         const float trimDb =
             std::clamp(params_.trimDb[ch], -30.0f, 12.0f);
         const float target = std::pow(10.0f, trimDb / 20.0f);
-        if (std::abs(target - targetGain_[ch]) > 1e-6f) {
-            targetGain_[ch] = target;
+        targetGain_[ch] = target;
+        if (justEnabled) {
+            currentGain_[ch] = 1.0f;
+            gainStep_[ch] = (target - 1.0f) / static_cast<float>(rampFrames);
+            rampRemaining_[ch] = rampFrames;
+        } else if (std::abs(target - currentGain_[ch]) > 1e-6f) {
             gainStep_[ch] = (target - currentGain_[ch]) /
                             static_cast<float>(rampFrames);
             rampRemaining_[ch] = rampFrames;
+        } else {
+            currentGain_[ch] = target;
+            gainStep_[ch] = 0.0f;
+            rampRemaining_[ch] = 0;
         }
 
         const double delayMs =
@@ -82,7 +113,7 @@ void ChannelManager::applyParams(const ChannelManagerParamSet& params) {
 
 void ChannelManager::processInterleaved(float* buffer, int frames, int channels) {
     if (buffer == nullptr || frames <= 0 || channels <= 0) return;
-    if (!params_.enabled) return;
+    if (!params_.enabled && !rampingDown_) return;
 
     const int activeChannels = std::min(channels, MAX_CHANNELS);
     const int declaredChannels = std::min(params_.channelCount, activeChannels);
@@ -119,6 +150,20 @@ void ChannelManager::processInterleaved(float* buffer, int frames, int channels)
                 x *= currentGain_[ch];
             }
             buffer[base + ch] = x;
+        }
+    }
+
+    if (rampingDown_) {
+        bool stillRamping = false;
+        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+            if (rampRemaining_[ch] > 0) {
+                stillRamping = true;
+                break;
+            }
+        }
+        if (!stillRamping) {
+            rampingDown_ = false;
+            reset();
         }
     }
 }

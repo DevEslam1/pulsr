@@ -23,8 +23,8 @@ DsdDecoder::DsdDecoder() {
 void DsdDecoder::generateFilters() {
     // Stage 1 output sample rate is (44100 * dsdRate) / 8 = 352.8 kHz for DSD64
     const double stage1Rate = (44100.0 * static_cast<double>(dsdRate_)) / 8.0;
-    // Anti-aliasing cutoff at 0.42 * targetRate_ (e.g. 20.16 kHz for 48kHz target rate)
-    const double cutoff = std::min(0.48, (0.42 * static_cast<double>(targetRate_)) / stage1Rate);
+    // Anti-aliasing cutoff at 0.42 * targetRate_ relative to stage1Rate, clamped up to 0.48 (Nyquist headroom)
+    const double cutoff = std::clamp((0.42 * static_cast<double>(targetRate_)) / stage1Rate, 0.01, 0.48);
 
     double sum = 0.0;
     for (int i = 0; i < DECIMATION_TAPS; ++i) {
@@ -60,9 +60,7 @@ void DsdDecoder::generateFilters() {
 
 void DsdDecoder::configure(DsdRate rate, int targetPcmSampleRate, DsdBitOrder bitOrder) {
     dsdRate_ = rate;
-    const double stage1Rate = (44100.0 * static_cast<double>(dsdRate_)) / 8.0;
-    const int maxTargetRate = std::min(768000, static_cast<int>(stage1Rate));
-    targetRate_ = std::clamp(targetPcmSampleRate, 44100, maxTargetRate);
+    targetRate_ = std::clamp(targetPcmSampleRate, 44100, 768000);
     bitOrder_ = bitOrder;
 
     const double dsdFrequencyHz = 44100.0 * static_cast<double>(dsdRate_);
@@ -79,6 +77,8 @@ void DsdDecoder::reset() {
     std::memset(stage2RingL_, 0, sizeof(stage2RingL_));
     std::memset(stage2RingR_, 0, sizeof(stage2RingR_));
     stage2WriteIdx_ = 0;
+    prevDecimOutL_ = 0.0f;
+    prevDecimOutR_ = 0.0f;
     phaseAcc_ = 0.0;
 
     dcPrevInL_ = 0.0f;
@@ -117,11 +117,11 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                 bitValR = (bR >> (7 - bit)) & 1;
             }
 
-            // Convert 0/1 to bipolar -1/+1 signed int64_t
-            const int64_t xL = bitValL ? 1 : -1;
-            const int64_t xR = bitValR ? 1 : -1;
+            // Convert 0/1 to bipolar -1/+1 unsigned two's-complement wrap-around
+            const uint64_t xL = bitValL ? 1ULL : static_cast<uint64_t>(-1LL);
+            const uint64_t xR = bitValR ? 1ULL : static_cast<uint64_t>(-1LL);
 
-            // --- STAGE 1: CIC Integrators (order 3, signed 64-bit) ---
+            // --- STAGE 1: CIC Integrators (order 3, unsigned 64-bit modular wrap-around) ---
             cicL_.int1 += xL;
             cicL_.int2 += cicL_.int1;
             cicL_.int3 += cicL_.int2;
@@ -130,34 +130,28 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
             cicR_.int2 += cicR_.int1;
             cicR_.int3 += cicR_.int2;
 
-            // Slow leak on the integrators to prevent int64 overflow on prolonged pathological DC (> 240 dB down)
-            cicL_.int1 -= (cicL_.int1 >> 40);
-            cicL_.int2 -= (cicL_.int2 >> 40);
-            cicL_.int3 -= (cicL_.int3 >> 40);
-            cicR_.int1 -= (cicR_.int1 >> 40);
-            cicR_.int2 -= (cicR_.int2 >> 40);
-            cicR_.int3 -= (cicR_.int3 >> 40);
-
             cicCount_++;
 
             // Decimate 8x in CIC stage
             if (cicCount_ >= 8) {
                 cicCount_ = 0;
 
-                // CIC Comb filters (signed 64-bit)
-                int64_t c1L = cicL_.int3 - cicL_.comb1_d;
+                // CIC Comb filters (unsigned 64-bit wrap-around)
+                uint64_t c1L = cicL_.int3 - cicL_.comb1_d;
                 cicL_.comb1_d = cicL_.int3;
-                int64_t c2L = c1L - cicL_.comb2_d;
+                uint64_t c2L = c1L - cicL_.comb2_d;
                 cicL_.comb2_d = c1L;
-                int64_t c3L = c2L - cicL_.comb3_d;
+                uint64_t c3L_u = c2L - cicL_.comb3_d;
                 cicL_.comb3_d = c2L;
+                const int64_t c3L = static_cast<int64_t>(c3L_u);
 
-                int64_t c1R = cicR_.int3 - cicR_.comb1_d;
+                uint64_t c1R = cicR_.int3 - cicR_.comb1_d;
                 cicR_.comb1_d = cicR_.int3;
-                int64_t c2R = c1R - cicR_.comb2_d;
+                uint64_t c2R = c1R - cicR_.comb2_d;
                 cicR_.comb2_d = c1R;
-                int64_t c3R = c2R - cicR_.comb3_d;
+                uint64_t c3R_u = c2R - cicR_.comb3_d;
                 cicR_.comb3_d = c2R;
+                const int64_t c3R = static_cast<int64_t>(c3R_u);
 
                 // Scale CIC output (8^3 = 512 gain) and clamp to [-2.0f, 2.0f] to prevent runaway on corrupted streams
                 const float cicOutL = std::clamp(static_cast<float>(c3L) * (1.0f / 512.0f), -2.0f, 2.0f);
@@ -258,10 +252,14 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                 while (phaseAcc_ >= decimationRatio_ && outFrames < maxPcmFrames) {
                     phaseAcc_ -= decimationRatio_;
 
+                    const float frac = 1.0f - static_cast<float>(phaseAcc_ / 8.0);
+                    const float interpL = prevDecimOutL_ + frac * (decimationOutL - prevDecimOutL_);
+                    const float interpR = prevDecimOutR_ + frac * (decimationOutR - prevDecimOutR_);
+
                     // --- STAGE 4: 5Hz DC Blocker Highpass Filter ---
                     // y[n] = x[n] - x[n-1] + R * y[n-1]
-                    const float sL = decimationOutL * headroomScale;
-                    const float sR = decimationOutR * headroomScale;
+                    const float sL = interpL * headroomScale;
+                    const float sR = interpR * headroomScale;
 
                     float dcOutL = sL - dcPrevInL_ + dcPole_ * dcPrevOutL_;
                     float dcOutR = sR - dcPrevInR_ + dcPole_ * dcPrevOutR_;
@@ -277,6 +275,9 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                     pcmOutInterleaved[outFrames * 2 + 1] = std::clamp(dcOutR, -1.0f, 1.0f);
                     outFrames++;
                 }
+
+                prevDecimOutL_ = decimationOutL;
+                prevDecimOutR_ = decimationOutR;
             }
         }
     }

@@ -698,14 +698,6 @@ void ConvolutionReverb::drainRetiredIrs() {
         tail = (tail + 1) % kMaxRetired;
     }
     retiredTail_.store(tail, std::memory_order_release);
-
-    int overflow = overflowCount_.load(std::memory_order_acquire);
-    if (overflow > 0) {
-        for (int i = 0; i < overflow && i < kMaxEmergencyOverflow; ++i) {
-            overflowSlots_[i].reset();
-        }
-        overflowCount_.store(0, std::memory_order_release);
-    }
 }
 
 void ConvolutionReverb::ensurePredelayCapacity() {
@@ -824,25 +816,13 @@ void ConvolutionReverb::setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir) {
     if (ir && ir->numPartitions > 0) {
         ensurePartitionCapacity(ir->numPartitions);
     }
+    irCrossfadeSamples_ = 0;
     if (preparedIr_) {
-        // Trigger smooth 25ms crossfade on wet path when swapping IR presets during playback
-        if (ir) {
-            irCrossfadeSamples_ = static_cast<int>(coreRate_ * 0.025);
-            irCrossfadeTotal_ = std::max(1, irCrossfadeSamples_);
-        }
         const int head = retiredHead_.load(std::memory_order_relaxed);
         const int nextHead = (head + 1) % kMaxRetired;
         if (nextHead != retiredTail_.load(std::memory_order_acquire)) {
             retiredRing_[head] = std::move(preparedIr_);
             retiredHead_.store(nextHead, std::memory_order_release);
-        } else {
-            // Ring is full: preserve ownership in pre-allocated emergency overflow slot
-            // avoiding destroying multi-MB FFT partitions on the real-time audio thread.
-            int idx = overflowCount_.load(std::memory_order_relaxed);
-            if (idx < kMaxEmergencyOverflow) {
-                overflowSlots_[idx] = std::move(preparedIr_);
-                overflowCount_.store(idx + 1, std::memory_order_release);
-            }
         }
     }
     preparedIr_ = std::move(ir);
@@ -941,6 +921,11 @@ void ConvolutionReverb::preparePartitions() {
             directRingR_.resize(ringSize, 0.0f);
             directPos_ = 0;
         }
+        if (preparedIr_->totalTaps > 0 && directPos_ >= preparedIr_->totalTaps) {
+            directPos_ = 0;
+            std::fill(directRingL_.begin(), directRingL_.end(), 0.0f);
+            std::fill(directRingR_.begin(), directRingR_.end(), 0.0f);
+        }
         return;
     }
 
@@ -1030,18 +1015,15 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
         return;
     }
 
-    // When enabling from cold bypass, prime the dry delay line with current input
-    // so delayedDry starts continuously without stale historical audio.
+    // When enabling from cold bypass, zero the dry delay line so delayedDry starts clean
     if (smoothedEnabledMix_ < 1e-4f && targetMix > 1e-4f) {
-        for (int k = 0; k < PARTITION_SIZE; ++k) {
-            dryDelayL_[k] = inL[0];
-            dryDelayR_[k] = inR[0];
-        }
+        std::fill(std::begin(dryDelayL_), std::end(dryDelayL_), 0.0f);
+        std::fill(std::begin(dryDelayR_), std::end(dryDelayR_), 0.0f);
         dryDelayPos_ = 0;
         // FIX M-14: prime the >48kHz native dry delay the same way.
         if (sampleRate_ > 48000.0) {
-            std::fill(hqDryL_.begin(), hqDryL_.end(), inL[0]);
-            std::fill(hqDryR_.begin(), hqDryR_.end(), inR[0]);
+            std::fill(hqDryL_.begin(), hqDryL_.end(), 0.0f);
+            std::fill(hqDryR_.begin(), hqDryR_.end(), 0.0f);
             hqDryPos_ = 0;
         }
     }
@@ -1067,7 +1049,7 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
     }
 
     // High sample rates (>48kHz): stream pure wet reverberation path through 48kHz core
-    if (frames * 4 > static_cast<int>(scratchInL_.size())) {
+    if (frames > static_cast<int>(scratchInL_.size())) {
         // Safety guard: preallocated capacity exceeded, fallback to dry
         if (inL != outL) std::memcpy(outL, inL, frames * sizeof(float));
         if (inR != outR) std::memcpy(outR, inR, frames * sizeof(float));
@@ -1236,14 +1218,8 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
             const float dryGain = static_cast<float>(std::cos(effectiveWet * (M_PI / 2.0)));
             float curWetGain = static_cast<float>(std::sin(effectiveWet * (M_PI / 2.0)));
 
-            if (irCrossfadeSamples_ > 0) {
-                const float fade = 1.0f - static_cast<float>(irCrossfadeSamples_) / static_cast<float>(irCrossfadeTotal_);
-                curWetGain *= (0.5f - 0.5f * std::cos(fade * static_cast<float>(M_PI)));
-                --irCrossfadeSamples_;
-            }
-
-            dryDelayL_[dryDelayPos_] = inSampleL;
-            dryDelayR_[dryDelayPos_] = inSampleR;
+            dryDelayL_[dryDelayPos_] = inL[i];
+            dryDelayR_[dryDelayPos_] = inR[i];
             dryDelayPos_ = (dryDelayPos_ + 1) % PARTITION_SIZE;
 
             outL[i] = inL[i] * dryGain + wetSampleL * curWetGain;
@@ -1318,12 +1294,6 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
 
         const float effectiveDryL = curMix * delayedDryL + (1.0f - curMix) * inL[i];
         const float effectiveDryR = curMix * delayedDryR + (1.0f - curMix) * inR[i];
-
-        if (irCrossfadeSamples_ > 0) {
-            const float fade = 1.0f - static_cast<float>(irCrossfadeSamples_) / static_cast<float>(irCrossfadeTotal_);
-            curWetGain *= (0.5f - 0.5f * std::cos(fade * static_cast<float>(M_PI)));
-            --irCrossfadeSamples_;
-        }
 
         outL[i] = effectiveDryL * dryGain + wetSampleL * curWetGain;
         outR[i] = effectiveDryR * dryGain + wetSampleR * curWetGain;

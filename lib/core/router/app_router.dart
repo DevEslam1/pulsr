@@ -345,6 +345,16 @@ GoRouter createRouter(MediaScannerService scannerService,
           return '/';
         }
       }
+      if (AppConfig.isPure) {
+        const purePaths = {
+          '/radio',
+          '/proxy-settings',
+        };
+        if (purePaths.any(
+            (p) => state.uri.path == p || state.uri.path.startsWith('$p/'))) {
+          return '/';
+        }
+      }
       return null;
     },
     errorBuilder: (context, state) => Scaffold(
@@ -489,8 +499,21 @@ GoRouter createRouter(MediaScannerService scannerService,
         pageBuilder: (context, state) => _buildAlbumRoute(context, state, repo),
       ),
       GoRoute(
+        path: '/album/:id',
+        name: 'album-detail',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildAlbumRoute(context, state, repo),
+      ),
+      GoRoute(
         path: '/artist',
         name: 'artist',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            _buildArtistRoute(context, state, repo),
+      ),
+      GoRoute(
+        path: '/artist/:id',
+        name: 'artist-detail',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) =>
             _buildArtistRoute(context, state, repo),
@@ -502,8 +525,20 @@ GoRouter createRouter(MediaScannerService scannerService,
         pageBuilder: (context, state) => _buildGenreRoute(context, state),
       ),
       GoRoute(
+        path: '/genre/:name',
+        name: 'genre-detail',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildGenreRoute(context, state),
+      ),
+      GoRoute(
         path: '/year',
         name: 'year',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildYearRoute(context, state),
+      ),
+      GoRoute(
+        path: '/year/:year',
+        name: 'year-detail',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) => _buildYearRoute(context, state),
       ),
@@ -541,6 +576,13 @@ GoRouter createRouter(MediaScannerService scannerService,
             notFoundMessage: context.l10n.playlistNotFoundHint,
           );
         },
+      ),
+      GoRoute(
+        path: '/playlist/:id',
+        name: 'playlist-detail',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            _buildPlaylistRoute(context, state, repo),
       ),
 
       GoRoute(

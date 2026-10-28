@@ -2,22 +2,14 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// {@category DesignSystem}
 /// A premium, interactive custom-painted slider with an organic wavy track.
-///
-/// Features:
-/// - Smooth animated sinusoidal wave on the active track (like Android 13/14 and premium media players)
-/// - Interactive expansion on touch (track expands from 4.5px to 8px, thumb from 7px to 10px)
-/// - Sine envelope so wave starts and ends smoothly at center line
-/// - Luminous soft glow behind the active wave
-/// - Haptic feedback on drag gestures and division steps
-/// - Battery & CPU efficient rendering inside RepaintBoundary
 class PulsrSlider extends StatefulWidget {
   final double value;
   final double min;
@@ -91,7 +83,6 @@ class _PulsrSliderState extends State<PulsrSlider>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Motion decisions must not read MediaQuery during initState.
     _expandController.duration = context.motionMs(180);
     _waveController.duration = context.motionMs(3200);
     _syncWave();
@@ -287,8 +278,9 @@ class _PulsrSliderState extends State<PulsrSlider>
                       return CustomPaint(
                         painter: _PulsrSliderPainter(
                           t: t,
+                          divisions: widget.divisions,
                           expandFactor: _isFocused || _isHovered
-                              ? max(0.4, _expandAnimation.value)
+                              ? max(0.35, _expandAnimation.value)
                               : _expandAnimation.value,
                           wavePhase: widget.animateWave
                               ? _waveController.value * 2 * pi
@@ -296,7 +288,7 @@ class _PulsrSliderState extends State<PulsrSlider>
                           isWavy: widget.isWavy,
                           inactiveColor: widget.inactiveColor ??
                               (p.isDark ? Colors.white : Colors.black)
-                                  .withValues(alpha: 0.12),
+                                  .withValues(alpha: 0.14),
                           activeColor: widget.activeColor ?? p.accent,
                           thumbColor: widget.thumbColor ??
                               (p.isDark ? Colors.white : p.accent),
@@ -324,6 +316,7 @@ class _SliderStepIntent extends Intent {
 
 class _PulsrSliderPainter extends CustomPainter {
   final double t;
+  final int? divisions;
   final double expandFactor;
   final double wavePhase;
   final bool isWavy;
@@ -335,6 +328,7 @@ class _PulsrSliderPainter extends CustomPainter {
 
   _PulsrSliderPainter({
     required this.t,
+    required this.divisions,
     required this.expandFactor,
     required this.wavePhase,
     required this.isWavy,
@@ -345,6 +339,11 @@ class _PulsrSliderPainter extends CustomPainter {
     required this.isRtl,
   });
 
+  double _smoothstep(double x) {
+    final c = x.clamp(0.0, 1.0);
+    return c * c * (3.0 - 2.0 * c);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (isRtl) {
@@ -352,13 +351,14 @@ class _PulsrSliderPainter extends CustomPainter {
       canvas.translate(size.width, 0);
       canvas.scale(-1, 1);
     }
-    final trackHeight = 4.5 + (3.5 * expandFactor);
-    final thumbRadius = 7.0 + (3.0 * expandFactor);
+    final trackHeight = 4.2 + (3.6 * expandFactor);
+    final thumbRadius = 6.8 + (3.2 * expandFactor);
     final centerY = size.height / 2;
     final thumbX = (t * size.width).clamp(0.0, size.width);
 
-    // 1. Inactive background track (from thumb to end)
-    if (thumbX < size.width) {
+    // 1. Inactive background track (with subtle gap near thumb for modern separation)
+    final inactiveStart = (thumbX + thumbRadius + 4.0).clamp(0.0, size.width);
+    if (inactiveStart < size.width) {
       final inactivePaint = Paint()
         ..color = inactiveColor
         ..style = PaintingStyle.stroke
@@ -366,10 +366,23 @@ class _PulsrSliderPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round;
 
       canvas.drawLine(
-        Offset(thumbX, centerY),
+        Offset(inactiveStart, centerY),
         Offset(size.width, centerY),
         inactivePaint,
       );
+
+      // Subtle division ticks if divisions are specified and reasonable
+      if (divisions != null && divisions! > 1 && divisions! <= 24) {
+        final tickPaint = Paint()
+          ..color = inactiveColor.withValues(alpha: 0.45)
+          ..style = PaintingStyle.fill;
+        for (int i = 1; i < divisions!; i++) {
+          final tickX = (i / divisions!) * size.width;
+          if (tickX > inactiveStart + 4 && tickX < size.width - 4) {
+            canvas.drawCircle(Offset(tickX, centerY), 1.4, tickPaint);
+          }
+        }
+      }
     }
 
     // 2. Active foreground progress track (from 0 to thumb)
@@ -377,7 +390,7 @@ class _PulsrSliderPainter extends CustomPainter {
       final activePaint = Paint()
         ..shader = LinearGradient(
           colors: [
-            activeColor.withValues(alpha: 0.82),
+            activeColor.withValues(alpha: 0.80),
             activeColor,
           ],
           begin: Alignment.centerLeft,
@@ -388,25 +401,23 @@ class _PulsrSliderPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round;
 
-      if (!isWavy || thumbX < 14.0) {
-        // Flat straight line for short segments or non-wavy mode
+      if (!isWavy || thumbX < 16.0) {
         canvas.drawLine(
             Offset(0, centerY), Offset(thumbX, centerY), activePaint);
       } else {
-        final wavePath = Path();
-        wavePath.moveTo(0, centerY);
+        final wavePath = Path()..moveTo(0, centerY);
 
         const wavelength = 26.0;
-        final amplitude = 3.5 + (2.0 * expandFactor);
-        const fadeDistance = 14.0;
-        const step = 2.5;
+        final amplitude = 3.2 + (2.2 * expandFactor);
+        const fadeDistance = 16.0;
+        const step = 2.0;
 
         for (double x = 0; x <= thumbX; x += step) {
           double env = 1.0;
           if (x < fadeDistance) {
-            env = (x / fadeDistance);
+            env = _smoothstep(x / fadeDistance);
           } else if (thumbX - x < fadeDistance) {
-            env = ((thumbX - x) / fadeDistance).clamp(0.0, 1.0);
+            env = _smoothstep((thumbX - x) / fadeDistance);
           }
           final y = centerY +
               amplitude * env * sin((x / wavelength) * 2 * pi - wavePhase);
@@ -414,9 +425,8 @@ class _PulsrSliderPainter extends CustomPainter {
         }
         wavePath.lineTo(thumbX, centerY);
 
-        // Soft luminous glow underneath active wave
         final waveGlowPaint = Paint()
-          ..color = activeColor.withValues(alpha: 0.20 + (0.16 * expandFactor))
+          ..color = activeColor.withValues(alpha: 0.18 + (0.18 * expandFactor))
           ..style = PaintingStyle.stroke
           ..strokeWidth = trackHeight + 3.5
           ..strokeCap = StrokeCap.round
@@ -428,15 +438,16 @@ class _PulsrSliderPainter extends CustomPainter {
       }
     }
 
-    // 3. Subtle glow behind the thumb
+    // 3. Ambient halo behind thumb
     final glowPaint = Paint()
-      ..color = glowColor.withValues(alpha: 0.25 + (0.35 * expandFactor))
+      ..color = glowColor.withValues(alpha: 0.22 + (0.36 * expandFactor))
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(thumbX, centerY), thumbRadius + 5, glowPaint);
+    canvas.drawCircle(Offset(thumbX, centerY),
+        thumbRadius + 4.5 + (2.0 * expandFactor), glowPaint);
 
-    // 4. Drop shadow for thumb elevation
+    // 4. Elevation drop shadow
     final shadowPaint = Paint()
-      ..color = AppColors.scrimAt(0.3)
+      ..color = AppColors.scrimAt(0.32)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
     canvas.drawCircle(Offset(thumbX, centerY + 1.5), thumbRadius, shadowPaint);
 
@@ -448,16 +459,18 @@ class _PulsrSliderPainter extends CustomPainter {
 
     // 6. Crisp outer accent ring
     final ringPaint = Paint()
-      ..color = activeColor.withValues(alpha: 0.85)
+      ..color = activeColor.withValues(alpha: 0.90)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.8;
     canvas.drawCircle(Offset(thumbX, centerY), thumbRadius, ringPaint);
+
     if (isRtl) canvas.restore();
   }
 
   @override
   bool shouldRepaint(_PulsrSliderPainter old) =>
       old.t != t ||
+      old.divisions != divisions ||
       old.expandFactor != expandFactor ||
       old.wavePhase != wavePhase ||
       old.isWavy != isWavy ||

@@ -272,7 +272,7 @@ class YtmErrorClassifier {
   /// track. The trailing lookahead keeps it off longer runs like `1400` and
   /// `500x500`.
   static final RegExp _httpStatusPattern = RegExp(
-    r'(?:https?|status(?:\s*code)?|response(?:\s*code)?|code|err(?:or)?|[a-z]_)'
+    r'(?:https?|status(?:\s*code)?|response(?:\s*code)?|code|err(?:or)?|ytm_|http_)'
     r'[^0-9]{0,4}([1-5]\d{2})(?![0-9a-z])',
     caseSensitive: false,
   );

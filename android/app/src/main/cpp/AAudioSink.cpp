@@ -3,7 +3,9 @@
 
 #include <android/log.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <thread>
 #include <time.h>
@@ -131,9 +133,10 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     }
     lastXRunCount_.store(AAudioStream_getXRunCount(stream), std::memory_order_relaxed);
     disconnected_.store(false, std::memory_order_release);
+    lastWriteResult_.store(AAUDIO_OK, std::memory_order_relaxed);
 
-    // Pre-reserve volume scratch buffer to prevent audio-thread allocation
-    volumeScratch_.reserve(static_cast<size_t>(bytesPerFrame_ * config_.sampleRate));
+    // Pre-allocate volume scratch buffer under streamMutex_ to prevent audio-thread allocation
+    volumeScratch_.resize(static_cast<size_t>(bytesPerFrame_ * config_.sampleRate));
 
     const aaudio_result_t sr = AAudioStream_requestStart(stream);
     if (sr != AAUDIO_OK) {
@@ -155,7 +158,7 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
     config_ = config;
     bytesPerFrame_ =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);
-    bitPerfect_ = config_.preferExclusive || config_.encoding == Encoding::I24Packed;
+    bitPerfect_ = config_.preferExclusive;
     if (bytesPerFrame_ <= 0 || config_.sampleRate <= 0 ||
         config_.channelCount <= 0 || config_.channelCount > 8) {
         lastError_ = "invalid config";
@@ -288,46 +291,75 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     AAudioStream* st = stream_.load(std::memory_order_acquire);
     if (st == nullptr || releasing_.load(std::memory_order_acquire)) return -1;
 
-    const uint8_t* src = data;
-    int32_t remaining = sizeBytes;
-
     const float curVol = volume_.load(std::memory_order_relaxed);
-    if (!bitPerfect_ && curVol != 1.0f) {
-        // Grow the scratch to fit abnormally large blocks instead of silently
-        // writing the block at full scale (a surprise-loudness defect).
-        if (static_cast<size_t>(remaining) > volumeScratch_.capacity()) {
-            volumeScratch_.reserve(static_cast<size_t>(remaining));
-        }
-        volumeScratch_.resize(static_cast<size_t>(remaining));
-        std::memcpy(volumeScratch_.data(), src, static_cast<size_t>(remaining));
-        if (config_.encoding == Encoding::Float) {
-            float* f = reinterpret_cast<float*>(volumeScratch_.data());
-            const int n = remaining / static_cast<int32_t>(sizeof(float));
-            for (int i = 0; i < n; ++i) f[i] *= curVol;
-            src = volumeScratch_.data();
-        } else if (config_.encoding == Encoding::Int16) {
-            int16_t* s = reinterpret_cast<int16_t*>(volumeScratch_.data());
-            const int n = remaining / static_cast<int32_t>(sizeof(int16_t));
-            for (int i = 0; i < n; ++i) {
-                float v = static_cast<float>(s[i]) * curVol;
-                v = v < -32768.0f ? -32768.0f
-                                  : (v > 32767.0f ? 32767.0f : v);
-                s[i] = static_cast<int16_t>(v);
-            }
-            src = volumeScratch_.data();
+    const bool applyVol = (!bitPerfect_ && curVol != 1.0f);
+
+    alignas(16) uint8_t stackScratch[2048];
+    uint8_t* scratchPtr = nullptr;
+    int32_t maxChunkFrames = 0;
+
+    if (applyVol) {
+        if (volumeScratch_.size() >= static_cast<size_t>(bytesPerFrame_)) {
+            scratchPtr = volumeScratch_.data();
+            maxChunkFrames = static_cast<int32_t>(volumeScratch_.size() / bytesPerFrame_);
+        } else {
+            scratchPtr = stackScratch;
+            maxChunkFrames = static_cast<int32_t>(sizeof(stackScratch) / bytesPerFrame_);
         }
     }
 
-    int32_t framesLeft = remaining / bytesPerFrame_;
-    const uint8_t* cursor = src;
+    const int32_t totalFrames = sizeBytes / bytesPerFrame_;
+    int32_t framesLeft = totalFrames;
+    const uint8_t* inCursor = data;
     int retries = 0;
     constexpr int kMaxRetries = 10;
+
     while (framesLeft > 0) {
         if (releasing_.load(std::memory_order_acquire) || stream_.load(std::memory_order_acquire) == nullptr) break;
-        aaudio_result_t w = AAudioStream_write(st, cursor, framesLeft,
-                                               kWriteTimeoutNs);
+
+        const uint8_t* writeSrc = inCursor;
+        int32_t framesToWrite = framesLeft;
+
+        if (applyVol && maxChunkFrames > 0) {
+            framesToWrite = std::min(framesLeft, maxChunkFrames);
+            const int32_t chunkBytes = framesToWrite * bytesPerFrame_;
+            std::memcpy(scratchPtr, inCursor, static_cast<size_t>(chunkBytes));
+
+            if (config_.encoding == Encoding::Float) {
+                float* f = reinterpret_cast<float*>(scratchPtr);
+                const int n = chunkBytes / static_cast<int32_t>(sizeof(float));
+                for (int i = 0; i < n; ++i) {
+                    f[i] *= curVol;
+                }
+            } else if (config_.encoding == Encoding::Int16) {
+                int16_t* s = reinterpret_cast<int16_t*>(scratchPtr);
+                const int n = chunkBytes / static_cast<int32_t>(sizeof(int16_t));
+                for (int i = 0; i < n; ++i) {
+                    float v = static_cast<float>(s[i]) * curVol;
+                    v = std::clamp(v, -32768.0f, 32767.0f);
+                    s[i] = static_cast<int16_t>(std::lrintf(v));
+                }
+            } else if (config_.encoding == Encoding::I24Packed) {
+                const int numSamples = chunkBytes / 3;
+                for (int i = 0; i < numSamples; ++i) {
+                    uint8_t* p = scratchPtr + i * 3;
+                    const int32_t raw = static_cast<int32_t>(p[0]) |
+                                        (static_cast<int32_t>(p[1]) << 8) |
+                                        (static_cast<int32_t>(static_cast<int8_t>(p[2])) << 16);
+                    float v = static_cast<float>(raw) * curVol;
+                    v = std::clamp(v, -8388608.0f, 8388607.0f);
+                    const int32_t scaled = std::lrintf(v);
+                    p[0] = static_cast<uint8_t>(scaled & 0xFF);
+                    p[1] = static_cast<uint8_t>((scaled >> 8) & 0xFF);
+                    p[2] = static_cast<uint8_t>((scaled >> 16) & 0xFF);
+                }
+            }
+            writeSrc = scratchPtr;
+        }
+
+        aaudio_result_t w = AAudioStream_write(st, writeSrc, framesToWrite, kWriteTimeoutNs);
         if (w > 0) {
-            cursor += w * bytesPerFrame_;
+            inCursor += w * bytesPerFrame_;
             framesLeft -= w;
             framesWritten_.fetch_add(w, std::memory_order_relaxed);
             retries = 0;
@@ -338,13 +370,12 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
             disconnected_.store(true, std::memory_order_release);
             break;
         } else {
-            lastError_ = std::string("write: ") + AAudio_convertResultToText(w);
-            LOGE("AAudio write failed: %s", lastError_.c_str());
+            lastWriteResult_.store(w, std::memory_order_relaxed);
             break;
         }
     }
 
-    const int32_t framesWritten = (remaining / bytesPerFrame_) - framesLeft;
+    const int32_t framesWritten = totalFrames - framesLeft;
     return framesWritten > 0 ? (framesWritten * bytesPerFrame_) : (framesLeft == 0 ? sizeBytes : -1);
 }
 
@@ -365,6 +396,8 @@ void AAudioSink::Flush() {
     AAudioStream* st = stream_.load(std::memory_order_acquire);
     if (st == nullptr) return;
     AAudioStream_requestPause(st);
+    aaudio_stream_state_t nextState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_PAUSING, &nextState, 100000000LL);
     // requestFlush is unsupported on some MMAP streams; ignore the result.
     AAudioStream_requestFlush(st);
     readBase_ = AAudioStream_getFramesRead(st);
@@ -395,7 +428,7 @@ int64_t AAudioSink::FramesWritten() const {
     const int64_t written = framesWritten_.load(std::memory_order_relaxed);
     const int64_t base = framesWrittenBase_.load(std::memory_order_relaxed);
     return written > base ? written - base
-                                        : 0;
+                          : 0;
 }
 
 bool AAudioSink::HasPendingData() const {
@@ -475,14 +508,17 @@ int64_t AAudioSink::GetTimestampLatencyFrames() const {
                 ? static_cast<int64_t>(static_cast<double>(elapsedNs) * 1e-9 * sr)
                 : 0;
             const int64_t dacPos = framePosition + elapsedFrames;
-            const int64_t written = framesWritten_.load(std::memory_order_relaxed);
-            latency = (written > dacPos) ? (written - dacPos) : 0;
+            const int64_t netWritten = FramesWritten();
+            const int64_t base = readBase_.load(std::memory_order_relaxed);
+            const int64_t offset = readOffset_.load(std::memory_order_relaxed);
+            const int64_t effectiveDacPos = offset + ((dacPos > base) ? (dacPos - base) : 0);
+            latency = (netWritten > effectiveDacPos) ? (netWritten - effectiveDacPos) : 0;
         } else {
             // Negative capacity fallback when timestamp is unavailable
             latency = -static_cast<int64_t>(AAudioStream_getBufferCapacityInFrames(st));
         }
     } else {
-        latency = -static_cast<int64_t>(BufferCapacityFrames());
+        latency = -static_cast<int64_t>((static_cast<int64_t>(config_.sampleRate) * std::max(config_.targetBufferMs, 20)) / 1000);
     }
     activeReaders_.fetch_sub(1, std::memory_order_release);
     return latency;

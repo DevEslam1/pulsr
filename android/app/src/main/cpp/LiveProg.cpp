@@ -6,11 +6,14 @@
 #include <algorithm>
 #include <functional>
 #include <sstream>
+#include <charconv>
+#include <locale>
 
 namespace {
 
 enum class TokenType {
     End,
+    Invalid,
     Number,
     Ident,
     Plus,
@@ -58,6 +61,7 @@ public:
 
     Token next() {
         skipWhitespace();
+        if (unclosedComment_) return {TokenType::Invalid, 0.0, "unclosed block comment"};
         if (pos_ >= src_.size()) return {TokenType::End, 0.0, ""};
 
         char c = src_[pos_];
@@ -89,7 +93,13 @@ public:
                     ++pos_;
                 }
             }
-            double val = std::strtod(src_.c_str() + start, nullptr);
+            double val = 0.0;
+            auto [ptr, ec] = std::from_chars(src_.data() + start, src_.data() + pos_, val);
+            if (ec != std::errc()) {
+                std::istringstream iss(src_.substr(start, pos_ - start));
+                iss.imbue(std::locale::classic());
+                iss >> val;
+            }
             return {TokenType::Number, val, ""};
         }
 
@@ -123,7 +133,7 @@ public:
             default: break;
         }
 
-        return {TokenType::End, 0.0, ""};
+        return {TokenType::Invalid, 0.0, std::string(1, c)};
     }
 
 private:
@@ -136,8 +146,20 @@ private:
                 while (pos_ < src_.size() && src_[pos_] != '\n') ++pos_;
             } else if (src_[pos_] == '/' && pos_ + 1 < src_.size() && src_[pos_ + 1] == '*') {
                 pos_ += 2;
-                while (pos_ + 1 < src_.size() && !(src_[pos_] == '*' && src_[pos_ + 1] == '/')) ++pos_;
-                pos_ += 2;
+                bool closed = false;
+                while (pos_ + 1 < src_.size()) {
+                    if (src_[pos_] == '*' && src_[pos_ + 1] == '/') {
+                        pos_ += 2;
+                        closed = true;
+                        break;
+                    }
+                    ++pos_;
+                }
+                if (!closed) {
+                    pos_ = src_.size();
+                    unclosedComment_ = true;
+                    break;
+                }
             } else {
                 break;
             }
@@ -146,6 +168,7 @@ private:
 
     const std::string& src_;
     size_t pos_;
+    bool unclosedComment_ = false;
 };
 
 int getFunctionId(const std::string& name) {
@@ -232,17 +255,11 @@ int LiveProg::getOrRegisterVar(const std::string& name) {
 }
 
 void LiveProg::reset() {
-    if (isCompiled_ && (enabled_ || smoothedEnabledMix_ >= 1e-4f) && !sampleBytecode_.empty()) {
-        prevSampleBytecode_ = sampleBytecode_;
-        prevMemory_ = memory_;
-        prevIdxSpl0_ = idxSpl0_;
-        prevIdxSpl1_ = idxSpl1_;
-        programCrossfadeProgress_ = 0.0f;
-    } else {
-        prevSampleBytecode_.clear();
-        prevMemory_.clear();
-        programCrossfadeProgress_ = 1.0f;
-    }
+    prevSampleBytecode_.clear();
+    prevMemory_.clear();
+    prevIdxSpl0_ = -1;
+    prevIdxSpl1_ = -1;
+    programCrossfadeProgress_ = 1.0f;
     smoothedEnabledMix_ = (enabled_ && isCompiled_ && !sampleBytecode_.empty()) ? 1.0f : 0.0f;
     for (size_t i = 0; i < memory_.size(); ++i) {
         if (static_cast<int>(i) != idxSrate_) {
@@ -281,11 +298,15 @@ void LiveProg::applyParams(const LiveProgParamSet& params) {
     // Preferred path: the script was compiled off the audio thread and packaged
     // into the snapshot. Applying it only copies bytecode (pre-reserved) and
     // resizes pre-reserved memory, so the audio callback never compiles/allocates.
+    const double initialSliders[8] = {
+        params.slider1, params.slider2, params.slider3, params.slider4,
+        params.slider5, params.slider6, params.slider7, params.slider8
+    };
     if (params.program && params.program != activeProgram_) {
         // Do not copy params.code here: this runs on the audio thread and
         // std::string assignment can heap-allocate. The compiled program is
         // the only thing the audio path needs.
-        applyPreparedProgram(params.program);
+        applyPreparedProgram(params.program, initialSliders);
     } else if (!params.program && activeProgram_) {
         applyPreparedProgram(nullptr);
     }
@@ -324,7 +345,7 @@ std::shared_ptr<const LiveProgProgram> LiveProg::buildProgram() const {
     return p;
 }
 
-void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>& program) {
+void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>& program, const double* initialSliders) {
     if (!program) {
         if (isCompiled_ && (enabled_ || smoothedEnabledMix_ >= 1e-4f) && !sampleBytecode_.empty()) {
             prevSampleBytecode_ = sampleBytecode_;
@@ -346,7 +367,6 @@ void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>
         for (int i = 0; i < 8; ++i) idxSliders_[i] = -1;
         memory_.clear();
         isCompiled_ = false;
-        reset();
         return;
     }
     activeProgram_ = program;
@@ -408,6 +428,14 @@ void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>
     if (idxSrate_ >= 0 && idxSrate_ < static_cast<int>(memory_.size())) {
         memory_[idxSrate_] = sampleRate_;
     }
+    if (initialSliders) {
+        for (int i = 0; i < 8; ++i) {
+            int vIdx = idxSliders_[i];
+            if (vIdx >= 0 && vIdx < static_cast<int>(memory_.size())) {
+                memory_[vIdx] = initialSliders[i];
+            }
+        }
+    }
     if (!initBytecode_.empty()) {
         executeBytecode(initBytecode_, memory_);
     }
@@ -442,7 +470,9 @@ bool LiveProg::loadCode(const std::string& scriptCode) {
     if (ok) {
         auto newProg = buildProgram();
         activeProgram_ = newProg;
-        applyPreparedProgram(newProg);
+        double curSliders[8] = {};
+        for (int i = 0; i < 8; ++i) curSliders[i] = getSlider(i + 1);
+        applyPreparedProgram(newProg, curSliders);
         if (hadActive) {
             prevSampleBytecode_.assign(oldSampleBytecode.begin(), oldSampleBytecode.end());
             prevMemory_.assign(oldMemory.begin(), oldMemory.end());
@@ -571,6 +601,10 @@ bool LiveProg::compileScript(const std::string& code) {
                 outProgram.push_back({OpCode::Neg});
                 return true;
             }
+            if (cur.type == TokenType::Invalid) {
+                lastError_ = "Invalid token: " + cur.strVal;
+                return false;
+            }
             lastError_ = "Unexpected token in expression";
             return false;
         };
@@ -653,6 +687,10 @@ bool LiveProg::compileScript(const std::string& code) {
                 return false;
             }
             if (match(TokenType::Semi)) return true;
+            if (cur.type == TokenType::Invalid) {
+                lastError_ = "Invalid token: " + cur.strVal;
+                return false;
+            }
 
             if (cur.type == TokenType::If) {
                 cur = lexer.next();

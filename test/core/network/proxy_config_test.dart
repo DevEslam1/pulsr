@@ -22,7 +22,7 @@ void main() {
       expect(config.isValid, true);
       expect(
         config.toFindProxyString(Uri.parse('https://music.youtube.com/search')),
-        'PROXY 127.0.0.1:8080; DIRECT',
+        'PROXY 127.0.0.1:8080',
       );
     });
 
@@ -61,7 +61,7 @@ void main() {
       expect(config.toFindProxyString(Uri.parse('http://localhost:3000')),
           'DIRECT');
       expect(config.toFindProxyString(Uri.parse('https://music.youtube.com')),
-          'PROXY 127.0.0.1:8080; DIRECT');
+          'PROXY 127.0.0.1:8080');
     });
 
     test('serialization to and from Map preserves all fields', () {

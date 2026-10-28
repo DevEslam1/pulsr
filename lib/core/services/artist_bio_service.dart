@@ -37,6 +37,7 @@ class ArtistBioService {
       : _client = client ?? http.Client(),
         _ownsClient = client == null;
 
+  @disposeMethod
   void dispose() {
     if (_ownsClient) {
       _client.close();
@@ -120,10 +121,18 @@ class ArtistBioService {
           final list = data['data'] as List<dynamic>?;
           if (list != null && list.isNotEmpty) {
             final first = list.first;
-            pictureUrl = first['picture_xl'] ??
-                first['picture_big'] ??
-                first['picture_medium'];
-            fanCount = (first['nb_fan'] as num?)?.toInt();
+            final returnedName =
+                (first['name'] as String?)?.trim().toLowerCase();
+            final matches = returnedName == null ||
+                returnedName == key ||
+                returnedName.contains(key) ||
+                key.contains(returnedName);
+            if (matches) {
+              pictureUrl = first['picture_xl'] ??
+                  first['picture_big'] ??
+                  first['picture_medium'];
+              fanCount = (first['nb_fan'] as num?)?.toInt();
+            }
           }
         } catch (_) {}
       }
@@ -131,9 +140,87 @@ class ArtistBioService {
       String? bio;
       if (wikiRes.statusCode == 200 && wikiRes.body.isNotEmpty) {
         try {
-          final wikiData = json.decode(wikiRes.body);
+          dynamic wikiData = json.decode(wikiRes.body);
+          if (wikiData is Map && wikiData['type'] == 'disambiguation') {
+            for (final suffix in ['_(band)', '_(musician)']) {
+              final fbTitle =
+                  '${cleanName.replaceAll(RegExp(r'\s+'), '_')}$suffix';
+              final fbUri = Uri.parse(
+                  'https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(fbTitle)}');
+              try {
+                final fbRes = await _client.get(
+                  fbUri,
+                  headers: {
+                    'User-Agent':
+                        'PulsrMusic/${AppConfig.appVersion} (https://github.com/DevEslam1)',
+                  },
+                ).timeout(const Duration(seconds: 4));
+                if (fbRes.statusCode == 200 && fbRes.body.isNotEmpty) {
+                  final fbData = json.decode(fbRes.body);
+                  if (fbData is Map && fbData['type'] != 'disambiguation') {
+                    wikiData = fbData;
+                    break;
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+
           if (wikiData is Map && wikiData['type'] != 'disambiguation') {
-            bio = wikiData['extract'] as String?;
+            final desc =
+                (wikiData['description'] as String?)?.toLowerCase() ?? '';
+            final extract =
+                (wikiData['extract'] as String?)?.toLowerCase() ?? '';
+            final isSingleWord = !cleanName.contains(RegExp(r'\s+'));
+            const musicKeywords = [
+              'music',
+              'band',
+              'singer',
+              'song',
+              'musician',
+              'rapper',
+              'artist',
+              'album',
+              'composer',
+              'orchestra',
+              'record',
+              'vocalist',
+              'dj',
+              'guitarist',
+              'drummer',
+              'producer',
+            ];
+            const nonMusicTopics = [
+              'village',
+              'commune',
+              'town',
+              'city',
+              'species',
+              'genus',
+              'plant',
+              'river',
+              'mountain',
+              'island',
+              'film',
+              'novel',
+              'book',
+              'company',
+              'corporation',
+              'aircraft',
+              'ship',
+              'automobile',
+            ];
+            final hasMusic = musicKeywords
+                .any((k) => desc.contains(k) || extract.contains(k));
+            final isClearlyUnrelated = nonMusicTopics.any((topic) =>
+                desc.startsWith(topic) ||
+                desc.contains('$topic in ') ||
+                desc.contains('$topic of '));
+
+            if (!isSingleWord ||
+                (!isClearlyUnrelated && (hasMusic || desc.isEmpty))) {
+              bio = wikiData['extract'] as String?;
+            }
           }
         } catch (_) {}
       }

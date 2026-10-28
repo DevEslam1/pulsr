@@ -109,9 +109,10 @@ class AppHttpOverrides extends HttpOverrides {
         if (_config.type == AppProxyType.socks5) {
           final bridgePort = _socks5BridgeServer?.port;
           if (bridgePort != null) {
-            return 'PROXY 127.0.0.1:$bridgePort; DIRECT';
+            return 'PROXY 127.0.0.1:$bridgePort';
           }
           unawaited(ensureSocks5Bridge());
+          return 'PROXY 127.0.0.1:9';
         }
         return _config.toFindProxyString(uri);
       }
@@ -522,13 +523,18 @@ class AppHttpOverrides extends HttpOverrides {
         upstreamSocket = tunnel.socket;
         upstreamReader = tunnel.reader;
 
-        final rewrittenLines = <String>[
+        final trimmedLines = List<String>.from(lines);
+        while (trimmedLines.isNotEmpty && trimmedLines.last.isEmpty) {
+          trimmedLines.removeLast();
+        }
+        final filteredHeaders = trimmedLines.skip(1).where(
+              (l) => l.isNotEmpty && !l.toLowerCase().startsWith('proxy-'),
+            );
+        final rewrittenHeader = [
           '$method $pathWithQuery $httpVersion',
-          ...lines.skip(1).where(
-                (l) => !l.toLowerCase().startsWith('proxy-'),
-              ),
-        ];
-        upstreamSocket.add(latin1.encode(rewrittenLines.join('\r\n')));
+          ...filteredHeaders,
+        ].join('\r\n');
+        upstreamSocket.add(latin1.encode('$rewrittenHeader\r\n\r\n'));
         await upstreamSocket.flush();
 
         clientReader.forwardTo(upstreamSocket);
@@ -647,6 +653,18 @@ class _SocketByteReader {
           return;
         }
         _buffer.addAll(chunk);
+        if (_waitHeaderEnd &&
+            _availableBytes > 65536 &&
+            _findHeaderEndIndex() == -1) {
+          _error = const SocketException('HTTP header exceeds 64 KB limit');
+          if (_waitCompleter != null && !_waitCompleter!.isCompleted) {
+            _waitCompleter!.completeError(
+              const SocketException('HTTP header exceeds 64 KB limit'),
+            );
+            _waitCompleter = null;
+          }
+          return;
+        }
         if (_waitCompleter != null) {
           if (_waitHeaderEnd && _findHeaderEndIndex() != -1) {
             if (!_waitCompleter!.isCompleted) _waitCompleter!.complete();
@@ -674,9 +692,10 @@ class _SocketByteReader {
       onDone: () {
         final target = _forwardTarget;
         if (target != null) {
-          try {
-            target.destroy();
-          } catch (_) {}
+          target
+              .flush()
+              .then((_) => target.close())
+              .catchError((_) => target.destroy());
           return;
         }
         _isDone = true;
@@ -704,12 +723,21 @@ class _SocketByteReader {
 
   Future<List<int>> readUntilHeaderEnd(Duration timeout) async {
     _checkAndRethrowError();
+    if (_availableBytes > 65536 && _findHeaderEndIndex() == -1) {
+      throw const SocketException('HTTP header exceeds 64 KB limit');
+    }
     var endIdx = _findHeaderEndIndex();
     if (endIdx != -1) {
+      if (endIdx - _offset > 65536) {
+        throw const SocketException('HTTP header exceeds 64 KB limit');
+      }
       final res = _buffer.sublist(_offset, endIdx);
       _offset = endIdx;
       _compactBufferIfNeeded();
       return res;
+    }
+    if (_availableBytes > 65536) {
+      throw const SocketException('HTTP header exceeds 64 KB limit');
     }
     if (_isDone) {
       throw const SocketException('Connection closed before HTTP header end');
@@ -725,7 +753,13 @@ class _SocketByteReader {
     _checkAndRethrowError();
     endIdx = _findHeaderEndIndex();
     if (endIdx == -1) {
+      if (_availableBytes > 65536) {
+        throw const SocketException('HTTP header exceeds 64 KB limit');
+      }
       throw const SocketException('Incomplete HTTP header received');
+    }
+    if (endIdx - _offset > 65536) {
+      throw const SocketException('HTTP header exceeds 64 KB limit');
     }
     final res = _buffer.sublist(_offset, endIdx);
     _offset = endIdx;
@@ -746,7 +780,10 @@ class _SocketByteReader {
       }
     }
     if (_isDone) {
-      target.destroy();
+      target
+          .flush()
+          .then((_) => target.close())
+          .catchError((_) => target.destroy());
       return;
     }
     _forwardTarget = target;

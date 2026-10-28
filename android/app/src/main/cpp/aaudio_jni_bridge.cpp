@@ -9,6 +9,7 @@
 #include <jni.h>
 
 #include <mutex>
+#include <new>
 #include <shared_mutex>
 #include <string>
 
@@ -35,33 +36,8 @@ struct SinkReadLock {
     std::shared_lock<std::shared_mutex> lock{gSinkLifecycleMutex};
 };
 
-}  // namespace
-
-extern "C" JNIEXPORT jlong JNICALL
-Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeOpen(
-    JNIEnv* /*env*/, jclass /*clazz*/, jint sampleRate, jint channelCount,
-    jint encoding, jboolean preferExclusive, jint targetBufferMs) {
-    AAudioSink::Config cfg;
-    cfg.sampleRate = sampleRate;
-    cfg.channelCount = channelCount;
-    cfg.encoding = static_cast<AAudioSink::Encoding>(encoding);
-    cfg.preferExclusive = preferExclusive == JNI_TRUE;
-    cfg.targetBufferMs = targetBufferMs;
-    auto* sink = new (std::nothrow) AAudioSink();
-    if (sink == nullptr) return 0;
-    std::string error;
-    if (!sink->Open(cfg, &error)) {
-        LOGW("nativeOpen failed: %s", error.c_str());
-        delete sink;
-        return 0;
-    }
-    return reinterpret_cast<jlong>(sink);
-}
-
-extern "C" JNIEXPORT jlong JNICALL
-Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeOpenForDevice(
-    JNIEnv* /*env*/, jclass /*clazz*/, jint sampleRate, jint channelCount,
-    jint encoding, jboolean preferExclusive, jint targetBufferMs, jint deviceId) {
+static jlong OpenSinkInternal(jint deviceId, jint sampleRate, jint channelCount,
+                              jint encoding, jboolean preferExclusive, jint targetBufferMs) {
     AAudioSink::Config cfg;
     cfg.deviceId = deviceId;
     cfg.sampleRate = sampleRate;
@@ -73,11 +49,27 @@ Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeOpenForDevice(
     if (sink == nullptr) return 0;
     std::string error;
     if (!sink->Open(cfg, &error)) {
-        LOGW("nativeOpen failed: %s", error.c_str());
+        LOGW("OpenSinkInternal failed: %s", error.c_str());
         delete sink;
         return 0;
     }
     return reinterpret_cast<jlong>(sink);
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeOpen(
+    JNIEnv* /*env*/, jclass /*clazz*/, jint sampleRate, jint channelCount,
+    jint encoding, jboolean preferExclusive, jint targetBufferMs) {
+    return OpenSinkInternal(0, sampleRate, channelCount, encoding, preferExclusive, targetBufferMs);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeOpenForDevice(
+    JNIEnv* /*env*/, jclass /*clazz*/, jint sampleRate, jint channelCount,
+    jint encoding, jboolean preferExclusive, jint targetBufferMs, jint deviceId) {
+    return OpenSinkInternal(deviceId, sampleRate, channelCount, encoding, preferExclusive, targetBufferMs);
 }
 
 extern "C" JNIEXPORT void JNICALL

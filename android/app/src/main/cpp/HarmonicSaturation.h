@@ -36,7 +36,7 @@ public:
                (modeCrossfadeProgress_ < 1.0f);
     }
     int getLatencyFrames() const {
-        return (enabled_ || smoothedEnabledMix_ >= 1e-4f) && k_ > 1e-9 ? DRY_DELAY : 0;
+        return (enabled_ || smoothedEnabledMix_ >= 1e-4f) ? DRY_DELAY : 0;
     }
     bool isMultiband() const { return multiband_; }
     void applyParams(const SaturationParamSet& params);
@@ -50,6 +50,9 @@ public:
 
 private:
     void smoothParameters(int frames);
+    inline void processFrameStereo(float inL, float inR, float& outL, float& outR,
+                                   float currentEnabledMix, double k, float mix,
+                                   float tilt, float hpCoeff, int mode, float invNorm);
 
     static constexpr int OVERSAMPLE_FACTOR = 4;
     // FIX M-23: lengthened the anti-alias polyphase FIR from 24 to 32 taps

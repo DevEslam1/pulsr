@@ -21,7 +21,6 @@ void DynamicBass::reset() {
     yHpMid_.reset();
     yLpMid_.reset();
     yLpSide_.reset();
-    xHpBass_.reset();
     xLpBass_.reset();
     envelope_ = 0.0;
     smoothedStrength_ = enabled_ ? strength_ : 0.0;
@@ -74,15 +73,6 @@ void DynamicBass::updateFilters() {
     yHpMid_.setHighPass(sampleRate_, static_cast<double>(yLow_), q);
     yLpMid_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
     yLpSide_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
-    // FIX C-5: the X-band defines the acoustic response range around the
-    // boosted Y band. The X low-pass is the only X filter applied to the signal
-    // path (see processInterleaved); it is clamped up to yHigh so it stays
-    // transparent over the boosted band. The X high-pass is retained/configured
-    // for completeness but is not cascaded after the Y band-pass — every preset
-    // has xLow > yHigh, so it would reject the whole Y band and silence the
-    // stage. Clamp it to the Y low edge so any future use cannot do so either.
-    xHpBass_.setHighPass(sampleRate_, std::min<double>(static_cast<double>(xLow_),
-                                                       static_cast<double>(yLow_)), q);
     xLpBass_.setLowPass(sampleRate_, std::max<double>(static_cast<double>(xHigh_),
                                                       static_cast<double>(yHigh_)), q);
 }
@@ -90,12 +80,6 @@ void DynamicBass::updateFilters() {
 void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
     if (paramsChanged_.load(std::memory_order_acquire)) {
         const bool presetChanged = (pendingDevicePreset_ != devicePreset_);
-        // FIX M-19: snapshot the current cutoffs so a live cutoff change (not
-        // just a preset switch) can clear the biquad states. updateFilters()
-        // rewrites the coefficients; keeping the old delay registers against new
-        // coefficients produces a transient/click (same reason
-        // LinkwitzRiley4::configure resets on retune).
-        const int oldXLow = xLow_, oldXHigh = xHigh_, oldYLow = yLow_, oldYHigh = yHigh_;
         enabled_ = pendingEnabled_;
         devicePreset_ = pendingDevicePreset_;
 
@@ -112,19 +96,8 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
 
         strength_ = std::clamp(pendingStrength_, 0.0, 8.0);
         updateFilters();
-        const bool cutoffChanged = (xLow_ != oldXLow) || (xHigh_ != oldXHigh) ||
-                                   (yLow_ != oldYLow) || (yHigh_ != oldYHigh);
         if (presetChanged) {
             reset();
-        } else if (cutoffChanged) {
-            // FIX M-19: reset only the biquad delay registers (not the envelope
-            // or smoothed strength, which must stay continuous) so a live cutoff
-            // tweak does not click.
-            yHpMid_.reset();
-            yLpMid_.reset();
-            yLpSide_.reset();
-            xHpBass_.reset();
-            xLpBass_.reset();
         }
         paramsChanged_.store(false, std::memory_order_release);
     }
@@ -141,6 +114,9 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     const double startStr = smoothedStrength_;
     smoothedStrength_ += smoothFactor * (targetStr - smoothedStrength_);
+    if (std::abs(smoothedStrength_ - targetStr) < 1e-4) {
+        smoothedStrength_ = targetStr;
+    }
     const double strStep = (smoothedStrength_ - startStr) / static_cast<double>(frames);
     double currentStr = startStr;
 
@@ -193,7 +169,7 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         // fades in with the effect and returns to unity — otherwise the stereo
         // width steps abruptly when the stage is disabled (the narrowing used to
         // run at full depth for the ~140 ms until the strength smoother reached 0).
-        const double strNorm = std::clamp((currentStr - 1.0) / 7.0, 0.0, 1.0);
+        const double strNorm = std::clamp(currentStr, 0.0, 1.0);
         const double effLow = 1.0 + strNorm * (sLow - 1.0);
         const double effHigh = 1.0 + strNorm * (sHigh - 1.0);
         const double sideLow = yLpSide_.process(S);

@@ -33,6 +33,30 @@ extension PulsrSafePush on BuildContext {
         return identical(a.first, b.first) && identical(a.last, b.last);
       }
     }
+    if (a is Map && b is Map) {
+      if (a.length != b.length) return false;
+      for (final entry in a.entries) {
+        if (!b.containsKey(entry.key)) return false;
+        final valA = entry.value;
+        final valB = b[entry.key];
+        if (identical(valA, valB)) continue;
+        if (valA is List && valB is List) {
+          if (valA.length != valB.length) return false;
+          if (valA.length > 20) {
+            if (valA.isNotEmpty &&
+                (!identical(valA.first, valB.first) ||
+                    !identical(valA.last, valB.last))) {
+              return false;
+            }
+          } else if (!_equality.equals(valA, valB)) {
+            return false;
+          }
+        } else if (valA != valB) {
+          return false;
+        }
+      }
+      return true;
+    }
     return _equality.equals(a, b);
   }
 
@@ -57,7 +81,16 @@ extension PulsrSafePush on BuildContext {
       _lastPushAt = null;
       _clearTimer = null;
     });
-    push<void>(location, extra: extra);
+    try {
+      push<void>(location, extra: extra);
+    } catch (_) {
+      _clearTimer?.cancel();
+      _clearTimer = null;
+      _lastLocation = null;
+      _lastExtra = null;
+      _lastPushAt = null;
+      rethrow;
+    }
     return true;
   }
 
