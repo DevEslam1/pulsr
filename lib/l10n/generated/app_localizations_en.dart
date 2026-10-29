@@ -8739,4 +8739,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get lyricsSharePickHint =>
       'Select 1 to 6 lines to create a 9:16 story card.';
+
+  @override
+  String get cassetteTapeType => 'TYPE II • CrO₂';
+
+  @override
+  String get cassetteEqSpec => '70µs EQ • HI-FI';
+
+  @override
+  String cdTrackNumber(String number) {
+    return 'TRK $number';
+  }
 }

@@ -15504,6 +15504,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select 1 to 6 lines to create a 9:16 story card.'**
   String get lyricsSharePickHint;
+
+  /// No description provided for @cassetteTapeType.
+  ///
+  /// In en, this message translates to:
+  /// **'TYPE II • CrO₂'**
+  String get cassetteTapeType;
+
+  /// No description provided for @cassetteEqSpec.
+  ///
+  /// In en, this message translates to:
+  /// **'70µs EQ • HI-FI'**
+  String get cassetteEqSpec;
+
+  /// Track number chip on the CD player theme.
+  ///
+  /// In en, this message translates to:
+  /// **'TRK {number}'**
+  String cdTrackNumber(String number);
 }
 
 class _AppLocalizationsDelegate

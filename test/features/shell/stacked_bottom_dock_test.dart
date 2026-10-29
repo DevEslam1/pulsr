@@ -125,9 +125,45 @@ void main() {
   });
 
   testWidgets(
-      'StackedBottomDock gestures: swipe down stacks, swipe down again swaps, swipe up restores',
+      'swipe down opens the dock style picker instead of silently restacking',
       (tester) async {
     DockStackMode currentMode = DockStackMode.defaultLayout;
+    var changes = 0;
+
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return buildTestWidget(
+            mode: currentMode,
+            onModeChanged: (newMode) {
+              changes++;
+              setState(() => currentMode = newMode);
+            },
+            hasSong: true,
+          );
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(currentMode, equals(DockStackMode.defaultLayout));
+
+    await tester.fling(find.text('Test Track'), const Offset(0, 300), 1000.0);
+    await tester.pumpAndSettle();
+
+    // The gesture is a request, not a mutation: the picker opens and the
+    // layout stays exactly where the user left it.
+    expect(changes, equals(0),
+        reason: 'a downward swipe must never change the dock layout on its own');
+    expect(find.text('Dock style'), findsOneWidget);
+
+    Navigator.of(tester.element(find.text('Dock style'))).pop();
+    await tester.pumpAndSettle();
+    expect(currentMode, equals(DockStackMode.defaultLayout));
+  });
+
+  testWidgets('swipe up un-stacks a stacked dock back to the resting layout',
+      (tester) async {
+    DockStackMode currentMode = DockStackMode.navBarOnTop;
 
     await tester.pumpWidget(
       StatefulBuilder(
@@ -144,44 +180,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // In default layout, song title is displayed and bottom nav bar is displayed
-    expect(find.text('Test Track'), findsOneWidget);
-    expect(find.byType(PulsrBottomNavBar), findsOneWidget);
-    expect(currentMode, equals(DockStackMode.defaultLayout));
-
-    // 1. Swipe down -> should transition to system mode
-    await tester.fling(find.text('Test Track'), const Offset(0, 300), 1000.0);
-    await tester.pumpAndSettle();
-    expect(currentMode, equals(DockStackMode.system));
-
-    // 2. Swipe down -> should transition to miniPlayerOnTop
-    await tester.fling(find.text('Test Track'), const Offset(0, 300), 1000.0);
-    await tester.pumpAndSettle();
-    expect(currentMode, equals(DockStackMode.miniPlayerOnTop));
-
-    // 2. Swipe down again -> should transition to navBarOnTop (replaces stack order)
     await tester.fling(
       find.byType(PulsrBottomNavBar),
-      const Offset(0, 300),
+      const Offset(0, -300),
       1000.0,
       warnIfMissed: false,
     );
     await tester.pumpAndSettle();
-    expect(currentMode, equals(DockStackMode.navBarOnTop));
 
-    // 3. Swipe down again -> should swap back to miniPlayerOnTop
-    await tester.fling(
-      find.byType(PulsrBottomNavBar),
-      const Offset(0, 300),
-      1000.0,
-      warnIfMissed: false,
-    );
-    await tester.pumpAndSettle();
-    expect(currentMode, equals(DockStackMode.miniPlayerOnTop));
-
-    // 4. Swipe up -> should restore defaultLayout
-    await tester.fling(find.text('Test Track'), const Offset(0, -300), 1000.0);
-    await tester.pumpAndSettle();
     expect(currentMode, equals(DockStackMode.defaultLayout));
   });
 

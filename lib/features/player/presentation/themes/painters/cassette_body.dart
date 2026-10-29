@@ -155,9 +155,9 @@ class _CassetteBody extends StatelessWidget {
                   letterSpacing: AppTracking.wide,
                 ),
               ),
-              const Text(
-                'TYPE II • CrO₂',
-                style: TextStyle(
+              Text(
+                context.l10n.cassetteTapeType,
+                style: const TextStyle(
                   fontSize: 8.5,
                   fontWeight: FontWeight.w700,
                   color: Colors.white60,
@@ -189,9 +189,9 @@ class _CassetteBody extends StatelessWidget {
                   letterSpacing: AppTracking.wide,
                 ),
               ),
-              const Text(
-                '70µs EQ • HI-FI',
-                style: TextStyle(
+              Text(
+                context.l10n.cassetteEqSpec,
+                style: const TextStyle(
                   fontSize: 8.5,
                   fontWeight: FontWeight.w700,
                   color: Colors.white60,

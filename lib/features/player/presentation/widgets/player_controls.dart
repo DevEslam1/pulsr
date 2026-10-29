@@ -292,7 +292,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                   },
                   child: AnimatedScale(
                     scale: _isPlayPressed ? 0.92 : 1.0,
-                    duration: Duration(milliseconds: _isPlayPressed ? 90 : 280),
+                    duration: context.motionMs(_isPlayPressed ? 90 : 280),
                     curve: _isPlayPressed
                         ? Curves.easeOutCubic
                         : Curves.easeOutBack,

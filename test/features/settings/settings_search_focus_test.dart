@@ -134,7 +134,7 @@ void main() {
     // Clearing returns to the category view.
     await tester.tap(find.descendant(
         of: find.byType(TextField),
-        matching: find.byIcon(Icons.clear_rounded)));
+        matching: find.byIcon(Icons.close_rounded)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text(l10n.settingsSearchCrossfadeTitle), findsNothing);

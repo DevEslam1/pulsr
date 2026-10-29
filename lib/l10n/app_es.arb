@@ -944,7 +944,7 @@
   "radioDirectoryEmpty": "No se encontraron emisoras",
   "radioDirectoryError": "No se pudo cargar el directorio de radio",
   "radioDirectoryAdded": "Añadida",
-"radioDirectoryUnreachable": "No se pudo acceder a esta emisión. Prueba otra emisora.",
+  "radioDirectoryUnreachable": "No se pudo acceder a esta emisión. Prueba otra emisora.",
   "radioCuratedAdded": "{count} emisoras seleccionadas añadidas",
   "@radioCuratedAdded": {
     "placeholders": {
@@ -2634,10 +2634,10 @@
     "description": "tranche7 quality"
   },
   "bpGuardrails": "Protecciones activas: DSP y ReplayGain omitidos. Usa el volumen del DAC cuando esté activo.",
-"bpChainVerified": "Cadena bit-perfect verificada",
-"bpChainResampled": "Se detectó remuestreo del sistema",
-"bpChainDepthReduced": "Profundidad de bits truncada",
-"bpChainInactive": "Bit-Perfect armado pero inactivo",
+  "bpChainVerified": "Cadena bit-perfect verificada",
+  "bpChainResampled": "Se detectó remuestreo del sistema",
+  "bpChainDepthReduced": "Profundidad de bits truncada",
+  "bpChainInactive": "Bit-Perfect armado pero inactivo",
   "@bpGuardrails": {
     "description": "tranche7 quality"
   },
@@ -4003,7 +4003,7 @@
   "browseNoChangesToSave": "No hay cambios que guardar",
   "browseNoGenresFound": "No se encontraron géneros",
   "browseNoRecommendations": "No hay recomendaciones en este momento.",
-"ytmCachedResults": "Se muestran resultados guardados de una búsqueda anterior.",
+  "ytmCachedResults": "Se muestran resultados guardados de una búsqueda anterior.",
   "browseNoResultsFound": "No se encontraron resultados",
   "browseNoSongsInLibrary": "No hay canciones en la biblioteca",
   "browseNoSongsMatch": "Ninguna canción coincide con",
@@ -4135,9 +4135,9 @@
   "errYtmPlaybackFailed": "Falló la reproducción. Inténtalo de nuevo.",
   "errYtmGeneric": "Algo salió mal con YouTube Music.",
   "errYtmRegionRestricted": "Esta pista está restringida en tu región.",
-"errYtmAgeRestricted": "Esta pista tiene restricción de edad (+18) en YouTube. Inicia sesión con una cuenta verificada o prueba otra subida.",
-"errYtmStreamFailed": "No se pudo cargar la emisión. Actualizando el enlace…",
-"errYtmStreamExpired": "El enlace de emisión caducó. Actualizando…",
+  "errYtmAgeRestricted": "Esta pista tiene restricción de edad (+18) en YouTube. Inicia sesión con una cuenta verificada o prueba otra subida.",
+  "errYtmStreamFailed": "No se pudo cargar la emisión. Actualizando el enlace…",
+  "errYtmStreamExpired": "El enlace de emisión caducó. Actualizando…",
   "errYtmUnavailable": "Esta pista no está disponible.",
   "errYtmSessionExpired": "Sesión de YouTube caducada. Toca para reconectar.",
   "errYtmNotInBuild": "YouTube Music no está disponible en esta compilación.",
@@ -4680,5 +4680,8 @@
   "lyricsShareTitle": "Compartir tarjeta de letras",
   "lyricsShareLimitHint": "Puedes seleccionar hasta 6 líneas para la tarjeta de historia.",
   "lyricsShareSelectionCount": "{count}/6 líneas",
-  "lyricsSharePickHint": "Selecciona de 1 a 6 líneas para crear una tarjeta 9:16."
+  "lyricsSharePickHint": "Selecciona de 1 a 6 líneas para crear una tarjeta 9:16.",
+  "cassetteTapeType": "TIPO II • CrO₂",
+  "cassetteEqSpec": "EQ 70µs • HI-FI",
+  "cdTrackNumber": "PISTA {number}"
 }

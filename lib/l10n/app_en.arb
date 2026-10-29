@@ -6244,5 +6244,16 @@
   "lyricsShareTitle": "Share Lyrics Card",
   "lyricsShareLimitHint": "You can select up to 6 lines for the story card.",
   "lyricsShareSelectionCount": "{count}/6 lines",
-  "lyricsSharePickHint": "Select 1 to 6 lines to create a 9:16 story card."
+  "lyricsSharePickHint": "Select 1 to 6 lines to create a 9:16 story card.",
+  "cassetteTapeType": "TYPE II • CrO₂",
+  "cassetteEqSpec": "70µs EQ • HI-FI",
+  "cdTrackNumber": "TRK {number}",
+  "@cdTrackNumber": {
+    "description": "Track number chip on the CD player theme.",
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  }
 }

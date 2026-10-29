@@ -8681,4 +8681,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get lyricsSharePickHint => 'اختر من 1 إلى 6 أسطر لإنشاء بطاقة 9:16.';
+
+  @override
+  String get cassetteTapeType => 'النوع II • CrO₂';
+
+  @override
+  String get cassetteEqSpec => 'معايرة 70µs • HI-FI';
+
+  @override
+  String cdTrackNumber(String number) {
+    return 'المقطع $number';
+  }
 }

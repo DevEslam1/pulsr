@@ -944,7 +944,7 @@
   "radioDirectoryEmpty": "لم يتم العثور على محطات",
   "radioDirectoryError": "تعذر تحميل دليل الراديو",
   "radioDirectoryAdded": "تمت الإضافة",
-"radioDirectoryUnreachable": "تعذّر الوصول إلى هذا البث. جرّب محطة أخرى.",
+  "radioDirectoryUnreachable": "تعذّر الوصول إلى هذا البث. جرّب محطة أخرى.",
   "radioCuratedAdded": "تمت إضافة {count} محطة مختارة",
   "@radioCuratedAdded": {
     "placeholders": {
@@ -2634,10 +2634,10 @@
     "description": "tranche7 quality"
   },
   "bpGuardrails": "الحماية نشطة: تم تجاوز DSP وReplayGain. استخدم مستوى صوت DAC عند تفعيله.",
-"bpChainVerified": "سلسلة بت-بيرفكت مُتحقّقة",
-"bpChainResampled": "تم كشف إعادة أخذ عينات من النظام",
-"bpChainDepthReduced": "تم تقليل عمق البِت",
-"bpChainInactive": "وضع بت-بيرفكت مُفعّل لكنه غير نشط",
+  "bpChainVerified": "سلسلة بت-بيرفكت مُتحقّقة",
+  "bpChainResampled": "تم كشف إعادة أخذ عينات من النظام",
+  "bpChainDepthReduced": "تم تقليل عمق البِت",
+  "bpChainInactive": "وضع بت-بيرفكت مُفعّل لكنه غير نشط",
   "@bpGuardrails": {
     "description": "tranche7 quality"
   },
@@ -4003,7 +4003,7 @@
   "browseNoChangesToSave": "لا توجد تغييرات للحفظ",
   "browseNoGenresFound": "لا توجد أنواع",
   "browseNoRecommendations": "لا توجد توصيات الآن.",
-"ytmCachedResults": "تُعرض نتائج محفوظة من بحث سابق.",
+  "ytmCachedResults": "تُعرض نتائج محفوظة من بحث سابق.",
   "browseNoResultsFound": "لا توجد نتائج",
   "browseNoSongsInLibrary": "لا توجد أغانٍ في المكتبة",
   "browseNoSongsMatch": "لا توجد أغانٍ تطابق",
@@ -4135,9 +4135,9 @@
   "errYtmPlaybackFailed": "فشل التشغيل. حاول مجددًا.",
   "errYtmGeneric": "حدث خطأ في YouTube Music.",
   "errYtmRegionRestricted": "هذا المسار مقيد في منطقتك.",
-"errYtmAgeRestricted": "هذا المقطع مقيّد بالعمر (+18) على يوتيوب. سجّل الدخول بحساب موثّق العمر أو جرّب نسخة أخرى.",
-"errYtmStreamFailed": "تعذّر تحميل البث. جارٍ تحديث الرابط…",
-"errYtmStreamExpired": "انتهت صلاحية رابط البث. جارٍ التحديث…",
+  "errYtmAgeRestricted": "هذا المقطع مقيّد بالعمر (+18) على يوتيوب. سجّل الدخول بحساب موثّق العمر أو جرّب نسخة أخرى.",
+  "errYtmStreamFailed": "تعذّر تحميل البث. جارٍ تحديث الرابط…",
+  "errYtmStreamExpired": "انتهت صلاحية رابط البث. جارٍ التحديث…",
   "errYtmUnavailable": "هذا المسار غير متاح.",
   "errYtmSessionExpired": "انتهت جلسة YouTube. انقر لإعادة الاتصال.",
   "errYtmNotInBuild": "YouTube Music غير متاح في هذا الإصدار.",
@@ -4680,5 +4680,8 @@
   "lyricsShareTitle": "مشاركة بطاقة الكلمات",
   "lyricsShareLimitHint": "يمكنك اختيار ما يصل إلى 6 أسطر لبطاقة القصة.",
   "lyricsShareSelectionCount": "{count}/6 أسطر",
-  "lyricsSharePickHint": "اختر من 1 إلى 6 أسطر لإنشاء بطاقة 9:16."
+  "lyricsSharePickHint": "اختر من 1 إلى 6 أسطر لإنشاء بطاقة 9:16.",
+  "cassetteTapeType": "النوع II • CrO₂",
+  "cassetteEqSpec": "معايرة 70µs • HI-FI",
+  "cdTrackNumber": "المقطع {number}"
 }

@@ -52,6 +52,9 @@ class AudioQualityBadge extends StatelessWidget {
             ? output.sampleRate ~/ 1000
             : 44);
 
+    final palette = context.palette;
+    final gold = palette.goldAccent;
+
     final outputBitDepth = (output != null && output.targetBitDepth > 0)
         ? output.targetBitDepth
         : (output != null && output.bitDepth > 0 ? output.bitDepth : 16);
@@ -78,9 +81,9 @@ class AudioQualityBadge extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                (isUsb ? AppColors.dacGold : info.badgeColor)
+                (isUsb ? gold : info.badgeColor)
                     .withValues(alpha: 0.20),
-                (isUsb ? AppColors.dacGold : info.badgeColor)
+                (isUsb ? gold : info.badgeColor)
                     .withValues(alpha: 0.06),
               ],
               begin: Alignment.topLeft,
@@ -88,13 +91,13 @@ class AudioQualityBadge extends StatelessWidget {
             ),
             borderRadius: AppRadii.r20All,
             border: Border.all(
-              color: (isUsb ? AppColors.dacGold : info.badgeColor)
+              color: (isUsb ? gold : info.badgeColor)
                   .withValues(alpha: 0.45),
               width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isUsb ? AppColors.dacGold : info.badgeColor)
+                color: (isUsb ? gold : info.badgeColor)
                     .withValues(alpha: 0.14),
                 blurRadius: 8,
                 spreadRadius: -1,
@@ -110,7 +113,7 @@ class AudioQualityBadge extends StatelessWidget {
                 Icon(
                   isUsb ? Icons.usb_rounded : info.icon,
                   size: compact ? 12 : 14,
-                  color: isUsb ? AppColors.dacGold : info.badgeColor,
+                  color: isUsb ? gold : info.badgeColor,
                 ),
                 const SizedBox(width: AppSpacing.s6),
                 Text(
@@ -130,7 +133,7 @@ class AudioQualityBadge extends StatelessWidget {
                     height: 3,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.specularAt(0.5),
+                      color: palette.textTertiary,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.s6),
@@ -141,7 +144,7 @@ class AudioQualityBadge extends StatelessWidget {
                             ? '$deviceShortName • Direct'
                             : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b'),
                     style: TextStyle(
-                      color: AppColors.specularAt(0.9),
+                      color: palette.textSecondary,
                       fontSize:
                           compact ? AppFontSize.tiny : AppFontSize.caption,
                       fontWeight: FontWeight.w700,
@@ -152,7 +155,7 @@ class AudioQualityBadge extends StatelessWidget {
                 Icon(
                   Icons.tune_rounded,
                   size: compact ? 11 : 13,
-                  color: (isUsb ? AppColors.dacGold : info.badgeColor)
+                  color: (isUsb ? gold : info.badgeColor)
                       .withValues(alpha: 0.8),
                 ),
               ],

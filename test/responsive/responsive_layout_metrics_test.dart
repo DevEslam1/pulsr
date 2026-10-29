@@ -308,9 +308,9 @@ void main() {
 
       expect(find.byType(TextField), findsOneWidget);
       expect(find.text('Queen'), findsOneWidget);
-      expect(find.byIcon(Icons.clear_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.close_rounded), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.clear_rounded));
+      await tester.tap(find.byIcon(Icons.close_rounded));
       await tester.pump();
 
       expect(controller.text, isEmpty);

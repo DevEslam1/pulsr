@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -595,9 +595,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
                       // ---------- Content (Local vs Online) ----------
                       AnimatedSwitcher(
-                        duration: PulsrMotion.standard,
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
+                        duration: context.motion(PulsrMotion.standard),
+                        switchInCurve:
+                            context.motionCurve(Curves.easeOutCubic),
+                        switchOutCurve:
+                            context.motionCurve(Curves.easeInCubic),
                         child: KeyedSubtree(
                           key: ValueKey('home_tab_$currentTab'),
                           child: currentTab == 0
@@ -862,7 +864,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         // Section isolation (gap 04-02): each stream section is wrapped in a
         // RepaintBoundary so one emission never repaints unrelated sections.
         // Note: this screen has no whole-dashboard BlocBuilder; the 57KB
-        // rebuild claim (04-01) was overstated — emissions are already scoped
+        // rebuild claim (04-01) was overstated â€” emissions are already scoped
         // to the StreamBuilders below.
         RepaintBoundary(
           child: RecentlyPlayedSection(
@@ -1019,9 +1021,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
         // ---------- Online Category Content (Carousel + Top Charts) ----------
         AnimatedSwitcher(
-          duration: PulsrMotion.standard,
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
+          duration: context.motion(PulsrMotion.standard),
+          switchInCurve: context.motionCurve(Curves.easeOutCubic),
+          switchOutCurve: context.motionCurve(Curves.easeInCubic),
           child: OnlineCategorySection(
             key: PageStorageKey('online_cat_$_selectedOnlineCategory'),
             title: _selectedOnlineCategory == 'Recommended For You'

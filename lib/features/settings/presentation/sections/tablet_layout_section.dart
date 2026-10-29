@@ -32,6 +32,10 @@ mixin TabletLayoutSection
     final categories =
         _getCategories(context, pro: state.isProfessional, state: state);
     final screenWidth = MediaQuery.sizeOf(context).width;
+    // The rail is fixed chrome, so its type is clamped rather than its width:
+    // growing the pane at large text scales starved the detail column and
+    // overflowed at 800dp in Spanish. Clamping keeps the pane allocation
+    // stable and stops the title wrapping mid-word ("Settin/gs").
     final masterWidth = screenWidth < 1000 ? 280.0 : 320.0;
     final effectiveActiveId = activeCatId == 'all' ? 'sound' : activeCatId;
 
@@ -41,116 +45,121 @@ mixin TabletLayoutSection
         // Left Master Navigation Pane
         SizedBox(
           width: masterWidth,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTabletMasterHeader(context),
-              const SizedBox(height: AppSpacing.s6),
-              Expanded(
-                child: ListView.separated(
-                  padding: EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.s14,
-                    AppSpacing.xxs,
-                    AppSpacing.s14,
-                    PulsrLayoutMetrics.scrollBottom(context),
-                  ),
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: categories.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppSpacing.xxs),
-                  itemBuilder: (context, i) {
-                    final cat = categories[i];
-                    final isSelected = effectiveActiveId == cat.id;
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTabletMasterHeader(context),
+                const SizedBox(height: AppSpacing.s6),
+                Expanded(
+                  child: ListView.separated(
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.s14,
+                      AppSpacing.xxs,
+                      AppSpacing.s14,
+                      PulsrLayoutMetrics.scrollBottom(context),
+                    ),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: categories.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.xxs),
+                    itemBuilder: (context, i) {
+                      final cat = categories[i];
+                      final isSelected = effectiveActiveId == cat.id;
 
-                    return PulsrPressable(
-                      pressedScale: 0.985,
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        _selectCategory(cat.id);
-                        if (_searchQuery.isNotEmpty) {
-                          _searchController.clear();
-                          _searchQuery = '';
-                        }
-                      },
-                      child: AnimatedContainer(
-                        duration: context.motionMs(180),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? p.accent.withValues(alpha: 0.14)
-                              : Colors.transparent,
-                          borderRadius: AppRadii.cardRadius,
-                          border: Border.all(
+                      return PulsrPressable(
+                        pressedScale: 0.985,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          _selectCategory(cat.id);
+                          if (_searchQuery.isNotEmpty) {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: context.motionMs(180),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.xs),
+                          decoration: BoxDecoration(
                             color: isSelected
-                                ? p.accent.withValues(alpha: 0.45)
+                                ? p.accent.withValues(alpha: 0.14)
                                 : Colors.transparent,
-                            width: 1.2,
+                            borderRadius: AppRadii.cardRadius,
+                            border: Border.all(
+                              color: isSelected
+                                  ? p.accent.withValues(alpha: 0.45)
+                                  : Colors.transparent,
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: AppSpacing.s38,
+                                height: AppSpacing.s38,
+                                decoration: BoxDecoration(
+                                  color: cat.tintColor.withValues(
+                                      alpha: isSelected ? 0.22 : 0.12),
+                                  borderRadius: AppRadii.r12All,
+                                ),
+                                child: Icon(
+                                  cat.icon,
+                                  size: 19,
+                                  color: cat.tintColor,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      cat.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? p.accent
+                                            : p.textPrimary,
+                                        fontSize: AppFontSize.bodySmall,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.s2),
+                                    Text(
+                                      cat.subtitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.caption,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 18,
+                                color: isSelected
+                                    ? p.accent
+                                    : p.textTertiary.withValues(alpha: 0.5),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: AppSpacing.s38,
-                              height: AppSpacing.s38,
-                              decoration: BoxDecoration(
-                                color: cat.tintColor.withValues(
-                                    alpha: isSelected ? 0.22 : 0.12),
-                                borderRadius: AppRadii.r12All,
-                              ),
-                              child: Icon(
-                                cat.icon,
-                                size: 19,
-                                color: cat.tintColor,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    cat.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color:
-                                          isSelected ? p.accent : p.textPrimary,
-                                      fontSize: AppFontSize.bodySmall,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w800
-                                          : FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.s2),
-                                  Text(
-                                    cat.subtitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.caption,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              size: 18,
-                              color: isSelected
-                                  ? p.accent
-                                  : p.textTertiary.withValues(alpha: 0.5),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
 

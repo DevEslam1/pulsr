@@ -272,23 +272,18 @@ class StackedBottomDockState extends State<StackedBottomDock> {
     widget.onModeChanged(nextMode);
   }
 
+  /// A downward flick on the dock no longer *silently* restacks it.
+  ///
+  /// It used to cycle default -> system -> mini-in-front -> nav-in-front, so a
+  /// user who flicked down while reaching for the mini player could land in a
+  /// layout they never asked for and had no obvious way back from. The gesture
+  /// now opens the explicit picker; the mode only changes on a deliberate tap.
   void _handleSwipeDown() {
-    switch (widget.mode) {
-      case DockStackMode.defaultLayout:
-        _setMode(DockStackMode.system);
-        break;
-      case DockStackMode.system:
-        _setMode(DockStackMode.miniPlayerOnTop);
-        break;
-      case DockStackMode.miniPlayerOnTop:
-        _setMode(DockStackMode.navBarOnTop);
-        break;
-      case DockStackMode.navBarOnTop:
-        _setMode(DockStackMode.miniPlayerOnTop);
-        break;
-    }
+    _showDockStylePicker();
   }
 
+  /// One meaning per direction: up always *un-stacks*, and from the resting
+  /// layout it opens Now Playing. It never cycles through styles.
   void _handleSwipeUp() {
     if (widget.mode != DockStackMode.defaultLayout) {
       _setMode(DockStackMode.defaultLayout);
@@ -299,13 +294,19 @@ class StackedBottomDockState extends State<StackedBottomDock> {
 
   /// Discoverable alternative to the swipe-only dock-mode cycling: a long-press
   /// on the mini player opens an explicit chooser.
+  bool _pickerOpen = false;
+
   void _showDockStylePicker() {
+    if (_pickerOpen) return;
+    _pickerOpen = true;
     HapticFeedback.mediumImpact();
     DockStylePickerSheet.show(
       context,
       current: widget.mode,
       onSelected: _setMode,
-    );
+    ).whenComplete(() {
+      _pickerOpen = false;
+    });
   }
 
   @override

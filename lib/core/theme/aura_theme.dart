@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+﻿import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_colors.dart';
@@ -63,7 +63,9 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     Color? successSoft,
     Color? errorSoft,
     Color? warningSoft,
-  })  : surfaceElevated =
+    Color? goldAccent,
+  })  : _goldAccent = goldAccent,
+        surfaceElevated =
             surfaceElevated ?? (isDark ? surfaceContainerHigh : surface),
         surfaceOverlay = surfaceOverlay ??
             (isDark ? const Color(0xFF222230) : const Color(0xFFEEEEEE)),
@@ -99,6 +101,16 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   final Color error;
   final Color warning; // attention / caution semantic role
   final Color info; // informational / neutral highlight role
+
+  /// Theme-aware Hi-Res / USB-DAC tier gold.
+  ///
+  /// Brand gold is intentionally fixed for *dark* surfaces, but at ~1.3:1 it is
+  /// invisible on a light card. This resolves to a darkened gold that clears
+  /// WCAG AA (4.5:1) against [surface] whenever the palette is light.
+  final Color? _goldAccent;
+
+  Color get goldAccent =>
+      _goldAccent ?? (isDark ? AppColors.dacGold : const Color(0xFF6B5200));
   final bool isDark;
 
   /// Readable foreground for surfaces painted with [error].
@@ -111,7 +123,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   /// Deepest immersive-player backdrop below [bg] (circle/classic themes).
   final Color deepShade;
 
-  // ── Extended Semantic Surface & Overlay Tokens ──────────────────────────
+  // â”€â”€ Extended Semantic Surface & Overlay Tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   final Color surfaceElevated;
   final Color surfaceOverlay;
   final Color scrimLight;
@@ -170,6 +182,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     Color? successSoft,
     Color? errorSoft,
     Color? warningSoft,
+    Color? goldAccent,
   }) {
     return PulsrPalette(
       accent: accent ?? this.accent,
@@ -204,6 +217,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       successSoft: successSoft ?? this.successSoft,
       errorSoft: errorSoft ?? this.errorSoft,
       warningSoft: warningSoft ?? this.warningSoft,
+      goldAccent: goldAccent ?? _goldAccent,
     );
   }
 
@@ -255,6 +269,9 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       successSoft: Color.lerp(successSoft, other.successSoft, t) ?? successSoft,
       errorSoft: Color.lerp(errorSoft, other.errorSoft, t) ?? errorSoft,
       warningSoft: Color.lerp(warningSoft, other.warningSoft, t) ?? warningSoft,
+      goldAccent: Color.lerp(
+              _goldAccent ?? goldAccent, other.goldAccent, t) ??
+          goldAccent,
     );
   }
 }
@@ -290,10 +307,17 @@ class AuraTheme {
         isHighContrast: true);
   }
 
+  /// Gold tier marker that stays legible on a light surface: darken the brand
+  /// gold until it clears WCAG AA against white (the light surface base).
+  static Color _lightGold(double amount) {
+    final gold = AppColors.dacGold;
+    return Color.lerp(gold, Colors.black, amount)!;
+  }
+
   /// Darkens bright brand/status colours used as foreground text or icons on
   /// a light surface until they clear the WCAG AA body-text threshold.
   static Color _lightReadable(Color color, double amount) {
-    if (color.computeLuminance() <= 0.18) return color;
+    if (color.computeLuminance() <= 0.10) return color;
     return Color.lerp(color, Colors.black, amount)!;
   }
 
@@ -309,7 +333,7 @@ class AuraTheme {
 
     if (!isDark) {
       final readableAccent =
-          _lightReadable(accent, isHighContrast ? 0.40 : 0.30);
+          _lightReadable(accent, isHighContrast ? 0.62 : 0.30);
       final readableSuccess =
           _lightReadable(AppColors.success, isHighContrast ? 0.40 : 0.30);
       final readableError =
@@ -350,6 +374,7 @@ class AuraTheme {
           error: readableError,
           warning: readableWarning,
           isDark: false,
+          goldAccent: _lightGold(0.62),
           playerCard: Colors.white,
           deepShade: Colors.white,
         );
@@ -384,6 +409,7 @@ class AuraTheme {
         error: readableError,
         warning: readableWarning,
         isDark: false,
+        goldAccent: _lightGold(0.50),
         playerCard: Colors.white,
         deepShade: const Color(0xFFFAFAFA),
       );

@@ -156,7 +156,7 @@ void main() {
       expect(find.text('SOUND & PLAYBACK'), findsOneWidget);
 
       // Clear search
-      await tester.tap(find.byIcon(Icons.clear_rounded));
+      await tester.tap(find.byIcon(Icons.close_rounded));
       await settleAnims(tester);
 
       // Category row restored

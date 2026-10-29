@@ -14,7 +14,6 @@ import 'package:pulsr/core/widgets/pulsr_empty_state.dart';
 import 'package:pulsr/core/widgets/pulsr_chip.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
-import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_state.dart';
 import 'package:pulsr/features/search/presentation/search_screen.dart';

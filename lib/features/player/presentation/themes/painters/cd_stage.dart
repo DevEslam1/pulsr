@@ -479,7 +479,7 @@ class _CdOpticalDisplayHud extends StatelessWidget {
 
           // Track Number Matrix
           Text(
-            'TRK $trackNum',
+            context.l10n.cdTrackNumber(trackNum),
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,

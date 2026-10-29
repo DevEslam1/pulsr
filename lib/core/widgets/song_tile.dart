@@ -276,54 +276,65 @@ class _SongTileState extends State<SongTile> {
                             SizedBox(width: spacingArtwork),
                           ],
                           Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  song.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: isActive ? p.accent : p.textPrimary,
-                                    fontWeight: isActive
-                                        ? FontWeight.w800
-                                        : FontWeight.w600,
-                                    letterSpacing: AppTracking.title,
-                                    fontSize: isCompact || isTileNarrow
-                                        ? AppFontSize.bodySmall
-                                        : AppFontSize.body,
+                            // Dense list rows keep a bounded height (58dp,
+                            // 48dp on narrow tiles), so the global 200% text
+                            // scale cannot be honoured inside them without
+                            // overflowing the row. Clamp the two text lines the
+                            // way the dock and mini player do, and leave the
+                            // rest of the app on the full scale.
+                            child: MediaQuery.withClampedTextScaling(
+                              maxScaleFactor: 1.4,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    song.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color:
+                                          isActive ? p.accent : p.textPrimary,
+                                      fontWeight: isActive
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                      letterSpacing: AppTracking.title,
+                                      fontSize: isCompact || isTileNarrow
+                                          ? AppFontSize.bodySmall
+                                          : AppFontSize.body,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: AppSpacing.s2),
-                                Row(
-                                  children: [
-                                    if (isDownloadedTrack) ...[
-                                      Icon(
-                                        Icons.download_done_rounded,
-                                        size: isCompact ? 12 : 13,
-                                        color: p.accent,
-                                      ),
-                                      const SizedBox(width: AppSpacing.xxs),
-                                    ],
-                                    Expanded(
-                                      child: Text(
-                                        widget.subtitleOverride ?? song.artist,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: isActive
-                                              ? p.textPrimary
-                                                  .withValues(alpha: 0.78)
-                                              : p.textSecondary,
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: AppFontSize.label,
+                                  const SizedBox(height: AppSpacing.s2),
+                                  Row(
+                                    children: [
+                                      if (isDownloadedTrack) ...[
+                                        Icon(
+                                          Icons.download_done_rounded,
+                                          size: isCompact ? 12 : 13,
+                                          color: p.accent,
+                                        ),
+                                        const SizedBox(width: AppSpacing.xxs),
+                                      ],
+                                      Expanded(
+                                        child: Text(
+                                          widget.subtitleOverride ??
+                                              song.artist,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: isActive
+                                                ? p.textPrimary
+                                                    .withValues(alpha: 0.78)
+                                                : p.textSecondary,
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: AppFontSize.label,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           if (showDurationInTile) ...[

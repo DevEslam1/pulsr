@@ -119,6 +119,8 @@ mixin SettingsHeaderSection on State<SettingsScreen> {
               Expanded(
                 child: Text(
                   context.l10n.settings,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: AppFontSize.headline,
