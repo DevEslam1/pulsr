@@ -8,6 +8,33 @@ enum DspEngineType {
   none,
 }
 
+// Platform maps are untyped at runtime (older APKs, backup imports and test
+// fixtures may send 1/0 instead of true/false or a numeric string). Parse
+// tolerantly so one malformed field cannot discard the whole report.
+int _asInt(Object? value, [int fallback = 0]) {
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value.trim()) ?? fallback;
+  return fallback;
+}
+
+bool _asBool(Object? value, {bool fallback = false}) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final v = value.trim().toLowerCase();
+    if (v == 'true' || v == '1') return true;
+    if (v == 'false' || v == '0') return false;
+  }
+  return fallback;
+}
+
+Map<String, dynamic> _asMap(Object? value) {
+  if (value is Map) {
+    return value.map((k, v) => MapEntry(k.toString(), v));
+  }
+  return const <String, dynamic>{};
+}
+
 class DspStageDebugInfo {
   final String name;
   final String category; // 'Android HAL', 'C++ Native', 'System'
@@ -42,14 +69,14 @@ class DspStageDebugInfo {
 
   factory DspStageDebugInfo.fromMap(Map<String, dynamic> map) {
     return DspStageDebugInfo(
-      name: map['name'] as String? ?? '',
-      category: map['category'] as String? ?? 'DSP',
-      isSupported: map['isSupported'] as bool? ?? false,
-      isEnabled: map['isEnabled'] as bool? ?? false,
-      isBypassed: map['isBypassed'] as bool? ?? false,
-      isDegraded: map['isDegraded'] as bool? ?? false,
-      parameters: (map['parameters'] as Map?)?.cast<String, dynamic>() ?? {},
-      statusDescription: map['statusDescription'] as String? ?? '',
+      name: map['name']?.toString() ?? '',
+      category: map['category']?.toString() ?? 'DSP',
+      isSupported: _asBool(map['isSupported']),
+      isEnabled: _asBool(map['isEnabled']),
+      isBypassed: _asBool(map['isBypassed']),
+      isDegraded: _asBool(map['isDegraded']),
+      parameters: _asMap(map['parameters']),
+      statusDescription: map['statusDescription']?.toString() ?? '',
     );
   }
 }
@@ -112,16 +139,14 @@ class DspDebugReport {
     }
 
     return DspDebugReport(
-      audioSessionId: (map['audioSessionId'] as num?)?.toInt() ?? 0,
-      isSessionAttached: (map['isSessionAttached'] as bool?) ?? false,
-      dspPreference: map['dspPreference'] as String? ?? 'native',
-      isBitPerfectBypassActive:
-          (map['isBitPerfectBypassActive'] as bool?) ?? false,
-      isNativeDspLoaded: (map['isNativeDspLoaded'] as bool?) ?? false,
-      activeDspStagesMask: (map['activeDspStagesMask'] as num?)?.toInt() ?? 0,
-      autoDegradedStagesMask:
-          (map['autoDegradedStagesMask'] as num?)?.toInt() ?? 0,
-      hasOemAudio: (map['hasOemAudio'] as bool?) ?? false,
+      audioSessionId: _asInt(map['audioSessionId']),
+      isSessionAttached: _asBool(map['isSessionAttached']),
+      dspPreference: map['dspPreference']?.toString() ?? 'native',
+      isBitPerfectBypassActive: _asBool(map['isBitPerfectBypassActive']),
+      isNativeDspLoaded: _asBool(map['isNativeDspLoaded']),
+      activeDspStagesMask: _asInt(map['activeDspStagesMask']),
+      autoDegradedStagesMask: _asInt(map['autoDegradedStagesMask']),
+      hasOemAudio: _asBool(map['hasOemAudio']),
       detectedOemEngines: parsedOem,
       stages: parsedStages,
       activeEffectNames: parsedActive,
@@ -135,6 +160,9 @@ class DspDebugReport {
   /// debug snapshots could not be told apart from live ones.
   static DateTime _parseTimestamp(Object? raw) {
     if (raw is DateTime) return raw;
+    if (raw is num) {
+      return DateTime.fromMillisecondsSinceEpoch(raw.toInt());
+    }
     if (raw is String) {
       final parsed = DateTime.tryParse(raw);
       if (parsed != null) return parsed;

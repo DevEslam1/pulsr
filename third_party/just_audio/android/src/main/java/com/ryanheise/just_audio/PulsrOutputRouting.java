@@ -105,11 +105,19 @@ public final class PulsrOutputRouting {
     public static synchronized void unobserve(AAudioAudioSink sink) { nativeSinks.remove(sink); }
 
     public static synchronized boolean select(AudioDeviceInfo device) {
-        try {
-            for (ExoPlayer player : players.keySet()) player.setPreferredAudioDevice(device);
-            preferred = device;
-            return true;
-        } catch (RuntimeException failure) { return false; }
+        // Best-effort per player: one released/failed player must neither abort
+        // the routing of the remaining players nor leave the stored
+        // preference disagreeing with the iteration.
+        boolean allApplied = true;
+        for (ExoPlayer player : players.keySet()) {
+            try {
+                player.setPreferredAudioDevice(device);
+            } catch (RuntimeException failure) {
+                allApplied = false;
+            }
+        }
+        preferred = device;
+        return allApplied;
     }
 
     /** [device ID, app AudioTrack rate, PCM encoding]. Zero means unverified.

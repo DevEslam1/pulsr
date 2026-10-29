@@ -398,6 +398,16 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     final mappable = gains.length == bandCount;
     final oldComp = _appliedMusicEqComp;
 
+    if (!mappable) {
+      // Switching 10 -> 32/64 bands interpolates the active curve (including
+      // any compensation folded into it) onto the new layout. The old 10-band
+      // vector can no longer be subtracted band-for-band; doing so corrupted
+      // unrelated bands. Drop the bookkeeping and let the next route/track pass
+      // start from the new base instead.
+      _appliedMusicEqComp = null;
+      return;
+    }
+
     final newComp = (wantComp && mappable)
         ? _earbudService.eqCompensation(caps)
         : List<double>.filled(bandCount, 0.0);

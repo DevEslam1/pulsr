@@ -243,6 +243,10 @@ class _DspSection extends StatelessWidget {
               bitPerfectOutput: state.bitPerfectOutput,
               bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
               device: state.currentOutputDevice,
+              // AAudio Direct bypasses the ExoPlayer DSP chain just like
+              // bit-perfect; omitting it let the switch look enabled while the
+              // controller guard rejected every change.
+              aaudioEnabled: state.aaudioOutputEnabled,
             );
             return Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(

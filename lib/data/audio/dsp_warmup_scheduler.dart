@@ -21,7 +21,7 @@ class DspWarmupScheduler {
   }) async {
     try {
       await _channel.sendWarmupBuffer(
-          durationMs: warmupDuration.inMilliseconds);
+          durationMs: _sanitizeDurationMs(warmupDuration));
     } catch (e, st) {
       ErrorLogger.log('DspWarmupScheduler silent buffer preload error',
           error: e, stackTrace: st, category: 'DspWarmupScheduler');
@@ -33,12 +33,17 @@ class DspWarmupScheduler {
   Future<void> warmup(
       {Duration duration = const Duration(milliseconds: 100)}) async {
     try {
-      await _channel.sendWarmupBuffer(durationMs: duration.inMilliseconds);
+      await _channel.sendWarmupBuffer(durationMs: _sanitizeDurationMs(duration));
     } catch (e, st) {
       ErrorLogger.log('DspWarmupScheduler standalone warmup error',
           error: e, stackTrace: st, category: 'DspWarmupScheduler');
     }
   }
+
+  /// A zero/negative duration is not a warmup and a multi-second one would
+  /// block the caller for no benefit; keep the native request in a sane range.
+  static int _sanitizeDurationMs(Duration duration) =>
+      duration.inMilliseconds.clamp(1, 5000);
 
   /// Generates a silent float PCM buffer for DSP stage warmup testing.
   Float32List createSilentWarmupBuffer({

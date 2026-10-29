@@ -133,7 +133,9 @@ class OptimizedDspPipeline {
   /// Otherwise uses measured native latency if available, falling back to static estimates.
   double calculateTotalEstimatedLatencyMs() {
     if (isBitPerfectBypass) return 0.0;
-    if (_nativeLatencyFrames > 0) {
+    if (_nativeLatencyFrames > 0 &&
+        _nativeSampleRate.isFinite &&
+        _nativeSampleRate > 0) {
       return (_nativeLatencyFrames / _nativeSampleRate) * 1000.0;
     }
     return getActiveStages().fold<double>(
@@ -144,13 +146,22 @@ class OptimizedDspPipeline {
 
   /// Updates measured native latency from C++ engine (call after each setActiveStages).
   void updateNativeLatency({required int frames, double sampleRate = 48000.0}) {
-    _nativeLatencyFrames = frames;
-    _nativeSampleRate = sampleRate > 0 ? sampleRate : 48000.0;
+    // A negative frame count or a non-finite/zero rate is a bad measurement,
+    // not a real latency. Clamp rather than dividing by zero or subtracting a
+    // negative delay from the playback position.
+    _nativeLatencyFrames = frames < 0 ? 0 : frames;
+    _nativeSampleRate =
+        (sampleRate.isFinite && sampleRate > 0) ? sampleRate : 48000.0;
   }
 
   /// Returns compensated position for lyrics/seek sync.
   Duration getCompensatedPosition(Duration rawPosition) {
-    if (isBitPerfectBypass || _nativeLatencyFrames <= 0) return rawPosition;
+    if (isBitPerfectBypass ||
+        _nativeLatencyFrames <= 0 ||
+        !_nativeSampleRate.isFinite ||
+        _nativeSampleRate <= 0) {
+      return rawPosition;
+    }
     final latencyMs = (_nativeLatencyFrames / _nativeSampleRate) * 1000.0;
     final latency = Duration(microseconds: (latencyMs * 1000).round());
     if (rawPosition <= latency) return Duration.zero;
@@ -186,7 +197,11 @@ class OptimizedDspPipeline {
     }
     if (isCrossfeedEnabled != null) crossfeedEnabled = isCrossfeedEnabled;
     if (isReverbEnabled != null) reverbEnabled = isReverbEnabled;
-    if (stereoBalance != null) balance = stereoBalance;
+    if (stereoBalance != null) {
+      balance = stereoBalance.isFinite
+          ? stereoBalance.clamp(-1.0, 1.0).toDouble()
+          : 0.0;
+    }
     if (isMonoMix != null) monoMix = isMonoMix;
     if (isSaturationEnabled != null) saturationEnabled = isSaturationEnabled;
     if (isLiveProgEnabled != null) liveProgEnabled = isLiveProgEnabled;

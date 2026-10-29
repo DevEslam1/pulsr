@@ -129,6 +129,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     // can call unobserve() when they are replaced (HashSet requires explicit removal).
     private DefaultAudioSink currentDefaultSink = null;
     private AAudioAudioSink currentNativeSink = null;
+    // Arguments of the most recent load(), so an output rebuild that interrupts
+    // a load can restore the same item/position instead of dropping the pending
+    // prepareResult (which would hang the Dart setAudioSource future).
+    private int lastLoadIndex = 0;
+    private long lastLoadPositionUs = C.TIME_UNSET;
     private Integer errorCode;
     private String errorMessage;
     private Integer currentIndex;
@@ -441,7 +446,13 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     Runnable doRebuild = () -> {
                         if (player == null) return;
                         rebuildPlayerForOutput();
-                        if (!loadedSources.isEmpty()) player.prepare();
+                        // The rebuild auto-prepares an in-flight load; after a
+                        // renderer error the player is IDLE, so retry explicitly
+                        // with the replacement sink. Avoid a duplicate prepare.
+                        if (!loadedSources.isEmpty()
+                                && player.getPlaybackState() == Player.STATE_IDLE) {
+                            player.prepare();
+                        }
                     };
                     if (android.os.Looper.myLooper() == handler.getLooper()) {
                         doRebuild.run();
@@ -521,9 +532,18 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 changed |= aaudioPreferExclusive != exclusive;
                 aaudioPreferExclusive = exclusive;
             }
-            if (bufferMs != null && bufferMs >= 20 && bufferMs <= 1000) {
-                changed |= aaudioTargetBufferMs != bufferMs;
-                aaudioTargetBufferMs = bufferMs;
+            if (bufferMs != null) {
+                // 8 ms is the low-latency wired/USB target documented by the
+                // caller-side controller; anything outside 8..1000 is a bad
+                // request and keeps the previous value instead of silently
+                // pretending it was applied.
+                if (bufferMs >= 8 && bufferMs <= 1000) {
+                    changed |= aaudioTargetBufferMs != bufferMs;
+                    aaudioTargetBufferMs = bufferMs;
+                } else {
+                    Log.w(TAG, "Ignoring AAudio targetBufferMs=" + bufferMs
+                            + " outside 8..1000");
+                }
             }
             boolean effective = enabled && Build.VERSION.SDK_INT >= 28 && AaudioNativeBridge.ensureAvailable();
             if (effective && !aaudioOutputEnabled) {
@@ -981,6 +1001,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         errorMessage = null;
         enqueuePlaybackEvent();
         int windowIndex = initialIndex != null ? initialIndex : 0;
+        lastLoadIndex = windowIndex;
+        lastLoadPositionUs = initialPosition;
         player.setMediaSources(mediaSources, windowIndex, initialPosition);
         loadedSources.clear();
         loadedSources.addAll(mediaSources);
@@ -1009,10 +1031,34 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     /** Rebuild the renderer when an output switch changes its sink contract. */
     private void rebuildPlayerForOutput() {
         if (player == null) return;
-        int index = player.getCurrentMediaItemIndex();
-        long position = player.getCurrentPosition();
+        // A load in flight owns prepareResult until the player reaches READY.
+        // Keep it pending across the rebuild (the new ExoPlayer's READY
+        // completes it) and reload the same item/position; dropping it would
+        // hang the Dart setAudioSource future forever.
+        final boolean loading =
+                processingState == ProcessingState.loading || prepareResult != null;
+        int index = loading ? lastLoadIndex : player.getCurrentMediaItemIndex();
+        // getCurrentPosition() (not player.getCurrentPosition()) honours a
+        // pending seek target, so a seek that has not landed yet survives the
+        // rebuild below.
+        long position = loading && lastLoadPositionUs != C.TIME_UNSET
+                ? lastLoadPositionUs : getCurrentPosition();
+        if (!loading) {
+            // Seek/play Results belong to the old ExoPlayer instance; complete
+            // them before releasing it so their Dart futures resolve instead of
+            // hanging.
+            if (seekResult != null) {
+                seekResult.success(new HashMap<String, Object>());
+                seekResult = null;
+                seekPos = null;
+            }
+            if (playResult != null) {
+                playResult.success(new HashMap<String, Object>());
+                playResult = null;
+            }
+        }
         boolean playWhenReady = player.getPlayWhenReady();
-        boolean prepare = player.getPlaybackState() != Player.STATE_IDLE;
+        boolean prepare = loading || player.getPlaybackState() != Player.STATE_IDLE;
         float volume = player.getVolume();
         int repeat = player.getRepeatMode();
         boolean shuffle = player.getShuffleModeEnabled();
@@ -1046,7 +1092,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         player.setAudioAttributes(attributes, false);
         if (!loadedSources.isEmpty()) {
             player.setMediaSources(new ArrayList<>(loadedSources),
-                    Math.min(index, loadedSources.size() - 1), position);
+                    Math.min(Math.max(index, 0), loadedSources.size() - 1), position);
             player.setShuffleOrder(outputShuffleOrder);
             if (prepare) player.prepare();
         }
@@ -1285,6 +1331,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         this.errorMessage = errorMsg;
         if (switchToIdle) {
             processingState = ProcessingState.idle;
+            // A seek pending on this player would otherwise never complete
+            // (the state transitions it waits for cannot happen after an error).
+            abortSeek();
         }
         broadcastImmediatePlaybackEvent();
         if (prepareResult != null) {
@@ -1389,12 +1438,24 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             playResult.success(new HashMap<String, Object>());
             playResult = null;
         }
+        abortSeek();
         mediaSources.clear();
         loadedSources.clear();
         clearAudioEffects();
         if (player != null) {
             PulsrOutputRouting.unregister(player);
-        player.release();
+            // The routing registry uses explicit-lifetime sets (strong refs);
+            // without this, every disposed player's sink leaks and stale sinks
+            // keep answering route snapshots forever.
+            if (currentNativeSink != null) {
+                PulsrOutputRouting.unobserve(currentNativeSink);
+                currentNativeSink = null;
+            }
+            if (currentDefaultSink != null) {
+                PulsrOutputRouting.unobserve(currentDefaultSink);
+                currentDefaultSink = null;
+            }
+            player.release();
             player = null;
             processingState = ProcessingState.idle;
             broadcastImmediatePlaybackEvent();

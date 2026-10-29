@@ -98,7 +98,9 @@ class DspReliabilityCounters {
       sessionReattachFailure: parseInt(map['sessionReattachFailure']),
       autoDegradeActivation: parseInt(map['autoDegradeActivation']),
       autoDegradeRecovery: parseInt(map['autoDegradeRecovery']),
-      lastRedactedError: map['lastRedactedError'] as String?,
+      // Tolerate a legacy/corrupt value that is not a string instead of
+      // failing the whole counters load (and resetting every counter to zero).
+      lastRedactedError: map['lastRedactedError']?.toString(),
       lastErrorTimestamp: parseDate(map['lastErrorTimestamp']),
     );
   }
@@ -139,7 +141,10 @@ class DspReliabilityTracker {
       _instance ??= DspReliabilityTracker._internal();
 
   DspReliabilityTracker._internal() {
-    _loadFromPrefs();
+    // Keep the very first load as the shared init future. Starting a second
+    // load from ensureInitialized() duplicated prefs I/O and emitted the
+    // initial counters twice on the broadcast stream.
+    _initFuture = _loadFromPrefs();
   }
 
   @visibleForTesting
@@ -157,6 +162,9 @@ class DspReliabilityTracker {
 
   bool _initialized = false;
   Future<void>? _initFuture;
+  // Serializes preference writes so rapid counter increments cannot land out
+  // of order (a slower earlier write overwriting a newer snapshot on disk).
+  Future<void> _saveChain = Future<void>.value();
 
   Future<void> ensureInitialized() {
     return _initFuture ??= _loadFromPrefs();
@@ -276,14 +284,15 @@ class DspReliabilityTracker {
 
   Future<void> resetCounters() async {
     _counters = const DspReliabilityCounters.zero();
-    _notifyAndSave();
+    await _notifyAndSave();
   }
 
-  void _notifyAndSave() {
+  Future<void> _notifyAndSave() {
     if (!_streamController.isClosed) {
       _streamController.add(_counters);
     }
-    unawaited(_saveToPrefs());
+    _saveChain = _saveChain.then((_) => _saveToPrefs());
+    return _saveChain;
   }
 
   void dispose() {

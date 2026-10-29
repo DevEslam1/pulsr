@@ -58,8 +58,8 @@ class DspSnapshot {
       return DspSnapshot(
         presetName: m['preset'] as String? ?? 'Flat',
         gains: gains,
-        volumeBoost: (m['volumeBoost'] as num?)?.toDouble() ?? 0.0,
-        bassBoost: (m['bassBoost'] as num?)?.toDouble() ?? 0.0,
+        volumeBoost: _finite((m['volumeBoost'] as num?)?.toDouble() ?? 0.0),
+        bassBoost: _finite((m['bassBoost'] as num?)?.toDouble() ?? 0.0),
         savedAt: DateTime.fromMillisecondsSinceEpoch(
             (m['savedAt'] as num?)?.toInt() ?? 0),
         effects:
@@ -81,7 +81,20 @@ class DspSnapshotStore {
   final Map<String, DspSnapshot> _snapshots = {};
   late final Future<void> ready;
   bool _clearedBeforeLoad = false;
-  bool enabled = true;
+  bool _enabled = true;
+  bool _enabledDirty = false;
+
+  /// Whether per-scope snapshots are applied. A value written before the async
+  /// initial load completes wins over the stored value: the old public field
+  /// was unconditionally overwritten by [load], so a fast enable/disable toggle
+  /// could be silently reverted by the in-flight read.
+  bool get enabled => _enabled;
+  set enabled(bool value) {
+    // Mark dirty even when the value equals the current default: an explicit
+    // write made before the async load must win over the stored value.
+    _enabled = value;
+    _enabledDirty = true;
+  }
 
   DspSnapshotStore() {
     ready = load();
@@ -158,7 +171,10 @@ class DspSnapshotStore {
   Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      enabled = prefs.getBool('${prefsKey}_enabled') ?? enabled;
+      final storedEnabled = prefs.getBool('${prefsKey}_enabled');
+      if (storedEnabled != null && !_enabledDirty) {
+        _enabled = storedEnabled;
+      }
       final raw = prefs.getString(prefsKey);
       if (raw == null || raw.isEmpty) return;
       if (_clearedBeforeLoad) return; // user cleared before load finished
@@ -184,17 +200,33 @@ class DspSnapshotStore {
   Future<void> reload() async {
     await ready;
     _clearedBeforeLoad = false;
+    _enabledDirty = false;
     _snapshots.clear();
     await load();
   }
 
-  Future<void> persist() async {
+  Future<void> _persistChain = Future<void>.value();
+
+  Future<void> persist() {
+    // Serialize writes: saving a snapshot and toggling the feature can overlap
+    // at their awaits, and an older serialized map must not overwrite a newer
+    // one on disk.
+    final next = _persistChain.then((_) => _persistNow());
+    _persistChain = next;
+    return next;
+  }
+
+  Future<void> _persistNow() async {
     try {
       // Wait out the initial load so a pre-load save is never overwritten by a
       // partial map serialized before stored entries were merged in.
       await ready;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('${prefsKey}_enabled', enabled);
+      final enabledToPersist = _enabled;
+      await prefs.setBool('${prefsKey}_enabled', enabledToPersist);
+      // Only clear the dirty flag if the user did not toggle again while the
+      // write was in flight; otherwise the newer value still needs saving.
+      if (_enabled == enabledToPersist) _enabledDirty = false;
       await prefs.setString(prefsKey,
           jsonEncode(_snapshots.map((k, v) => MapEntry(k, v.toMap()))));
     } catch (e, st) {

@@ -423,6 +423,12 @@ class EqualizerManager {
     dynamicBassXHigh = DspParamRanges.dynamicBassXHigh.clamp(dynamicBassXHigh);
     dynamicBassYLow = DspParamRanges.dynamicBassYLow.clamp(dynamicBassYLow);
     dynamicBassYHigh = DspParamRanges.dynamicBassYHigh.clamp(dynamicBassYHigh);
+    if (dynamicBassXHigh <= dynamicBassXLow) {
+      dynamicBassXHigh = (dynamicBassXLow + 100).clamp(20, 12000);
+    }
+    if (dynamicBassYHigh <= dynamicBassYLow) {
+      dynamicBassYHigh = (dynamicBassYLow + 10).clamp(20, 300);
+    }
     dynamicBassSideGainLow = DspParamRanges.dynamicBassSideGainLow.clampRaw(
         dynamicBassSideGainLow.isFinite ? dynamicBassSideGainLow : 0.10);
     dynamicBassSideGainHigh = DspParamRanges.dynamicBassSideGainHigh.clampRaw(
@@ -1055,7 +1061,7 @@ class EqualizerManager {
 
   Future<void> setVolumeBoost(double value) async {
     final preampDb = selectedHeadphoneProfile?.preampGain ?? 0.0;
-    var safeValue = DspParamRanges.volumeBoost.clampRaw(value);
+    var safeValue = DspParamRanges.volumeBoost.clamp(value);
     if ((preampDb + safeValue * 10.0) > 6.0) {
       safeValue = DspParamRanges.volumeBoost.clampRaw((6.0 - preampDb) / 10.0);
     }
@@ -1376,12 +1382,12 @@ class EqualizerManager {
     final prevEnabled = isSaturationEnabled;
 
     final targetDrive = drive != null
-        ? DspParamRanges.saturationDrive.clampRaw(drive)
+        ? DspParamRanges.saturationDrive.clamp(drive)
         : prevDrive;
     final targetMix =
-        mix != null ? DspParamRanges.saturationMix.clampRaw(mix) : prevMix;
+        mix != null ? DspParamRanges.saturationMix.clamp(mix) : prevMix;
     final targetTilt =
-        tilt != null ? DspParamRanges.saturationTilt.clampRaw(tilt) : prevTilt;
+        tilt != null ? DspParamRanges.saturationTilt.clamp(tilt) : prevTilt;
     final targetMode =
         mode != null ? DspParamRanges.saturationMode.clamp(mode) : prevMode;
     final targetMultiband = multiband ?? prevMultiband;
@@ -1510,7 +1516,7 @@ class EqualizerManager {
     final prevVolumeLinear = loudnessVolumeLinear;
 
     final targetIntensity = intensity != null
-        ? DspParamRanges.loudnessContourIntensity.clampRaw(intensity)
+        ? DspParamRanges.loudnessContourIntensity.clamp(intensity)
         : prevIntensity;
     var targetVolumeLinear = prevVolumeLinear;
 
@@ -1605,13 +1611,13 @@ class EqualizerManager {
     final prevEnabled = isSubCrossoverEnabled;
 
     final targetCornerHz = cornerHz != null
-        ? DspParamRanges.subCrossoverCornerHz.clampRaw(cornerHz)
+        ? DspParamRanges.subCrossoverCornerHz.clamp(cornerHz)
         : prevCornerHz;
     final targetSlope = slopeDbPerOct != null
-        ? (slopeDbPerOct < 18.0 ? 12.0 : 24.0)
+        ? DspParamRanges.normalizeSubCrossoverSlope(slopeDbPerOct)
         : prevSlope;
     final targetGain = gain != null
-        ? DspParamRanges.subCrossoverGain.clampRaw(gain)
+        ? DspParamRanges.subCrossoverGain.clamp(gain)
         : prevGain;
     final targetBassMono = bassMono ?? prevBassMono;
     final targetAntiPop = antiPop ?? prevAntiPop;
@@ -1761,13 +1767,13 @@ class EqualizerManager {
   }) async {
     if (bands != null) multibandCompressorBands = List.from(bands);
     if (f0 != null) {
-      multibandCompressorF0 = DspParamRanges.multibandCompressorF0.clampRaw(f0);
+      multibandCompressorF0 = DspParamRanges.multibandCompressorF0.clamp(f0);
     }
     if (f1 != null) {
-      multibandCompressorF1 = DspParamRanges.multibandCompressorF1.clampRaw(f1);
+      multibandCompressorF1 = DspParamRanges.multibandCompressorF1.clamp(f1);
     }
     if (f2 != null) {
-      multibandCompressorF2 = DspParamRanges.multibandCompressorF2.clampRaw(f2);
+      multibandCompressorF2 = DspParamRanges.multibandCompressorF2.clamp(f2);
     }
     // Crossovers must stay strictly ordered (f0 < f1 < f2); individual
     // clamps alone allow inversions such as f0=500 > f1=200.
@@ -1874,7 +1880,7 @@ class EqualizerManager {
     final prevEnabled = isDynamicBassEnabled;
 
     final targetStrength = strength != null
-        ? DspParamRanges.dynamicBassStrength.clampRaw(strength)
+        ? DspParamRanges.dynamicBassStrength.clamp(strength)
         : prevStrength;
     final targetPreset = preset != null
         ? DspParamRanges.dynamicBassPreset.clamp(preset)
@@ -1924,11 +1930,19 @@ class EqualizerManager {
       }
       if (sideGainLow != null) {
         targetSideGainLow =
-            DspParamRanges.dynamicBassSideGainLow.clampRaw(sideGainLow);
+            DspParamRanges.dynamicBassSideGainLow.clamp(sideGainLow);
       }
       if (sideGainHigh != null) {
         targetSideGainHigh =
-            DspParamRanges.dynamicBassSideGainHigh.clampRaw(sideGainHigh);
+            DspParamRanges.dynamicBassSideGainHigh.clamp(sideGainHigh);
+      }
+      // The native filters require xLow < xHigh and yLow < yHigh. Independent
+      // per-field clamps could leave an inverted (effectively silent) mid band.
+      if (targetXHigh <= targetXLow) {
+        targetXHigh = (targetXLow + 100).clamp(20, 12000);
+      }
+      if (targetYHigh <= targetYLow) {
+        targetYHigh = (targetYLow + 10).clamp(20, 300);
       }
     }
 

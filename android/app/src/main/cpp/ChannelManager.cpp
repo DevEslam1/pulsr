@@ -54,6 +54,12 @@ void ChannelManager::applyParams(const ChannelManagerParamSet& params) {
     const bool wasEnabled = params_.enabled;
     params_ = params;
     params_.channelCount = std::clamp(params_.channelCount, 2, MAX_CHANNELS);
+    // A NaN trim/delay survives std::clamp and would poison the gain/delay
+    // smoothing for that channel; scrub the incoming snapshot values here.
+    for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+        if (!std::isfinite(params_.trimDb[ch])) params_.trimDb[ch] = 0.0f;
+        if (!std::isfinite(params_.delayMs[ch])) params_.delayMs[ch] = 0.0f;
+    }
     if (!params_.enabled) {
         if (wasEnabled) {
             const int rampFrames = std::max(

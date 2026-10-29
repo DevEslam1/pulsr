@@ -59,6 +59,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
   bool _isResyncing = false;
   int _pipelineLatencyFrames = 0;
   Timer? _autoRefreshTimer;
+  bool _refreshInFlight = false;
 
   @override
   void initState() {
@@ -99,18 +100,29 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
   }
 
   Future<void> _refreshReport({bool silent = false}) async {
-    if (!silent) {
-      setState(() => _isLoading = true);
-    }
+    // The 1.5s timer and the manual refresh button can overlap while a slow
+    // platform call is in flight. Serialize them so a late response cannot
+    // overwrite a newer report or latency sample (same reasoning as the
+    // telemetry cubit's in-flight guard).
+    if (_refreshInFlight) return;
+    _refreshInFlight = true;
     try {
-      final reportFuture = AudioEffectsChannel().getDspDebugReport();
-      final latencyFuture = AudioEffectsChannel().getPipelineLatencyFrames();
-      final results = await Future.wait([reportFuture, latencyFuture]);
-      final report = results[0] as DspDebugReport;
-      final latencyFrames = results[1] as int;
+      if (!silent) {
+        setState(() => _isLoading = true);
+      }
+      final channel = AudioEffectsChannel();
+      final results = await Future.wait<Object?>([
+        channel.getDspDebugReport(),
+        channel.getPipelineLatencyFrames(),
+      ]);
+      // getDspDebugReport() is nullable (non-Android / platform failure);
+      // casting it to non-null used to throw and discard the latency sample
+      // too, leaving the sheet on stale data with no indication.
+      final report = results[0] as DspDebugReport?;
+      final latencyFrames = results[1] as int? ?? 0;
       if (mounted) {
         setState(() {
-          _report = report;
+          if (report != null) _report = report;
           _pipelineLatencyFrames = latencyFrames;
           _isLoading = false;
         });
@@ -119,6 +131,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    } finally {
+      _refreshInFlight = false;
     }
   }
 
@@ -132,7 +146,19 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
       if (getIt.isRegistered<EqualizerManager>()) {
         await getIt<EqualizerManager>().resyncActiveEffects();
       } else {
-        await AudioEffectsChannel().resyncForTrack(44100);
+        // Fall back to the live output rate instead of assuming 44.1 kHz:
+        // resyncing filter coefficients at the wrong rate shifts the response.
+        var fallbackRate = 44100.0;
+        try {
+          final rate = context
+                  .read<SettingsCubit>()
+                  .state
+                  .currentOutputDevice
+                  ?.sampleRate ??
+              0;
+          if (rate > 0) fallbackRate = rate.toDouble();
+        } catch (_) {}
+        await AudioEffectsChannel().resyncForTrack(fallbackRate);
       }
       if (mounted) {
         messenger.showSnackBar(
@@ -167,7 +193,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
     return DspInspectorSheet.sanitizeReport(raw);
   }
 
-  Future<void> _shareReport(BuildContext context) async {
+  Future<void> _shareReport() async {
     if (_report == null) return;
     final jsonText = exportReportForShare();
     await SharePlus.instance.share(ShareParams(text: jsonText));
@@ -175,7 +201,9 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
 
   Future<void> _copyReportToClipboard(BuildContext context) async {
     if (_report == null) return;
-    final jsonText = _report!.toFormattedJson();
+    // Share and clipboard must expose the same privacy-redacted payload;
+    // copying the raw report leaked absolute paths that share redacts.
+    final jsonText = exportReportForShare();
     await Clipboard.setData(ClipboardData(text: jsonText));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -285,7 +313,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                         tooltip: context.l10n.share,
                         icon: Icon(Icons.share_rounded,
                             color: p.accent, size: 20),
-                        onPressed: () => _shareReport(context),
+                        onPressed: () => _shareReport(),
                       ),
                       IconButton(
                         constraints: const BoxConstraints(
@@ -444,6 +472,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
     required AudioOutputInfo? currentOutputDevice,
   }) {
     final rep = _report;
+    final reportedRate = currentOutputDevice?.sampleRate ?? 0;
+    final latencyRate = reportedRate > 0 ? reportedRate : 44100;
     final isBypassed = rep?.isBitPerfectBypassActive == true;
     final rawAttached = rep?.isSessionAttached == true;
     final sessionId = rep?.audioSessionId ?? 0;
@@ -750,7 +780,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
               _buildStatChip(
                 p,
                 'LATENCY',
-                '${((_pipelineLatencyFrames / (currentOutputDevice?.sampleRate ?? 44100)) * 1000.0).toStringAsFixed(1)} ms ($_pipelineLatencyFrames f)',
+                '${((_pipelineLatencyFrames / latencyRate) * 1000.0).toStringAsFixed(1)} ms ($_pipelineLatencyFrames f)',
               ),
               _buildStatChip(
                 p,

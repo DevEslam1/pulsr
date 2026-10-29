@@ -262,6 +262,7 @@ class DspEffectApplier {
     bool requiresGuard = true,
     bool guardCondition = true,
     bool showErrorOnGuard = true,
+    bool rebalanceVolumeBoost = true,
     required DspSlice Function(DspSlice current) updateDsp,
     required Future<void> Function() applyAudioHandler,
     String? failureMessage,
@@ -281,8 +282,16 @@ class DspEffectApplier {
     ));
     try {
       await applyAudioHandler();
-      if (featureName != 'Volume Boost') {
-        unawaited(_rebalanceVolumeBoost());
+      if (rebalanceVolumeBoost) {
+        // Rebalancing is best-effort. The bare unawaited() call turned a
+        // native failure into an unhandled zone error after the setter had
+        // already succeeded, which could crash debug builds/tests.
+        unawaited(_rebalanceVolumeBoost().catchError(
+          (Object e, StackTrace st) {
+            ErrorLogger.log('Failed to rebalance volume boost',
+                error: e, stackTrace: st, category: 'PlayerDspController');
+          },
+        ));
       }
       return true;
     } catch (e, st) {

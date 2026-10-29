@@ -1260,18 +1260,28 @@ class AudioPlayer {
   /// Fades profile changes separately from sleep and crossfade envelopes.
   Future<bool> dspSetTransitionMuted(bool muted) async {
     if (_disposed || !_active || _platformValue == null) return false;
-    return await MethodChannel(
-          'com.ryanheise.just_audio.methods.${_platformValue!.id}',
-        ).invokeMethod<bool>('dspSetTransitionMuted', {'muted': muted}) ??
-        false;
+    try {
+      return await MethodChannel(
+            'com.ryanheise.just_audio.methods.${_platformValue!.id}',
+          ).invokeMethod<bool>('dspSetTransitionMuted', {'muted': muted}) ??
+          false;
+    } catch (_) {
+      // Not the Pulsr Android fork — let the caller apply without a fade.
+      return false;
+    }
   }
 
   /// Actual render-thread gain; a requested mute alone is not an acknowledgement.
   Future<double?> dspGetTransitionGain() async {
     if (_disposed || !_active || _platformValue == null) return null;
-    return MethodChannel(
-      'com.ryanheise.just_audio.methods.${_platformValue!.id}',
-    ).invokeMethod<double>('dspGetTransitionGain');
+    try {
+      return await MethodChannel(
+        'com.ryanheise.just_audio.methods.${_platformValue!.id}',
+      ).invokeMethod<double>('dspGetTransitionGain');
+    } catch (_) {
+      // Not the Pulsr Android fork — signal "cannot report" to the caller.
+      return null;
+    }
   }
 
   /// Pulsr fork: requests the opt-in 24/32-bit float DSP path on this player's
@@ -3684,9 +3694,16 @@ class LockCachingAudioSource extends StreamAudioSource {
       _httpClient = null;
       throw Exception('HTTP Status Error: ${response.statusCode}');
     }
-    (await _partialCacheFile).createSync(recursive: true);
+    partialCacheFile.createSync(recursive: true);
+    if (_disposed) {
+      // dispose() may have run while the request/mime write was awaiting;
+      // never open a sink nobody will close.
+      httpClient.close(force: true);
+      _httpClient = null;
+      throw Exception('LockCachingAudioSource disposed');
+    }
     // ignore: close_sinks
-    final sink = _sink = (await _partialCacheFile).openWrite();
+    final sink = _sink = partialCacheFile.openWrite();
     final sourceLength =
         response.contentLength == -1 ? null : response.contentLength;
     final mimeType = response.headers.contentType.toString();
@@ -3695,18 +3712,31 @@ class LockCachingAudioSource extends StreamAudioSource {
         acceptRanges != null && acceptRanges != 'none';
     final mimeFile = await _mimeFile;
     await mimeFile.writeAsString(mimeType);
+    if (_disposed) {
+      // dispose() raced the mime write; release the handles it could not see.
+      try {
+        await sink.close();
+      } catch (_) {}
+      if (_sink == sink) _sink = null;
+      httpClient.close(force: true);
+      _httpClient = null;
+      throw Exception('LockCachingAudioSource disposed');
+    }
     final inProgressResponses = <_InProgressCacheResponse>[];
     late StreamSubscription<List<int>> subscription;
     var percentProgress = 0;
     void updateProgress(int newPercentProgress) {
       if (newPercentProgress != percentProgress) {
         percentProgress = newPercentProgress;
-        _downloadProgressSubject.add(percentProgress / 100);
+        if (!_downloadProgressSubject.isClosed) {
+          _downloadProgressSubject.add(percentProgress / 100);
+        }
       }
     }
 
     _progress = 0;
     subscription = _subscription = response.listen((data) async {
+      if (_disposed) return;
       _progress += data.length;
       final newPercentProgress = (sourceLength == null)
           ? 0
@@ -3826,20 +3856,38 @@ class LockCachingAudioSource extends StreamAudioSource {
           cacheResponse.controller.close();
         }
       }
-      (await _partialCacheFile).renameSync(cacheFile.path);
+      // Flush and close the sink BEFORE renaming: renaming while the sink
+      // still holds buffered bytes truncates the cache and leaves a dangling
+      // file handle writing into the renamed file.
+      try {
+        await sink.flush();
+      } catch (_) {}
+      try {
+        await sink.close();
+      } catch (_) {}
+      if (_sink == sink) _sink = null;
+      try {
+        (await _partialCacheFile).renameSync(cacheFile.path);
+      } catch (_) {}
       await subscription.cancel();
       _subscription = null;
       httpClient.close();
       _httpClient = null;
-      _sink = null;
       _downloading = false;
     }, onError: (Object e, StackTrace stackTrace) async {
-      (await _partialCacheFile).deleteSync();
+      // Close first so buffered bytes do not survive (and the handle is not
+      // left dangling) before the partial file is discarded.
+      try {
+        await sink.close();
+      } catch (_) {}
+      if (_sink == sink) _sink = null;
+      try {
+        (await _partialCacheFile).deleteSync();
+      } catch (_) {}
       await subscription.cancel();
       _subscription = null;
       httpClient.close();
       _httpClient = null;
-      _sink = null;
       // Fail all pending requests
       for (final req in _requests) {
         req.fail(e, stackTrace);

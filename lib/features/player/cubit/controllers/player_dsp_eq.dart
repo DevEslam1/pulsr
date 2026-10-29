@@ -209,7 +209,7 @@ extension PlayerDspEqExtension on PlayerDspController {
   /// PlayerState.dsp.preampDb so the reconciliation path and UI never drift from
   /// the engine (PlayerCubit._syncAudioEffects reads it back from the handler).
   Future<bool> setPreamp(double preampDb) {
-    var clamped = DspParamRanges.preampDb.clampRaw(preampDb);
+    var clamped = DspParamRanges.preampDb.clamp(preampDb);
     if (clamped > 0) {
       clamped = GainStagingBudget.clampBoostDb(
         requestedBoostDb: clamped,
@@ -296,7 +296,7 @@ extension PlayerDspEqExtension on PlayerDspController {
     markUserInteracting();
     if (!guardDsp('Band Gain', showError: false)) return;
     if (!gain.isFinite) return;
-    final clamped = gain.clamp(-15.0, 15.0);
+    final clamped = DspParamRanges.eqBandGainDb.clamp(gain);
     final state = _getState();
     final currentGains = List<double>.from(state.eqPreset.gains);
     if (bandIndex < 0 || bandIndex >= currentGains.length) return;

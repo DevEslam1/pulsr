@@ -69,7 +69,10 @@ extension PlayerDspEffectsExtension on PlayerDspController {
 
   // Audio Effects
   Future<void> setBassBoost(double amount) async {
-    final requested = amount.clamp(0.0, 1.0).toDouble();
+    // NaN survives num.clamp and would poison both the stored slider value and
+    // GainStagingBudget for every later setter; treat non-finite as zero.
+    final requested =
+        amount.isFinite ? amount.clamp(0.0, 1.0).toDouble() : 0.0;
     // Budget bass boost against every other active boost stage so the summed
     // DSP gain stays within headroom (not just an isolated 0..1 clamp).
     final allowedDb = GainStagingBudget.clampBoostDb(
@@ -111,12 +114,15 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         applyAudioHandler: () => _audioHandler.setVirtualizerEnabled(enabled),
       );
 
-  Future<void> setVirtualizerStrength(double strength) => applyDspEffect(
-        featureName: 'Virtualizer',
-        showErrorOnGuard: false,
-        updateDsp: (dsp) => dsp.copyWith(virtualizerStrength: strength),
-        applyAudioHandler: () => _audioHandler.setVirtualizerStrength(strength),
-      );
+  Future<void> setVirtualizerStrength(double strength) {
+    final clamped = DspParamRanges.virtualizerStrength.clamp(strength);
+    return applyDspEffect(
+      featureName: 'Virtualizer',
+      showErrorOnGuard: false,
+      updateDsp: (dsp) => dsp.copyWith(virtualizerStrength: clamped),
+      applyAudioHandler: () => _audioHandler.setVirtualizerStrength(clamped),
+    );
+  }
 
   Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) {
     final isEnabled = enabled ?? (preset != DynamicsPreset.off);
@@ -133,14 +139,26 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   }
 
   Future<void> toggleDynamicsBypass() async {
-    await _audioHandler.toggleDynamicsBypass();
-    final state = _getState();
-    _emit(state.copyWith(
-      dsp: state.dsp.copyWith(
-        isDynamicsEnabled: !_audioHandler.isDynamicsBypassed &&
-            state.dynamicsPreset != DynamicsPreset.off,
-      ),
-    ));
+    try {
+      // Turning bypass OFF re-enables the dynamics stage, which the
+      // bit-perfect/AAudio guard must still refuse.
+      if (_audioHandler.isDynamicsBypassed && !guardDsp('Dynamics')) return;
+      await _audioHandler.toggleDynamicsBypass();
+      final state = _getState();
+      _emit(state.copyWith(
+        dsp: state.dsp.copyWith(
+          isDynamicsEnabled: !_audioHandler.isDynamicsBypassed &&
+              state.dynamicsPreset != DynamicsPreset.off,
+        ),
+      ));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to toggle dynamics bypass',
+          error: e, stackTrace: st, category: 'PlayerDspController');
+      final s = _getState();
+      _emit(s.copyWith(
+          playback: s.playback
+              .copyWith(errorMessage: 'Failed to toggle dynamics bypass: $e')));
+    }
   }
 
   Future<void> setDspEffectsEnabled(bool enabled) async {
@@ -180,6 +198,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
             isArbitraryEqEnabled: false,
             isLiveProgEnabled: false,
             isDynamicBassEnabled: false,
+            // MBC is also forced off by the manager below; mirror it in the
+            // slice so the UI cannot keep showing an enabled compressor.
+            isMultibandCompressorEnabled: false,
             volumeBoost: 0.0,
           ),
         ));
@@ -367,8 +388,18 @@ extension PlayerDspEffectsExtension on PlayerDspController {
               thresholdDb: -0.2, releaseMs: 50.0);
         }
         if (_multibandCompressorRestore) {
-          _multibandCompressorRestore = false;
           await _audioHandler.equalizerManager.setMultibandCompressor(true);
+          // Clear only after the native call accepted it, so a failure leaves
+          // the restore intent intact for the next enable attempt.
+          _multibandCompressorRestore = false;
+          if (!_isClosed()) {
+            final s = _getState();
+            if (!s.dsp.isMultibandCompressorEnabled) {
+              _emit(s.copyWith(
+                dsp: s.dsp.copyWith(isMultibandCompressorEnabled: true),
+              ));
+            }
+          }
         }
       }
     } catch (e) {
@@ -396,7 +427,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   }
 
   Future<void> setVolumeBoost(double value) {
-    final requested = value.clamp(0.0, 1.0).toDouble();
+    final requested =
+        value.isFinite ? value.clamp(0.0, 1.0).toDouble() : 0.0;
     // Budget the broadband volume boost against the FULL active gain chain
     // (EQ/ReplayGain preamp, bass boost, loudness, saturation, dynamic bass,
     // sub-crossover) instead of only the headphone preamp, so stacking effects
@@ -419,6 +451,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     return applyDspEffect(
       featureName: 'Volume Boost',
       guardCondition: requested > 0.01,
+      // The setter already budgets this stage against every other active gain;
+      // running the generic rebalance too would clamp it a second time.
+      rebalanceVolumeBoost: false,
       // State mirrors the user's requested boost (the slider stays put); the
       // engine receives the headroom-staged value so stacked effects can't
       // over-drive the signal into the final output clamp.
@@ -437,12 +472,12 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   Future<void> setCrossfeed(bool enabled,
       {double? delayUs, double? feedDb, double? fcut, int? mode}) {
     final clampedDelay = delayUs != null
-        ? DspParamRanges.crossfeedDelayUs.clampRaw(delayUs)
+        ? DspParamRanges.crossfeedDelayUs.clamp(delayUs)
         : null;
     final clampedFeed =
-        feedDb != null ? DspParamRanges.crossfeedFeedDb.clampRaw(feedDb) : null;
+        feedDb != null ? DspParamRanges.crossfeedFeedDb.clamp(feedDb) : null;
     final clampedFcut =
-        fcut != null ? DspParamRanges.crossfeedFcut.clampRaw(fcut) : null;
+        fcut != null ? DspParamRanges.crossfeedFcut.clamp(fcut) : null;
     final clampedMode =
         mode != null ? DspParamRanges.crossfeedMode.clamp(mode) : null;
     // Route-gating (fix #1): crossfeed is a headphone-imaging effect that
@@ -486,13 +521,13 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) {
     final clampedThresh = thresholdDb != null
-        ? DspParamRanges.limiterThresholdDb.clampRaw(thresholdDb)
+        ? DspParamRanges.limiterThresholdDb.clamp(thresholdDb)
         : null;
     final clampedRelease = releaseMs != null
-        ? DspParamRanges.limiterReleaseMs.clampRaw(releaseMs)
+        ? DspParamRanges.limiterReleaseMs.clamp(releaseMs)
         : null;
     final clampedLookahead = lookaheadMs != null
-        ? DspParamRanges.limiterLookaheadMs.clampRaw(lookaheadMs)
+        ? DspParamRanges.limiterLookaheadMs.clamp(lookaheadMs)
         : null;
     return applyDspEffect(
       featureName: 'Limiter',
@@ -509,18 +544,26 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     );
   }
 
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) =>
-      applyDspEffect(
-        featureName: 'Reverb',
-        guardCondition: enabled,
-        updateDsp: (dsp) => dsp.copyWith(
-          isReverbEnabled: enabled,
-          reverbPreset: preset ?? dsp.reverbPreset,
-          reverbWetDry: wetDry ?? dsp.reverbWetDry,
-        ),
-        applyAudioHandler: () =>
-            _audioHandler.setReverb(enabled, preset: preset, wetDry: wetDry),
-      );
+  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) {
+    // Keep the Dart slice numerically identical to what EqualizerManager
+    // forwards: an out-of-range ordinal / NaN wet-dry used to be stored raw here
+    // while the manager clamped it, so the UI reported a different room/mix.
+    final clampedPreset =
+        preset?.clamp(0, ReverbPreset.values.length - 1);
+    final clampedWetDry =
+        wetDry != null ? DspParamRanges.reverbWetDry.clamp(wetDry) : null;
+    return applyDspEffect(
+      featureName: 'Reverb',
+      guardCondition: enabled,
+      updateDsp: (dsp) => dsp.copyWith(
+        isReverbEnabled: enabled,
+        reverbPreset: clampedPreset ?? dsp.reverbPreset,
+        reverbWetDry: clampedWetDry ?? dsp.reverbWetDry,
+      ),
+      applyAudioHandler: () => _audioHandler.setReverb(enabled,
+          preset: clampedPreset, wetDry: clampedWetDry),
+    );
+  }
 
   Future<void> setReverbPreset(int preset) =>
       setReverb(_getState().isReverbEnabled, preset: preset);
@@ -608,7 +651,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   }
 
   Future<void> setStereoBalance(double balance) {
-    final clamped = balance.clamp(-1.0, 1.0);
+    final clamped = DspParamRanges.stereoBalance.clamp(balance);
     return applyDspEffect(
       featureName: 'Stereo Balance',
       requiresGuard: true,
@@ -657,11 +700,11 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   Future<void> setSaturation(bool enabled,
       {double? drive, double? mix, double? tilt, int? mode, bool? multiband}) {
     final clampedDrive =
-        drive != null ? DspParamRanges.saturationDrive.clampRaw(drive) : null;
+        drive != null ? DspParamRanges.saturationDrive.clamp(drive) : null;
     final clampedMix =
-        mix != null ? DspParamRanges.saturationMix.clampRaw(mix) : null;
+        mix != null ? DspParamRanges.saturationMix.clamp(mix) : null;
     final clampedTilt =
-        tilt != null ? DspParamRanges.saturationTilt.clampRaw(tilt) : null;
+        tilt != null ? DspParamRanges.saturationTilt.clamp(tilt) : null;
     final clampedMode =
         mode != null ? DspParamRanges.saturationMode.clamp(mode) : null;
     return applyDspEffect(
@@ -702,21 +745,21 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       double? lowCrossoverHz,
       double? highCrossoverHz}) {
     final clampedWidth =
-        width != null ? DspParamRanges.stereoWidth.clampRaw(width) : null;
+        width != null ? DspParamRanges.stereoWidth.clamp(width) : null;
     final clampedLow = lowWidth != null
-        ? DspParamRanges.stereoWidthBand.clampRaw(lowWidth)
+        ? DspParamRanges.stereoWidthBand.clamp(lowWidth)
         : null;
     final clampedMid = midWidth != null
-        ? DspParamRanges.stereoWidthBand.clampRaw(midWidth)
+        ? DspParamRanges.stereoWidthBand.clamp(midWidth)
         : null;
     final clampedHigh = highWidth != null
-        ? DspParamRanges.stereoWidthBand.clampRaw(highWidth)
+        ? DspParamRanges.stereoWidthBand.clamp(highWidth)
         : null;
     final clampedLowCross = lowCrossoverHz != null
-        ? DspParamRanges.stereoWidthLowCrossoverHz.clampRaw(lowCrossoverHz)
+        ? DspParamRanges.stereoWidthLowCrossoverHz.clamp(lowCrossoverHz)
         : null;
     final clampedHighCross = highCrossoverHz != null
-        ? DspParamRanges.stereoWidthHighCrossoverHz.clampRaw(highCrossoverHz)
+        ? DspParamRanges.stereoWidthHighCrossoverHz.clamp(highCrossoverHz)
         : null;
     return applyDspEffect(
       featureName: 'Stereo Width',
@@ -746,7 +789,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
 
   Future<void> setLoudnessContour(bool enabled, {double? intensity}) {
     final clampedIntensity = intensity != null
-        ? DspParamRanges.loudnessContourIntensity.clampRaw(intensity)
+        ? DspParamRanges.loudnessContourIntensity.clamp(intensity)
         : null;
     return applyDspEffect(
       featureName: 'Loudness Contour',
@@ -768,10 +811,13 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       bool? bassMono,
       bool? antiPop}) {
     final clampedCorner = cornerHz != null
-        ? DspParamRanges.subCrossoverCornerHz.clampRaw(cornerHz)
+        ? DspParamRanges.subCrossoverCornerHz.clamp(cornerHz)
         : null;
     final clampedGain =
-        gain != null ? DspParamRanges.subCrossoverGain.clampRaw(gain) : null;
+        gain != null ? DspParamRanges.subCrossoverGain.clamp(gain) : null;
+    final clampedSlope = slopeDbPerOct != null
+        ? DspParamRanges.normalizeSubCrossoverSlope(slopeDbPerOct)
+        : null;
     return applyDspEffect(
       featureName: 'Sub Crossover',
       guardCondition: enabled,
@@ -779,14 +825,14 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         isSubCrossoverEnabled: enabled,
         subCrossoverCornerHz: clampedCorner ?? dsp.subCrossoverCornerHz,
         subCrossoverSlopeDbPerOct:
-            slopeDbPerOct ?? dsp.subCrossoverSlopeDbPerOct,
+            clampedSlope ?? dsp.subCrossoverSlopeDbPerOct,
         subCrossoverGain: clampedGain ?? dsp.subCrossoverGain,
         subCrossoverBassMono: bassMono ?? dsp.subCrossoverBassMono,
         subCrossoverAntiPop: antiPop ?? dsp.subCrossoverAntiPop,
       ),
       applyAudioHandler: () => _audioHandler.setSubCrossover(enabled,
           cornerHz: clampedCorner,
-          slopeDbPerOct: slopeDbPerOct,
+          slopeDbPerOct: clampedSlope,
           gain: clampedGain,
           bassMono: bassMono,
           antiPop: antiPop),
@@ -924,7 +970,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     double? sideGainHigh,
   }) {
     final clampedStrength = strength != null
-        ? DspParamRanges.dynamicBassStrength.clampRaw(strength)
+        ? DspParamRanges.dynamicBassStrength.clamp(strength)
         : null;
     final clampedPreset =
         preset != null ? DspParamRanges.dynamicBassPreset.clamp(preset) : null;

@@ -73,6 +73,12 @@ void main() {
       expect(restored.bridgeTimeoutFailure, 0);
       expect(restored.lastErrorTimestamp, isNull);
     });
+
+    test('non-string persisted last error is coerced instead of failing', () {
+      final restored = DspReliabilityCounters.fromMap(
+          <String, dynamic>{'lastRedactedError': 42});
+      expect(restored.lastRedactedError, '42');
+    });
   });
 
   group('DspReliabilityTracker', () {

@@ -23,6 +23,7 @@ import '../../../../data/audio/output_format_negotiation.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/audio_output_info.dart';
+import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../../../domain/models/reverb_preset.dart';
@@ -160,6 +161,9 @@ class PlayerDspController {
       bypassDspOnBitPerfect: s.bypassDspOnBitPerfect,
       device: s.currentOutputDevice,
       aaudioEnabled: s.aaudioOutputEnabled,
+      // DoP packs DSD into the PCM carrier; any DSP/gain write corrupts it.
+      // The EQ sheet already gates on this, but programmatic setters did not.
+      dsdDopActive: AudioQualityInfo.dsdDopActive,
     );
   }
 
@@ -272,6 +276,7 @@ class PlayerDspController {
     bool requiresGuard = true,
     bool guardCondition = true,
     bool showErrorOnGuard = true,
+    bool rebalanceVolumeBoost = true,
     required DspSlice Function(DspSlice current) updateDsp,
     required Future<void> Function() applyAudioHandler,
     String? failureMessage,
@@ -281,6 +286,7 @@ class PlayerDspController {
         requiresGuard: requiresGuard,
         guardCondition: guardCondition,
         showErrorOnGuard: showErrorOnGuard,
+        rebalanceVolumeBoost: rebalanceVolumeBoost,
         updateDsp: updateDsp,
         applyAudioHandler: applyAudioHandler,
         failureMessage: failureMessage,

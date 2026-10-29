@@ -116,7 +116,10 @@ public final class AAudioAudioSink implements AudioSink {
 
     @Override
     public long getCurrentPositionUs(boolean sourceEnded) {
-        if (handle == 0L || sampleRate <= 0) {
+        // After configure/flush/discontinuity the timeline has been re-based but
+        // the new base presentation time is not known until the next buffer:
+        // reporting the old base here would expose a stale position.
+        if (handle == 0L || sampleRate <= 0 || pendingBasePosition) {
             return CURRENT_POSITION_NOT_SET;
         }
         long framesWritten = AaudioNativeBridge.nativeGetFramesWritten(handle);
@@ -273,9 +276,11 @@ public final class AAudioAudioSink implements AudioSink {
             }
             updateMeasuredRoute();
             if (pcmEncoding == C.ENCODING_PCM_32BIT) {
-                // Advance the original int32 buffer proportionally
-                // (1 float32 out per 1 int32 in, same sample count).
-                buffer.position(buffer.limit());
+                // int32 -> float is 1:1 in samples (4 bytes in, 4 bytes out),
+                // so a partial native write must advance the source by the
+                // same byte count; jumping to the limit would drop the tail.
+                buffer.position(Math.min(buffer.limit(),
+                        buffer.position() + written));
             } else {
                 buffer.position(buffer.position() + written);
             }
@@ -290,7 +295,8 @@ public final class AAudioAudioSink implements AudioSink {
         }
         updateMeasuredRoute();
         if (pcmEncoding == C.ENCODING_PCM_32BIT) {
-            buffer.position(buffer.limit());
+            buffer.position(Math.min(buffer.limit(),
+                    buffer.position() + written));
         } else {
             buffer.position(offset + written);
         }

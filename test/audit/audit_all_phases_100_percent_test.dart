@@ -101,6 +101,16 @@ void main() {
     });
 
     group('3. DSP Chain Validator & Warmup Scheduler', () {
+      test('DspChainValidator ignores non-finite measurements', () {
+        expect(DspChainValidator.computeThd(double.nan, const [1.0]), 0.0);
+        expect(DspChainValidator.computeThd(1.0, const [double.nan, 0.1]),
+            closeTo(10.0, 1e-9));
+        expect(
+            DspChainValidator.computeFlatnessDeltaDb(
+                const [0.0, double.nan, 2.0]),
+            closeTo(1.0, 1e-9));
+      });
+
       test('DspChainValidator flags high THD or non-flat response', () {
         final validator = DspChainValidator();
         final report = validator.validate(

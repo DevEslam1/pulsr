@@ -77,5 +77,39 @@ void main() {
       expect(report.activeEffectNames, isEmpty);
       expect(report.detectedOemEngines, isEmpty);
     });
+
+    test('fromMap tolerates numeric/string flags and non-string params', () {
+      final report = DspDebugReport.fromMap(<dynamic, dynamic>{
+        'audioSessionId': '42',
+        'isSessionAttached': 1,
+        'isNativeDspLoaded': 'true',
+        'activeDspStagesMask': '15',
+        'autoDegradedStagesMask': 2.0,
+        'stages': [
+          <dynamic, dynamic>{
+            'name': 'EQ',
+            'isSupported': 1,
+            'isEnabled': 0,
+            'parameters': <dynamic, dynamic>{1: 'one'},
+          },
+        ],
+      });
+
+      expect(report.audioSessionId, 42);
+      expect(report.isSessionAttached, isTrue);
+      expect(report.isNativeDspLoaded, isTrue);
+      expect(report.activeDspStagesMask, 15);
+      expect(report.autoDegradedStagesMask, 2);
+      expect(report.stages.single.isSupported, isTrue);
+      expect(report.stages.single.isEnabled, isFalse);
+      expect(report.stages.single.parameters['1'], 'one');
+    });
+
+    test('numeric timestamp is parsed as epoch milliseconds', () {
+      final report = DspDebugReport.fromMap(<dynamic, dynamic>{
+        'timestamp': 1000,
+      });
+      expect(report.timestamp.millisecondsSinceEpoch, 1000);
+    });
   });
 }

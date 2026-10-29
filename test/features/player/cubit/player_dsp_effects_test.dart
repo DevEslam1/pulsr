@@ -384,4 +384,49 @@ void main() {
       expect(handler.calls, contains('switchComparisonSlot'));
     });
   });
+
+  group('PlayerDspEffects input sanitization', () {
+    test('non-finite and out-of-range values are clamped in state', () async {
+      await controller.setVirtualizerStrength(double.nan);
+      expect(state.virtualizerStrength, 0.0);
+      await controller.setVirtualizerStrength(7);
+      expect(state.virtualizerStrength, 1.0);
+
+      await controller.setStereoBalance(double.nan);
+      expect(state.stereoBalance, 0.0);
+
+      await controller.setReverb(true, preset: 99, wetDry: double.nan);
+      expect(state.reverbPreset, ReverbPreset.values.length - 1);
+      expect(state.reverbWetDry, 0.2);
+
+      await controller.setSubCrossover(true, slopeDbPerOct: 13);
+      expect(state.subCrossoverSlopeDbPerOct, 12.0);
+      await controller.setSubCrossover(true, slopeDbPerOct: double.nan);
+      expect(state.subCrossoverSlopeDbPerOct, 24.0);
+
+      await controller.setCrossfeed(true, delayUs: double.nan);
+      expect(state.crossfeedDelayUs, 350.0);
+
+      await controller.setSaturation(true, drive: double.nan);
+      expect(state.saturationDrive, 0.3);
+    });
+
+    test('non-finite bass/volume boost do not poison gain staging', () async {
+      await controller.setBassBoost(double.nan);
+      expect(state.eqPreset.bassBoost, 0.0);
+      await controller.setVolumeBoost(double.nan);
+      expect(state.volumeBoost, 0.0);
+    });
+
+    test('master disable clears the multiband compressor flag', () async {
+      state = PlayerState(
+        dsp: const DspSlice().copyWith(isMultibandCompressorEnabled: true),
+      );
+      expect(state.isMultibandCompressorEnabled, isTrue);
+
+      await controller.setDspEffectsEnabled(false);
+
+      expect(state.isMultibandCompressorEnabled, isFalse);
+    });
+  });
 }

@@ -69,10 +69,11 @@ class DspDiagnosticReport {
 class DspChainValidator {
   /// Measures output THD (Total Harmonic Distortion) given fundamental and harmonic magnitudes.
   static double computeThd(double fundamentalMag, List<double> harmonicMags) {
-    if (fundamentalMag <= 0.0) return 0.0;
+    if (!fundamentalMag.isFinite || fundamentalMag <= 0.0) return 0.0;
     double harmonicSumSq = 0.0;
     for (final h in harmonicMags) {
-      harmonicSumSq += h * h;
+      // A non-finite harmonic is a bad measurement, not distortion energy.
+      if (h.isFinite) harmonicSumSq += h * h;
     }
     return (math.sqrt(harmonicSumSq) / fundamentalMag) * 100.0;
   }
@@ -80,9 +81,13 @@ class DspChainValidator {
   /// Calculates frequency flatness variation across frequency bands.
   /// Standard target is ±0.5 dB across 20 Hz – 20 kHz for a flat response.
   static double computeFlatnessDeltaDb(List<double> measuredGainDb) {
-    if (measuredGainDb.isEmpty) return 0.0;
-    final minGain = measuredGainDb.reduce(math.min);
-    final maxGain = measuredGainDb.reduce(math.max);
+    // Non-finite measurements carry no flatness information; letting one NaN
+    // through made reduce() return NaN and the subsequent comparison silently
+    // report a perfectly flat chain.
+    final finite = measuredGainDb.where((g) => g.isFinite).toList();
+    if (finite.isEmpty) return 0.0;
+    final minGain = finite.reduce(math.min);
+    final maxGain = finite.reduce(math.max);
     return ((maxGain - minGain) / 2.0).abs();
   }
 
@@ -205,15 +210,19 @@ class DspChainValidator {
       message: 'THD at ${satThd.toStringAsFixed(2)}%',
     );
 
-    // 3. Convolver / Reverb Stage Latency
-    double convolverLatency = 7.2; // typical partition FFT convolution latency
-    bool convolverHealthy = true;
-    if (debugStatus != null && debugStatus['convolverLatencyMs'] is num) {
-      convolverLatency = (debugStatus['convolverLatencyMs'] as num).toDouble();
-      if (convolverLatency > 20.0) {
-        convolverHealthy = false;
+    // 3. Convolver / Reverb Stage Latency (estimated: the native debug report
+    // does not expose per-stage convolver latency). Use the report's real engine
+    // state for truthful warnings instead of a key that never exists.
+    final double convolverLatency = 7.2; // typical partition FFT convolution latency
+    final bool convolverHealthy = true;
+    if (debugStatus != null) {
+      if (debugStatus['isNativeDspLoaded'] == false) {
         allWarnings.add(
-            'Convolver latency elevated: ${convolverLatency.toStringAsFixed(1)}ms');
+            'Native DSP engine is not loaded; processing falls back to the Android/OEM path');
+      }
+      if (debugStatus['isBitPerfectBypassActive'] == true) {
+        allWarnings.add(
+            'Bit-Perfect bypass is active; all DSP stages are bypassed');
       }
     }
 

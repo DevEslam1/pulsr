@@ -136,7 +136,7 @@ extension EqualizerRestoreOps on EqualizerManager {
       currentPreset = EqPreset(name: presetName, gains: gains, bassBoost: bass);
       comparisonSlots[ComparisonSlot.slotA] = currentPreset;
       preampDb = DspParamRanges.preampDb
-          .clampRaw(prefs.getDouble(PrefsKeys.eqPreamp) ?? 0.0);
+          .clamp(prefs.getDouble(PrefsKeys.eqPreamp) ?? 0.0);
 
       isVirtualizerEnabled =
           prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;

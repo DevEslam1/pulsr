@@ -257,8 +257,13 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private volatile boolean transitionMuted;
     private volatile float transitionGain = 1.0f;
     public boolean setTransitionMuted(boolean muted) {
+        // Only claim success when the mute can actually be rendered: the DSP
+        // chain must be configured and its native engine alive. Otherwise the
+        // caller (a profile-change fade) should proceed unmuted instead of
+        // polling a gain that can never move.
+        if (!isNativeReady()) return false;
         transitionMuted = muted;
-        return NATIVE_AVAILABLE;
+        return true;
     }
     public float getTransitionGain() { return transitionGain; }
     private FloatBuffer scratchFloats;

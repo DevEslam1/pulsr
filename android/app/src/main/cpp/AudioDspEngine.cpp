@@ -50,6 +50,10 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.reverb.predelayMs = clampFinite(s.reverb.predelayMs, 0.0, 150.0, 0.0);
     s.reverb.damping = clampFinite(s.reverb.damping, 0.0, 1.0, 0.5);
     s.reverb.crossChannel = clampFinite(s.reverb.crossChannel, 0.0, 1.0, 0.0);
+    // A preset ordinal outside the enum would make createSynthetic() build an
+    // arbitrary room and can desynchronise preset_. Clamp it to the wire
+    // contract (0..Custom) like the Dart-side ReverbPreset does.
+    s.reverb.preset = clampInt(s.reverb.preset, 0, static_cast<int>(ReverbPreset::Custom));
 
     s.panner.balance = clampFinite(s.panner.balance, -1.0, 1.0, 0.0);
 
@@ -121,6 +125,19 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.dynamicBass.strength = clampFinite(s.dynamicBass.strength, 0.0, 8.0, 1.0);
     s.dynamicBass.sideGainLow = clampFinite(s.dynamicBass.sideGainLow, 0.0, 2.0, 0.10);
     s.dynamicBass.sideGainHigh = clampFinite(s.dynamicBass.sideGainHigh, 0.0, 2.0, 0.50);
+    // The native filters require xLow < xHigh and yLow < yHigh; independent
+    // clamps could otherwise leave an inverted (effectively silent) mid band.
+    s.dynamicBass.xLow = clampInt(s.dynamicBass.xLow, 20, 2400);
+    s.dynamicBass.xHigh = clampInt(s.dynamicBass.xHigh, 500, 12000);
+    s.dynamicBass.yLow = clampInt(s.dynamicBass.yLow, 20, 200);
+    s.dynamicBass.yHigh = clampInt(s.dynamicBass.yHigh, 30, 300);
+    s.dynamicBass.devicePreset = clampInt(s.dynamicBass.devicePreset, 0, 9);
+    if (s.dynamicBass.xHigh <= s.dynamicBass.xLow) {
+        s.dynamicBass.xHigh = std::min(s.dynamicBass.xLow + 100, 12000);
+    }
+    if (s.dynamicBass.yHigh <= s.dynamicBass.yLow) {
+        s.dynamicBass.yHigh = std::min(s.dynamicBass.yLow + 10, 300);
+    }
 
     s.replayGain.trackGainDb = clampFinite(s.replayGain.trackGainDb, -60.0, 24.0, 0.0);
     s.replayGain.albumGainDb = clampFinite(s.replayGain.albumGainDb, -60.0, 24.0, 0.0);
@@ -752,7 +769,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
     } hazardGuard{audioHazardPtr_};
     lastBlockBitPerfect_.store(snapshot && snapshot->bitPerfect.enabled, std::memory_order_relaxed);
-    if (!snapshot) return frames;
+    if (!snapshot) {
+        effectiveLatencyFrames_.store(0, std::memory_order_release);
+        limiterActive_.store(false, std::memory_order_relaxed);
+        return frames;
+    }
 
     const uint64_t resetGeneration = resetRequestGeneration_.load(std::memory_order_acquire);
     if (resetGeneration != lastResetGeneration_) {
@@ -994,7 +1015,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         // 1b. Arbitrary Response EQ (EqualizerAPO GraphicEq)
         if ((stages & STAGE_ARBITRARY_EQ) || arbitraryEq_.isRamping()) {
             arbitraryEq_.processInterleaved(buffer, frames, channels);
-            if (channels >= 2) blockLatency += arbitraryEq_.getLatencyFrames();
+            // FIR latency applies to every channel count, not only stereo.
+            blockLatency += arbitraryEq_.getLatencyFrames();
         }
 
         // 1c. ViPER-DDC (Digital Dynamic Correction)

@@ -108,6 +108,27 @@ void main() {
       const raw = Duration(seconds: 90);
       expect(pipeline.getCompensatedPosition(raw), raw);
     });
+
+    test('invalid native latency falls back to the static estimates', () {
+      final pipeline = OptimizedDspPipeline()
+        ..updateState(isEqEnabled: true)
+        ..updateNativeLatency(frames: -10, sampleRate: double.nan);
+
+      expect(
+          pipeline.calculateTotalEstimatedLatencyMs(),
+          closeTo(
+              DspStage.parametricEq.estimatedLatencyMs +
+                  DspStage.volume.estimatedLatencyMs,
+              1e-9));
+      const raw = Duration(seconds: 1);
+      expect(pipeline.getCompensatedPosition(raw), raw);
+    });
+
+    test('non-finite balance never activates the panner', () {
+      final pipeline = OptimizedDspPipeline()
+        ..updateState(stereoBalance: double.nan);
+      expect(pipeline.getActiveStages(), isNot(contains(DspStage.stereoPanner)));
+    });
   });
 
   group('AudioFeatureInfo conflict matrix — Phase-1 stages', () {

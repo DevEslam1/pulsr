@@ -30,22 +30,46 @@ class DspTelemetry {
         weeklyDose = 0.0,
         safetyAttenuationActive = false;
 
+  /// Tolerant numeric reader: the platform channel is untyped at runtime, so a
+  /// malformed/legacy payload must not throw (the cubit would treat it as a
+  /// poll failure) and NaN/Infinity must not enter the UI state (NaN != NaN
+  /// would make every later emit look changed).
+  static double _readDouble(List<dynamic> list, int index) {
+    if (index < 0 || index >= list.length) return 0.0;
+    final value = list[index];
+    if (value is num) {
+      final d = value.toDouble();
+      return d.isFinite ? d : 0.0;
+    }
+    if (value is String) {
+      final d = double.tryParse(value);
+      return (d != null && d.isFinite) ? d : 0.0;
+    }
+    return 0.0;
+  }
+
+  static int _readInt(List<dynamic> list, int index) {
+    if (index < 0 || index >= list.length) return 0;
+    final value = list[index];
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
   factory DspTelemetry.fromNativeList(List<dynamic> list) {
     if (list.length < 15) {
       return const DspTelemetry.zero();
     }
-    final limiter = (list[0] as num?)?.toDouble() ?? 0.0;
-    final dynEq = List<double>.generate(
-        8, (i) => (list[1 + i] as num?)?.toDouble() ?? 0.0);
-    final mb = List<double>.generate(
-        4, (i) => (list[9 + i] as num?)?.toDouble() ?? 0.0);
-    final rtf = (list[13] as num?)?.toDouble() ?? 0.0;
-    final degraded = (list[14] as num?)?.toInt() ?? 0;
-    final dose =
-        list.length >= 16 ? ((list[15] as num?)?.toDouble() ?? 0.0) : 0.0;
-    final attenuation = list.length >= 17
-        ? (((list[16] as num?)?.toDouble() ?? 0.0) > 0.5)
-        : false;
+    final limiter = _readDouble(list, 0).clamp(-60.0, 0.0).toDouble();
+    final dynEq = List<double>.generate(8, (i) => _readDouble(list, 1 + i));
+    final mb = List<double>.generate(4, (i) => _readDouble(list, 9 + i));
+    // RTF above 1 means overload; keep it visible but bounded so a corrupt
+    // value cannot break percent formatting. Dose is a 0..100 multiple of the
+    // weekly threshold.
+    final rtf = _readDouble(list, 13).clamp(0.0, 10.0).toDouble();
+    final degraded = _readInt(list, 14);
+    final dose = _readDouble(list, 15).clamp(0.0, 100.0).toDouble();
+    final attenuation = _readDouble(list, 16) > 0.5;
 
     return DspTelemetry(
       limiterGrDb: limiter,

@@ -6,6 +6,17 @@ import 'package:pulsr/features/player/cubit/dsp_telemetry_cubit.dart';
 
 class MockAudioEffectsChannel extends Mock implements AudioEffectsChannel {}
 
+/// Waits until the cubit has actually observed [count] failed polls instead of
+/// assuming a fixed wall-clock window (the old 10ms sleeps were flaky when the
+/// whole DSP suite ran in parallel).
+Future<void> waitForFailures(DspTelemetryCubit cubit, int count) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 2));
+  while (cubit.consecutiveFailures < count &&
+      DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 2));
+  }
+}
+
 void main() {
   test('a throwing channel backs off instead of spamming unhandled errors (B3)',
       () async {
@@ -48,7 +59,8 @@ void main() {
       pollingInterval: const Duration(milliseconds: 1),
     );
     cubit.subscribe();
-    await Future<void>.delayed(const Duration(milliseconds: 10));
+    await waitForFailures(cubit, 3);
+    expect(cubit.consecutiveFailures, greaterThanOrEqualTo(3));
     // Timer is parked after 3 failures; a manual refresh must recover.
     await cubit.refreshOnce();
     await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -85,7 +97,7 @@ void main() {
     cubit.subscribe();
 
     // 1. Initial 3 failures park the timer and schedule retry
-    await Future<void>.delayed(const Duration(milliseconds: 10));
+    await waitForFailures(cubit, 3);
     expect(cubit.consecutiveFailures, greaterThanOrEqualTo(3));
     expect(cubit.isRetryTimerActive, isTrue);
 

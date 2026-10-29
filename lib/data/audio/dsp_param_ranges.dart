@@ -157,6 +157,14 @@ abstract final class DspParamRanges {
   static const DspRange subCrossoverGain =
       DspRange(0.0, 1.0, defaultValue: 0.8);
 
+  /// Native SubCrossover implements Linkwitz-Riley 2nd/4th order only, so the
+  /// UI's continuous-looking slope is quantized to 12 or 24 dB/oct. Non-finite
+  /// input falls back to the native default (24) instead of propagating NaN.
+  static double normalizeSubCrossoverSlope(double value) {
+    if (!value.isFinite) return 24.0;
+    return value < 18.0 ? 12.0 : 24.0;
+  }
+
   // --- Multiband compressor crossovers (DspParams.h MultibandCompressorParamSet)
   static const DspRange multibandCompressorF0 =
       DspRange(40.0, 500.0, defaultValue: 160.0);

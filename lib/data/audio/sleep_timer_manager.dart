@@ -424,6 +424,14 @@ class SleepTimerManager {
 
     final player = _lastPlayerGetter?.call();
     if ((_nativeCurveArmed || _nativeCurveArming) && player != null) {
+      // The armed curve is a multiplier on the player's base volume. Clearing
+      // it restores unity instantly, so silence the base first; otherwise a
+      // fade that has not reached zero (paused mid-fade, ticker drift) blips
+      // back to full volume between the clear and the pause landing. The
+      // restore in `finally` re-applies the pre-fade level afterwards.
+      try {
+        await player.setVolume(0);
+      } catch (_) {}
       try {
         player.dspClearGainCurve().catchError((_) => false);
       } catch (_) {}

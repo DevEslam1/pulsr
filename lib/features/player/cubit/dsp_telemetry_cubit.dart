@@ -108,13 +108,20 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   }
 
   Future<void> refreshOnce() async {
+    // A timer tick may already be in flight. Wait for it to finish instead of
+    // silently dropping the user's explicit refresh (the old implementation
+    // returned immediately, so a refresh during a slow/failing poll did
+    // nothing).
+    while (_fetchInFlight) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
     await _fetchTelemetry();
   }
 
   Future<void> _fetchTelemetry() async {
     // Skip this tick while a previous fetch is still in flight: the 200ms timer
-    // can fire before the 250ms channel timeout, and overlapping polls could
-    // emit telemetry out of order.
+    // can fire before the channel timeout, and overlapping polls could emit
+    // telemetry out of order.
     if (_fetchInFlight) return;
     _fetchInFlight = true;
     try {
