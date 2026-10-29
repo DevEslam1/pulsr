@@ -1,11 +1,8 @@
 // lib/core/widgets/pulsr_card.dart
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../motion/pulsr_motion.dart';
-import '../performance/gpu_budget.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
 
@@ -80,7 +77,7 @@ class _PulsrCardState extends State<PulsrCard> {
       case PulsrCardVariant.elevated:
         return p.surfaceElevated;
       case PulsrCardVariant.glass:
-        return p.surfaceOverlay;
+        return p.surfaceContainer;
     }
   }
 
@@ -94,9 +91,8 @@ class _PulsrCardState extends State<PulsrCard> {
       case PulsrCardVariant.outlined:
         return p.hairline;
       case PulsrCardVariant.elevated:
-        return p.isDark ? AppColors.specularAt(0.10) : p.hairline;
       case PulsrCardVariant.glass:
-        return p.isDark ? AppColors.specularAt(0.16) : AppColors.scrimAt(0.08);
+        return p.hairline;
     }
   }
 
@@ -155,36 +151,6 @@ class _PulsrCardState extends State<PulsrCard> {
         ? Padding(padding: widget.padding!, child: widget.child)
         : widget.child;
 
-    final showTopSheen = widget.variant == PulsrCardVariant.elevated ||
-        widget.variant == PulsrCardVariant.glass;
-
-    if (showTopSheen) {
-      content = Stack(
-        children: [
-          PositionedDirectional(
-            top: 0,
-            start: 16,
-            end: 16,
-            height: 1.0,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.specularAt(0.0),
-                      AppColors.specularAt(p.isDark ? 0.32 : 0.60),
-                      AppColors.specularAt(0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          content,
-        ],
-      );
-    }
-
     final isTappable = widget.onTap != null || widget.onLongPress != null;
 
     if (isTappable) {
@@ -195,18 +161,6 @@ class _PulsrCardState extends State<PulsrCard> {
           onTap: widget.onTap,
           onLongPress: widget.onLongPress,
           borderRadius: radius,
-          child: content,
-        ),
-      );
-    }
-
-    if (widget.variant == PulsrCardVariant.glass &&
-        context.motionEnabled &&
-        !GpuBudget.isGpuSaverActive) {
-      content = ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: content,
         ),
       );

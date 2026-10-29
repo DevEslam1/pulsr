@@ -78,6 +78,7 @@ void main() {
             body: PulsrBottomNavBar(
               currentIndex: 0,
               onTap: (_) {},
+              enableBlur: true,
             ),
           ),
         ),
@@ -91,6 +92,7 @@ void main() {
             body: PulsrBottomNavBar(
               currentIndex: 0,
               onTap: (_) {},
+              enableBlur: true,
             ),
           ),
         ),

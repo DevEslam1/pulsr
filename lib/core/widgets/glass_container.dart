@@ -2,7 +2,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../performance/gpu_budget.dart';
 import '../theme/aura_theme.dart';
@@ -124,65 +123,25 @@ class GlassContainer extends StatelessWidget {
     final p = context.palette;
     final effectiveRadius =
         borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
-    final effectiveAlpha = tintFactor != null
-        ? (0.20 + (tintFactor!.clamp(0.0, 1.0) * 0.70))
-        : opacity;
 
-    final baseSurface = color ?? (p.isDark ? p.surface : p.surfaceContainer);
-    final baseColor = baseSurface.withValues(alpha: effectiveAlpha);
+    final baseColor = color ?? (p.isDark ? p.surfaceContainer : p.surface);
 
     final effectiveBorder = border ??
         Border.all(
-          color: (p.isDark ? Colors.white : Colors.black).withValues(
-            alpha:
-                p.isDark ? (isLiquid ? 0.15 : 0.09) : (isLiquid ? 0.10 : 0.06),
-          ),
-          width: isLiquid ? 1.15 : 1.0,
+          color: p.hairline,
+          width: 1.0,
         );
 
-    final effectiveShadow = boxShadow ??
-        (isLiquid
-            ? [
-                BoxShadow(
-                  color: AppColors.scrimAt(p.isDark ? 0.38 : 0.09),
-                  blurRadius: 20,
-                  spreadRadius: -2,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: p.accent.withValues(alpha: p.isDark ? 0.06 : 0.025),
-                  blurRadius: 14,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null);
-
-    // Subtle directional surface sheen for liquid/standard glass tiers
-    final Gradient? surfaceGradient = tier == GlassTier.solid
-        ? null
-        : LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color.alphaBlend(
-                AppColors.specularAt(
-                    p.isDark ? (isLiquid ? 0.05 : 0.025) : 0.18),
-                baseColor,
-              ),
-              baseColor,
-            ],
-          );
+    final effectiveShadow = boxShadow;
 
     final decoration = shape != null
         ? ShapeDecoration(
-            color: surfaceGradient == null ? baseColor : null,
-            gradient: surfaceGradient,
+            color: baseColor,
             shape: shape!,
             shadows: effectiveShadow,
           )
         : BoxDecoration(
-            color: surfaceGradient == null ? baseColor : null,
-            gradient: surfaceGradient,
+            color: baseColor,
             borderRadius: effectiveRadius,
             border: effectiveBorder,
             boxShadow: effectiveShadow,
@@ -191,37 +150,9 @@ class GlassContainer extends StatelessWidget {
     final Widget paddedChild =
         padding != null ? Padding(padding: padding!, child: child) : child;
 
-    final showSpecular = specularHighlight || isLiquid;
-
     final Widget decoratedContent = Container(
       decoration: decoration,
-      child: showSpecular
-          ? Stack(
-              children: [
-                PositionedDirectional(
-                  top: 0,
-                  start: 12,
-                  end: 12,
-                  height: 1.2,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.specularAt(0.0),
-                            AppColors.specularAt(p.isDark ? 0.48 : 0.78),
-                            AppColors.specularAt(0.0),
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                paddedChild,
-              ],
-            )
-          : paddedChild,
+      child: paddedChild,
     );
 
     if (!enableBlur || GpuBudget.isGpuSaverActive || blur <= 0) {

@@ -346,18 +346,18 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                       child: Container(
                         height: 56,
                         decoration: BoxDecoration(
-                          color: p.surface.withValues(alpha: 0.88),
+                          color: p.surfaceContainer,
                           borderRadius: AppRadii.r24All,
                           border: Border.all(
                             color: p.hairline,
-                            width: 1.2,
+                            width: 1.0,
                           ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black
-                                  .withValues(alpha: p.isDark ? 0.35 : 0.12),
-                              blurRadius: 18,
-                              offset: const Offset(0, 4),
+                                  .withValues(alpha: p.isDark ? 0.20 : 0.05),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),

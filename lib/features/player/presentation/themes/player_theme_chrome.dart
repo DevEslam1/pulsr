@@ -14,7 +14,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
-import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/services/sound_feedback_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -536,18 +535,15 @@ class PlayerViewSwitcher extends StatelessWidget {
     final isQueue = state.isQueueVisible;
     final isTrack = !isLyrics && !isQueue;
     final l10n = context.l10n;
-    final surfaceBase = p.isDark ? Colors.white : Colors.black;
     // Custom Theme Studio shape controls apply when the user picked the custom
     // colour source, so preset themes keep their hand-tuned geometry.
     final custom = context
-        .select<SettingsCubit, ({double radius, bool glow, bool active})>(
+        .select<SettingsCubit, ({double radius, bool active})>(
             (c) => (
                   radius: c.state.customThemeRadius,
-                  glow: c.state.customThemeGlow,
                   active: c.state.themeColorSource == ThemeColorSource.custom,
                 ));
     final barRadius = custom.active ? custom.radius : 20.0;
-    final showGlow = custom.active && custom.glow;
 
     return Center(
       child: ConstrainedBox(
@@ -564,27 +560,13 @@ class PlayerViewSwitcher extends StatelessWidget {
               final pillContainer = Container(
                 padding: const EdgeInsets.all(3.0),
                 decoration: BoxDecoration(
-                  color: GpuBudget.isGpuSaverActive
-                      ? surfaceBase
-                      : surfaceBase.withValues(alpha: surfaceFillAlpha),
+                  color: p.surfaceContainer,
                   borderRadius: AppRadii.circular(barRadius),
                   border: Border.all(
-                    color: surfaceBase.withValues(alpha: borderAlpha),
+                    color: p.hairline,
                     width: 1.0,
                   ),
-                  boxShadow: [
-                    if (showGlow)
-                      BoxShadow(
-                        color: activeColor.withValues(alpha: 0.30),
-                        blurRadius: 20,
-                        spreadRadius: 1,
-                      ),
-                    BoxShadow(
-                      color: AppColors.scrimAt(0.20),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  boxShadow: PulsrElevation.level1(context),
                 ),
                 child: Stack(
                   children: [
@@ -601,27 +583,13 @@ class PlayerViewSwitcher extends StatelessWidget {
                         heightFactor: 1.0,
                         child: Container(
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                activeColor.withValues(alpha: 0.32),
-                                activeColor.withValues(alpha: 0.16),
-                              ],
-                            ),
+                            color: p.accentContainer,
                             borderRadius: AppRadii.circular(
                                 math.max(4.0, barRadius - 3.0)),
                             border: Border.all(
-                              color: activeColor.withValues(alpha: 0.52),
+                              color: p.accent,
                               width: 1.0,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: activeColor.withValues(alpha: 0.20),
-                                blurRadius: 10,
-                                spreadRadius: -2,
-                              ),
-                            ],
                           ),
                         ),
                       ),
@@ -749,7 +717,6 @@ class PlayerBottomActionDock extends StatelessWidget {
                   active: c.state.themeColorSource == ThemeColorSource.custom,
                 ));
     final barRadius = custom.active ? custom.radius : 24.0;
-    final showGlow = custom.active && custom.glow;
 
     final IconData outputIcon = isCast
         ? Icons.cast_connected_rounded
@@ -774,37 +741,21 @@ class PlayerBottomActionDock extends StatelessWidget {
           borderRadius: AppRadii.circular(barRadius),
           child: Builder(
             builder: (context) {
-              final dockSurfaceBase = p.isDark ? Colors.white : Colors.black;
               final dockContainer = Container(
                 padding: const EdgeInsets.all(3.0),
                 decoration: BoxDecoration(
-                  color: GpuBudget.isGpuSaverActive ? p.surface : null,
-                  gradient: GpuBudget.isGpuSaverActive
-                      ? null
-                      : LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            dockSurfaceBase.withValues(alpha: 0.09),
-                            dockSurfaceBase.withValues(alpha: 0.04),
-                          ],
-                        ),
+                  color: p.surfaceContainer,
                   borderRadius: AppRadii.circular(barRadius),
                   border: Border.all(
-                    color: dockSurfaceBase.withValues(alpha: 0.14),
+                    color: p.hairline,
                     width: 1.0,
                   ),
                   boxShadow: [
-                    if (showGlow)
-                      BoxShadow(
-                        color: props.activeColor.withValues(alpha: 0.28),
-                        blurRadius: 20,
-                        spreadRadius: 1,
-                      ),
                     BoxShadow(
-                      color: AppColors.scrimAt(0.20),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
+                      color: Colors.black
+                          .withValues(alpha: p.isDark ? 0.20 : 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),

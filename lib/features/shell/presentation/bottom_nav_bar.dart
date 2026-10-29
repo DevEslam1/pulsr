@@ -9,7 +9,6 @@ import '../../../core/utils/adaptive.dart';
 import 'nav_destinations.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 class PulsrBottomNavBar extends StatefulWidget {
   final int currentIndex;
@@ -18,6 +17,7 @@ class PulsrBottomNavBar extends StatefulWidget {
   final VoidCallback? onSwipeUp;
   final bool includeSafeArea;
   final bool iconOnly;
+  final bool enableBlur;
 
   const PulsrBottomNavBar({
     super.key,
@@ -27,6 +27,7 @@ class PulsrBottomNavBar extends StatefulWidget {
     this.onSwipeUp,
     this.includeSafeArea = true,
     this.iconOnly = false,
+    this.enableBlur = false,
   });
 
   @override
@@ -121,16 +122,9 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black
-                            .withValues(alpha: p.isDark ? 0.40 : 0.12),
-                        blurRadius: 24,
+                            .withValues(alpha: p.isDark ? 0.25 : 0.06),
+                        blurRadius: 8,
                         spreadRadius: 0,
-                        offset: const Offset(0, 8),
-                      ),
-                      BoxShadow(
-                        color:
-                            p.accent.withValues(alpha: p.isDark ? 0.10 : 0.05),
-                        blurRadius: 18,
-                        spreadRadius: -2,
                         offset: const Offset(0, 2),
                       ),
                     ],
@@ -142,25 +136,10 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                         final navContainer = Container(
                           decoration: BoxDecoration(
                             borderRadius: navRadius,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                GpuBudget.isGpuSaverActive
-                                    ? p.surface
-                                    : p.surface.withValues(
-                                        alpha: p.isDark ? 0.78 : 0.88),
-                                GpuBudget.isGpuSaverActive
-                                    ? p.surfaceContainer
-                                    : p.surfaceContainer.withValues(
-                                        alpha: p.isDark ? 0.72 : 0.84),
-                              ],
-                            ),
+                            color: p.surfaceContainer,
                             border: Border.all(
-                              color: p.isDark
-                                  ? AppColors.specularStrong
-                                  : AppColors.scrimAt(0.08),
-                              width: 1.2,
+                              color: p.hairline,
+                              width: 1.0,
                             ),
                           ),
                           padding: const EdgeInsets.symmetric(
@@ -206,7 +185,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                           ),
                         );
 
-                        if (GpuBudget.isGpuSaverActive) {
+                        if (!widget.enableBlur || GpuBudget.isGpuSaverActive) {
                           return navContainer;
                         }
                         return BackdropFilter(

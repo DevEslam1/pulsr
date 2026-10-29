@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <functional>
 #include <sstream>
-#include <charconv>
 #include <locale>
 
 namespace {
@@ -93,13 +92,9 @@ public:
                     ++pos_;
                 }
             }
-            double val = 0.0;
-            auto [ptr, ec] = std::from_chars(src_.data() + start, src_.data() + pos_, val);
-            if (ec != std::errc()) {
-                std::istringstream iss(src_.substr(start, pos_ - start));
-                iss.imbue(std::locale::classic());
-                iss >> val;
-            }
+            std::string numStr = src_.substr(start, pos_ - start);
+            char* endPtr = nullptr;
+            double val = std::strtod(numStr.c_str(), &endPtr);
             return {TokenType::Number, val, ""};
         }
 

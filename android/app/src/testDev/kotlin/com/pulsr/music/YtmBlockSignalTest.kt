@@ -90,10 +90,14 @@ class YtmBlockSignalTest {
 
     @Test
     fun testBotDetectionDoesNotMatchTrackTitlesOrAgeWalls() {
+        // A track/artist name containing "Robot" used to match the bare
+        // "robot" substring and trigger a global bot cooldown.
         assertNotEquals(
             YtmBlockSignal.BotChallenge,
             YtmBlockSignal.parse(200, "Robot Rock - Daft Punk")
         )
+        // "verification required" also describes an age wall; it must not be
+        // read as a bot interstitial.
         val loginRequired = JSONObject().apply { put("status", "LOGIN_REQUIRED") }
         assertNotEquals(
             YtmBlockSignal.BotChallenge,
@@ -286,6 +290,7 @@ class YtmBlockSignalTest {
             YtmBlockSignal.SignInRequired, YtmBlockSignal.ClientDeprecated, YtmBlockSignal.GeoBlocked, YtmBlockSignal.AgeRestricted -> 2
             YtmBlockSignal.VideoGone -> 1
             YtmBlockSignal.NetworkUnavailable -> 0
+YtmBlockSignal.DeadlineExceeded -> 0
         }
 
         assertTrue(priority(YtmBlockSignal.Interrupted) > priority(YtmBlockSignal.BotChallenge))

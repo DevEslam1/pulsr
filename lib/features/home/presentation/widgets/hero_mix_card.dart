@@ -45,42 +45,13 @@ class HeroMixCard extends StatelessWidget {
             height: height,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  p.accent.withValues(alpha: 0.36),
-                  p.accent.withValues(alpha: 0.12),
-                  p.surfaceContainer,
-                ],
-                stops: const [0, 0.55, 1],
-                begin: AlignmentDirectional.topStart,
-                end: AlignmentDirectional.bottomEnd,
-              ),
+              color: p.surfaceContainer,
               borderRadius: AppRadii.r24All,
-              border: Border.all(color: p.accent.withValues(alpha: 0.38)),
+              border: Border.all(color: p.hairline),
               boxShadow: PulsrElevation.level2(context),
             ),
             child: Stack(
               children: [
-                // Top specular refraction edge
-                PositionedDirectional(
-                  top: 0,
-                  start: 20,
-                  end: 20,
-                  child: IgnorePointer(
-                    child: Container(
-                      height: 1.0,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white.withValues(alpha: 0.0),
-                            Colors.white.withValues(alpha: 0.24),
-                            Colors.white.withValues(alpha: 0.0),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
                 // Decorative waveform glyph, bleeds off the trailing edge.
                 PositionedDirectional(
                   end: -18,
@@ -157,26 +128,9 @@ class HeroMixCard extends StatelessWidget {
                           width: 52,
                           height: 52,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Color.lerp(p.accent, Colors.white, 0.14)!,
-                                p.accent,
-                              ],
-                            ),
+                            color: p.accent,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.22),
-                              width: 1.0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: p.glow,
-                                blurRadius: 18,
-                                spreadRadius: 1,
-                              ),
-                            ],
+                            boxShadow: PulsrElevation.level2(context),
                           ),
                           child: Icon(Icons.play_arrow_rounded,
                               color: p.onAccent, size: 30),

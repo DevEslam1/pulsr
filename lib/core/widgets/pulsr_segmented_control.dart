@@ -54,8 +54,6 @@ class PulsrSegmentedControl extends StatelessWidget {
     if (segments.length < 2) return const SizedBox.shrink();
 
     final clampedIndex = selectedIndex.clamp(0, segments.length - 1);
-    final pillTopSheen =
-        Color.lerp(p.accent, Colors.white, p.isDark ? 0.14 : 0.10)!;
 
     if (slidingIndicator) {
       return Container(
@@ -65,9 +63,7 @@ class PulsrSegmentedControl extends StatelessWidget {
           color: p.surfaceContainer,
           borderRadius: AppRadii.r16All,
           border: Border.all(
-            color: p.isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.06),
+            color: p.hairline,
           ),
         ),
         child: LayoutBuilder(
@@ -99,7 +95,7 @@ class PulsrSegmentedControl extends StatelessWidget {
 
             return Stack(
               children: [
-                // Sliding indicator pill with subtle top sheen & glow
+                // Sliding flat indicator pill
                 AnimatedPositionedDirectional(
                   duration: context.motionMs(220),
                   curve: context.motionCurve(Curves.easeOutCubic),
@@ -113,23 +109,9 @@ class PulsrSegmentedControl extends StatelessWidget {
                       : segmentWidth,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [pillTopSheen, p.accent],
-                      ),
+                      color: p.accent,
                       borderRadius: AppRadii.r12All,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        width: 0.8,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: p.accent.withValues(alpha: 0.28),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      boxShadow: PulsrElevation.level1(context),
                     ),
                   ),
                 ),

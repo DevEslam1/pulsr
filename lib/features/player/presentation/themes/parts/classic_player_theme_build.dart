@@ -6,7 +6,6 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
     final state = props.state;
     final cubit = props.cubit;
     final activeColor = props.activeColor;
-    final bgColor = props.bgColor;
     final song = state.currentSong;
 
     final (
@@ -48,86 +47,10 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
 
     return Stack(
       children: [
-        // 1. Dynamic Ambient Backdrop (Isolated in RepaintBoundary for 120fps)
+        // 1. Flat Material Backdrop
         Positioned.fill(
-          child: RepaintBoundary(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: AnimatedContainer(
-                    duration: context.motionMs(500),
-                    curve: context.motionCurve(Curves.easeInOut),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color.lerp(bgColor, Colors.black,
-                                  p.isDark ? 0.40 : 0.04) ??
-                              bgColor,
-                          p.bg,
-                          Color.lerp(
-                                  p.bg, Colors.black, p.isDark ? 0.48 : 0.05) ??
-                              p.bg,
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0.0, 0.50, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Ambient Top Glow Sphere (Behind Artwork)
-                PositionedDirectional(
-                  top: -40,
-                  start: -30,
-                  end: -30,
-                  height: isTablet ? 540 : 420,
-                  child: IgnorePointer(
-                    child: AnimatedContainer(
-                      duration: context.motionMs(500),
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.center,
-                          radius: 0.85,
-                          colors: [
-                            activeColor.withValues(
-                                alpha: state.isPlaying ? 0.34 : 0.22),
-                            activeColor.withValues(alpha: 0.09),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.54, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Ambient Bottom Glow (Near Controls) - Centered for visual symmetry
-                PositionedDirectional(
-                  bottom: -70,
-                  start: 0,
-                  end: 0,
-                  height: isTablet ? 420 : 320,
-                  child: IgnorePointer(
-                    child: AnimatedContainer(
-                      duration: context.motionMs(500),
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.center,
-                          radius: 0.85,
-                          colors: [
-                            activeColor.withValues(alpha: 0.18),
-                            activeColor.withValues(alpha: 0.05),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: Container(
+            color: p.bg,
           ),
         ),
 

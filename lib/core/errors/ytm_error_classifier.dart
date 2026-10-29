@@ -185,7 +185,11 @@ enum YtmBlockSignal {
       case 'YTM_TIMEOUT':
       case 'YTM_OFFLINE':
       case 'RESOLVE_TIMEOUT':
-        return YtmBlockSignal.networkUnavailable;
+      // Local budget exhaustion (native RESOLVE_DEADLINE). Deliberately in the
+      // timeout family rather than the block family: the chain ran out of time,
+      // which says nothing about the egress and must stay retryable.
+      case 'RESOLVE_DEADLINE':
+      return YtmBlockSignal.networkUnavailable;
       case 'RATE_LIMITED':
       case 'YTM_429':
         return YtmBlockSignal.rateLimited;

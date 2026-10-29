@@ -246,34 +246,17 @@ class _PlayerControlsState extends State<PlayerControls> {
                           height: resolvedSideSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: widget.hasPrevious
-                                ? LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      p.textPrimary.withValues(alpha: 0.12),
-                                      p.textPrimary.withValues(alpha: 0.05),
-                                    ],
-                                  )
-                                : null,
                             color: widget.hasPrevious
-                                ? null
-                                : p.textPrimary.withValues(alpha: 0.03),
+                                ? p.surfaceContainerHigh
+                                : p.surfaceContainer.withValues(alpha: 0.5),
                             border: Border.all(
                               color: widget.hasPrevious
-                                  ? p.textPrimary.withValues(alpha: 0.16)
-                                  : p.textPrimary.withValues(alpha: 0.05),
+                                  ? p.hairline
+                                  : p.hairline.withValues(alpha: 0.5),
                               width: 1.0,
                             ),
                             boxShadow: widget.hasPrevious
-                                ? [
-                                    BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.22),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ]
+                                ? PulsrElevation.level1(context)
                                 : null,
                           ),
                           child: Center(
@@ -319,39 +302,13 @@ class _PlayerControlsState extends State<PlayerControls> {
                       height: widget.mainButtonSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color.lerp(
-                                    widget.primaryColor, Colors.white, 0.22) ??
-                                widget.primaryColor,
-                            widget.primaryColor,
-                            Color.lerp(
-                                    widget.primaryColor, Colors.black, 0.14) ??
-                                widget.primaryColor,
-                          ],
-                          stops: const [0.0, 0.58, 1.0],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: widget.primaryColor.withValues(
-                                alpha: widget.isPlaying ? 0.48 : 0.28),
-                            blurRadius: widget.isPlaying ? 26 : 18,
-                            spreadRadius: widget.isPlaying ? 2 : 0,
-                            offset: const Offset(0, 6),
-                          ),
-                          BoxShadow(
-                            color: AppColors.scrimAt(0.28),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        color: widget.primaryColor,
+                        boxShadow: PulsrElevation.level2(context),
                         border: Border.all(
                           color: widget.abLoopActive
                               ? p.accent
-                              : AppColors.specularAt(0.32),
-                          width: widget.abLoopActive ? 2.2 : 1.4,
+                              : Colors.transparent,
+                          width: widget.abLoopActive ? 2.0 : 0.0,
                         ),
                       ),
                       child: Center(
@@ -439,34 +396,17 @@ class _PlayerControlsState extends State<PlayerControls> {
                           height: resolvedSideSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: widget.hasNext
-                                ? LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      p.textPrimary.withValues(alpha: 0.12),
-                                      p.textPrimary.withValues(alpha: 0.05),
-                                    ],
-                                  )
-                                : null,
                             color: widget.hasNext
-                                ? null
-                                : p.textPrimary.withValues(alpha: 0.03),
+                                ? p.surfaceContainerHigh
+                                : p.surfaceContainer.withValues(alpha: 0.5),
                             border: Border.all(
                               color: widget.hasNext
-                                  ? p.textPrimary.withValues(alpha: 0.16)
-                                  : p.textPrimary.withValues(alpha: 0.05),
+                                  ? p.hairline
+                                  : p.hairline.withValues(alpha: 0.5),
                               width: 1.0,
                             ),
                             boxShadow: widget.hasNext
-                                ? [
-                                    BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.22),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ]
+                                ? PulsrElevation.level1(context)
                                 : null,
                           ),
                           child: Center(
@@ -645,15 +585,6 @@ class _ControlButton extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: activeColor,
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: activeColor.withValues(alpha: 0.6),
-                              blurRadius: 4,
-                              spreadRadius: 0.5,
-                            )
-                          ]
-                        : null,
                   ),
                 ),
               ],
@@ -721,24 +652,12 @@ class _AbPointButton extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: isActive
                         ? effectiveColor.withValues(alpha: 0.16)
-                        : (p.isDark ? Colors.white : Colors.black)
-                            .withValues(alpha: 0.05),
+                        : p.surfaceContainerHigh,
                     border: Border.all(
-                      color: isActive
-                          ? effectiveColor.withValues(alpha: 0.50)
-                          : (p.isDark ? Colors.white : Colors.black)
-                              .withValues(alpha: 0.12),
-                      width: isActive ? 1.4 : 1.0,
+                      color: isActive ? effectiveColor : p.hairline,
+                      width: 1.0,
                     ),
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: effectiveColor.withValues(alpha: 0.25),
-                              blurRadius: 8,
-                              spreadRadius: 0.5,
-                            )
-                          ]
-                        : null,
+                    boxShadow: isActive ? PulsrElevation.level1(context) : null,
                   ),
                   child: Text(
                     label,
@@ -758,15 +677,6 @@ class _AbPointButton extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: effectiveColor,
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: effectiveColor.withValues(alpha: 0.6),
-                              blurRadius: 4,
-                              spreadRadius: 0.5,
-                            )
-                          ]
-                        : null,
                   ),
                 ),
               ],

@@ -1,12 +1,10 @@
 // lib/core/widgets/pulsr_bottom_sheet.dart
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
 import '../utils/l10n_extensions.dart';
-import '../performance/gpu_budget.dart';
 import 'pulsr_dialog.dart';
 import 'pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -224,19 +222,6 @@ class PulsrBottomSheetContainer extends StatelessWidget {
     final effectiveBorderRadius =
         isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius;
 
-    final navGradient = LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        GpuBudget.isGpuSaverActive
-            ? p.surface
-            : p.surface.withValues(alpha: p.isDark ? 0.78 : 0.88),
-        GpuBudget.isGpuSaverActive
-            ? p.surfaceContainer
-            : p.surfaceContainer.withValues(alpha: p.isDark ? 0.72 : 0.84),
-      ],
-    );
-
     return Align(
       alignment: Alignment.bottomCenter,
       child: AnimatedPadding(
@@ -255,16 +240,10 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                 boxShadow: [
                   BoxShadow(
                     color:
-                        Colors.black.withValues(alpha: p.isDark ? 0.40 : 0.12),
-                    blurRadius: 24,
+                        Colors.black.withValues(alpha: p.isDark ? 0.30 : 0.08),
+                    blurRadius: 12,
                     spreadRadius: 0,
-                    offset: const Offset(0, -4),
-                  ),
-                  BoxShadow(
-                    color: p.accent.withValues(alpha: p.isDark ? 0.08 : 0.04),
-                    blurRadius: 18,
-                    spreadRadius: -2,
-                    offset: const Offset(0, 2),
+                    offset: const Offset(0, -3),
                   ),
                 ],
               ),
@@ -274,30 +253,26 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                   : EdgeInsets.zero,
               child: ClipRRect(
                 borderRadius: effectiveBorderRadius,
-                child: Builder(
-                  builder: (context) {
-                    final sheetContent = Container(
-                      decoration: BoxDecoration(
-                        gradient: navGradient,
-                        borderRadius: effectiveBorderRadius,
-                        border: Border.all(
-                          color: p.isDark
-                              ? AppColors.specularStrong
-                              : AppColors.scrimAt(0.08),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: _PulsrBottomSheetScope(
-                        child: SafeArea(
-                          top: false,
-                          left: false,
-                          right: false,
-                          child: Material(
-                            type: MaterialType.transparency,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainer,
+                    borderRadius: effectiveBorderRadius,
+                    border: Border.all(
+                      color: p.hairline,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: _PulsrBottomSheetScope(
+                    child: SafeArea(
+                      top: false,
+                      left: false,
+                      right: false,
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                                 // Top drag pill
                                 if (showDragHandle) ...[
                                   const SizedBox(height: AppSpacing.s10),
@@ -377,22 +352,12 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                           ),
                         ),
                       ),
-                    );
-
-                    if (GpuBudget.isGpuSaverActive) {
-                      return sheetContent;
-                    }
-                    return BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                      child: sheetContent,
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
-    );
+        );
   }
 }

@@ -31,6 +31,7 @@ void main() {
   late _LibraryCubit libraryCubit;
   late StreamController<SearchState> states;
   late ValueNotifier<List<String>> savedSearches;
+  late ValueNotifier<List<SongsTableData>> searchPlayedSongs;
   late ValueNotifier<bool> hasMoreResults;
   late PlayerCubit player;
 
@@ -58,6 +59,7 @@ void main() {
     libraryCubit = _LibraryCubit();
     states = StreamController<SearchState>.broadcast();
     savedSearches = ValueNotifier<List<String>>(const []);
+    searchPlayedSongs = ValueNotifier<List<SongsTableData>>(const []);
     hasMoreResults = ValueNotifier<bool>(false);
     player = stubPlayerCubit();
     when(() => player.playSong(any(), queue: any(named: 'queue')))
@@ -66,6 +68,10 @@ void main() {
     when(() => searchCubit.state).thenReturn(const SearchState());
     when(() => searchCubit.stream).thenAnswer((_) => states.stream);
     when(() => searchCubit.savedSearches).thenReturn(savedSearches);
+    when(() => searchCubit.searchPlayedSongs).thenReturn(searchPlayedSongs);
+    when(() => searchCubit.recordPlayedSong(any())).thenAnswer((_) async {});
+    when(() => searchCubit.removeSearchPlayedSong(any())).thenAnswer((_) async {});
+    when(() => searchCubit.clearSearchPlayedSongs()).thenAnswer((_) async {});
     when(() => searchCubit.hasMoreResults).thenReturn(hasMoreResults);
     when(() => searchCubit.isDebouncing).thenReturn(false);
     when(() => searchCubit.isSaved(any(), any())).thenReturn(false);
@@ -92,6 +98,7 @@ void main() {
     addTearDown(() async {
       await states.close();
       savedSearches.dispose();
+      searchPlayedSongs.dispose();
       hasMoreResults.dispose();
     });
   });

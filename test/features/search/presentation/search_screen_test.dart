@@ -12,7 +12,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/highlighted_text.dart';
 import 'package:pulsr/core/widgets/pulsr_empty_state.dart';
 import 'package:pulsr/core/widgets/pulsr_chip.dart';
+import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_state.dart';
 import 'package:pulsr/features/search/presentation/search_screen.dart';
@@ -30,11 +32,13 @@ void main() {
   late _SearchCubit searchCubit;
   late StreamController<SearchState> states;
   late ValueNotifier<List<String>> savedSearches;
+  late ValueNotifier<List<SongsTableData>> searchPlayedSongs;
   late ValueNotifier<bool> hasMoreResults;
 
   setUpAll(() {
     registerFallbackValue('');
     registerFallbackValue(List<String>.empty());
+    registerFallbackValue(createTestSong());
   });
 
   setUp(() {
@@ -42,11 +46,16 @@ void main() {
     searchCubit = _SearchCubit();
     states = StreamController<SearchState>.broadcast();
     savedSearches = ValueNotifier<List<String>>(const []);
+    searchPlayedSongs = ValueNotifier<List<SongsTableData>>(const []);
     hasMoreResults = ValueNotifier<bool>(false);
 
     when(() => searchCubit.state).thenReturn(const SearchState());
     when(() => searchCubit.stream).thenAnswer((_) => states.stream);
     when(() => searchCubit.savedSearches).thenReturn(savedSearches);
+    when(() => searchCubit.searchPlayedSongs).thenReturn(searchPlayedSongs);
+    when(() => searchCubit.recordPlayedSong(any())).thenAnswer((_) async {});
+    when(() => searchCubit.removeSearchPlayedSong(any())).thenAnswer((_) async {});
+    when(() => searchCubit.clearSearchPlayedSongs()).thenAnswer((_) async {});
     when(() => searchCubit.hasMoreResults).thenReturn(hasMoreResults);
     when(() => searchCubit.isDebouncing).thenReturn(false);
     when(() => searchCubit.isSaved(any(), any())).thenReturn(false);
@@ -61,6 +70,7 @@ void main() {
     addTearDown(() async {
       await states.close();
       savedSearches.dispose();
+      searchPlayedSongs.dispose();
       hasMoreResults.dispose();
     });
   });
@@ -84,14 +94,12 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('renders the start page with quick discovery tags',
+  testWidgets('renders the start page',
       (tester) async {
     await pumpScreen(tester);
 
     expect(find.text('Search'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Rock'), findsWidgets);
-    expect(find.text('Pop'), findsWidgets);
   });
 
   testWidgets('typing a query renders local song results', (tester) async {
@@ -145,7 +153,7 @@ void main() {
 
     await emit(tester, const SearchState());
     expect(find.byType(HighlightedSongTile), findsNothing);
-    expect(find.text('Rock'), findsWidgets);
+    expect(find.byType(TextField), findsOneWidget);
   });
 
   testWidgets('the filter bar selects a filter', (tester) async {

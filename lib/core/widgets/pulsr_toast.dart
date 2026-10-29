@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../features/player/cubit/player_cubit.dart';
@@ -8,7 +7,6 @@ import '../constants/app_radii.dart';
 import '../constants/app_typography.dart';
 import '../di/injection.dart';
 import '../motion/pulsr_motion.dart';
-import '../performance/gpu_budget.dart';
 import '../services/sound_feedback_service.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
@@ -463,58 +461,31 @@ class _ToastWidgetState extends State<_ToastWidget>
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black
-                                  .withValues(alpha: p.isDark ? 0.40 : 0.12),
-                              blurRadius: 24,
+                                  .withValues(alpha: p.isDark ? 0.30 : 0.08),
+                              blurRadius: 10,
                               spreadRadius: 0,
-                              offset: const Offset(0, 8),
-                            ),
-                            BoxShadow(
-                              color: statusColor.withValues(
-                                  alpha: p.isDark ? 0.14 : 0.08),
-                              blurRadius: 18,
-                              spreadRadius: -2,
-                              offset: const Offset(0, 2),
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: ClipRRect(
                           borderRadius: snackbarRadius,
-                          child: Builder(
-                            builder: (context) {
-                              final toastContainer = Semantics(
-                                liveRegion: true,
-                                container: true,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: snackbarRadius,
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        GpuBudget.isGpuSaverActive
-                                            ? p.surface
-                                            : p.surface.withValues(
-                                                alpha: p.isDark ? 0.82 : 0.90),
-                                        GpuBudget.isGpuSaverActive
-                                            ? p.surfaceContainer
-                                            : p.surfaceContainer.withValues(
-                                                alpha: p.isDark ? 0.76 : 0.86),
-                                      ],
-                                    ),
-                                    border: Border.all(
-                                      color: widget.isError
-                                          ? p.error.withValues(alpha: 0.45)
-                                          : (widget.isSuccess
-                                              ? p.success
-                                                  .withValues(alpha: 0.45)
-                                              : (p.isDark
-                                                  ? Colors.white
-                                                      .withValues(alpha: 0.14)
-                                                  : Colors.black.withValues(
-                                                      alpha: 0.08))),
-                                      width: 1.2,
-                                    ),
-                                  ),
+                          child: Semantics(
+                            liveRegion: true,
+                            container: true,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: snackbarRadius,
+                                color: p.surfaceContainerHigh,
+                                border: Border.all(
+                                  color: widget.isError
+                                      ? p.error
+                                      : (widget.isSuccess
+                                          ? p.success
+                                          : p.hairline),
+                                  width: 1.0,
+                                ),
+                              ),
                                   padding: EdgeInsetsDirectional.fromSTEB(
                                     isCompactLandscape ? 10 : 12,
                                     isCompactLandscape ? 7 : 9,
@@ -691,17 +662,8 @@ class _ToastWidgetState extends State<_ToastWidget>
                                     ],
                                   ),
                                 ),
-                              );
-
-                              if (GpuBudget.isGpuSaverActive) {
-                                return toastContainer;
-                              }
-                              return BackdropFilter(
-                                filter:
-                                    ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                                child: toastContainer,
-                              );
-                            },
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -709,9 +671,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                   ),
                 ),
               ),
-            ),
-          ),
-        );
+            );
       },
     );
   }

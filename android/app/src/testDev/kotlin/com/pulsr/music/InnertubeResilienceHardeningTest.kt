@@ -529,5 +529,22 @@ class InnertubeResilienceHardeningTest {
         assertNotNull(shortCircuit.get())
         assertEquals("Blocked by 2 clients", shortCircuit.get()?.message)
     }
-}
 
+@Test
+    fun testNTransformGuardsEmptyOrNullString() {
+        // FIX #4: Empty or null transformed n must return original url
+        fun applyNTransform(url: String, transformed: String?): String {
+            val n = "originalN123"
+            if (transformed.isNullOrEmpty() || transformed == n) return url
+            return url.replace("n=$n", "n=$transformed")
+        }
+
+        val original = "https://googlevideo.com/videoplayback?expire=123&n=originalN123"
+        assertEquals(original, applyNTransform(original, ""))
+        assertEquals(original, applyNTransform(original, null))
+        assertEquals(original, applyNTransform(original, "originalN123"))
+
+        val expected = "https://googlevideo.com/videoplayback?expire=123&n=decipheredN"
+        assertEquals(expected, applyNTransform(original, "decipheredN"))
+    }
+}

@@ -125,14 +125,14 @@ class SortFilterSheet extends StatelessWidget {
           Navigator.pop(context);
         },
         child: Container(
-          constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+          constraints: const BoxConstraints(minHeight: 36, minWidth: 36),
           padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+              horizontal: AppSpacing.s12, vertical: AppSpacing.s6),
           decoration: BoxDecoration(
-            color: p.accentContainer,
+            color: p.surfaceContainerHigh,
             borderRadius: AppRadii.full,
             border: Border.all(
-              color: p.accent.withValues(alpha: 0.30),
+              color: p.hairline,
             ),
           ),
           child: Row(
@@ -142,16 +142,17 @@ class SortFilterSheet extends StatelessWidget {
                 ascending
                     ? Icons.arrow_upward_rounded
                     : Icons.arrow_downward_rounded,
-                size: 16,
+                size: 15,
                 color: p.accent,
               ),
-              const SizedBox(width: AppSpacing.xxs),
+              const SizedBox(width: AppSpacing.xs),
               Text(
                 ascending ? 'A–Z' : 'Z–A',
                 style: TextStyle(
                   color: p.accent,
                   fontSize: AppFontSize.caption,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
@@ -166,11 +167,15 @@ class SortFilterSheet extends StatelessWidget {
             if (useTwoColumns) {
               return GridView.builder(
                 shrinkWrap: true,
-                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
-                    AppSpacing.sm, AppSpacing.md, AppSpacing.s20),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                  AppSpacing.md,
+                  AppSpacing.s16,
+                ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  mainAxisExtent: 54,
+                  mainAxisExtent: 48,
                   crossAxisSpacing: AppSpacing.xs,
                   mainAxisSpacing: AppSpacing.xs,
                 ),
@@ -179,21 +184,28 @@ class SortFilterSheet extends StatelessWidget {
                   context,
                   p,
                   sortOptions[index],
+                  isGrid: true,
                 ),
               );
             }
 
             return ListView.separated(
               shrinkWrap: true,
+              physics: const BouncingScrollPhysics(),
               padding: const EdgeInsetsDirectional.fromSTEB(
-                  AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.s20),
+                AppSpacing.md,
+                AppSpacing.xs,
+                AppSpacing.md,
+                AppSpacing.s16,
+              ),
               itemCount: sortOptions.length,
               separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppSpacing.s6),
+                  const SizedBox(height: AppSpacing.s2),
               itemBuilder: (context, index) => _buildSortOptionTile(
                 context,
                 p,
                 sortOptions[index],
+                isGrid: false,
               ),
             );
           },
@@ -205,79 +217,106 @@ class SortFilterSheet extends StatelessWidget {
   Widget _buildSortOptionTile(
     BuildContext context,
     PulsrPalette p,
-    _SortOptionSpec option,
-  ) {
+    _SortOptionSpec option, {
+    required bool isGrid,
+  }) {
     final isSelected = currentSort == option.key;
     return Semantics(
       button: true,
       selected: isSelected,
       label: option.label,
-      child: PulsrPressable(
-        pressedScale: 0.985,
-        onTap: () => _handleSelect(context, option.key),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          alignment: AlignmentDirectional.centerStart,
-          padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.xs, horizontal: AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? p.accentContainer
-                : p.surfaceContainer.withValues(alpha: 0.65),
-            borderRadius: AppRadii.r14All,
-            border: Border.all(
-              color: isSelected
-                  ? p.accent.withValues(alpha: 0.45)
-                  : p.hairline.withValues(alpha: 0.7),
-              width: isSelected ? 1.2 : 1.0,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: AppRadii.r12All,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _handleSelect(context, option.key),
+          borderRadius: AppRadii.r12All,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            alignment: AlignmentDirectional.centerStart,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s12,
+              vertical: AppSpacing.s10,
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? p.accent.withValues(alpha: 0.18)
-                      : p.surface.withValues(alpha: 0.7),
-                  borderRadius: AppRadii.r10All,
-                ),
-                child: Icon(
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? p.accentContainer
+                  : (isGrid ? p.surfaceContainer : Colors.transparent),
+              borderRadius: AppRadii.r12All,
+              border: isSelected
+                  ? Border.all(
+                      color: p.accent.withValues(alpha: 0.35),
+                      width: 1.0,
+                    )
+                  : (isGrid
+                      ? Border.all(color: p.hairline, width: 1.0)
+                      : null),
+            ),
+            child: Row(
+              children: [
+                Icon(
                   option.icon,
-                  size: 17,
+                  size: 20,
                   color: isSelected ? p.accent : p.textSecondary,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  option.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isSelected ? p.accent : p.textPrimary,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: AppFontSize.body,
+                const SizedBox(width: AppSpacing.s12),
+                Expanded(
+                  child: Text(
+                    option.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isSelected ? p.accent : p.textPrimary,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: AppFontSize.body,
+                    ),
                   ),
                 ),
-              ),
-              if (isSelected)
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.xxs),
-                  decoration: BoxDecoration(
-                    color: p.accent.withValues(alpha: 0.16),
-                    shape: BoxShape.circle,
+                if (isSelected) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.16),
+                      borderRadius: AppRadii.full,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          ascending
+                              ? Icons.arrow_upward_rounded
+                              : Icons.arrow_downward_rounded,
+                          color: p.accent,
+                          size: 13,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          ascending ? 'A–Z' : 'Z–A',
+                          style: TextStyle(
+                            color: p.accent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Icon(
-                    ascending
-                        ? Icons.arrow_upward_rounded
-                        : Icons.arrow_downward_rounded,
+                  const SizedBox(width: AppSpacing.xs),
+                  Icon(
+                    Icons.check_rounded,
                     color: p.accent,
-                    size: 16,
+                    size: 18,
                   ),
-                ),
-            ],
+                ],
+              ],
+            ),
           ),
         ),
       ),

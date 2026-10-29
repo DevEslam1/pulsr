@@ -505,6 +505,61 @@ class YtmService {
     }
   }
 
+  /// Pushes a JSON capability override to the native client matrix.
+  ///
+  /// The native side validates it, persists it, and re-applies it on the next
+  /// start. This is the only way to change client versions, priorities or token
+  /// requirements without shipping a release; see [refreshClientCapabilitiesFrom]
+  /// for the fetch wrapper and `YTM_CAPABILITIES_URL` for the opt-in switch.
+  Future<bool> updateClientCapabilities(String json) async {
+    if (json.trim().isEmpty) return false;
+    try {
+      final applied = await _channel
+          .invokeMethod<bool>('updateClientCapabilities', {'json': json})
+          .timeout(const Duration(seconds: 4));
+      return applied ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
+      return false;
+    }
+  }
+
+  /// Native capability-matrix load state, for diagnostics.
+  Future<Map<String, dynamic>?> getClientCapabilitiesState() async {
+    try {
+      final state = await _channel
+          .invokeMethod<Map<Object?, Object?>>('getClientCapabilitiesState')
+          .timeout(const Duration(seconds: 2));
+      if (state == null) return null;
+      return state.map((k, v) => MapEntry(k.toString(), v));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetches a capability override from [url] and applies it.
+  ///
+  /// Opt-in only: `main` calls this when the build defines `YTM_CAPABILITIES_URL`,
+  /// so a default build makes no extra request and the packaged asset stays
+  /// authoritative. Failures are silent by design - a missing or malformed
+  /// override must never disturb startup.
+  Future<bool> refreshClientCapabilitiesFrom(String url) async {
+    try {
+      final response =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
+      if (response.statusCode < 200 || response.statusCode >= 300) return false;
+      // The native parser rejects anything unreasonable, but a 64 KB cap keeps a
+      // misconfigured URL from becoming a memory problem on the startup path.
+      if (response.bodyBytes.length > 64 * 1024) return false;
+      return await updateClientCapabilities(response.body);
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
+      return false;
+    }
+  }
+
   /// Checks if active connection is via VPN.
   Future<bool> isVpnConnected() async {
     try {

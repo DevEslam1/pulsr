@@ -540,19 +540,17 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                                   horizontal: AppSpacing.s8,
                                   vertical: AppSpacing.s4),
                               decoration: BoxDecoration(
-                                color: context.palette.surfaceContainerHigh
-                                    .withValues(alpha: 0.90),
+                                color: context.palette.surfaceContainerHigh,
                                 borderRadius: AppRadii.r12All,
                                 border: Border.all(
-                                  color: context.palette.hairline
-                                      .withValues(alpha: 0.6),
+                                  color: context.palette.hairline,
                                   width: 1.0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.30),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),

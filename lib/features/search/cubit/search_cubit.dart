@@ -28,6 +28,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
     historyReady = _loadHistoryAsync();
     _loadFilter();
     savedSearchesReady = _loadSavedSearches();
+    searchPlayedSongsReady = _loadSearchPlayedSongs();
   }
 
   late final Future<void> historyReady;
@@ -70,6 +71,15 @@ class SearchCubit extends PulsrCubit<SearchState> {
   final ValueNotifier<List<String>> savedSearches =
       ValueNotifier<List<String>>(const []);
   late final Future<void> savedSearchesReady;
+
+  static const String _searchPlayedSongsKey = 'search_played_songs';
+  static const int searchPlayedSongsMax = 10;
+
+  /// Reactive list of songs played from the search screen, kept outside the
+  /// freezed state so no code generation is required.
+  final ValueNotifier<List<SongsTableData>> searchPlayedSongs =
+      ValueNotifier<List<SongsTableData>>(const []);
+  late final Future<void> searchPlayedSongsReady;
 
   /// True while the latest query has not been executed yet (debounce window).
   /// The UI uses this to keep the skeleton up instead of flashing "no results".
@@ -159,6 +169,38 @@ class SearchCubit extends PulsrCubit<SearchState> {
       if (!isClosed) savedSearches.value = List.unmodifiable(list);
     } catch (e, st) {
       ErrorLogger.log('Failed to load saved searches',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
+  }
+
+  Future<void> _loadSearchPlayedSongs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list =
+          prefs.getStringList(_searchPlayedSongsKey) ?? const <String>[];
+      final loaded = <SongsTableData>[];
+      for (final item in list) {
+        try {
+          final decoded = jsonDecode(item);
+          if (decoded is Map<String, dynamic>) {
+            loaded.add(SongsTableData.fromJson(decoded));
+          }
+        } catch (_) {}
+      }
+      if (!isClosed) searchPlayedSongs.value = List.unmodifiable(loaded);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load search played songs',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
+  }
+
+  Future<void> _persistSearchPlayedSongs(List<SongsTableData> list) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final strings = list.map((s) => jsonEncode(s.toJson())).toList();
+      await prefs.setStringList(_searchPlayedSongsKey, strings);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist search played songs',
           error: e, stackTrace: st, category: 'SearchCubit');
     }
   }
@@ -295,6 +337,42 @@ class SearchCubit extends PulsrCubit<SearchState> {
       // Legacy/plain-text entry.
     }
     return (query: entry, filter: 'All');
+  }
+
+  // ── Search-played songs ─────────────────────────────────────────────
+  Future<void> recordPlayedSong(SongsTableData song) async {
+    await searchPlayedSongsReady;
+    if (isClosed) return;
+    final current = searchPlayedSongs.value;
+    final updated = [
+      song,
+      ...current.where((s) => s.id != song.id),
+    ].take(searchPlayedSongsMax).toList();
+    searchPlayedSongs.value = List.unmodifiable(updated);
+    await _persistSearchPlayedSongs(updated);
+  }
+
+  Future<void> removeSearchPlayedSong(int songId) async {
+    await searchPlayedSongsReady;
+    if (isClosed) return;
+    final updated = searchPlayedSongs.value
+        .where((s) => s.id != songId)
+        .toList(growable: false);
+    searchPlayedSongs.value = List.unmodifiable(updated);
+    await _persistSearchPlayedSongs(updated);
+  }
+
+  Future<void> clearSearchPlayedSongs() async {
+    await searchPlayedSongsReady;
+    if (isClosed) return;
+    searchPlayedSongs.value = const [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_searchPlayedSongsKey);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to clear search played songs',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
   }
 
   // ── Autocomplete ────────────────────────────────────────────────────
@@ -556,6 +634,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
     await super.close();
     savedSearches.value = const [];
     savedSearches.dispose();
+    searchPlayedSongs.value = const [];
+    searchPlayedSongs.dispose();
     hasMoreResults.dispose();
   }
 }

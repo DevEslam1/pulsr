@@ -66,7 +66,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   })  : surfaceElevated =
             surfaceElevated ?? (isDark ? surfaceContainerHigh : surface),
         surfaceOverlay = surfaceOverlay ??
-            (isDark ? const Color(0xCC12121A) : const Color(0xE0FFFFFF)),
+            (isDark ? const Color(0xFF222230) : const Color(0xFFEEEEEE)),
         scrimLight = scrimLight ??
             (isDark ? const Color(0x26000000) : const Color(0x14000000)),
         scrimMedium = scrimMedium ??
@@ -330,7 +330,7 @@ class AuraTheme {
           surfaceContainer: const Color(0xFFF1F1F1),
           surfaceContainerHigh: const Color(0xFFE4E4E4),
           surfaceElevated: Colors.white,
-          surfaceOverlay: Colors.white.withValues(alpha: 0.95),
+          surfaceOverlay: const Color(0xFFE4E4E4),
           scrimLight: AppColors.scrimAt(0.12),
           scrimMedium: AppColors.scrimAt(0.35),
           scrimHeavy: AppColors.scrimAt(0.65),
@@ -364,7 +364,7 @@ class AuraTheme {
         surfaceContainer: const Color(0xFFF5F5F5),
         surfaceContainerHigh: const Color(0xFFEEEEEE),
         surfaceElevated: Colors.white,
-        surfaceOverlay: Colors.white.withValues(alpha: 0.88),
+        surfaceOverlay: const Color(0xFFEEEEEE),
         scrimLight: AppColors.scrimAt(0.08),
         scrimMedium: AppColors.scrimAt(0.25),
         scrimHeavy: AppColors.scrimAt(0.50),
@@ -400,7 +400,7 @@ class AuraTheme {
         surfaceContainer: const Color(0xFF111114),
         surfaceContainerHigh: const Color(0xFF1B1B20),
         surfaceElevated: const Color(0xFF1B1B20),
-        surfaceOverlay: Colors.black.withValues(alpha: 0.90),
+        surfaceOverlay: const Color(0xFF1B1B20),
         scrimLight: AppColors.scrimAt(0.25),
         scrimMedium: AppColors.scrimAt(0.55),
         scrimHeavy: AppColors.scrimAt(0.85),
@@ -434,7 +434,7 @@ class AuraTheme {
         surfaceContainer: const Color(0xFF121216),
         surfaceContainerHigh: const Color(0xFF18181E),
         surfaceElevated: const Color(0xFF16161D),
-        surfaceOverlay: Colors.black.withValues(alpha: 0.85),
+        surfaceOverlay: const Color(0xFF18181E),
         scrimLight: AppColors.scrimAt(0.20),
         scrimMedium: AppColors.scrimAt(0.50),
         scrimHeavy: AppColors.scrimAt(0.85),
@@ -468,7 +468,7 @@ class AuraTheme {
       surfaceContainer: const Color(0xFF1A1A24),
       surfaceContainerHigh: const Color(0xFF222230),
       surfaceElevated: const Color(0xFF1E1E2A),
-      surfaceOverlay: const Color(0xFF12121A).withValues(alpha: 0.78),
+      surfaceOverlay: const Color(0xFF222230),
       scrimLight: AppColors.scrimAt(0.15),
       scrimMedium: AppColors.scrimAt(0.40),
       scrimHeavy: AppColors.scrimAt(0.70),

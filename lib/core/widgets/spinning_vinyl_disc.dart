@@ -123,26 +123,6 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
                   ),
                 ),
 
-                // Specular reflection gradient sheen
-                Container(
-                  width: discSize,
-                  height: discSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: SweepGradient(
-                      center: Alignment.center,
-                      colors: [
-                        Colors.transparent,
-                        AppColors.specularAt(0.06),
-                        Colors.transparent,
-                        AppColors.highlightSoft,
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
-                    ),
-                  ),
-                ),
-
                 // Center album art label
                 ClipOval(
                   child: SizedBox(

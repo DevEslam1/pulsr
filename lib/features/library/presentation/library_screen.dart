@@ -20,7 +20,6 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/song_classification.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/pulsr_artwork_header.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/song_tile.dart';
@@ -665,19 +664,34 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ],
                 )
               : AppBar(
-                  backgroundColor: Colors.transparent,
+                  backgroundColor: p.bg,
                   elevation: 0,
                   scrolledUnderElevation: 0,
-                  toolbarHeight: 116,
-                  titleSpacing: 0,
-                  flexibleSpace: PulsrArtworkHeader(
-                    height: 116,
-                    title: context.l10n.navLibrary,
-                    subtitle:
+                  toolbarHeight: 70,
+                  titleSpacing: Adaptive.pagePadding(context),
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        context.l10n.navLibrary,
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: AppTracking.heading,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s2),
+                      Text(
                         '${context.l10n.songsCount(state.songs.length)} · '
                         '${context.l10n.albumsCount(state.albums.length)}',
-                    albumIds: [
-                      for (final album in state.albums.take(4)) album.id
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                   ),
                   actions: [

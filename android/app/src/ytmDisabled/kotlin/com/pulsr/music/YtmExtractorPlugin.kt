@@ -18,6 +18,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
     companion object {
         private const val CHANNEL_NAME = "com.pulsr.music/ytm"
+        private const val DISABLED_REASON = "YouTube Music is not available in this build"
 
         fun registerWith(flutterEngine: FlutterEngine, context: android.content.Context? = null): YtmExtractorPlugin {
             val plugin = YtmExtractorPlugin()
@@ -32,17 +33,43 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         when (call.method) {
             "isAvailable" -> result.success(false)
             "isWifiConnected" -> result.success(true)
+            "isVpnConnected" -> result.success(false)
+            "getLimitedMode" -> result.success(false)
             "ensurePoTokenReady" -> result.success(false)
             "invalidatePoToken" -> result.success(true)
+            "getPlayerPoToken" -> result.success(null)
+            "getAccountPoToken" -> result.success(null)
+            "setDataSyncId" -> result.success(true)
+            "setClientVersion" -> result.success(false)
+            "preWarm" -> result.success(true)
+            "resetIdentities" -> result.success(true)
+            // Same key set as the real plugin: the Dart layer reads streamingPoToken and
+            // isLimitedMode out of this map, and a missing key is a different failure mode
+            // from a false one.
             "getPoTokenState" -> result.success(
                 mapOf(
                     "isReady" to false,
                     "isExpired" to true,
                     "isExpiringSoon" to true,
                     "visitorData" to "",
+                    "streamingPoToken" to "",
                     "webViewBroken" to false,
+                    "isLimitedMode" to false,
                 )
             )
+            "getClientCapabilitiesState" -> result.success(null)
+            // Data calls are gated on `isAvailable == false` in Dart and must fail
+            // loudly rather than return an empty payload that reads as "no
+            // results". Listed explicitly so validateChannelParity can prove this
+            // stub covers every method the enabled plugin declares.
+            "updateClientCapabilities",
+            "search",
+            "searchContinuation",
+            "trending",
+            "getCharts",
+            "getMoods",
+            "getPlaylist",
+            "resolveStream" -> result.error("YTM_DISABLED", DISABLED_REASON, null)
             "getCookies" -> {
                 // YouTube hosts only. Folding accounts.google.com into the same
                 // name-keyed jar sent Google account-management cookies to
@@ -68,9 +95,8 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
             "setCookies" -> result.success(true)
             "clearCookies" -> result.success(true)
-            "isVpnConnected" -> result.success(false)
             "clearNetworkCaches" -> result.success(true)
-            else -> result.error("YTM_DISABLED", "YouTube Music is not available in this build", null)
+            else -> result.error("YTM_DISABLED", DISABLED_REASON, null)
         }
     }
 

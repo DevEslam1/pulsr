@@ -10,6 +10,13 @@ import org.schabi.newpipe.extractor.services.youtube.PoTokenResult
  *
  * Ensures synchronous readiness and delegates lifecycle, LRU caching,
  * proactive refresh, and fallback logic to [PoTokenManager].
+ *
+ * Only the web client is implemented. [getWebEmbedClientPoToken],
+ * [getAndroidClientPoToken] and [getIosClientPoToken] return null on purpose:
+ * the BotGuard session this app mints is a web-player session, and a token
+ * minted in the wrong context is rejected rather than ignored. The cost is that
+ * NewPipeExtractor is limited to its web-client path, which is the path this app
+ * exercises.
  */
 internal class PoTokenProviderImpl(context: Context) : PoTokenProvider {
 

@@ -1,5 +1,4 @@
 // lib/features/player/presentation/widgets/quran_mushaf_view.dart
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -346,16 +345,13 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                               ),
                               if (shouldBlur)
                                 Positioned.fill(
-                                  child: ClipRRect(
-                                    borderRadius: AppRadii.r10All,
-                                    child: BackdropFilter(
-                                      filter: ImageFilter.blur(
-                                          sigmaX: 5, sigmaY: 5),
-                                      child: Container(
-                                        color: p.surfaceContainer
-                                            .withValues(alpha: 0.6),
-                                        alignment: Alignment.center,
-                                        child: Row(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: p.surfaceContainer,
+                                      borderRadius: AppRadii.r10All,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Icon(Icons.touch_app_rounded,
@@ -374,8 +370,6 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
                             ],
                           ),
                         ),

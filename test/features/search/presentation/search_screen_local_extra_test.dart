@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/pulsr_empty_state.dart';
 import 'package:pulsr/core/widgets/shimmer_skeleton.dart';
+import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_state.dart';
@@ -26,11 +27,13 @@ void main() {
   late _SearchCubit searchCubit;
   late StreamController<SearchState> states;
   late ValueNotifier<List<String>> savedSearches;
+  late ValueNotifier<List<SongsTableData>> searchPlayedSongs;
   late ValueNotifier<bool> hasMoreResults;
 
   setUpAll(() {
     registerFallbackValue('');
     registerFallbackValue(<String>[]);
+    registerFallbackValue(createTestSong(id: -1));
   });
 
   setUp(() {
@@ -38,11 +41,16 @@ void main() {
     searchCubit = _SearchCubit();
     states = StreamController<SearchState>.broadcast();
     savedSearches = ValueNotifier<List<String>>(const []);
+    searchPlayedSongs = ValueNotifier<List<SongsTableData>>(const []);
     hasMoreResults = ValueNotifier<bool>(false);
 
     when(() => searchCubit.state).thenReturn(const SearchState());
     when(() => searchCubit.stream).thenAnswer((_) => states.stream);
     when(() => searchCubit.savedSearches).thenReturn(savedSearches);
+    when(() => searchCubit.searchPlayedSongs).thenReturn(searchPlayedSongs);
+    when(() => searchCubit.recordPlayedSong(any())).thenAnswer((_) async {});
+    when(() => searchCubit.removeSearchPlayedSong(any())).thenAnswer((_) async {});
+    when(() => searchCubit.clearSearchPlayedSongs()).thenAnswer((_) async {});
     when(() => searchCubit.hasMoreResults).thenReturn(hasMoreResults);
     when(() => searchCubit.isDebouncing).thenReturn(false);
     when(() => searchCubit.isSaved(any(), any())).thenReturn(false);
@@ -64,6 +72,7 @@ void main() {
     addTearDown(() async {
       await states.close();
       savedSearches.dispose();
+      searchPlayedSongs.dispose();
       hasMoreResults.dispose();
     });
   });

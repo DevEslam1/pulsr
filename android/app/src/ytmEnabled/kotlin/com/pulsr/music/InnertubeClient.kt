@@ -48,7 +48,7 @@ internal class InnertubeClient(
     private val cookieStore: YtmCookieStore = YtmCookieStore.getInstance(context),
     private val rateLimiter: RateLimiter = RateLimiter.shared,
     private val resolutionStrategy: ResolutionStrategy = ResolutionStrategy(context, cookieStore, PoTokenManager)
-) {
+    ) {
     enum class ClientType(
         val clientName: String,
         val clientVersion: String,
@@ -303,7 +303,7 @@ internal class InnertubeClient(
         // FIX #13 & #16: Shared egress bot/block circuit breaker check
         if (egressBlockBreaker.isActive()) {
             val remainingSec = (egressBlockBreaker.remainingMs() / 1000L).coerceAtLeast(1)
-            val signal = globalBlockSignal.get()
+            val signal = globalBlockSignal.get() ?: YtmBlockSignal.BotChallenge
             Log.w(TAG, "[$traceId] Fast-failing: egress bot/block breaker active ($signal) for another ${remainingSec}s")
             throw InnertubeException(
                 signal = signal,
@@ -686,7 +686,6 @@ internal class InnertubeClient(
                     is AttemptResult.Success -> {
                         winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
                         egressBlockBreaker.onSuccess()
-                        globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                         return bootstrapped.payload
                     }
                     is AttemptResult.Failure -> {
@@ -746,7 +745,6 @@ internal class InnertubeClient(
                         shortCircuit.set(null) // clear short-circuit on recovery
                         winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
                         egressBlockBreaker.onSuccess()
-                        globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                         return webRes.payload
                     }
                     // FIX #10: Skip subsequent recovery attempt if failure is NetworkUnavailable or RateLimited
@@ -772,7 +770,6 @@ internal class InnertubeClient(
                         shortCircuit.set(null) // clear short-circuit on recovery
                         winnerStore.recordWinningClient(trackType, ClientType.ANDROID_MUSIC)
                         egressBlockBreaker.onSuccess()
-                        globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                         return androidRes.payload
                     }
                 }
@@ -825,7 +822,6 @@ internal class InnertubeClient(
                             cancelAll()
                             winnerStore.recordWinningClient(trackType, client)
                             egressBlockBreaker.onSuccess()
-                            globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                             return res.payload
                         }
                         is AttemptResult.Failure -> {
@@ -899,7 +895,6 @@ internal class InnertubeClient(
                         cancelAll()
                         winnerStore.recordWinningClient(trackType, client)
                         egressBlockBreaker.onSuccess()
-                        globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                         return res.payload
                     }
                     is AttemptResult.Failure -> {
@@ -979,7 +974,6 @@ internal class InnertubeClient(
                 is AttemptResult.Success -> {
                     winnerStore.recordWinningClient(trackType, client)
                     egressBlockBreaker.onSuccess()
-                    globalBlockSignal.set(YtmBlockSignal.BotChallenge)
                     return res.payload
                 }
                 is AttemptResult.Failure -> {
@@ -1010,7 +1004,10 @@ internal class InnertubeClient(
         // FIX #3: Respect any short-circuit triggered by the final recovery attempt
         shortCircuit.get()?.let { throw it }
 
-        val finalSignal = lastSignalRef.get() ?: YtmBlockSignal.NetworkUnavailable
+        // No client produced a verdict: this is local budget exhaustion, not a
+        // transport verdict. Reporting NetworkUnavailable here made the NewPipe
+        // fallback in YtmExtractorPlugin skip a track it could still resolve.
+        val finalSignal = lastSignalRef.get() ?: YtmBlockSignal.DeadlineExceeded
         throw InnertubeException(
             signal = finalSignal,
             message = "All Innertube client fallback resolutions failed for video $videoId",
@@ -1219,6 +1216,103 @@ internal class InnertubeClient(
             }
         }
         return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.SEARCH)
+    }
+
+    /**
+     * Searches through the capability-ordered SEARCH chain instead of pinning
+     * every request to WEB_REMIX.
+     *
+     * `DEFAULT_SEARCH_CHAIN` / `DEFAULT_BROWSE_CHAIN` and their VPN reorderings
+     * were unreachable before this: [ResolutionStrategy.buildChain] had exactly one
+     * caller, with [ResolutionStrategy.Operation.STREAM_RESOLVE]. A WEB_REMIX-side
+     * block therefore took search and browsing down even though four other clients
+     * were declared eligible for them.
+     *
+     * Terminal transport signals abort the walk; a per-client verdict moves on to
+     * the next client, and two egress-wide verdicts are enough to stop.
+     */
+    fun requestSearchAuto(query: String, params: String? = null): JSONObject =
+        requestThroughChain(
+            ResolutionStrategy.Operation.SEARCH,
+            describe = "search",
+        ) { client ->
+            requestSearch(query, params, client).also { lastSearchClient = client }
+        }
+
+    /** Browse equivalent of [requestSearchAuto]. */
+    fun requestBrowseAuto(browseId: String): JSONObject =
+        requestThroughChain(
+            ResolutionStrategy.Operation.BROWSE,
+            describe = "browse:$browseId",
+        ) { client ->
+            requestBrowse(browseId, client)
+        }
+
+    /**
+     * Replays a search continuation against the client that produced it.
+     *
+     * Deliberately not chain-driven: a continuation token is issued by one client
+     * and is not portable across clients, so re-walking the chain would hand a
+     * WEB_REMIX token to ANDROID_VR and get an empty page back.
+     */
+    fun requestContinuationAuto(token: String): JSONObject =
+        requestContinuation(token, lastSearchClient)
+
+    /**
+     * Shared client walk for the non-player operations.
+     *
+     * [attempt] performs one request against one client. The walk stops on a
+     * terminal transport verdict, because nothing else will succeed on this egress,
+     * and tolerates per-client verdicts up to [MAX_EGRESS_VERDICTS] so a blocked
+     * egress cannot cost a full chain of timeouts.
+     */
+    private inline fun requestThroughChain(
+        op: ResolutionStrategy.Operation,
+        describe: String,
+        attempt: (ClientType) -> JSONObject,
+    ): JSONObject {
+        val chain = resolutionStrategy.buildChain(
+            op,
+            limitedMode = PoTokenManager.isLimitedMode,
+            hasJsEngine = true,
+        ).take(MAX_CHAIN_ATTEMPTS)
+
+        var lastError: Throwable? = null
+        var egressVerdicts = 0
+        for (client in chain) {
+            try {
+                return attempt(client)
+            } catch (e: Throwable) {
+                if (e is VirtualMachineError || e is ThreadDeath) throw e
+                if (e is InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw e
+                }
+                lastError = e
+                val signal = (e as? InnertubeException)?.signal
+                Log.w(TAG, "$describe: ${client.name} failed (${e.message}); walking the chain")
+                if (signal == YtmBlockSignal.RateLimited ||
+                    signal == YtmBlockSignal.NetworkUnavailable ||
+                    signal == YtmBlockSignal.Interrupted
+                ) {
+                    throw e
+                }
+                if (signal == YtmBlockSignal.IpBlocked ||
+                    signal == YtmBlockSignal.BotChallenge ||
+                    signal == YtmBlockSignal.PoTokenInvalid
+                ) {
+                    egressVerdicts++
+                    if (egressVerdicts >= MAX_EGRESS_VERDICTS) throw e
+                }
+            }
+        }
+
+        lastError?.let { throw it }
+        throw InnertubeException(
+            signal = YtmBlockSignal.ClientDeprecated,
+            message = "No eligible client for $describe",
+            traceId = UUID.randomUUID().toString(),
+        )
     }
 
     private fun addActiveCall(
@@ -1695,6 +1789,22 @@ internal class InnertubeClient(
         const val RESOLVE_DEADLINE_MS = 5000L
         private const val DATASYNC_BOOTSTRAP_INTERVAL_MS = 300_000L
 
+        /**
+         * Client that answered the most recent auto-chained search request.
+         *
+         * Process-wide, not per instance: every method-channel call constructs a
+         * fresh [InnertubeClient], so an instance field would reset to WEB_REMIX
+         * between the search and its continuation and then replay the token
+         * against the wrong client. Continuation tokens are issued per client.
+         */
+        @Volatile
+        private var lastSearchClient: ClientType = ClientType.WEB_REMIX
+
+        // Non-player operations walk at most this many clients before giving up, and
+        // stop early once this many egress-wide verdicts are seen.
+        private const val MAX_CHAIN_ATTEMPTS = 4
+        private const val MAX_EGRESS_VERDICTS = 2
+
         // Presence check for an `n` query parameter in a raw URL (used when Uri
         // parsing itself failed and the parameter set cannot be inspected).
         private val N_QUERY_PARAM = Regex("""[?&]n=""")
@@ -1731,7 +1841,10 @@ internal class InnertubeClient(
         private val lastDataSyncBootstrapMs = AtomicLong(0L)
 
         private val egressBlockBreaker = EgressBlockBreaker()
-        private val globalBlockSignal = AtomicReference(YtmBlockSignal.BotChallenge)
+        // Only written where a block is actually recorded. The success paths used to
+        // set this to BotChallenge, which let a concurrent fast-fail label an IP block
+        // as a bot challenge.
+        private val globalBlockSignal = AtomicReference<YtmBlockSignal?>(null)
 
         private val threadCounter = AtomicInteger(0)
 
@@ -1803,6 +1916,7 @@ internal class InnertubeClient(
             YtmBlockSignal.AgeRestricted           -> 2
             YtmBlockSignal.VideoGone               -> 1
             YtmBlockSignal.NetworkUnavailable      -> 0
+            YtmBlockSignal.DeadlineExceeded        -> 0
             null                                   -> -1
         }
     }

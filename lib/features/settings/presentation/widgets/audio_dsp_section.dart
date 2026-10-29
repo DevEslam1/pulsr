@@ -316,6 +316,8 @@ class _DspSection extends StatelessWidget {
                       isLoudnessContourEnabled) ...[
                     const SizedBox(height: AppSpacing.xxs),
                     SettingSliderRow(
+                      contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                          0, AppSpacing.sm, 0, AppSpacing.s12),
                       label: l10n.dspLoudnessIntensity,
                       value: loudnessContourIntensity,
                       min: 0.0,

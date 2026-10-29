@@ -9,7 +9,6 @@ import '../widgets/pulsr_dialog.dart';
 import 'breakpoints.dart';
 import 'pulsr_layout_metrics.dart';
 import 'responsive_values.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Adaptive modal presenter that displays:
 /// - Modal bottom sheet on [PulsrBreakpoint.compact] (portrait phone)
@@ -105,16 +104,15 @@ class PulsrResponsiveSheetContainer extends StatelessWidget {
     final p = context.palette;
 
     if (isDialogMode) {
-      return GlassContainer(
+      return GlassContainer.solid(
         borderRadius: AppRadii.dialogRadius,
-        opacity: p.isDark ? 0.90 : 0.95,
-        blur: 16.0,
+        color: p.surfaceContainerHigh,
         boxShadow: [
           BoxShadow(
-            color: AppColors.scrimAt(p.isDark ? 0.55 : 0.22),
-            blurRadius: 36,
+            color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.10),
+            blurRadius: 16,
             spreadRadius: 0,
-            offset: const Offset(0, 14),
+            offset: const Offset(0, 4),
           ),
         ],
         child: ClipRRect(

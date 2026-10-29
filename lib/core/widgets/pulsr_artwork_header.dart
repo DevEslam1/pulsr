@@ -63,31 +63,11 @@ class PulsrArtworkHeader extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  p.bg.withValues(alpha: 0.55),
-                  p.bg.withValues(alpha: 0.30),
+                  p.bg.withValues(alpha: 0.85),
+                  p.bg.withValues(alpha: 0.95),
                   p.bg,
                 ],
                 stops: const [0.0, 0.45, 1.0],
-              ),
-            ),
-          ),
-          // A single soft accent bloom, matching the Now Playing glow.
-          PositionedDirectional(
-            top: -70,
-            end: -40,
-            child: IgnorePointer(
-              child: Container(
-                width: 220,
-                height: 170,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      p.accent.withValues(alpha: 0.20),
-                      p.accent.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
               ),
             ),
           ),

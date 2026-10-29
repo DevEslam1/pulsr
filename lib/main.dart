@@ -269,6 +269,22 @@ Future<void> main() async {
                   error: e, stackTrace: st, category: 'Startup');
             }),
         ]);
+        // Optional remote override for the native client matrix. The channel could
+        // always apply one, but nothing in the app ever pushed JSON to it, so a client
+        // version or capability change needed a release. Opt-in: empty unless the build
+        // defines YTM_CAPABILITIES_URL, which keeps the packaged asset authoritative
+        // everywhere else. Fire-and-forget and failure-tolerant.
+        try {
+          const capabilitiesUrl = String.fromEnvironment('YTM_CAPABILITIES_URL');
+          if (onlineAllowed &&
+              capabilitiesUrl.isNotEmpty &&
+              getIt.isRegistered<YtmService>()) {
+            unawaited(getIt<YtmService>()
+                .refreshClientCapabilitiesFrom(capabilitiesUrl)
+                .timeout(const Duration(seconds: 12))
+                .catchError((_) => false));
+          }
+        } catch (_) {}
         // Warm the native extractor (BotGuard WebView + client matrix) while
         // the user is still looking at the home screen, so the first YTM
         // search/tap doesn't pay cold-start attestation (~seconds).

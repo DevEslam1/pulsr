@@ -144,7 +144,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 val vpnActive = runCatching {
                     plugin.context?.let { CellularFailoverHelper.isVpnActive(it) } ?: false
                 }.getOrDefault(false)
-                val normalizedId = EgressTracker.egressId(label, vpnActive, isCellular = false)
+                val isCellular = runCatching {
+                    plugin.context?.let { CellularFailoverHelper.isCellularActive(it) } ?: false
+                }.getOrDefault(false)
+                val normalizedId = EgressTracker.egressId(label, vpnActive, isCellular)
                 EgressSignals.notify(normalizedId)
             }
             EgressSignals.onEgressChanged = { id -> PoTokenManager.onEgressChanged(id) }
@@ -171,6 +174,13 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
             PoTokenManager.init(appContext)
             RateLimiter.shared.initPrefs(appContext)
+            // The capability matrix owns client ordering, token requirements, versions and
+            // priorities. It used to be loaded only from the `preWarm` channel branch, which
+            // Dart fires and forgets at startup, so any resolve that beat that call ran on
+            // the compiled defaults and the matrix then changed under the live session.
+            // Every data call passes through here, which makes this the one point where the
+            // engine configuration becomes deterministic.
+            ClientCapabilityMatrix.init(appContext)
             YoutubeStreamExtractor.setPoTokenProvider(PoTokenProviderImpl(appContext))
             extractorReady = true
         }
@@ -769,90 +779,102 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
     /**
      * Search with multi-tier fallback:
-     * 1. Primary: NewPipe MUSIC_SONGS filter.
-     * 2. If results < limit: fallback to NewPipe general search.
-     * 3. If results < limit: supplement with native InnerTube search.
+     * 1. Primary: native InnerTube through the capability-ordered client chain.
+     * 2. If results < minAcceptable: NewPipe MUSIC_SONGS.
+     * 3. If results < minAcceptable: NewPipe general search.
      * Propagates bot challenges / rate limits if no tracks could be extracted.
+     *
+     * The order is deliberate. InnerTube already has a capability-ordered chain
+     * with short-circuiting, while NewPipe pays an extra round trip and is the
+     * engine most exposed to YouTube-side extraction breakage. Search used to put
+     * NewPipe first, the opposite of the stream path.
      */
     private fun search(query: String, limit: Int): List<Map<String, Any?>> {
         val results = mutableListOf<Map<String, Any?>>()
         val seenVideoIds = mutableSetOf<String>()
-        var primaryError: Throwable? = null
         var innerTubeError: Throwable? = null
+        var songsError: Throwable? = null
 
-        // Supplements 2 and 3 are each a full extra network round trip run
-        // sequentially behind the primary. They only buy more rows, never a
-        // usable answer, so only pay for them when the primary came up short
-        // of a full page: ten songs already fills the search list, and a
-        // near-full primary used to be followed by two more hops that often
-        // added nothing. Callers asking for a smaller page keep the old
-        // behaviour (minOf == their limit).
+        // Each tier is a full network round trip, so only pay for the next one
+        // when this one came up short of a usable page.
         val minAcceptable = minOf(limit, 10)
 
-        // 1. Primary: MUSIC_SONGS
-        try {
-            val songsExtractor = ServiceList.YouTube.getSearchExtractor(
-                query,
-                listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS),
-                "",
-            )
-            songsExtractor.fetchPage()
-            val songItems = (SearchInfo.getInfo(songsExtractor).relatedItems ?: emptyList()).asSequence().filterIsInstance<StreamInfoItem>()
-            for (map in streamItemsToMaps(songItems, limit)) {
-                val vid = map["videoId"] as? String
-                if (vid != null && seenVideoIds.add(vid)) {
-                    results.add(map)
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Primary songs search failed: ${e.message}")
-            primaryError = e
-        }
-
-        // 2. Fallback / supplement: General search if not throttled
-        if (results.size < minAcceptable) {
-            if (primaryError !is ReCaptchaException && primaryError !is RateLimitedException) {
-                try {
-                    val generalExtractor = ServiceList.YouTube.getSearchExtractor(query)
-                    generalExtractor.fetchPage()
-                    val items = (SearchInfo.getInfo(generalExtractor).relatedItems ?: emptyList()).asSequence().filterIsInstance<StreamInfoItem>()
-                    for (map in streamItemsToMaps(items, limit - results.size)) {
-                        val vid = map["videoId"] as? String
-                        if (vid != null && seenVideoIds.add(vid)) {
-                            results.add(map)
-                        }
+        // 1. Primary: InnerTube
+        val ctx = context?.applicationContext
+        if (ctx != null) {
+            try {
+                YtmCookieStore.getInstance(ctx).readFromCookieManager()
+                val client = InnertubeClient(ctx)
+                val json = client.requestSearchAuto(query)
+                for (map in parseInnertubeTracksFromJson(json, limit)) {
+                    val vid = map["videoId"] as? String
+                    if (vid != null && seenVideoIds.add(vid)) {
+                        results.add(map)
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "General search fallback failed: ${e.message}")
                 }
+            } catch (e: Throwable) {
+                Log.w(TAG, "InnerTube search failed: ${e.message}")
+                innerTubeError = e
             }
         }
 
-        // 3. Fallback / supplement: Native InnerTube search
-        if (results.size < minAcceptable) {
-            val ctx = context?.applicationContext
-            if (ctx != null) {
-                try {
-                    YtmCookieStore.getInstance(ctx).readFromCookieManager()
-                    val client = InnertubeClient(ctx)
-                    val json = client.requestSearch(query)
-                    val innerTracks = parseInnertubeTracksFromJson(json, limit - results.size)
-                    for (map in innerTracks) {
-                        val vid = map["videoId"] as? String
-                        if (vid != null && seenVideoIds.add(vid)) {
-                            results.add(map)
-                        }
+        // A rate-limit verdict is egress-wide, so the NewPipe tiers would only
+        // burn the same budget against the same wall.
+        val throttled = (innerTubeError as? InnertubeClient.InnertubeException)?.signal ==
+            YtmBlockSignal.RateLimited
+
+        // 2. NewPipe MUSIC_SONGS
+        if (results.size < minAcceptable && !throttled) {
+            try {
+                val songsExtractor = ServiceList.YouTube.getSearchExtractor(
+                    query,
+                    listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS),
+                    "",
+                )
+                songsExtractor.fetchPage()
+                val songItems = (SearchInfo.getInfo(songsExtractor).relatedItems ?: emptyList())
+                    .asSequence()
+                    .filterIsInstance<StreamInfoItem>()
+                for (map in streamItemsToMaps(songItems, limit - results.size)) {
+                    val vid = map["videoId"] as? String
+                    if (vid != null && seenVideoIds.add(vid)) {
+                        results.add(map)
                     }
-                } catch (e: Throwable) {
-                    Log.w(TAG, "InnerTube search fallback failed: ${e.message}")
-                    innerTubeError = e
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "NewPipe songs search failed: ${e.message}")
+                songsError = e
             }
         }
 
-        // Propagate genuine errors when no results could be extracted
+        // 3. NewPipe general search, unless the extractor already reported a block
+        // or a rate limit (a second request would only repeat the refusal).
+        if (results.size < minAcceptable &&
+            !throttled &&
+            songsError !is ReCaptchaException &&
+            songsError !is RateLimitedException
+        ) {
+            try {
+                val generalExtractor = ServiceList.YouTube.getSearchExtractor(query)
+                generalExtractor.fetchPage()
+                val items = (SearchInfo.getInfo(generalExtractor).relatedItems ?: emptyList())
+                    .asSequence()
+                    .filterIsInstance<StreamInfoItem>()
+                for (map in streamItemsToMaps(items, limit - results.size)) {
+                    val vid = map["videoId"] as? String
+                    if (vid != null && seenVideoIds.add(vid)) {
+                        results.add(map)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "NewPipe general search failed: ${e.message}")
+            }
+        }
+
+        // Propagate a genuine verdict when nothing could be extracted. The
+        // InnerTube error wins: it is the structured one (signal + traceId).
         if (results.isEmpty()) {
-            val errToRethrow = primaryError ?: innerTubeError
+            val errToRethrow = innerTubeError ?: songsError
             if (errToRethrow != null) {
                 throw errToRethrow
             }
@@ -870,7 +892,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         val browseIds = listOf("FEmusic_charts", "FEmusic_moods_and_genres")
         for (bid in browseIds) {
             try {
-                val json = client.requestBrowse(bid)
+                val json = client.requestBrowseAuto(bid)
                 val tracks = parseInnertubeTracksFromJson(json, limit)
                 if (tracks.isNotEmpty()) {
                     Log.i(TAG, "trending: $bid returned ${tracks.size} tracks")
@@ -891,7 +913,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             ?: throw ExtractionException("No context available for searchContinuation")
         YtmCookieStore.getInstance(ctx).readFromCookieManager()
         val client = InnertubeClient(ctx)
-        val json = client.requestContinuation(token)
+        val json = client.requestContinuationAuto(token)
         val errorObj = json.optJSONObject("error")
         if (errorObj != null) {
             val errMsg = errorObj.optString("message").takeIf { it.isNotBlank() }
@@ -906,7 +928,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             ?: throw ExtractionException("No context available for browseMusicSection")
         YtmCookieStore.getInstance(ctx).readFromCookieManager()
         val client = InnertubeClient(ctx)
-        val json = client.requestBrowse(browseId)
+        val json = client.requestBrowseAuto(browseId)
         val errorObj = json.optJSONObject("error")
         if (errorObj != null) {
             val errMsg = errorObj.optString("message").takeIf { it.isNotBlank() }
@@ -1044,7 +1066,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
         for (bId in browseIds) {
             try {
-                val json = client.requestBrowse(bId)
+                val json = client.requestBrowseAuto(bId)
                 val errorObj = json.optJSONObject("error")
                 if (errorObj != null) {
                     val errMsg = errorObj.optString("message").takeIf { it.isNotBlank() }
@@ -1084,7 +1106,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                         }
                         hasContinuation = true
                         try {
-                            val contJson = client.requestContinuation(token)
+                            val contJson = client.requestContinuationAuto(token)
                             val contTracks = parsePlaylistTracksFromJson(contJson, limit - allTracks.size)
                             if (contTracks.isEmpty()) {
                                 hasContinuation = false
@@ -1826,7 +1848,16 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                             throw e
                         }
                         else -> {
-                            // Non-terminal: proceed to NewPipe fallback
+                            // Non-terminal: proceed to NewPipe fallback.
+                            //
+                            // BotChallenge and IpBlocked are deliberately NOT terminal here: NewPipe
+                            // issues its own requests with different clients, so a WEB_REMIX-side
+                            // verdict is no evidence that the extractor will fail too, and the attempt
+                            // costs one bounded round trip. Recorded as a decision on 2026-10-28, not
+                            // left as an oversight.
+                            //
+                            // RESOLVE_DEADLINE lands here on purpose as well: the native chain running
+                            // out of budget says nothing about whether NewPipe could still resolve it.
                         }
                     }
                 }

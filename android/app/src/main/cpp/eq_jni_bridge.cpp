@@ -552,7 +552,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeResetDsdDecoder(
         JNIEnv* /* env */, jobject /* thiz */) {
     sDecoderCache.decoder.reset();
 }
-}
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetActiveStages(

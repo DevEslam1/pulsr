@@ -24,7 +24,18 @@ enum class YtmBlockSignal(val code: String) {
     SignatureDecipherFailed("SIGNATURE_DECIPHER_FAILED"),
     SabrEnforced("SABR_ENFORCED"),
     Interrupted("INTERRUPTED"),
-    AgeRestricted("AGE_RESTRICTED");
+    AgeRestricted("AGE_RESTRICTED"),
+
+    /**
+     * The local chain exhausted its time budget before any client produced a
+     * verdict.
+     *
+     * Distinct from [NetworkUnavailable] on purpose: the chain used to report
+     * budget exhaustion as a transport failure, and the NewPipe fallback treats a
+     * transport failure as terminal, so a slow resolve silently disabled the
+     * second engine.
+     */
+    DeadlineExceeded("RESOLVE_DEADLINE");
 
     companion object {
         private val BOT_SUBSTRINGS = listOf(

@@ -78,45 +78,41 @@ internal class ResolutionStrategy(
     ): List<InnertubeClient.ClientType> {
         SabrDemotionStore.init(context)
         val isVpn = try { CellularFailoverHelper.isVpnActive(context) } catch (_: Throwable) { false }
-        val baseChain = when (op) {
-            Operation.STREAM_RESOLVE -> {
-                val winner = winnerStore.getWinningClient(trackType)
-                val defaultChain = if (isVpn) {
-                    // 08-2026: VPN datacenter IPs are flagged for BotGuard. WEB_REMIX (poToken+visitorData)
-                    // fails with LOGIN_REQUIRED/BOT_CHALLENGE while ANDROID_VR/IOS_MUSIC (no PoToken)
-                    // still succeed. Prioritize no-PoToken clients on VPN.
-                    listOf(
-                        InnertubeClient.ClientType.VISIONOS,
-                        InnertubeClient.ClientType.ANDROID_VR,
-                        InnertubeClient.ClientType.IOS_MUSIC,
-                        InnertubeClient.ClientType.WEB_REMIX,
-                        InnertubeClient.ClientType.ANDROID_MUSIC,
-                        InnertubeClient.ClientType.ANDROID_CREATOR,
-                        InnertubeClient.ClientType.WEB_EMBEDDED_PLAYER,
-                        InnertubeClient.ClientType.MWEB,
-                        InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
-                        InnertubeClient.ClientType.ANDROID_TESTSUITE
-                    )
-                } else DEFAULT_STREAM_CHAIN
-                if (winner != null && defaultChain.contains(winner) && !isVpn) {
-                    listOf(winner) + (defaultChain - winner)
-                } else {
-                    defaultChain
-                }
+        val baseOpChain = when (op) {
+            Operation.STREAM_RESOLVE -> DEFAULT_STREAM_CHAIN
+            Operation.SEARCH -> DEFAULT_SEARCH_CHAIN
+            Operation.BROWSE -> DEFAULT_BROWSE_CHAIN
+        }
+
+        // A persisted winner is promoted only on the direct path: on a VPN the egress
+        // itself is what changed, so a client that won on the home connection is not
+        // evidence of anything.
+        val winnerPromoted = if (op == Operation.STREAM_RESOLVE && !isVpn) {
+            val winner = winnerStore.getWinningClient(trackType)
+            if (winner != null && baseOpChain.contains(winner)) {
+                listOf(winner) + (baseOpChain - winner)
+            } else {
+                baseOpChain
             }
-            Operation.SEARCH -> if (isVpn) listOf(
-                InnertubeClient.ClientType.IOS_MUSIC,
-                InnertubeClient.ClientType.ANDROID_VR,
-                InnertubeClient.ClientType.WEB_REMIX,
-                InnertubeClient.ClientType.MWEB,
-                InnertubeClient.ClientType.ANDROID_MUSIC
-            ) else DEFAULT_SEARCH_CHAIN
-            Operation.BROWSE -> if (isVpn) listOf(
-                InnertubeClient.ClientType.IOS_MUSIC,
-                InnertubeClient.ClientType.ANDROID_VR,
-                InnertubeClient.ClientType.WEB_REMIX,
-                InnertubeClient.ClientType.MWEB
-            ) else DEFAULT_BROWSE_CHAIN
+        } else {
+            baseOpChain
+        }
+
+        // 08-2026: VPN datacenter IPs are flagged for BotGuard. WEB_REMIX
+        // (poToken + visitorData) answers LOGIN_REQUIRED/BOT_CHALLENGE there while the
+        // token-free clients still resolve, so on a VPN the token-free clients go first.
+        //
+        // Derived from capabilities instead of a second hard-coded list: the previous
+        // VPN branches were a byte-identical copy of the defaults for stream (so the
+        // documented reordering never happened) and drifted independently for
+        // search/browse. `partition` is stable, so the order inside each group survives.
+        val baseChain = if (isVpn) {
+            val (tokenFree, tokenBound) = winnerPromoted.partition { client ->
+                !ClientCapabilityMatrix.getCapability(client).requiresPoToken
+            }
+            tokenFree + tokenBound
+        } else {
+            winnerPromoted
         }
 
         // Treat a token that is about to expire as absent: `isReady` only checks
@@ -169,18 +165,18 @@ internal class ResolutionStrategy(
         val sabrDemoted = chain.filter { SabrDemotionStore.isSabrDemoted(it) }
         val orderedChain = if (sabrDemoted.isEmpty()) chain else chain.filterNot { sabrDemoted.contains(it) } + sabrDemoted
         return orderedChain.ifEmpty {
-            // Absolute fallback filtered through capabilities
-            listOf(InnertubeClient.ClientType.IOS_MUSIC, InnertubeClient.ClientType.ANDROID_VR).filter {
-                val cap = ClientCapabilityMatrix.getCapability(it)
+            // Absolute fallback, still filtered through the same gate. The old tail
+            // returned IOS_MUSIC unconditionally, which contradicted the filter two
+            // lines above it as soon as IOS_MUSIC carried a token requirement in the
+            // capability asset.
+            val gate: (InnertubeClient.ClientType) -> Boolean = { client ->
+                val cap = ClientCapabilityMatrix.getCapability(client)
                 (!cap.requiresJsSignature || hasJsEngine) && (!limitedMode || !cap.requiresPoToken)
-            }.ifEmpty {
-                baseChain.filter {
-                    val cap = ClientCapabilityMatrix.getCapability(it)
-                    (!cap.requiresJsSignature || hasJsEngine) && (!limitedMode || !cap.requiresPoToken)
-                }
-            }.ifEmpty {
-                listOf(InnertubeClient.ClientType.IOS_MUSIC)
             }
+            listOf(InnertubeClient.ClientType.IOS_MUSIC, InnertubeClient.ClientType.ANDROID_VR)
+                .filter(gate)
+                .ifEmpty { baseChain.filter(gate) }
+                .ifEmpty { listOf(baseChain.first()) }
         }
     }
 }

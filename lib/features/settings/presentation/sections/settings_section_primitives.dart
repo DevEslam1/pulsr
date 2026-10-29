@@ -192,6 +192,7 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
               min: 0,
               max: 120,
               divisions: 12,
+              isWavy: false,
               semanticLabel: context.l10n.excludeTracksUnder(selected),
               onChanged: (val) {
                 setDialogState(() => selected = val.toInt());

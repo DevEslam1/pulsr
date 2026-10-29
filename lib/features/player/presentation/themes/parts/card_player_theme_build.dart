@@ -308,9 +308,9 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                   boxShadow: [
                     BoxShadow(
                       color:
-                          Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-                      blurRadius: 18,
-                      offset: const Offset(0, 6),
+                          Colors.black.withValues(alpha: isDark ? 0.20 : 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),

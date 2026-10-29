@@ -1,6 +1,5 @@
 // lib/features/player/presentation/widgets/now_playing_queue_view.dart
-import 'dart:ui' show ImageFilter, lerpDouble;
-import '../../../../core/performance/gpu_budget.dart';
+import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -277,30 +276,20 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                               final animValue =
                                   Curves.easeOutBack.transform(animation.value);
                               final scale = lerpDouble(1.0, 1.03, animValue)!;
-                              final allowBlur = !GpuBudget.isGpuSaverActive;
-
-                              Widget proxyCard = Container(
+                              final Widget proxyCard = Container(
                                 decoration: BoxDecoration(
-                                  color: p.surfaceContainerHigh
-                                      .withValues(alpha: 0.85),
+                                  color: p.surfaceContainerHigh,
                                   borderRadius: AppRadii.r16All,
                                   border: Border.all(
-                                    color: p.accent.withValues(alpha: 0.85),
+                                    color: p.accent,
                                     width: 1.5,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: p.accent
-                                          .withValues(alpha: 0.22 * animValue),
-                                      blurRadius: 16,
-                                      spreadRadius: 1,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                    BoxShadow(
-                                      color:
-                                          AppColors.scrimAt(0.35 * animValue),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 8),
+                                      color: Colors.black.withValues(
+                                          alpha: 0.25 * animValue),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
                                     ),
                                   ],
                                 ),
@@ -310,17 +299,6 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                   child: child,
                                 ),
                               );
-
-                              if (allowBlur) {
-                                proxyCard = ClipRRect(
-                                  borderRadius: AppRadii.r16All,
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(
-                                        sigmaX: 12, sigmaY: 12),
-                                    child: proxyCard,
-                                  ),
-                                );
-                              }
 
                               return Transform.scale(
                                 scale: scale,

@@ -301,6 +301,7 @@ class PlaybackSection extends StatelessWidget {
         SettingSliderRow(
           label: context.l10n.settingsDuckLevel,
           value: state.duckingLevel,
+          enabled: state.duckingMode == 'duck',
           min: 0.05,
           max: 1.0,
           divisions: 19,

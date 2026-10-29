@@ -321,12 +321,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                                           decoration: BoxDecoration(
                                             color: p.accent,
                                             shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                  color: p.glow,
-                                                  blurRadius: 14,
-                                                  spreadRadius: 1),
-                                            ],
+                                            boxShadow: PulsrElevation.level1(context),
                                           ),
                                           child: Icon(Icons.play_arrow_rounded,
                                               color: p.onAccent, size: 22),

@@ -34,6 +34,22 @@ object CellularFailoverHelper {
     }
 
     /**
+     * True when the active network is cellular.
+     *
+     * poTokens are bound to the egress they were minted on, and [EgressTracker]
+     * distinguishes proxy / VPN / cellular / Wi-Fi. Without this query a Wi-Fi to
+     * cellular switch kept the `wifi:direct` identity, so a token minted on one
+     * path was replayed on the other and read back as PoTokenInvalid.
+     */
+    fun isCellularActive(context: Context): Boolean = runCatching {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return@runCatching false
+        val network = cm.activeNetwork ?: return@runCatching false
+        val caps = cm.getNetworkCapabilities(network) ?: return@runCatching false
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+    }.getOrDefault(false)
+
+    /**
      * Executes an HTTP request strictly routed over the cellular network.
      * Optionally accepts an [onCloseRef] to receive a callback that unregisters
      * the network callback once the caller finishes streaming data.

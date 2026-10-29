@@ -299,11 +299,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     double size = 42,
     double iconSize = 20,
   }) {
-    final isDark = p.isDark;
-    final surface =
-        (isDark ? Colors.white : Colors.black).withValues(alpha: 0.14);
-    final border =
-        (isDark ? Colors.white : Colors.black).withValues(alpha: 0.18);
+    final surface = p.surfaceContainerHigh;
+    final border = p.hairline;
 
     final button = Material(
       color: Colors.transparent,
@@ -324,9 +321,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             border: Border.all(color: border, width: 1),
             boxShadow: [
               BoxShadow(
-                color: AppColors.scrimAt(0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: p.isDark ? 0.20 : 0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
               ),
             ],
           ),

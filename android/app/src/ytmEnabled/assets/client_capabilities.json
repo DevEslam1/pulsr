@@ -14,7 +14,7 @@
     "ANDROID_VR": {
       "clientNameId": "28",
       "clientVersion": "1.63.27",
-      "requiresPoToken": true,
+      "requiresPoToken": false,
       "requiresLogin": false,
       "supportsStreamResolve": true,
       "supportsSearch": true,
@@ -25,7 +25,7 @@
     "IOS_MUSIC": {
       "clientNameId": "26",
       "clientVersion": "8.32.1",
-      "requiresPoToken": true,
+      "requiresPoToken": false,
       "requiresLogin": false,
       "supportsStreamResolve": true,
       "supportsSearch": true,

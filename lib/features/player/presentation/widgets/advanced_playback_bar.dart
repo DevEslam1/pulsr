@@ -1,5 +1,4 @@
 // F1/F2/F11 controls: AB loop, per-track delay, bookmark resume.
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -8,7 +7,6 @@ import '../../cubit/player_state.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../../core/motion/pulsr_motion.dart';
-import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -17,7 +15,6 @@ import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// AB-loop / bookmark labels need a placeholder for an unset point; the
 /// duration itself is formatted with the shared [Formatters.formatDuration] so
@@ -51,7 +48,6 @@ class AdvancedPlaybackBar extends StatelessWidget {
                   active: c.state.themeColorSource == ThemeColorSource.custom,
                 ));
     final barRadius = custom.active ? custom.radius : 24.0;
-    final showGlow = custom.active && custom.glow;
     final resolvedActiveColor = activeColor ?? p.accent;
     final double barHeight = height ?? 48.0;
 
@@ -121,28 +117,18 @@ class AdvancedPlaybackBar extends StatelessWidget {
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 6.0),
                           decoration: BoxDecoration(
-                            color: GpuBudget.isGpuSaverActive
-                                ? p.surface
-                                : (p.isDark ? Colors.white : Colors.black)
-                                    .withValues(alpha: 0.06),
+                            color: p.surfaceContainer,
                             borderRadius: AppRadii.circular(barRadius),
                             border: Border.all(
-                              color: (p.isDark ? Colors.white : Colors.black)
-                                  .withValues(alpha: 0.12),
+                              color: p.hairline,
                               width: 1.0,
                             ),
                             boxShadow: [
-                              if (showGlow)
-                                BoxShadow(
-                                  color: resolvedActiveColor.withValues(
-                                      alpha: 0.28),
-                                  blurRadius: 20,
-                                  spreadRadius: 1,
-                                ),
                               BoxShadow(
-                                color: AppColors.scrimAt(0.20),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
+                                color: Colors.black.withValues(
+                                    alpha: p.isDark ? 0.20 : 0.05),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
@@ -394,13 +380,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                           ),
                         );
 
-                        if (disableBlur || GpuBudget.isGpuSaverActive) {
-                          return dockContainer;
-                        }
-                        return BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                          child: dockContainer,
-                        );
+                        return dockContainer;
                       },
                     ),
                   ),

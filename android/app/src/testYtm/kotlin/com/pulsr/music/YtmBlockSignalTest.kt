@@ -290,6 +290,7 @@ class YtmBlockSignalTest {
             YtmBlockSignal.SignInRequired, YtmBlockSignal.ClientDeprecated, YtmBlockSignal.GeoBlocked, YtmBlockSignal.AgeRestricted -> 2
             YtmBlockSignal.VideoGone -> 1
             YtmBlockSignal.NetworkUnavailable -> 0
+YtmBlockSignal.DeadlineExceeded -> 0
         }
 
         assertTrue(priority(YtmBlockSignal.Interrupted) > priority(YtmBlockSignal.BotChallenge))

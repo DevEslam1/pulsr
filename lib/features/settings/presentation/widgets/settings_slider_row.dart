@@ -34,6 +34,8 @@ class SettingSliderRow extends StatelessWidget {
   final String Function(double value)? formatValue;
 
   final bool enabled;
+  final EdgeInsetsGeometry? contentPadding;
+  final bool isWavy;
 
   const SettingSliderRow({
     super.key,
@@ -48,6 +50,8 @@ class SettingSliderRow extends StatelessWidget {
     this.divisions,
     this.formatValue,
     this.enabled = true,
+    this.contentPadding,
+    this.isWavy = false,
   });
 
   String _fmt(double v) =>
@@ -59,8 +63,9 @@ class SettingSliderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-          AppSpacing.md, AppSpacing.sm, AppSpacing.sm, AppSpacing.s14),
+      padding: contentPadding ??
+          const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.s12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -85,14 +90,14 @@ class SettingSliderRow extends StatelessWidget {
                 child: Text(label,
                     style: TextStyle(
                         color: enabled ? p.textPrimary : p.textTertiary,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         fontSize: AppFontSize.body)),
               ),
               Text(
                 _fmt(value),
                 style: TextStyle(
                     color: enabled ? p.accent : p.textTertiary,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: AppFontSize.label),
               ),
               const SizedBox(width: AppSpacing.s2),
@@ -135,6 +140,7 @@ class SettingSliderRow extends StatelessWidget {
                 min: min,
                 max: max,
                 divisions: divisions,
+                isWavy: isWavy,
                 semanticLabel: '$label ${_fmt(value)}',
                 onChanged: onChanged,
               ),

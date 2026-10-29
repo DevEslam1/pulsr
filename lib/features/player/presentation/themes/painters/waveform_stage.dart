@@ -187,7 +187,7 @@ class _WaveformHeroStage extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 3D Perspective Tilt Squircle: Touch-responsive Matrix4 perspective rotation
 // ---------------------------------------------------------------------------
-class _TiltableArtworkSquircle extends StatefulWidget {
+class _TiltableArtworkSquircle extends StatelessWidget {
   final Widget child;
   final double size;
 
@@ -197,85 +197,8 @@ class _TiltableArtworkSquircle extends StatefulWidget {
   });
 
   @override
-  State<_TiltableArtworkSquircle> createState() =>
-      _TiltableArtworkSquircleState();
-}
-
-class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _returnController;
-  Animation<Offset>? _returnAnimation;
-  Offset _tilt = Offset.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    _returnController = AnimationController(vsync: this)
-      ..addListener(_onReturnTick);
-  }
-
-  void _onReturnTick() {
-    final animation = _returnAnimation;
-    if (!mounted || animation == null) return;
-    setState(() {
-      _tilt = animation.value;
-    });
-  }
-
-  @override
-  void dispose() {
-    _returnController.dispose();
-    super.dispose();
-  }
-
-  void _onPanUpdate(DragUpdateDetails details) {
-    if (!mounted) return;
-    _returnController.stop();
-    final half = widget.size / 2;
-    if (half <= 0) return;
-    final dx = ((details.localPosition.dx - half) / half).clamp(-1.0, 1.0);
-    final dy = ((details.localPosition.dy - half) / half).clamp(-1.0, 1.0);
-    setState(() {
-      _tilt = Offset(dx, dy);
-    });
-  }
-
-  void _snapBack() {
-    if (!mounted || _tilt == Offset.zero) return;
-    _returnController.duration = context.motionMs(400);
-    _returnAnimation = _returnController.drive(
-      Tween<Offset>(begin: _tilt, end: Offset.zero).chain(
-        CurveTween(curve: context.motionCurve(Curves.easeOutBack)),
-      ),
-    );
-    _returnController.forward(from: 0.0);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    const double maxAngle = 0.22; // ~12.6 degrees
-    final transform = Matrix4.identity()
-      ..setEntry(3, 2, 0.001)
-      ..rotateX(-_tilt.dy * maxAngle)
-      ..rotateY(_tilt.dx * maxAngle);
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onPanStart: (d) => _onPanUpdate(
-        DragUpdateDetails(
-          localPosition: d.localPosition,
-          globalPosition: d.globalPosition,
-        ),
-      ),
-      onPanUpdate: _onPanUpdate,
-      onPanEnd: (_) => _snapBack(),
-      onPanCancel: _snapBack,
-      child: Transform(
-        transform: transform,
-        alignment: Alignment.center,
-        child: widget.child,
-      ),
-    );
+    return child;
   }
 }
 

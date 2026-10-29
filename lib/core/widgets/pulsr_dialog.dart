@@ -357,16 +357,15 @@ class PulsrDialog extends StatelessWidget {
             expanded: 540.0,
           ),
         ),
-        child: GlassContainer(
+        child: GlassContainer.solid(
           borderRadius: AppRadii.dialogRadius,
-          opacity: p.isDark ? 0.88 : 0.94,
-          blur: 14.0,
+          color: p.surfaceContainerHigh,
           boxShadow: [
             BoxShadow(
-              color: AppColors.scrimAt(p.isDark ? 0.50 : 0.18),
-              blurRadius: 32,
+              color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.10),
+              blurRadius: 16,
               spreadRadius: 0,
-              offset: const Offset(0, 12),
+              offset: const Offset(0, 4),
             ),
           ],
           child: Column(

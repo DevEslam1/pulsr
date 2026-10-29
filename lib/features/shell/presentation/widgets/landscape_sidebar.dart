@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -17,7 +15,6 @@ import '../nav_destinations.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// The 4 navigation rail display modes based on screen width/posture.
 enum SidebarRailMode {
@@ -198,25 +195,11 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
             width: totalWidth,
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  GpuBudget.isGpuSaverActive
-                      ? p.surface
-                      : p.surface.withValues(alpha: p.isDark ? 0.86 : 0.92),
-                  GpuBudget.isGpuSaverActive
-                      ? p.surfaceContainer
-                      : p.surfaceContainer
-                          .withValues(alpha: p.isDark ? 0.80 : 0.88),
-                ],
-              ),
+              color: p.surfaceContainer,
               border: BorderDirectional(
                 end: BorderSide(
-                  color: p.isDark
-                      ? AppColors.specularStrong
-                      : AppColors.scrimAt(0.08),
-                  width: 1.2,
+                  color: p.hairline,
+                  width: 1.0,
                 ),
               ),
             ),
@@ -370,13 +353,7 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                     ),
                   );
 
-                  if (GpuBudget.isGpuSaverActive) {
-                    return sidebarBody;
-                  }
-                  return BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                    child: sidebarBody,
-                  );
+                  return sidebarBody;
                 },
               ),
             ),

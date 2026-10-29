@@ -316,8 +316,8 @@ class YtmStream {
       artworkUrl: (map['artworkUrl'] as String?)?.trim().isNotEmpty == true
           ? (map['artworkUrl'] as String).trim()
           : null,
-      userAgent: map['userAgent'] as String?,
-      cookies: map['cookies'] as String?,
+      userAgent: (map['userAgent'] as String?) ?? _header(map, 'User-Agent'),
+      cookies: (map['cookies'] as String?) ?? _header(map, 'Cookie'),
       expiresAt: (map['expiresAt'] as num?)?.toInt() ?? expiryFromUrl(url),
       loudnessDb: (map['loudnessDb'] as num?)?.toDouble() ??
           (map['perVideoLoudnessDb'] as num?)?.toDouble(),
@@ -326,8 +326,26 @@ class YtmStream {
       // that is January 1971, so every stream would be born expired and the URL
       // cache would refuse to store it.
     ).withResolvedExpiry();
-  }
+    }
 
-  @override
-  String toString() => 'YtmStream($videoId, $container, ${bitrateKbps}kbps)';
-}
+    /// Reads a value out of the native `headers` bag.
+    ///
+    /// The NewPipe fallback returns `headers` (User-Agent + Cookie) instead of the
+    /// separate top-level keys the InnerTube path uses. Only the top-level keys were
+    /// read, so the cookie the extractor had already computed was dropped for every
+    /// NewPipe-resolved stream.
+    static String? _header(Map<Object?, Object?> map, String name) {
+      final raw = map['headers'];
+      if (raw is! Map) return null;
+      final wanted = name.toLowerCase();
+      for (final entry in raw.entries) {
+        if (entry.key.toString().toLowerCase() != wanted) continue;
+        final value = entry.value?.toString().trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+      return null;
+    }
+
+    @override
+    String toString() => 'YtmStream($videoId, $container, ${bitrateKbps}kbps)';
+    }

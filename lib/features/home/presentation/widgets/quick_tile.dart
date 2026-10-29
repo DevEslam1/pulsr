@@ -48,20 +48,9 @@ class QuickTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s10, vertical: AppSpacing.s10),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: AlignmentDirectional.topStart,
-                end: AlignmentDirectional.bottomEnd,
-                colors: [
-                  Color.alphaBlend(
-                      color.withValues(alpha: 0.08), p.surfaceContainer),
-                  p.surfaceContainer,
-                ],
-              ),
+              color: p.surfaceContainer,
               borderRadius: AppRadii.r18All,
-              border: Border.all(
-                color:
-                    Color.alphaBlend(color.withValues(alpha: 0.22), p.hairline),
-              ),
+              border: Border.all(color: p.hairline),
             ),
             child: Row(
               children: [
@@ -69,10 +58,10 @@ class QuickTile extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.16),
+                    color: color.withValues(alpha: 0.12),
                     borderRadius: AppRadii.r14All,
                     border: Border.all(
-                      color: color.withValues(alpha: 0.26),
+                      color: p.hairline,
                       width: 0.8,
                     ),
                   ),

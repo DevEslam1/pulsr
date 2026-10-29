@@ -361,7 +361,9 @@ object PoTokenManager {
     fun currentEgressId(): String = EgressTracker.egressId(
         proxyLabel = runCatching { ProxyPool.currentPathLabel }.getOrDefault("DIRECT"),
         vpnActive = runCatching { appContext?.let { CellularFailoverHelper.isVpnActive(it) } ?: false }.getOrDefault(false),
-        isCellular = false, // CellularFailoverHelper has no cellular query; proxy+vpn cover the dominant changes
+        isCellular = runCatching {
+            appContext?.let { CellularFailoverHelper.isCellularActive(it) } ?: false
+        }.getOrDefault(false),
     )
 
     /**

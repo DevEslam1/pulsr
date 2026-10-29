@@ -36,19 +36,6 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
-const List<String> _localTags = [
-  'Rock',
-  'Pop',
-  'Hip-Hop',
-  'Acoustic',
-  'FLAC',
-  'Lossless',
-  'Jazz',
-  'Electronic',
-  'Top Hits',
-  'Trending',
-];
-
 const List<String> _onlineTags = [
   'Top Hits',
   'Trending',
@@ -718,60 +705,8 @@ class _StartPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if ((tab == 0 || tab == 1) && history.isNotEmpty) ...[
-            _buildRecentSectionHeader(
-              context: context,
-              icon: Icons.history_rounded,
-              title:
-                  '${context.l10n.recentSearches} • ${context.l10n.localMusic}',
-              onClear: () {
-                HapticFeedback.lightImpact();
-                local.clearHistory();
-              },
-              p: p,
-            ),
-            for (final term in history.take(5))
-              _RecentRow(
-                icon: Icons.history_rounded,
-                term: term,
-                onTap: () => onRecent(term),
-                onRemove: () => local.removeHistoryQuery(term),
-              ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          if (ytm != null && (tab == 0 || tab == 2))
-            ValueListenableBuilder<List<String>>(
-              valueListenable: ytm.historyNotifier,
-              builder: (context, online, _) {
-                if (online.isEmpty) return const SizedBox.shrink();
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildRecentSectionHeader(
-                      context: context,
-                      icon: Icons.public_rounded,
-                      title:
-                          '${context.l10n.recentSearches} • ${context.l10n.onlineStream}',
-                      onClear: () {
-                        HapticFeedback.lightImpact();
-                        ytm.clearHistory();
-                      },
-                      p: p,
-                    ),
-                    for (final term in online.take(5))
-                      _RecentRow(
-                        icon: Icons.public_rounded,
-                        term: term,
-                        onTap: () => onRecent(term),
-                        onRemove: () => ytm.removeHistoryQuery(term),
-                      ),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                );
-              },
-            ),
+          _buildRecentSearchesSection(context, p, local, ytm),
           // Saved searches are local-only, so hide them on the Online tab
-          // (applying one there changed nothing visible).
           if (tab != 2)
             ValueListenableBuilder<List<String>>(
               valueListenable: local.savedSearches,
@@ -811,90 +746,182 @@ class _StartPage extends StatelessWidget {
                 );
               },
             ),
-          if (tab != 2) _buildRecentlyPlayed(context, p),
-          _label(
-              tab == 2
-                  ? context.l10n.popularSearches
-                  : context.l10n.quickDiscovery,
-              p),
-          const SizedBox(height: AppSpacing.xs),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xxs,
-            children: [
-              for (final tag in tab == 2 ? _onlineTags : _localTags)
-                ActionChip(
-                  label: Text(_localizedTag(context, tag)),
-                  backgroundColor: p.surfaceContainer,
-                  side: BorderSide(color: p.hairline),
-                  labelStyle: TextStyle(
-                      color: p.accent,
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w700),
-                  onPressed: () => onTag(tag),
-                ),
-            ],
-          ),
+          if (tab != 2)
+            ValueListenableBuilder<List<SongsTableData>>(
+              valueListenable: local.searchPlayedSongs,
+              builder: (context, playedSongs, _) {
+                if (playedSongs.isEmpty) return const SizedBox.shrink();
+                final currentSongId = context
+                    .select<PlayerCubit, int?>((c) => c.state.currentSong?.id);
+                final player = context.read<PlayerCubit>();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildRecentSectionHeader(
+                      context: context,
+                      icon: Icons.history_rounded,
+                      title: context.l10n.recentlyPlayed,
+                      onClear: () {
+                        HapticFeedback.lightImpact();
+                        local.clearSearchPlayedSongs();
+                      },
+                      p: p,
+                    ),
+                    for (final song in playedSongs.take(6))
+                      _SearchPlayedSongTile(
+                        song: song,
+                        isCurrent: currentSongId == song.id,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          local.recordPlayedSong(song);
+                          player.playSong(song, queue: playedSongs);
+                        },
+                        onRemove: () => local.removeSearchPlayedSong(song.id),
+                      ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                );
+              },
+            ),
+          if (tab == 2) ...[
+            _label(context.l10n.popularSearches, p),
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xxs,
+              children: [
+                for (final tag in _onlineTags)
+                  ActionChip(
+                    label: Text(_localizedTag(context, tag)),
+                    backgroundColor: p.surfaceContainer,
+                    side: BorderSide(color: p.hairline),
+                    labelStyle: TextStyle(
+                        color: p.accent,
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w700),
+                    onPressed: () => onTag(tag),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildRecentlyPlayed(BuildContext context, PulsrPalette p) {
-    final recent = context.select<PlayerCubit, List<SongsTableData>>(
-      (c) => c.state.queueHistory.take(8).toList(),
+  Widget _buildRecentSearchesSection(
+    BuildContext context,
+    PulsrPalette p,
+    SearchCubit local,
+    YtmSearchCubit? ytm,
+  ) {
+    if (ytm == null) {
+      if (tab == 2 || history.isEmpty) return const SizedBox.shrink();
+      return _buildHistoryItems(
+        context: context,
+        p: p,
+        terms: history.take(5).toList(),
+        onClear: () {
+          HapticFeedback.lightImpact();
+          local.clearHistory();
+        },
+        onRemove: (term) => local.removeHistoryQuery(term),
+      );
+    }
+
+    return ValueListenableBuilder<List<String>>(
+      valueListenable: ytm.historyNotifier,
+      builder: (context, onlineHistory, _) {
+        if (tab == 0) {
+          // Unified recent searches for All tab: deduplicated and combined
+          final combined = <String>[];
+          final seen = <String>{};
+          final maxLen = history.length > onlineHistory.length
+              ? history.length
+              : onlineHistory.length;
+          for (var i = 0; i < maxLen; i++) {
+            if (i < history.length) {
+              final term = history[i].trim();
+              if (term.isNotEmpty && seen.add(term.toLowerCase())) {
+                combined.add(history[i]);
+              }
+            }
+            if (i < onlineHistory.length) {
+              final term = onlineHistory[i].trim();
+              if (term.isNotEmpty && seen.add(term.toLowerCase())) {
+                combined.add(onlineHistory[i]);
+              }
+            }
+          }
+          if (combined.isEmpty) return const SizedBox.shrink();
+
+          return _buildHistoryItems(
+            context: context,
+            p: p,
+            terms: combined.take(5).toList(),
+            onClear: () {
+              HapticFeedback.lightImpact();
+              local.clearHistory();
+              ytm.clearHistory();
+            },
+            onRemove: (term) {
+              local.removeHistoryQuery(term);
+              ytm.removeHistoryQuery(term);
+            },
+          );
+        } else if (tab == 1) {
+          if (history.isEmpty) return const SizedBox.shrink();
+          return _buildHistoryItems(
+            context: context,
+            p: p,
+            terms: history.take(5).toList(),
+            onClear: () {
+              HapticFeedback.lightImpact();
+              local.clearHistory();
+            },
+            onRemove: (term) => local.removeHistoryQuery(term),
+          );
+        } else {
+          if (onlineHistory.isEmpty) return const SizedBox.shrink();
+          return _buildHistoryItems(
+            context: context,
+            p: p,
+            terms: onlineHistory.take(5).toList(),
+            onClear: () {
+              HapticFeedback.lightImpact();
+              ytm.clearHistory();
+            },
+            onRemove: (term) => ytm.removeHistoryQuery(term),
+          );
+        }
+      },
     );
-    if (recent.isEmpty) return const SizedBox.shrink();
-    final player = context.read<PlayerCubit>();
+  }
+
+  Widget _buildHistoryItems({
+    required BuildContext context,
+    required PulsrPalette p,
+    required List<String> terms,
+    required VoidCallback onClear,
+    required ValueChanged<String> onRemove,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _label(context.l10n.recentlyPlayed, p),
-        const SizedBox(height: AppSpacing.xs),
-        SizedBox(
-          height: 106,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: recent.length,
-            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
-            itemBuilder: (context, index) {
-              final song = recent[index];
-              return SizedBox(
-                width: 78,
-                child: InkWell(
-                  borderRadius: AppRadii.r12All,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    player.playSong(song, queue: recent);
-                  },
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CachedArtwork(
-                        id: song.id,
-                        type: ArtworkType.AUDIO,
-                        size: 72,
-                        borderRadius: 14,
-                      ),
-                      const SizedBox(height: AppSpacing.s6),
-                      Text(
-                        song.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+        _buildRecentSectionHeader(
+          context: context,
+          icon: Icons.history_rounded,
+          title: context.l10n.recentSearches,
+          onClear: onClear,
+          p: p,
         ),
+        for (final term in terms)
+          _RecentRow(
+            icon: Icons.history_rounded,
+            term: term,
+            onTap: () => onRecent(term),
+            onRemove: () => onRemove(term),
+          ),
         const SizedBox(height: AppSpacing.md),
       ],
     );
@@ -909,6 +936,100 @@ class _StartPage extends StatelessWidget {
           letterSpacing: AppTracking.wide,
         ),
       );
+}
+
+class _SearchPlayedSongTile extends StatelessWidget {
+  final SongsTableData song;
+  final bool isCurrent;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+
+  const _SearchPlayedSongTile({
+    required this.song,
+    required this.isCurrent,
+    required this.onTap,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Material(
+      color: isCurrent ? p.surfaceContainer : Colors.transparent,
+      borderRadius: AppRadii.r12All,
+      child: InkWell(
+        borderRadius: AppRadii.r12All,
+        onTap: onTap,
+        onLongPress: () => SongOptionsSheet.show(context, song: song),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.s6,
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: CachedArtwork(
+                  id: song.id,
+                  remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                  albumId: song.albumId,
+                  type: ArtworkType.AUDIO,
+                  size: 48,
+                  borderRadius: 12,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      song.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isCurrent ? p.accent : p.textPrimary,
+                        fontSize: AppFontSize.body,
+                        fontWeight:
+                            isCurrent ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      song.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isCurrent)
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                  child:
+                      Icon(Icons.graphic_eq_rounded, size: 18, color: p.accent),
+                ),
+              IconButton(
+                icon: Icon(Icons.close_rounded,
+                    size: 18, color: p.textTertiary),
+                visualDensity: VisualDensity.compact,
+                tooltip: context.l10n.remove,
+                onPressed: onRemove,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _RecentRow extends StatelessWidget {
@@ -1086,6 +1207,7 @@ class _LocalResults extends StatelessWidget {
                   subtitleOverride: '${song.artist} • ${song.album}',
                   onTap: () {
                     cubit.commitQuery();
+                    cubit.recordPlayedSong(song);
                     player.playSong(song, queue: state.results);
                   },
                   onMorePressed: () =>
@@ -1350,6 +1472,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                         subtitleOverride: '${song.artist} • ${song.album}',
                         onTap: () {
                           widget.onCommit();
+                          context.read<SearchCubit>().recordPlayedSong(song);
                           player.playSong(song, queue: localSongs);
                         },
                         onMorePressed: () =>
@@ -1433,8 +1556,12 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                         song: onlineSongs[i],
                         query: widget.query,
                         subtitleOverride: onlineTracks[i].artist,
-                        onTap: () =>
-                            player.playSong(onlineSongs[i], queue: onlineSongs),
+                        onTap: () {
+                          context
+                              .read<SearchCubit>()
+                              .recordPlayedSong(onlineSongs[i]);
+                          player.playSong(onlineSongs[i], queue: onlineSongs);
+                        },
                         trailing: YtmDownloadButton(song: onlineSongs[i]),
                       ),
                     if (onlineSongs.length > _onlinePreview)
@@ -1809,7 +1936,10 @@ class _OnlineResults extends StatelessWidget {
                 song: song,
                 query: state.query,
                 subtitleOverride: state.results[index].artist,
-                onTap: () => playerCubit.playSong(song, queue: songs),
+                onTap: () {
+                  context.read<SearchCubit>().recordPlayedSong(song);
+                  playerCubit.playSong(song, queue: songs);
+                },
                 trailing: YtmDownloadButton(song: song),
               );
             },

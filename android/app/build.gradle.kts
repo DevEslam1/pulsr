@@ -469,8 +469,106 @@ tasks.register("validateProdIsolation") {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Flavor parity guards (2026-10-28 engine audit)
+// ---------------------------------------------------------------------------
+
+/**
+ * The dev and ytm flavor unit-test source sets must stay identical.
+ *
+ * They had drifted: six engine test classes (HedgedResolutionTest,
+ * JsDecipherCacheTest, PlayerJavaScriptTest, PoTokenStoreTest,
+ * SabrHardeningTest, YtmHttpClientTest) existed only in testDev, and three
+ * shared files had diverged - so the flavor that actually ships ran 39 fewer
+ * engine tests than the flavor that does not.
+ */
+tasks.register("validateFlavorTestParity") {
+    group = "verification"
+    description = "Fails when the dev and ytm unit-test source sets diverge."
+    doLast {
+        val devDir = file("src/testDev/kotlin")
+        val ytmDir = file("src/testYtm/kotlin")
+
+        fun collect(dir: File): Map<String, String> =
+            if (!dir.exists()) emptyMap()
+            else dir.walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                // Line endings are normalised before comparing: this working copy
+                // legitimately mixes CRLF and LF files (git core.autocrlf rewrites
+                // them on checkout), so a byte comparison would fail on checkout
+                // noise instead of on real drift.
+                .associate {
+                    it.relativeTo(dir).invariantSeparatorsPath to
+                        it.readText().replace("\r\n", "\n")
+                }
+
+        val dev = collect(devDir)
+        val ytm = collect(ytmDir)
+        val onlyDev = (dev.keys - ytm.keys).sorted()
+        val onlyYtm = (ytm.keys - dev.keys).sorted()
+        val differ = (dev.keys intersect ytm.keys).filter { dev[it] != ytm[it] }.sorted()
+
+        if (onlyDev.isNotEmpty() || onlyYtm.isNotEmpty() || differ.isNotEmpty()) {
+            throw GradleException(
+                "Flavor unit tests diverged. dev-only=" + onlyDev +
+                    " ytm-only=" + onlyYtm +
+                    " content-differs=" + differ
+            )
+        }
+        println(
+            "[validateFlavorTestParity] PASSED: " + dev.size +
+                " test files identical across dev and ytm."
+        )
+    }
+}
+
+/**
+ * The prod stub must implement at least every channel method the real plugin
+ * does.
+ *
+ * A stub that answers a read-only getter with an error, or omits a map key the
+ * Dart layer reads, is a "works in dev, throws in prod" bug waiting for a
+ * release; this makes the contract checkable instead of reviewable.
+ */
+tasks.register("validateChannelParity") {
+    group = "verification"
+    description = "Fails when the prod stub is missing a YTM channel method."
+    doLast {
+        fun methodsOf(path: File): Set<String> {
+            if (!path.exists()) throw GradleException("Missing plugin source: " + path.path)
+            val text = path.readText()
+            val start = text.indexOf("override fun onMethodCall")
+            if (start < 0) throw GradleException("No onMethodCall in " + path.path)
+            val end = text.indexOf("else ->", start)
+            val block = if (end > start) text.substring(start, end) else text.substring(start)
+            // Matches both `"name" -> ...` and the multi-label form
+            // `"a",\n "b",\n "c" -> ...`, which a `->`-only pattern silently
+            // skipped (it counted the last label of a group and dropped the rest).
+            return Regex("(?m)^\\s*\"([A-Za-z0-9_]+)\"\\s*(?:,|->)")
+                .findAll(block)
+                .map { it.groupValues[1] }
+                .toSet()
+        }
+
+        val enabled = methodsOf(file("src/ytmEnabled/kotlin/com/pulsr/music/YtmExtractorPlugin.kt"))
+        val disabled = methodsOf(file("src/ytmDisabled/kotlin/com/pulsr/music/YtmExtractorPlugin.kt"))
+        val missing = (enabled - disabled).sorted()
+        if (missing.isNotEmpty()) {
+            throw GradleException("Prod stub is missing channel methods: " + missing)
+        }
+        println(
+            "[validateChannelParity] PASSED: " + enabled.size +
+                " channel methods covered by the prod stub."
+        )
+    }
+}
+
 afterEvaluate {
     tasks.matching { it.name.startsWith("assemble") || it.name == "check" || it.name == "test" }.configureEach {
         dependsOn("validateProdIsolation")
+        // 2026-10-28 audit: the two flavor source sets had drifted, and the prod
+        // stub answered some channel methods with an error where the enabled
+        // plugin answers with a value. Both are build failures now.
+        dependsOn("validateFlavorTestParity", "validateChannelParity")
     }
 }

@@ -57,6 +57,8 @@ class _DiagnosticSection extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.s6),
               SettingSliderRow(
+                contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                    0, AppSpacing.sm, 0, AppSpacing.s12),
                 label: context.l10n.settingsSyncOffset,
                 value: state.bluetoothLatencyOffsetMs.toDouble(),
                 enabled: isAndroid,

@@ -150,6 +150,8 @@ class _GainSection extends StatelessWidget {
                 if (rgBlocked == null &&
                     state.replayGainMode != ReplayGainMode.off) ...[
                   SettingSliderRow(
+                    contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                        0, AppSpacing.sm, 0, AppSpacing.s12),
                     label: context.l10n.settingsPreampWithRg,
                     value: state.replayGainPreampWithRg,
                     min: -12.0,
@@ -161,6 +163,8 @@ class _GainSection extends StatelessWidget {
                     onChanged: cubit.setReplayGainPreampWithRg,
                   ),
                   SettingSliderRow(
+                    contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                        0, AppSpacing.sm, 0, AppSpacing.s12),
                     label: context.l10n.settingsPreampWithoutRg,
                     value: state.replayGainPreampWithoutRg,
                     min: -12.0,
