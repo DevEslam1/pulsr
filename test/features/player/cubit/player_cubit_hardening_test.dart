@@ -59,6 +59,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   int? get currentAudioSessionId => null;
   @override
   Stream<int?> get audioSessionIdStream => Stream<int?>.empty();
+
   @override
   Future<void> setVolume(double volume) async {
     _vol = volume;

@@ -605,6 +605,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   final StreamController<String> _errorSubject =
       StreamController<String>.broadcast();
   Stream<String> get errorStream => _errorSubject.stream;
+  // Output-mode fallbacks are informational, not playback failures. They ride
+  // the error stream prefixed so PlayerCubit can show them without engaging
+  // the unplayable-track auto-skip path.
+  static const String outputModeNoticePrefix = '__pulsr_output_mode__:';
+  String? _lastOutputModeNotice;
   int? _currentAudioSessionId;
   final StreamController<int?> _audioSessionIdSubject =
       StreamController<int?>.broadcast();
@@ -1938,6 +1943,42 @@ class PulsrAudioHandler extends BaseAudioHandler
       // (every bufferedPosition update) and must count as ONE underrun, or one
       // hiccup would trip the widen-buffer / quality step-down thresholds.
       var wasBuffering = false;
+
+      _subscriptions.add(
+        player.outputModeEffectStream.listen(
+          (effect) {
+            if (_disposed) return;
+            if (effect.reason == null) {
+              // A mode became effective again; allow a future failure on the
+              // same output to surface once more.
+              if (effect.aaudioActive || effect.floatActive) {
+                _lastOutputModeNotice = null;
+              }
+              return;
+            }
+            final message = effect.reason == 'float_rejected'
+                ? "High-resolution float output isn't available on this "
+                    'output; using 16-bit output.'
+                : "Direct (AAudio) output isn't available on this output; "
+                    'using the standard audio output.';
+            if (message == _lastOutputModeNotice) return;
+            _lastOutputModeNotice = message;
+            ErrorLogger.log(
+              'Audio output mode fallback: ${effect.reason} '
+              '(aaudioActive=${effect.aaudioActive}, '
+              'floatActive=${effect.floatActive})',
+              category: 'AudioHandler',
+            );
+            if (!_errorSubject.isClosed) {
+              _errorSubject.add('$outputModeNoticePrefix$message');
+            }
+          },
+          onError: (e, st) {
+            ErrorLogger.log('Player outputModeEffectStream error',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          },
+        ),
+      );
 
       _subscriptions.add(
         player.playbackEventStream.listen(

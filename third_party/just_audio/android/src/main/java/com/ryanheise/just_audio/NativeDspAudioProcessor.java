@@ -256,6 +256,28 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     // fade the complete chain without replacing another owner's envelope.
     private volatile boolean transitionMuted;
     private volatile float transitionGain = 1.0f;
+
+    /**
+     * Carries an in-flight gain ramp / transition fade onto a replacement
+     * processor when the output mode swaps its inner sink. Without this a
+     * mode switch mid-fade would drop the envelope and jump to unity.
+     * Runs on the playback thread; the method-channel thread may arm a curve
+     * concurrently on either instance, hence both ramp locks.
+     */
+    void copyContinuousStateTo(NativeDspAudioProcessor target) {
+        if (target == null || target == this) return;
+        synchronized (rampLock) {
+            synchronized (target.rampLock) {
+                target.rampGains = rampGains == null ? null : rampGains.clone();
+                target.rampSegmentMs = rampSegmentMs;
+                target.rampPosFrames = rampPosFrames;
+                target.staticGain = staticGain;
+            }
+        }
+        target.transitionMuted = transitionMuted;
+        target.transitionGain = transitionGain;
+    }
+
     public boolean setTransitionMuted(boolean muted) {
         // Only claim success when the mute can actually be rendered: the DSP
         // chain must be configured and its native engine alive. Otherwise the

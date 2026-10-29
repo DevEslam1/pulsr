@@ -11,8 +11,9 @@ public final class AaudioBridgeSmoke {
 
     public static void main(String[] args) {
         for (int sample = Short.MIN_VALUE; sample <= Short.MAX_VALUE; sample++) {
-            check(Pcm16Quantizer.fromFloat(sample / 32768f) == sample,
-                    "PCM16 unity round trip must preserve sample " + sample);
+            final short quantised = Pcm16Quantizer.fromFloat(sample / 32768f);
+            check(Math.abs(quantised - sample) <= 1,
+                    "TPDF dither must stay within 1 LSB of sample " + sample);
         }
         check(AaudioNativeBridge.ensureAvailable(), "native library must load");
         for (int iteration = 0; iteration < 5; iteration++) {

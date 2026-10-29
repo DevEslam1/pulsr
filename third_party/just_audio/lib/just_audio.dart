@@ -52,6 +52,28 @@ JustAudioPlatform get _pluginPlatform {
 /// await player.dispose();
 /// ```
 ///
+/// Result of an output-mode change on an [AudioPlayer].
+///
+/// [aaudioActive] / [floatActive] describe what the native sink is *actually*
+/// running, which may differ from the requested preference when the device
+/// refuses a mode; [reason] is non-null for such a fallback.
+class DspOutputModeEffect {
+  final bool aaudioActive;
+  final bool floatActive;
+  final String? reason;
+
+  const DspOutputModeEffect({
+    required this.aaudioActive,
+    required this.floatActive,
+    this.reason,
+  });
+
+  @override
+  String toString() =>
+      'DspOutputModeEffect(aaudioActive: $aaudioActive, '
+      'floatActive: $floatActive, reason: $reason)';
+}
+
 /// You must call [stop] or [dispose] to release the resources used by this
 /// player, including any temporary files created to cache assets.
 class AudioPlayer {
@@ -86,6 +108,43 @@ class AudioPlayer {
   bool _aaudioOutputEnabled = false;
   bool _aaudioPreferExclusive = true;
   int _aaudioTargetBufferMs = 150;
+
+  /// Effective (not requested) state of the optional output paths, surfaced to
+  /// the app so a native fallback is visible instead of silently diverging
+  /// from the persisted preference.
+  bool _aaudioOutputActive = false;
+  bool _floatOutputActive = false;
+  final StreamController<DspOutputModeEffect> _outputModeEffectController =
+      StreamController<DspOutputModeEffect>.broadcast();
+  MethodChannel? _platformControlChannel;
+
+  /// Emits whenever the platform applies or rejects an output-mode change.
+  Stream<DspOutputModeEffect> get outputModeEffectStream =>
+      _outputModeEffectController.stream;
+
+  /// True when the current native sink is actually the AAudio Direct path.
+  bool get aaudioOutputActive => _aaudioOutputActive;
+
+  /// True when the current native sink is actually the float DSP path.
+  bool get floatOutputActive => _floatOutputActive;
+
+  void _applyOutputModeEffect({
+    required bool aaudioActive,
+    required bool floatActive,
+    String? reason,
+  }) {
+    final changed = aaudioActive != _aaudioOutputActive ||
+        floatActive != _floatOutputActive;
+    _aaudioOutputActive = aaudioActive;
+    _floatOutputActive = floatActive;
+    if ((changed || reason != null) && !_outputModeEffectController.isClosed) {
+      _outputModeEffectController.add(DspOutputModeEffect(
+        aaudioActive: aaudioActive,
+        floatActive: floatActive,
+        reason: reason,
+      ));
+    }
+  }
 
   /// This is set to [_nativePlatform] when [_active] is `true` and
   /// [_idlePlatform] otherwise.
@@ -1300,6 +1359,7 @@ class AudioPlayer {
       final platform = _platformValue;
       if (!_active || platform == null) {
         _floatOutputEnabled = enabled;
+        _floatOutputActive = false;
         return true; // remembered; flushed on platform activation
       }
       final channel =
@@ -1308,6 +1368,11 @@ class AudioPlayer {
               .invokeMethod<bool>('dspSetFloatOutput', {'enabled': enabled}) ??
           false;
       if (accepted) _floatOutputEnabled = enabled;
+      _applyOutputModeEffect(
+        aaudioActive: _aaudioOutputActive,
+        floatActive: accepted && enabled && !_aaudioOutputActive,
+        reason: enabled && !accepted ? 'float_rejected' : null,
+      );
       return accepted;
     } catch (_) {
       // Not the Pulsr Android fork (web/iOS/macOS/windows).
@@ -1335,6 +1400,7 @@ class AudioPlayer {
         _aaudioOutputEnabled = enabled;
         _aaudioPreferExclusive = preferExclusive;
         _aaudioTargetBufferMs = targetBufferMs;
+        _aaudioOutputActive = false;
         return true; // remembered; flushed on platform activation
       }
       final channel =
@@ -1350,6 +1416,14 @@ class AudioPlayer {
         _aaudioPreferExclusive = preferExclusive;
         _aaudioTargetBufferMs = targetBufferMs;
       }
+      final aaudioActive = accepted && enabled;
+      // The explicit settings action already reports an active-player
+      // rejection; only reflect the effective state here to avoid a duplicate
+      // snackbar/toast. Async fallbacks still carry a reason.
+      _applyOutputModeEffect(
+        aaudioActive: aaudioActive,
+        floatActive: !aaudioActive && _floatOutputEnabled,
+      );
       return accepted;
     } catch (_) {
       // Not the Pulsr Android fork (web/iOS/macOS/windows).
@@ -1635,6 +1709,9 @@ class AudioPlayer {
       await _currentIndexSubject.close();
       await _loopModeSubject.close();
       await _shuffleModeEnabledSubject.close();
+      _platformControlChannel?.setMethodCallHandler(null);
+      _platformControlChannel = null;
+      await _outputModeEffectController.close();
     });
   }
 
@@ -1838,24 +1915,58 @@ class AudioPlayer {
       });
       if (checkInterruption() || _disposed) return inactiveResult(platform);
 
-      // Pulsr fork: push the remembered float-output preference before any
-      // other call configures the native audio sink. The native handler stores
-      // the flag without initialising the player, so the sink built by the
-      // following setAudioAttributes/load calls uses the requested 16-bit
-      // (default) or 24/32-bit float DSP path.
+      // Pulsr fork: push the remembered output-mode preferences before any
+      // other call configures the native audio sink, and keep listening for
+      // native fallbacks (e.g. the device refusing AAudio later) so the app can
+      // reflect the effective mode.
       if (active && !_isUnitTest()) {
         try {
-          final dspChannel =
-              MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
-          await dspChannel.invokeMethod<bool>(
-              'dspSetFloatOutput', {'enabled': _floatOutputEnabled});
-          await dspChannel.invokeMethod<bool>('dspSetAaudioOutput', {
-            'enabled': _aaudioOutputEnabled,
-            'preferExclusive': _aaudioPreferExclusive,
-            'targetBufferMs': _aaudioTargetBufferMs,
+          final control = MethodChannel(
+              'com.ryanheise.just_audio.methods.${platform.id}');
+          _platformControlChannel?.setMethodCallHandler(null);
+          _platformControlChannel = control;
+          control.setMethodCallHandler((call) async {
+            if (call.method == 'dspOutputModeEffect') {
+              final args = call.arguments;
+              if (args is Map) {
+                _applyOutputModeEffect(
+                  aaudioActive: args['aaudioActive'] == true,
+                  floatActive: args['floatActive'] == true,
+                  reason: args['reason'] is String
+                      ? args['reason'] as String
+                      : null,
+                );
+              }
+            }
+            return null;
           });
+          final floatAccepted = await control.invokeMethod<bool>(
+                  'dspSetFloatOutput', {'enabled': _floatOutputEnabled}) ??
+              false;
+          final aaudioAccepted = await control.invokeMethod<bool>(
+                  'dspSetAaudioOutput', {
+                'enabled': _aaudioOutputEnabled,
+                'preferExclusive': _aaudioPreferExclusive,
+                'targetBufferMs': _aaudioTargetBufferMs,
+              }) ??
+              false;
+          final aaudioActive = _aaudioOutputEnabled && aaudioAccepted;
+          String? reason;
+          if (_aaudioOutputEnabled && !aaudioAccepted) {
+            reason = 'aaudio_rejected';
+          } else if (_floatOutputEnabled && !floatAccepted) {
+            reason = 'float_rejected';
+          }
+          _applyOutputModeEffect(
+            aaudioActive: aaudioActive,
+            floatActive: !aaudioActive && _floatOutputEnabled && floatAccepted,
+            reason: reason,
+          );
         } catch (_) {
           // Not the Pulsr Android fork — keep the default 16-bit path.
+          _platformControlChannel?.setMethodCallHandler(null);
+          _platformControlChannel = null;
+          _applyOutputModeEffect(aaudioActive: false, floatActive: false);
         }
       }
 
@@ -1970,6 +2081,8 @@ class AudioPlayer {
       await platform.dispose(DisposeRequest());
     } else {
       _nativePlatform = null;
+      _platformControlChannel?.setMethodCallHandler(null);
+      _platformControlChannel = null;
       try {
         await _pluginPlatform.disposePlayer(DisposePlayerRequest(id: _id!));
       } catch (e) {
@@ -1979,6 +2092,8 @@ class AudioPlayer {
         _id = null;
       }
     }
+    _aaudioOutputActive = false;
+    _floatOutputActive = false;
   }
 
   /// Clears the plugin's internal asset cache directory. Call this when the

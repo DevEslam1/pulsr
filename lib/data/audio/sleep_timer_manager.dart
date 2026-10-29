@@ -431,7 +431,14 @@ class SleepTimerManager {
       // restore in `finally` re-applies the pre-fade level afterwards.
       try {
         await player.setVolume(0);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to silence the player before clearing the sleep fade',
+          error: e,
+          stackTrace: st,
+          category: 'SleepTimer',
+        );
+      }
       try {
         player.dspClearGainCurve().catchError((_) => false);
       } catch (_) {}

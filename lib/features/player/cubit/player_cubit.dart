@@ -922,6 +922,16 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     });
 
     autoSub(_audioHandler.errorStream, (err) {
+      if (err.startsWith(PulsrAudioHandler.outputModeNoticePrefix)) {
+        // Informational output fallback (AAudio/float rejected): show the
+        // message without counting the track as unplayable or auto-skipping.
+        safeEmit(state.copyWith(
+            playback: state.playback.copyWith(
+                errorMessage: err.substring(
+                    PulsrAudioHandler.outputModeNoticePrefix.length),
+                isBuffering: false)));
+        return;
+      }
       widgetBridge.onPlaybackError(err);
       final failed = state.currentSong;
       if (failed == null) {

@@ -34,6 +34,59 @@ import java.nio.IntBuffer;
 public final class AAudioAudioSink implements AudioSink {
     private static final String TAG = "PulsrAAudioSink";
 
+    /** Seam over the JNI bridge so sink logic is testable without native code. */
+    interface Bridge {
+        long openForDevice(int sampleRate, int channelCount, int encoding,
+                boolean preferExclusive, int targetBufferMs, int deviceId);
+        int getDeviceId(long handle);
+        void close(long handle);
+        int write(long handle, ByteBuffer buffer, int offset, int length);
+        void play(long handle);
+        void pause(long handle);
+        void flush(long handle);
+        long getFramesRead(long handle);
+        long getFramesWritten(long handle);
+        boolean isExclusive(long handle);
+        void setVolume(long handle, float volume);
+    }
+
+    private static final Bridge NATIVE_BRIDGE = new Bridge() {
+        @Override public long openForDevice(int sampleRate, int channelCount, int encoding,
+                boolean preferExclusive, int targetBufferMs, int deviceId) {
+            return AaudioNativeBridge.nativeOpenForDevice(sampleRate, channelCount, encoding,
+                    preferExclusive, targetBufferMs, deviceId);
+        }
+        @Override public int getDeviceId(long handle) {
+            return AaudioNativeBridge.nativeGetDeviceId(handle);
+        }
+        @Override public void close(long handle) { AaudioNativeBridge.nativeClose(handle); }
+        @Override public int write(long handle, ByteBuffer buffer, int offset, int length) {
+            return AaudioNativeBridge.nativeWrite(handle, buffer, offset, length);
+        }
+        @Override public void play(long handle) { AaudioNativeBridge.nativePlay(handle); }
+        @Override public void pause(long handle) { AaudioNativeBridge.nativePause(handle); }
+        @Override public void flush(long handle) { AaudioNativeBridge.nativeFlush(handle); }
+        @Override public long getFramesRead(long handle) {
+            return AaudioNativeBridge.nativeGetFramesRead(handle);
+        }
+        @Override public long getFramesWritten(long handle) {
+            return AaudioNativeBridge.nativeGetFramesWritten(handle);
+        }
+        @Override public boolean isExclusive(long handle) {
+            return AaudioNativeBridge.nativeIsExclusive(handle);
+        }
+        @Override public void setVolume(long handle, float volume) {
+            AaudioNativeBridge.nativeSetVolume(handle, volume);
+        }
+    };
+
+    private Bridge bridge = NATIVE_BRIDGE;
+
+    /** Test seam; production always uses NATIVE_BRIDGE. */
+    void setBridgeForTest(Bridge bridge) {
+        this.bridge = bridge;
+    }
+
     private Listener listener;
     private Format configuredFormat;
     private int targetBufferMs;
@@ -122,8 +175,8 @@ public final class AAudioAudioSink implements AudioSink {
         if (handle == 0L || sampleRate <= 0 || pendingBasePosition) {
             return CURRENT_POSITION_NOT_SET;
         }
-        long framesWritten = AaudioNativeBridge.nativeGetFramesWritten(handle);
-        long framesRead = AaudioNativeBridge.nativeGetFramesRead(handle);
+        long framesWritten = bridge.getFramesWritten(handle);
+        long framesRead = bridge.getFramesRead(handle);
         if (framesRead > framesWritten) {
             framesRead = framesWritten;
         }
@@ -165,7 +218,7 @@ public final class AAudioAudioSink implements AudioSink {
         closeHandle();
         long newHandle;
         try {
-            newHandle = AaudioNativeBridge.nativeOpenForDevice(inputFormat.sampleRate,
+            newHandle = bridge.openForDevice(inputFormat.sampleRate,
                     inputFormat.channelCount, encoding, preferExclusive,
                     targetBufferMs, preferredDeviceId);
         } catch (UnsatisfiedLinkError e) {
@@ -180,7 +233,7 @@ public final class AAudioAudioSink implements AudioSink {
         handle = newHandle;
         openedDeviceId = preferredDeviceId;
         routePending = false;
-        measuredStream = new int[] {AaudioNativeBridge.nativeGetDeviceId(handle),
+        measuredStream = new int[] {bridge.getDeviceId(handle),
                 inputFormat.sampleRate, inputFormat.pcmEncoding == C.ENCODING_PCM_24BIT
                     ? AudioFormat.ENCODING_PCM_24BIT_PACKED
                     : inputFormat.pcmEncoding == C.ENCODING_PCM_32BIT
@@ -193,17 +246,17 @@ public final class AAudioAudioSink implements AudioSink {
         eosWritten = false;
         handledEndOfStream = false;
         pendingBasePosition = true;
-        AaudioNativeBridge.nativeSetVolume(handle, volume);
-        if (!playing) AaudioNativeBridge.nativePause(handle);
+        bridge.setVolume(handle, volume);
+        if (!playing) bridge.pause(handle);
         Log.i(TAG, "AAudio sink configured: " + sampleRate + "Hz/" + channelCount
                 + "ch pcm=" + inputFormat.pcmEncoding
-                + " exclusive=" + AaudioNativeBridge.nativeIsExclusive(handle));
+                + " exclusive=" + bridge.isExclusive(handle));
     }
 
     @Override
     public void play() {
         playing = true;
-        if (handle != 0L) AaudioNativeBridge.nativePlay(handle);
+        if (handle != 0L) bridge.play(handle);
     }
 
     @Override
@@ -268,7 +321,7 @@ public final class AAudioAudioSink implements AudioSink {
             ByteBuffer direct = ByteBuffer.allocateDirect(remaining);
             direct.put(writeBuffer.duplicate());
             direct.flip();
-            int written = AaudioNativeBridge.nativeWrite(handle, direct, 0,
+            int written = bridge.write(handle, direct, 0,
                     remaining);
             if (written < 0) {
                 throw new WriteException(-1, configuredFormat,
@@ -287,7 +340,7 @@ public final class AAudioAudioSink implements AudioSink {
             return !buffer.hasRemaining();
         }
         int offset = writeBuffer.position();
-        int written = AaudioNativeBridge.nativeWrite(handle, writeBuffer, offset,
+        int written = bridge.write(handle, writeBuffer, offset,
                 remaining);
         if (written < 0) {
             throw new WriteException(-1, configuredFormat,
@@ -336,15 +389,15 @@ public final class AAudioAudioSink implements AudioSink {
     @Override
     public boolean isEnded() {
         return handledEndOfStream && handle != 0L
-                && AaudioNativeBridge.nativeGetFramesRead(handle)
-                        >= AaudioNativeBridge.nativeGetFramesWritten(handle);
+                && bridge.getFramesRead(handle)
+                        >= bridge.getFramesWritten(handle);
     }
 
     @Override
     public boolean hasPendingData() {
         return handle != 0L
-                && AaudioNativeBridge.nativeGetFramesRead(handle)
-                        < AaudioNativeBridge.nativeGetFramesWritten(handle);
+                && bridge.getFramesRead(handle)
+                        < bridge.getFramesWritten(handle);
     }
 
     @Override
@@ -409,14 +462,14 @@ public final class AAudioAudioSink implements AudioSink {
     public void setVolume(float volume) {
         this.volume = volume;
         if (handle != 0L) {
-            AaudioNativeBridge.nativeSetVolume(handle, volume);
+            bridge.setVolume(handle, volume);
         }
     }
 
     @Override
     public void pause() {
         playing = false;
-        if (handle != 0L) AaudioNativeBridge.nativePause(handle);
+        if (handle != 0L) bridge.pause(handle);
     }
 
     @Override
@@ -424,8 +477,8 @@ public final class AAudioAudioSink implements AudioSink {
         eosWritten = false;
         handledEndOfStream = false;
         pendingBasePosition = true;
-        if (handle != 0L) AaudioNativeBridge.nativeFlush(handle);
-        if (playing && handle != 0L) AaudioNativeBridge.nativePlay(handle);
+        if (handle != 0L) bridge.flush(handle);
+        if (playing && handle != 0L) bridge.play(handle);
     }
 
     @Override
@@ -451,7 +504,7 @@ public final class AAudioAudioSink implements AudioSink {
     }
 
     private void updateMeasuredRoute() {
-        int device = AaudioNativeBridge.nativeGetDeviceId(handle);
+        int device = bridge.getDeviceId(handle);
         int[] previous = measuredStream;
         if (previous[0] != device) measuredStream = new int[] {device, previous[1], previous[2]};
     }
@@ -462,7 +515,7 @@ public final class AAudioAudioSink implements AudioSink {
             long toClose = handle;
             handle = 0L;
             try {
-                AaudioNativeBridge.nativeClose(toClose);
+                bridge.close(toClose);
             } catch (UnsatisfiedLinkError e) {
                 Log.w(TAG, "nativeClose failed: " + e.getMessage());
             }

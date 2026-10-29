@@ -9,9 +9,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import androidx.media3.common.C;
-import androidx.media3.common.audio.AudioProcessor;
 import androidx.media3.exoplayer.audio.AudioSink;
-import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import androidx.media3.exoplayer.DefaultLivePlaybackSpeedControl;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
@@ -112,28 +110,22 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private ExoPlayer player;
     private Integer audioSessionId;
-    // Pulsr fork: per-player DSP processor handle for the sample-accurate
-    // gain-ramp API (dspSetGainCurve / dspClearGainCurve).
-    private NativeDspAudioProcessor dspAudioProcessor;
+    // Pulsr fork: the active per-sink DSP processor, owned by the swappable
+    // sink. Written on the playback thread, read by method-channel calls.
+    private volatile NativeDspAudioProcessor dspAudioProcessor;
     // Pulsr fork: opt-in 24/32-bit float output path. Off by default so the
     // audio sink is built exactly as before (16-bit) unless Dart enables it.
-    private boolean floatOutputEnabled = false;
+    private volatile boolean floatOutputEnabled = false;
     // Pulsr fork: opt-in AAudio "Direct" output path. Off by default so the
     // sink is built exactly as before (DefaultAudioSink + DSP chain). When
-    // enabled, the whole Media3 sink is replaced by AAudioAudioSink
-    // (bit-perfect; the DSP processor chain is bypassed in this mode).
+    // enabled, the inner Media3 sink is AAudioAudioSink (bit-perfect; the DSP
+    // processor chain is bypassed in this mode).
     private volatile boolean aaudioOutputEnabled = false;
-    private boolean aaudioPreferExclusive = true;
-    private int aaudioTargetBufferMs = 150;
-    // Pulsr fork: strong references to the active sinks so PulsrOutputRouting
-    // can call unobserve() when they are replaced (HashSet requires explicit removal).
-    private DefaultAudioSink currentDefaultSink = null;
-    private AAudioAudioSink currentNativeSink = null;
-    // Arguments of the most recent load(), so an output rebuild that interrupts
-    // a load can restore the same item/position instead of dropping the pending
-    // prepareResult (which would hang the Dart setAudioSource future).
-    private int lastLoadIndex = 0;
-    private long lastLoadPositionUs = C.TIME_UNSET;
+    private volatile boolean aaudioPreferExclusive = true;
+    private volatile int aaudioTargetBufferMs = 150;
+    // Pulsr fork: stable sink that swaps its inner backend on output-mode
+    // changes instead of releasing/re-preparing the whole ExoPlayer.
+    private volatile OutputSinkControl sinkWrapper;
     private Integer errorCode;
     private String errorMessage;
     private Integer currentIndex;
@@ -439,25 +431,29 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         || cause instanceof AudioSink.InitializationException
                         || cause instanceof AudioSink.WriteException) {
                     // A stream can be refused after the setting was accepted
-                    // (a new song or device). Recover once with the mixed sink;
-                    // never label this fallback as exclusive output.
+                    // (a new song or device). Swap the inner sink in place and
+                    // retry; never rebuild the player or label this as exclusive.
                     Log.w(TAG, "AAudio output refused; restoring AudioTrack", error);
+                    final boolean wasAaudioEnabled = aaudioOutputEnabled;
                     aaudioOutputEnabled = false;
-                    Runnable doRebuild = () -> {
+                    if (wasAaudioEnabled) {
+                        notifyOutputModeToDart("aaudio_rejected", false, floatOutputEnabled);
+                    }
+                    Runnable doFallback = () -> {
                         if (player == null) return;
-                        rebuildPlayerForOutput();
-                        // The rebuild auto-prepares an in-flight load; after a
-                        // renderer error the player is IDLE, so retry explicitly
-                        // with the replacement sink. Avoid a duplicate prepare.
+                        if (sinkWrapper != null) sinkWrapper.requestModeChange(true);
+                        // A renderer error parks the player in IDLE; retry with
+                        // the replacement sink. The mode-change message itself is
+                        // applied by the following configure if this lands first.
                         if (!loadedSources.isEmpty()
                                 && player.getPlaybackState() == Player.STATE_IDLE) {
                             player.prepare();
                         }
                     };
                     if (android.os.Looper.myLooper() == handler.getLooper()) {
-                        doRebuild.run();
+                        doFallback.run();
                     } else {
-                        handler.post(doRebuild);
+                        handler.post(doFallback);
                     }
                     return;
                 }
@@ -500,6 +496,38 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
     }
 
+    /** AAudio availability seam, overridable in JVM tests. */
+    boolean isAaudioOutputSupported() {
+        return Build.VERSION.SDK_INT >= 28 && AaudioNativeBridge.ensureAvailable();
+    }
+
+    /**
+     * Probes one real AAudio stream before AAudio Direct is accepted. Kept
+     * package-private/overridable so JVM tests can exercise the mode-change
+     * path without native code.
+     */
+    boolean probeAaudioOutput(int sampleRate, int channels, int targetBufferMs,
+            boolean preferExclusive) {
+        long probe = 0L;
+        try {
+            probe = AaudioNativeBridge.nativeOpen(sampleRate, channels,
+                    AaudioNativeBridge.ENCODING_PCM_I16, preferExclusive, targetBufferMs);
+            if (probe == 0L) return false;
+            // If exclusive mode was requested, confirm the stream really is
+            // exclusive; a device may silently grant shared mode instead.
+            if (preferExclusive && !AaudioNativeBridge.nativeIsExclusive(probe)) {
+                Log.w(TAG, "AAudio probe opened in shared mode; exclusive not available");
+                return false;
+            }
+            return true;
+        } catch (LinkageError | RuntimeException refused) {
+            Log.w(TAG, "AAudio output probe refused", refused);
+            return false;
+        } finally {
+            if (probe != 0L) AaudioNativeBridge.nativeClose(probe);
+        }
+    }
+
     private void completeSeek() {
         seekPos = null;
         seekResult.success(new HashMap<String, Object>());
@@ -510,8 +538,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     public void onMethodCall(final MethodCall call, final Result result) {
         // Pulsr fork: the float-output preference must reach the player BEFORE
         // the sink is built, so handle it without forcing initialization. Once
-        // the player exists this only updates the stored flag; an already
-        // configured sink keeps its encodings until it is rebuilt.
+        // the player exists the flag is stored and the stable sink wrapper
+        // swaps its inner backend on the playback thread (no player teardown).
         if ("dspSetFloatOutput".equals(call.method)) {
             Boolean requested = call.argument("enabled");
             boolean enabled = requested != null && requested;
@@ -545,7 +573,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             + " outside 8..1000");
                 }
             }
-            boolean effective = enabled && Build.VERSION.SDK_INT >= 28 && AaudioNativeBridge.ensureAvailable();
+            boolean effective = enabled && isAaudioOutputSupported();
             if (effective && !aaudioOutputEnabled) {
                 // Library availability alone says nothing about whether this
                 // device grants the requested sharing mode. Probe a real stream
@@ -559,30 +587,19 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 int channels = (requestedChannels != null && requestedChannels > 0)
                         ? requestedChannels
                         : (format != null && format.channelCount > 0 ? format.channelCount : 2);
-                long probe = 0L;
-                try {
-                    probe = AaudioNativeBridge.nativeOpen(rate, channels,
-                            AaudioNativeBridge.ENCODING_PCM_I16, aaudioPreferExclusive,
-                            aaudioTargetBufferMs);
-                    effective = probe != 0L;
-                    // Bug 6 fix: if exclusive mode was requested, confirm the probe
-                    // actually opened an exclusive stream. A device may silently grant
-                    // shared mode instead, which is not bit-perfect.
-                    if (effective && aaudioPreferExclusive
-                            && !AaudioNativeBridge.nativeIsExclusive(probe)) {
-                        effective = false;
-                        Log.w(TAG, "AAudio probe opened in shared mode; exclusive not available");
-                    }
-                    if (effective && format == null && requestedRate == null) {
-                        int otherRate = (rate == 48000) ? 44100 : 48000;
-                        long probeOther = AaudioNativeBridge.nativeOpen(otherRate, channels,
+                effective = probeAaudioOutput(rate, channels,
+                        aaudioTargetBufferMs, aaudioPreferExclusive);
+                if (effective && format == null && requestedRate == null) {
+                    int otherRate = (rate == 48000) ? 44100 : 48000;
+                    long probeOther = 0L;
+                    try {
+                        probeOther = AaudioNativeBridge.nativeOpen(otherRate, channels,
                                 AaudioNativeBridge.ENCODING_PCM_I16, aaudioPreferExclusive,
                                 aaudioTargetBufferMs);
                         if (probeOther != 0L) {
                             // Also verify exclusive mode for the second rate probe.
                             boolean otherExclusive = !aaudioPreferExclusive
                                     || AaudioNativeBridge.nativeIsExclusive(probeOther);
-                            AaudioNativeBridge.nativeClose(probeOther);
                             if (!otherExclusive) {
                                 effective = false;
                                 Log.w(TAG, "AAudio secondary probe opened in shared mode; exclusive not available");
@@ -590,17 +607,22 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         } else {
                             effective = false;
                         }
+                    } catch (LinkageError | RuntimeException refused) {
+                        effective = false;
+                        Log.w(TAG, "AAudio secondary probe refused", refused);
+                    } finally {
+                        if (probeOther != 0L) AaudioNativeBridge.nativeClose(probeOther);
                     }
-                } catch (LinkageError | RuntimeException refused) {
-                    effective = false;
-                    Log.w(TAG, "AAudio output probe refused", refused);
-                } finally {
-                    if (probe != 0L) AaudioNativeBridge.nativeClose(probe);
                 }
             }
-            changed = aaudioOutputEnabled != effective || (effective && changed);
+            final boolean modeChanged = aaudioOutputEnabled != effective;
+            final boolean forceReconfigure = effective && changed && !modeChanged;
             aaudioOutputEnabled = effective;
-            if (changed) rebuildPlayerForOutput();
+            if (sinkWrapper != null && (modeChanged || forceReconfigure)) {
+                // Apply on the playback thread by swapping the inner sink; the
+                // ExoPlayer (and any in-flight load/seek) is left untouched.
+                sinkWrapper.requestModeChange(forceReconfigure);
+            }
             result.success(effective == enabled);
             return;
         }
@@ -1001,8 +1023,6 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         errorMessage = null;
         enqueuePlaybackEvent();
         int windowIndex = initialIndex != null ? initialIndex : 0;
-        lastLoadIndex = windowIndex;
-        lastLoadPositionUs = initialPosition;
         player.setMediaSources(mediaSources, windowIndex, initialPosition);
         loadedSources.clear();
         loadedSources.addAll(mediaSources);
@@ -1011,92 +1031,20 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     /**
-     * Pulsr fork: stores the 24/32-bit float-output preference and applies it
-     * to the DSP processor when one already exists. Returns true when the
-     * request was honoured exactly, false when the platform forced a safe
-     * degradation to the existing 16-bit path.
+     * Pulsr fork: stores the 24/32-bit float-output preference and asks the
+     * stable sink wrapper to swap its inner backend on the playback thread.
+     * Returns true when the request was honoured exactly, false when the
+     * platform forced a safe degradation to the existing 16-bit path.
      */
     private boolean applyFloatOutput(boolean enabled) {
         boolean supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
         boolean effective = enabled && supported;
         boolean changed = floatOutputEnabled != effective;
         floatOutputEnabled = effective;
-        if (dspAudioProcessor != null) {
-            dspAudioProcessor.setFloatOutput(effective);
+        if (changed && sinkWrapper != null) {
+            sinkWrapper.requestModeChange();
         }
-        if (changed) rebuildPlayerForOutput();
         return effective == enabled;
-    }
-
-    /** Rebuild the renderer when an output switch changes its sink contract. */
-    private void rebuildPlayerForOutput() {
-        if (player == null) return;
-        // A load in flight owns prepareResult until the player reaches READY.
-        // Keep it pending across the rebuild (the new ExoPlayer's READY
-        // completes it) and reload the same item/position; dropping it would
-        // hang the Dart setAudioSource future forever.
-        final boolean loading =
-                processingState == ProcessingState.loading || prepareResult != null;
-        int index = loading ? lastLoadIndex : player.getCurrentMediaItemIndex();
-        // getCurrentPosition() (not player.getCurrentPosition()) honours a
-        // pending seek target, so a seek that has not landed yet survives the
-        // rebuild below.
-        long position = loading && lastLoadPositionUs != C.TIME_UNSET
-                ? lastLoadPositionUs : getCurrentPosition();
-        if (!loading) {
-            // Seek/play Results belong to the old ExoPlayer instance; complete
-            // them before releasing it so their Dart futures resolve instead of
-            // hanging.
-            if (seekResult != null) {
-                seekResult.success(new HashMap<String, Object>());
-                seekResult = null;
-                seekPos = null;
-            }
-            if (playResult != null) {
-                playResult.success(new HashMap<String, Object>());
-                playResult = null;
-            }
-        }
-        boolean playWhenReady = player.getPlayWhenReady();
-        boolean prepare = loading || player.getPlaybackState() != Player.STATE_IDLE;
-        float volume = player.getVolume();
-        int repeat = player.getRepeatMode();
-        boolean shuffle = player.getShuffleModeEnabled();
-        boolean skipSilence = player.getSkipSilenceEnabled();
-        PlaybackParameters params = player.getPlaybackParameters();
-        AudioAttributes attributes = player.getAudioAttributes();
-        player.removeListener(this);
-        PulsrOutputRouting.unregister(player);
-        // Unobserve the active sinks before releasing, so the routing registry
-        // doesn't hold stale strong references (companion to Bug 5 HashSet fix).
-        if (currentNativeSink != null) {
-            PulsrOutputRouting.unobserve(currentNativeSink);
-            currentNativeSink = null;
-        }
-        if (currentDefaultSink != null) {
-            PulsrOutputRouting.unobserve(currentDefaultSink);
-            currentDefaultSink = null;
-        }
-        player.release();
-        player = null;
-        if (dspAudioProcessor != null) {
-            dspAudioProcessor.release();
-            dspAudioProcessor = null;
-        }
-        ensurePlayerInitialized();
-        player.setVolume(volume);
-        player.setRepeatMode(repeat);
-        player.setShuffleModeEnabled(shuffle);
-        player.setSkipSilenceEnabled(skipSilence);
-        player.setPlaybackParameters(params);
-        player.setAudioAttributes(attributes, false);
-        if (!loadedSources.isEmpty()) {
-            player.setMediaSources(new ArrayList<>(loadedSources),
-                    Math.min(Math.max(index, 0), loadedSources.size() - 1), position);
-            player.setShuffleOrder(outputShuffleOrder);
-            if (prepare) player.prepare();
-        }
-        player.setPlayWhenReady(playWhenReady);
     }
 
     private void applyShuffleOrder(ShuffleOrder order) {
@@ -1106,49 +1054,41 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private void ensurePlayerInitialized() {
         if (player == null) {
-            // Pulsr fork: the audio sink carries NativeDspAudioProcessor so the
-            // native DSP chain sees the decoded PCM stream. The instance is
-            // kept around so the gain-ramp method-channel API can reach it.
-            NativeDspAudioProcessor dspProcessor = new NativeDspAudioProcessor();
-            // Apply the opt-in float preference before the sink is configured.
-            dspProcessor.setFloatOutput(floatOutputEnabled);
-            dspAudioProcessor = dspProcessor;
+            // Pulsr fork: one stable sink wrapper owns the inner backend (and
+            // its DSP processor) for the lifetime of the player. Output-mode
+            // changes swap only that backend on the playback thread.
+            PulsrAudioSink sink = new PulsrAudioSink(
+                    context,
+                    () -> aaudioOutputEnabled,
+                    () -> aaudioPreferExclusive,
+                    () -> aaudioTargetBufferMs,
+                    () -> floatOutputEnabled,
+                    () -> player,
+                    this::onActiveDspProcessorChanged,
+                    new PulsrAudioSink.FallbackListener() {
+                        @Override
+                        public void onAaudioRejected(String reason, Exception cause) {
+                            onAaudioOutputRejected(reason, cause);
+                        }
+
+                        @Override
+                        public void onFloatRejected(String reason, Exception cause) {
+                            onFloatOutputRejected(reason, cause);
+                        }
+                    });
+            sinkWrapper = sink;
             DefaultRenderersFactory renderersFactoryImpl = new DefaultRenderersFactory(context) {
                 @Override
                 protected AudioSink buildAudioSink(Context context, boolean enableFloatOutput,
                         boolean enableAudioTrackPlaybackParams) {
-                    // Pulsr fork: opt-in AAudio Direct output (bit-perfect,
-                    // DSP chain bypassed). Falls back to DefaultAudioSink on
-                    // any construction failure so playback is never broken.
-                    if (aaudioOutputEnabled) {
-                        try {
-                            AAudioAudioSink nativeSink = new AAudioAudioSink(aaudioPreferExclusive,
-                                aaudioTargetBufferMs);
-                            currentNativeSink = nativeSink;
-                            currentDefaultSink = null;
-                            PulsrOutputRouting.observe(nativeSink);
-                            return nativeSink;
-                        } catch (Throwable t) {
-                            Log.w(TAG, "AAudio sink unavailable, using DefaultAudioSink: "
-                                + t.getMessage());
-                        }
-                    }
-                    DefaultAudioSink sink = new DefaultAudioSink.Builder(context)
-                        .setEnableFloatOutput(enableFloatOutput)
-                        .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                        .setAudioProcessors(enableFloatOutput ? new AudioProcessor[0] : new AudioProcessor[] { dspProcessor })
-                        .build();
-                    currentDefaultSink = sink;
-                    currentNativeSink = null;
-                    PulsrOutputRouting.observe(sink);
-                    return enableFloatOutput ? new FloatDspAudioSink(sink, dspProcessor) : sink;
+                    sink.setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams);
+                    return sink;
                 }
             };
-            // DefaultRenderersFactory forwards this into buildAudioSink(). Enabling
-            // it is what lets the sink negotiate/emit float PCM; leaving it false
-            // keeps the historical 16-bit-only sink.
+            // The wrapper selects float/16-bit/AAudio per configure, so let the
+            // renderers factory report float capability unconditionally.
             renderersFactoryImpl.setEnableAudioFloatOutput(
-                floatOutputEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP);
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP);
             renderersFactoryImpl.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER);
             RenderersFactory renderersFactory = (eventHandler, videoListener, audioListener, textOutput, metadataOutput) -> {
                 Renderer[] defaultRenderers = renderersFactoryImpl
@@ -1182,6 +1122,46 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             setAudioSessionId(player.getAudioSessionId());
             player.addListener(this);
         }
+    }
+
+    /** Called by the sink wrapper whenever its active DSP processor changes. */
+    private void onActiveDspProcessorChanged(NativeDspAudioProcessor processor) {
+        dspAudioProcessor = processor;
+    }
+
+    /** Called on the playback thread when AAudio failed; fall back in place. */
+    private void onAaudioOutputRejected(String reason, Exception cause) {
+        boolean wasEnabled = aaudioOutputEnabled;
+        aaudioOutputEnabled = false;
+        Log.w(TAG, "AAudio output rejected (" + reason + "); using AudioTrack path", cause);
+        if (wasEnabled) {
+            notifyOutputModeToDart(reason, false, floatOutputEnabled);
+        }
+    }
+
+    /** Called on the playback thread when a float swap failed; report it. */
+    private void onFloatOutputRejected(String reason, Exception cause) {
+        Log.w(TAG, "Float output rejected (" + reason + "); keeping current sink", cause);
+        notifyOutputModeToDart(reason, aaudioOutputEnabled, false);
+    }
+
+    /**
+     * Native -> Dart notification so the app can reflect the effective output
+     * mode (e.g. a settings toggle that fell back to the standard sink).
+     */
+    private void notifyOutputModeToDart(String reason, boolean aaudioActive,
+            boolean floatActive) {
+        handler.post(() -> {
+            try {
+                methodChannel.invokeMethod("dspOutputModeEffect", mapOf(
+                        "aaudioActive", aaudioActive,
+                        "floatActive", floatActive,
+                        "reason", reason));
+            } catch (RuntimeException ignored) {
+                // Flutter engine detached; the preference is re-pushed on the
+                // next activation anyway.
+            }
+        });
     }
 
     private void setAudioAttributes(int contentType, int flags, int usage) {
@@ -1444,27 +1424,18 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         clearAudioEffects();
         if (player != null) {
             PulsrOutputRouting.unregister(player);
-            // The routing registry uses explicit-lifetime sets (strong refs);
-            // without this, every disposed player's sink leaks and stale sinks
-            // keep answering route snapshots forever.
-            if (currentNativeSink != null) {
-                PulsrOutputRouting.unobserve(currentNativeSink);
-                currentNativeSink = null;
-            }
-            if (currentDefaultSink != null) {
-                PulsrOutputRouting.unobserve(currentDefaultSink);
-                currentDefaultSink = null;
-            }
             player.release();
             player = null;
             processingState = ProcessingState.idle;
             broadcastImmediatePlaybackEvent();
         }
-        if (dspAudioProcessor != null) {
-            dspAudioProcessor.clearGainCurve();
-            dspAudioProcessor.release();
-            dspAudioProcessor = null;
-        }
+        // The renderer release above normally releases the sink wrapper; do it
+        // again defensively (idempotent) so the routing registry and the
+        // processor's native engine are always torn down.
+        OutputSinkControl sink = sinkWrapper;
+        sinkWrapper = null;
+        if (sink != null) sink.release();
+        dspAudioProcessor = null;
         eventChannel.endOfStream();
         dataEventChannel.endOfStream();
     }

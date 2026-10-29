@@ -117,6 +117,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Stream<int?> get audioSessionIdStream => _audioSessionIdController.stream;
 
+
   final StreamController<SongsTableData> _onTrackChangedController =
       StreamController<SongsTableData>.broadcast();
   @override
@@ -1450,6 +1451,14 @@ void main() {
       testAudioHandler._errorController.add('Hardware decoder failure');
       await Future<void>.delayed(const Duration(milliseconds: 50));
       expect(cubit.state.errorMessage, equals('Hardware decoder failure'));
+
+      // Output-mode fallbacks ride errorStream with a marker; they must be
+      // surfaced without being treated as an unplayable-track failure.
+      testAudioHandler._errorController.add(
+          '${PulsrAudioHandler.outputModeNoticePrefix}Direct unavailable');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(cubit.state.errorMessage, equals('Direct unavailable'));
+      expect(cubit.state.currentSong?.id, equals(777));
 
       // sleepTimerRemainingStream
       testAudioHandler._sleepTimerController.add(const Duration(minutes: 20));
