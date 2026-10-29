@@ -700,6 +700,20 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
             ErrorLogger.log('Failed clearing audio handler network caches',
                 error: e, stackTrace: st, category: 'PulsrApp');
           }
+          try {
+            if (getIt.isRegistered<IDownloadRepository>()) {
+              final resumed =
+                  await getIt<IDownloadRepository>().resumeAutoPaused();
+              if (resumed > 0) {
+                ErrorLogger.log(
+                    'Network restored — resumed $resumed auto-paused downloads',
+                    category: 'PulsrApp');
+              }
+            }
+          } catch (e, st) {
+            ErrorLogger.log('Failed resuming policy-paused downloads',
+                error: e, stackTrace: st, category: 'PulsrApp');
+          }
         });
       } catch (e, st) {
         ErrorLogger.log('Failed to start network change monitor',

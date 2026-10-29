@@ -1,5 +1,7 @@
 // lib/domain/models/download_task.dart
 
+import 'ytm_audio_quality.dart';
+
 enum DownloadStatus {
   queued,
   downloading,
@@ -77,6 +79,17 @@ class DownloadTask {
   /// the provider row directly instead of resolving it by path.
   final String? contentUri;
 
+  /// Album and duration captured at admission. Persisted so a download that
+  /// resumes after a restart still tags with the real album and fetches lyrics
+  /// with the right duration instead of falling back to "Unknown Album" / 0:00.
+  final String? album;
+  final int? durationMs;
+
+  /// Quality this task was admitted with (`low`/`medium`/`high`), persisted so
+  /// a pause/restart/retry keeps the user's picker choice instead of silently
+  /// reverting to the global default.
+  final YtmAudioQuality? quality;
+
   const DownloadTask({
     required this.id,
     required this.videoId,
@@ -96,6 +109,9 @@ class DownloadTask {
     this.localSongId,
     this.fileSize,
     this.contentUri,
+    this.album,
+    this.durationMs,
+    this.quality,
   });
 
   DownloadTask copyWith({
@@ -117,6 +133,9 @@ class DownloadTask {
     int? localSongId,
     int? fileSize,
     String? contentUri,
+    String? album,
+    int? durationMs,
+    YtmAudioQuality? quality,
     bool clearError = false, // FIX-A09: support clearing error via copyWith
     bool clearSpeedKbps = false,
     bool clearEtaSeconds = false,
@@ -142,6 +161,9 @@ class DownloadTask {
       localSongId: localSongId ?? this.localSongId,
       fileSize: fileSize ?? this.fileSize,
       contentUri: contentUri ?? this.contentUri,
+      album: album ?? this.album,
+      durationMs: durationMs ?? this.durationMs,
+      quality: quality ?? this.quality,
     );
   }
 
@@ -165,6 +187,9 @@ class DownloadTask {
       'localSongId': localSongId,
       'fileSize': fileSize,
       'contentUri': contentUri,
+      'album': album,
+      'durationMs': durationMs,
+      'quality': quality?.name,
     };
   }
 
@@ -193,7 +218,18 @@ class DownloadTask {
       localSongId: (json['localSongId'] as num?)?.toInt(),
       fileSize: (json['fileSize'] as num?)?.toInt(),
       contentUri: json['contentUri'] as String?,
+      album: json['album'] as String?,
+      durationMs: (json['durationMs'] as num?)?.toInt(),
+      quality: _qualityFromName(json['quality']),
     );
+  }
+
+  static YtmAudioQuality? _qualityFromName(Object? raw) {
+    if (raw is! String) return null;
+    for (final quality in YtmAudioQuality.values) {
+      if (quality.name == raw) return quality;
+    }
+    return null;
   }
 
   @override
@@ -203,18 +239,42 @@ class DownloadTask {
           runtimeType == other.runtimeType &&
           id == other.id &&
           videoId == other.videoId &&
+          title == other.title &&
+          artist == other.artist &&
           status == other.status &&
           progress == other.progress &&
           filePath == other.filePath &&
+          format == other.format &&
+          bitrate == other.bitrate &&
           error == other.error &&
           sourceSongId == other.sourceSongId &&
           localSongId == other.localSongId &&
           fileSize == other.fileSize &&
-          contentUri == other.contentUri;
+          contentUri == other.contentUri &&
+          album == other.album &&
+          durationMs == other.durationMs &&
+          quality == other.quality;
 
   @override
-  int get hashCode => Object.hash(id, videoId, status, progress, filePath,
-      error, sourceSongId, localSongId, fileSize, contentUri);
+  int get hashCode => Object.hashAll([
+        id,
+        videoId,
+        title,
+        artist,
+        status,
+        progress,
+        filePath,
+        format,
+        bitrate,
+        error,
+        sourceSongId,
+        localSongId,
+        fileSize,
+        contentUri,
+        album,
+        durationMs,
+        quality,
+      ]);
 }
 
 class StorageStats {

@@ -57,6 +57,17 @@ class DownloadService : Service() {
         private const val REQUEST_CODE_RESUME = 1004
         private const val TIMEOUT_NOTIFICATION_ID = 9402
 
+        /**
+         * How long an empty job map may keep the foreground service alive.
+         * The scheduler in Dart starts the next queued transfer immediately
+         * after one finishes, but removing the finished job at 100% used to
+         * tear the service down in that gap — and restarting an FGS from the
+         * background can be refused on Android 12+. A short grace period,
+         * cancelled by the next ACTION_START, closes the gap without leaving a
+         * finished notification behind.
+         */
+        private const val IDLE_STOP_GRACE_MS = 5000L
+
         var onDownloadCancelledListener: ((String) -> Unit)? = null
         var onDownloadPausedListener: ((String) -> Unit)? = null
         var onDownloadResumedListener: ((String) -> Unit)? = null
@@ -164,6 +175,21 @@ class DownloadService : Service() {
     private var foregroundStarted = false
     private var degraded = false
 
+    private val idleHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val idleStopRunnable = Runnable {
+        if (activeDownloads.isEmpty()) stopForegroundAndSelf()
+    }
+
+    /** Defers teardown briefly so the next queued job can claim the service. */
+    private fun scheduleIdleStop() {
+        idleHandler.removeCallbacks(idleStopRunnable)
+        idleHandler.postDelayed(idleStopRunnable, IDLE_STOP_GRACE_MS)
+    }
+
+    private fun cancelIdleStop() {
+        idleHandler.removeCallbacks(idleStopRunnable)
+    }
+
     override fun onCreate() {
         super.onCreate()
         createChannel()
@@ -175,6 +201,7 @@ class DownloadService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 degraded = false
+                cancelIdleStop()
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
                 val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
                     ?: getString(R.string.download_notification_default_title)
@@ -200,7 +227,7 @@ class DownloadService : Service() {
                     timeoutPausedIds.remove(vid)
                 }
                 if (activeDownloads.isEmpty()) {
-                    stopForegroundAndSelf()
+                    scheduleIdleStop()
                 } else {
                     renderCurrentNotification(vid)
                 }
@@ -246,6 +273,7 @@ class DownloadService : Service() {
                 }
             }
             ACTION_STOP -> {
+                cancelIdleStop()
                 activeDownloads.clear()
                 downloadTitles.clear()
                 pausedDownloads.clear()
@@ -262,13 +290,13 @@ class DownloadService : Service() {
      */
     private fun renderCurrentNotification(preferredVid: String?) {
         if (activeDownloads.isEmpty()) {
-            stopForegroundAndSelf()
+            scheduleIdleStop()
             return
         }
         val vid = preferredVid?.takeIf { activeDownloads.containsKey(it) }
             ?: activeDownloads.keys.firstOrNull()
             ?: run {
-                stopForegroundAndSelf()
+                scheduleIdleStop()
                 return
             }
         val single = activeDownloads.size == 1
@@ -283,8 +311,12 @@ class DownloadService : Service() {
         } else {
             activeDownloads.values.average().toInt()
         }
-        // Pause/resume only makes sense for one identifiable download.
-        postNotification(title, progress, vid, pausedDownloads.contains(vid), single)
+        // Pause/resume only makes sense for one identifiable download, except
+        // when every job in the map is paused: then offering Resume on the
+        // first paused job is the only way back without opening the app.
+        val allPaused = activeDownloads.keys.all { pausedDownloads.contains(it) }
+        val showTransport = single || allPaused
+        postNotification(title, progress, vid, pausedDownloads.contains(vid), showTransport)
     }
 
     private fun postNotification(
@@ -322,6 +354,7 @@ class DownloadService : Service() {
     }
 
     private fun stopForegroundAndSelf() {
+        cancelIdleStop()
         try {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (_: Exception) {}
@@ -430,6 +463,7 @@ class DownloadService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        cancelIdleStop()
         activeDownloads.clear()
         downloadTitles.clear()
         pausedDownloads.clear()

@@ -17,6 +17,10 @@ void main() {
     // Caps lowered after EQ/Auto tranche:
     //   equalizer_manager.dart -5121B (EqualizerPresetOps part: preset slots,
     //     JSON import/export, A/B comparison, custom frequency layouts)
+    // Caps lowered after the download-cycle tranche:
+    //   yt_download_service.dart -773B (foreground controller, pause registry,
+    //     HTTP response/IO support)
+    //   ytm_service.dart -291B (YtmMediaHelpers: artwork/playability parsing)
     const caps = {
       'lib/data/audio/audio_handler.dart': 223500,
       'lib/features/player/cubit/player_cubit.dart': 170000,
@@ -28,8 +32,8 @@ void main() {
       // lower the cap, never raise it. (Re-pinned after the null-safety fix in
       // ytm_account_service and the bounded-failure-map guard in ytm_service.)
       'lib/core/services/ytm_account_service.dart': 141050,
-      'lib/core/services/yt_download_service.dart': 76773,
-      'lib/core/services/ytm_service.dart': 78291,
+      'lib/core/services/yt_download_service.dart': 76000,
+      'lib/core/services/ytm_service.dart': 78000,
       'lib/features/playlists/presentation/playlists_screen.dart': 91411,
     };
     final offenders = <String>[];

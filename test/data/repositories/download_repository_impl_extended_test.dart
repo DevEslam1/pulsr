@@ -1,20 +1,27 @@
 // test/data/repositories/download_repository_impl_extended_test.dart
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/errors/failures.dart';
+import 'package:pulsr/core/errors/ytm_error_classifier.dart';
+import 'package:pulsr/core/network/connectivity_guard.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/data/repositories/download_repository_impl.dart';
 import 'package:pulsr/domain/models/download_task.dart';
+import 'package:pulsr/domain/models/ytm_audio_quality.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtDownloadService extends Mock implements YtDownloadService {}
+
+class MockConnectivity extends Mock implements Connectivity {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -259,6 +266,7 @@ void main() {
       expect(calls, 1);
       final tasks = await repo.getAllDownloads();
       expect(tasks.single.status, DownloadStatus.failed);
+      verify(() => service.releaseForeground('abcdefghijk')).called(1);
     });
   });
 
@@ -291,6 +299,224 @@ void main() {
       expect(stats.downloadedSongsCount, 1);
       expect(stats.usedBytes, 10);
       expect(stats.freeBytes, 100 * 1024 * 1024);
+    });
+  });
+
+  group('download cycle hardening', () {
+    test('does not re-admit a task that is already tagging', () async {
+      final completer = Completer<Result<int>>();
+      void Function(YtDownloadProgress)? report;
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((invocation) {
+        report = invocation.namedArguments[const Symbol('onProgress')]
+            as void Function(YtDownloadProgress)?;
+        return completer.future;
+      });
+
+      await repo.queueDownload(task('abcdefghijk'));
+      await Future<void>.delayed(Duration.zero);
+      report?.call(const YtDownloadProgress(YtDownloadStage.tagging));
+      await Future<void>.delayed(Duration.zero);
+
+      final second = await repo.queueDownload(task('abcdefghijk'));
+      expect(second.toNullable()!.admission, DownloadAdmission.alreadyActive);
+      verify(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).called(1);
+
+      completer.complete(const Right(1));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect((await repo.getAllDownloads()).single.status,
+          DownloadStatus.complete);
+    });
+
+    test('pause / resume of a completed row is a no-op', () async {
+      final temp = Directory.systemTemp.createTempSync('dl_terminal');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final file = File('${temp.path}${Platform.pathSeparator}done.m4a')
+        ..writeAsStringSync('audio');
+      SharedPreferences.setMockInitialValues({
+        'pulsr_download_tasks_v2': jsonEncode([
+          task('abcdefghijk')
+              .copyWith(status: DownloadStatus.complete, filePath: file.path)
+              .toJson(),
+        ]),
+      });
+      await repo.reconcileOnBoot();
+
+      expect((await repo.pauseDownload('abcdefghijk')).isRight(), isTrue);
+      expect((await repo.resumeDownload('abcdefghijk')).isRight(), isTrue);
+
+      expect((await repo.getAllDownloads()).single.status,
+          DownloadStatus.complete);
+      verifyNever(() => service.markPaused(any()));
+      verifyNever(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress')));
+    });
+
+    test('policy-blocked transfer parks paused and resumes on network return',
+        () async {
+      var policyChecks = 0;
+      when(() => service.downloadPolicyBlock()).thenAnswer((_) async {
+        policyChecks++;
+        return policyChecks == 1
+            ? null
+            : const DownloadFailure('Wi-Fi Only Mode is active.');
+      });
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((_) async =>
+              const Left(DownloadFailure('Wi-Fi Only Mode is active.')));
+
+      await repo.queueDownload(task('abcdefghijk'));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      var stored = (await repo.getAllDownloads()).single;
+      expect(stored.status, DownloadStatus.paused);
+      verify(() => service.markPaused('abcdefghijk')).called(1);
+
+      when(() => service.downloadPolicyBlock()).thenAnswer((_) async => null);
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((_) async => const Right(7));
+
+      expect(await repo.resumeAutoPaused(), 1);
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      stored = (await repo.getAllDownloads()).single;
+      expect(stored.status, DownloadStatus.complete);
+    });
+
+    test('a connectivity loss parks paused and resumes on reconnect',
+        () async {
+      final connectivity = MockConnectivity();
+      when(() => connectivity.checkConnectivity())
+          .thenAnswer((_) async => [ConnectivityResult.none]);
+      ConnectivityGuard.setMockConnectivity(connectivity);
+      addTearDown(() => ConnectivityGuard.setMockConnectivity(Connectivity()));
+
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((_) async => const Left(DownloadFailure(
+                'No connection while downloading',
+                YtmException('YTM_NETWORK'),
+              )));
+
+      await repo.queueDownload(task('abcdefghijk'));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      var stored = (await repo.getAllDownloads()).single;
+      expect(stored.status, DownloadStatus.paused);
+      expect(stored.error, contains('No connection'));
+      expect(await repo.resumeAutoPaused(), 0,
+          reason: 'a loss event must not resume while the device is offline');
+
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((_) async => const Right(7));
+      when(() => connectivity.checkConnectivity())
+          .thenAnswer((_) async => [ConnectivityResult.wifi]);
+
+      expect(await repo.resumeAutoPaused(), 1);
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      stored = (await repo.getAllDownloads()).single;
+      expect(stored.status, DownloadStatus.complete);
+    });
+
+    test('passes quality, album, duration and source row into the transfer',
+        () async {
+      SongsTableData? captured;
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((invocation) async {
+        captured = invocation.positionalArguments.first as SongsTableData;
+        return const Right(3);
+      });
+
+      await repo.queueDownload(DownloadTask(
+        id: 'abcdefghijk',
+        videoId: 'abcdefghijk',
+        title: 'Song',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 123000,
+        quality: YtmAudioQuality.low,
+        sourceSongId: -7,
+        createdAt: DateTime(2026, 1, 1),
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+
+      expect(captured, isNotNull);
+      expect(captured!.album, 'Album');
+      expect(captured!.durationMs, 123000);
+      expect(captured!.id, -7);
+      verify(() => service.setPendingDownloadQuality(
+          'abcdefghijk', YtmAudioQuality.low)).called(1);
+    });
+
+    test('persists per-track quality and metadata across boot', () async {
+      SharedPreferences.setMockInitialValues({
+        'pulsr_download_tasks_v2': jsonEncode([
+          task('abcdefghijk')
+              .copyWith(
+                album: 'Album',
+                durationMs: 123000,
+                quality: YtmAudioQuality.low,
+              )
+              .toJson(),
+        ]),
+      });
+      await repo.reconcileOnBoot();
+
+      final stored = (await repo.getAllDownloads()).single;
+      expect(stored.status, DownloadStatus.paused);
+      expect(stored.album, 'Album');
+      expect(stored.durationMs, 123000);
+      expect(stored.quality, YtmAudioQuality.low);
+    });
+
+    test('pausing the active transfer immediately fills the freed slot',
+        () async {
+      SharedPreferences.setMockInitialValues(
+          {'setting_download_max_concurrent': 1});
+      final completers = <Completer<Result<int>>>[];
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((_) {
+        final completer = Completer<Result<int>>();
+        completers.add(completer);
+        return completer.future;
+      });
+      when(() => service.cancel(any())).thenAnswer((_) {
+        for (final completer in completers) {
+          if (!completer.isCompleted) {
+            completer.complete(const Left(DownloadFailure('canceled')));
+            break;
+          }
+        }
+      });
+
+      await repo.queueDownload(task('aaaaaaaaaaa'));
+      await repo.queueDownload(task('bbbbbbbbbbb'));
+      expect(completers, hasLength(1));
+      verify(() => service.setKeepForegroundAlive(true))
+          .called(greaterThan(0));
+
+      await repo.pauseDownload('aaaaaaaaaaa');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(completers, hasLength(2),
+          reason: 'the queued track must start without waiting for another '
+              'completion');
+
+      completers.last.complete(const Right(2));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      verify(() => service.setKeepForegroundAlive(false)).called(1);
     });
   });
 

@@ -77,7 +77,7 @@ void main() {
     test('httpClient is tuned and pkgHttpClient is a real client', () {
       final module = _TestNetworkModule();
       final ioClient = module.httpClient;
-      expect(ioClient.maxConnectionsPerHost, 5);
+      expect(ioClient.maxConnectionsPerHost, 16);
       expect(ioClient.connectionTimeout, const Duration(seconds: 15));
       expect(ioClient.idleTimeout, const Duration(seconds: 90));
       disposeHttpClient(ioClient);

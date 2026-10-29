@@ -25,6 +25,8 @@ void main() {
     when(() => cubit.applyPoorNetworkPreset()).thenAnswer((_) async {});
     when(() => cubit.setBitPerfectOutput(any())).thenAnswer((_) async {});
     when(() => cubit.setFollowTrackSampleRate(any())).thenAnswer((_) async {});
+    when(() => cubit.setFloatOutputEnabled(any())).thenAnswer((_) async {});
+    when(() => cubit.setBluetoothHiResEnabled(any())).thenAnswer((_) async {});
     when(() => cubit.setCrossfade(any())).thenAnswer((_) async {});
     when(() => cubit.setGapless(any())).thenAnswer((_) async {});
   }
@@ -130,6 +132,60 @@ void main() {
     verify(() => cubit.setFollowTrackSampleRate(true)).called(1);
     verify(() => cubit.setCrossfade(0.0)).called(1);
     verify(() => cubit.setGapless(true)).called(1);
+  });
+
+  testWidgets('wired headphones default to fidelity and enable the float path',
+      (tester) async {
+    await pumpWizard(
+      tester,
+      device: const AudioOutputInfo(
+        deviceName: 'Wired Headphones',
+        isUsbDac: false,
+        sampleRate: 48000,
+        bitDepth: 24,
+        isBitPerfectActive: false,
+        activeDeviceType: 'wired',
+      ),
+    );
+
+    // A plugged 3.5mm device preselects Headphones + Hi-Res.
+    await tapNext(tester);
+    await tapNext(tester);
+    await tester.tap(find.text(l10n.settingsWizardApply));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    verify(() => cubit.setFloatOutputEnabled(true)).called(1);
+    verify(() => cubit.setBitPerfectOutput(false)).called(1);
+    verifyNever(() => cubit.applyMaximumQualityPreset());
+    verifyNever(() => cubit.setFollowTrackSampleRate(any()));
+  });
+
+  testWidgets('bluetooth + fidelity enables hi-res without bit-perfect',
+      (tester) async {
+    await pumpWizard(
+      tester,
+      device: const AudioOutputInfo(
+        deviceName: 'Buds',
+        isUsbDac: false,
+        sampleRate: 96000,
+        bitDepth: 24,
+        isBluetooth: true,
+        isBitPerfectActive: false,
+      ),
+    );
+    await tapNext(tester);
+    await tester.tap(find.text(l10n.settingsWizardFidelity));
+    await tester.pump();
+    await tapNext(tester);
+    await tester.tap(find.text(l10n.settingsWizardApply));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    verify(() => cubit.setBluetoothHiResEnabled(true)).called(1);
+    verify(() => cubit.setBitPerfectOutput(false)).called(1);
+    verifyNever(() => cubit.applyMaximumQualityPreset());
+    verifyNever(() => cubit.setFloatOutputEnabled(any()));
   });
 
   testWidgets('bluetooth + save-data applies poor-network preset',

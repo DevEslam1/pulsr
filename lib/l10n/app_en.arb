@@ -5247,7 +5247,7 @@
   "@featureInfoBitPerfectSubtitle": {
     "description": "Audio feature info string"
   },
-  "featureInfoBitPerfectDescription": "Bypasses Android AudioFlinger resampler and sends the file's exact samples (e.g. 96 kHz / 24-bit) straight to the DAC via AudioMixerAttributes (API 34) for USB, or via direct/offload for wired. No software volume or DSP is applied. Requires Android 14+ for USB, or a wired device that advertises FLOAT/24-bit & hi-res rates. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).",
+  "featureInfoBitPerfectDescription": "Bypasses Android AudioFlinger and sends the file's exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr's own UAC2 isochronous sink when the platform exposes no exclusive mixer. No software volume or DSP is applied. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).",
   "@featureInfoBitPerfectDescription": {
     "description": "Audio feature info string"
   },
@@ -6253,6 +6253,19 @@
     "placeholders": {
       "number": {
         "type": "String"
+      }
+    }
+  },
+  "deselectAllAction": "Deselect All",
+  "@deselectAllAction": {
+    "description": "Tooltip for clearing a multi-select in the downloads screen"
+  },
+  "clearCompletedDownloadsConfirm": "{count, plural, =1{Remove 1 completed download?} other{Remove {count} completed downloads?}}",
+  "@clearCompletedDownloadsConfirm": {
+    "description": "Confirmation prompt for clearing completed downloads",
+    "placeholders": {
+      "count": {
+        "type": "int"
       }
     }
   }

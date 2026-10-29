@@ -4354,7 +4354,7 @@
   "onboardingPersonalizeDesc": "اختر لونًا الآن — يمكنك تغييره في أي وقت من الإعدادات.",
   "featureInfoBitPerfectTitle": "تمرير USB بتقنية Bit-Perfect",
   "featureInfoBitPerfectSubtitle": "بث مباشر عبر العتاد إلى DAC USB / سلكي",
-  "featureInfoBitPerfectDescription": "يتجاوز مُعيد أخذ العينات AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC عبر AudioMixerAttributes (API 34) لـ USB، أو عبر direct/offload للسلكي. لا يُطبَّق أي مستوى صوت أو DSP برمجي. يتطلب أندرويد 14+ لـ USB، أو جهازًا سلكيًا يدعم FLOAT/24 بت ومعدلات عالية الدقة. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).",
+  "featureInfoBitPerfectDescription": "يتجاوز AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC USB عبر AudioMixerAttributes (API 34)، أو عبر مستقبل UAC2 المتزامن الخاص بـ Pulsr عندما لا توفر المنصة مازجًا حصريًا. لا يُطبَّق أي مستوى صوت أو DSP برمجي. لا يوفر أندرويد إخراج Bit-Perfect حصريًا لمقبس 3.5 مم / وحدة الترميز الداخلية — إذ يستخدم هذا المسار AAudio Direct ومسار DSP العائم 24/32 بت بدلًا من ذلك. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).",
   "featureInfoBypassDspTitle": "تجاوز DSP في وضع Bit-Perfect",
   "featureInfoBypassDspSubtitle": "تيار بتات نقي بلا تلوين إلى DAC",
   "featureInfoBypassDspDescription": "عند التفعيل، يؤدي الدخول إلى Bit-Perfect إلى تعطيل EQ وVirtualizer وDynamics وCrossfeed وLimiter وReverb وموازن الستيريو ومُعيد أخذ العينات Sinc فورًا (القناع الأصلي = 0). يُقفل مستوى الصوت على DAC العتادي. أوقفه إذا أردت EQ + Bit-Perfect (ليس Bit-Perfect حقيقيًا، لكن بعض أجهزة DAC تتحمله).",
@@ -4683,5 +4683,7 @@
   "lyricsSharePickHint": "اختر من 1 إلى 6 أسطر لإنشاء بطاقة 9:16.",
   "cassetteTapeType": "النوع II • CrO₂",
   "cassetteEqSpec": "معايرة 70µs • HI-FI",
-  "cdTrackNumber": "المقطع {number}"
+  "cdTrackNumber": "المقطع {number}",
+  "deselectAllAction": "إلغاء تحديد الكل",
+  "clearCompletedDownloadsConfirm": "{count, plural, =1{إزالة تنزيل مكتمل واحد؟} other{إزالة {count} تنزيلات مكتملة؟}}"
 }

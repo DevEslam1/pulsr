@@ -70,8 +70,16 @@ class DownloadTile extends StatelessWidget {
         ? Formatters.formatBytes(resolvedBytes)
         : null;
 
+    final formatLabel = (task.format != null && task.format!.isNotEmpty)
+        ? task.format!.toUpperCase()
+        : null;
+    final bitrateLabel = (task.bitrate != null && task.bitrate! > 0)
+        ? '${task.bitrate} kbps'
+        : null;
+    final codecLabel = [formatLabel, bitrateLabel].whereType<String>().join(' ');
     final subtitleParts = <String>[
       if (task.artist.isNotEmpty) task.artist,
+      if (codecLabel.isNotEmpty) codecLabel,
       if (formattedSize != null) formattedSize,
     ];
     final subtitleText = subtitleParts.join(' • ');
@@ -314,7 +322,8 @@ class DownloadTile extends StatelessWidget {
             ],
           ),
           if (task.status == DownloadStatus.downloading ||
-              task.status == DownloadStatus.tagging) ...[
+              task.status == DownloadStatus.tagging ||
+              task.status == DownloadStatus.paused) ...[
             const SizedBox(height: AppSpacing.sm),
             TweenAnimationBuilder<double>(
               duration: PulsrMotion.standard,
@@ -326,7 +335,10 @@ class DownloadTile extends StatelessWidget {
               builder: (context, animatedProgress, _) {
                 final progressValue = task.status == DownloadStatus.tagging
                     ? null
-                    : (animatedProgress > 0 ? animatedProgress : null);
+                    : (task.status == DownloadStatus.paused ||
+                            animatedProgress > 0
+                        ? animatedProgress
+                        : null);
                 return Semantics(
                   label: statusLabel,
                   value: progressValue == null
@@ -349,7 +361,8 @@ class DownloadTile extends StatelessWidget {
                 );
               },
             ),
-            if (task.status == DownloadStatus.downloading) ...[
+            if (task.status == DownloadStatus.downloading ||
+                task.status == DownloadStatus.paused) ...[
               const SizedBox(height: AppSpacing.xs),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -362,15 +375,19 @@ class DownloadTile extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (task.speedKbps != null && task.speedKbps! > 0)
+                  if (task.status == DownloadStatus.downloading &&
+                      task.speedKbps != null &&
+                      task.speedKbps! > 0)
                     Text(
                       '${task.speedKbps!.toStringAsFixed(0)} KB/s',
                       style: TextStyle(
                           color: p.textTertiary, fontSize: AppFontSize.label),
                     ),
-                  if (task.etaSeconds != null && task.etaSeconds! > 0)
+                  if (task.status == DownloadStatus.downloading &&
+                      task.etaSeconds != null &&
+                      task.etaSeconds! > 0)
                     Text(
-                      '${l10n.browseEta} ${task.etaSeconds}s',
+                      '${l10n.browseEta} ${Formatters.formatDuration(Duration(seconds: task.etaSeconds!))}',
                       style: TextStyle(
                           color: p.textTertiary, fontSize: AppFontSize.label),
                     ),

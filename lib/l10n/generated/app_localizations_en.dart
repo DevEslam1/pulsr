@@ -7672,7 +7672,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureInfoBitPerfectDescription =>
-      'Bypasses Android AudioFlinger resampler and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the DAC via AudioMixerAttributes (API 34) for USB, or via direct/offload for wired. No software volume or DSP is applied. Requires Android 14+ for USB, or a wired device that advertises FLOAT/24-bit & hi-res rates. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).';
+      'Bypasses Android AudioFlinger and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr\'s own UAC2 isochronous sink when the platform exposes no exclusive mixer. No software volume or DSP is applied. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).';
 
   @override
   String get featureInfoBypassDspTitle => 'Bypass DSP in Bit-Perfect Mode';
@@ -8749,5 +8749,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String cdTrackNumber(String number) {
     return 'TRK $number';
+  }
+
+  @override
+  String get deselectAllAction => 'Deselect All';
+
+  @override
+  String clearCompletedDownloadsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Remove $count completed downloads?',
+      one: 'Remove 1 completed download?',
+    );
+    return '$_temp0';
   }
 }

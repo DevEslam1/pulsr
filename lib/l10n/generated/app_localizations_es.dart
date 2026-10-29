@@ -7725,7 +7725,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get featureInfoBitPerfectDescription =>
-      'Omite el remuestreador AudioFlinger de Android y envía las muestras exactas del archivo (p. ej., 96 kHz / 24 bits) directamente al DAC mediante AudioMixerAttributes (API 34) para USB, o mediante direct/offload para conexión por cable. No se aplica volumen ni DSP por software. Requiere Android 14+ para USB, o un dispositivo con cable que anuncie FLOAT/24 bits y tasas de alta resolución. Bluetooth NUNCA es bit-perfect (transcodificación SBC/AAC/LDAC).';
+      'Omite AudioFlinger de Android y envía las muestras exactas del archivo (p. ej., 96 kHz / 24 bits) directamente al DAC USB mediante AudioMixerAttributes (API 34), o a través del sumidero isócrono UAC2 propio de Pulsr cuando la plataforma no expone un mezclador exclusivo. No se aplica volumen ni DSP por software. Android no expone salida bit-perfect exclusiva para el conector de 3,5 mm / códec interno: esa ruta usa AAudio Direct y el flujo DSP de 24/32 bits en coma flotante. Bluetooth NUNCA es bit-perfect (transcodificación SBC/AAC/LDAC).';
 
   @override
   String get featureInfoBypassDspTitle => 'Omitir DSP en modo bit-perfect';
@@ -8816,5 +8816,19 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String cdTrackNumber(String number) {
     return 'PISTA $number';
+  }
+
+  @override
+  String get deselectAllAction => 'Deseleccionar todo';
+
+  @override
+  String clearCompletedDownloadsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '¿Quitar $count descargas completadas?',
+      one: '¿Quitar 1 descarga completada?',
+    );
+    return '$_temp0';
   }
 }

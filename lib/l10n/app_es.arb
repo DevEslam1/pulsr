@@ -4354,7 +4354,7 @@
   "onboardingPersonalizeDesc": "Elige un color ahora; puedes cambiarlo cuando quieras en Ajustes.",
   "featureInfoBitPerfectTitle": "Pass-through USB bit-perfect",
   "featureInfoBitPerfectSubtitle": "Streaming directo por hardware a DAC USB / con cable",
-  "featureInfoBitPerfectDescription": "Omite el remuestreador AudioFlinger de Android y envía las muestras exactas del archivo (p. ej., 96 kHz / 24 bits) directamente al DAC mediante AudioMixerAttributes (API 34) para USB, o mediante direct/offload para conexión por cable. No se aplica volumen ni DSP por software. Requiere Android 14+ para USB, o un dispositivo con cable que anuncie FLOAT/24 bits y tasas de alta resolución. Bluetooth NUNCA es bit-perfect (transcodificación SBC/AAC/LDAC).",
+  "featureInfoBitPerfectDescription": "Omite AudioFlinger de Android y envía las muestras exactas del archivo (p. ej., 96 kHz / 24 bits) directamente al DAC USB mediante AudioMixerAttributes (API 34), o a través del sumidero isócrono UAC2 propio de Pulsr cuando la plataforma no expone un mezclador exclusivo. No se aplica volumen ni DSP por software. Android no expone salida bit-perfect exclusiva para el conector de 3,5 mm / códec interno: esa ruta usa AAudio Direct y el flujo DSP de 24/32 bits en coma flotante. Bluetooth NUNCA es bit-perfect (transcodificación SBC/AAC/LDAC).",
   "featureInfoBypassDspTitle": "Omitir DSP en modo bit-perfect",
   "featureInfoBypassDspSubtitle": "Flujo de bits puro y sin color al DAC",
   "featureInfoBypassDspDescription": "Cuando está activado, entrar en Bit-Perfect desactiva inmediatamente EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Balance estéreo y Remuestreador sinc (máscara nativa = 0). El volumen se bloquea al DAC de hardware. Desactívalo si quieres EQ + bit-perfect (no es bit-perfect auténtico, pero algunos DAC lo toleran).",
@@ -4683,5 +4683,7 @@
   "lyricsSharePickHint": "Selecciona de 1 a 6 líneas para crear una tarjeta 9:16.",
   "cassetteTapeType": "TIPO II • CrO₂",
   "cassetteEqSpec": "EQ 70µs • HI-FI",
-  "cdTrackNumber": "PISTA {number}"
+  "cdTrackNumber": "PISTA {number}",
+  "deselectAllAction": "Deseleccionar todo",
+  "clearCompletedDownloadsConfirm": "{count, plural, =1{¿Quitar 1 descarga completada?} other{¿Quitar {count} descargas completadas?}}"
 }

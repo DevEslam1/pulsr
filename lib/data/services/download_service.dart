@@ -164,7 +164,7 @@ class DownloadService {
         (album != null && album.isNotEmpty) ? album : 'Unknown Album';
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
-        await _tagChannel.invokeMethod('writeTags', {
+        final result = await _tagChannel.invokeMethod<Object?>('writeTags', {
           'path': filePath,
           'title': title,
           'artist': artist,
@@ -177,6 +177,12 @@ class DownloadService {
           'artworkPath': artworkPath,
           'removeArtwork': false,
         });
+        if (result is Map && result['verified'] == false) {
+          ErrorLogger.log(
+            'writeTags unverified on $filePath: ${result['verifiedFields']}',
+            category: 'DownloadService',
+          );
+        }
         return true;
       } on PlatformException catch (e) {
         if (attempt == 0) {

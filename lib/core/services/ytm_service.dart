@@ -27,6 +27,7 @@ import '../errors/ytm_error_classifier.dart';
 
 export '../errors/ytm_error_classifier.dart' show YtmException;
 import 'ytm_circuit_breaker.dart';
+import 'ytm_media_helpers.dart';
 
 /// Descriptor for one client in the pure-Dart (desktop / native-fallback)
 /// InnerTube player chain.
@@ -767,44 +768,6 @@ class YtmService {
     return winner.future;
   }
 
-  /// Picks the largest thumbnail URL from an InnerTube `thumbnail` object
-  /// (`{ thumbnails: [{ url, width, height }, ...] }`). Mirrors the native
-  /// `extractThumbnailUrl` so the Dart fallback yields the same artwork as the
-  /// native extractor; without it, home carousels render placeholders because
-  /// the fallback is a single request and routinely wins the search race.
-  static String? _extractThumbnailUrl(dynamic thumbnailObj) {
-    if (thumbnailObj is! Map) return null;
-    final thumbs = thumbnailObj['thumbnails'];
-    if (thumbs is! List) return null;
-    String? best;
-    var maxPixels = -1;
-    for (final item in thumbs) {
-      if (item is! Map) continue;
-      final url = (item['url'] as String?)?.trim();
-      if (url == null || url.isEmpty) continue;
-      final w = (item['width'] as num?)?.toInt() ?? 0;
-      final h = (item['height'] as num?)?.toInt() ?? 0;
-      final pixels = w * h;
-      if (best == null || pixels > maxPixels) {
-        maxPixels = pixels;
-        best = url;
-      }
-    }
-    return best;
-  }
-
-  static String? _innertubeArtwork(Map<String, dynamic> renderer) {
-    final responsive = ((renderer['thumbnail']
-        as Map?)?['musicThumbnailRenderer'] as Map?)?['thumbnail'];
-    final fromResponsive = _extractThumbnailUrl(responsive);
-    if (fromResponsive != null) return fromResponsive;
-    final twoRow = ((renderer['thumbnailRenderer']
-            as Map?)?['musicThumbnailRenderer'] as Map?)?['thumbnail'] ??
-        ((renderer['thumbnail'] as Map?)?['musicThumbnailRenderer']
-            as Map?)?['thumbnail'];
-    return _extractThumbnailUrl(twoRow);
-  }
-
   Future<List<YtmTrack>> _searchInnertube(String query,
       {int limit = 30}) async {
     try {
@@ -902,9 +865,8 @@ class YtmService {
                 final c1 = flexCols[1]
                         ['musicResponsiveListItemFlexColumnRenderer']?['text']
                     ?['runs'] as List<dynamic>?;
-                if (c1 != null && c1.isNotEmpty) {
-                  artist = c1[0]['text'] as String? ?? artist;
-                }
+                final parsedArtist = YtmMediaHelpers.firstArtistRun(c1);
+                if (parsedArtist != null) artist = parsedArtist;
               }
 
               if (videoId != null && videoId.length == 11) {
@@ -913,7 +875,7 @@ class YtmService {
                   title: title,
                   artist: artist,
                   duration: Duration.zero,
-                  artworkUrl: _innertubeArtwork(r),
+                  artworkUrl: YtmMediaHelpers.innertubeArtwork(r),
                 ));
               }
               return;
@@ -933,28 +895,15 @@ class YtmService {
               }
               final subObj = r['subtitle'] as Map<String, dynamic>?;
               final subRuns = subObj?['runs'] as List<dynamic>?;
-              String artist = 'Unknown Artist';
-              if (subRuns != null && subRuns.isNotEmpty) {
-                for (final run in subRuns) {
-                  final text = (run['text'] as String?)?.trim();
-                  if (text != null &&
-                      text.isNotEmpty &&
-                      text != '•' &&
-                      text != '·' &&
-                      text.toLowerCase() != 'song' &&
-                      text.toLowerCase() != 'video') {
-                    artist = text;
-                    break;
-                  }
-                }
-              }
+              final parsedArtist = YtmMediaHelpers.firstArtistRun(subRuns);
+              final artist = parsedArtist ?? 'Unknown Artist';
               if (videoId != null && videoId.length == 11) {
                 tracks.add(YtmTrack(
                   videoId: videoId,
                   title: title,
                   artist: artist,
                   duration: Duration.zero,
-                  artworkUrl: _innertubeArtwork(r),
+                  artworkUrl: YtmMediaHelpers.innertubeArtwork(r),
                 ));
               }
               return;
@@ -1239,38 +1188,10 @@ class YtmService {
     return null;
   }
 
-  static bool _isPlayabilityOrRestrictedError(Object error) {
-    if (error is YtmException) {
-      if (error.isAuth || error.isUnavailable) return true;
-      final code = error.code.toUpperCase();
-      if (code == 'SIGN_IN_REQUIRED' ||
-          code == 'LOGIN_REQUIRED' ||
-          code == 'AGE_RESTRICTED' ||
-          code == 'VIDEO_GONE' ||
-          code == 'CONTENT_GONE' ||
-          code == 'YTM_UNAVAILABLE' ||
-          code == 'UNPLAYABLE') {
-        return true;
-      }
-    }
-    final info = YtmErrorClassifier.classify(error);
-    return info.signal == YtmBlockSignal.signInRequired ||
-        info.signal == YtmBlockSignal.videoGone ||
-        info.signal == YtmBlockSignal.geoBlocked;
-  }
-
-  /// Resolves audio stream using multi-tier fallback:
-  /// (1) Direct authenticated account stream (if logged in)
-  /// (2) Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
-  /// Remote yt-dlp backend (Engine 3) is decommissioned.
-  ///
-  /// Coalesces concurrent identical non-force resolves. A `forceRefresh` bypasses
-  /// coalescing so it always performs a fresh resolve.
-  ///
-  /// [coalesce] can also be turned off on its own. A hedged caller needs its
-  /// second, staggered attempt to be a genuinely independent chain — with
-  /// coalescing on, that attempt just awaited the first one's future, so the
-  /// "hedge" raced a promise against itself and never reduced tail latency.
+  /// Resolves audio: account stream, then the native multi-client extractor.
+  /// Coalesces identical non-force resolves; a hedged caller can disable
+  /// [coalesce] so its second attempt is genuinely independent, and
+  /// [forceRefresh] always performs a fresh resolve.
   Future<YtmStream> resolveStream(String videoId,
       {String quality = 'high',
       bool forceRefresh = false,
@@ -1301,7 +1222,7 @@ class YtmService {
         return existing
             .timeout(_defaultResolveTimeout + const Duration(seconds: 5))
             .catchError((Object e) async {
-          if (_isPlayabilityOrRestrictedError(e)) {
+          if (YtmMediaHelpers.isPlayabilityOrRestrictedError(e)) {
             final alt = await resolveAlternateStream(
               title,
               artist,
@@ -1745,7 +1666,7 @@ class YtmService {
     final err = firstError;
     if (title != null &&
         title.trim().isNotEmpty &&
-        (err == null || _isPlayabilityOrRestrictedError(err))) {
+        (err == null || YtmMediaHelpers.isPlayabilityOrRestrictedError(err))) {
       debugPrint(
           '[YTM_SERVICE] Direct stream resolution unplayable for "$videoId" ($title). Attempting alternative stream resolution...');
       final altStream = await resolveAlternateStream(

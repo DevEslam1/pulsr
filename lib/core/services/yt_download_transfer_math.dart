@@ -48,12 +48,17 @@ class YtDownloadTransferMath {
     required String container,
     int? expectedBytes,
     String? videoId,
+    int? chunkCount,
   }) {
     final size = expectedBytes != null && expectedBytes > 0
         ? expectedBytes.toString()
         : 'unknown';
     final id = videoId?.trim() ?? '';
-    return 'v2|$id|${container.trim().toLowerCase()}|$size';
+    // Chunk boundaries are derived from (total, chunkCount). Resuming parts
+    // written under a different split would append the wrong byte ranges and
+    // still pass every size check, so the layout is part of the identity.
+    final layout = chunkCount != null ? '|chunks=$chunkCount' : '';
+    return 'v2|$id|${container.trim().toLowerCase()}|$size$layout';
   }
 
   /// Whether a `.part` carrying [stampContents] may be resumed against

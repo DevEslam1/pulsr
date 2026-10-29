@@ -12,6 +12,7 @@ import '../../core/constants/audio_formats.dart';
 import '../../core/errors/failures.dart';
 import '../../core/utils/cue_parser.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/metadata_placeholders.dart';
 import '../../core/utils/safe_file_path.dart';
 import '../../domain/models/chapter_info.dart';
 import '../../domain/models/genre_item.dart';
@@ -2062,8 +2063,9 @@ class MusicRepository implements IMusicRepository {
         // can land on it without colliding with a loser's exact path.
         await _dedupeSongsByPath();
         final remappedSongs = await _remapSongsOntoExistingPaths(songs);
+        final preservedSongs = await _preserveExistingMetadata(remappedSongs);
         await _db.batch((batch) {
-          batch.insertAllOnConflictUpdate(_db.songsTable, remappedSongs);
+          batch.insertAllOnConflictUpdate(_db.songsTable, preservedSongs);
           batch.insertAllOnConflictUpdate(_db.albumsTable, albums);
           batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
         });
@@ -2210,6 +2212,123 @@ class MusicRepository implements IMusicRepository {
       out.add(c);
     }
     return changed ? out : songs;
+  }
+
+  /// Stops a scanner pass from replacing authoritative metadata with the
+  /// placeholders MediaStore uses when a container has no readable tags.
+  ///
+  /// A downloaded WebM/Opus (or a file whose tag write failed) is indexed by
+  /// MediaStore as "Unknown Artist"/"Unknown Album" and a file-name title.
+  /// Without this merge, every library rescan reverted a correctly reconciled
+  /// download back to Unknown Artist.
+  Future<List<SongsTableCompanion>> _preserveExistingMetadata(
+      List<SongsTableCompanion> songs) async {
+    if (songs.isEmpty) return songs;
+
+    final ids = <int>{};
+    for (final companion in songs) {
+      if (companion.id.present) ids.add(companion.id.value);
+    }
+    if (ids.isEmpty) return songs;
+
+    final existingById = <int, SongsTableData>{};
+    final idList = ids.toList(growable: false);
+    const chunkSize = 400;
+    for (var i = 0; i < idList.length; i += chunkSize) {
+      final chunk =
+          idList.sublist(i, (i + chunkSize).clamp(0, idList.length));
+      final rows = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.isIn(chunk)))
+          .get();
+      for (final row in rows) {
+        existingById[row.id] = row;
+      }
+    }
+    if (existingById.isEmpty) return songs;
+
+    final out = <SongsTableCompanion>[];
+    for (final incoming in songs) {
+      if (!incoming.id.present) {
+        out.add(incoming);
+        continue;
+      }
+      final existing = existingById[incoming.id.value];
+      if (existing == null) {
+        out.add(incoming);
+        continue;
+      }
+      out.add(_preserveOneScannedMetadata(incoming, existing));
+    }
+    return out;
+  }
+
+  SongsTableCompanion _preserveOneScannedMetadata(
+    SongsTableCompanion incoming,
+    SongsTableData existing,
+  ) {
+    final incomingTitle = incoming.title.present ? incoming.title.value : null;
+    final incomingArtist =
+        incoming.artist.present ? incoming.artist.value : null;
+    final incomingAlbum = incoming.album.present ? incoming.album.value : null;
+
+    final scannerLacksTags =
+        MetadataPlaceholders.isUnknownArtist(incomingArtist) ||
+            MetadataPlaceholders.isUnknownAlbum(incomingAlbum);
+    final downloadedTitleIsSuspect =
+        existing.isDownloaded && scannerLacksTags;
+
+    final keepExistingTitle =
+        (downloadedTitleIsSuspect ||
+                MetadataPlaceholders.isUnknownTitle(incomingTitle)) &&
+            MetadataPlaceholders.isRealTitle(existing.title);
+    final keepExistingArtist =
+        MetadataPlaceholders.isUnknownArtist(incomingArtist) &&
+            MetadataPlaceholders.isRealArtist(existing.artist);
+    final keepExistingAlbum =
+        MetadataPlaceholders.isUnknownAlbum(incomingAlbum) &&
+            MetadataPlaceholders.isRealAlbum(existing.album);
+
+    final incomingGenre = incoming.genre.present ? incoming.genre.value : null;
+    final incomingYear = incoming.year.present ? incoming.year.value : null;
+    final incomingTrack =
+        incoming.trackNumber.present ? incoming.trackNumber.value : null;
+
+    return incoming.copyWith(
+      title: keepExistingTitle ? Value(existing.title) : incoming.title,
+      artist: keepExistingArtist ? Value(existing.artist) : incoming.artist,
+      album: keepExistingAlbum ? Value(existing.album) : incoming.album,
+      artistId:
+          keepExistingArtist ? Value(existing.artistId) : incoming.artistId,
+      albumId: keepExistingAlbum ? Value(existing.albumId) : incoming.albumId,
+      durationMs: incoming.durationMs.present && incoming.durationMs.value > 0
+          ? incoming.durationMs
+          : (existing.durationMs > 0
+              ? Value(existing.durationMs)
+              : incoming.durationMs),
+      genre: (incomingGenre == null || incomingGenre.trim().isEmpty) &&
+              (existing.genre ?? '').trim().isNotEmpty
+          ? Value(existing.genre)
+          : incoming.genre,
+      year: incomingYear == null && existing.year != null
+          ? Value(existing.year)
+          : incoming.year,
+      trackNumber: incomingTrack == null && existing.trackNumber != null
+          ? Value(existing.trackNumber)
+          : incoming.trackNumber,
+      fileSize: incoming.fileSize.present && incoming.fileSize.value != null
+          ? incoming.fileSize
+          : (existing.fileSize != null
+              ? Value(existing.fileSize)
+              : incoming.fileSize),
+      uri: incoming.uri.present && (incoming.uri.value ?? '').isNotEmpty
+          ? incoming.uri
+          : (existing.uri != null ? Value(existing.uri) : incoming.uri),
+      dateAdded: incoming.dateAdded.present && incoming.dateAdded.value != null
+          ? incoming.dateAdded
+          : (existing.dateAdded != null
+              ? Value(existing.dateAdded)
+              : incoming.dateAdded),
+    );
   }
 
   /// Deterministic negative primary key for a virtual track expanded from a
@@ -2829,6 +2948,32 @@ class MusicRepository implements IMusicRepository {
     }
   }
 
+  /// Chooses the best real metadata for a merged download row. The existing
+  /// row wins, then the download's known value, then the scanner's.
+  static String _bestMetadata(
+    String current,
+    String? downloaded,
+    String? scanned,
+    bool Function(String?) isPlaceholder,
+  ) {
+    if (!isPlaceholder(current)) return current;
+    if (downloaded != null && !isPlaceholder(downloaded)) return downloaded;
+    if (scanned != null && !isPlaceholder(scanned)) return scanned;
+    return current;
+  }
+
+  /// For a row the scanner created while saving, the download's known value is
+  /// authoritative: MediaStore may have guessed from the file name or found no
+  /// tags at all.
+  static String _downloadedMetadata(
+    String scanned,
+    String? downloaded,
+    bool Function(String?) isPlaceholder,
+  ) =>
+      (downloaded != null && !isPlaceholder(downloaded))
+          ? downloaded
+          : scanned;
+
   @override
   Future<Result<int?>> reconcileDownloadedSong({
     required int oldId,
@@ -2888,16 +3033,47 @@ class MusicRepository implements IMusicRepository {
                       ? oldRow.dateAdded! * 1000
                       : oldRow.dateAdded!)
                   : nowMs;
+              final bestTitle = _bestMetadata(oldRow.title,
+                  fallbackSong?.title, null, MetadataPlaceholders.isUnknownTitle);
+              final bestArtist = _bestMetadata(oldRow.artist,
+                  fallbackSong?.artist, null, MetadataPlaceholders.isUnknownArtist);
+              final bestAlbum = _bestMetadata(oldRow.album,
+                  fallbackSong?.album, null, MetadataPlaceholders.isUnknownAlbum);
               await (_db.update(_db.songsTable)
                     ..where((t) => t.id.equals(oldId)))
                   .write(
                 SongsTableCompanion(
                   path: Value(newPath),
+                  title: Value(bestTitle),
+                  artist: Value(bestArtist),
+                  album: Value(bestAlbum),
+                  artistId: bestArtist != oldRow.artist
+                      ? const Value(null)
+                      : const Value.absent(),
+                  albumId: bestAlbum != oldRow.album
+                      ? const Value(null)
+                      : const Value.absent(),
+                  durationMs: oldRow.durationMs <= 0 &&
+                          (fallbackSong?.durationMs ?? 0) > 0
+                      ? Value(fallbackSong!.durationMs)
+                      : const Value.absent(),
                   source: const Value(SongSource.local),
                   isMissing: const Value(false),
                   isDownloaded: const Value(true),
                   dateAdded: Value(resolvedDateAdded),
                   pendingDownloadPath: const Value(null),
+                  remoteId: (oldRow.remoteId ?? '').trim().isEmpty &&
+                          (fallbackSong?.remoteId ?? '').trim().isNotEmpty
+                      ? Value(fallbackSong!.remoteId)
+                      : const Value.absent(),
+                  remoteArtworkUrl: (oldRow.remoteArtworkUrl ?? '')
+                              .trim()
+                              .isEmpty &&
+                          (fallbackSong?.remoteArtworkUrl ?? '')
+                              .trim()
+                              .isNotEmpty
+                      ? Value(fallbackSong!.remoteArtworkUrl)
+                      : const Value.absent(),
                   bitrateKbps: fallbackSong?.bitrateKbps != null
                       ? Value(fallbackSong!.bitrateKbps)
                       : const Value.absent(),
@@ -2980,7 +3156,55 @@ class MusicRepository implements IMusicRepository {
         final targetId = newRow.id;
         survivingId = targetId;
 
-        if (oldRow == null || oldRow.id == targetId) return;
+        if (oldRow == null || oldRow.id == targetId) {
+          // The scanner already owns the path (or the download row itself is
+          // the target). Adopt the download's metadata instead of trusting
+          // MediaStore, which falls back to "Unknown Artist" when the
+          // container carries no readable tags (WebM/Opus) and otherwise
+          // guesses the title from the file name.
+          final bestTitle = _downloadedMetadata(newRow.title,
+              fallbackSong?.title, MetadataPlaceholders.isUnknownTitle);
+          final bestArtist = _downloadedMetadata(newRow.artist,
+              fallbackSong?.artist, MetadataPlaceholders.isUnknownArtist);
+          final bestAlbum = _downloadedMetadata(newRow.album,
+              fallbackSong?.album, MetadataPlaceholders.isUnknownAlbum);
+          final bestDuration = newRow.durationMs > 0
+              ? newRow.durationMs
+              : (fallbackSong?.durationMs ?? 0);
+          final bestRemoteId = (newRow.remoteId ?? '').trim().isNotEmpty
+              ? newRow.remoteId
+              : fallbackSong?.remoteId;
+          final bestArt = (newRow.remoteArtworkUrl ?? '').trim().isNotEmpty
+              ? newRow.remoteArtworkUrl
+              : fallbackSong?.remoteArtworkUrl;
+          await (_db.update(_db.songsTable)
+                ..where((t) => t.id.equals(targetId)))
+              .write(SongsTableCompanion(
+            title: Value(bestTitle),
+            artist: Value(bestArtist),
+            album: Value(bestAlbum),
+            // A scanner id for the placeholder name would still take the song
+            // to an "Unknown Artist" page; drop it when the name was repaired.
+            artistId: bestArtist != newRow.artist
+                ? const Value(null)
+                : const Value.absent(),
+            albumId: bestAlbum != newRow.album
+                ? const Value(null)
+                : const Value.absent(),
+            durationMs:
+                bestDuration > 0 ? Value(bestDuration) : const Value.absent(),
+            source: const Value(SongSource.local),
+            isDownloaded: const Value(true),
+            remoteId: bestRemoteId != null && bestRemoteId.trim().isNotEmpty
+                ? Value(bestRemoteId)
+                : const Value.absent(),
+            remoteArtworkUrl:
+                bestArt != null && bestArt.trim().isNotEmpty
+                    ? Value(bestArt)
+                    : const Value.absent(),
+          ));
+          return;
+        }
         final oldData = oldRow;
         final newData = newRow;
 
@@ -3035,24 +3259,28 @@ class MusicRepository implements IMusicRepository {
         final keepOldPosition =
             (oldData.lastPlayed ?? 0) > (newData.lastPlayed ?? 0);
 
-        final String effectiveTitle = (oldData.title.isNotEmpty &&
-                !oldData.title.toLowerCase().startsWith('ytdl_'))
-            ? oldData.title
-            : newData.title;
-        final String effectiveArtist = (oldData.artist.isNotEmpty &&
-                oldData.artist != '<unknown>' &&
-                oldData.artist != 'Unknown')
-            ? oldData.artist
-            : newData.artist;
-        final String effectiveAlbum = (oldData.album.isNotEmpty &&
-                oldData.album != '<unknown>' &&
-                oldData.album != 'Unknown')
-            ? oldData.album
-            : newData.album;
-        final String? effectiveRemoteArt = (oldData.remoteArtworkUrl != null &&
-                oldData.remoteArtworkUrl!.isNotEmpty)
-            ? oldData.remoteArtworkUrl
-            : newData.remoteArtworkUrl;
+        final String effectiveTitle = _bestMetadata(oldData.title,
+            fallbackSong?.title, newData.title, MetadataPlaceholders.isUnknownTitle);
+        final String effectiveArtist = _bestMetadata(
+            oldData.artist,
+            fallbackSong?.artist,
+            newData.artist,
+            MetadataPlaceholders.isUnknownArtist);
+        final String effectiveAlbum = _bestMetadata(
+            oldData.album,
+            fallbackSong?.album,
+            newData.album,
+            MetadataPlaceholders.isUnknownAlbum);
+        final String? effectiveRemoteArt = [
+          oldData.remoteArtworkUrl,
+          fallbackSong?.remoteArtworkUrl,
+          newData.remoteArtworkUrl,
+        ].firstWhere((v) => v != null && v.trim().isNotEmpty, orElse: () => null);
+        final String? effectiveRemoteId = [
+          oldData.remoteId,
+          fallbackSong?.remoteId,
+          newData.remoteId,
+        ].firstWhere((v) => v != null && v.trim().isNotEmpty, orElse: () => null);
 
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId)))
             .write(
@@ -3060,6 +3288,12 @@ class MusicRepository implements IMusicRepository {
             title: Value(effectiveTitle),
             artist: Value(effectiveArtist),
             album: Value(effectiveAlbum),
+            artistId: effectiveArtist != newData.artist
+                ? const Value(null)
+                : const Value.absent(),
+            albumId: effectiveAlbum != newData.album
+                ? const Value(null)
+                : const Value.absent(),
             genre: Value(oldData.genre ?? newData.genre),
             isFavorite: Value(oldData.isFavorite || newData.isFavorite),
             playCount: Value(oldData.playCount + newData.playCount),
@@ -3068,7 +3302,7 @@ class MusicRepository implements IMusicRepository {
                 ? oldData.lastPositionMs
                 : newData.lastPositionMs),
             // Carry the video id and online remoteArtworkUrl
-            remoteId: Value(oldData.remoteId ?? newData.remoteId),
+            remoteId: Value(effectiveRemoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
             source: const Value(SongSource.local),
             isDownloaded: const Value(true),
@@ -3123,14 +3357,29 @@ class MusicRepository implements IMusicRepository {
                 t.cueStartMs.isNull()))
           .getSingleOrNull();
       if (existing != null) {
+        // A reader that could not parse tags (or a failed tag write) reports
+        // placeholders. Do not let that wipe real metadata that is already in
+        // the library.
+        final safeTitle = MetadataPlaceholders.isUnknownTitle(title) &&
+                MetadataPlaceholders.isRealTitle(existing.title)
+            ? existing.title
+            : title;
+        final safeArtist = MetadataPlaceholders.isUnknownArtist(artist) &&
+                MetadataPlaceholders.isRealArtist(existing.artist)
+            ? existing.artist
+            : artist;
+        final safeAlbum = MetadataPlaceholders.isUnknownAlbum(album) &&
+                MetadataPlaceholders.isRealAlbum(existing.album)
+            ? existing.album
+            : album;
         await _db.transaction(() async {
           await (_db.update(_db.songsTable)
                 ..where((t) => t.id.equals(existing.id)))
               .write(
             SongsTableCompanion(
-              title: Value(title),
-              artist: Value(artist),
-              album: Value(album),
+              title: Value(safeTitle),
+              artist: Value(safeArtist),
+              album: Value(safeAlbum),
               genre: Value(genre),
               year: Value(year),
               trackNumber: Value(trackNumber),
@@ -3144,14 +3393,14 @@ class MusicRepository implements IMusicRepository {
             await (_db.update(_db.albumsTable)
                   ..where((t) => t.id.equals(existing.albumId!)))
                 .write(AlbumsTableCompanion(
-              title: Value(album),
-              artist: Value(artist),
+              title: Value(safeAlbum),
+              artist: Value(safeArtist),
             ));
           }
           if (existing.artistId != null && existing.artistId! > 0) {
             await (_db.update(_db.artistsTable)
                   ..where((t) => t.id.equals(existing.artistId!)))
-                .write(ArtistsTableCompanion(name: Value(artist)));
+                .write(ArtistsTableCompanion(name: Value(safeArtist)));
           }
         });
       }

@@ -231,8 +231,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                           ),
                           tooltip:
                               _selectedVideoIds.length == filteredTasks.length
-                                  ? 'Deselect all'
-                                  : 'Select all',
+                                  ? l10n.deselectAllAction
+                                  : l10n.selectAllAction,
                           onPressed: () {
                             setState(() {
                               if (_selectedVideoIds.length ==
@@ -821,8 +821,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final confirmed = await PulsrDialogHelper.showConfirmDialog(
       context,
       title: l10n.clear,
-      message:
-          'Remove ${completedTasks.length} completed download${completedTasks.length == 1 ? "" : "s"}?',
+      message: l10n.clearCompletedDownloadsConfirm(completedTasks.length),
       confirmLabel: l10n.clear,
       cancelLabel: l10n.cancel,
       isDestructive: true,

@@ -315,6 +315,117 @@ void main() {
       expect(byId['taggingtask']!.status, DownloadStatus.paused);
       expect(byId['failedtask']!.status, DownloadStatus.failed);
     });
+
+    test('completion adopts the reconciled row metadata for the task tile',
+        () async {
+      final temp = Directory.systemTemp.createTempSync('dl_meta_row');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final file = File('${temp.path}${Platform.pathSeparator}reconciled.m4a')
+        ..writeAsStringSync('audio');
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      await db!.into(db!.songsTable).insert(SongsTableCompanion.insert(
+            id: const Value(50),
+            title: 'Real Title',
+            artist: const Value('Real Artist'),
+            album: const Value('Real Album'),
+            path: file.path,
+            fileSize: const Value(5),
+          ));
+      repo = DownloadRepositoryImpl(service, db);
+      when(() => service.download(any(),
+              bypassInternalQueue: any(named: 'bypassInternalQueue'),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((_) async => const Right(50));
+
+      await repo.queueDownload(DownloadTask(
+        id: 'abcdefghijk',
+        videoId: 'abcdefghijk',
+        title: 'Unknown Title',
+        artist: 'Unknown Artist',
+        createdAt: DateTime(2026, 1, 1),
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+
+      final completed = (await repo.getAllDownloads()).single;
+      expect(completed.status, DownloadStatus.complete);
+      expect(completed.title, 'Real Title');
+      expect(completed.artist, 'Real Artist');
+      expect(completed.album, 'Real Album');
+    });
+
+    test('boot repairs a legacy row scanned as Unknown Artist from the task',
+        () async {
+      final temp = Directory.systemTemp.createTempSync('dl_boot_meta');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final file = File('${temp.path}${Platform.pathSeparator}legacy.m4a')
+        ..writeAsStringSync('audio');
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      await db!.into(db!.songsTable).insert(SongsTableCompanion.insert(
+            id: const Value(60),
+            title: 'Real Artist - Real Title',
+            artist: const Value('Unknown Artist'),
+            album: const Value('Unknown Album'),
+            path: file.path,
+          ));
+      repo = DownloadRepositoryImpl(service, db);
+
+      await seed([
+        DownloadTask(
+          id: 'abcdefghijk',
+          videoId: 'abcdefghijk',
+          title: 'Real Title',
+          artist: 'Real Artist',
+          album: 'Real Album',
+          status: DownloadStatus.complete,
+          localSongId: 60,
+          filePath: file.path,
+          fileSize: 5,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+      ]);
+
+      final row = (await (db!.select(db!.songsTable)
+                ..where((s) => s.id.equals(60)))
+              .getSingle());
+      expect(row.title, 'Real Title');
+      expect(row.artist, 'Real Artist');
+      expect(row.album, 'Real Album');
+
+      final task = (await repo.getAllDownloads()).single;
+      expect(task.artist, 'Real Artist');
+      expect(task.title, 'Real Title');
+    });
+
+    test('adopts the library row when the save finished before process death',
+        () async {
+      final temp = Directory.systemTemp.createTempSync('dl_boot_saved');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final file = File('${temp.path}${Platform.pathSeparator}saved.m4a')
+        ..writeAsStringSync('12345678');
+
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      await db!.into(db!.songsTable).insert(SongsTableCompanion.insert(
+            id: const Value(44),
+            title: 'Downloaded',
+            path: file.path,
+            fileSize: const Value(8),
+            remoteId: const Value('abcdefghijk'),
+          ));
+      repo = DownloadRepositoryImpl(service, db);
+
+      await seed([
+        task('abcdefghijk', status: DownloadStatus.tagging),
+      ]);
+
+      final restored = (await repo.getAllDownloads()).single;
+      expect(restored.status, DownloadStatus.complete);
+      expect(restored.localSongId, 44);
+      expect(restored.fileSize, 8);
+      expect(restored.format, 'm4a');
+      verifyNever(() => service.download(any(),
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress')));
+    });
   });
 
   group('storage stats', () {

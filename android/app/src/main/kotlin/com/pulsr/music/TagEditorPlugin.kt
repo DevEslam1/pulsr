@@ -216,6 +216,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     var tempFile: java.io.File? = null
                     var backupFile: java.io.File? = null
                     var verified = false
+                    var coreMetadataVerified = false
                     try {
                         val file = if (isContentUri) {
                             val uri = android.net.Uri.parse(path)
@@ -442,6 +443,16 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                                 }
 
                                 verified = verifiedFields.values.all { it }
+                                // Artwork read-back can fail on some containers
+                                // while title/artist/album were written fine.
+                                // Never roll the whole tag write back for that:
+                                // it silently leaves the download untagged and
+                                // MediaStore reports "Unknown Artist".
+                                coreMetadataVerified =
+                                    listOf("title", "artist", "album").all { key ->
+                                        !verifiedFields.containsKey(key) ||
+                                            verifiedFields[key] == true
+                                    }
                             }
                         } catch (_: Exception) {
                             verified = false
@@ -469,7 +480,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     } finally {
                         tempFile?.let { runCatching { it.delete() } }
                         backupFile?.let { backup ->
-                            if (verified) {
+                            if (verified || coreMetadataVerified) {
                                 runCatching { backup.delete() }
                             } else {
                                 try {

@@ -61,6 +61,19 @@ class FakeHeaders implements HttpHeaders {
       throw UnimplementedError('headers.${invocation.memberName}');
 }
 
+class FakeSocket implements Socket {
+  bool destroyed = false;
+
+  @override
+  void destroy() {
+    destroyed = true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('socket.${invocation.memberName}');
+}
+
 class FakeResponse extends Stream<List<int>> implements HttpClientResponse {
   @override
   final int statusCode;
@@ -68,6 +81,9 @@ class FakeResponse extends Stream<List<int>> implements HttpClientResponse {
   final int? fixedContentLength;
   final Stream<List<int>>? bodyStream;
   final FakeHeaders responseHeaders = FakeHeaders();
+
+  bool detachCalled = false;
+  FakeSocket? detachedSocket;
 
   FakeResponse({
     required this.statusCode,
@@ -77,6 +93,12 @@ class FakeResponse extends Stream<List<int>> implements HttpClientResponse {
     Map<String, String> headers = const {},
   }) {
     responseHeaders.values.addAll(headers);
+  }
+
+  @override
+  Future<Socket> detachSocket({bool writeHeaders = true}) async {
+    detachCalled = true;
+    return detachedSocket = FakeSocket();
   }
 
   @override
@@ -404,6 +426,42 @@ void main() {
       expect(progressNotifications, isNotEmpty);
     });
 
+    test('repairs Unknown Artist from the resolved stream metadata', () async {
+      const videoId = 'vidArtist001';
+      when(() => ytm.resolveStream(
+            any(),
+            quality: any(named: 'quality'),
+            forceRefresh: any(named: 'forceRefresh'),
+            preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
+          )).thenAnswer((_) async => _stream(
+            videoId: videoId,
+            duration: const Duration(seconds: 1),
+            bitrateKbps: 64,
+          ));
+      server = (request) async => sequential(_m4aBody(140000));
+
+      final song = _song(videoId: videoId)
+          .copyWith(title: 'Unknown Title', artist: 'Unknown Artist');
+      final result = await service.download(song);
+
+      expect(result.isRight(), isTrue);
+      expect(lastWriteTagsArgs!['title'], 'T');
+      expect(lastWriteTagsArgs!['artist'], 'A');
+
+      final captured = verify(() => repo.reconcileDownloadedSong(
+            oldId: song.id,
+            newPath: saveResult!,
+            fallbackSong: captureAny(named: 'fallbackSong'),
+          )).captured;
+      final fallback = captured.single as SongsTableData;
+      expect(fallback.title, 'T',
+          reason: 'the resolved stream carries the real video title');
+      expect(fallback.artist, 'A',
+          reason: 'the resolved stream carries the real author');
+    });
+
     test('embeds downloaded artwork and withholds cookies from googlevideo',
         () async {
       final jpg = Uint8List.fromList(List<int>.filled(2048, 0x41));
@@ -636,6 +694,58 @@ void main() {
           hasLength(1));
     });
 
+    test('drops a 416-rejected partial and restarts from zero', () async {
+      const videoId = 'vidRange4161';
+      final stream = _stream(videoId: videoId);
+      when(() => ytm.resolveStream(
+            any(),
+            quality: any(named: 'quality'),
+            forceRefresh: any(named: 'forceRefresh'),
+            preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
+          )).thenAnswer((_) async => stream);
+
+      final dest = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
+      File('${dest.path}.part').writeAsBytesSync(_m4aBody(70000));
+      File('${dest.path}.part.stamp').writeAsStringSync(
+          YtDownloadService.resumeStampFor(
+              videoId: videoId,
+              container: stream.container,
+              expectedBytes: YtDownloadTransferMath.estimateBytes(stream)));
+
+      final fullBody = _m4aBody(3000000);
+      server = (request) async {
+        final range = request.headers.values['range'];
+        if (range == 'bytes=0-0') {
+          return FakeResponse(
+            statusCode: 200,
+            body: const [0],
+            fixedContentLength: fullBody.length,
+          );
+        }
+        if (range != null) {
+          return FakeResponse(statusCode: HttpStatus.requestedRangeNotSatisfiable);
+        }
+        return FakeResponse(
+          statusCode: 200,
+          body: fullBody,
+          fixedContentLength: fullBody.length,
+        );
+      };
+
+      final result = await service.download(_song(videoId: videoId));
+
+      expect(result.isRight(), isTrue);
+      expect(client.requests.where((r) => r.headers.values['range'] != null),
+          hasLength(2), reason: 'probe plus the rejected resume attempt');
+      expect(
+          client.requests.where(
+              (r) => !r.headers.values.containsKey('range')),
+          hasLength(1),
+          reason: 'the retry must start from zero without a Range header');
+    });
+
     test('discards a .part whose stamp belongs to another URL', () async {
       const videoId = 'vidStampOld1';
       final stream = _stream(
@@ -735,6 +845,51 @@ void main() {
       expect(writeTagsCalls, 1);
     });
 
+    test('reuses the previous chunk split instead of corrupting its parts',
+        () async {
+      const videoId = 'vidLayout001';
+      const total = 3000000;
+      final bytes = _m4aBody(total);
+      final dest = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
+      final baseStamp = YtDownloadTransferMath.resumeStampFor(
+          container: 'm4a', expectedBytes: total, videoId: videoId);
+      File('${dest.path}.parts').writeAsStringSync('$baseStamp|chunks=2');
+      // A complete first half from the earlier two-chunk attempt.
+      File('${dest.path}.part0').writeAsBytesSync(List<int>.filled(1500000, 0));
+
+      final requestedRanges = <String>[];
+      server = (request) async {
+        final range = request.headers.values['range'];
+        if (range == 'bytes=0-0') {
+          return FakeResponse(
+            statusCode: 206,
+            body: const [0],
+            fixedContentLength: 1,
+            headers: {
+              'content-range': 'bytes 0-0/$total',
+              'accept-ranges': 'bytes',
+            },
+          );
+        }
+        requestedRanges.add(range!);
+        final match = RegExp(r'bytes=(\d+)-(\d+)').firstMatch(range)!;
+        final start = int.parse(match.group(1)!);
+        final end = int.parse(match.group(2)!);
+        return FakeResponse(
+          statusCode: 206,
+          body: bytes.sublist(start, end + 1),
+          headers: {'content-range': 'bytes $start-$end/$total'},
+        );
+      };
+
+      final result = await service.download(_song(videoId: videoId));
+
+      expect(result.isRight(), isTrue);
+      expect(requestedRanges, ['bytes=1500000-2999999'],
+          reason: 'the old two-chunk layout must be adopted so part0 stays '
+              'valid; four chunks would request from offset 0 again');
+    });
+
     test('falls back to one sequential request when Range is ignored mid-way',
         () async {
       const total = 3000000;
@@ -774,6 +929,124 @@ void main() {
           .where((r) => !r.headers.values.containsKey('range'))
           .toList();
       expect(sequentialRequests, hasLength(1));
+    });
+
+    test('aborts the probe body instead of draining a whole ignored Range',
+        () async {
+      const total = 3000000;
+      late FakeResponse probeResponse;
+      server = (request) async {
+        if (request.headers.values['range'] == 'bytes=0-0') {
+          probeResponse = FakeResponse(
+            statusCode: 200,
+            body: _m4aBody(total),
+            fixedContentLength: total,
+          );
+          return probeResponse;
+        }
+        return FakeResponse(
+          statusCode: 200,
+          body: _m4aBody(total),
+          fixedContentLength: total,
+        );
+      };
+
+      final result = await service.download(_song(videoId: 'vidProbeAbort'));
+
+      expect(result.isRight(), isTrue);
+      expect(probeResponse.detachCalled, isTrue,
+          reason: 'the full-body probe response must be detached, not drained');
+      final bodyRequests = client.requests
+          .where((r) => r.headers.values['range'] != 'bytes=0-0')
+          .toList();
+      expect(bodyRequests, hasLength(1));
+    });
+  });
+
+  group('queue lifecycle', () {
+    test('cancelling a queued download resolves it without starting it',
+        () async {
+      service.setMaxConcurrentDownloads(1);
+      final activeController = StreamController<List<int>>();
+      server = (request) async {
+        if (request.headers.values['range'] == 'bytes=0-0') {
+          return FakeResponse(
+            statusCode: 200,
+            body: const [0],
+            fixedContentLength: 2 * 1024 * 1024,
+          );
+        }
+        return FakeResponse(
+          statusCode: 200,
+          bodyStream: activeController.stream,
+          fixedContentLength: 2 * 1024 * 1024,
+        );
+      };
+
+      final first = service.download(_song(videoId: 'vidQueue0001'));
+      await _waitFor(() => client.requests.isNotEmpty);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final queuedStages = <String>[];
+      final second = service.download(
+        _song(videoId: 'vidQueue0002'),
+        onProgress: (progress) => queuedStages.add(_stageName(progress)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(queuedStages, contains('queued'));
+
+      service.cancel('vidQueue0002');
+      final secondResult = await second.timeout(const Duration(seconds: 2));
+      expect(secondResult.isLeft(), isTrue,
+          reason: 'the queued future must complete on cancel');
+
+      service.cancel('vidQueue0001');
+      activeController.add(const [0, 0, 0]);
+      await activeController.close();
+      await first.timeout(const Duration(seconds: 2));
+    });
+
+    test('a restart waits for the canceled writer to unwind first', () async {
+      service.setMaxConcurrentDownloads(1);
+      final firstController = StreamController<List<int>>();
+      final secondController = StreamController<List<int>>();
+      var bodyRequests = 0;
+      server = (request) async {
+        if (request.headers.values['range'] == 'bytes=0-0') {
+          return FakeResponse(
+            statusCode: 200,
+            body: const [0],
+            fixedContentLength: 2 * 1024 * 1024,
+          );
+        }
+        bodyRequests++;
+        return FakeResponse(
+          statusCode: 200,
+          bodyStream: bodyRequests == 1
+              ? firstController.stream
+              : secondController.stream,
+          fixedContentLength: 2 * 1024 * 1024,
+        );
+      };
+
+      final first = service.download(_song(videoId: 'vidRestart01'));
+      await _waitFor(() => bodyRequests == 1);
+      service.cancel('vidRestart01');
+      final second = service.download(_song(videoId: 'vidRestart01'));
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(bodyRequests, 1,
+          reason: 'the second writer must wait for the canceled transfer');
+
+      firstController.add(const [0, 0, 0]);
+      await firstController.close();
+      await first.timeout(const Duration(seconds: 2));
+      await _waitFor(() => bodyRequests == 2);
+
+      service.cancel('vidRestart01');
+      secondController.add(const [0, 0, 0]);
+      await secondController.close();
+      await second.timeout(const Duration(seconds: 2));
     });
   });
 

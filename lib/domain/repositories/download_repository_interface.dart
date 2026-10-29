@@ -32,4 +32,9 @@ abstract class IDownloadRepository {
 
   /// Reconciles persisted queue and verifies downloaded files integrity on app startup.
   Future<void> reconcileOnBoot();
+
+  /// Resumes tasks paused automatically (Wi-Fi/offline-only policy or a lost
+  /// connection), once transferring is viable again. User-initiated pauses are
+  /// left alone. Returns the number of tasks re-queued.
+  Future<int> resumeAutoPaused();
 }

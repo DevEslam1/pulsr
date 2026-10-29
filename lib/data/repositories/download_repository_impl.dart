@@ -5,16 +5,21 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:drift/drift.dart' show BooleanExpressionOperators;
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/services.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/channels.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/ytm_error_classifier.dart';
+import '../../core/network/connectivity_guard.dart';
 import '../../core/services/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/metadata_placeholders.dart';
 import '../models/download_settings.dart';
 import '../../domain/models/download_task.dart';
 import '../../core/di/injection.dart';
@@ -50,6 +55,16 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   final Queue<String> _queue = Queue<String>();
   final Set<String> _activeVideoIds = {};
   final Set<String> _pausedVideoIds = {};
+
+  /// Tasks paused automatically — by the Wi-Fi/offline policy or by a lost
+  /// connection — not by the user. Only these are auto-resumed when the
+  /// network path returns; a manual pause stays put.
+  final Set<String> _autoPausedVideoIds = {};
+
+  /// Suppresses slot refills while the policy watchdog pauses the whole queue;
+  /// otherwise each pause immediately started the next not-yet-paused task,
+  /// only for the same watchdog pass to cancel it again.
+  bool _enforcingPolicy = false;
   final Map<String, Completer<void>> _activeCompleters = {};
   final StreamController<DownloadTask> _streamController =
       StreamController<DownloadTask>.broadcast();
@@ -144,10 +159,11 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     final existing = _tasks[videoId];
-    // Dedupe: if already downloading or queued, return existing id instead of double-writer
-    if (existing != null &&
-        (existing.status == DownloadStatus.downloading ||
-            existing.status == DownloadStatus.queued)) {
+    // Dedupe: if already downloading, tagging or queued, return the existing
+    // id instead of admitting a second writer. `tagging` was missing here, so
+    // re-tapping a track while its bytes were being saved reset the row to
+    // "queued" at 0% even though the same job was still finishing.
+    if (existing != null && existing.status.isActive) {
       return Right(QueueDownloadResult(
         taskId: existing.id,
         admission: DownloadAdmission.alreadyActive,
@@ -164,7 +180,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               admission: DownloadAdmission.alreadyComplete,
             ));
           }
-        } catch (_) {}
+        } catch (e) {
+          ErrorLogger.addBreadcrumb(
+            'Could not verify completed file, re-admitting: $videoId ($e)',
+            category: 'Download',
+          );
+        }
       }
       // File missing → allow re-download (treat as failed)
     }
@@ -173,22 +194,36 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     try {
       final freeBytes =
           await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
-      if (freeBytes > 0 && freeBytes < 15 * 1024 * 1024) {
+      if (freeBytes > 0 && freeBytes < 20 * 1024 * 1024) {
         return const Left(
             StorageFailure('Insufficient storage space for downloading audio'));
       }
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger.addBreadcrumb(
+        'Free-space preflight unavailable; admission continues ($e)',
+        category: 'Download',
+      );
+    }
 
     // Mirror sanitize done in YtDownloadService; ensures / \ : * ? etc not in paths
+    // A retry may arrive with only the identity (title/artist); keep the
+    // metadata captured by the original admission so tagging, lyrics lookup
+    // and the picker's quality survive a failed/restarted attempt.
     final queuedTask = task.copyWith(
       status: DownloadStatus.queued,
       progress: 0.0,
       clearError: true,
       clearSpeedKbps: true,
       clearEtaSeconds: true,
+      artworkUrl: task.artworkUrl ?? existing?.artworkUrl,
+      sourceSongId: task.sourceSongId ?? existing?.sourceSongId,
+      album: task.album ?? existing?.album,
+      durationMs: task.durationMs ?? existing?.durationMs,
+      quality: task.quality ?? existing?.quality,
     );
 
     _pausedVideoIds.remove(videoId);
+    _autoPausedVideoIds.remove(videoId);
     if (existing != null && existing.status == DownloadStatus.paused) {
       // Re-admitting a paused task is a resume: clear the service-side paused
       // marker and the notification's Resume action, otherwise the job stays
@@ -216,10 +251,40 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 
   @override
-  Future<Either<AppFailure, Unit>> pauseDownload(String videoId) async {
+  Future<Either<AppFailure, Unit>> pauseDownload(String videoId) =>
+      _pauseTask(videoId, byPolicy: false);
+
+  /// Pauses [videoId]. [byPolicy] marks the pause as automatic (policy or
+  /// connectivity), so [resumeAutoPaused] may undo it when the network
+  /// returns.
+  Future<Either<AppFailure, Unit>> _pauseTask(
+    String videoId, {
+    required bool byPolicy,
+    String? error,
+  }) async {
     final task = _tasks[videoId];
     if (task == null) {
       return const Left(DownloadFailure('Task not found'));
+    }
+    // Pausing a finished/failed row is a stale notification echo, not a state
+    // change: overwriting `complete` with `paused` made a landed download
+    // reappear as resumable (and a resume then fetched a second copy).
+    if (task.status.isTerminal) {
+      return const Right(unit);
+    }
+    if (byPolicy) {
+      _autoPausedVideoIds.add(videoId);
+    } else {
+      // A deliberate pause outranks the watchdog: never auto-resume it.
+      _autoPausedVideoIds.remove(videoId);
+    }
+    if (task.status == DownloadStatus.paused) {
+      // Idempotent pause: keep the native Resume action and the service's
+      // paused marker in sync even when the row was already paused (e.g. a
+      // notification action arriving after a restart).
+      _ytDownloadService.markPaused(videoId);
+      _notifyNativePaused(videoId, true);
+      return const Right(unit);
     }
 
     _pausedVideoIds.add(videoId);
@@ -234,16 +299,59 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       if (c != null) {
         try {
           await c.future.timeout(const Duration(seconds: 2));
-        } catch (_) {}
+        } catch (e) {
+          ErrorLogger.addBreadcrumb(
+            'Pause timed out waiting for the canceled job: $videoId ($e)',
+            category: 'Download',
+          );
+        }
       }
       // FIX-A08: Force-remove videoId from _activeVideoIds and _activeCompleters to prevent leaks
       _activeVideoIds.remove(videoId);
       _activeCompleters.remove(videoId);
     }
 
-    _updateTask(task.copyWith(status: DownloadStatus.paused));
+    // The job may have finished saving/tagging while the cancel was in flight
+    // (pause lost the race); never downgrade a terminal row.
+    final latest = _tasks[videoId];
+    if (latest == null) {
+      return const Right(unit);
+    }
+    if (latest.status.isTerminal) {
+      _pausedVideoIds.remove(videoId);
+      _ytDownloadService.clearPaused(videoId);
+      return const Right(unit);
+    }
+    _updateTask(latest.copyWith(
+      status: DownloadStatus.paused,
+      error: error,
+      clearError: error == null,
+      clearSpeedKbps: true,
+      clearEtaSeconds: true,
+    ));
     _notifyNativePaused(videoId, true);
+    // Pausing an active transfer frees a slot; without this the next queued
+    // track waited for an unrelated completion before starting.
+    _processQueue();
     return const Right(unit);
+  }
+
+  /// Parks a task that cannot make progress for an environmental reason
+  /// (policy or connectivity), preserving its partial and its place in the
+  /// auto-resume set. [error] is shown on the paused tile when the reason is
+  /// not obvious from the paused state itself.
+  void _parkAutoPaused(String videoId, DownloadTask current, {String? error}) {
+    _autoPausedVideoIds.add(videoId);
+    _pausedVideoIds.add(videoId);
+    _ytDownloadService.markPaused(videoId);
+    _notifyNativePaused(videoId, true);
+    _updateTask(current.copyWith(
+      status: DownloadStatus.paused,
+      error: error,
+      clearError: error == null,
+      clearSpeedKbps: true,
+      clearEtaSeconds: true,
+    ));
   }
 
   @override
@@ -251,6 +359,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final task = _tasks[videoId];
     if (task == null) {
       return const Left(DownloadFailure('Task not found'));
+    }
+    // Resume is only meaningful for a paused task. A duplicate tap, a stale
+    // notification action, or an admission racing the completion tail used to
+    // re-queue a complete/active row and fetch a second copy.
+    if (task.status != DownloadStatus.paused) {
+      return const Right(unit);
     }
 
     await _reloadSettings();
@@ -260,6 +374,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     _pausedVideoIds.remove(videoId);
+    _autoPausedVideoIds.remove(videoId);
     _ytDownloadService.clearPaused(videoId);
     _notifyNativePaused(videoId, false);
     final queuedTask = task.copyWith(
@@ -278,6 +393,31 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // inside _downloadAudioWithRetry, and raises the notification itself.
     _processQueue();
     return const Right(unit);
+  }
+
+  /// Resumes downloads that were paused automatically, once the policy allows
+  /// transferring again. Called on network-path changes; user pauses are not
+  /// touched. Returns how many tasks were re-queued.
+  @override
+  Future<int> resumeAutoPaused() async {
+    if (_autoPausedVideoIds.isEmpty) return 0;
+    await _reloadSettings();
+    if (await _ytDownloadService.downloadPolicyBlock() != null) return 0;
+    // The monitor fires for losses as well as gains; resuming while the
+    // device is still offline would just fail (and re-park) every task.
+    if (!await ConnectivityGuard.hasConnection()) return 0;
+
+    var resumed = 0;
+    for (final videoId in List<String>.of(_autoPausedVideoIds)) {
+      final task = _tasks[videoId];
+      if (task == null || task.status != DownloadStatus.paused) {
+        _autoPausedVideoIds.remove(videoId);
+        continue;
+      }
+      final result = await resumeDownload(videoId);
+      if (result.isRight()) resumed++;
+    }
+    return resumed;
   }
 
   @override
@@ -304,6 +444,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   Future<Either<AppFailure, Unit>> deleteDownload(String videoId) async {
     var task = _tasks[videoId];
     _pausedVideoIds.remove(videoId);
+    _autoPausedVideoIds.remove(videoId);
     _queue.remove(videoId);
     // A deleted task must not keep the foreground service alive through its
     // paused marker (C-7).
@@ -343,6 +484,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     _tasks.remove(videoId);
+    _ytDownloadService.releaseForeground(videoId);
     // A late progress tick or a queued flush must not keep the deleted task's
     // bookkeeping alive.
     _throttleFlushTimers.remove(videoId)?.cancel();
@@ -514,6 +656,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     try {
       final prefs = await SharedPreferences.getInstance();
       final rawJson = prefs.getString(_prefKey);
+      final interruptedSaves = <String>{};
       if (rawJson != null && rawJson.isNotEmpty) {
         final list = jsonDecode(rawJson) as List<dynamic>;
         for (final item in list) {
@@ -522,6 +665,11 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               task.status == DownloadStatus.queued ||
               task.status == DownloadStatus.tagging) {
             // Restore interrupted downloads as paused on startup (process death reconciliation)
+            if (task.status == DownloadStatus.tagging) {
+              // The file may already be in the library; re-downloading it
+              // would produce a duplicate MediaStore entry.
+              interruptedSaves.add(task.videoId);
+            }
             _tasks[task.videoId] = task.copyWith(status: DownloadStatus.paused);
           } else {
             _tasks[task.videoId] = task;
@@ -531,6 +679,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       // FIX-A06: Reconcile completed tasks asynchronously in batched parallel
       // chunks (no main-thread existsSync/lengthSync blocking).
       await _reconcileCompletedFiles();
+      await _reconcileInterruptedSaves(interruptedSaves);
       // Keep the partials of everything we still track, so a download paused
       // across a restart can resume from its bytes instead of from zero. Named
       // by video id: the on-disk names carry the container extension
@@ -557,17 +706,18 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final db = _effectiveDb;
     final prefetchedSongs = <int, SongsTableData>{};
     if (db != null) {
-      final missingMetaSongIds = completedTasks
-          .where((t) =>
-              (t.filePath == null || t.fileSize == null) &&
-              t.localSongId != null)
+      // Fetch the library row for every completed task, not only for missing
+      // file metadata: a download completed before the metadata-repair fix may
+      // still carry "Unknown Artist" on its tile, and the row is the truth.
+      final songIds = completedTasks
+          .where((t) => t.localSongId != null)
           .map((t) => t.localSongId!)
           .toSet()
           .toList(growable: false);
       const dbChunkSize = 400;
-      for (var i = 0; i < missingMetaSongIds.length; i += dbChunkSize) {
-        final chunk = missingMetaSongIds.sublist(
-            i, (i + dbChunkSize).clamp(0, missingMetaSongIds.length));
+      for (var i = 0; i < songIds.length; i += dbChunkSize) {
+        final chunk =
+            songIds.sublist(i, (i + dbChunkSize).clamp(0, songIds.length));
         try {
           final rows = await (db.select(db.songsTable)
                 ..where((s) => s.id.isIn(chunk)))
@@ -595,6 +745,57 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
   }
 
+  /// A process kill between `saveToMusic` and the completion write leaves a
+  /// task persisted as `tagging` while its file already sits in the library.
+  /// Resuming it would download the same audio again (and MediaStore would
+  /// suffix a second copy), so adopt the existing local row instead.
+  Future<void> _reconcileInterruptedSaves(Set<String> videoIds) async {
+    if (videoIds.isEmpty) return;
+    final db = _effectiveDb;
+    if (db == null) return;
+    for (final videoId in videoIds) {
+      final task = _tasks[videoId];
+      if (task == null || task.status != DownloadStatus.paused) continue;
+      try {
+        final row = await (db.select(db.songsTable)
+              ..where((s) =>
+                  s.remoteId.equals(videoId) &
+                  s.source.equals(SongSource.local) &
+                  s.isMissing.equals(false))
+              ..limit(1))
+            .getSingleOrNull();
+        if (row == null || row.path.isEmpty) continue;
+        final file = File(row.path);
+        if (!await file.exists()) continue;
+        var size = row.fileSize;
+        if (size == null || size <= 0) size = await file.length();
+        final ext =
+            p.extension(row.path).replaceFirst('.', '').toLowerCase();
+        _pausedVideoIds.remove(videoId);
+        _autoPausedVideoIds.remove(videoId);
+        _updateTask(task.copyWith(
+          status: DownloadStatus.complete,
+          progress: 1.0,
+          clearError: true,
+          clearSpeedKbps: true,
+          clearEtaSeconds: true,
+          localSongId: row.id,
+          filePath: row.path,
+          fileSize: size,
+          format: ext.isEmpty ? null : ext,
+          bitrate: row.bitrateKbps,
+        ));
+        _cachedStorageStats = null;
+        ErrorLogger.addBreadcrumb(
+            'Recovered interrupted download from the library: $videoId',
+            category: 'Download');
+      } catch (e, st) {
+        ErrorLogger.log('Failed reconciling interrupted download save',
+            error: e, stackTrace: st, category: 'Download');
+      }
+    }
+  }
+
   /// Reconciles a single completed [task] against disk, marking a deleted file
   /// as failed. Used right after a completion so one track does not trigger a
   /// stat of the entire download history.
@@ -607,43 +808,118 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       var filePath = task.filePath;
       var fileSize = task.fileSize;
 
-      if ((filePath == null || fileSize == null) && task.localSongId != null) {
+      SongsTableData? song;
+      if (task.localSongId != null) {
         final songId = task.localSongId!;
-        SongsTableData? song = prefetchedSongs?[songId];
+        song = prefetchedSongs?[songId];
         if (song == null && prefetchedSongs == null && db != null) {
           song = await (db.select(db.songsTable)
                 ..where((s) => s.id.equals(songId)))
               .getSingleOrNull();
         }
         if (song != null) {
+          filePath ??= song.path;
+          fileSize ??= song.fileSize;
+        }
+      }
+
+      var updated = task;
+      var changed = false;
+
+      // MediaStore derives TITLE from the file name when tags are missing
+      // ("Artist - Title"), which still passes the placeholder check.
+      final rowTitleLooksLikeFileName = song != null &&
+          MetadataPlaceholders.isUnknownArtist(song.artist) &&
+          song.title.toLowerCase().contains(task.title.toLowerCase()) &&
+          song.title != task.title;
+
+      // The library row may have been repaired (stream metadata, tagger, or a
+      // previous scanner pass) after this download was persisted. Refresh the
+      // tile's metadata without touching real task values with placeholders.
+      if (song != null) {
+        if (MetadataPlaceholders.isRealTitle(song.title) &&
+            !rowTitleLooksLikeFileName &&
+            song.title != updated.title) {
+          updated = updated.copyWith(title: song.title);
+          changed = true;
+        }
+        if (MetadataPlaceholders.isRealArtist(song.artist) &&
+            song.artist != updated.artist) {
+          updated = updated.copyWith(artist: song.artist);
+          changed = true;
+        }
+        if (MetadataPlaceholders.isRealAlbum(song.album) &&
+            song.album != updated.album) {
+          updated = updated.copyWith(album: song.album);
+          changed = true;
+        }
+        if (song.durationMs > 0 && song.durationMs != updated.durationMs) {
+          updated = updated.copyWith(durationMs: song.durationMs);
+          changed = true;
+        }
+        if (filePath == null && song.path.isNotEmpty) {
           filePath = song.path;
+        }
+        if (fileSize == null && song.fileSize != null) {
           fileSize = song.fileSize;
+        }
+
+        // Legacy repair: an earlier scanner pass could have replaced the
+        // library row with MediaStore placeholders while the persisted task
+        // still remembers the real online metadata. Restore it.
+        final repairTitle =
+            (MetadataPlaceholders.isUnknownTitle(song.title) ||
+                        rowTitleLooksLikeFileName) &&
+                    MetadataPlaceholders.isRealTitle(task.title)
+                ? task.title
+                : song.title;
+        final repairArtist =
+            MetadataPlaceholders.isUnknownArtist(song.artist) &&
+                    MetadataPlaceholders.isRealArtist(task.artist)
+                ? task.artist
+                : song.artist;
+        final repairAlbum =
+            MetadataPlaceholders.isUnknownAlbum(song.album) &&
+                    MetadataPlaceholders.isRealAlbum(task.album)
+                ? task.album!
+                : song.album;
+        final database = db;
+        final songRowId = song.id;
+        if (database != null &&
+            (repairTitle != song.title ||
+                repairArtist != song.artist ||
+                repairAlbum != song.album)) {
+          await (database.update(database.songsTable)
+                ..where((s) => s.id.equals(songRowId)))
+              .write(SongsTableCompanion(
+            title: Value(repairTitle),
+            artist: Value(repairArtist),
+            album: Value(repairAlbum),
+          ));
         }
       }
 
       if (filePath != null) {
         final f = File(filePath);
         if (!await f.exists()) {
-          final updated = task.copyWith(
+          _updateTask(updated.copyWith(
             filePath: filePath,
             fileSize: fileSize,
             status: DownloadStatus.failed,
             error: 'File deleted',
-          );
-          _updateTask(updated);
-        } else {
-          if (fileSize == null || fileSize <= 0) {
-            fileSize = await f.length();
-          }
-          if (task.filePath != filePath || task.fileSize != fileSize) {
-            final updated = task.copyWith(
-              filePath: filePath,
-              fileSize: fileSize,
-            );
-            _updateTask(updated);
-          }
+          ));
+          return;
+        }
+        if (fileSize == null || fileSize <= 0) {
+          fileSize = await f.length();
         }
       }
+
+      if (updated.filePath != filePath || updated.fileSize != fileSize) {
+        updated = updated.copyWith(filePath: filePath, fileSize: fileSize);
+        changed = true;
+      }
+      if (changed) _updateTask(updated);
     } catch (e, st) {
       ErrorLogger.log('Failed reconciling completed download file',
           error: e, stackTrace: st, category: 'Download');
@@ -785,11 +1061,21 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         ...terminal.take(room),
       ];
       final rawList = tasks.map((t) => t.toJson()).toList();
-      await prefs.setString(_prefKey, jsonEncode(rawList));
-    } catch (_) {}
+      final encoded = jsonEncode(rawList);
+      if (!await prefs.setString(_prefKey, encoded)) {
+        ErrorLogger.log('Download queue persistence was rejected by prefs',
+            category: 'Download');
+      }
+    } catch (e, st) {
+      // Swallowing this used to make a failed write indistinguishable from a
+      // successful one, so the next boot silently lost every active task.
+      ErrorLogger.log('Failed persisting download queue',
+          error: e, stackTrace: st, category: 'Download');
+    }
   }
 
   void _processQueue() {
+    if (_enforcingPolicy) return;
     _ensurePolicyWatchdog();
     while (_activeVideoIds.length < _maxConcurrent && _queue.isNotEmpty) {
       final videoId = _queue.removeFirst();
@@ -810,6 +1096,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // one that actually has jobs in it, and it drains after this one does. This
     // used to stop the service the moment the repository's own sets emptied,
     // which is true while the service is still finishing the last transfer.
+    //
+    // `keepAlive` is what bridges two sequential jobs: the native notification
+    // removes a job at 100% and used to tear itself down before this scheduler
+    // started the next transfer, and an FGS started from the background can be
+    // refused outright on Android 12+.
+    _ytDownloadService
+        .setKeepForegroundAlive(_activeVideoIds.isNotEmpty || _queue.isNotEmpty);
     _ensurePolicyWatchdog();
   }
 
@@ -823,25 +1116,44 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       _policyWatchdog = null;
       return;
     }
-    _policyWatchdog ??= Timer.periodic(const Duration(seconds: 15), (_) {
+    _policyWatchdog ??= Timer.periodic(const Duration(seconds: 5), (_) {
       unawaited(_enforcePolicy());
     });
   }
 
   Future<void> _enforcePolicy() async {
-    if (_activeVideoIds.isEmpty) return;
     AppFailure? block;
     try {
+      // Picking up a concurrency change here also lets raising the limit take
+      // effect during a long batch without another admission event.
+      await _reloadSettings();
       block = await _ytDownloadService.downloadPolicyBlock();
     } catch (e, st) {
       ErrorLogger.log('Download policy watch failed',
           error: e, stackTrace: st, category: 'Download');
       return;
     }
-    if (block == null) return;
-    // pauseDownload mutates _activeVideoIds; iterate a snapshot.
-    for (final videoId in List<String>.of(_activeVideoIds)) {
-      await pauseDownload(videoId);
+    if (block == null) {
+      // New slots may have opened up (higher concurrency); fill them.
+      _processQueue();
+      return;
+    }
+    // Pause queued work too. The watchdog used to pause only active transfers,
+    // so every queued job started in turn and failed against the same policy
+    // instead of waiting for Wi-Fi. These pauses are tagged so a network-path
+    // change can resume them automatically.
+    final pending = {
+      ..._activeVideoIds,
+      ..._queue,
+    }.toList(growable: false);
+    _enforcingPolicy = true;
+    try {
+      for (final videoId in pending) {
+        await _pauseTask(videoId, byPolicy: true, error: block.message);
+      }
+    } finally {
+      _enforcingPolicy = false;
+      _processQueue();
     }
   }
 
@@ -881,10 +1193,23 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         videoId: videoId,
         title: task.title,
         artist: task.artist,
-        duration: Duration.zero,
+        duration: Duration(milliseconds: task.durationMs ?? 0),
         artworkUrl: task.artworkUrl,
       );
-      final songRow = synthTrack.toSongData();
+      // `sourceSongId` is the row the user actually tapped; using it (instead
+      // of relying on the synthetic id being identical) makes the completed
+      // row replace the right queue/library entry. Album and duration are
+      // persisted with the task so a resumed download still tags and looks up
+      // lyrics with the real metadata.
+      final songRow = synthTrack.toSongData().copyWith(
+        id: task.sourceSongId ?? synthTrack.songId,
+        album: task.album ?? '',
+      );
+
+      // A per-track quality survives restarts in the persisted task; hand it to
+      // the service's admission path, which consumes it only when it creates a
+      // new job (so a dedupe chain cannot swallow it).
+      final quality = task.quality;
 
       Either<AppFailure, int>? result;
       // One initial attempt + up to 2 transient retries with backoff.
@@ -909,6 +1234,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             clearEtaSeconds: true,
           ));
         }
+        // Re-arm the picker override for every attempt: the transfer consumes
+        // it when it creates a job, so a repository-level retry (a fresh job)
+        // would otherwise fall back to the global download quality.
+        if (quality != null) {
+          _ytDownloadService.setPendingDownloadQuality(videoId, quality);
+        }
         result = await _ytDownloadService.download(
           songRow,
           bypassInternalQueue: true,
@@ -917,6 +1248,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             // A deleted task must not be resurrected by a late progress tick.
             final progressTask = _tasks[videoId];
             if (progressTask == null) return;
+            // `canceled` is a request, not transfer progress. Mapping it to
+            // `downloading` used to flip a task that was already saving (or
+            // paused) back to an active-looking row.
+            if (p.stage == YtDownloadStage.canceled) return;
 
             final mappedStatus = switch (p.stage) {
               YtDownloadStage.queued => DownloadStatus.queued,
@@ -928,7 +1263,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               YtDownloadStage.indexing =>
                 DownloadStatus.tagging,
               YtDownloadStage.done => DownloadStatus.tagging,
-              YtDownloadStage.canceled => DownloadStatus.downloading,
+              YtDownloadStage.canceled => progressTask.status,
             };
 
             _updateTask(progressTask.copyWith(
@@ -941,6 +1276,18 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         );
         final failure = result.getLeft().toNullable();
         if (failure == null) break; // success
+        // The transfer itself already retried with backoff. A connectivity
+        // failure that outlived that belongs to the network-change listener:
+        // retrying here only delays parking it, while the partial is safe.
+        final info =
+            YtmErrorClassifier.classify(failure.error ?? failure.message);
+        if (info.signal == YtmBlockSignal.networkUnavailable &&
+            !await ConnectivityGuard.hasConnection()) {
+          // Genuinely offline: more waiting cannot help. A network failure
+          // while the device is online may be a transient DNS/route blip, so
+          // that one still gets the normal retry budget.
+          break;
+        }
         if (!_isTransientFailure(failure)) {
           break; // permanent: don't burn retries
         }
@@ -998,12 +1345,42 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           // Classify via YtmErrorClassifier for localized message, but repository keeps raw for UI to map
           final current = _tasks[videoId];
           if (current == null) return;
+          if (_pausedVideoIds.contains(videoId) ||
+              current.status == DownloadStatus.paused) {
+            return;
+          }
+          // A transfer refused by the Wi-Fi/offline policy is not a broken
+          // download: park it as paused (and mark it policy-owned) so the next
+          // network-path change resumes it, instead of showing a permanent
+          // failure the user must retry by hand.
+          AppFailure? policyBlock;
+          try {
+            policyBlock = await _ytDownloadService.downloadPolicyBlock();
+          } catch (_) {
+            policyBlock = null;
+          }
+          if (policyBlock != null) {
+            _parkAutoPaused(videoId, current, error: policyBlock.message);
+            return;
+          }
+          final info =
+              YtmErrorClassifier.classify(failure.error ?? failure.message);
+          if (info.signal == YtmBlockSignal.networkUnavailable &&
+              !await ConnectivityGuard.hasConnection()) {
+            // Connectivity loss is temporary even when it outlives the retry
+            // budget. Parking as auto-paused keeps the partial and lets the
+            // network-change listener resume it; a failed row would require a
+            // manual retry for something the device already knows how to fix.
+            _parkAutoPaused(videoId, current, error: failure.message);
+            return;
+          }
           _updateTask(current.copyWith(
             status: DownloadStatus.failed,
             error: failure.message,
             clearSpeedKbps: true,
             clearEtaSeconds: true,
           ));
+          _ytDownloadService.releaseForeground(videoId);
         },
         (newId) async {
           _cachedStorageStats =
@@ -1013,6 +1390,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           String? resolvedPath =
               current.filePath ?? _ytDownloadService.getDownloadedPath(videoId);
           int? resolvedSize = current.fileSize;
+          String? resolvedFormat = current.format;
+          int? resolvedBitrate = current.bitrate;
+          var resolvedTitle = current.title;
+          var resolvedArtist = current.artist;
+          var resolvedAlbum = current.album;
+          var resolvedDuration = current.durationMs;
 
           final db = _effectiveDb;
           if (db != null) {
@@ -1023,9 +1406,25 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               if (song != null) {
                 resolvedPath = song.path;
                 resolvedSize = song.fileSize;
-                if ((resolvedSize == null || resolvedSize <= 0) &&
-                    File(resolvedPath).existsSync()) {
-                  resolvedSize = File(resolvedPath).lengthSync();
+                resolvedBitrate = song.bitrateKbps ?? resolvedBitrate;
+                // The reconciled row is authoritative: the download service
+                // may have repaired "Unknown Artist" from the resolved
+                // stream, and the task tile must show the same metadata.
+                if (MetadataPlaceholders.isRealTitle(song.title)) {
+                  resolvedTitle = song.title;
+                }
+                if (MetadataPlaceholders.isRealArtist(song.artist)) {
+                  resolvedArtist = song.artist;
+                }
+                if (MetadataPlaceholders.isRealAlbum(song.album)) {
+                  resolvedAlbum = song.album;
+                }
+                if (song.durationMs > 0) resolvedDuration = song.durationMs;
+                if ((resolvedSize == null || resolvedSize <= 0)) {
+                  // Stat off the platform thread; this completes on the
+                  // download's own isolate, never the UI thread.
+                  final f = File(resolvedPath);
+                  if (await f.exists()) resolvedSize = await f.length();
                 }
               }
             } catch (e, st) {
@@ -1034,10 +1433,15 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             }
           }
 
+          if (resolvedFormat == null && resolvedPath != null) {
+            final ext =
+                p.extension(resolvedPath).replaceFirst('.', '').toLowerCase();
+            if (ext.isNotEmpty) resolvedFormat = ext;
+          }
           if (resolvedSize == null && resolvedPath != null) {
             try {
               final f = File(resolvedPath);
-              if (f.existsSync()) resolvedSize = f.lengthSync();
+              if (await f.exists()) resolvedSize = await f.length();
             } catch (e, st) {
               ErrorLogger.log('Failed checking resolved download file length',
                   error: e, stackTrace: st, category: 'Download');
@@ -1056,8 +1460,17 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             localSongId: newId,
             filePath: resolvedPath,
             fileSize: resolvedSize,
+            format: resolvedFormat,
+            bitrate: resolvedBitrate,
+            title: resolvedTitle,
+            artist: resolvedArtist,
+            album: resolvedAlbum,
+            durationMs: resolvedDuration,
             contentUri: _ytDownloadService.getDownloadedContentUri(videoId),
           ));
+          // Guarantees the native job is dropped even if the service's own
+          // terminal publish was skipped (foreground start still in flight).
+          _ytDownloadService.releaseForeground(videoId);
           // Reconcile just this task: a full sweep of every completed download
           // after each completion re-stat'ed the entire history on every track.
           final completed = _tasks[videoId];
@@ -1075,6 +1488,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           clearSpeedKbps: true,
           clearEtaSeconds: true,
         ));
+        _ytDownloadService.releaseForeground(videoId);
       }
     } finally {
       _activeVideoIds.remove(videoId);

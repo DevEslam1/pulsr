@@ -267,6 +267,74 @@ void main() {
       expect(rows.single.title, 'Updated');
     });
 
+    test('a scan cannot replace downloaded metadata with MediaStore placeholders',
+        () async {
+      await insertSong(
+        id: 1,
+        title: 'Real Title',
+        artist: 'Real Artist',
+        album: 'Real Album',
+        path: '/music/downloaded.webm',
+        isDownloaded: true,
+        remoteId: 'vidDownloaded',
+      );
+
+      final res = await repo.syncScannedMusic(
+        songs: [
+          const SongsTableCompanion(
+            id: Value(1),
+            title: Value('Real Artist - Real Title'),
+            artist: Value('Unknown Artist'),
+            album: Value('Unknown Album'),
+            path: Value('/music/downloaded.webm'),
+            source: Value(SongSource.local),
+          ),
+        ],
+        albums: const [],
+        artists: const [],
+      );
+      expect(res.isRight(), isTrue);
+
+      final row = (await repo.getSongById(1)).getOrElse((_) => null)!;
+      expect(row.title, 'Real Title',
+          reason: 'MediaStore title is a file-name guess without tags');
+      expect(row.artist, 'Real Artist');
+      expect(row.album, 'Real Album');
+      expect(row.isDownloaded, isTrue);
+      expect(row.remoteId, 'vidDownloaded');
+    });
+
+    test('a scan keeps a real artist when MediaStore reports Unknown Artist',
+        () async {
+      await insertSong(
+        id: 2,
+        title: 'Title',
+        artist: 'Real Artist',
+        album: 'Real Album',
+        path: '/music/local.mp3',
+      );
+
+      await repo.syncScannedMusic(
+        songs: [
+          const SongsTableCompanion(
+            id: Value(2),
+            title: Value('Updated Title'),
+            artist: Value('Unknown Artist'),
+            album: Value('Unknown Album'),
+            path: Value('/music/local.mp3'),
+            source: Value(SongSource.local),
+          ),
+        ],
+        albums: const [],
+        artists: const [],
+      );
+
+      final row = (await repo.getSongById(2)).getOrElse((_) => null)!;
+      expect(row.title, 'Updated Title');
+      expect(row.artist, 'Real Artist');
+      expect(row.album, 'Real Album');
+    });
+
     test('an empty batch is a harmless no-op', () async {
       final res = await repo.syncScannedMusic(
           songs: const [], albums: const [], artists: const []);
@@ -354,6 +422,29 @@ void main() {
       expect(res.isRight(), isTrue);
       final row = (await repo.getSongById(1)).getOrElse((_) => null);
       expect(row!.title, 'New');
+    });
+
+    test('updateSongTags cannot replace real metadata with placeholders',
+        () async {
+      await insertSong(
+        id: 2,
+        title: 'Real Title',
+        artist: 'Real Artist',
+        album: 'Real Album',
+        path: '/music/real.mp3',
+      );
+
+      await repo.updateSongTags(
+        path: '/music/real.mp3',
+        title: 'Unknown Song',
+        artist: 'Unknown Artist',
+        album: 'Unknown Album',
+      );
+
+      final row = (await repo.getSongById(2)).getOrElse((_) => null)!;
+      expect(row.title, 'Real Title');
+      expect(row.artist, 'Real Artist');
+      expect(row.album, 'Real Album');
     });
   });
 
@@ -555,6 +646,103 @@ void main() {
           (await repo.getPlaylistSongs(plId)).getOrElse((_) => []);
       expect(playlistSongs, hasLength(1));
       expect(playlistSongs.single.id, 2);
+    });
+
+    test('adopts download metadata over an unknown scanner row', () async {
+      final temp = Directory.systemTemp.createTempSync('repo_reconcile_meta');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final file = File('${temp.path}${Platform.pathSeparator}meta.webm')
+        ..writeAsStringSync('audio');
+
+      await insertSong(
+        id: 20,
+        title: 'Real Artist - Real Title',
+        artist: 'Unknown Artist',
+        album: 'Unknown Album',
+        path: file.path,
+        durationMs: 0,
+      );
+
+      const fallback = SongsTableData(
+        id: -1,
+        title: 'Real Title',
+        artist: 'Real Artist',
+        album: 'Real Album',
+        durationMs: 123000,
+        path: 'ytmusic://fallbackMeta',
+        source: SongSource.youtube,
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        remoteId: 'vidRealMeta',
+        remoteArtworkUrl: 'https://img.example/cover.jpg',
+      );
+
+      final res = await repo.reconcileDownloadedSong(
+          oldId: -1, newPath: file.path, fallbackSong: fallback);
+      expect(res.getOrElse((_) => null), 20);
+
+      final row = (await repo.getSongById(20)).getOrElse((_) => null)!;
+      expect(row.title, 'Real Title');
+      expect(row.artist, 'Real Artist');
+      expect(row.album, 'Real Album');
+      expect(row.durationMs, 123000);
+      expect(row.isDownloaded, isTrue);
+      expect(row.source, SongSource.local);
+      expect(row.remoteId, 'vidRealMeta');
+      expect(row.remoteArtworkUrl, 'https://img.example/cover.jpg');
+    });
+
+    test('merged rows take the download artist when both are unknown',
+        () async {
+      final temp = Directory.systemTemp.createTempSync('repo_reconcile_meta2');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final file = File('${temp.path}${Platform.pathSeparator}meta2.webm')
+        ..writeAsStringSync('audio');
+
+      await insertSong(
+        id: 21,
+        title: 'Real Title',
+        artist: 'Unknown Artist',
+        album: 'Unknown Album',
+        path: 'ytmusic://vidUnknown',
+        source: SongSource.youtube,
+        remoteId: 'vidUnknown',
+      );
+      await insertSong(
+        id: 22,
+        title: 'Real Artist - Real Title',
+        artist: 'Unknown Artist',
+        album: 'Unknown Album',
+        path: file.path,
+      );
+
+      const fallback = SongsTableData(
+        id: -1,
+        title: 'Real Title',
+        artist: 'Real Artist',
+        album: 'Real Album',
+        durationMs: 1000,
+        path: 'ytmusic://fallbackUnknown',
+        source: SongSource.youtube,
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      final res = await repo.reconcileDownloadedSong(
+          oldId: 21, newPath: file.path, fallbackSong: fallback);
+      expect(res.getOrElse((_) => null), 22);
+
+      final row = (await repo.getSongById(22)).getOrElse((_) => null)!;
+      expect(row.title, 'Real Title');
+      expect(row.artist, 'Real Artist');
+      expect(row.album, 'Real Album');
+      expect(row.isDownloaded, isTrue);
     });
 
     test(

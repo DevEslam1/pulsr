@@ -12,6 +12,7 @@ import '../../../core/utils/error_logger.dart';
 export '../../../core/utils/batch_download_l10n.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/download_task.dart';
+import '../../../domain/models/ytm_audio_quality.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../downloads/cubit/downloads_cubit.dart';
@@ -236,8 +237,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     }
   }
 
-  Future<void> download(SongsTableData song) async {
-    final result = await _admit(song);
+  Future<void> download(SongsTableData song, {YtmAudioQuality? quality}) async {
+    final result = await _admit(song, quality);
     if (result.outcome == _AdmitOutcome.failed &&
         result.error != null &&
         !isClosed) {
@@ -255,7 +256,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   /// paused marker is cleared — the old `download()` queued a brand-new task
   /// over the paused one and left the notification's Resume action stale.
   Future<({_AdmitOutcome outcome, String? error})> _admit(
-      SongsTableData song) async {
+      SongsTableData song, YtmAudioQuality? quality) async {
     final videoId = song.remoteId;
     if (videoId == null || videoId.isEmpty) {
       return (outcome: _AdmitOutcome.alreadyLocal, error: null);
@@ -295,7 +296,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     _set(videoId,
         const YtDownloadItem(status: YtDownloadStatus.queued, progress: 0));
 
-    final result = await _downloads.queueDownload(_taskFor(song, videoId));
+    final result =
+        await _downloads.queueDownload(_taskFor(song, videoId, quality));
     if (isClosed) return (outcome: _AdmitOutcome.queued, error: null);
     if (result.isRight()) {
       final admission = result.toNullable()!.admission;
@@ -331,7 +333,12 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     }
   }
 
-  DownloadTask _taskFor(SongsTableData song, String videoId) => DownloadTask(
+  DownloadTask _taskFor(
+    SongsTableData song,
+    String videoId,
+    YtmAudioQuality? quality,
+  ) =>
+      DownloadTask(
         id: videoId,
         videoId: videoId,
         title: song.title,
@@ -339,6 +346,9 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
         status: DownloadStatus.queued,
         artworkUrl: song.remoteArtworkUrl,
         sourceSongId: song.id,
+        album: song.album.isNotEmpty ? song.album : null,
+        durationMs: song.durationMs > 0 ? song.durationMs : null,
+        quality: quality,
         createdAt: DateTime.now(),
       );
 
@@ -416,7 +426,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
         continue;
       }
 
-      final result = await _admit(song);
+      final result = await _admit(song, null);
       if (isClosed) break;
       switch (result.outcome) {
         case _AdmitOutcome.queued:

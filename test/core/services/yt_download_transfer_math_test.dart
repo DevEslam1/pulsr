@@ -100,6 +100,24 @@ void main() {
           isTrue);
     });
 
+    test('a different chunk layout never resumes the old parts', () {
+      final fourChunks = YtDownloadTransferMath.resumeStampFor(
+          container: 'm4a',
+          expectedBytes: 1000,
+          videoId: 'video-one',
+          chunkCount: 4);
+      final eightChunks = YtDownloadTransferMath.resumeStampFor(
+          container: 'm4a',
+          expectedBytes: 1000,
+          videoId: 'video-one',
+          chunkCount: 8);
+
+      expect(fourChunks, isNot(eightChunks),
+          reason: 'chunk boundaries change with the split');
+      expect(YtDownloadTransferMath.resumeStampMatches(
+          fourChunks, eightChunks), isFalse);
+    });
+
     test('an unknown size still yields a stable container-scoped stamp', () {
       expect(YtDownloadTransferMath.resumeStampFor(container: 'm4a'),
           YtDownloadTransferMath.resumeStampFor(container: 'm4a'));

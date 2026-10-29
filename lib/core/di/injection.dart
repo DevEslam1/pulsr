@@ -210,7 +210,10 @@ FutureOr<void> disposePkgHttpClient(http.Client client) {
 abstract class NetworkModule {
   @Singleton(dispose: disposeHttpClient)
   HttpClient get httpClient => HttpClient()
-    ..maxConnectionsPerHost = 5
+    // Downloads split one body across up to 8 ranged connections and run up to
+    // 5 tracks at once; the old cap of 5 serialized most chunk requests behind
+    // each other, so the "parallel" transfer was effectively single-stream.
+    ..maxConnectionsPerHost = 16
     ..connectionTimeout = const Duration(seconds: 15)
     ..idleTimeout = const Duration(seconds: 90);
 

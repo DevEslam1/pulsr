@@ -115,7 +115,7 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.text('50%'), findsOneWidget);
     expect(find.textContaining('KB/s'), findsOneWidget);
-    expect(find.textContaining('5s'), findsOneWidget);
+    expect(find.textContaining('0:05'), findsOneWidget);
     expect(find.byIcon(Icons.close_rounded), findsOneWidget);
   });
 
@@ -149,6 +149,20 @@ void main() {
     expect(find.byIcon(Icons.pause_circle_outline_rounded), findsOneWidget);
     expect(find.text(l10n.statusPaused), findsOneWidget);
     expect(find.byIcon(Icons.close_rounded), findsNothing);
+  });
+
+  testWidgets('paused keeps its progress bar and percentage visible',
+      (tester) async {
+    await pumpTile(
+      tester,
+      _task(status: DownloadStatus.paused, progress: 0.4),
+    );
+
+    expect(find.text('40%'), findsOneWidget);
+    final bar = tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator),
+    );
+    expect(bar.value, closeTo(0.4, 0.001));
   });
 
   testWidgets('complete shows the success icon and hides the status label',

@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/download_task.dart';
+import 'package:pulsr/domain/models/ytm_audio_quality.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -127,6 +128,22 @@ void main() {
             (s) => s.itemFor('testVid1').status == YtDownloadStatus.running),
         isTrue);
     await sub.cancel();
+    await cubit.close();
+  });
+
+  test('download() carries picker quality and full metadata into the task',
+      () async {
+    final cubit = build();
+
+    await cubit.download(testSong, quality: YtmAudioQuality.low);
+
+    final captured =
+        verify(() => mockDownloads.queueDownload(captureAny())).captured.single
+            as DownloadTask;
+    expect(captured.quality, YtmAudioQuality.low);
+    expect(captured.album, 'Test Album');
+    expect(captured.durationMs, 210000);
+    expect(captured.sourceSongId, -101);
     await cubit.close();
   });
 

@@ -4,31 +4,37 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/errors/error_message_resolver.dart';
-import '../../../../core/services/yt_download_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
+import '../../../../data/models/download_settings.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../cubit/ytm_download_cubit.dart';
 import '../../../downloads/presentation/widgets/download_quality_picker_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
-/// Routes a picker-confirmed [quality] into the service's per-download
-/// override, then queues the download through [cubit]. Extracted to the top
-/// level so the wiring is unit-testable without the YTM UI being compiled in.
+/// Routes a picker-confirmed [quality] into the queued task, where the
+/// repository persists it and hands it to the transfer service. Extracted to
+/// the top level so the wiring is unit-testable without the YTM UI being
+/// compiled in.
 @visibleForTesting
 void routeDownloadQuality(
   YtmDownloadCubit cubit,
   SongsTableData song,
   YtmAudioQuality quality,
 ) {
-  final videoId = song.remoteId;
-  if (videoId != null &&
-      videoId.isNotEmpty &&
-      getIt.isRegistered<YtDownloadService>()) {
-    getIt<YtDownloadService>().setPendingDownloadQuality(videoId, quality);
+  cubit.download(song, quality: quality);
+}
+
+/// The picker's preselection: the user's persisted download-quality default,
+/// falling back to high for an unknown/legacy value.
+@visibleForTesting
+YtmAudioQuality downloadQualityFromSetting(String? value) {
+  final normalized = value?.trim().toLowerCase();
+  for (final quality in YtmAudioQuality.values) {
+    if (quality.name == normalized) return quality;
   }
-  cubit.download(song);
+  return YtmAudioQuality.high;
 }
 
 /// Per-result download control: shows an idle download icon, a determinate
@@ -138,10 +144,20 @@ class YtmDownloadButton extends StatelessWidget {
           case YtDownloadStatus.canceled:
           case YtDownloadStatus.idle:
             return GestureDetector(
-              onLongPress: () {
+              onLongPress: () async {
+                // Open on the persisted default instead of always "high", so
+                // the sheet reflects the choice the user already made.
+                String? defaultQuality;
+                try {
+                  defaultQuality = (await DownloadSettings.load()).quality;
+                } catch (_) {
+                  defaultQuality = null;
+                }
+                if (!context.mounted) return;
                 DownloadQualityPickerSheet.show(
                   context,
                   song: song,
+                  initialQuality: downloadQualityFromSetting(defaultQuality),
                   onConfirm: (quality) {
                     routeDownloadQuality(cubit, song, quality);
                   },

@@ -98,6 +98,26 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         DownloadService.onDownloadResumedListener = null
         DownloadService.onDownloadCompletedListener = null
         DownloadService.onDownloadDegradedListener = null
+        // The Dart engine that owns the transfers is going away with this
+        // plugin, so the foreground notification has no writer left. Without
+        // this, swiping the task away while a download is running left the
+        // process and its stale "downloading" notification alive indefinitely
+        // (the service is stopWithTask=false).
+        context?.let { ctx ->
+            try {
+                DownloadService.stop(ctx)
+            } catch (_: Exception) {
+            }
+            // ACTION_STOP can be refused when the app is in the background;
+            // stopService always tears the FGS down (and its notification) if
+            // it is still running.
+            try {
+                ctx.stopService(
+                    android.content.Intent(ctx, DownloadService::class.java)
+                )
+            } catch (_: Exception) {
+            }
+        }
         if (::channel.isInitialized) {
             channel.setMethodCallHandler(null)
         }

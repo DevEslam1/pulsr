@@ -53,6 +53,9 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
     } else if (device?.isBluetooth == true) {
       _selectedOutput = AudioWizardOutputType.bluetooth;
       _selectedPriority = AudioWizardPriority.balanced;
+    } else if (device?.activeDeviceType == 'wired') {
+      _selectedOutput = AudioWizardOutputType.headphones;
+      _selectedPriority = AudioWizardPriority.fidelity;
     } else {
       _selectedOutput = AudioWizardOutputType.speaker;
       _selectedPriority = AudioWizardPriority.balanced;
@@ -65,11 +68,21 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
 
     try {
       final cubit = widget.cubit;
+      final isUsbDac = _selectedOutput == AudioWizardOutputType.usbDac;
+      final isBluetooth = _selectedOutput == AudioWizardOutputType.bluetooth;
 
-      // 1. Apply coherent priority preset
+      // 1. Apply coherent priority preset. Only a USB DAC can own an exclusive
+      // bit-perfect stream; every other route gets the best path it actually
+      // has instead of a request the platform will reject.
       switch (_selectedPriority) {
         case AudioWizardPriority.fidelity:
-          await cubit.applyMaximumQualityPreset();
+          if (isUsbDac) {
+            await cubit.applyMaximumQualityPreset();
+          } else if (isBluetooth) {
+            await cubit.setBluetoothHiResEnabled(true);
+          } else {
+            await cubit.setFloatOutputEnabled(true);
+          }
           break;
         case AudioWizardPriority.balanced:
           await cubit.applySmoothPlaybackPreset();
@@ -80,10 +93,10 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
       }
 
       // 2. Hardware-specific guard rails
-      if (_selectedOutput == AudioWizardOutputType.bluetooth) {
+      if (!isUsbDac) {
+        // A previous USB session may have armed exclusive output.
         await cubit.setBitPerfectOutput(false);
-      } else if (_selectedOutput == AudioWizardOutputType.usbDac &&
-          _selectedPriority == AudioWizardPriority.fidelity) {
+      } else if (_selectedPriority == AudioWizardPriority.fidelity) {
         await cubit.setFollowTrackSampleRate(true);
       }
 
@@ -385,7 +398,11 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           context,
           icon: Icons.album_rounded,
           title: l10n.settingsWizardFidelity,
-          subtitle: l10n.settingsWizardFidelityDesc,
+          subtitle: _selectedOutput == AudioWizardOutputType.usbDac
+              ? l10n.settingsWizardFidelityDesc
+              : _selectedOutput == AudioWizardOutputType.bluetooth
+                  ? l10n.settingsBluetoothHiResDesc
+                  : l10n.settingsFloatDspDesc,
           badge: 'Hi-Res',
           isSelected: _selectedPriority == AudioWizardPriority.fidelity,
           onTap: () =>

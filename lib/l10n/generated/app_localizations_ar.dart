@@ -7617,7 +7617,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get featureInfoBitPerfectDescription =>
-      'يتجاوز مُعيد أخذ العينات AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC عبر AudioMixerAttributes (API 34) لـ USB، أو عبر direct/offload للسلكي. لا يُطبَّق أي مستوى صوت أو DSP برمجي. يتطلب أندرويد 14+ لـ USB، أو جهازًا سلكيًا يدعم FLOAT/24 بت ومعدلات عالية الدقة. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).';
+      'يتجاوز AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC USB عبر AudioMixerAttributes (API 34)، أو عبر مستقبل UAC2 المتزامن الخاص بـ Pulsr عندما لا توفر المنصة مازجًا حصريًا. لا يُطبَّق أي مستوى صوت أو DSP برمجي. لا يوفر أندرويد إخراج Bit-Perfect حصريًا لمقبس 3.5 مم / وحدة الترميز الداخلية — إذ يستخدم هذا المسار AAudio Direct ومسار DSP العائم 24/32 بت بدلًا من ذلك. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).';
 
   @override
   String get featureInfoBypassDspTitle => 'تجاوز DSP في وضع Bit-Perfect';
@@ -8691,5 +8691,19 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String cdTrackNumber(String number) {
     return 'المقطع $number';
+  }
+
+  @override
+  String get deselectAllAction => 'إلغاء تحديد الكل';
+
+  @override
+  String clearCompletedDownloadsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'إزالة $count تنزيلات مكتملة؟',
+      one: 'إزالة تنزيل مكتمل واحد؟',
+    );
+    return '$_temp0';
   }
 }

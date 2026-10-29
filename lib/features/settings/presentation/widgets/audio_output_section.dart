@@ -169,6 +169,10 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
     final isUsbDac =
         dev?.isUsbDac == true || (dev == null && state.isProfessional);
     final isBluetooth = dev?.isBluetooth == true;
+    final isWired = !isUsbDac &&
+        !isBluetooth &&
+        (dev?.activeDeviceType == 'wired' ||
+            dev?.activeDeviceType == 'wired_headset');
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -224,7 +228,9 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                               ? Icons.usb_rounded
                               : isBluetooth
                                   ? Icons.bluetooth_audio_rounded
-                                  : Icons.speaker_rounded,
+                                  : isWired
+                                      ? Icons.headphones_rounded
+                                      : Icons.speaker_rounded,
                           color: isUsbDac ? p.warning : p.accent,
                           size: 18,
                         ),
@@ -613,6 +619,70 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
               ),
             ],
           ),
+        ] else if (isWired) ...[
+          // ════════════ WIRED / 3.5MM BRANCH ════════════
+          // Android exposes no exclusive bit-perfect mode for the internal
+          // codec, so the closest path is a native AAudio stream opened at the
+          // track rate (EXCLUSIVE attempt, SHARED fallback) with the float DSP
+          // chain for everything the mixer would otherwise truncate.
+          Builder(builder: (ctx) {
+            final aaudioConflict = isAndroid
+                ? AudioConflicts.dspBlockedByAaudioDirect(
+                    aaudioEnabled: state.aaudioOutputEnabled,
+                  )
+                : unsupported;
+            return Column(
+              children: [
+                SettingsNavTile(
+                  Icons.equalizer_rounded,
+                  context.l10n.equalizerAndSoundEffects,
+                  PlatformCapabilities.hasEqualizer
+                      ? context.l10n.equalizerSubtitle
+                      : unsupported,
+                  featureInfo: AudioFeatureRegistry.equalizer,
+                  disabledReason: aaudioConflict,
+                  onTap: PlatformCapabilities.hasEqualizer &&
+                          aaudioConflict == null
+                      ? () => EqualizerSheet.show(context)
+                      : null,
+                ),
+                settingsCardDivider(p),
+                SettingsSwitchTile(
+                  Icons.surround_sound_rounded,
+                  context.l10n.settingsAaudioDirect,
+                  context.l10n.settingsAaudioDirectDesc,
+                  value: isAndroid && state.aaudioOutputEnabled,
+                  disabledReason: isAndroid ? null : unsupported,
+                  onChanged: isAndroid ? cubit.setAaudioOutputEnabled : (v) {},
+                ),
+                if (isAndroid && state.aaudioOutputEnabled) ...[
+                  if (aaudioConflict != null)
+                    SettingsConflictCard(reason: aaudioConflict),
+                  SettingSliderRow(
+                    label: context.l10n.settingsAaudioBufferSize,
+                    subtitle: context.l10n.settingsAaudioBufferSizeDesc,
+                    value: state.aaudioTargetBufferMs.toDouble(),
+                    min: 20,
+                    max: 500,
+                    divisions: 24,
+                    defaultValue: 150,
+                    formatValue: (v) => '${v.round()} ms',
+                    enabled: true,
+                    onChanged: (v) => cubit.setAaudioTargetBufferMs(v.round()),
+                  ),
+                ],
+                settingsCardDivider(p),
+                SettingsSwitchTile(
+                  Icons.graphic_eq_rounded,
+                  context.l10n.settingsFloatDspPath,
+                  context.l10n.settingsFloatDspDesc,
+                  value: isAndroid && state.floatOutputEnabled,
+                  disabledReason: aaudioConflict,
+                  onChanged: isAndroid ? cubit.setFloatOutputEnabled : (v) {},
+                ),
+              ],
+            );
+          }),
         ] else ...[
           // ════════════ SPEAKER / BUILT-IN BRANCH ════════════
           SettingsNavTile(
