@@ -14,6 +14,10 @@ extension PlayerDspFollowRate on PlayerDspController {
     if (service == null || _settingsCubit == null) return;
     await _followSampleRateMutex.protect(() async {
       final settings = _settingsCubit!.state;
+      // The user's "Per-Track Output Format Negotiation" switch is the master
+      // gate: off means keep one manual/manufacturer output format for the
+      // whole session instead of renegotiating per track.
+      if (!settings.outputFormatNegotiationEnabled) return;
       // Bluetooth Hi-Res: the A2DP link owns the format, so exclusive
       // bit-perfect is impossible, but when the codec advertises the track's
       // native rate we can ask it to switch — avoiding an unnecessary platform
@@ -76,6 +80,22 @@ extension PlayerDspFollowRate on PlayerDspController {
       if (!decision.applied) return;
       try {
         if (directStreaming) {
+          // The UAC2 tee forwards decoded PCM at the track rate with no
+          // resampler. Opening the isochronous endpoint at a different
+          // negotiated rate would play the whole track fast/slow (e.g. 44.1k
+          // frames into a 48k stream). Leave direct streaming and let the
+          // Android mixer resample instead.
+          if (decision.sampleRate != rate) {
+            _lastFollowedSampleRate = null;
+            ErrorLogger.log(
+                'USB DAC lacks track rate $rate Hz (negotiated '
+                '${decision.sampleRate} Hz); leaving direct USB streaming '
+                'for platform resampling',
+                category: 'PlayerDspController');
+            await usb.stopStreaming();
+            await _settingsCubit!.refreshOutputDevice();
+            return;
+          }
           final res = await usb.startStreaming(
             sampleRate: decision.sampleRate,
             bitDepth: decision.bitDepth,

@@ -169,7 +169,8 @@ class YtDownloadService {
   /// Foreground-service lifecycle: start timing, coalesced progress publishes,
   /// job removal and deferred idle stops.
   late final YtDownloadForegroundController _foreground =
-      YtDownloadForegroundController(onDeferredIdle: _stopForegroundServiceIfIdle);
+      YtDownloadForegroundController(
+          onDeferredIdle: _stopForegroundServiceIfIdle);
 
   /// True while the repository still has work: bridges the gap where the
   /// native job map empties at 100% before the next transfer starts, a moment
@@ -671,8 +672,7 @@ class YtDownloadService {
 
       // Repair placeholder metadata from the stream resolver before tagging,
       // naming the file or reconciling the library row.
-      final effectiveSong =
-          YtDownloadMetadataResolver.resolve(song, stream);
+      final effectiveSong = YtDownloadMetadataResolver.resolve(song, stream);
 
       // 3. Tagging — artwork embed + tag standardization (TagEditorPlugin) & lyrics fetch
       String? lrcText;
@@ -775,25 +775,28 @@ class YtDownloadService {
       // on local. Do not rescan the whole library here; deduplication is handled inside reconcile.
       // If needed, a lightweight single-file rescan can be done, but the reconciled row is sufficient.
 
-      final result = reconciled.fold(
-        (f) => Left<AppFailure, int>(f),
-        (newId) {
-          if (newId == null) {
-            ErrorLogger.log('Download indexing missing library row: $videoId',
-                category: 'download');
-            return const Left<AppFailure, int>(DownloadFailure(
+      AppFailure? reconcileFailure;
+      final newId = reconciled.fold((f) {
+        reconcileFailure = f;
+        return null;
+      }, (id) => id);
+      if (newId == null) {
+        ErrorLogger.log('Download indexing missing library row: $videoId',
+            category: 'download');
+        await YtDownloadArtifactStore.deleteSavedMedia(
+            path: finalPath, contentUri: contentUri);
+        forgetDownloadedPath(videoId);
+        return Left<AppFailure, int>(reconcileFailure ??
+            const DownloadFailure(
                 'Downloaded file was not found in the library'));
-          }
-          onProgress?.call(const YtDownloadProgress(YtDownloadStage.done, 1));
-          // F5: the only place allowed to report a finished transfer to the
-          // foreground service, now that the byte progress is capped at 99.
-          _foreground.publish(videoId, effectiveSong.title, 1);
-          ErrorLogger.addBreadcrumb('Download done: $videoId',
-              category: 'download', data: {'newId': newId});
-          return Right<AppFailure, int>(newId);
-        },
-      );
-      return result;
+      }
+      onProgress?.call(const YtDownloadProgress(YtDownloadStage.done, 1));
+      // F5: the only place allowed to report a finished transfer to the
+      // foreground service, now that the byte progress is capped at 99.
+      _foreground.publish(videoId, effectiveSong.title, 1);
+      ErrorLogger.addBreadcrumb('Download done: $videoId',
+          category: 'download', data: {'newId': newId});
+      return Right<AppFailure, int>(newId);
     } on YtmException catch (e) {
       final classified = YtmErrorClassifier.classify(e);
       ErrorLogger.log(
@@ -972,7 +975,9 @@ class YtDownloadService {
                       (1000 * (1 << (attempts - 1))).clamp(1000, 15000)));
         }
 
-        if (!YtmErrorClassifier.isUrlBurned(e)) {
+        final expiredSignature =
+            e is YtmException && e.code == 'YTM_STREAM_EXPIRED';
+        if (!expiredSignature && !YtmErrorClassifier.isUrlBurned(e)) {
           // A dropped connection, not a refusal: the URL still works and the
           // bytes already on disk are still valid, so the retry resumes from
           // them. Re-resolving here threw a good URL away and — because the
@@ -999,7 +1004,7 @@ class YtDownloadService {
           if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
             rethrow;
           }
-        } else if (_ytmService.isBotCoolingDown) {
+        } else if (!expiredSignature && _ytmService.isBotCoolingDown) {
           // Egress/bot block with no rate-limiter window: back off briefly so
           // the re-resolve below doesn't slam straight into the fail-fast.
           await Future.delayed(Duration(
@@ -1010,8 +1015,9 @@ class YtDownloadService {
         }
 
         final signal = YtmErrorClassifier.classify(e).signal;
-        if (signal == YtmBlockSignal.botChallenge ||
-            signal == YtmBlockSignal.poTokenInvalid) {
+        if (!expiredSignature &&
+            (signal == YtmBlockSignal.botChallenge ||
+                signal == YtmBlockSignal.poTokenInvalid)) {
           await _ytmService.invalidatePoToken();
           await _ytmService.ensurePoTokenReady();
         }
@@ -1063,11 +1069,10 @@ class YtDownloadService {
         total = probeResp.contentLength;
       }
 
-      if (status == HttpStatus.forbidden ||
-          status == HttpStatus.unauthorized) {
+      if (status == HttpStatus.forbidden || status == HttpStatus.unauthorized) {
         await YtDownloadHttpSupport.drainSmall(probeResp);
         throw YtmException(
-            'YTM_BOT_BLOCKED', 'HTTP $status on stream probe');
+            'YTM_STREAM_EXPIRED', 'HTTP $status on stream probe');
       }
 
       rangesSupported =
@@ -1261,7 +1266,7 @@ class YtDownloadService {
             if (resp.statusCode == HttpStatus.forbidden ||
                 resp.statusCode == HttpStatus.unauthorized) {
               await resp.drain<void>();
-              throw YtmException('YTM_BOT_BLOCKED',
+              throw YtmException('YTM_STREAM_EXPIRED',
                   'HTTP ${resp.statusCode} on chunk $chunkIndex');
             }
             // A 200 to a ranged request means the whole body is coming: written
@@ -1381,8 +1386,8 @@ class YtDownloadService {
           throw const DownloadFailure('Download canceled');
         }
 
-        final outPartFile = File('${dest.path}.part');
-        final outSink = outPartFile.openWrite();
+        final mergePartFile = File('${dest.path}.mergepart');
+        final outSink = mergePartFile.openWrite();
         try {
           for (final part in tempParts) {
             if (task.isCanceled ||
@@ -1406,20 +1411,21 @@ class YtDownloadService {
 
         // Verify merged total size and atomically rename (BUG-014)
         if (total > 0) {
-          final finalSize = await outPartFile.length();
+          final finalSize = await mergePartFile.length();
           if (finalSize != total) {
-            await outPartFile.delete().catchError((_) => outPartFile);
+            await mergePartFile.delete().catchError((_) => mergePartFile);
             throw DownloadFailure(
                 'Merged file size mismatch: $finalSize/$total');
           }
         }
-        if (await outPartFile.exists()) {
+        if (await mergePartFile.exists()) {
           if (await dest.exists()) {
             await dest.delete();
           }
-          await outPartFile.rename(dest.path);
+          await mergePartFile.rename(dest.path);
         }
         mergeCompleted = true;
+        await YtDownloadArtifactStore.deleteLegacySequentialPart(dest.path);
       } catch (e) {
         if (e is _RangeIgnored) {
           rethrow; // FIX-A02: Bubble _RangeIgnored to outer catch
@@ -1427,10 +1433,10 @@ class YtDownloadService {
         keepParts = _partsWorthKeeping(e);
         rethrow;
       } finally {
-        final outPartFile = File('${dest.path}.part');
+        final mergePartFile = File('${dest.path}.mergepart');
         try {
-          if (await outPartFile.exists()) {
-            await outPartFile.delete();
+          if (await mergePartFile.exists()) {
+            await mergePartFile.delete();
           }
         } catch (_) {
           // Best-effort: failure intentionally ignored on this non-critical path.
@@ -1608,8 +1614,8 @@ class YtDownloadService {
     if (response.statusCode == HttpStatus.forbidden ||
         response.statusCode == HttpStatus.unauthorized) {
       await response.drain<void>();
-      throw YtmException(
-          'YTM_BOT_BLOCKED', 'HTTP ${response.statusCode} on stream request');
+      throw YtmException('YTM_STREAM_EXPIRED',
+          'HTTP ${response.statusCode} on stream request');
     }
 
     // The server says the resume offset is past the end of the body (the

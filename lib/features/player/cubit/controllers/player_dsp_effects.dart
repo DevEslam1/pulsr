@@ -71,8 +71,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   Future<void> setBassBoost(double amount) async {
     // NaN survives num.clamp and would poison both the stored slider value and
     // GainStagingBudget for every later setter; treat non-finite as zero.
-    final requested =
-        amount.isFinite ? amount.clamp(0.0, 1.0).toDouble() : 0.0;
+    final requested = amount.isFinite ? amount.clamp(0.0, 1.0).toDouble() : 0.0;
     // Budget bass boost against every other active boost stage so the summed
     // DSP gain stays within headroom (not just an isolated 0..1 clamp).
     final allowedDb = GainStagingBudget.clampBoostDb(
@@ -427,8 +426,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   }
 
   Future<void> setVolumeBoost(double value) {
-    final requested =
-        value.isFinite ? value.clamp(0.0, 1.0).toDouble() : 0.0;
+    final requested = value.isFinite ? value.clamp(0.0, 1.0).toDouble() : 0.0;
     // Budget the broadband volume boost against the FULL active gain chain
     // (EQ/ReplayGain preamp, bass boost, loudness, saturation, dynamic bass,
     // sub-crossover) instead of only the headphone preamp, so stacking effects
@@ -471,9 +469,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
 
   Future<void> setCrossfeed(bool enabled,
       {double? delayUs, double? feedDb, double? fcut, int? mode}) {
-    final clampedDelay = delayUs != null
-        ? DspParamRanges.crossfeedDelayUs.clamp(delayUs)
-        : null;
+    final clampedDelay =
+        delayUs != null ? DspParamRanges.crossfeedDelayUs.clamp(delayUs) : null;
     final clampedFeed =
         feedDb != null ? DspParamRanges.crossfeedFeedDb.clamp(feedDb) : null;
     final clampedFcut =
@@ -548,8 +545,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     // Keep the Dart slice numerically identical to what EqualizerManager
     // forwards: an out-of-range ordinal / NaN wet-dry used to be stored raw here
     // while the manager clamped it, so the UI reported a different room/mix.
-    final clampedPreset =
-        preset?.clamp(0, ReverbPreset.values.length - 1);
+    final clampedPreset = preset?.clamp(0, ReverbPreset.values.length - 1);
     final clampedWetDry =
         wetDry != null ? DspParamRanges.reverbWetDry.clamp(wetDry) : null;
     return applyDspEffect(

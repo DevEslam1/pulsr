@@ -385,8 +385,8 @@ void main() {
       ]);
 
       final row = (await (db!.select(db!.songsTable)
-                ..where((s) => s.id.equals(60)))
-              .getSingle());
+            ..where((s) => s.id.equals(60)))
+          .getSingle());
       expect(row.title, 'Real Title');
       expect(row.artist, 'Real Artist');
       expect(row.album, 'Real Album');

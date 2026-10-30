@@ -49,7 +49,8 @@ void main() {
     when(() => searchCubit.savedSearches).thenReturn(savedSearches);
     when(() => searchCubit.searchPlayedSongs).thenReturn(searchPlayedSongs);
     when(() => searchCubit.recordPlayedSong(any())).thenAnswer((_) async {});
-    when(() => searchCubit.removeSearchPlayedSong(any())).thenAnswer((_) async {});
+    when(() => searchCubit.removeSearchPlayedSong(any()))
+        .thenAnswer((_) async {});
     when(() => searchCubit.clearSearchPlayedSongs()).thenAnswer((_) async {});
     when(() => searchCubit.hasMoreResults).thenReturn(hasMoreResults);
     when(() => searchCubit.isDebouncing).thenReturn(false);

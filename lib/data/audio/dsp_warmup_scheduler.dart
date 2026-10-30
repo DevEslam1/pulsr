@@ -33,7 +33,8 @@ class DspWarmupScheduler {
   Future<void> warmup(
       {Duration duration = const Duration(milliseconds: 100)}) async {
     try {
-      await _channel.sendWarmupBuffer(durationMs: _sanitizeDurationMs(duration));
+      await _channel.sendWarmupBuffer(
+          durationMs: _sanitizeDurationMs(duration));
     } catch (e, st) {
       ErrorLogger.log('DspWarmupScheduler standalone warmup error',
           error: e, stackTrace: st, category: 'DspWarmupScheduler');

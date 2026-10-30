@@ -1184,7 +1184,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       replayGainMode: prefs?.getString(PrefsKeys.replayGainMode) ?? 'off',
       preampWithRg: prefs?.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
       preampWithoutRg:
-          prefs?.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? 0.0,
+          prefs?.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0,
       duckFactor: duckingController.duckFactor,
       isDucked: _duckActive,
       nativeRgActive: _nativeRgActive && Platform.isAndroid,
@@ -1256,7 +1256,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       albumContext: _isConsecutiveAlbumPlayback(),
       preampWithRg: prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
       preampWithoutRg:
-          prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? 0.0,
+          prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0,
     );
     try {
       final perSongDb = _perSongVolumeDbFor(song);
@@ -1370,7 +1370,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           preampWithRg:
               prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
           preampWithoutRg:
-              prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? 0.0,
+              prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0,
         )),
         preventClipping: true,
         enabled: true,

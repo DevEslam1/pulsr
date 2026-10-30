@@ -114,8 +114,8 @@ void main() {
 
       expect(fourChunks, isNot(eightChunks),
           reason: 'chunk boundaries change with the split');
-      expect(YtDownloadTransferMath.resumeStampMatches(
-          fourChunks, eightChunks), isFalse);
+      expect(YtDownloadTransferMath.resumeStampMatches(fourChunks, eightChunks),
+          isFalse);
     });
 
     test('an unknown size still yields a stable container-scoped stamp', () {

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/cupertino.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_colors.dart';
@@ -269,8 +269,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       successSoft: Color.lerp(successSoft, other.successSoft, t) ?? successSoft,
       errorSoft: Color.lerp(errorSoft, other.errorSoft, t) ?? errorSoft,
       warningSoft: Color.lerp(warningSoft, other.warningSoft, t) ?? warningSoft,
-      goldAccent: Color.lerp(
-              _goldAccent ?? goldAccent, other.goldAccent, t) ??
+      goldAccent: Color.lerp(_goldAccent ?? goldAccent, other.goldAccent, t) ??
           goldAccent,
     );
   }

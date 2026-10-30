@@ -1,4 +1,7 @@
 // test/golden/song_tile_golden_test.dart
+// Golden images are gitignored; run with --update-goldens to create them.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -76,7 +79,11 @@ Widget _harness({required PlayerState state, required Widget child}) {
 }
 
 void main() {
-  testWidgets('SongTile normal golden', (tester) async {
+  bool goldenExists(String name) =>
+      File('test/golden/goldens/$name').existsSync();
+
+  testWidgets('SongTile normal golden',
+      skip: !goldenExists('song_tile_normal.png'), (tester) async {
     await tester.pumpWidget(
       _harness(
         state: const PlayerState(
@@ -93,7 +100,8 @@ void main() {
     );
   });
 
-  testWidgets('SongTile selected golden', (tester) async {
+  testWidgets('SongTile selected golden',
+      skip: !goldenExists('song_tile_selected.png'), (tester) async {
     await tester.pumpWidget(
       _harness(
         state: const PlayerState(
@@ -110,7 +118,8 @@ void main() {
     );
   });
 
-  testWidgets('SongTile playing golden', (tester) async {
+  testWidgets('SongTile playing golden',
+      skip: !goldenExists('song_tile_playing.png'), (tester) async {
     await tester.pumpWidget(
       _harness(
         state: const PlayerState(

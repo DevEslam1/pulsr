@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../constants/channels.dart';
 import '../utils/error_logger.dart';
 
@@ -11,9 +12,31 @@ class AppConfig {
       String.fromEnvironment('SENTRY_DSN', defaultValue: '');
   static const String flavor =
       String.fromEnvironment('FLAVOR', defaultValue: 'dev');
-  static const String appVersion =
-      String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
+  static const String _buildTimeVersion =
+      String.fromEnvironment('APP_VERSION', defaultValue: '');
+  static String _installedVersion = '1.0.0';
+
+  /// Installed package version. Resolved from the platform manifest at
+  /// startup so release builds do not compare against a stale constant (the
+  /// updater would otherwise re-offer the version already installed).
+  static String get appVersion => _installedVersion;
   static const String developerName = 'Eslam Mahmoud';
+
+  /// Reads the real versionName/CFBundleShortVersionString. A build-time
+  /// [APP_VERSION] define wins so tests and CI can pin it.
+  static Future<void> loadInstalledVersion() async {
+    if (_buildTimeVersion.isNotEmpty) {
+      _installedVersion = _buildTimeVersion;
+      return;
+    }
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (info.version.isNotEmpty) _installedVersion = info.version;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read installed app version',
+          error: e, stackTrace: st, category: 'AppConfig');
+    }
+  }
 
   /// YouTube Music search/stream/download. Off by default so Play Store builds
   /// never expose it; enable with `--dart-define=ENABLE_YTM=true`.

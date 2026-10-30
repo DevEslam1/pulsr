@@ -309,23 +309,29 @@ JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPreset(
         JNIEnv* /* env */, jobject /* thiz */, jint preset) {
     if (preset < 0 || preset > static_cast<jint>(ReverbPreset::Custom)) return;
-    auto current = AudioDspEngine::instance().getParams();
-    std::shared_ptr<const PreparedIr> ir = nullptr;
-    const double effectiveSr = getEffectiveSampleRate();
-    if (preset != static_cast<int>(ReverbPreset::Custom)) {
-        // Switching to a synthetic preset — create it from current damping
-        ir = PreparedIr::createSynthetic(
-            effectiveSr, preset, static_cast<float>(current->reverb.damping));
-    } else {
-        // FIX C-3: Switching back to Custom — restore the last loaded custom IR
-        ir = gLastCustomIr;
-        // If no custom IR was ever loaded, ir stays nullptr;
-        // the engine will be silent on Custom until the user loads an IR file.
+    // IR synthesis allocates several MB; a bad_alloc must return to Java as a
+    // failed call, never unwind through the JNI boundary.
+    try {
+        auto current = AudioDspEngine::instance().getParams();
+        std::shared_ptr<const PreparedIr> ir = nullptr;
+        const double effectiveSr = getEffectiveSampleRate();
+        if (preset != static_cast<int>(ReverbPreset::Custom)) {
+            // Switching to a synthetic preset — create it from current damping
+            ir = PreparedIr::createSynthetic(
+                effectiveSr, preset, static_cast<float>(current->reverb.damping));
+        } else {
+            // FIX C-3: Switching back to Custom — restore the last loaded custom IR
+            ir = gLastCustomIr;
+            // If no custom IR was ever loaded, ir stays nullptr;
+            // the engine will be silent on Custom until the user loads an IR file.
+        }
+        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+            snap.reverb.preset = preset;
+            snap.reverb.preparedIr = ir;
+        });
+    } catch (...) {
+        LOGE("nativeSetReverbPreset failed (allocation/JNI)");
     }
-    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
-        snap.reverb.preset = preset;
-        snap.reverb.preparedIr = ir;
-    });
 }
 
 JNIEXPORT void JNICALL
@@ -348,19 +354,23 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPredelay(
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbDamping(
         JNIEnv* /* env */, jobject /* thiz */, jdouble damping) {
-    auto current = AudioDspEngine::instance().getParams();
-    std::shared_ptr<const PreparedIr> ir = nullptr;
-    const double effectiveSr = getEffectiveSampleRate();
-    if (current->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
-        ir = PreparedIr::createSynthetic(
-            effectiveSr, current->reverb.preset, static_cast<float>(damping));
-    }
-    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
-        snap.reverb.damping = damping;
-        if (ir) {
-            snap.reverb.preparedIr = ir;
+    try {
+        auto current = AudioDspEngine::instance().getParams();
+        std::shared_ptr<const PreparedIr> ir = nullptr;
+        const double effectiveSr = getEffectiveSampleRate();
+        if (current->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
+            ir = PreparedIr::createSynthetic(
+                effectiveSr, current->reverb.preset, static_cast<float>(damping));
         }
-    });
+        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+            snap.reverb.damping = damping;
+            if (ir) {
+                snap.reverb.preparedIr = ir;
+            }
+        });
+    } catch (...) {
+        LOGE("nativeSetReverbDamping failed (allocation/JNI)");
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -386,39 +396,49 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     // releasing with JNI_ABORT does NOT undo the writes on a non-copy JVM,
     // silently corrupting the caller's array. Working on a private copy and
     // releasing right away guarantees the Java array is never mutated.
-    std::vector<float> ir(data, data + len);
+    std::vector<float> ir;
+    try {
+        ir.assign(data, data + len);
+    } catch (...) {
+        env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
+        return JNI_FALSE;
+    }
     env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
 
     int frames = (channels > 0) ? (len / channels) : len;
 
-    // Normalize the loaded IR to unit peak. A full-scale impulse response would
-    // otherwise drive the wet path far above the dry signal (createCustom does
-    // not normalize), forcing constant limiting/clipping. Normalizing here keeps
-    // the reverb's dry/wet balance meaningful for arbitrary user IRs.
-    float irPeak = 0.0f;
-    for (int i = 0; i < len; ++i) {
-        const float a = std::abs(ir[i]);
-        if (a > irPeak) irPeak = a;
-    }
-    if (irPeak > 1e-6f && std::isfinite(irPeak)) {
-        const float invPeak = 1.0f / irPeak;
+    try {
+        // Normalize the loaded IR to unit peak. A full-scale impulse response would
+        // otherwise drive the wet path far above the dry signal (createCustom does
+        // not normalize), forcing constant limiting/clipping. Normalizing here keeps
+        // the reverb's dry/wet balance meaningful for arbitrary user IRs.
+        float irPeak = 0.0f;
         for (int i = 0; i < len; ++i) {
-            ir[i] *= invPeak;
+            const float a = std::abs(ir[i]);
+            if (a > irPeak) irPeak = a;
         }
-    }
+        if (irPeak > 1e-6f && std::isfinite(irPeak)) {
+            const float invPeak = 1.0f / irPeak;
+            for (int i = 0; i < len; ++i) {
+                ir[i] *= invPeak;
+            }
+        }
 
-    auto current = AudioDspEngine::instance().getParams();
-    const double effectiveSr = getEffectiveSampleRate();
-    const double targetCoreRate = std::min(effectiveSr, 48000.0);
-    auto customIr = PreparedIr::createCustom(effectiveSr, ir.data(), frames, channels, targetCoreRate);
+        const double effectiveSr = getEffectiveSampleRate();
+        const double targetCoreRate = std::min(effectiveSr, 48000.0);
+        auto customIr = PreparedIr::createCustom(effectiveSr, ir.data(), frames, channels, targetCoreRate);
 
-    if (customIr) {
-        gLastCustomIr = customIr; // FIX C-3: persist for Custom preset restore
-        AudioDspEngine::instance().updateParams([customIr](DspParamSnapshot& snap) {
-            snap.reverb.preset = static_cast<int>(ReverbPreset::Custom);
-            snap.reverb.preparedIr = customIr;
-        });
-        return JNI_TRUE;
+        if (customIr) {
+            gLastCustomIr = customIr; // FIX C-3: persist for Custom preset restore
+            AudioDspEngine::instance().updateParams([customIr](DspParamSnapshot& snap) {
+                snap.reverb.preset = static_cast<int>(ReverbPreset::Custom);
+                snap.reverb.preparedIr = customIr;
+            });
+            return JNI_TRUE;
+        }
+    } catch (...) {
+        // Never unwind C++ exceptions (bad_alloc on a huge IR) into Java.
+        LOGE("nativeLoadImpulseResponse failed (allocation)");
     }
     return JNI_FALSE;
 }
@@ -485,7 +505,8 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
     if (env->GetArrayLength(dsdL) < byteCount || env->GetArrayLength(dsdR) < byteCount) return nullptr;
     if (dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD64) &&
         dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD128) &&
-        dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD256)) {
+        dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD256) &&
+        dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD512)) {
         return nullptr;
     }
     if (bitOrder < 0 || bitOrder > 1) return nullptr;

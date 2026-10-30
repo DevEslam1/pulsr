@@ -1018,8 +1018,8 @@ class _SearchPlayedSongTile extends StatelessWidget {
                       Icon(Icons.graphic_eq_rounded, size: 18, color: p.accent),
                 ),
               IconButton(
-                icon: Icon(Icons.close_rounded,
-                    size: 18, color: p.textTertiary),
+                icon:
+                    Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
                 visualDensity: VisualDensity.compact,
                 tooltip: context.l10n.remove,
                 onPressed: onRemove,

@@ -107,6 +107,12 @@ class AudioVisualizer extends StatefulWidget {
 
 class AudioVisualizerState extends State<AudioVisualizer>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  // The native visualizer tap is process-global. Ref-count claims so one
+  // widget disposing (theme swap, navigation) cannot stop the stream another
+  // instance is still rendering.
+  static int _nativeSessionRefs = 0;
+  bool _claimedNativeSession = false;
+
   static const MethodChannel _methodChannel =
       MethodChannel(PulsrChannels.visualizer);
   static const EventChannel _eventChannel =
@@ -340,6 +346,10 @@ class AudioVisualizerState extends State<AudioVisualizer>
       if (mounted) setState(() => _hasActiveSession = false);
     });
 
+    if (!_claimedNativeSession) {
+      _claimedNativeSession = true;
+      _nativeSessionRefs++;
+    }
     _subscription = _eventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
         if (event is List) {
@@ -373,8 +383,13 @@ class AudioVisualizerState extends State<AudioVisualizer>
   void _stopNativeStream() {
     _subscription?.cancel();
     _subscription = null;
-    if (Platform.isAndroid) {
-      _methodChannel.invokeMethod('releaseVisualizer').catchError((_) {});
+    if (_claimedNativeSession) {
+      _claimedNativeSession = false;
+      _nativeSessionRefs = math.max(0, _nativeSessionRefs - 1);
+      // Only the last claimant may tear down the process-global tap.
+      if (_nativeSessionRefs == 0 && Platform.isAndroid) {
+        _methodChannel.invokeMethod('releaseVisualizer').catchError((_) {});
+      }
     }
   }
 

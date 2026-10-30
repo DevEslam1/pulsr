@@ -312,7 +312,8 @@ pulsr/
 - **`SpatialPanner.cpp / .h` & `StereoWidth.cpp / .h`**: Binaural spatial audio panner and M/S matrix stereo width expansion.
 - **`ViperDdc.cpp / .h`**: Parser and convolver for ViPER4Android `.vdc` Device Dynamic Correction files.
 - **`LiveProg.cpp / .h`**: Embedded JSFX-compatible dynamic audio scripting engine.
-- **`DsdDecoder.cpp / .h`**: Converts 1-bit DSD (DSD64/DSD128/DSD256) bitstreams into 24-bit/32-bit linear PCM.
+- **`DsdDecoder.cpp / .h`**: Converts 1-bit DSD (DSD64/DSD128/DSD256/DSD512) bitstreams into 24-bit/32-bit linear PCM.
+- **`ChannelManager.cpp / .h`**: Per-channel trim and delay for 2–8 channel layouts, running before the brickwall limiter.
 - **`aaudio_jni_bridge.cpp` & `eq_jni_bridge.cpp`**: JNI bridges binding C++ methods to Kotlin and Dart method channels.
 
 #### `server/pulsr_party/` (Go Real-Time Group Listening Server)

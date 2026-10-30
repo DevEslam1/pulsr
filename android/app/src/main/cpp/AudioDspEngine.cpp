@@ -218,11 +218,16 @@ void AudioDspEngine::applySampleRateLocked(double sampleRate) {
     // matches the requested rate; a Custom IR is resampled by the reverb, so it
     // always matches.
     if (std::abs(sampleRate - current->sampleRate) <= 0.5) {
+        // Synthetic IRs are always built at min(rate, 48 kHz); compare against
+        // that capped rate so a same-rate resync at 96/192/768 kHz does not
+        // look like a mismatch and republish on every seek.
+        const int expectedIrRate =
+            static_cast<int>(std::round(std::min(sampleRate, 48000.0)));
         const bool irMatches =
             current->reverb.preset == static_cast<int>(ReverbPreset::Custom) ||
             !current->reverb.enabled ||
             !current->reverb.preparedIr ||
-            current->reverb.preparedIr->createdSampleRate == static_cast<int>(std::round(sampleRate));
+            current->reverb.preparedIr->createdSampleRate == expectedIrRate;
         if (irMatches) {
             return;
         }
@@ -645,6 +650,13 @@ void AudioDspEngine::setBypassCompare(bool enabled, double gainCompensationDb) {
 void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snapshot) {
     if (!snapshot) return;
     std::lock_guard<std::mutex> lock(publishMutex_);
+    // updateParams releases publishMutex_ before broadcasting, so two control
+    // threads can deliver generation N and N+1 in reverse order. Never let an
+    // older snapshot overwrite a newer one on the render engine.
+    if (snapshot->generation < lastBroadcastGeneration_.load(std::memory_order_acquire)) {
+        return;
+    }
+    lastBroadcastGeneration_.store(snapshot->generation, std::memory_order_release);
     auto mutableSnap = std::make_shared<DspParamSnapshot>(*snapshot);
     // Preserve the latest REQUESTED track rate, including a command the
     // renderer has not consumed yet. The applied rate can still be old.
@@ -708,6 +720,7 @@ void AudioDspEngine::resetInternal() {
     arbitraryEq_.reset();
     liveProg_.reset();
     safetyLimiter_.reset();
+    channelManager_.reset();
     smoothedReplayGain_ = 1.0;
     targetReplayGain_ = 1.0;
     smoothedDirectVolume_ = 1.0;

@@ -241,6 +241,10 @@ private:
     std::atomic<uint64_t> resetRequestGeneration_{0};
     uint64_t lastResetGeneration_ = 0; // render thread only
     std::atomic<uint64_t> snapshotGeneration_{1};
+    // Highest control-broadcast generation accepted via publishParams().
+    // Control threads broadcast outside publishMutex_, so this drops snapshots
+    // that arrive out of order. Local rate merges do not touch it.
+    std::atomic<uint64_t> lastBroadcastGeneration_{0};
     std::atomic<uint64_t> lastAppliedGeneration_{0};
     std::atomic<uint32_t> autoDegradedStages_{0};
 

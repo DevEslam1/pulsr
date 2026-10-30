@@ -1,5 +1,5 @@
 // TEMPORARY audit harness — renders player themes to PNG for visual review.
-// Run with: flutter test test/_audit_visual_test.dart --update-goldens
+// Run explicitly with: flutter test test/_audit_visual.dart --update-goldens
 import 'dart:io';
 
 import 'package:flutter/material.dart';

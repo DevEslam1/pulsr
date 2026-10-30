@@ -115,7 +115,8 @@ mixin SettingsSearchResults
                   return ActionChip(
                     label: Text(s,
                         style: TextStyle(
-                            fontSize: AppFontSize.caption, color: p.textPrimary)),
+                            fontSize: AppFontSize.caption,
+                            color: p.textPrimary)),
                     backgroundColor: p.surfaceContainer,
                     side: BorderSide(color: p.hairline),
                     onPressed: () {

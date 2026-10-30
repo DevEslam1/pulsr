@@ -515,9 +515,9 @@ class YtmService {
   Future<bool> updateClientCapabilities(String json) async {
     if (json.trim().isEmpty) return false;
     try {
-      final applied = await _channel
-          .invokeMethod<bool>('updateClientCapabilities', {'json': json})
-          .timeout(const Duration(seconds: 4));
+      final applied = await _channel.invokeMethod<bool>(
+          'updateClientCapabilities',
+          {'json': json}).timeout(const Duration(seconds: 4));
       return applied ?? false;
     } catch (e, st) {
       ErrorLogger.log('Non-critical YTM operation failed',
@@ -823,7 +823,8 @@ class YtmService {
         }
       }
 
-      await YtmRateLimiter.shared.acquirePermit();
+      await YtmRateLimiter.shared
+          .acquirePermit(maxWait: const Duration(seconds: 15));
       final response = await _httpClient
           .post(
             Uri.parse(
@@ -840,73 +841,83 @@ class YtmService {
         void traverse(dynamic node) {
           if (node is Map<String, dynamic>) {
             if (node.containsKey('musicResponsiveListItemRenderer')) {
-              final r = node['musicResponsiveListItemRenderer']
-                  as Map<String, dynamic>;
-              final flexCols = r['flexColumns'] as List<dynamic>? ?? [];
-              String? videoId;
-              String title = 'Unknown Title';
-              String artist = 'Unknown Artist';
+              try {
+                final r = node['musicResponsiveListItemRenderer']
+                    as Map<String, dynamic>;
+                final flexCols = r['flexColumns'] as List<dynamic>? ?? [];
+                String? videoId;
+                String title = 'Unknown Title';
+                String artist = 'Unknown Artist';
 
-              final pData = r['playlistItemData'] as Map<String, dynamic>?;
-              videoId = pData?['videoId'] as String?;
+                final pData = r['playlistItemData'] as Map<String, dynamic>?;
+                videoId = pData?['videoId'] as String?;
 
-              if (flexCols.isNotEmpty) {
-                final c0 = flexCols[0]
-                        ['musicResponsiveListItemFlexColumnRenderer']?['text']
-                    ?['runs'] as List<dynamic>?;
-                if (c0 != null && c0.isNotEmpty) {
-                  title = c0[0]['text'] as String? ?? title;
-                  final nav =
-                      c0[0]['navigationEndpoint'] as Map<String, dynamic>?;
-                  videoId ??= nav?['watchEndpoint']?['videoId'] as String?;
+                if (flexCols.isNotEmpty) {
+                  final c0 = flexCols[0]
+                          ['musicResponsiveListItemFlexColumnRenderer']?['text']
+                      ?['runs'] as List<dynamic>?;
+                  if (c0 != null && c0.isNotEmpty) {
+                    title = c0[0]['text'] as String? ?? title;
+                    final nav =
+                        c0[0]['navigationEndpoint'] as Map<String, dynamic>?;
+                    videoId ??= nav?['watchEndpoint']?['videoId'] as String?;
+                  }
                 }
-              }
-              if (flexCols.length > 1) {
-                final c1 = flexCols[1]
-                        ['musicResponsiveListItemFlexColumnRenderer']?['text']
-                    ?['runs'] as List<dynamic>?;
-                final parsedArtist = YtmMediaHelpers.firstArtistRun(c1);
-                if (parsedArtist != null) artist = parsedArtist;
-              }
+                if (flexCols.length > 1) {
+                  final c1 = flexCols[1]
+                          ['musicResponsiveListItemFlexColumnRenderer']?['text']
+                      ?['runs'] as List<dynamic>?;
+                  final parsedArtist = YtmMediaHelpers.firstArtistRun(c1);
+                  if (parsedArtist != null) artist = parsedArtist;
+                }
 
-              if (videoId != null && videoId.length == 11) {
-                tracks.add(YtmTrack(
-                  videoId: videoId,
-                  title: title,
-                  artist: artist,
-                  duration: Duration.zero,
-                  artworkUrl: YtmMediaHelpers.innertubeArtwork(r),
-                ));
+                if (videoId != null && videoId.length == 11) {
+                  tracks.add(YtmTrack(
+                    videoId: videoId,
+                    title: title,
+                    artist: artist,
+                    duration: Duration.zero,
+                    artworkUrl: YtmMediaHelpers.innertubeArtwork(r),
+                  ));
+                }
+                return;
+              } catch (_) {
+                // One malformed renderer must not discard the whole page.
+                return;
               }
-              return;
             }
             if (node.containsKey('musicTwoRowItemRenderer')) {
-              final r = node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
-              final nav = r['navigationEndpoint'] as Map<String, dynamic>?;
-              String? videoId = nav?['watchEndpoint']?['videoId'] as String?;
-              final titleObj = r['title'] as Map<String, dynamic>?;
-              final titleRuns = titleObj?['runs'] as List<dynamic>?;
-              String title = 'Unknown Title';
-              if (titleRuns != null && titleRuns.isNotEmpty) {
-                title = titleRuns[0]['text'] as String? ?? title;
-                videoId ??= (titleRuns[0]['navigationEndpoint']
-                        as Map<String, dynamic>?)?['watchEndpoint']?['videoId']
-                    as String?;
+              try {
+                final r =
+                    node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
+                final nav = r['navigationEndpoint'] as Map<String, dynamic>?;
+                String? videoId = nav?['watchEndpoint']?['videoId'] as String?;
+                final titleObj = r['title'] as Map<String, dynamic>?;
+                final titleRuns = titleObj?['runs'] as List<dynamic>?;
+                String title = 'Unknown Title';
+                if (titleRuns != null && titleRuns.isNotEmpty) {
+                  title = titleRuns[0]['text'] as String? ?? title;
+                  videoId ??= (titleRuns[0]['navigationEndpoint']
+                          as Map<String, dynamic>?)?['watchEndpoint']
+                      ?['videoId'] as String?;
+                }
+                final subObj = r['subtitle'] as Map<String, dynamic>?;
+                final subRuns = subObj?['runs'] as List<dynamic>?;
+                final parsedArtist = YtmMediaHelpers.firstArtistRun(subRuns);
+                final artist = parsedArtist ?? 'Unknown Artist';
+                if (videoId != null && videoId.length == 11) {
+                  tracks.add(YtmTrack(
+                    videoId: videoId,
+                    title: title,
+                    artist: artist,
+                    duration: Duration.zero,
+                    artworkUrl: YtmMediaHelpers.innertubeArtwork(r),
+                  ));
+                }
+                return;
+              } catch (_) {
+                return;
               }
-              final subObj = r['subtitle'] as Map<String, dynamic>?;
-              final subRuns = subObj?['runs'] as List<dynamic>?;
-              final parsedArtist = YtmMediaHelpers.firstArtistRun(subRuns);
-              final artist = parsedArtist ?? 'Unknown Artist';
-              if (videoId != null && videoId.length == 11) {
-                tracks.add(YtmTrack(
-                  videoId: videoId,
-                  title: title,
-                  artist: artist,
-                  duration: Duration.zero,
-                  artworkUrl: YtmMediaHelpers.innertubeArtwork(r),
-                ));
-              }
-              return;
             }
             for (final val in node.values) {
               traverse(val);

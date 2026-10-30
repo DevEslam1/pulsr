@@ -317,6 +317,10 @@ class MediaScannerService {
     // query and completion has modSec >= this value, so the next incremental
     // scan re-examines it instead of skipping it forever.
     final scanStartEpochSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    // A budget/cancel cut leaves part of MediaStore unprocessed. Such a pass
+    // must not prune unseen rows or advance the delta epoch, otherwise the
+    // skipped files are never revisited by an incremental scan.
+    var truncated = false;
     _emitProgress(0.0,
         currentFile: 'Initializing scanner...', isIncremental: incremental);
     try {
@@ -433,6 +437,7 @@ class MediaScannerService {
       for (int i = 0; i < songsToProcess.length; i += 30) {
         if (_cancelScanRequested || stopwatch.elapsed >= wallClockBudget) {
           // Bounded scan / cancelled: truncate remaining songsToProcess to what we have previewed so far
+          truncated = true;
           songsToProcess = songsToProcess.take(i > 0 ? i : 30).toList();
           break;
         }
@@ -485,23 +490,42 @@ class MediaScannerService {
           totalCount: songsToProcess.length,
           isIncremental: incremental);
 
-      await _repository.syncScannedMusic(
+      final syncResult = await _repository.syncScannedMusic(
         songs: parseResult.songs,
         albums: parseResult.albums,
         artists: parseResult.artists,
+      );
+      syncResult.fold(
+        (failure) => throw StateError('Library sync failed: $failure'),
+        (_) {},
       );
 
       _emitProgress(0.9,
           currentFile: 'Pruning orphaned catalog entries...',
           isIncremental: incremental);
 
-      // Clean up orphaned entries (performed on full scans)
-      if (!incremental) {
-        await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+      // A truncated pass has not seen the whole library, so pruning against
+      // its partial valid-id set would mark/delete valid tracks. Skip both
+      // destructive post-passes and leave the next scan to complete them.
+      if (!truncated && !incremental) {
+        final cleanupResult =
+            await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+        cleanupResult.fold(
+          (failure) => ErrorLogger.log('Orphan cleanup failed: $failure',
+              category: 'scanner'),
+          (_) {},
+        );
       }
 
       // Expand sibling CUE sheets into virtual per-track rows.
-      await _repository.expandCueSheets();
+      if (!truncated) {
+        final cueResult = await _repository.expandCueSheets();
+        cueResult.fold(
+          (failure) => ErrorLogger.log('CUE expansion failed: $failure',
+              category: 'scanner'),
+          (_) {},
+        );
+      }
       _emitProgress(1.0,
           currentFile: 'Scan complete',
           scannedCount: parseResult.songs.length,
@@ -523,8 +547,16 @@ class MediaScannerService {
           '${parseResult.nativeDecoderRequiredCount > 0 ? ', ${parseResult.nativeDecoderRequiredCount} file(s) need a native decoder (not indexed)' : ''}',
           category: 'scanner');
 
-      markScanComplete(epochSec: scanStartEpochSec);
-      scheduleAudioQualityEnrichment();
+      if (!truncated) {
+        markScanComplete(epochSec: scanStartEpochSec);
+        scheduleAudioQualityEnrichment();
+      } else {
+        ErrorLogger.log(
+          'Scan truncated after ${parseResult.songs.length} tracks; '
+          'keeping the previous delta epoch so the remainder is rescanned',
+          category: 'scanner',
+        );
+      }
       return parseResult.songs.length;
     } catch (e, st) {
       ErrorLogger.log('Media scanner failed',

@@ -796,8 +796,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     final device = state.currentOutputDevice;
     if (device != null && device.isBluetooth) {
       _lastBtLatencyDeviceKey = DeviceProfileService.deviceKeyFromInfo(device);
-      await _deviceProfileService
-          .rememberBtLatency(_lastBtLatencyDeviceKey!, clamped);
+      await _deviceProfileService.rememberBtLatency(
+          _lastBtLatencyDeviceKey!, clamped);
     }
   }
 
@@ -822,7 +822,6 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     if (clamped == state.bluetoothLatencyOffsetMs) return;
     safeEmit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
   }
-
 
   /// Toggles per-session audio telemetry. The logger reads this flag on every
   /// call, so disabling takes effect immediately with no re-wiring.

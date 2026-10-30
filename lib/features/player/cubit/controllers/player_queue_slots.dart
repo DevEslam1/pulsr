@@ -39,6 +39,19 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _persistQueueDebounce = null;
     if (_isClosed()) return;
     try {
+      // The active slot is written on load/track changes, but seeks and speed
+      // changes do not go through setQueueSlot. Refresh it here so a
+      // background/process-death save restores the live position.
+      final liveState = _getState();
+      final activeSlot = _queueSlots[liveState.activeQueueSlot];
+      if (activeSlot != null && liveState.queue.isNotEmpty) {
+        _queueSlots[liveState.activeQueueSlot] = QueueSlotData(
+          songIds: activeSlot.songIds,
+          currentIndex: liveState.currentIndex,
+          position: liveState.position,
+          speed: liveState.playbackSpeed,
+        );
+      }
       final prefs = await SharedPreferences.getInstance();
       final data = QueueSlotCodec.encodeDocument(
         {

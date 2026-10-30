@@ -127,7 +127,8 @@ void main() {
     test('non-finite balance never activates the panner', () {
       final pipeline = OptimizedDspPipeline()
         ..updateState(stereoBalance: double.nan);
-      expect(pipeline.getActiveStages(), isNot(contains(DspStage.stereoPanner)));
+      expect(
+          pipeline.getActiveStages(), isNot(contains(DspStage.stereoPanner)));
     });
   });
 

@@ -927,8 +927,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         // message without counting the track as unplayable or auto-skipping.
         safeEmit(state.copyWith(
             playback: state.playback.copyWith(
-                errorMessage: err.substring(
-                    PulsrAudioHandler.outputModeNoticePrefix.length),
+                errorMessage: err
+                    .substring(PulsrAudioHandler.outputModeNoticePrefix.length),
                 isBuffering: false)));
         return;
       }

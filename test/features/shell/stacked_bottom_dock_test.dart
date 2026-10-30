@@ -153,7 +153,8 @@ void main() {
     // The gesture is a request, not a mutation: the picker opens and the
     // layout stays exactly where the user left it.
     expect(changes, equals(0),
-        reason: 'a downward swipe must never change the dock layout on its own');
+        reason:
+            'a downward swipe must never change the dock layout on its own');
     expect(find.text('Dock style'), findsOneWidget);
 
     Navigator.of(tester.element(find.text('Dock style'))).pop();

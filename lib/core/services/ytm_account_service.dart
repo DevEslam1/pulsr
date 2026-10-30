@@ -200,9 +200,13 @@ class YtmAccountService {
 
         // Validate session asynchronously off the startup critical path so init() does
         // not block app launch or hit the 8-second startup timeout.
+        final cookiesUnderValidation = _cookies;
         unawaited(() async {
           try {
             final ok = await validateSession();
+            // A login/sign-out completed while the old jar was being checked:
+            // never apply the stale verdict to the new session.
+            if (_cookies != cookiesUnderValidation) return;
             if (!ok) {
               await _deleteStoredCookies(); // dead session: wipe, don't poison WebView
               _cookies = null;
@@ -1003,10 +1007,15 @@ class YtmAccountService {
         if (await YtmOAuthService.shared.ensureFresh()) {
           _oauthAccessToken = YtmOAuthService.shared.accessToken;
         } else if (_oauthAccessToken != null && _oauthAccessToken!.isNotEmpty) {
-          // Expired with no usable refresh token: the session is dead. Tear it
-          // down so the UI stops advertising a connected account that 401s.
-          await logout();
-          throw const YtmException('YTM_AUTH', 'Session expired');
+          if (YtmOAuthService.shared.lastRefreshFailedTerminally) {
+            // Expired AND the server rejected the refresh grant: the session
+            // is dead. Tear it down so the UI stops claiming it is connected.
+            await logout();
+            throw const YtmException('YTM_AUTH', 'Session expired');
+          }
+          // Network/timeout: keep the session; fail this request only.
+          throw const YtmException(
+              'YTM_OFFLINE', 'Could not refresh the session while offline');
         }
       } on YtmException {
         rethrow;
@@ -1016,7 +1025,8 @@ class YtmAccountService {
     }
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        await YtmRateLimiter.shared.acquirePermit();
+        await YtmRateLimiter.shared
+            .acquirePermit(maxWait: const Duration(seconds: 10));
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
         final res = await _innertubeClient
             .post(uri, headers: _resignHeaders(headers), body: body)
@@ -1030,10 +1040,16 @@ class YtmAccountService {
             _oauthAccessToken = YtmOAuthService.shared.accessToken;
             continue;
           }
-          // Refresh failed: the bearer is dead. Invalidate the session so the
-          // UI stops claiming it is connected, and hand the 401 back.
-          await logout();
-          return res;
+          if (YtmOAuthService.shared.lastRefreshFailedTerminally) {
+            // Refresh rejected by the server: the bearer is dead. Invalidate
+            // the session so the UI stops claiming it is connected.
+            await logout();
+            return res;
+          }
+          // Transient refresh failure (offline/timeout): keep the session and
+          // report a retryable offline error instead of signing the user out.
+          throw const YtmException(
+              'YTM_OFFLINE', 'Could not refresh the session while offline');
         }
 
         // A 403 on a cookie session: attempt a single retry with re-signed headers
@@ -1054,7 +1070,15 @@ class YtmAccountService {
             YtmRateLimiter.shared.onRateLimited();
             breaker?.recordFailure(YtmBlockSignal.rateLimited);
           } else if (res.statusCode == 403) {
-            breaker?.recordFailure(YtmBlockSignal.ipBlocked);
+            // A single 403 is often a private/members-only/geo refusal, not an
+            // IP ban. Opening the global 10-minute IP breaker on it took
+            // library/browse/search down entirely. Only arm the breaker when
+            // the body carries a real bot/interstitial verdict.
+            final verdict =
+                YtmErrorClassifier.classifyCode('response', res.body);
+            if (verdict.signal == YtmBlockSignal.botChallenge) {
+              breaker?.recordFailure(YtmBlockSignal.botChallenge);
+            }
           }
           final backoffSec = (1 << attempt) + Random().nextInt(2);
           debugPrint(

@@ -399,6 +399,15 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     public void flush() {
         endOfStreamQueued = false;
         if (inner != null) inner.flush();
+        // Default mode inserts the processor in the DefaultAudioSink chain, so
+        // Media3 flushes it without FloatDspAudioSink's explicit native reset.
+        // Clear the DSP history here after the sink flush (whose onFlush may
+        // have re-synced the rate) so a seek cannot replay the old position's
+        // reverb tail/limiter envelope. Float mode resets inside its own flush.
+        final Inner current = currentInner;
+        if (mode == Mode.DEFAULT && current != null && current.processor != null) {
+            current.processor.resetNativeState();
+        }
     }
 
     @Override

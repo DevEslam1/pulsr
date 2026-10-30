@@ -39,6 +39,28 @@ class ImportResult {
   });
 }
 
+/// CUE chapters share one container path, so a plain path cannot identify
+/// them in a backup. Append the chapter's start offset; imported backups
+/// without the suffix keep matching by plain path.
+const String _cueRefMarker = '#pulsr_cue=';
+
+String _composeSongRef(String path, int? cueStartMs) {
+  if (cueStartMs == null || cueStartMs <= 0) return path;
+  return '$path$_cueRefMarker$cueStartMs';
+}
+
+String _songRef(SongsTableData song) =>
+    _composeSongRef(song.path, song.cueStartMs);
+
+({String path, int? cueStartMs}) _parseSongRef(String ref) {
+  final markerAt = ref.lastIndexOf(_cueRefMarker);
+  if (markerAt < 0) return (path: ref, cueStartMs: null);
+  final cueStartMs =
+      int.tryParse(ref.substring(markerAt + _cueRefMarker.length));
+  if (cueStartMs == null) return (path: ref, cueStartMs: null);
+  return (path: ref.substring(0, markerAt), cueStartMs: cueStartMs);
+}
+
 @singleton
 class ExportBackupUseCase {
   final IMusicRepository _repository;
@@ -50,7 +72,7 @@ class ExportBackupUseCase {
     final favoritesResult = await _repository.getFavorites();
     final favoritesSongs =
         favoritesResult.fold((l) => <SongsTableData>[], (r) => r);
-    final favoritePaths = favoritesSongs.map((s) => s.path).toList();
+    final favoritePaths = favoritesSongs.map(_songRef).toList();
 
     // 2. Playlists with song file paths
     final playlistsResult = await _repository.getPlaylists();
@@ -66,7 +88,7 @@ class ExportBackupUseCase {
         'name': pl.name,
         'isSmart': pl.isSmart,
         'smartCriteria': pl.smartCriteria,
-        'songPaths': playlistSongs.map((s) => s.path).toList(),
+        'songPaths': playlistSongs.map(_songRef).toList(),
       });
     }
 
@@ -121,7 +143,7 @@ class ExportBackupUseCase {
     for (final song in allSongs) {
       if (song.playCount > 0 || song.lastPlayed != null) {
         historyData.add({
-          'path': song.path,
+          'path': _songRef(song),
           'playCount': song.playCount,
           'lastPlayed': song.lastPlayed,
         });
@@ -178,7 +200,7 @@ class ExportBackupUseCase {
               'title': s.title,
               'artist': s.artist,
               'album': s.album,
-              'path': s.path,
+              'path': _songRef(s),
               'remoteId': s.remoteId,
               'durationMs': s.durationMs,
             })
@@ -207,7 +229,7 @@ class ExportBackupUseCase {
           return 'yt:${song.remoteId}';
         }
         if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
-          return 'path:${song.path}';
+          return 'path:${_songRef(song)}';
         }
         return 'id:$idPart';
       }
@@ -256,13 +278,25 @@ class ExportBackupUseCase {
       if (items.isNotEmpty) {
         items.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
         final byId = {for (final s in allSongs) s.id: s};
-        queuePaths = [
+        // Resolve first, then derive the index: indexing the unfiltered list
+        // and exporting only matched paths pointed restore at the wrong track
+        // whenever a missing song sat before the current one.
+        final resolved =
+            <({SongsTableData song, bool isCurrent, int positionMs})>[
           for (final it in items)
-            if (byId.containsKey(it.songId)) byId[it.songId]!.path
+            if (byId[it.songId] != null)
+              (
+                song: byId[it.songId]!,
+                isCurrent: it.isCurrent,
+                positionMs: it.positionMs,
+              )
         ];
-        final cur = items.indexWhere((e) => e.isCurrent);
-        queueIndex = cur == -1 ? 0 : cur;
-        queuePositionMs = cur == -1 ? 0 : items[cur].positionMs;
+        if (resolved.isNotEmpty) {
+          queuePaths = [for (final e in resolved) _songRef(e.song)];
+          final cur = resolved.indexWhere((e) => e.isCurrent);
+          queueIndex = cur == -1 ? 0 : cur;
+          queuePositionMs = cur == -1 ? 0 : resolved[cur].positionMs;
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to encode queue backup data',
@@ -382,6 +416,9 @@ class ImportBackupUseCase {
     for (final song in allSongs) {
       pathMap[song.path] = song;
       pathMap[song.path.replaceAll('\\', '/').toLowerCase()] = song;
+      final ref = _songRef(song);
+      pathMap[ref] = song;
+      pathMap[ref.toLowerCase()] = song;
       if (song.remoteId != null && song.remoteId!.isNotEmpty) {
         remoteIdMap[song.remoteId!] = song;
       }
@@ -397,11 +434,15 @@ class ImportBackupUseCase {
       }).toList();
     }
 
-    SongsTableData? matchPath(String path) {
-      // 1. Exact or normalized path match
-      final direct =
-          pathMap[path] ?? pathMap[path.replaceAll('\\', '/').toLowerCase()];
+    SongsTableData? matchPath(String rawRef) {
+      final parsedRef = _parseSongRef(rawRef);
+      final ref = parsedRef.cueStartMs == null
+          ? rawRef
+          : _composeSongRef(parsedRef.path, parsedRef.cueStartMs);
+      // 1. Exact or normalized path/chapter-ref match
+      final direct = pathMap[ref] ?? pathMap[ref.toLowerCase()];
       if (direct != null) return direct;
+      final path = parsedRef.path;
 
       // 2. Fallback for ytmusic:// paths matching by remoteId
       if (path.startsWith('ytmusic://')) {
@@ -888,27 +929,37 @@ class ImportBackupUseCase {
       final posMs = rawPosMs is num ? rawPosMs.toInt() : 0;
       if (paths.isNotEmpty) {
         try {
-          await _db.transaction(() async {
-            await _db.delete(_db.queueItemsTable).go();
-            var order = 0;
-            for (var i = 0; i < paths.length; i++) {
-              final matched = matchPath(paths[i]);
-              if (matched == null) {
-                unmatchedPaths.add(paths[i]);
-                continue;
-              }
-              await _db.into(_db.queueItemsTable).insert(
-                    QueueItemsTableCompanion.insert(
-                      songId: matched.id,
-                      orderIndex: order,
-                      isCurrent: Value(i == idx.clamp(0, paths.length - 1)),
-                      positionMs: Value(
-                          i == idx.clamp(0, paths.length - 1) ? posMs : 0),
-                    ),
-                  );
-              order++;
+          // Resolve every path BEFORE replacing the existing queue: clearing
+          // first and then failing to match a single path left the user with
+          // no queue at all after a restore.
+          final resolved = <({SongsTableData song, int originalIndex})>[];
+          for (var i = 0; i < paths.length; i++) {
+            final matched = matchPath(paths[i]);
+            if (matched == null) {
+              unmatchedPaths.add(paths[i]);
+            } else {
+              resolved.add((song: matched, originalIndex: i));
             }
-          });
+          }
+          if (resolved.isNotEmpty) {
+            final currentOriginal = idx.clamp(0, paths.length - 1);
+            var currentOrdinal =
+                resolved.indexWhere((e) => e.originalIndex == currentOriginal);
+            if (currentOrdinal == -1) currentOrdinal = 0;
+            await _db.transaction(() async {
+              await _db.delete(_db.queueItemsTable).go();
+              for (var order = 0; order < resolved.length; order++) {
+                await _db.into(_db.queueItemsTable).insert(
+                      QueueItemsTableCompanion.insert(
+                        songId: resolved[order].song.id,
+                        orderIndex: order,
+                        isCurrent: Value(order == currentOrdinal),
+                        positionMs: Value(order == currentOrdinal ? posMs : 0),
+                      ),
+                    );
+              }
+            });
+          }
         } catch (e, st) {
           ErrorLogger.log('Failed restoring queue',
               error: e, stackTrace: st, category: 'Backup');

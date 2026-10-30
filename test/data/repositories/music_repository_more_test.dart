@@ -267,7 +267,8 @@ void main() {
       expect(rows.single.title, 'Updated');
     });
 
-    test('a scan cannot replace downloaded metadata with MediaStore placeholders',
+    test(
+        'a scan cannot replace downloaded metadata with MediaStore placeholders',
         () async {
       await insertSong(
         id: 1,

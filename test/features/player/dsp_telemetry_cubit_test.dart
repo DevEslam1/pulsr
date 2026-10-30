@@ -11,8 +11,8 @@ class MockAudioEffectsChannel extends Mock implements AudioEffectsChannel {}
 /// whole DSP suite ran in parallel).
 Future<void> waitForFailures(DspTelemetryCubit cubit, int count) async {
   final deadline = DateTime.now().add(const Duration(seconds: 2));
-  while (cubit.consecutiveFailures < count &&
-      DateTime.now().isBefore(deadline)) {
+  while (
+      cubit.consecutiveFailures < count && DateTime.now().isBefore(deadline)) {
     await Future<void>.delayed(const Duration(milliseconds: 2));
   }
 }

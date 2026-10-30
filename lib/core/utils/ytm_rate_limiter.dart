@@ -156,7 +156,7 @@ class YtmRateLimiter {
   /// Acquires a permit before making a native YTM request.
   /// If [fastFail] is true and an active backoff window is longer than 30s,
   /// throws a [TimeoutException] immediately instead of blocking the async mutex for minutes.
-  Future<void> acquirePermit({bool fastFail = false}) =>
+  Future<void> acquirePermit({bool fastFail = false, Duration? maxWait}) =>
       _nativeMutex.run(() async {
         while (true) {
           final now = clock.now();
@@ -165,6 +165,10 @@ class YtmRateLimiter {
             if (fastFail && waitDuration > const Duration(seconds: 30)) {
               throw TimeoutException(
                   'Rate limiter in long backoff (${waitDuration.inSeconds}s remaining)');
+            }
+            if (maxWait != null && waitDuration > maxWait) {
+              throw TimeoutException(
+                  'Rate limiter backoff ${waitDuration.inSeconds}s exceeds ${maxWait.inSeconds}s budget');
             }
             await Future<void>.delayed(waitDuration);
           }
@@ -179,6 +183,10 @@ class YtmRateLimiter {
           // Wait for the next token to become available
           final waitMs =
               ((1.0 - _tokens) / _refillRate * 1000).ceil().clamp(10, 5000);
+          if (maxWait != null && Duration(milliseconds: waitMs) > maxWait) {
+            throw TimeoutException(
+                'Rate limiter token wait ${waitMs}ms exceeds ${maxWait.inSeconds}s budget');
+          }
           await Future<void>.delayed(Duration(milliseconds: waitMs));
         }
       });

@@ -317,8 +317,9 @@ class ProxyEntry {
     if (parts.isEmpty) return null;
 
     final host = parts[0];
-    final port =
-        parts.length > 1 ? (int.tryParse(parts[1]) ?? defaultPort) : defaultPort;
+    final port = parts.length > 1
+        ? (int.tryParse(parts[1]) ?? defaultPort)
+        : defaultPort;
     final username = parts.length > 2 ? parts[2] : '';
     final password = parts.length > 3 ? parts.sublist(3).join(':') : '';
 

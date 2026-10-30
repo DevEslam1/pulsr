@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -596,10 +596,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                       // ---------- Content (Local vs Online) ----------
                       AnimatedSwitcher(
                         duration: context.motion(PulsrMotion.standard),
-                        switchInCurve:
-                            context.motionCurve(Curves.easeOutCubic),
-                        switchOutCurve:
-                            context.motionCurve(Curves.easeInCubic),
+                        switchInCurve: context.motionCurve(Curves.easeOutCubic),
+                        switchOutCurve: context.motionCurve(Curves.easeInCubic),
                         child: KeyedSubtree(
                           key: ValueKey('home_tab_$currentTab'),
                           child: currentTab == 0

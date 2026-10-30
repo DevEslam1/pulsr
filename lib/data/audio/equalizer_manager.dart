@@ -1381,9 +1381,8 @@ class EqualizerManager {
     final prevMultiband = saturationMultiband;
     final prevEnabled = isSaturationEnabled;
 
-    final targetDrive = drive != null
-        ? DspParamRanges.saturationDrive.clamp(drive)
-        : prevDrive;
+    final targetDrive =
+        drive != null ? DspParamRanges.saturationDrive.clamp(drive) : prevDrive;
     final targetMix =
         mix != null ? DspParamRanges.saturationMix.clamp(mix) : prevMix;
     final targetTilt =
@@ -1616,9 +1615,8 @@ class EqualizerManager {
     final targetSlope = slopeDbPerOct != null
         ? DspParamRanges.normalizeSubCrossoverSlope(slopeDbPerOct)
         : prevSlope;
-    final targetGain = gain != null
-        ? DspParamRanges.subCrossoverGain.clamp(gain)
-        : prevGain;
+    final targetGain =
+        gain != null ? DspParamRanges.subCrossoverGain.clamp(gain) : prevGain;
     final targetBassMono = bassMono ?? prevBassMono;
     final targetAntiPop = antiPop ?? prevAntiPop;
 

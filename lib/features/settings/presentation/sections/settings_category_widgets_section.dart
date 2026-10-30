@@ -213,14 +213,18 @@ mixin SettingsCategoryWidgetsSection
                 context.l10n.whatsNewSubtitle(AppConfig.appVersion),
                 onTap: () => showWhatsNewSheet(context),
               ),
-              _navTile(
-                context,
-                Icons.system_update_alt_rounded,
-                'Check for Updates',
-                'Check GitHub releases for new version',
-                onTap: () => AppUpdateService.instance
-                    .checkForUpdates(context, userInitiated: true),
-              ),
+              // The Play Store build has no INTERNET permission and does not
+              // declare REQUEST_INSTALL_PACKAGES, so a GitHub self-updater
+              // cannot work there; updates are delivered by Play instead.
+              if (!AppConfig.isPure)
+                _navTile(
+                  context,
+                  Icons.system_update_alt_rounded,
+                  'Check for Updates',
+                  'Check GitHub releases for new version',
+                  onTap: () => AppUpdateService.instance
+                      .checkForUpdates(context, userInitiated: true),
+                ),
               _navTile(
                 context,
                 Icons.person_outline_rounded,

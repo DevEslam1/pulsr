@@ -1,4 +1,7 @@
 // test/golden/player_top_bar_golden_test.dart
+// Golden images are gitignored; run with --update-goldens to create them.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,7 +15,9 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 class _MockPlayerCubit extends Fake implements PlayerCubit {}
 
 void main() {
-  testWidgets('PlayerTopBar golden', (tester) async {
+  testWidgets('PlayerTopBar golden',
+      skip: !File('test/golden/goldens/player_top_bar.png').existsSync(),
+      (tester) async {
     final props = PlayerThemeProps(
       state: const PlayerState(),
       cubit: _MockPlayerCubit(),

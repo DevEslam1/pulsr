@@ -128,6 +128,12 @@ Future<void> main() async {
     return;
   }
 
+  // Resolve the installed version before any screen (Settings/About, updater)
+  // reads AppConfig.appVersion. Best-effort: the 1.0.0 fallback is only used
+  // when the platform channel is unavailable.
+  await AppConfig.loadInstalledVersion()
+      .timeout(const Duration(seconds: 2), onTimeout: () {});
+
   // Initialize in-memory SettingsCache synchronously enough for the first
   // frame. Artwork and UI-sound init are not needed to paint the shell, so they
   // run behind the first frame instead of adding path_provider/prefs awaits to
@@ -275,7 +281,8 @@ Future<void> main() async {
         // defines YTM_CAPABILITIES_URL, which keeps the packaged asset authoritative
         // everywhere else. Fire-and-forget and failure-tolerant.
         try {
-          const capabilitiesUrl = String.fromEnvironment('YTM_CAPABILITIES_URL');
+          const capabilitiesUrl =
+              String.fromEnvironment('YTM_CAPABILITIES_URL');
           if (onlineAllowed &&
               capabilitiesUrl.isNotEmpty &&
               getIt.isRegistered<YtmService>()) {
@@ -373,9 +380,17 @@ Future<void> main() async {
                         .toList(),
                   )
                 : null;
+            // Exception values (HTTP/URL/session errors) bypass the message
+            // field, so scrub them too before the event leaves the device.
+            final scrubbedExceptions = event.exceptions
+                ?.map((e) => e.value == null
+                    ? e
+                    : e.copyWith(value: ErrorLogger.redactPii(e.value!)))
+                .toList();
             return event.copyWith(
               user: null,
               message: scrubbedMessage,
+              exceptions: scrubbedExceptions,
             );
           };
         },

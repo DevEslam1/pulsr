@@ -45,6 +45,20 @@ class CloudSyncService {
   static const String _keySyncFavorites = 'cloud_sync_favorites_enabled';
   static const String _keySyncPlaylists = 'cloud_sync_playlists_enabled';
   static const String _keyDeviceId = 'cloud_sync_device_id';
+  static const String _keyUploadedFavoriteIds =
+      'cloud_sync_uploaded_favorite_ids';
+  static const String _keyUploadedPlaylistSongs =
+      'cloud_sync_uploaded_playlist_songs';
+  static const String _keyUploadedPlaylistIds =
+      'cloud_sync_uploaded_playlist_ids';
+
+  // What *this device* last uploaded. Only ids in this set can be tombstoned,
+  // so a fresh install can never delete favorites/playlist members added by
+  // another device that it has not merged yet.
+  Set<String> _lastUploadedFavoriteIds = <String>{};
+  Map<String, Set<String>> _lastUploadedPlaylistSongIds =
+      <String, Set<String>>{};
+  Set<String> _lastUploadedPlaylistIds = <String>{};
 
   Future<String> getDeviceId() async {
     final prefs = await _getPrefs();
@@ -146,6 +160,57 @@ class CloudSyncService {
     }
   }
 
+  Future<void> _loadUploadBaselines() async {
+    final prefs = await _getPrefs();
+    try {
+      final favRaw = prefs.getString(_keyUploadedFavoriteIds);
+      if (favRaw != null && favRaw.isNotEmpty) {
+        final decoded = jsonDecode(favRaw);
+        if (decoded is List) {
+          _lastUploadedFavoriteIds = decoded.whereType<String>().toSet();
+        }
+      }
+      final plIdsRaw = prefs.getString(_keyUploadedPlaylistIds);
+      if (plIdsRaw != null && plIdsRaw.isNotEmpty) {
+        final decoded = jsonDecode(plIdsRaw);
+        if (decoded is List) {
+          _lastUploadedPlaylistIds = decoded.whereType<String>().toSet();
+        }
+      }
+      final plRaw = prefs.getString(_keyUploadedPlaylistSongs);
+      if (plRaw != null && plRaw.isNotEmpty) {
+        final decoded = jsonDecode(plRaw);
+        if (decoded is Map) {
+          _lastUploadedPlaylistSongIds = {
+            for (final e in decoded.entries)
+              if (e.value is List)
+                e.key.toString(): (e.value as List).whereType<String>().toSet(),
+          };
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load cloud-sync upload baselines',
+          error: e, stackTrace: st, category: 'CloudSync');
+    }
+  }
+
+  Future<void> _persistUploadBaselines() async {
+    final prefs = await _getPrefs();
+    try {
+      await prefs.setString(_keyUploadedFavoriteIds,
+          jsonEncode(_lastUploadedFavoriteIds.toList()));
+      await prefs.setString(
+          _keyUploadedPlaylistSongs,
+          jsonEncode(_lastUploadedPlaylistSongIds
+              .map((k, v) => MapEntry(k, v.toList()))));
+      await prefs.setString(_keyUploadedPlaylistIds,
+          jsonEncode(_lastUploadedPlaylistIds.toList()));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist cloud-sync upload baselines',
+          error: e, stackTrace: st, category: 'CloudSync');
+    }
+  }
+
   bool _syncInProgress = false;
 
   Future<bool> syncAll({bool? syncFavorites, bool? syncPlaylists}) async {
@@ -182,6 +247,7 @@ class CloudSyncService {
 
     try {
       await _loadSyncedHashes();
+      await _loadUploadBaselines();
       final firestore = FirebaseFirestore.instance;
       final userDoc = firestore.collection('users').doc(user.uid);
 
@@ -202,6 +268,7 @@ class CloudSyncService {
 
       await _setLastSyncTime(DateTime.now());
       await _persistSyncedHashes();
+      await _persistUploadBaselines();
       return true;
     } catch (e, st) {
       ErrorLogger.log('Cloud sync failed',
@@ -257,6 +324,9 @@ class CloudSyncService {
     // into `_syncedDocHashes` only after a commit succeeds, so a permanent
     // write failure can never mark unsynced content as synced.
     Map<String, String> pendingHashes = <String, String>{};
+    Set<String>? favoriteBaseline;
+    Set<String>? playlistBaseline;
+    Map<String, Set<String>>? playlistSongBaseline;
     int opCount = 0;
     bool commitFailed = false;
 
@@ -281,9 +351,11 @@ class CloudSyncService {
       final favRes = await _repository.getFavorites();
       final localFavorites = favRes.fold((l) => <SongsTableData>[], (r) => r);
       final favCollection = userDoc.collection('favorites');
+      final localFavoriteDocIds = <String>{};
 
       for (final song in localFavorites) {
         final docId = _stableSongId(song);
+        localFavoriteDocIds.add(docId);
         final payloadRaw =
             '${song.title}|${song.artist}|${song.album}|${song.durationMs}|${song.path}|${song.remoteId}|${song.remoteArtworkUrl}|${song.source}|true';
         final hash = sha256.convert(utf8.encode(payloadRaw)).toString();
@@ -313,6 +385,7 @@ class CloudSyncService {
               'remoteArtworkUrl': song.remoteArtworkUrl,
               'source': song.source,
               'isFavorite': true,
+              'deleted': false,
               'dateAdded': song.dateAdded,
               'contentHash': hash,
               'localVersion': FieldValue.increment(1),
@@ -325,6 +398,29 @@ class CloudSyncService {
         opCount++;
         await commitBatchIfFull();
       }
+
+      // Tombstone favorites this device previously uploaded and no longer has.
+      // The baseline makes this safe on a fresh install: ids this device never
+      // uploaded (e.g. added by another device) are never deleted.
+      for (final removedId
+          in _lastUploadedFavoriteIds.difference(localFavoriteDocIds)) {
+        currentBatch.set(
+            favCollection.doc(removedId),
+            {
+              'deleted': true,
+              'isFavorite': false,
+              'contentHash': 'deleted',
+              'localVersion': FieldValue.increment(1),
+              'modifiedAt': FieldValue.serverTimestamp(),
+              'lastModifiedBy': deviceId,
+              'deviceTimestamp': DateTime.now().millisecondsSinceEpoch,
+            },
+            SetOptions(merge: true));
+        pendingHashes[removedId] = 'deleted';
+        opCount++;
+        await commitBatchIfFull();
+      }
+      favoriteBaseline = localFavoriteDocIds;
     }
 
     // 2. Upload playlists with stable playlist doc ID
@@ -332,9 +428,11 @@ class CloudSyncService {
       final playlistRes = await _repository.getPlaylists();
       final localPlaylists =
           playlistRes.fold((l) => <PlaylistsTableData>[], (r) => r);
+      final localPlaylistDocIds = <String>{};
 
       for (final pl in localPlaylists) {
         final plDocId = _stablePlaylistId(pl, prefs);
+        localPlaylistDocIds.add(plDocId);
         final plPayloadRaw =
             '${pl.name}|${pl.createdAt.toIso8601String()}|${pl.isSmart}|${pl.smartCriteria}';
         final plHash = sha256.convert(utf8.encode(plPayloadRaw)).toString();
@@ -350,6 +448,7 @@ class CloudSyncService {
                 'createdAt': pl.createdAt.toIso8601String(),
                 'isSmart': pl.isSmart,
                 'smartCriteria': pl.smartCriteria,
+                'deleted': false,
                 'contentHash': plHash,
                 'localVersion': FieldValue.increment(1),
                 'modifiedAt': FieldValue.serverTimestamp(),
@@ -364,8 +463,10 @@ class CloudSyncService {
 
         final songsRes = await _repository.getPlaylistSongs(pl.id);
         final pSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+        final localSongDocIds = <String>{};
         for (final song in pSongs) {
           final songDocId = _stableSongId(song);
+          localSongDocIds.add(songDocId);
           final songPayloadRaw =
               '${song.title}|${song.artist}|${song.album}|${song.path}|${song.remoteId}|${song.remoteArtworkUrl}|${song.durationMs}|${song.source}';
           final sHash = sha256.convert(utf8.encode(songPayloadRaw)).toString();
@@ -389,6 +490,7 @@ class CloudSyncService {
                   'remoteArtworkUrl': song.remoteArtworkUrl,
                   'durationMs': song.durationMs,
                   'source': song.source,
+                  'deleted': false,
                   'contentHash': sHash,
                   'localVersion': FieldValue.increment(1),
                   'modifiedAt': FieldValue.serverTimestamp(),
@@ -401,7 +503,48 @@ class CloudSyncService {
             await commitBatchIfFull();
           }
         }
+
+        final previousSongIds =
+            _lastUploadedPlaylistSongIds[plDocId] ?? const <String>{};
+        for (final removedId in previousSongIds.difference(localSongDocIds)) {
+          currentBatch.set(
+              plDoc.collection('songs').doc(removedId),
+              {
+                'deleted': true,
+                'contentHash': 'deleted',
+                'localVersion': FieldValue.increment(1),
+                'modifiedAt': FieldValue.serverTimestamp(),
+                'lastModifiedBy': deviceId,
+                'deviceTimestamp': DateTime.now().millisecondsSinceEpoch,
+              },
+              SetOptions(merge: true));
+          pendingHashes['${plDocId}_$removedId'] = 'deleted';
+          opCount++;
+          await commitBatchIfFull();
+        }
+        playlistSongBaseline ??= <String, Set<String>>{};
+        playlistSongBaseline[plDocId] = localSongDocIds;
       }
+
+      final playlistCollection = userDoc.collection('playlists');
+      for (final removedId
+          in _lastUploadedPlaylistIds.difference(localPlaylistDocIds)) {
+        currentBatch.set(
+            playlistCollection.doc(removedId),
+            {
+              'deleted': true,
+              'contentHash': 'deleted',
+              'localVersion': FieldValue.increment(1),
+              'modifiedAt': FieldValue.serverTimestamp(),
+              'lastModifiedBy': deviceId,
+              'deviceTimestamp': DateTime.now().millisecondsSinceEpoch,
+            },
+            SetOptions(merge: true));
+        pendingHashes['pl_tombstone_$removedId'] = 'deleted';
+        opCount++;
+        await commitBatchIfFull();
+      }
+      playlistBaseline = localPlaylistDocIds;
     }
 
     if (opCount > 0) {
@@ -410,6 +553,19 @@ class CloudSyncService {
         _syncedDocHashes.addAll(pendingHashes);
       } else {
         commitFailed = true;
+      }
+    }
+    if (!commitFailed) {
+      if (favoriteBaseline != null) {
+        _lastUploadedFavoriteIds = favoriteBaseline;
+      }
+      if (playlistBaseline != null) {
+        _lastUploadedPlaylistIds = playlistBaseline;
+      }
+      if (playlistSongBaseline != null) {
+        _lastUploadedPlaylistSongIds
+          ..clear()
+          ..addAll(playlistSongBaseline);
       }
     }
     return !commitFailed;
@@ -426,7 +582,7 @@ class CloudSyncService {
       final favItems = <Map<String, dynamic>>[];
       if (favSnapshot.docs.isNotEmpty) {
         for (final doc in favSnapshot.docs) {
-          favItems.add(doc.data());
+          favItems.add({...doc.data(), '__docId': doc.id});
         }
       } else {
         // Legacy document fallback
@@ -442,11 +598,13 @@ class CloudSyncService {
       final allLocalSongs = await _db.select(_db.songsTable).get();
       final localByRemoteId = <String, SongsTableData>{};
       final localByTitleArtist = <(String, String), SongsTableData>{};
+      final localByStableId = <String, SongsTableData>{};
       for (final s in allLocalSongs) {
         if (s.remoteId != null && s.remoteId!.isNotEmpty) {
           localByRemoteId[s.remoteId!] = s;
         }
         localByTitleArtist[(s.title.toLowerCase(), s.artist.toLowerCase())] = s;
+        localByStableId[_stableSongId(s)] = s;
       }
 
       await _db.transaction(() async {
@@ -456,12 +614,25 @@ class CloudSyncService {
           final remoteId = item['remoteId'] as String?;
           final remoteArtworkUrl = item['remoteArtworkUrl'] as String?;
           final durationMs = (item['durationMs'] as num?)?.toInt() ?? 0;
+          final docId = item['__docId'] as String?;
+          final isDeleted = item['deleted'] == true;
 
-          if (title.isEmpty) continue;
+          if (title.isEmpty && !isDeleted) continue;
 
           SongsTableData? match;
+          if (docId != null) match = localByStableId[docId];
+          // A tombstone must remove the favorite, never resurrect it from a
+          // title/artist fallback.
+          if (isDeleted) {
+            if (match != null && match.isFavorite) {
+              await (_db.update(_db.songsTable)
+                    ..where((t) => t.id.equals(match!.id)))
+                  .write(const SongsTableCompanion(isFavorite: Value(false)));
+            }
+            continue;
+          }
           if (remoteId != null && remoteId.isNotEmpty) {
-            match = localByRemoteId[remoteId];
+            match ??= localByRemoteId[remoteId];
           }
           match ??=
               localByTitleArtist[(title.toLowerCase(), artist.toLowerCase())];
@@ -509,10 +680,22 @@ class CloudSyncService {
           existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
       final prefs = await _getPrefs();
       final deviceId = await getDeviceId();
+      final playlistSongsAll = await _db.select(_db.songsTable).get();
+      final localByStableId = {
+        for (final s in playlistSongsAll) _stableSongId(s): s,
+      };
+      final localByRemoteId = <String, SongsTableData>{};
+      final localByTitleArtist = <(String, String), SongsTableData>{};
+      for (final s in playlistSongsAll) {
+        final rid = s.remoteId;
+        if (rid != null && rid.isNotEmpty) localByRemoteId[rid] = s;
+        localByTitleArtist[(s.title.toLowerCase(), s.artist.toLowerCase())] = s;
+      }
 
       if (plSnapshot.docs.isNotEmpty) {
         for (final plDoc in plSnapshot.docs) {
           final plData = plDoc.data();
+          if (plData['deleted'] == true) continue;
           final name = (plData['name'] as String?) ?? '';
           if (name.isEmpty) continue;
 
@@ -579,21 +762,25 @@ class CloudSyncService {
               final remoteId = sItem['remoteId'] as String?;
               final remoteArtworkUrl = sItem['remoteArtworkUrl'] as String?;
               final durationMs = (sItem['durationMs'] as num?)?.toInt() ?? 0;
+              final isDeleted = sItem['deleted'] == true;
+
+              SongsTableData? match = localByStableId[sDoc.id];
+              if (isDeleted) {
+                if (match != null) {
+                  await _repository.removeSongFromPlaylist(pl.id, match.id);
+                }
+                continue;
+              }
 
               if (title.isEmpty) continue;
 
-              SongsTableData? match;
               if (remoteId != null && remoteId.isNotEmpty) {
-                match = await (_db.select(_db.songsTable)
-                      ..where((t) => t.remoteId.equals(remoteId)))
-                    .getSingleOrNull();
+                match ??= localByRemoteId[remoteId];
               }
-              match ??= await (_db.select(_db.songsTable)
-                    ..where((t) =>
-                        t.title.lower().equals(title.toLowerCase()) &
-                        t.artist.lower().equals(artist.toLowerCase()))
-                    ..limit(1))
-                  .getSingleOrNull();
+              match ??= localByTitleArtist[(
+                title.toLowerCase(),
+                artist.toLowerCase()
+              )];
 
               int? songId = match?.id;
               if (songId == null && remoteId != null && remoteId.isNotEmpty) {

@@ -286,8 +286,8 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(
-                                          alpha: 0.25 * animValue),
+                                      color: Colors.black
+                                          .withValues(alpha: 0.25 * animValue),
                                       blurRadius: 8,
                                       offset: const Offset(0, 3),
                                     ),

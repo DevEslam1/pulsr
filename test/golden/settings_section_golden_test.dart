@@ -1,11 +1,16 @@
 // test/golden/settings_section_golden_test.dart
+// Golden images are gitignored; run with --update-goldens to create them.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/settings/presentation/widgets/settings_section.dart';
 
 void main() {
-  testWidgets('SettingsSection golden', (tester) async {
+  testWidgets('SettingsSection golden',
+      skip: !File('test/golden/goldens/settings_section.png').existsSync(),
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AuraTheme.darkTheme,

@@ -352,24 +352,23 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                                     ),
                                     alignment: Alignment.center,
                                     child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.touch_app_rounded,
-                                                size: 16, color: p.accent),
-                                            const SizedBox(
-                                                width: AppSpacing.xxs),
-                                            Text(
-                                              'Tap to reveal (Hifz recall)',
-                                              style: TextStyle(
-                                                fontSize: AppFontSize.caption,
-                                                fontWeight: FontWeight.w700,
-                                                color: p.accent,
-                                              ),
-                                            ),
-                                          ],
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.touch_app_rounded,
+                                            size: 16, color: p.accent),
+                                        const SizedBox(width: AppSpacing.xxs),
+                                        Text(
+                                          'Tap to reveal (Hifz recall)',
+                                          style: TextStyle(
+                                            fontSize: AppFontSize.caption,
+                                            fontWeight: FontWeight.w700,
+                                            color: p.accent,
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),

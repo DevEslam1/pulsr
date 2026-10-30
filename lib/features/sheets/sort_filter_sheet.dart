@@ -249,9 +249,7 @@ class SortFilterSheet extends StatelessWidget {
                       color: p.accent.withValues(alpha: 0.35),
                       width: 1.0,
                     )
-                  : (isGrid
-                      ? Border.all(color: p.hairline, width: 1.0)
-                      : null),
+                  : (isGrid ? Border.all(color: p.hairline, width: 1.0) : null),
             ),
             child: Row(
               children: [

@@ -725,7 +725,8 @@ void main() {
           );
         }
         if (range != null) {
-          return FakeResponse(statusCode: HttpStatus.requestedRangeNotSatisfiable);
+          return FakeResponse(
+              statusCode: HttpStatus.requestedRangeNotSatisfiable);
         }
         return FakeResponse(
           statusCode: 200,
@@ -738,10 +739,10 @@ void main() {
 
       expect(result.isRight(), isTrue);
       expect(client.requests.where((r) => r.headers.values['range'] != null),
-          hasLength(2), reason: 'probe plus the rejected resume attempt');
+          hasLength(2),
+          reason: 'probe plus the rejected resume attempt');
       expect(
-          client.requests.where(
-              (r) => !r.headers.values.containsKey('range')),
+          client.requests.where((r) => !r.headers.values.containsKey('range')),
           hasLength(1),
           reason: 'the retry must start from zero without a Range header');
     });
@@ -1129,8 +1130,8 @@ void main() {
     });
   });
 
-  group('bot block', () {
-    test('a 403 probe surfaces the classified bot-block failure', () async {
+  group('expired stream URL', () {
+    test('a 403 probe re-resolves without burning the poToken', () async {
       server = (request) async => FakeResponse(statusCode: 403);
       when(() => ytm.resolveStream(
                 any(),
@@ -1146,7 +1147,7 @@ void main() {
       final result = await service.download(_song());
 
       result.match(
-        (failure) => expect(failure.message.toLowerCase(), contains('verif')),
+        (failure) => expect(failure.message.toLowerCase(), contains('expired')),
         (_) => fail('expected a failure'),
       );
       verify(() => ytm.resolveStream(
@@ -1157,7 +1158,9 @@ void main() {
             title: any(named: 'title'),
             artist: any(named: 'artist'),
           )).called(5);
-      verify(() => ytm.invalidatePoToken()).called(greaterThanOrEqualTo(1));
+      // A media-URL 403 is an expired signature; minting a new poToken pays
+      // for a full BotGuard round and does not fix the URL.
+      verifyNever(() => ytm.invalidatePoToken());
     });
   });
 

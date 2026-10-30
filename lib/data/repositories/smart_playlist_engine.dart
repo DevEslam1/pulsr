@@ -257,8 +257,18 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         }
 
       case SmartRuleField.isLossless:
-        final losslessExpr = t.codec.isIn(
-                const ['FLAC', 'ALAC', 'WAV', 'AIFF', 'PCM', 'DSF', 'DFF']) |
+        // Guard the nullable codec with isNotNull so an un-enriched row yields
+        // FALSE (not NULL); otherwise `NOT(lossless)` silently drops it.
+        final losslessExpr = (t.codec.isNotNull() &
+                t.codec.isIn(const [
+                  'FLAC',
+                  'ALAC',
+                  'WAV',
+                  'AIFF',
+                  'PCM',
+                  'DSF',
+                  'DFF'
+                ])) |
             (t.bitDepth.isNotNull() & t.bitDepth.isBiggerOrEqualValue(24)) |
             t.path.lower().like('%.flac') |
             t.path.lower().like('%.wav') |

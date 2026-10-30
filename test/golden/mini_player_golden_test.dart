@@ -1,4 +1,10 @@
 // test/golden/mini_player_golden_test.dart
+//
+// Golden images are generated locally (`flutter test test/golden
+// --update-goldens`) and are gitignored, so a clean checkout has no master
+// images. Skip rather than fail when the reference is absent.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -93,8 +99,12 @@ Widget _harness({required DockStackMode mode}) {
 }
 
 void main() {
+  bool goldenExists(String name) =>
+      File('test/golden/goldens/$name').existsSync();
+
   for (final mode in DockStackMode.values) {
-    testWidgets('MiniPlayer dock golden: ${mode.name}', (tester) async {
+    testWidgets('MiniPlayer dock golden: ${mode.name}',
+        skip: !goldenExists('mini_player_${mode.name}.png'), (tester) async {
       await tester.pumpWidget(_harness(mode: mode));
       await tester.pumpAndSettle();
 

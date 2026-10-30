@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../performance/gpu_budget.dart';
+import '../services/settings_cache.dart';
 import '../theme/aura_theme.dart';
 
 /// {@category DesignSystem}
@@ -124,7 +125,17 @@ class GlassContainer extends StatelessWidget {
     final effectiveRadius =
         borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
 
-    final baseColor = color ?? (p.isDark ? p.surfaceContainer : p.surface);
+    // The user's Liquid Glass Tint (0 = ultra clear, 1 = tinted) and the
+    // preset opacity were previously accepted but never applied, so every
+    // "glass" surface rendered opaque and the slider did nothing.
+    final tint = (tintFactor ??
+            SettingsCache()
+                .getDouble('setting_liquid_glass_tint', defaultValue: 0.8))
+        .clamp(0.0, 1.0);
+    final tintAlpha = (opacity * (0.35 + 0.65 * tint)).clamp(0.0, 1.0);
+    final base = color ?? (p.isDark ? p.surfaceContainer : p.surface);
+    final baseColor =
+        color == null ? base.withValues(alpha: base.a * tintAlpha) : base;
 
     final effectiveBorder = border ??
         Border.all(

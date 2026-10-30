@@ -213,7 +213,8 @@ class DspChainValidator {
     // 3. Convolver / Reverb Stage Latency (estimated: the native debug report
     // does not expose per-stage convolver latency). Use the report's real engine
     // state for truthful warnings instead of a key that never exists.
-    final double convolverLatency = 7.2; // typical partition FFT convolution latency
+    final double convolverLatency =
+        7.2; // typical partition FFT convolution latency
     final bool convolverHealthy = true;
     if (debugStatus != null) {
       if (debugStatus['isNativeDspLoaded'] == false) {
@@ -221,8 +222,8 @@ class DspChainValidator {
             'Native DSP engine is not loaded; processing falls back to the Android/OEM path');
       }
       if (debugStatus['isBitPerfectBypassActive'] == true) {
-        allWarnings.add(
-            'Bit-Perfect bypass is active; all DSP stages are bypassed');
+        allWarnings
+            .add('Bit-Perfect bypass is active; all DSP stages are bypassed');
       }
     }
 

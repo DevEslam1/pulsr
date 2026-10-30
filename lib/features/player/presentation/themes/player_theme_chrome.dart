@@ -537,12 +537,11 @@ class PlayerViewSwitcher extends StatelessWidget {
     final l10n = context.l10n;
     // Custom Theme Studio shape controls apply when the user picked the custom
     // colour source, so preset themes keep their hand-tuned geometry.
-    final custom = context
-        .select<SettingsCubit, ({double radius, bool active})>(
-            (c) => (
-                  radius: c.state.customThemeRadius,
-                  active: c.state.themeColorSource == ThemeColorSource.custom,
-                ));
+    final custom =
+        context.select<SettingsCubit, ({double radius, bool active})>((c) => (
+              radius: c.state.customThemeRadius,
+              active: c.state.themeColorSource == ThemeColorSource.custom,
+            ));
     final barRadius = custom.active ? custom.radius : 20.0;
 
     return Center(

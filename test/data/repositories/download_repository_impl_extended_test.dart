@@ -307,11 +307,10 @@ void main() {
       final completer = Completer<Result<int>>();
       void Function(YtDownloadProgress)? report;
       when(() => service.download(any(),
-              bypassInternalQueue: any(named: 'bypassInternalQueue'),
-              onProgress: any(named: 'onProgress')))
-          .thenAnswer((invocation) {
-        report = invocation.namedArguments[const Symbol('onProgress')]
-            as void Function(YtDownloadProgress)?;
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((invocation) {
+        report = invocation.namedArguments[const Symbol('onProgress')] as void
+            Function(YtDownloadProgress)?;
         return completer.future;
       });
 
@@ -390,8 +389,7 @@ void main() {
       expect(stored.status, DownloadStatus.complete);
     });
 
-    test('a connectivity loss parks paused and resumes on reconnect',
-        () async {
+    test('a connectivity loss parks paused and resumes on reconnect', () async {
       final connectivity = MockConnectivity();
       when(() => connectivity.checkConnectivity())
           .thenAnswer((_) async => [ConnectivityResult.none]);
@@ -431,9 +429,8 @@ void main() {
         () async {
       SongsTableData? captured;
       when(() => service.download(any(),
-              bypassInternalQueue: any(named: 'bypassInternalQueue'),
-              onProgress: any(named: 'onProgress')))
-          .thenAnswer((invocation) async {
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((invocation) async {
         captured = invocation.positionalArguments.first as SongsTableData;
         return const Right(3);
       });
@@ -486,9 +483,8 @@ void main() {
           {'setting_download_max_concurrent': 1});
       final completers = <Completer<Result<int>>>[];
       when(() => service.download(any(),
-              bypassInternalQueue: any(named: 'bypassInternalQueue'),
-              onProgress: any(named: 'onProgress')))
-          .thenAnswer((_) {
+          bypassInternalQueue: any(named: 'bypassInternalQueue'),
+          onProgress: any(named: 'onProgress'))).thenAnswer((_) {
         final completer = Completer<Result<int>>();
         completers.add(completer);
         return completer.future;
@@ -505,8 +501,7 @@ void main() {
       await repo.queueDownload(task('aaaaaaaaaaa'));
       await repo.queueDownload(task('bbbbbbbbbbb'));
       expect(completers, hasLength(1));
-      verify(() => service.setKeepForegroundAlive(true))
-          .called(greaterThan(0));
+      verify(() => service.setKeepForegroundAlive(true)).called(greaterThan(0));
 
       await repo.pauseDownload('aaaaaaaaaaa');
       await Future<void>.delayed(const Duration(milliseconds: 20));

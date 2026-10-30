@@ -441,6 +441,12 @@ class AppDatabase extends _$AppDatabase {
               await m.addColumn(songsTable, songsTable.cueFile);
             }
           }
+          if (from == 11) {
+            // A v11 upgrade that rolled back its SAVEPOINT left the database at
+            // v11 without the UNIQUE/index guarantees. Every statement is
+            // idempotent, so retry the whole block once on the next open.
+            await _createV11Constraints(customStatement, db: this);
+          }
           if (from < 12) {
             await m.createTable(onlinePlaylistsTable);
             await m.createTable(onlinePlaylistEntriesTable);

@@ -31,8 +31,8 @@ AudioOutputInfo _info({
 void main() {
   group('OutputPathVerdict', () {
     test('USB + bit-perfect + no DSP is bit-perfect', () {
-      final v = OutputPathVerdict.of(
-          _info(usb: true, bitPerfect: true, type: 'usb'));
+      final v =
+          OutputPathVerdict.of(_info(usb: true, bitPerfect: true, type: 'usb'));
       expect(v.quality, OutputPathQuality.bitPerfect);
       expect(v.detail, '96 kHz / 24-bit');
       expect(v.isLossy, isFalse);

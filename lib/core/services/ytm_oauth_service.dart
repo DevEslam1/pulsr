@@ -111,6 +111,12 @@ class YtmOAuthService {
   /// session the user just logged out of.
   int _authGeneration = 0;
 
+  /// True only when the last failed refresh proved the session dead
+  /// (invalid_grant/invalid_client), not when the network was unavailable.
+  /// Account code uses this to avoid logging the user out on an offline blip.
+  bool _lastRefreshTerminal = false;
+  bool get lastRefreshFailedTerminally => _lastRefreshTerminal;
+
   bool get isSignedIn => _accessToken != null && _accessToken!.isNotEmpty;
 
   /// Current bearer token, or null. May be soft-expired; call [ensureFresh]
@@ -156,6 +162,7 @@ class YtmOAuthService {
     // The token is (nearly) expired and cannot be refreshed: treat as signed
     // out instead of reporting a usable session that will 401 on every call.
     if (_refreshToken == null || _refreshToken!.isEmpty) {
+      _lastRefreshTerminal = true;
       await _clearTokens();
       return false;
     }
@@ -283,7 +290,11 @@ class YtmOAuthService {
   Future<bool> _refreshOnce() async {
     final generation = _authGeneration;
     final refreshToken = _refreshToken;
-    if (refreshToken == null || refreshToken.isEmpty) return false;
+    _lastRefreshTerminal = false;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      _lastRefreshTerminal = true;
+      return false;
+    }
     try {
       final res = await _client
           .post(
@@ -311,10 +322,13 @@ class YtmOAuthService {
       // the UI stops claiming the account is connected.
       final error = json?['error'] as String?;
       if (error == 'invalid_grant' || error == 'invalid_client') {
+        _lastRefreshTerminal = true;
         if (generation == _authGeneration) await _clearTokens();
       }
       return false;
     } catch (e) {
+      // Timeout/DNS/5xx/cancellation: the grant may still be valid, so the
+      // caller must not tear down the session.
       debugPrint('[YtmOAuth] refresh failed: $e');
       return false;
     }

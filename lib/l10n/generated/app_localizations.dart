@@ -63,7 +63,8 @@ import 'app_localizations_es.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -71,7 +72,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -83,7 +85,8 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
     delegate,
     GlobalMaterialLocalizations.delegate,
     GlobalCupertinoLocalizations.delegate,
@@ -3791,7 +3794,8 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{title} {artist} {status} {progress}'**
-  String downloadTileSemantics(String title, String artist, String status, String progress);
+  String downloadTileSemantics(
+      String title, String artist, String status, String progress);
 
   /// No description provided for @downloadActionsSemantics.
   ///
@@ -13750,7 +13754,7 @@ abstract class AppLocalizations {
   /// Audio feature info string
   ///
   /// In en, this message translates to:
-  /// **'Bypasses Android AudioFlinger resampler and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the DAC via AudioMixerAttributes (API 34) for USB, or via direct/offload for wired. No software volume or DSP is applied. Requires Android 14+ for USB, or a wired device that advertises FLOAT/24-bit & hi-res rates. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).'**
+  /// **'Bypasses Android AudioFlinger and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr\'s own UAC2 isochronous sink when the platform exposes no exclusive mixer. No software volume or DSP is applied. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).'**
   String get featureInfoBitPerfectDescription;
 
   /// Audio feature info string
@@ -14459,7 +14463,8 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Clipping risk: EQ preamp ({preampDb} dB) + boost (+{boostDb} dB) = +{totalDb} dB > 6 dB headroom.'**
-  String conflictVolumeBoostClipping(String preampDb, String boostDb, String totalDb);
+  String conflictVolumeBoostClipping(
+      String preampDb, String boostDb, String totalDb);
 
   /// Audio conflict reason message
   ///
@@ -15155,7 +15160,8 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Downloading {active} • {completed}/{total} completed'**
-  String downloadsProgressSummary(Object active, Object completed, Object total);
+  String downloadsProgressSummary(
+      Object active, Object completed, Object total);
 
   /// No description provided for @downloadsRequeued.
   ///
@@ -15530,7 +15536,8 @@ abstract class AppLocalizations {
   String clearCompletedDownloadsConfirm(int count);
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -15539,26 +15546,27 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['ar', 'en', 'es'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['ar', 'en', 'es'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'ar': return AppLocalizationsAr();
-    case 'en': return AppLocalizationsEn();
-    case 'es': return AppLocalizationsEs();
+    case 'ar':
+      return AppLocalizationsAr();
+    case 'en':
+      return AppLocalizationsEn();
+    case 'es':
+      return AppLocalizationsEs();
   }
 
   throw FlutterError(
-    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
-  );
+      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

@@ -477,5 +477,51 @@ void main() {
           .execute(jsonEncode({'version': 1, 'playHistory': history}));
       expect(result.restoredHistoryCount, 150);
     });
+
+    test('preserves CUE chapter identity in favorites and queue', () async {
+      Future<void> insertChapter(int id, int cueStartMs) async {
+        await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+              id: Value(id),
+              title: 'Chapter $id',
+              path: '/music/album.flac',
+              cueStartMs: Value(cueStartMs),
+              cueFile: const Value('/music/album.cue'),
+              isFavorite: Value(id == 2),
+            ));
+      }
+
+      await insertChapter(1, 1000);
+      await insertChapter(2, 60000);
+      await db.into(db.queueItemsTable).insert(
+            QueueItemsTableCompanion.insert(
+              songId: 2,
+              orderIndex: 0,
+              isCurrent: const Value(true),
+              positionMs: const Value(5000),
+            ),
+          );
+
+      final exported =
+          jsonDecode(await exportUseCase.execute()) as Map<String, dynamic>;
+      expect(
+          exported['favorites'], contains('/music/album.flac#pulsr_cue=60000'));
+      expect((exported['queue'] as Map)['paths'],
+          contains('/music/album.flac#pulsr_cue=60000'));
+
+      await db.update(db.songsTable).write(
+            const SongsTableCompanion(isFavorite: Value(false)),
+          );
+      await db.delete(db.queueItemsTable).go();
+
+      final result = await importUseCase.execute(jsonEncode(exported));
+      expect(result.restoredFavoritesCount, 1);
+      final songs = await db.select(db.songsTable).get();
+      expect(
+          songs.singleWhere((s) => s.cueStartMs == 60000).isFavorite, isTrue);
+      expect(
+          songs.singleWhere((s) => s.cueStartMs == 1000).isFavorite, isFalse);
+      final queue = await db.select(db.queueItemsTable).get();
+      expect(queue.single.songId, 2);
+    });
   });
 }

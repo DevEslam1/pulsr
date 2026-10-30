@@ -1,4 +1,6 @@
-// TEMPORARY audit harness — screens + stress cases.
+// TEMPORARY audit harness — screens + stress cases. Not part of the default
+// suite (file name intentionally does not end in _test.dart); run explicitly
+// with: flutter test test/_audit_screens.dart --update-goldens
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -53,8 +55,8 @@ void main() {
         ..addFont(Future.value(manrope.readAsBytesSync().buffer.asByteData()));
       await loader.load();
     }
-    final flutterRoot = Platform.environment['FLUTTER_ROOT'] ??
-        r'D:\Courses\work\dev\flutter';
+    final flutterRoot =
+        Platform.environment['FLUTTER_ROOT'] ?? r'D:\Courses\work\dev\flutter';
     final icons = File(
         '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
     if (icons.existsSync()) {
@@ -67,8 +69,7 @@ void main() {
   final auth = _MockAuth();
   setUp(() {
     when(() => auth.state).thenReturn(const AuthState());
-    when(() => auth.stream)
-        .thenAnswer((_) => const Stream<AuthState>.empty());
+    when(() => auth.stream).thenAnswer((_) => const Stream<AuthState>.empty());
     when(() => settings.state).thenReturn(const SettingsState());
     when(() => settings.stream)
         .thenAnswer((_) => const Stream<SettingsState>.empty());

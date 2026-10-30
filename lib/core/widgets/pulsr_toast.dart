@@ -486,182 +486,171 @@ class _ToastWidgetState extends State<_ToastWidget>
                                   width: 1.0,
                                 ),
                               ),
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                    isCompactLandscape ? 10 : 12,
-                                    isCompactLandscape ? 7 : 9,
-                                    isCompactLandscape ? 8 : 10,
-                                    isCompactLandscape ? 7 : 9,
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                isCompactLandscape ? 10 : 12,
+                                isCompactLandscape ? 7 : 9,
+                                isCompactLandscape ? 8 : 10,
+                                isCompactLandscape ? 7 : 9,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Leading Status Badge
+                                  Container(
+                                    width: isCompactLandscape ? 30 : 32,
+                                    height: isCompactLandscape ? 30 : 32,
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(
+                                          alpha: p.isDark ? 0.18 : 0.12),
+                                      borderRadius: BorderRadius.circular(
+                                          isCompactLandscape ? 9 : 10),
+                                      border: Border.all(
+                                        color:
+                                            statusColor.withValues(alpha: 0.24),
+                                        width: 1.0,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        effectiveIcon,
+                                        color: statusColor,
+                                        size: isCompactLandscape ? 16 : 18,
+                                      ),
+                                    ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // Leading Status Badge
-                                      Container(
-                                        width: isCompactLandscape ? 30 : 32,
-                                        height: isCompactLandscape ? 30 : 32,
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withValues(
-                                              alpha: p.isDark ? 0.18 : 0.12),
-                                          borderRadius: BorderRadius.circular(
-                                              isCompactLandscape ? 9 : 10),
-                                          border: Border.all(
-                                            color: statusColor.withValues(
-                                                alpha: 0.24),
-                                            width: 1.0,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Icon(
-                                            effectiveIcon,
-                                            color: statusColor,
-                                            size: isCompactLandscape ? 16 : 18,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
+                                  const SizedBox(width: 10),
 
-                                      // Text Content
-                                      Flexible(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            if (widget.title != null) ...[
-                                              Text(
-                                                widget.title!,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: p.textPrimary,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: isCompactLandscape
-                                                      ? 12.0
-                                                      : AppFontSize.bodySmall,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 1),
-                                            ],
-                                            Text(
-                                              widget.message,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: widget.title != null
-                                                    ? p.textSecondary
-                                                    : p.textPrimary,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: isCompactLandscape
-                                                    ? 12.0
-                                                    : AppFontSize.bodySmall,
-                                                height: 1.22,
-                                              ),
+                                  // Text Content
+                                  Flexible(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (widget.title != null) ...[
+                                          Text(
+                                            widget.title!,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: isCompactLandscape
+                                                  ? 12.0
+                                                  : AppFontSize.bodySmall,
                                             ),
-                                          ],
-                                        ),
-                                      ),
-
-                                      // Optional Action Button
-                                      if (widget.action != null) ...[
-                                        const SizedBox(width: 8),
-                                        Semantics(
-                                          button: true,
-                                          label: widget.action!.label,
-                                          child: ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                                minWidth: 48, minHeight: 48),
-                                            child: GestureDetector(
-                                              behavior: HitTestBehavior.opaque,
-                                              onTap: () {
-                                                HapticFeedback.lightImpact();
-                                                widget.action!.onPressed();
-                                                dismiss();
-                                              },
-                                              child: Container(
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: isCompactLandscape
-                                                      ? 9
-                                                      : 11,
-                                                  vertical: isCompactLandscape
-                                                      ? 4
-                                                      : 5,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: statusColor.withValues(
-                                                      alpha: p.isDark
-                                                          ? 0.20
-                                                          : 0.14),
-                                                  borderRadius: AppRadii.r10All,
-                                                  border: Border.all(
-                                                    color:
-                                                        statusColor.withValues(
-                                                            alpha: 0.32),
-                                                    width: 1.0,
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    if (widget.action!.icon !=
-                                                        null) ...[
-                                                      Icon(
-                                                        widget.action!.icon,
-                                                        size: isCompactLandscape
-                                                            ? 12
-                                                            : 14,
-                                                        color: statusColor,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                    ],
-                                                    Text(
-                                                      widget.action!.label,
-                                                      style: TextStyle(
-                                                        color: statusColor,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        fontSize:
-                                                            isCompactLandscape
-                                                                ? 11.5
-                                                                : AppFontSize
-                                                                    .bodySmall,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
+                                          ),
+                                          const SizedBox(height: 1),
+                                        ],
+                                        Text(
+                                          widget.message,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: widget.title != null
+                                                ? p.textSecondary
+                                                : p.textPrimary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: isCompactLandscape
+                                                ? 12.0
+                                                : AppFontSize.bodySmall,
+                                            height: 1.22,
                                           ),
                                         ),
                                       ],
+                                    ),
+                                  ),
 
-                                      // Close Button
-                                      const SizedBox(width: 4),
-                                      Semantics(
-                                        button: true,
-                                        label: MaterialLocalizations.of(context)
-                                            .closeButtonTooltip,
+                                  // Optional Action Button
+                                  if (widget.action != null) ...[
+                                    const SizedBox(width: 8),
+                                    Semantics(
+                                      button: true,
+                                      label: widget.action!.label,
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                            minWidth: 48, minHeight: 48),
                                         child: GestureDetector(
                                           behavior: HitTestBehavior.opaque,
                                           onTap: () {
                                             HapticFeedback.lightImpact();
+                                            widget.action!.onPressed();
                                             dismiss();
                                           },
-                                          child: SizedBox(
-                                            width: 48,
-                                            height: 48,
-                                            child: Icon(
-                                              Icons.close_rounded,
-                                              size:
-                                                  isCompactLandscape ? 16 : 18,
-                                              color: p.textTertiary,
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal:
+                                                  isCompactLandscape ? 9 : 11,
+                                              vertical:
+                                                  isCompactLandscape ? 4 : 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withValues(
+                                                  alpha:
+                                                      p.isDark ? 0.20 : 0.14),
+                                              borderRadius: AppRadii.r10All,
+                                              border: Border.all(
+                                                color: statusColor.withValues(
+                                                    alpha: 0.32),
+                                                width: 1.0,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (widget.action!.icon !=
+                                                    null) ...[
+                                                  Icon(
+                                                    widget.action!.icon,
+                                                    size: isCompactLandscape
+                                                        ? 12
+                                                        : 14,
+                                                    color: statusColor,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                ],
+                                                Text(
+                                                  widget.action!.label,
+                                                  style: TextStyle(
+                                                    color: statusColor,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: isCompactLandscape
+                                                        ? 11.5
+                                                        : AppFontSize.bodySmall,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  ],
+
+                                  // Close Button
+                                  const SizedBox(width: 4),
+                                  Semantics(
+                                    button: true,
+                                    label: MaterialLocalizations.of(context)
+                                        .closeButtonTooltip,
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        dismiss();
+                                      },
+                                      child: SizedBox(
+                                        width: 48,
+                                        height: 48,
+                                        child: Icon(
+                                          Icons.close_rounded,
+                                          size: isCompactLandscape ? 16 : 18,
+                                          color: p.textTertiary,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           ),
@@ -671,7 +660,9 @@ class _ToastWidgetState extends State<_ToastWidget>
                   ),
                 ),
               ),
-            );
+            ),
+          ),
+        );
       },
     );
   }

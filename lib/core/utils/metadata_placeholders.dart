@@ -42,6 +42,5 @@ class MetadataPlaceholders {
   static bool isRealAlbum(String? value) => !isUnknownAlbum(value);
   static bool isRealTitle(String? value) => !isUnknownTitle(value);
 
-  static String _normalize(String? value) =>
-      (value ?? '').trim().toLowerCase();
+  static String _normalize(String? value) => (value ?? '').trim().toLowerCase();
 }

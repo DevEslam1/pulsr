@@ -269,7 +269,8 @@ class DsdDecoderHelper {
     const maxPcmBytes = 400 * 1024 * 1024; // 400 MB safe threshold
     if (estimatedPcmBytes > maxPcmBytes) {
       throw DsdUnsupportedException(
-        'Decoded PCM output exceeds memory safety limit of 400 MB ( MB)',
+        'Decoded PCM output exceeds the memory safety limit of 400 MB '
+        '(${estimatedPcmBytes ~/ (1024 * 1024)} MB)',
       );
     }
 

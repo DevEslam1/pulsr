@@ -769,8 +769,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         if (!await file.exists()) continue;
         var size = row.fileSize;
         if (size == null || size <= 0) size = await file.length();
-        final ext =
-            p.extension(row.path).replaceFirst('.', '').toLowerCase();
+        final ext = p.extension(row.path).replaceFirst('.', '').toLowerCase();
         _pausedVideoIds.remove(videoId);
         _autoPausedVideoIds.remove(videoId);
         _updateTask(task.copyWith(
@@ -867,22 +866,20 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         // Legacy repair: an earlier scanner pass could have replaced the
         // library row with MediaStore placeholders while the persisted task
         // still remembers the real online metadata. Restore it.
-        final repairTitle =
-            (MetadataPlaceholders.isUnknownTitle(song.title) ||
-                        rowTitleLooksLikeFileName) &&
-                    MetadataPlaceholders.isRealTitle(task.title)
-                ? task.title
-                : song.title;
+        final repairTitle = (MetadataPlaceholders.isUnknownTitle(song.title) ||
+                    rowTitleLooksLikeFileName) &&
+                MetadataPlaceholders.isRealTitle(task.title)
+            ? task.title
+            : song.title;
         final repairArtist =
             MetadataPlaceholders.isUnknownArtist(song.artist) &&
                     MetadataPlaceholders.isRealArtist(task.artist)
                 ? task.artist
                 : song.artist;
-        final repairAlbum =
-            MetadataPlaceholders.isUnknownAlbum(song.album) &&
-                    MetadataPlaceholders.isRealAlbum(task.album)
-                ? task.album!
-                : song.album;
+        final repairAlbum = MetadataPlaceholders.isUnknownAlbum(song.album) &&
+                MetadataPlaceholders.isRealAlbum(task.album)
+            ? task.album!
+            : song.album;
         final database = db;
         final songRowId = song.id;
         if (database != null &&
@@ -953,6 +950,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final isTerminal = task.status == DownloadStatus.complete ||
         task.status == DownloadStatus.failed ||
         task.status == DownloadStatus.paused;
+    // saving/indexing is the crash-sensitive window: the file may already be
+    // in MediaStore. Persist it immediately instead of after the 800 ms
+    // debounce so boot recovery knows to adopt/reconcile it.
+    final isSaving = task.status == DownloadStatus.tagging;
 
     if (isIntermediateProgress &&
         (now - lastEmit < _throttleMs) &&
@@ -986,7 +987,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     if (isIntermediateProgress) {
       _checkpointProgress(videoId, now);
     } else {
-      _schedulePersist(immediateOnTerminal: isTerminal);
+      _schedulePersist(immediateOnTerminal: isTerminal || isSaving);
     }
   }
 
@@ -1101,8 +1102,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // removes a job at 100% and used to tear itself down before this scheduler
     // started the next transfer, and an FGS started from the background can be
     // refused outright on Android 12+.
-    _ytDownloadService
-        .setKeepForegroundAlive(_activeVideoIds.isNotEmpty || _queue.isNotEmpty);
+    _ytDownloadService.setKeepForegroundAlive(
+        _activeVideoIds.isNotEmpty || _queue.isNotEmpty);
     _ensurePolicyWatchdog();
   }
 
@@ -1202,9 +1203,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       // persisted with the task so a resumed download still tags and looks up
       // lyrics with the real metadata.
       final songRow = synthTrack.toSongData().copyWith(
-        id: task.sourceSongId ?? synthTrack.songId,
-        album: task.album ?? '',
-      );
+            id: task.sourceSongId ?? synthTrack.songId,
+            album: task.album ?? '',
+          );
 
       // A per-track quality survives restarts in the persisted task; hand it to
       // the service's admission path, which consumes it only when it creates a

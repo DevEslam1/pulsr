@@ -8,6 +8,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:rxdart/rxdart.dart';
 import '../../core/constants/audio_formats.dart';
 import '../../core/errors/failures.dart';
 import '../../core/utils/cue_parser.dart';
@@ -22,6 +23,49 @@ import '../../domain/repositories/music_repository_interface.dart';
 import '../../core/utils/input_sanitizer.dart';
 import '../db/app_database.dart';
 import '../services/library_maintenance_service.dart';
+
+/// Emits an error value from a watched-result stream. `Stream.handleError`
+/// discards its callback's return value, which silently swallowed every
+/// database failure in these watch queries.
+///
+/// Implemented with a controller instead of `transform`: the upstream stream's
+/// runtime type is `Stream<Right<...>>`, and Dart reifies `transform`'s type
+/// argument, so an `Either` transformer is rejected at runtime even though the
+/// widened static type accepts it.
+extension ResultStreamRecovery<A, B> on Stream<Either<A, B>> {
+  Stream<Either<A, B>> onResultError(
+      Either<A, B> Function(Object error, StackTrace stackTrace) mapper) {
+    late final StreamController<Either<A, B>> controller;
+    StreamSubscription<Either<A, B>>? subscription;
+    void start() {
+      subscription = listen(
+        controller.add,
+        onError: (Object error, StackTrace stackTrace) =>
+            controller.add(mapper(error, stackTrace)),
+        onDone: controller.close,
+        cancelOnError: false,
+      );
+    }
+
+    Future<void> stop() async {
+      await subscription?.cancel();
+      subscription = null;
+    }
+
+    controller = isBroadcast
+        ? StreamController<Either<A, B>>.broadcast(
+            onListen: start,
+            onCancel: stop,
+          )
+        : StreamController<Either<A, B>>(
+            onListen: start,
+            onPause: () => subscription?.pause(),
+            onResume: () => subscription?.resume(),
+            onCancel: stop,
+          );
+    return controller.stream;
+  }
+}
 
 @Singleton(as: IMusicRepository)
 class MusicRepository implements IMusicRepository {
@@ -203,11 +247,12 @@ class MusicRepository implements IMusicRepository {
 
       return query
           .watch()
-          .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError(
-            (e) => Left<AppFailure, List<SongsTableData>>(
-                DatabaseFailure('Failed to watch songs', e)),
-          );
+          .map<Either<AppFailure, List<SongsTableData>>>(
+              (songs) => Right<AppFailure, List<SongsTableData>>(songs))
+          // Stream.handleError DISCARDS the callback's return value; use the
+          // RxDart operator that actually emits the mapped error value.
+          .onErrorReturnWith((e, st) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch songs', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch songs', e)));
     }
@@ -239,13 +284,15 @@ class MusicRepository implements IMusicRepository {
     if (!AppDatabase.ftsTrigramSupported) return false;
     final trimmed = query.trim();
     if (trimmed.isEmpty) return false;
+    // FTS5 trigram MATCH cannot resolve a query shorter than one trigram;
+    // those must fall back to the unicode61 prefix query (or LIKE).
+    if (trimmed.length < 3) return false;
     // Check for CJK Ideographs / Hiragana / Katakana / Hangul
     final hasCjk =
         RegExp(r'[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]')
             .hasMatch(trimmed);
     if (hasCjk) return true;
-    // Or short query (<= 3 chars) or substring search with spaces/fragments
-    return trimmed.length <= 3;
+    return trimmed.length == 3;
   }
 
   /// Formats query for FTS5 trigram virtual table.
@@ -312,23 +359,21 @@ class MusicRepository implements IMusicRepository {
           .customSelect(buffer.toString(),
               variables: vars, readsFrom: {_db.songsTable})
           .watch()
-          .asyncMap((rows) async {
+          .asyncMap<Either<AppFailure, List<SongsTableData>>>((rows) async {
             final songs = await Future.wait(
                 rows.map((r) => _db.songsTable.mapFromRow(r)));
             return Right<AppFailure, List<SongsTableData>>(songs);
           })
-          .handleError(
-            (e) {
-              // Missing/corrupt FTS (failed migration rebuild or a damaged
-              // index): attempt a bounded repair, then report. The next watch
-              // re-subscribes onto the rebuilt index. repairFtsIndex caps its
-              // own attempts per session, so this cannot loop.
-              AppDatabase.ftsRebuildFailed = true;
-              unawaited(_db.repairFtsIndex());
-              return Left<AppFailure, List<SongsTableData>>(
-                  DatabaseFailure('Failed to watch songs (FTS)', e));
-            },
-          );
+          .onErrorReturnWith((e, st) {
+            // Missing/corrupt FTS (failed migration rebuild or a damaged
+            // index): attempt a bounded repair, then report. The next watch
+            // re-subscribes onto the rebuilt index. repairFtsIndex caps its
+            // own attempts per session, so this cannot loop.
+            AppDatabase.ftsRebuildFailed = true;
+            unawaited(_db.repairFtsIndex());
+            return Left<AppFailure, List<SongsTableData>>(
+                DatabaseFailure('Failed to watch songs (FTS)', e));
+          });
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch songs', e)));
     }
@@ -654,7 +699,7 @@ class MusicRepository implements IMusicRepository {
       return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch downloaded songs', e)));
     } catch (e) {
       return Stream.value(
@@ -675,7 +720,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch favorites', e)));
     } catch (e) {
       return Stream.value(
@@ -972,7 +1017,7 @@ class MusicRepository implements IMusicRepository {
       return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch recently played', e)));
     } catch (e) {
       return Stream.value(
@@ -1047,7 +1092,7 @@ class MusicRepository implements IMusicRepository {
       return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch recently added', e)));
     } catch (e) {
       return Stream.value(
@@ -1105,7 +1150,7 @@ class MusicRepository implements IMusicRepository {
       return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch top played', e)));
     } catch (e) {
       return Stream.value(
@@ -1205,7 +1250,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
               DatabaseFailure('Failed to watch albums', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch albums', e)));
@@ -1230,7 +1275,7 @@ class MusicRepository implements IMusicRepository {
             ]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch album songs', e)));
     } catch (e) {
       return Stream.value(
@@ -1307,7 +1352,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.name)]))
           .watch()
           .map((artists) => Right<AppFailure, List<ArtistsTableData>>(artists))
-          .handleError((e) => Left<AppFailure, List<ArtistsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<ArtistsTableData>>(
               DatabaseFailure('Failed to watch artists', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch artists', e)));
@@ -1326,7 +1371,7 @@ class MusicRepository implements IMusicRepository {
                 (t.cueFile.isNull() | t.cueStartMs.isNotNull())))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch artist songs', e)));
     } catch (e) {
       return Stream.value(
@@ -1383,7 +1428,7 @@ class MusicRepository implements IMusicRepository {
             ..where((t) => t.artistId.equals(artistId)))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
               DatabaseFailure('Failed to watch artist albums', e)));
     } catch (e) {
       return Stream.value(
@@ -1400,7 +1445,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((playlists) =>
               Right<AppFailure, List<PlaylistsTableData>>(playlists))
-          .handleError((e) => Left<AppFailure, List<PlaylistsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<PlaylistsTableData>>(
               DatabaseFailure('Failed to watch playlists', e)));
     } catch (e) {
       return Stream.value(
@@ -1515,7 +1560,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((rows) => Right<AppFailure, List<SongsTableData>>(
               rows.map((row) => row.readTable(_db.songsTable)).toList()))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch playlist songs', e)));
     } catch (e) {
       return Stream.value(
@@ -1583,15 +1628,17 @@ class MusicRepository implements IMusicRepository {
   Future<Result<void>> addSongsToPlaylist(
       int playlistId, List<int> songIds) async {
     try {
-      final existingRows = await (_db.select(_db.playlistEntriesTable)
-            ..where((t) => t.playlistId.equals(playlistId)))
-          .get();
-      final existingSongIds = existingRows.map((r) => r.songId).toSet();
-      int nextOrderIndex = existingRows.isEmpty
-          ? 0
-          : existingRows.map((r) => r.orderIndex).reduce(max) + 1;
-
       await _db.transaction(() async {
+        // Read MAX(orderIndex) inside the same transaction: two concurrent
+        // adds used to pick the same next index and one batch then failed
+        // against the (playlist_id, order_index) unique index.
+        final existingRows = await (_db.select(_db.playlistEntriesTable)
+              ..where((t) => t.playlistId.equals(playlistId)))
+            .get();
+        final existingSongIds = existingRows.map((r) => r.songId).toSet();
+        int nextOrderIndex = existingRows.isEmpty
+            ? 0
+            : existingRows.map((r) => r.orderIndex).reduce(max) + 1;
         for (final songId in songIds) {
           if (!existingSongIds.contains(songId)) {
             existingSongIds.add(songId);
@@ -1937,8 +1984,9 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((folders) =>
               Right<AppFailure, List<ExcludedFoldersTableData>>(folders))
-          .handleError((e) => Left<AppFailure, List<ExcludedFoldersTableData>>(
-              DatabaseFailure('Failed to watch excluded folders', e)));
+          .onResultError((e, st) =>
+              Left<AppFailure, List<ExcludedFoldersTableData>>(
+                  DatabaseFailure('Failed to watch excluded folders', e)));
     } catch (e) {
       return Stream.value(
           Left(DatabaseFailure('Failed to watch excluded folders', e)));
@@ -2094,11 +2142,13 @@ class MusicRepository implements IMusicRepository {
           "SELECT s1.id AS id, s1.is_downloaded AS downloaded, "
           "lower(s1.path) AS path_key "
           "FROM songs s1 "
-          "WHERE s1.path != '' AND s1.path NOT LIKE 'ytmusic://%' "
+          "WHERE s1.source = 'local' AND s1.path != '' "
+          "AND s1.path NOT LIKE 'ytmusic://%' "
           "AND s1.cue_start_ms IS NULL "
           "AND lower(s1.path) IN ("
           "SELECT lower(path) FROM songs "
-          "WHERE path != '' AND path NOT LIKE 'ytmusic://%' "
+          "WHERE source = 'local' AND path != '' "
+          "AND path NOT LIKE 'ytmusic://%' "
           "AND cue_start_ms IS NULL "
           "GROUP BY lower(path) HAVING COUNT(*) > 1)",
         )
@@ -2235,8 +2285,7 @@ class MusicRepository implements IMusicRepository {
     final idList = ids.toList(growable: false);
     const chunkSize = 400;
     for (var i = 0; i < idList.length; i += chunkSize) {
-      final chunk =
-          idList.sublist(i, (i + chunkSize).clamp(0, idList.length));
+      final chunk = idList.sublist(i, (i + chunkSize).clamp(0, idList.length));
       final rows = await (_db.select(_db.songsTable)
             ..where((t) => t.id.isIn(chunk)))
           .get();
@@ -2274,13 +2323,11 @@ class MusicRepository implements IMusicRepository {
     final scannerLacksTags =
         MetadataPlaceholders.isUnknownArtist(incomingArtist) ||
             MetadataPlaceholders.isUnknownAlbum(incomingAlbum);
-    final downloadedTitleIsSuspect =
-        existing.isDownloaded && scannerLacksTags;
+    final downloadedTitleIsSuspect = existing.isDownloaded && scannerLacksTags;
 
-    final keepExistingTitle =
-        (downloadedTitleIsSuspect ||
-                MetadataPlaceholders.isUnknownTitle(incomingTitle)) &&
-            MetadataPlaceholders.isRealTitle(existing.title);
+    final keepExistingTitle = (downloadedTitleIsSuspect ||
+            MetadataPlaceholders.isUnknownTitle(incomingTitle)) &&
+        MetadataPlaceholders.isRealTitle(existing.title);
     final keepExistingArtist =
         MetadataPlaceholders.isUnknownArtist(incomingArtist) &&
             MetadataPlaceholders.isRealArtist(existing.artist);
@@ -2453,19 +2500,28 @@ class MusicRepository implements IMusicRepository {
       final newIdsByPath = <String, List<int>>{};
       final coverByContainerId = <int, String>{};
       final coveredPaths = <String>{};
+      // Paths whose cue state was conclusively evaluated in this pass. Virtual
+      // rows for any other path (e.g. a container that is currently missing or
+      // a cue that could not be read) must be preserved: deleting them would
+      // cascade away playlist entries and play history for a transient I/O
+      // failure.
+      final evaluatedPaths = <String>{};
       var expanded = 0;
 
       for (final container in containers) {
         final cuePath = _siblingCuePath(container.path);
         String? effectiveCuePath;
         String? rawCueContent;
+        var cueReadFailed = false;
         List<ChapterInfo> chapters = const [];
 
         if (cuePath.isNotEmpty && await File(cuePath).exists()) {
           try {
             rawCueContent = await File(cuePath).readAsString();
             effectiveCuePath = cuePath;
-          } catch (_) {}
+          } catch (_) {
+            cueReadFailed = true;
+          }
         } else if (!_embeddedCueMisses.contains(container.path)) {
           embeddedCueProbeCount++;
           final embedded =
@@ -2482,6 +2538,9 @@ class MusicRepository implements IMusicRepository {
             rawCueContent.isEmpty ||
             effectiveCuePath == null) {
           _cueContentHashCache.remove(container.path);
+          // A failed read is not evidence that the cue sheet disappeared;
+          // only a definitively absent/empty cue retires its virtual rows.
+          if (!cueReadFailed) evaluatedPaths.add(container.path);
           continue;
         }
 
@@ -2498,6 +2557,7 @@ class MusicRepository implements IMusicRepository {
                 existingVirtual.map((v) => v.id).toList();
             coverByContainerId[container.id] = effectiveCuePath;
             coveredPaths.add(container.path);
+            evaluatedPaths.add(container.path);
             expanded += existingVirtual.length;
             continue;
           }
@@ -2505,7 +2565,10 @@ class MusicRepository implements IMusicRepository {
 
         chapters = CueParser.parse(rawCueContent);
 
-        if (chapters.isEmpty) continue;
+        if (chapters.isEmpty) {
+          evaluatedPaths.add(container.path);
+          continue;
+        }
         // Only whole-file album sheets are expanded. Multi-file sheets map
         // chapters onto several source files; expanding the wrong window on
         // this one file would fabricate playback, so skip them.
@@ -2513,7 +2576,10 @@ class MusicRepository implements IMusicRepository {
             .map((c) => (c.fileName ?? '').toLowerCase())
             .where((f) => f.isNotEmpty)
             .toSet();
-        if (fileNames.length > 1) continue;
+        if (fileNames.length > 1) {
+          evaluatedPaths.add(container.path);
+          continue;
+        }
         // The cue must reference this audio file, not an unrelated sibling.
         if (fileNames.isNotEmpty &&
             !effectiveCuePath.startsWith('embedded://')) {
@@ -2523,19 +2589,26 @@ class MusicRepository implements IMusicRepository {
               .split('/')
               .last
               .toLowerCase();
-          if (referenced != audioName) continue;
+          if (referenced != audioName) {
+            evaluatedPaths.add(container.path);
+            continue;
+          }
         }
         final virtual = buildCueExpansion(
           container: container,
           chapters: chapters,
           cuePath: effectiveCuePath,
         );
-        if (virtual.isEmpty) continue;
+        if (virtual.isEmpty) {
+          evaluatedPaths.add(container.path);
+          continue;
+        }
         _cueContentHashCache[container.path] = contentHash;
         companions.addAll(virtual);
         newIdsByPath[container.path] = virtual.map((c) => c.id.value).toList();
         coverByContainerId[container.id] = effectiveCuePath;
         coveredPaths.add(container.path);
+        evaluatedPaths.add(container.path);
         expanded += virtual.length;
       }
 
@@ -2560,6 +2633,10 @@ class MusicRepository implements IMusicRepository {
             .get();
         for (final marker in markers) {
           if (coveredPaths.contains(marker.path)) continue;
+          // As with virtual rows, only clear markers for containers this pass
+          // actually observed; an absent SD card must not unhide a file that
+          // still has its cue sheet on disk.
+          if (!evaluatedPaths.contains(marker.path)) continue;
           await (_db.update(_db.songsTable)
                 ..where((t) => t.id.equals(marker.id)))
               .write(const SongsTableCompanion(cueFile: Value(null)));
@@ -2569,6 +2646,11 @@ class MusicRepository implements IMusicRepository {
               ..where((t) => t.cueStartMs.isNotNull()))
             .get();
         for (final row in virtualRows) {
+          // Never delete a virtual row whose container was not conclusively
+          // evaluated in this pass (missing/unreadable file): the cue could
+          // return on the next scan and the row still owns playlist/history
+          // references.
+          if (!evaluatedPaths.contains(row.path)) continue;
           final keep = newIdsByPath[row.path];
           if (keep != null && keep.contains(row.id)) continue;
           await (_db.delete(_db.songsTable)..where((t) => t.id.equals(row.id)))
@@ -2970,9 +3052,7 @@ class MusicRepository implements IMusicRepository {
     String? downloaded,
     bool Function(String?) isPlaceholder,
   ) =>
-      (downloaded != null && !isPlaceholder(downloaded))
-          ? downloaded
-          : scanned;
+      (downloaded != null && !isPlaceholder(downloaded)) ? downloaded : scanned;
 
   @override
   Future<Result<int?>> reconcileDownloadedSong({
@@ -3018,6 +3098,17 @@ class MusicRepository implements IMusicRepository {
         if (newRow != null && newRow.isMissing) {
           newRow = null;
         }
+        // A metadata match on a *different* path that still exists is an
+        // unrelated same-title local track, not this download. Hijacking it
+        // marked that file downloaded and orphaned the new one.
+        if (newRow != null && newRow.path != newPath) {
+          var matchedPathExists = false;
+          try {
+            matchedPathExists =
+                newRow.path.isNotEmpty && await File(newRow.path).exists();
+          } catch (_) {}
+          if (matchedPathExists) newRow = null;
+        }
       }
 
       final fileExists = await File(newPath).exists();
@@ -3033,12 +3124,15 @@ class MusicRepository implements IMusicRepository {
                       ? oldRow.dateAdded! * 1000
                       : oldRow.dateAdded!)
                   : nowMs;
-              final bestTitle = _bestMetadata(oldRow.title,
-                  fallbackSong?.title, null, MetadataPlaceholders.isUnknownTitle);
-              final bestArtist = _bestMetadata(oldRow.artist,
-                  fallbackSong?.artist, null, MetadataPlaceholders.isUnknownArtist);
-              final bestAlbum = _bestMetadata(oldRow.album,
-                  fallbackSong?.album, null, MetadataPlaceholders.isUnknownAlbum);
+              final bestTitle = _bestMetadata(oldRow.title, fallbackSong?.title,
+                  null, MetadataPlaceholders.isUnknownTitle);
+              final bestArtist = _bestMetadata(
+                  oldRow.artist,
+                  fallbackSong?.artist,
+                  null,
+                  MetadataPlaceholders.isUnknownArtist);
+              final bestAlbum = _bestMetadata(oldRow.album, fallbackSong?.album,
+                  null, MetadataPlaceholders.isUnknownAlbum);
               await (_db.update(_db.songsTable)
                     ..where((t) => t.id.equals(oldId)))
                   .write(
@@ -3066,14 +3160,13 @@ class MusicRepository implements IMusicRepository {
                           (fallbackSong?.remoteId ?? '').trim().isNotEmpty
                       ? Value(fallbackSong!.remoteId)
                       : const Value.absent(),
-                  remoteArtworkUrl: (oldRow.remoteArtworkUrl ?? '')
-                              .trim()
-                              .isEmpty &&
-                          (fallbackSong?.remoteArtworkUrl ?? '')
-                              .trim()
-                              .isNotEmpty
-                      ? Value(fallbackSong!.remoteArtworkUrl)
-                      : const Value.absent(),
+                  remoteArtworkUrl:
+                      (oldRow.remoteArtworkUrl ?? '').trim().isEmpty &&
+                              (fallbackSong?.remoteArtworkUrl ?? '')
+                                  .trim()
+                                  .isNotEmpty
+                          ? Value(fallbackSong!.remoteArtworkUrl)
+                          : const Value.absent(),
                   bitrateKbps: fallbackSong?.bitrateKbps != null
                       ? Value(fallbackSong!.bitrateKbps)
                       : const Value.absent(),
@@ -3193,15 +3286,18 @@ class MusicRepository implements IMusicRepository {
                 : const Value.absent(),
             durationMs:
                 bestDuration > 0 ? Value(bestDuration) : const Value.absent(),
+            path:
+                newRow.path != newPath ? Value(newPath) : const Value.absent(),
             source: const Value(SongSource.local),
+            isMissing: const Value(false),
             isDownloaded: const Value(true),
+            pendingDownloadPath: const Value(null),
             remoteId: bestRemoteId != null && bestRemoteId.trim().isNotEmpty
                 ? Value(bestRemoteId)
                 : const Value.absent(),
-            remoteArtworkUrl:
-                bestArt != null && bestArt.trim().isNotEmpty
-                    ? Value(bestArt)
-                    : const Value.absent(),
+            remoteArtworkUrl: bestArt != null && bestArt.trim().isNotEmpty
+                ? Value(bestArt)
+                : const Value.absent(),
           ));
           return;
         }
@@ -3259,8 +3355,11 @@ class MusicRepository implements IMusicRepository {
         final keepOldPosition =
             (oldData.lastPlayed ?? 0) > (newData.lastPlayed ?? 0);
 
-        final String effectiveTitle = _bestMetadata(oldData.title,
-            fallbackSong?.title, newData.title, MetadataPlaceholders.isUnknownTitle);
+        final String effectiveTitle = _bestMetadata(
+            oldData.title,
+            fallbackSong?.title,
+            newData.title,
+            MetadataPlaceholders.isUnknownTitle);
         final String effectiveArtist = _bestMetadata(
             oldData.artist,
             fallbackSong?.artist,
@@ -3275,12 +3374,14 @@ class MusicRepository implements IMusicRepository {
           oldData.remoteArtworkUrl,
           fallbackSong?.remoteArtworkUrl,
           newData.remoteArtworkUrl,
-        ].firstWhere((v) => v != null && v.trim().isNotEmpty, orElse: () => null);
+        ].firstWhere((v) => v != null && v.trim().isNotEmpty,
+            orElse: () => null);
         final String? effectiveRemoteId = [
           oldData.remoteId,
           fallbackSong?.remoteId,
           newData.remoteId,
-        ].firstWhere((v) => v != null && v.trim().isNotEmpty, orElse: () => null);
+        ].firstWhere((v) => v != null && v.trim().isNotEmpty,
+            orElse: () => null);
 
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId)))
             .write(
@@ -3304,7 +3405,10 @@ class MusicRepository implements IMusicRepository {
             // Carry the video id and online remoteArtworkUrl
             remoteId: Value(effectiveRemoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
+            path:
+                newData.path != newPath ? Value(newPath) : const Value.absent(),
             source: const Value(SongSource.local),
+            isMissing: const Value(false),
             isDownloaded: const Value(true),
             pendingDownloadPath: const Value(null),
           ),
@@ -3312,7 +3416,7 @@ class MusicRepository implements IMusicRepository {
 
         // FIX: Remove any other duplicate path rows that the scanner may have inserted in parallel
         // This guarantees a single entry per file path after download, fixing "repeats twice on local"
-        final newRowPath = newData.path;
+        final newRowPath = newPath;
         final duplicateOthers = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.path.lower().equals(newRowPath.toLowerCase()) &
@@ -3517,7 +3621,7 @@ class MusicRepository implements IMusicRepository {
             .where((g) => g.name.isNotEmpty)
             .toList();
         return Right<AppFailure, List<GenreItem>>(list);
-      }).handleError((e) => Left<AppFailure, List<GenreItem>>(
+      }).onResultError((e, st) => Left<AppFailure, List<GenreItem>>(
           DatabaseFailure('Failed to watch genres', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch genres', e)));
@@ -3569,7 +3673,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch genre songs', e)));
     } catch (e) {
       return Stream.value(
@@ -3625,7 +3729,7 @@ class MusicRepository implements IMusicRepository {
             .where((y) => y.year > 0)
             .toList();
         return Right<AppFailure, List<YearItem>>(list);
-      }).handleError((e) => Left<AppFailure, List<YearItem>>(
+      }).onResultError((e, st) => Left<AppFailure, List<YearItem>>(
           DatabaseFailure('Failed to watch years', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch years', e)));
@@ -3644,7 +3748,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch year songs', e)));
     } catch (e) {
       return Stream.value(

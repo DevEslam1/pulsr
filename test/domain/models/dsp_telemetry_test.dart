@@ -47,7 +47,23 @@ void main() {
 
     test('clamps corrupt ranges instead of propagating them', () {
       final list = <dynamic>[
-        99.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99.0, 0, 999.0, 1.0,
+        99.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        99.0,
+        0,
+        999.0,
+        1.0,
       ];
       final telemetry = DspTelemetry.fromNativeList(list);
 

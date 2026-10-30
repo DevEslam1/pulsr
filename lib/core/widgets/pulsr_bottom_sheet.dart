@@ -273,83 +273,80 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                                // Top drag pill
-                                if (showDragHandle) ...[
-                                  const SizedBox(height: AppSpacing.s10),
-                                  Center(
-                                    child: Semantics(
-                                      label: context.l10n.sheetDragHandle,
-                                      hint: context.l10n.sheetDragDownToDismiss,
-                                      child: Container(
-                                        width: AppSpacing.s40,
-                                        height: 4.5,
-                                        decoration: BoxDecoration(
-                                          color: (p.isDark
-                                                  ? Colors.white
-                                                  : Colors.black)
-                                              .withValues(alpha: 0.22),
-                                          borderRadius: AppRadii.full,
-                                        ),
-                                      ),
+                            // Top drag pill
+                            if (showDragHandle) ...[
+                              const SizedBox(height: AppSpacing.s10),
+                              Center(
+                                child: Semantics(
+                                  label: context.l10n.sheetDragHandle,
+                                  hint: context.l10n.sheetDragDownToDismiss,
+                                  child: Container(
+                                    width: AppSpacing.s40,
+                                    height: 4.5,
+                                    decoration: BoxDecoration(
+                                      color: (p.isDark
+                                              ? Colors.white
+                                              : Colors.black)
+                                          .withValues(alpha: 0.22),
+                                      borderRadius: AppRadii.full,
                                     ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.s8),
-                                ],
-
-                                // Optional Header
-                                if (title != null) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.s20,
-                                        vertical: AppSpacing.s8),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              DefaultTextStyle.merge(
-                                                style: TextStyle(
-                                                  color: p.textPrimary,
-                                                  fontSize: AppFontSize.title,
-                                                  fontWeight: FontWeight.w800,
-                                                  letterSpacing:
-                                                      AppTracking.title,
-                                                ),
-                                                child: title!,
-                                              ),
-                                              if (subtitle != null) ...[
-                                                const SizedBox(
-                                                    height: AppSpacing.s2),
-                                                DefaultTextStyle.merge(
-                                                  style: TextStyle(
-                                                    color: p.textSecondary,
-                                                    fontSize: AppFontSize.label,
-                                                  ),
-                                                  child: subtitle!,
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                        if (trailing != null) trailing!,
-                                      ],
-                                    ),
-                                  ),
-                                  Divider(color: p.hairline, height: 1),
-                                ],
-
-                                // Sheet Body
-                                Flexible(
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: child,
                                   ),
                                 ),
-                              ],
+                              ),
+                              const SizedBox(height: AppSpacing.s8),
+                            ],
+
+                            // Optional Header
+                            if (title != null) ...[
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.s20,
+                                    vertical: AppSpacing.s8),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          DefaultTextStyle.merge(
+                                            style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontSize: AppFontSize.title,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: AppTracking.title,
+                                            ),
+                                            child: title!,
+                                          ),
+                                          if (subtitle != null) ...[
+                                            const SizedBox(
+                                                height: AppSpacing.s2),
+                                            DefaultTextStyle.merge(
+                                              style: TextStyle(
+                                                color: p.textSecondary,
+                                                fontSize: AppFontSize.label,
+                                              ),
+                                              child: subtitle!,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    if (trailing != null) trailing!,
+                                  ],
+                                ),
+                              ),
+                              Divider(color: p.hairline, height: 1),
+                            ],
+
+                            // Sheet Body
+                            Flexible(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: child,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     ),
@@ -358,6 +355,8 @@ class PulsrBottomSheetContainer extends StatelessWidget {
               ),
             ),
           ),
-        );
+        ),
+      ),
+    );
   }
 }

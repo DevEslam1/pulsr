@@ -137,9 +137,9 @@ void main() {
 
     await cubit.download(testSong, quality: YtmAudioQuality.low);
 
-    final captured =
-        verify(() => mockDownloads.queueDownload(captureAny())).captured.single
-            as DownloadTask;
+    final captured = verify(() => mockDownloads.queueDownload(captureAny()))
+        .captured
+        .single as DownloadTask;
     expect(captured.quality, YtmAudioQuality.low);
     expect(captured.album, 'Test Album');
     expect(captured.durationMs, 210000);

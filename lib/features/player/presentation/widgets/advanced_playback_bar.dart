@@ -125,8 +125,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(
-                                    alpha: p.isDark ? 0.20 : 0.05),
+                                color: Colors.black
+                                    .withValues(alpha: p.isDark ? 0.20 : 0.05),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),

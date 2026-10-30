@@ -76,7 +76,8 @@ class DownloadTile extends StatelessWidget {
     final bitrateLabel = (task.bitrate != null && task.bitrate! > 0)
         ? '${task.bitrate} kbps'
         : null;
-    final codecLabel = [formatLabel, bitrateLabel].whereType<String>().join(' ');
+    final codecLabel =
+        [formatLabel, bitrateLabel].whereType<String>().join(' ');
     final subtitleParts = <String>[
       if (task.artist.isNotEmpty) task.artist,
       if (codecLabel.isNotEmpty) codecLabel,

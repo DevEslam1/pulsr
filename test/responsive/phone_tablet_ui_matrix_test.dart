@@ -32,6 +32,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../features/library/library_test_harness.dart' as lib;
 
 class MockScanner extends Mock implements MediaScannerService {}
+
 class MockAuthCubit extends Mock implements AuthCubit {}
 
 const _sizes = <String, Size>{

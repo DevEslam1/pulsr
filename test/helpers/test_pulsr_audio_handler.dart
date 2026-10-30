@@ -15,7 +15,6 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
-
   double _vol = 1.0;
   @override
   Future<T> withSmoothDspTransition<T>(Future<T> Function() action) => action();

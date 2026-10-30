@@ -69,8 +69,7 @@ class DspOutputModeEffect {
   });
 
   @override
-  String toString() =>
-      'DspOutputModeEffect(aaudioActive: $aaudioActive, '
+  String toString() => 'DspOutputModeEffect(aaudioActive: $aaudioActive, '
       'floatActive: $floatActive, reason: $reason)';
 }
 
@@ -1921,8 +1920,8 @@ class AudioPlayer {
       // reflect the effective mode.
       if (active && !_isUnitTest()) {
         try {
-          final control = MethodChannel(
-              'com.ryanheise.just_audio.methods.${platform.id}');
+          final control =
+              MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
           _platformControlChannel?.setMethodCallHandler(null);
           _platformControlChannel = control;
           control.setMethodCallHandler((call) async {
@@ -1943,13 +1942,13 @@ class AudioPlayer {
           final floatAccepted = await control.invokeMethod<bool>(
                   'dspSetFloatOutput', {'enabled': _floatOutputEnabled}) ??
               false;
-          final aaudioAccepted = await control.invokeMethod<bool>(
-                  'dspSetAaudioOutput', {
-                'enabled': _aaudioOutputEnabled,
-                'preferExclusive': _aaudioPreferExclusive,
-                'targetBufferMs': _aaudioTargetBufferMs,
-              }) ??
-              false;
+          final aaudioAccepted =
+              await control.invokeMethod<bool>('dspSetAaudioOutput', {
+                    'enabled': _aaudioOutputEnabled,
+                    'preferExclusive': _aaudioPreferExclusive,
+                    'targetBufferMs': _aaudioTargetBufferMs,
+                  }) ??
+                  false;
           final aaudioActive = _aaudioOutputEnabled && aaudioAccepted;
           String? reason;
           if (_aaudioOutputEnabled && !aaudioAccepted) {

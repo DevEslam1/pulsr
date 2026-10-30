@@ -81,24 +81,20 @@ class AudioQualityBadge extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                (isUsb ? gold : info.badgeColor)
-                    .withValues(alpha: 0.20),
-                (isUsb ? gold : info.badgeColor)
-                    .withValues(alpha: 0.06),
+                (isUsb ? gold : info.badgeColor).withValues(alpha: 0.20),
+                (isUsb ? gold : info.badgeColor).withValues(alpha: 0.06),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: AppRadii.r20All,
             border: Border.all(
-              color: (isUsb ? gold : info.badgeColor)
-                  .withValues(alpha: 0.45),
+              color: (isUsb ? gold : info.badgeColor).withValues(alpha: 0.45),
               width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isUsb ? gold : info.badgeColor)
-                    .withValues(alpha: 0.14),
+                color: (isUsb ? gold : info.badgeColor).withValues(alpha: 0.14),
                 blurRadius: 8,
                 spreadRadius: -1,
                 offset: const Offset(0, 2),
@@ -155,8 +151,8 @@ class AudioQualityBadge extends StatelessWidget {
                 Icon(
                   Icons.tune_rounded,
                   size: compact ? 11 : 13,
-                  color: (isUsb ? gold : info.badgeColor)
-                      .withValues(alpha: 0.8),
+                  color:
+                      (isUsb ? gold : info.badgeColor).withValues(alpha: 0.8),
                 ),
               ],
             ),

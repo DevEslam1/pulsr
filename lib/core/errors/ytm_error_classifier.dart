@@ -189,7 +189,7 @@ enum YtmBlockSignal {
       // timeout family rather than the block family: the chain ran out of time,
       // which says nothing about the egress and must stay retryable.
       case 'RESOLVE_DEADLINE':
-      return YtmBlockSignal.networkUnavailable;
+        return YtmBlockSignal.networkUnavailable;
       case 'RATE_LIMITED':
       case 'YTM_429':
         return YtmBlockSignal.rateLimited;
@@ -684,6 +684,15 @@ class YtmErrorClassifier {
     final explicitSignal = YtmBlockSignal.fromCode(code);
     if (explicitSignal != null) {
       return _mapSignal(explicitSignal, details, traceId);
+    }
+    // A media-URL signature expiry is not an identity verdict: re-resolve the
+    // URL, never mint a new poToken or rotate the egress path.
+    if (code.toUpperCase() == 'YTM_STREAM_EXPIRED') {
+      return YtmErrorInfo(
+        message: 'Stream link expired. Refreshing…',
+        recoveryAction: YtmRecoveryAction.retryWithBackoff,
+        traceId: traceId,
+      );
     }
 
     final detailLower = details?.toLowerCase() ?? '';

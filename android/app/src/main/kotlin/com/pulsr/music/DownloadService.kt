@@ -235,11 +235,17 @@ class DownloadService : Service() {
             ACTION_CANCEL -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 if (vid != null) {
-                    activeDownloads.remove(vid)
+                    // Completed jobs are removed from activeDownloads but the
+                    // notification can linger for a few seconds. Only forward a
+                    // cancel that actually targeted a live job; otherwise a
+                    // stale tap would delete the finished download and its row.
+                    val wasActive = activeDownloads.remove(vid) != null
                     downloadTitles.remove(vid)
                     pausedDownloads.remove(vid)
                     timeoutPausedIds.remove(vid)
-                    try { onDownloadCancelledListener?.invoke(vid) } catch (_: Exception) {}
+                    if (wasActive) {
+                        try { onDownloadCancelledListener?.invoke(vid) } catch (_: Exception) {}
+                    }
                 }
                 renderCurrentNotification(activeDownloads.keys.firstOrNull())
             }

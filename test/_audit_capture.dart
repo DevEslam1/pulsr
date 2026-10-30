@@ -1,4 +1,5 @@
-// TEMPORARY audit capture test (not part of the repo test suite).
+// TEMPORARY audit capture script (not part of the default suite; run
+// explicitly with: flutter test test/_audit_capture.dart --update-goldens).
 // Renders the real SettingsScreen across categories/layouts and writes PNGs
 // under test/audit_captures/ for visual review (run with --update-goldens).
 import 'dart:io';

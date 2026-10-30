@@ -53,7 +53,8 @@ void main() {
     when(() => searchCubit.savedSearches).thenReturn(savedSearches);
     when(() => searchCubit.searchPlayedSongs).thenReturn(searchPlayedSongs);
     when(() => searchCubit.recordPlayedSong(any())).thenAnswer((_) async {});
-    when(() => searchCubit.removeSearchPlayedSong(any())).thenAnswer((_) async {});
+    when(() => searchCubit.removeSearchPlayedSong(any()))
+        .thenAnswer((_) async {});
     when(() => searchCubit.clearSearchPlayedSongs()).thenAnswer((_) async {});
     when(() => searchCubit.hasMoreResults).thenReturn(hasMoreResults);
     when(() => searchCubit.isDebouncing).thenReturn(false);
@@ -93,8 +94,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('renders the start page',
-      (tester) async {
+  testWidgets('renders the start page', (tester) async {
     await pumpScreen(tester);
 
     expect(find.text('Search'), findsOneWidget);

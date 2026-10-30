@@ -130,7 +130,7 @@ bool UsbAudioSink::submitAll() {
 UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
                                    int altSetting, int sampleRate, int channels,
                                    int bytesPerSample) {
-    if (fd < 0 || channels <= 0 || bytesPerSample <= 0) {
+    if (fd < 0 || channels <= 0 || channels > 8 || bytesPerSample <= 0) {
         lastError_.store(EINVAL, std::memory_order_relaxed);
         return UsbStreamResult::InvalidArgs;
     }
@@ -601,7 +601,11 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
     }
 
     const int bps = bytesPerSample_;
-    const size_t totalSamples = static_cast<size_t>(frames) * channels;
+    const int sinkChannels = channels_;
+    if (sinkChannels <= 0) {
+        activeWriters_.fetch_sub(1, std::memory_order_release);
+        return;
+    }
     const size_t cap = ring_.size();
     const size_t mask = ringMask_;
     if (cap == 0) {
@@ -611,24 +615,42 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
 
     size_t w = ringWrite_.load(std::memory_order_relaxed);
     size_t r = ringRead_.load(std::memory_order_acquire);
-    size_t availSpace = (cap > (w - r)) ? (cap - (w - r) - 1) : 0;
+    const size_t availSpace = (cap > (w - r)) ? (cap - (w - r) - 1) : 0;
+    // Only ever write whole sink frames: a partial frame shifts every
+    // subsequent channel slot and stays misaligned for the session.
+    const size_t availFrames = (availSpace / static_cast<size_t>(bps)) /
+                               static_cast<size_t>(sinkChannels);
+    const size_t framesToWrite = std::min(
+        static_cast<size_t>(frames), availFrames);
 
-    size_t s = 0;
-    for (; s < totalSamples && availSpace >= static_cast<size_t>(bps); ++s) {
-        uint8_t packed[4];
-        packSample(buffer[s], packed, bps);
-        for (int b = 0; b < bps; ++b) {
-            ring_[(w + b) & mask] = packed[b];
+    for (size_t f = 0; f < framesToWrite; ++f) {
+        for (int c = 0; c < sinkChannels; ++c) {
+            // The render block's channel count can differ from the rate the
+            // DAC was opened at. Map per frame instead of packing samples
+            // sequentially: mono is duplicated, extra sink channels get
+            // silence, and surplus source channels are dropped (no downmix).
+            float sample;
+            if (channels == sinkChannels || c < channels) {
+                sample = buffer[f * static_cast<size_t>(channels) + c];
+            } else if (channels == 1) {
+                sample = buffer[f];
+            } else {
+                sample = 0.0f;
+            }
+            uint8_t packed[4];
+            packSample(sample, packed, bps);
+            for (int b = 0; b < bps; ++b) {
+                ring_[(w + b) & mask] = packed[b];
+            }
+            w += bps;
         }
-        w += bps;
-        availSpace -= bps;
     }
     ringWrite_.store(w, std::memory_order_release);
 
-    if (s < totalSamples) {
-        // Track overrun (dropped frames)
-        const size_t droppedSamples = totalSamples - s;
-        overrunCount_.fetch_add(droppedSamples / channels, std::memory_order_relaxed);
+    if (framesToWrite < static_cast<size_t>(frames)) {
+        overrunCount_.fetch_add(
+            static_cast<uint64_t>(frames) - framesToWrite,
+            std::memory_order_relaxed);
     }
 
     activeWriters_.fetch_sub(1, std::memory_order_release);

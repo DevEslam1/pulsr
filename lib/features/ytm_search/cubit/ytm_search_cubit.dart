@@ -11,6 +11,7 @@ import '../../../core/services/file_intent_handler.dart';
 import '../../../core/services/ytm_search_cache.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/ytm_rate_limiter.dart';
 import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 
@@ -377,7 +378,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       if (results.isNotEmpty) {
         try {
           final warmGeneration = effectiveGeneration;
-          if (!_service.isBotCoolingDown) {
+          if (!_service.isBotCoolingDown &&
+              !YtmRateLimiter.shared.isCoolingDown) {
             for (var i = 0; i < results.length && i < _warmTopN; i++) {
               final warmId = results[i].videoId;
               if (warmId.isEmpty) continue;

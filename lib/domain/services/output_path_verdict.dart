@@ -99,7 +99,8 @@ class OutputPathVerdict {
 
   static String _khz(int hz) {
     final k = hz / 1000.0;
-    final text = k == k.roundToDouble() ? k.toStringAsFixed(0) : k.toStringAsFixed(1);
+    final text =
+        k == k.roundToDouble() ? k.toStringAsFixed(0) : k.toStringAsFixed(1);
     return '$text kHz';
   }
 }

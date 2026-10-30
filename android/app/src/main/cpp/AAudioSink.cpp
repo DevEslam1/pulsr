@@ -312,7 +312,10 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     int32_t framesLeft = totalFrames;
     const uint8_t* inCursor = data;
     int retries = 0;
-    constexpr int kMaxRetries = 10;
+    // Cap the total stall at ~150 ms (3 x 50 ms). The caller handles partial
+    // writes, and a 500 ms block here also delayed Close/release behind the
+    // lifecycle lock.
+    constexpr int kMaxRetries = 3;
 
     while (framesLeft > 0) {
         if (releasing_.load(std::memory_order_acquire) || stream_.load(std::memory_order_acquire) == nullptr) break;
