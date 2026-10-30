@@ -15,6 +15,7 @@ class QuranModeService {
   static const String _keyEnabled = 'quran_mode_enabled';
   static const String _keyStyle = 'quran_reciter_style';
   static const String _keyStyleTunings = 'quran_reciter_style_tunings_v1';
+  static const String _keyUserOverride = 'quran_mode_user_override_v1';
 
   QuranModeService();
 
@@ -26,6 +27,27 @@ class QuranModeService {
   Future<void> setEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyEnabled, enabled);
+  }
+
+  /// The user's explicit on/off decision, or `null` when they have never
+  /// touched the Quran Mode toggle.
+  ///
+  /// Automatic activation ("this looks like a recitation") must never override
+  /// a decision the user made by hand, so the tri-state is persisted separately
+  /// from the effective mode: [_keyEnabled] records what the app last ran with,
+  /// this records what the user asked for.
+  Future<bool?> getUserOverride() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyUserOverride);
+  }
+
+  Future<void> setUserOverride(bool? value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value == null) {
+      await prefs.remove(_keyUserOverride);
+    } else {
+      await prefs.setBool(_keyUserOverride, value);
+    }
   }
 
   Future<QuranReciterStyle> getStyle() async {

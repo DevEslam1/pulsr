@@ -508,8 +508,10 @@ class MediaScannerService {
       // its partial valid-id set would mark/delete valid tracks. Skip both
       // destructive post-passes and leave the next scan to complete them.
       if (!truncated && !incremental) {
-        final cleanupResult =
-            await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+        final cleanupResult = await _repository.cleanupOrphanedSongs(
+          parseResult.validSongIds,
+          excludedFolderPrefixes: excludedFolders,
+        );
         cleanupResult.fold(
           (failure) => ErrorLogger.log('Orphan cleanup failed: $failure',
               category: 'scanner'),

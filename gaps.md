@@ -1322,3 +1322,28 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` implemented & verified.
 - `test/features/playlists/playlist_cubit_test.dart` now calls `TestWidgetsFlutterBinding.ensureInitialized()` because the pre-existing sound feature triggers haptics from `PlaylistCubit`.
 - `ftsRebuildFailed` remains static in `AppDatabase` because off-limits static readers in `music_repository.dart` still use it; the repair budget and `migrationFailed` are now per-instance.
 
+---
+
+## Re-audit 2026-10-30 — audio / data / player
+
+A second evidence-based pass over the three weakest areas (`features/player`, `lib/data`,
+`lib/data/audio` + native DSP), run against the current tree rather than this 2026-10-02 baseline.
+Full report: `AUDIT_2026-10-30_AUDIO_DATA_PLAYER.md`.
+
+- **Verified fixed since this register was written:** Quran persistence/restore, Reset-Profile
+  inversion, dead `preampDb`, O(n²) media-id resolution, rating-store singleton, slot-cache growth,
+  `SafeFilePath` on `deleteSongs`, FTS failure flag, download-persistence swallowing, scanner
+  re-entrancy and epoch.
+- **New defects found and fixed:** arbitrary `File.delete()` in `LibraryMaintenanceService`;
+  hidden folders being converted into "missing" rows and hard-deleted; `deleteSongs` never removing
+  files outside app-private roots; `watchSongsInFolder` swallowing DB failures; FTS health probe
+  answered from the content table; v12 tables missing from schema validation; `PrefsRepository`
+  dropping failed writes; unbounded CUE hash cache; Quran Mode auto-flipping over an explicit user
+  choice; autoplay appending outside the queue mutex; duplicate seek-bar semantics; media ids
+  resolved twice.
+- **Still open:** DB-at-rest encryption; 28–42 dp transport buttons and 20 dp Quran badge; scanner
+  whole-library isolate copies and sequential tag enrichment; transaction atomicity for cleanup
+  count rewrites; `migrationFailed` never surfaced; dead schema (`artists.album_count`,
+  `songs.pending_download_path`); god files and the empty-catch backlog.
+- **Gates after the pass:** `flutter analyze --fatal-infos --fatal-warnings` 0 issues;
+  `flutter test test/features/player test/data` 2,033/2,033 passed.

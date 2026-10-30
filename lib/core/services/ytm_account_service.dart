@@ -141,6 +141,24 @@ class YtmAccountService {
     'verification required',
   ];
 
+  /// Wording of YouTube's age wall, whatever client answered it.
+  ///
+  /// Kept next to [_botSubstrings] because the two were confused: an age wall
+  /// says "sign in to confirm your age", which contains the bot phrase
+  /// "sign in to confirm", so a +18 track used to count as an egress/bot
+  /// verdict against the very chain that was trying to resolve it.
+  static const _ageGateSubstrings = [
+    'confirm your age',
+    'confirm you are 18',
+    "confirm you're 18",
+    'age-restricted',
+    'age restricted',
+    'age verification',
+    'inappropriate for some users',
+    'mature content',
+    'over 18',
+  ];
+
   /// Notifies listeners whenever the YTM login state changes (login/logout).
   final loginState = ValueNotifier<bool>(false);
 
@@ -2519,11 +2537,24 @@ class YtmAccountService {
             // clients both return genuine bot challenges, every
             // remaining client will too — skip the rest of the chain.
             // Note: UNPLAYABLE indicates per-client catalog restriction, NOT a bot block.
-            final isBotBlock = status.contains('BOT') ||
-                _botSubstrings.any((sub) =>
-                    statusReason.toLowerCase().contains(sub.toLowerCase()));
+            // An age gate is a property of the track, not of the egress: a
+            // guest client's LOGIN_REQUIRED / "Sign in to confirm your age" is
+            // the expected answer for +18 content and says nothing about the
+            // IP or the session. Counting it as a block short-circuited the
+            // chain after two guests — before the authenticated WEB_REMIX
+            // (third in the guest order) could ever be tried.
+            final isAgeGate = status == 'LOGIN_REQUIRED' &&
+                _ageGateSubstrings
+                    .any((sub) => statusReason.toLowerCase().contains(sub));
+            final isBotBlock = !isAgeGate &&
+                (status.contains('BOT') ||
+                    _botSubstrings.any((sub) => statusReason
+                        .toLowerCase()
+                        .contains(sub.toLowerCase())));
             final isBlockSignal = isBotBlock ||
-                (!acceptsSessionAuth && status == 'LOGIN_REQUIRED');
+                (!acceptsSessionAuth &&
+                    status == 'LOGIN_REQUIRED' &&
+                    !isAgeGate);
             if (isBlockSignal) {
               consecutiveBlockSignals++;
               if (consecutiveBlockSignals >= 2) {

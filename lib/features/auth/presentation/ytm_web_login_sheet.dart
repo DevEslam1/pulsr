@@ -173,6 +173,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   int _deadHandleHits = 0;
   static const int _maxDeadHandleHits = 3;
 
+  /// Identity of the native WebView instance currently mounted. Bumped by
+  /// [_restartWebView] so Flutter builds a *new* platform view (and therefore
+  /// a new native WebView) instead of reusing a dead handle.
+  int _webViewInstance = 0;
+
   bool _disposed = false;
 
   /// Whether [error] means the native WebView is gone rather than that the call
@@ -202,7 +207,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         error: error, stackTrace: stack, category: 'YtmWebLoginSheet');
   }
 
-  void _setStateSafe(VoidCallback fn) => setState(fn);
+  /// setState that tolerates a callback landing after the sheet is gone.
+  /// WebView callbacks are async and a page load can outlive a fast dismiss;
+  /// without this guard those late callbacks threw "setState() called after
+  /// dispose()".
+  void _setStateSafe(VoidCallback fn) {
+    if (!mounted || _disposed) return;
+    setState(fn);
+  }
 
   final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
 
@@ -430,9 +442,20 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     ),
   ]);
 
+  /// Phrases that are, on their own, proof of Google's embedded-browser block.
   static const List<String> _blockPhrases = [
-    "couldn't sign you in",
     'this browser or app may not be secure',
+  ];
+
+  /// `Couldn't sign you in` is Google's generic failure heading, so it also
+  /// appears on ordinary errors ("Something went wrong"). It only counts as
+  /// the browser block when one of these companions is present — the same
+  /// pairing the injected detector in [EmbeddedBrowserUa.antiFingerprint]
+  /// requires.
+  static const String _blockHeading = "couldn't sign you in";
+  static const List<String> _blockHeadingCompanions = [
+    'try using a different browser',
+    'browser or app may not be secure',
   ];
 
   final GoogleBlockRecovery _blockRecovery =
@@ -540,7 +563,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
 
       _pollIntervalSeconds = 2;
-      _scheduleNextAuthPoll();
+      if (!widget.isBrowseMode) _scheduleNextAuthPoll();
       if (mounted) setState(() {});
     } catch (e, st) {
       ErrorLogger.log(
@@ -553,7 +576,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         _settings = YtmWebLoginSheet.buildDefaultSettings(
             userAgent: EmbeddedBrowserUa.mobile);
       });
-      _scheduleNextAuthPoll();
+      if (!widget.isBrowseMode) _scheduleNextAuthPoll();
     }
   }
 
@@ -591,8 +614,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   void _scheduleNextAuthPoll() {
     _authPollTimer?.cancel();
+    // Browse mode has nothing to save automatically: the user is reading a web
+    // page, and the poll's cookie harvest would only add background work (and a
+    // home-page bounce) on top of the page's own traffic.
     if (_disposed ||
         !mounted ||
+        widget.isBrowseMode ||
         _isLoggedIn ||
         _webViewGone ||
         _pollState == _AuthPollState.dead ||
@@ -685,11 +712,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   }
 
   Future<void> _updateNavState() async {
-    if (_disposed || _webViewController == null) return;
+    // Capture the controller: it is nulled out by _handleWebViewError and by
+    // dispose() while these calls are awaiting, and the previous `!` then threw
+    // a Null-check TypeError that was crash-reported as if it were a bug.
+    final controller = _webViewController;
+    if (_disposed || controller == null) return;
     try {
-      final back = await _webViewController!.canGoBack();
-      final forward = await _webViewController!.canGoForward();
-      final url = await _webViewController!.getUrl();
+      final back = await controller.canGoBack();
+      final forward = await controller.canGoForward();
+      final url = await controller.getUrl();
       if (mounted && !_disposed) {
         setState(() {
           _canGoBack = back;
@@ -706,32 +737,113 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   Future<void> _navigateTo(String url) async {
     final effectiveUrl = _withGeoParams(url);
+    // Record the destination before touching the platform view. If the native
+    // handle is already gone, the WebView is rebuilt from _currentUrl — and it
+    // must land on the page we were asked to open, not replay the block page
+    // that killed the previous instance.
+    _currentUrl = effectiveUrl;
     _pollIntervalSeconds = 2;
     _authPollAttempts = 0;
-    _scheduleNextAuthPoll();
+    _pollState = _AuthPollState.idle;
+
     final targetUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
         : mobileUserAgent;
     final isDesktop = _uaIdentityOverride == BrowserIdentity.desktop ||
         _uaIdentityOverride == BrowserIdentity.chromeDesktop;
+    final contentMode = isDesktop
+        ? UserPreferredContentMode.DESKTOP
+        : UserPreferredContentMode.MOBILE;
+
+    if (_webViewController == null || _webViewGone) {
+      // No live handle to drive. Update the settings the replacement starts
+      // with, then force a fresh native instance at _currentUrl.
+      _settings = _settingsWithIdentity(
+        _settings,
+        userAgent: targetUa,
+        contentMode: contentMode,
+      );
+      _restartWebView();
+      return;
+    }
+
+    _scheduleNextAuthPoll();
     try {
       await _applyWebViewIdentity(
         _webViewController,
         userAgent: targetUa,
-        contentMode: isDesktop
-            ? UserPreferredContentMode.DESKTOP
-            : UserPreferredContentMode.MOBILE,
+        contentMode: contentMode,
       );
     } catch (e, st) {
       _handleWebViewError('_navigateTo setSettings failed', e, st);
     }
-    final loadUrlFuture = _webViewController?.loadUrl(
-        urlRequest: URLRequest(url: WebUri(effectiveUrl)));
+    if (_webViewController == null || _webViewGone) {
+      _restartWebView();
+      return;
+    }
+    final loadUrlFuture = _webViewController!
+        .loadUrl(urlRequest: URLRequest(url: WebUri(effectiveUrl)));
     // `loadUrl` on a dead handle throws asynchronously; unawaited, that became an
     // unhandled rejection rather than reaching _handleWebViewError.
-    if (loadUrlFuture != null) {
-      unawaited(loadUrlFuture.catchError((Object e, StackTrace st) =>
-          _handleWebViewError('_navigateTo loadUrl failed', e, st)));
+    unawaited(loadUrlFuture.catchError((Object e, StackTrace st) =>
+        _handleWebViewError('_navigateTo loadUrl failed', e, st)));
+  }
+
+  /// Rebuilds the native WebView after its handle died.
+  ///
+  /// Bumping [_webViewInstance] changes the widget key, so the framework tears
+  /// down the old element and creates a new native view; simply clearing
+  /// [_webViewGone] would keep the dead platform handle. The new view starts
+  /// at [_currentUrl] with the identity already stored in [_settings].
+  void _restartWebView() {
+    _webViewGone = false;
+    _webViewController = null;
+    _deadHandleHits = 0;
+    _pollState = _AuthPollState.idle;
+    _pollIntervalSeconds = 2;
+    _authPollAttempts = 0;
+    // A brand-new view has no history yet. Leaving the old flags behind made
+    // PopScope swallow the first back press (it tried to pop history that no
+    // longer exists).
+    _canGoBack = false;
+    _canGoForward = false;
+    _setStateSafe(() => _webViewInstance++);
+    if (!widget.isBrowseMode) _scheduleNextAuthPoll();
+  }
+
+  /// Toolbar refresh that survives a native handle dying under it.
+  Future<void> _reloadPage() async {
+    final controller = _webViewController;
+    if (controller == null || _webViewGone) {
+      _navigateTo(_currentUrl);
+      return;
+    }
+    try {
+      await controller.reload();
+    } catch (e, st) {
+      _handleWebViewError('reload failed', e, st);
+    }
+  }
+
+  Future<void> _goBack() async {
+    final controller = _webViewController;
+    if (controller == null || _webViewGone) return;
+    try {
+      await controller.goBack();
+      await _updateNavState();
+    } catch (e, st) {
+      _handleWebViewError('goBack failed', e, st);
+    }
+  }
+
+  Future<void> _goForward() async {
+    final controller = _webViewController;
+    if (controller == null || _webViewGone) return;
+    try {
+      await controller.goForward();
+      await _updateNavState();
+    } catch (e, st) {
+      _handleWebViewError('goForward failed', e, st);
     }
   }
 
@@ -810,8 +922,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           if (mounted && !_disposed) {
             setState(() {});
             // Navigate to music.youtube.com to complete the OAuth redirect
-            // and ensure music.youtube.com domain cookies are also set.
-            unawaited(_navigateTo('https://music.youtube.com'));
+            // and ensure music.youtube.com domain cookies are also set. In
+            // browse mode the user is already on YouTube: bouncing would
+            // throw them off the page they are reading.
+            if (!widget.isBrowseMode) {
+              unawaited(_navigateTo('https://music.youtube.com'));
+            }
           }
         }
         return true;
@@ -835,7 +951,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         await accountService.saveSession(cookies);
         if (mounted && !_disposed) {
           setState(() {});
-          unawaited(_navigateTo('https://music.youtube.com'));
+          if (!widget.isBrowseMode) {
+            unawaited(_navigateTo('https://music.youtube.com'));
+          }
         }
       }
       return true;
@@ -864,7 +982,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             await accountService.saveSession(cookieStr);
             if (mounted && !_disposed) {
               setState(() {});
-              unawaited(_navigateTo('https://music.youtube.com'));
+              if (!widget.isBrowseMode) {
+                unawaited(_navigateTo('https://music.youtube.com'));
+              }
             }
           }
           return true;
@@ -945,11 +1065,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     if (cookies != null &&
         cookies.isNotEmpty &&
         YtmAccountService.looksLikeSignedInCookies(cookies)) {
-      await accountService.saveSession(cookies);
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true);
+      // saveSession refuses a jar without session cookies; trusting it blindly
+      // closed the sheet on a session that was never stored.
+      final saved = await accountService.saveSession(cookies);
+      if (saved) {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        } else {
+          _finishing = false;
+        }
+        return;
       }
-      return;
     }
 
     if (_isLoggedIn && accountService.isLoggedIn) {
@@ -957,6 +1083,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       if (valid) {
         if (mounted && Navigator.of(context).canPop()) {
           Navigator.of(context).pop(true);
+        } else {
+          // Hosted as a page rather than a route: there is nothing to pop, but
+          // the sheet must not latch `_finishing` and kill the Done button.
+          _finishing = false;
         }
         return;
       }
@@ -985,88 +1115,108 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     // Expand height cleanly down to the bottom of the screen with proper status bar clearance
     final safeTop = topPadding > 0 ? topPadding : 24.0;
-    final targetHeight =
-        (totalHeight - safeTop - (isBrowse ? 8 : 16)).clamp(300.0, totalHeight);
+    // `clamp(300, totalHeight)` throws when the viewport is shorter than 300 px
+    // (a resized desktop window, a small split-screen pane): clamp requires
+    // min <= max. Cap at the viewport and let the sheet shrink with it.
+    final availableHeight = totalHeight - safeTop - (isBrowse ? 8 : 16);
+    final targetHeight = availableHeight.clamp(0.0, totalHeight);
 
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: Adaptive.isTablet(context) ? 680 : double.infinity,
-          maxHeight: targetHeight,
-        ),
-        child: AnimatedPadding(
-          padding: EdgeInsets.only(bottom: bottomInset),
-          duration: context.motionMs(150),
-          child: Container(
-            height: targetHeight,
-            decoration: BoxDecoration(
-              color: p.surface,
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppRadii.r24)),
-              border: Border.all(color: p.hairline),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.scrimAt(0.35),
-                  blurRadius: 20,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              top: true,
-              bottom: true,
-              child: Column(
-                children: [
-                  // Top Drag Handle & Bar
-                  Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
-                        AppSpacing.s10, AppSpacing.md, AppSpacing.s6),
-                    child: Column(
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 36,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: p.textTertiary.withValues(alpha: 0.3),
-                              borderRadius: AppRadii.r2All,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        if (isBrowse) ...[
-                          // BROWSER TOOLBAR
-                          ..._buildBrowseToolbar(p),
-                        ] else ...[
-                          _buildLoginHeader(p),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  if (!isBrowse && _isLoggedIn)
-                    _buildLoggedInBanner(p)
-                  else if (!isBrowse && _showHint)
-                    _buildHintBanner(p),
-
-                  // Inline status banner during the block recovery ladder.
-                  if (!isBrowse && _blockStatus != null)
-                    _buildBlockStatusBanner(p),
-
-                  // Geo-block alert banner with one-tap bypass & YouTube fallback
-                  if (_isGeoBlocked) _buildGeoBlockBanner(p),
-
-                  if (_isLoading || _progressNotifier.value < 1.0)
-                    _buildLoadingBar(p),
-                  const Divider(height: 1),
-
-                  // WebView Body — replaced by the recovery card once the
-                  // automatic retries against Google's block page are spent.
-                  Expanded(
-                    child: _buildWebViewBody(p, isBrowse),
+    return PopScope(
+      // Back must unwind WebView history before it dismisses the sheet — both
+      // in the in-app browser and while walking back through Google's sign-in
+      // pages. Otherwise Android's back gesture closes the whole flow on the
+      // first press, losing the half-finished login.
+      canPop: _blockExhausted ||
+          _webViewGone ||
+          _deadHandleHits >= _YtmWebLoginSheetState._maxDeadHandleHits ||
+          !_canGoBack,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_goBack());
+      },
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: Adaptive.isTablet(context) ? 680 : double.infinity,
+            maxHeight: targetHeight,
+          ),
+          child: AnimatedPadding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            duration: context.motionMs(150),
+            child: Container(
+              height: targetHeight,
+              decoration: BoxDecoration(
+                color: p.surface,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadii.r24)),
+                border: Border.all(color: p.hairline),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.scrimAt(0.35),
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
                   ),
                 ],
+              ),
+              child: SafeArea(
+                top: true,
+                bottom: true,
+                child: Column(
+                  children: [
+                    // Top Drag Handle & Bar
+                    Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          AppSpacing.md,
+                          AppSpacing.s10,
+                          AppSpacing.md,
+                          AppSpacing.s6),
+                      child: Column(
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 36,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: p.textTertiary.withValues(alpha: 0.3),
+                                borderRadius: AppRadii.r2All,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          if (isBrowse) ...[
+                            // BROWSER TOOLBAR
+                            ..._buildBrowseToolbar(p),
+                          ] else ...[
+                            _buildLoginHeader(p),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    if (!isBrowse && _isLoggedIn)
+                      _buildLoggedInBanner(p)
+                    else if (!isBrowse && _showHint)
+                      _buildHintBanner(p),
+
+                    // Inline status banner during the block recovery ladder.
+                    if (!isBrowse && _blockStatus != null)
+                      _buildBlockStatusBanner(p),
+
+                    // Geo-block alert banner with one-tap bypass & YouTube fallback
+                    if (_isGeoBlocked) _buildGeoBlockBanner(p),
+
+                    if (_isLoading || _progressNotifier.value < 1.0)
+                      _buildLoadingBar(p),
+                    const Divider(height: 1),
+
+                    // WebView Body — replaced by the recovery card once the
+                    // automatic retries against Google's block page are spent.
+                    Expanded(
+                      child: _buildWebViewBody(p, isBrowse),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

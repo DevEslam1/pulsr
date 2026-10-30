@@ -261,6 +261,78 @@ void main() {
     });
   });
 
+  group('orphan cleanup vs. hidden folders', () {
+    test('rows inside a user-excluded folder are hidden, never "missing"',
+        () async {
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+          id: const Value(21),
+          title: 'Visible',
+          path: '/music/visible.mp3',
+          isFavorite: const Value(true)));
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+          id: const Value(22),
+          title: 'Hidden Favourite',
+          path: '/music/hidden/track.mp3',
+          isFavorite: const Value(true)));
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+          id: const Value(23), title: 'Gone', path: '/music/gone.mp3'));
+
+      // The scanner skips excluded folders, so 22 is absent from the scan set
+      // exactly like a deleted file would be.
+      final marked = await repository.cleanupOrphanedSongs(
+        {21},
+        excludedFolderPrefixes: ['/music/hidden'],
+      );
+
+      expect(marked.getOrElse((_) => -1), equals(1),
+          reason: 'only the genuinely absent row is marked');
+
+      final hidden = await (db.select(db.songsTable)
+            ..where((t) => t.id.equals(22)))
+          .getSingle();
+      expect(hidden.isMissing, isFalse,
+          reason: 'hiding a folder must not destroy the rows behind it');
+      expect(hidden.isFavorite, isTrue);
+
+      final gone = await (db.select(db.songsTable)
+            ..where((t) => t.id.equals(23)))
+          .getSingle();
+      expect(gone.isMissing, isTrue);
+    });
+
+    test('a sibling folder sharing a prefix is not treated as excluded',
+        () async {
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+          id: const Value(31),
+          title: 'Kept',
+          path: '/music/hidden2/track.mp3'));
+
+      await repository.cleanupOrphanedSongs(
+        {1},
+        excludedFolderPrefixes: ['/music/hidden'],
+      );
+
+      final row = await (db.select(db.songsTable)
+            ..where((t) => t.id.equals(31)))
+          .getSingle();
+      expect(row.isMissing, isTrue);
+    });
+  });
+
+  group('watchSongsInFolder error contract', () {
+    test('surfaces a database failure instead of an empty stream', () async {
+      await db.customStatement('DROP TABLE songs');
+
+      final result =
+          await repository.watchSongsInFolder('/music').first.timeout(
+                const Duration(seconds: 5),
+              );
+
+      expect(result.isLeft(), isTrue,
+          reason: 'a failed watch must not complete silently');
+    });
+  });
+
   group('reconcileDownloadedSong', () {
     Future<int> insertYtRow({
       int id = -100,

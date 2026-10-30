@@ -59,6 +59,8 @@ class EmbeddedBrowserUa {
   ///   • `; wv`              — literal "WebView" token
   ///   • `Version/4.0 `       — the legacy WebView version token
   ///
+  /// (`Build/<fingerprint>` is *not* one: Chrome on Android really sends it.)
+  ///
   /// Crucially, the *engine version* (`Chrome/…`) is left untouched. Chromium
   /// derives `navigator.userAgentData` / Client Hints from the engine, not from
   /// a UA override, so keeping the real version here means the string and the
@@ -439,6 +441,21 @@ class EmbeddedBrowserUa {
     ];
     var platform = isMobile ? 'Android' : 'Windows';
 
+    // High-entropy Client Hints must agree with the UA actually presented.
+    // A hardcoded "Pixel 9 Pro" / "15.0.0" on a Samsung or an Android-13 phone
+    // is a stronger embedded signal than sending no hints at all, and the UA
+    // string already carries the real model and OS version.
+    var androidVerMatch = ua.match(/Android\s+([0-9.]+)/);
+    var modelMatch = ua.match(/Android\s+[0-9.]+;\s*([^;)]+?)(?:\s+Build\/[^;)]*)?\)/);
+    var deviceModel = modelMatch ? modelMatch[1].replace(/\s+$/, '') : '';
+    var platformVersion = '15.0.0';
+    if (androidVerMatch) {
+      var versionParts = androidVerMatch[1].split('.');
+      platformVersion = (versionParts[0] || '15') + '.' +
+                        (versionParts[1] || '0') + '.' +
+                        (versionParts[2] || '0');
+    }
+
     var uadStub = {
       brands:   brandList,
       mobile:   isMobile,
@@ -448,10 +465,10 @@ class EmbeddedBrowserUa {
           brands:          brandList,
           mobile:          isMobile,
           platform:        platform,
-          platformVersion: isMobile ? '15.0.0' : '15.0.0',
+          platformVersion: isMobile ? platformVersion : '15.0.0',
           architecture:    isMobile ? 'arm' : 'x86',
           bitness:         '64',
-          model:           isMobile ? 'Pixel 9 Pro' : '',
+          model:           isMobile ? deviceModel : '',
           uaFullVersion:   chromeFull,
           fullVersionList: brandList.map(function (b) {
             return { brand: b.brand, version: chromeFull };

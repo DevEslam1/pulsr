@@ -41,13 +41,13 @@ extension _YtmCookieRecoveryView on _YtmWebLoginSheetState {
       _detectedCookies = null;
       _hadSuccessfulYtLoad = false;
       _mismatchAutoNavCount = 0;
-      // Manual "start over" also dismisses the block recovery card.
-      if (mounted && (_blockExhausted || _blockStatus != null)) {
-        _setStateSafe(() {
-          _blockExhausted = false;
-          _blockStatus = null;
-        });
-      }
+      // The header and the recovery card both read these fields, so the reset
+      // needs a rebuild — assigning them silently left the sheet showing a
+      // connected account over a session that had just been wiped.
+      _setStateSafe(() {
+        _blockExhausted = false;
+        _blockStatus = null;
+      });
       final target = widget.isBrowseMode
           ? 'https://music.youtube.com'
           : _YtmWebLoginSheetState.googleSignInUrl;
@@ -108,15 +108,9 @@ extension _YtmCookieRecoveryView on _YtmWebLoginSheetState {
             ),
             const SizedBox(height: AppSpacing.lg),
             FilledButton.icon(
-              onPressed: () {
-                _setStateSafe(() {
-                  _deadHandleHits = 0;
-                  _webViewGone = false;
-                  _pollState = _AuthPollState.idle;
-                  _pollIntervalSeconds = 2;
-                  _authPollAttempts = 0;
-                });
-              },
+              onPressed: () => _navigateTo(widget.isBrowseMode
+                  ? YtmLocale.homeUrl()
+                  : _YtmWebLoginSheetState.googleSignInUrl),
               icon: const Icon(Icons.refresh_rounded),
               label: Text(context.l10n.retry),
               style: FilledButton.styleFrom(

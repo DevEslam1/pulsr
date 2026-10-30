@@ -11,12 +11,7 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
                 minHeight: AppSpacing.minTouchTarget),
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
             tooltip: context.l10n.browseBack,
-            onPressed: _canGoBack
-                ? () async {
-                    await _webViewController?.goBack();
-                    await _updateNavState();
-                  }
-                : null,
+            onPressed: _canGoBack ? _goBack : null,
           ),
           IconButton(
             constraints: const BoxConstraints(
@@ -24,12 +19,7 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
                 minHeight: AppSpacing.minTouchTarget),
             icon: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
             tooltip: context.l10n.browseForward,
-            onPressed: _canGoForward
-                ? () async {
-                    await _webViewController?.goForward();
-                    await _updateNavState();
-                  }
-                : null,
+            onPressed: _canGoForward ? _goForward : null,
           ),
           const SizedBox(width: AppSpacing.xxs),
           Expanded(
@@ -67,7 +57,7 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
                 minHeight: AppSpacing.minTouchTarget),
             icon: const Icon(Icons.refresh_rounded, size: 20),
             tooltip: context.l10n.browseRefresh,
-            onPressed: () => _webViewController?.reload(),
+            onPressed: _reloadPage,
           ),
           IconButton(
             constraints: const BoxConstraints(
@@ -144,7 +134,11 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
             _navChip(
               label: context.l10n.browseEgyptMode,
               icon: Icons.public_rounded,
-              url: YtmLocale.homeUrl(),
+              // Explicit EG, not the device locale: this chip exists to force
+              // the Egyptian catalog when the device (or VPN) is elsewhere.
+              // It used to reuse homeUrl(), which made it a duplicate of Home
+              // and a no-op for the case it is labelled for.
+              url: 'https://music.youtube.com/?gl=EG&hl=en',
               p: p,
             ),
           ],
@@ -153,13 +147,33 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
     ];
   }
 
+  /// Whether [url] is the page currently shown.
+  ///
+  /// A raw string compare misses every chip: navigation appends `gl`/`hl`, so
+  /// `_currentUrl` is `…/explore?gl=EG&hl=en` while the chip's label URL is
+  /// `…/explore`. Compare host + path and require the chip's own query to be a
+  /// subset of the current one.
+  bool _isCurrentUrl(String url) {
+    if (_currentUrl == url) return true;
+    final current = Uri.tryParse(_currentUrl);
+    final target = Uri.tryParse(url);
+    if (current == null || target == null) return false;
+    if (current.host != target.host || current.path != target.path) {
+      return false;
+    }
+    for (final param in target.queryParameters.entries) {
+      if (current.queryParameters[param.key] != param.value) return false;
+    }
+    return true;
+  }
+
   Widget _navChip({
     required String label,
     required IconData icon,
     required String url,
     required PulsrPalette p,
   }) {
-    final isCurrent = _currentUrl == url || _currentUrl.startsWith('$url?');
+    final isCurrent = _isCurrentUrl(url);
 
     return InkWell(
       onTap: () => _navigateTo(url),

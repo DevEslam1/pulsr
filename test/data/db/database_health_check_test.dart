@@ -65,6 +65,25 @@ void main() {
             'ftsHealthy',
           ]));
     });
+
+    test('detects an index that drifted from the content table', () async {
+      // Simulate the classic FTS drift: rows written while the sync trigger is
+      // missing (e.g. a partial migration). COUNT(*) reads the content table
+      // and stays green; the integrity-check is what notices.
+      await db.customStatement('DROP TRIGGER songs_fts_insert;');
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+            id: const Value(1),
+            title: 'Unindexed Song',
+            path: '/music/unindexed.mp3',
+          ));
+
+      final report = await DatabaseHealthCheck(db).checkHealth();
+
+      expect(report.totalSongs, 1,
+          reason: 'the content table still counts the row');
+      expect(report.ftsHealthy, isFalse,
+          reason: 'an index missing a row must not be reported as healthy');
+    });
   });
 
   group('DatabaseMigrationValidator', () {
@@ -87,6 +106,13 @@ void main() {
       expect(result.missingIndexes, isEmpty);
       expect(result.currentVersion, result.expectedVersion);
       expect(result.isValid, isTrue);
+    });
+
+    test('required tables cover the v12 online-playlist schema', () {
+      expect(
+        DatabaseMigrationValidator.requiredTables,
+        containsAll(<String>['online_playlists', 'online_playlist_entries']),
+      );
     });
   });
 }

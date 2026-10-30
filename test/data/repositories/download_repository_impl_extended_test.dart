@@ -135,6 +135,19 @@ void main() {
       final file = File('${temp.path}${Platform.pathSeparator}done.m4a')
         ..writeAsStringSync('audio');
 
+      // The artifact delete is containment-checked, so the sandbox must look
+      // like an app-owned root to the path_provider lookup.
+      const pathProviderChannel =
+          MethodChannel('plugins.flutter.io/path_provider');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(pathProviderChannel, (call) async {
+        return temp.path;
+      });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(pathProviderChannel, null);
+      });
+
       SharedPreferences.setMockInitialValues({
         'pulsr_download_tasks_v2': jsonEncode([
           task('abcdefghijk')

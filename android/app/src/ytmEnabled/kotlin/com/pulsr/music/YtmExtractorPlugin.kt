@@ -517,6 +517,24 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     val preferM4a = call.argument<Boolean>("preferM4a") ?: false
                     runOffMainThread(result, requireExtractorReady = true) { resolveStreamWithFallback(videoId, quality, preferM4a) }
                 }
+                "resolveAgeGatedStream" -> {
+                    // +18 rescue: one authenticated WEB request under the
+                    // synced session. Deliberately does NOT fall back to
+                    // NewPipe — an age gate is account-level, so a second
+                    // anonymous extractor would only repeat the refusal.
+                    val videoId = call.argument<String>("videoId")?.trim()
+                    if (videoId.isNullOrEmpty() || !VIDEO_ID.matches(videoId)) {
+                        result.error("YTM_INVALID_ARGUMENT", "videoId is not a valid YouTube id", null)
+                        return
+                    }
+                    val quality = call.argument<String>("quality")?.trim() ?: "high"
+                    val preferM4a = call.argument<Boolean>("preferM4a") ?: false
+                    runOffMainThread(result, requireExtractorReady = true) {
+                        val ctx = context?.applicationContext
+                            ?: throw IllegalStateException("Extractor context unavailable")
+                        InnertubeClient(ctx).resolveAgeGatedStream(videoId, quality, preferM4a)
+                    }
+                }
                 else -> result.notImplemented()
             }
         } catch (t: Throwable) {

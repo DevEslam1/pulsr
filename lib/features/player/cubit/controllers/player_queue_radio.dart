@@ -186,106 +186,121 @@ extension PlayerQueueRadio on PlayerQueueController {
   }
 
   /// Fetches radio tracks via YtmService and appends them to the queue as QueueTier.autoplay.
+  ///
+  /// The network call runs outside [_queueMutex] (it can take seconds), but
+  /// every read-modify-write of the queue runs inside it. Without the lock a
+  /// recommendation batch that landed during a user remove/reorder emitted a
+  /// pre-await queue snapshot, so the removed track reappeared in state while
+  /// the engine held both versions.
   Future<void> fetchAndEnqueueAutoplay(String seedVideoId,
       {String? seedArtist}) async {
+    if (_autoplayFetchInFlight || _isClosed()) return;
     final ytmService = _ytmService ??
         (getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null);
     if (ytmService == null) return;
 
+    _autoplayFetchInFlight = true;
     try {
       final radioTracks =
           await ytmService.getRadioTracks(seedVideoId, limit: 15);
       if (radioTracks.isEmpty || _isClosed()) return;
 
-      final s = _getState();
-      final playedAndQueuedIds = <String>{};
-      for (final song in s.queue) {
-        if (song.remoteId != null) playedAndQueuedIds.add(song.remoteId!);
-      }
-      for (final song in s.queueHistory) {
-        if (song.remoteId != null) playedAndQueuedIds.add(song.remoteId!);
-      }
-
-      final artistCounts = <String, int>{};
-      final normalizedSeedArtist = (seedArtist ?? '').trim().toLowerCase();
-
-      final eligible = <SongsTableData>[];
-      for (final track in radioTracks) {
-        if (playedAndQueuedIds.contains(track.videoId)) continue;
-
-        // Duplicate recording check
-        final hasDup = s.queue.any((q) => isSameRecording(
-                q.title, q.artist, track.title, track.artist)) ||
-            s.queueHistory.any((h) =>
-                isSameRecording(h.title, h.artist, track.title, track.artist));
-        if (hasDup) continue;
-
-        // Artist limits: max 4 for seed artist, max 2 for other artists (matching BitChord)
-        final trackArtist = track.artist.trim().toLowerCase();
-        final limit = (normalizedSeedArtist.isNotEmpty &&
-                trackArtist.contains(normalizedSeedArtist))
-            ? 4
-            : 2;
-        final currentCount = artistCounts[trackArtist] ?? 0;
-        if (currentCount >= limit) continue;
-
-        artistCounts[trackArtist] = currentCount + 1;
-        playedAndQueuedIds.add(track.videoId);
-
-        final songData = track.toSongData();
-        songData.isAutoplay = true;
-        eligible.add(songData);
-        if (eligible.length >= 10) break;
-      }
-
-      if (eligible.isEmpty || _isClosed()) return;
-
-      final room = PlayerQueueController.maxQueueSize - s.queue.length;
-      if (room <= 0) return;
-
-      final toAppend = eligible.take(room).toList();
-      // AUDIT-FIX: track only the songs the engine actually accepted — a
-      // mid-loop failure must not append songs to the UI queue that were
-      // never enqueued (mirrors the batch-add path in the queue controller).
-      final added = <SongsTableData>[];
-      for (final song in toAppend) {
-        try {
-          await _audioHandler.addToQueueEnd(song);
-          added.add(song);
-        } catch (e, st) {
-          ErrorLogger.log('Failed to add autoplay song ${song.title}',
-              error: e, stackTrace: st, category: 'PlayerQueueRadio');
-          break;
+      await _queueMutex.protect(() async {
+        if (_isClosed()) return;
+        final s = _getState();
+        final playedAndQueuedIds = <String>{};
+        for (final song in s.queue) {
+          if (song.remoteId != null) playedAndQueuedIds.add(song.remoteId!);
         }
-      }
-      if (added.isEmpty || _isClosed()) return;
+        for (final song in s.queueHistory) {
+          if (song.remoteId != null) playedAndQueuedIds.add(song.remoteId!);
+        }
 
-      final fresh = _getState();
-      final updatedQueue = [...fresh.queue, ...added];
-      final updatedTiers = Map<int, QueueTier>.from(fresh.trackTiers);
-      for (final song in added) {
-        updatedTiers[song.id] = QueueTier.autoplay;
-      }
+        final artistCounts = <String, int>{};
+        final normalizedSeedArtist = (seedArtist ?? '').trim().toLowerCase();
 
-      setQueueSlot(
-        fresh.activeQueueSlot,
-        songs: updatedQueue,
-        currentIndex: fresh.currentIndex,
-        position: fresh.position,
-        speed: fresh.playbackSpeed,
-      );
-      debouncedPersistQueueSlots();
-      _bumpQueueVersion();
-      _emit(fresh.copyWith(
-        queueSlice: fresh.queueSlice.copyWith(
-          queue: List<SongsTableData>.unmodifiable(updatedQueue),
-          trackTiers: updatedTiers,
-        ),
-      ));
-      _invalidateQueueSyncResolution();
+        final eligible = <SongsTableData>[];
+        for (final track in radioTracks) {
+          if (playedAndQueuedIds.contains(track.videoId)) continue;
+
+          // Duplicate recording check
+          final hasDup = s.queue.any((q) => isSameRecording(
+                  q.title, q.artist, track.title, track.artist)) ||
+              s.queueHistory.any((h) => isSameRecording(
+                  h.title, h.artist, track.title, track.artist));
+          if (hasDup) continue;
+
+          // Artist limits: max 4 for seed artist, max 2 for other artists (matching BitChord)
+          final trackArtist = track.artist.trim().toLowerCase();
+          final limit = (normalizedSeedArtist.isNotEmpty &&
+                  trackArtist.contains(normalizedSeedArtist))
+              ? 4
+              : 2;
+          final currentCount = artistCounts[trackArtist] ?? 0;
+          if (currentCount >= limit) continue;
+
+          artistCounts[trackArtist] = currentCount + 1;
+          playedAndQueuedIds.add(track.videoId);
+
+          final songData = track.toSongData();
+          songData.isAutoplay = true;
+          eligible.add(songData);
+          if (eligible.length >= 10) break;
+        }
+
+        if (eligible.isEmpty || _isClosed()) return;
+
+        // Room is recomputed from the locked state: the pre-fetch snapshot could
+        // be stale by up to 500 entries.
+        final room = PlayerQueueController.maxQueueSize - s.queue.length;
+        if (room <= 0) return;
+
+        final toAppend = eligible.take(room).toList();
+        // AUDIT-FIX: track only the songs the engine actually accepted — a
+        // mid-loop failure must not append songs to the UI queue that were
+        // never enqueued (mirrors the batch-add path in the queue controller).
+        final added = <SongsTableData>[];
+        for (final song in toAppend) {
+          try {
+            await _audioHandler.addToQueueEnd(song);
+            added.add(song);
+          } catch (e, st) {
+            ErrorLogger.log('Failed to add autoplay song ${song.title}',
+                error: e, stackTrace: st, category: 'PlayerQueueRadio');
+            break;
+          }
+        }
+        if (added.isEmpty || _isClosed()) return;
+
+        final fresh = _getState();
+        final updatedQueue = [...fresh.queue, ...added];
+        final updatedTiers = Map<int, QueueTier>.from(fresh.trackTiers);
+        for (final song in added) {
+          updatedTiers[song.id] = QueueTier.autoplay;
+        }
+
+        setQueueSlot(
+          fresh.activeQueueSlot,
+          songs: updatedQueue,
+          currentIndex: fresh.currentIndex,
+          position: fresh.position,
+          speed: fresh.playbackSpeed,
+        );
+        debouncedPersistQueueSlots();
+        _bumpQueueVersion();
+        _emit(fresh.copyWith(
+          queueSlice: fresh.queueSlice.copyWith(
+            queue: List<SongsTableData>.unmodifiable(updatedQueue),
+            trackTiers: updatedTiers,
+          ),
+        ));
+        _invalidateQueueSyncResolution();
+      });
     } catch (e, st) {
       ErrorLogger.log('fetchAndEnqueueAutoplay failed',
           error: e, stackTrace: st, category: 'PlayerQueueRadio');
+    } finally {
+      _autoplayFetchInFlight = false;
     }
   }
 

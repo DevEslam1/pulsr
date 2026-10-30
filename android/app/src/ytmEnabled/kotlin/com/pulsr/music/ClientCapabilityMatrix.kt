@@ -100,6 +100,19 @@ internal object ClientCapabilityMatrix {
             requiresJsSignature = true,
             priority = 6
         ),
+        InnertubeClient.ClientType.WEB to ClientCapability(
+            clientType = InnertubeClient.ClientType.WEB,
+            clientNameId = "1",
+            defaultClientVersion = "1.20260825.01.00",
+            requiresPoToken = true,
+            requiresLogin = false,
+            supportsStreamResolve = true,
+            supportsSearch = false,
+            supportsBrowse = false,
+            requiresJsSignature = true,
+            // Not in any default chain: reached only by resolveAgeGatedStream().
+            priority = 0
+        ),
         InnertubeClient.ClientType.WEB_REMIX to ClientCapability(
             clientType = InnertubeClient.ClientType.WEB_REMIX,
             clientNameId = "67",

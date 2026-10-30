@@ -97,6 +97,14 @@ internal class InnertubeClient(
             false,
             "https://music.youtube.com",
         ),
+        WEB(
+            "WEB",
+            "1.20260825.01.00",
+            "1",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+            true,
+            "https://www.youtube.com",
+        ),
         WEB_REMIX(
             "WEB_REMIX",
             "1.20260825.01.00",
@@ -187,18 +195,24 @@ internal class InnertubeClient(
          * jar, the SAPISIDHASH `Authorization`, the session `visitorData`, the
          * account-bound poToken and `user.lockedSafetyMode`.
          *
-         * Only WEB_REMIX may. The remaining [isWeb] clients are embed / TV /
-         * mobile-web contexts that earn their place in the chain precisely by
-         * resolving *logged out* on a flagged IP. An authenticated embed request
-         * is an auth-context mismatch: YouTube answers LOGIN_REQUIRED with
-         * "sign in to confirm you're not a bot", which [YtmBlockSignal] reads as
-         * a BotChallenge — so it counts toward the chain short-circuit and
-         * invalidates the poToken mid-sweep. Signing in therefore disabled the
-         * exact fallbacks that work while signed out. This is the same
-         * guest-only rule already applied to ANDROID_MUSIC / IOS_MUSIC.
+         * WEB and WEB_REMIX may. WEB is not in the default chain: it is
+         * reached only through [resolveAgeGatedStream], because an age gate is
+         * decided by the account and `www.youtube.com`/WEB is the client
+         * YouTube runs its age-verification flow on.
+         *
+         * Every other client, including the other [isWeb] ones (embed / TV /
+         * mobile-web), stays guest-only. They earn their place in the chain
+         * precisely by resolving *logged out* on a flagged IP. An authenticated
+         * embed request is an auth-context mismatch: YouTube answers
+         * LOGIN_REQUIRED with "sign in to confirm you're not a bot", which
+         * [YtmBlockSignal] reads as a BotChallenge — so it counts toward the
+         * chain short-circuit and invalidates the poToken mid-sweep. Signing in
+         * therefore disabled the exact fallbacks that work while signed out.
+         * This is the same guest-only rule already applied to
+         * ANDROID_MUSIC / IOS_MUSIC.
          */
         val acceptsSessionAuth: Boolean
-            get() = this == WEB_REMIX
+            get() = this == WEB_REMIX || this == WEB
     }
 
     /**
@@ -287,7 +301,49 @@ internal class InnertubeClient(
         }
     }
 
-    private fun resolvePlayerStreamInternal(videoId: String, quality: String = "high", preferM4a: Boolean = false): Map<String, Any?> {
+    /**
+     * Resolves an age-gated (+18) track with the signed-in account.
+     *
+     * An age gate is an account-level verdict, not an egress or protocol one:
+     * with no session attached, WEB, WEB_REMIX, MWEB, ANDROID, IOS, ANDROID_VR
+     * and TVHTML5 all answer LOGIN_REQUIRED / "Sign in to confirm your age"
+     * for the same video, so rotating clients can never pass it. The only
+     * request that can is one made under the signed-in Google session on the
+     * client YouTube honours age verification on (WEB, www.youtube.com).
+     *
+     * Deliberately a single client, not a chain: the caller has already walked
+     * every other client, so its only job is to answer "does this account get
+     * through the gate" without opening a second sweep. WEB rather than Dart
+     * because the formats it returns carry an `n` throttling parameter that
+     * needs the JS decipher this class already owns.
+     *
+     * @throws InnertubeException with [YtmBlockSignal.AgeRestricted] (or a
+     *   transport signal) when the account itself is refused.
+     */
+    fun resolveAgeGatedStream(
+        videoId: String,
+        quality: String = "high",
+        preferM4a: Boolean = false,
+    ): Map<String, Any?> {
+        if (!cookieStore.isSessionValid()) {
+            throw InnertubeException(
+                signal = YtmBlockSignal.AgeRestricted,
+                message = "No signed-in session to pass the age gate for $videoId",
+            )
+        }
+        val result = resolvePlayerStreamInternal(
+            videoId, quality, preferM4a, forceClient = ClientType.WEB,
+        )
+        PoTokenManager.recordEgressSuccess()
+        return result
+    }
+
+    private fun resolvePlayerStreamInternal(
+        videoId: String,
+        quality: String = "high",
+        preferM4a: Boolean = false,
+        forceClient: ClientType? = null,
+    ): Map<String, Any?> {
         val traceId = UUID.randomUUID().toString()
 
         // Hard ceiling on the whole native chain. The hedged two-client race is
@@ -312,11 +368,12 @@ internal class InnertubeClient(
             )
         }
 
-        val clientChain = resolutionStrategy.buildChain(
-            ResolutionStrategy.Operation.STREAM_RESOLVE,
-            limitedMode = PoTokenManager.isLimitedMode,
-            hasJsEngine = true
-        )
+        val clientChain = forceClient?.let { listOf(it) }
+            ?: resolutionStrategy.buildChain(
+                ResolutionStrategy.Operation.STREAM_RESOLVE,
+                limitedMode = PoTokenManager.isLimitedMode,
+                hasJsEngine = true
+            )
 
         // FIX #1: Nullable AtomicReference with neutral default on throw
         val lastSignalRef = AtomicReference<YtmBlockSignal?>(null)
@@ -608,6 +665,13 @@ internal class InnertubeClient(
                     "artist" to author,
                     "artworkUrl" to artworkUrl,
                     "userAgent" to actualRequestUa, // FIX #8: Matches actual request UA
+                    // Only a stream resolved under the session may be fetched with
+                    // the session (same rule as the Dart Tier-1). The media URL of
+                    // an age-gated track is the one case where it matters: the
+                    // googlevideo edge re-checks the identity that was granted it.
+                    "cookies" to if (client.acceptsSessionAuth) {
+                        cookieStore.getMergedCookieHeader(client.endpointHost)
+                    } else null,
                     "activeClient" to client.name,
                     "traceId" to traceId,
                     "expiresAt" to parseUrlExpiryEpochSeconds(finalUrl)
@@ -713,6 +777,37 @@ internal class InnertubeClient(
                         shortCircuit.get()?.let { throw it }
                     }
                 }
+            }
+        }
+
+        // Single-client mode (age-gate rescue). No hedge, no fallback ladder:
+        // the caller already walked every other client, and the hedge below
+        // would drop a slow-but-correct WEB answer on its 3 s race window.
+        // [attemptClient] still does the work that matters here — session
+        // cookies + SAPISIDHASH + account poToken, then signature and `n`
+        // deciphering — which is exactly what a WEB player response needs.
+        if (forceClient != null) {
+            val result = attemptClient(forceClient, ignoreShortCircuit = true)
+            when (result) {
+                is AttemptResult.Success -> return result.payload
+                is AttemptResult.Interrupted -> {
+                    Thread.currentThread().interrupt()
+                    throw InnertubeException(
+                        signal = YtmBlockSignal.Interrupted,
+                        message = "Age-gate resolution interrupted for $videoId",
+                        traceId = traceId
+                    )
+                }
+                is AttemptResult.Failure -> throw InnertubeException(
+                    signal = result.signal ?: YtmBlockSignal.AgeRestricted,
+                    message = "Age-gate resolution failed on ${forceClient.name} for $videoId",
+                    traceId = traceId
+                )
+                is AttemptResult.ShortCircuited -> throw InnertubeException(
+                    signal = lastSignalRef.get() ?: YtmBlockSignal.AgeRestricted,
+                    message = "Age-gate resolution short-circuited on ${forceClient.name} for $videoId",
+                    traceId = traceId
+                )
             }
         }
 
@@ -1744,7 +1839,7 @@ internal class InnertubeClient(
                 ClientType.WEB_EMBEDDED_PLAYER -> {
                     put("platform", "DESKTOP")
                 }
-                ClientType.WEB_REMIX -> {
+                ClientType.WEB_REMIX, ClientType.WEB -> {
                     put("platform", "DESKTOP")
                 }
             }

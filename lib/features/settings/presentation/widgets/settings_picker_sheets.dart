@@ -169,9 +169,15 @@ Widget _ytmWebOptionTile(
       trailing: Icon(Icons.arrow_forward_ios_rounded,
           size: 14, color: p.textTertiary),
       onTap: () {
-        Navigator.pop(context);
+        // Resolve the navigator (and a context that outlives this sheet)
+        // before popping. The tile's own context is deactivated as soon as the
+        // options sheet closes, and the browser sheet still needs a live
+        // ancestor to attach its route to.
+        final navigator = Navigator.of(context);
+        final hostContext = navigator.context;
+        navigator.pop();
         YtmWebLoginSheet.show(
-          context,
+          hostContext,
           initialUrl: url,
           title: title,
           isBrowseMode: true,

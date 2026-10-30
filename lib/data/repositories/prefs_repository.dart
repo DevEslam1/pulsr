@@ -120,6 +120,17 @@ class PrefsRepository {
           // so one unsupported value cannot drop unrelated queued writes.
           firstError ??= e;
           firstStack ??= st;
+          // Transient platform failures are re-queued so the value is not lost
+          // after the caller's error handling: it stays pending for the next
+          // flush (lifecycle pause, dispose) instead of surviving only in the
+          // in-memory cache and vanishing on restart. A deterministic
+          // ArgumentError (unsupported type) is not retried forever, and a
+          // newer write or a remove() for the same key always wins.
+          if (e is! ArgumentError &&
+              !_removedKeys.contains(entry.key) &&
+              !_pendingWrites.containsKey(entry.key)) {
+            _pendingWrites[entry.key] = entry.value;
+          }
         }
       }
     } finally {

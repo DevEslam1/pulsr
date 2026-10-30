@@ -75,6 +75,34 @@ class PlayerQuranManager {
     }
   }
 
+  /// The user's explicit on/off choice, or `null` when they never made one.
+  /// A missing service (tests, pure builds) reports "no choice".
+  Future<bool?> getUserOverride() async {
+    final service = _service;
+    if (service == null) return null;
+    try {
+      return await service.getUserOverride();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read Quran Mode user override',
+          error: e, stackTrace: st, category: 'PlayerQuranManager');
+      return null;
+    }
+  }
+
+  /// Persists the user's explicit choice. Returns false when the write failed.
+  Future<bool> setUserOverride(bool? value) async {
+    final service = _service;
+    if (service == null) return true;
+    try {
+      await service.setUserOverride(value);
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist Quran Mode user override',
+          error: e, stackTrace: st, category: 'PlayerQuranManager');
+      return false;
+    }
+  }
+
   Future<QuranStyleTuning> getStyleTuning(QuranReciterStyle style) async {
     final service = _service;
     if (service == null) return const QuranStyleTuning();

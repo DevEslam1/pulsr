@@ -4,17 +4,17 @@ import 'dart:io';
 import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../core/constants/audio_formats.dart';
+import '../../core/constants/channels.dart';
 import '../../core/errors/failures.dart';
 import '../../core/utils/cue_parser.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/local_delete_guard.dart';
 import '../../core/utils/metadata_placeholders.dart';
-import '../../core/utils/safe_file_path.dart';
 import '../../domain/models/chapter_info.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
@@ -549,8 +549,9 @@ class MusicRepository implements IMusicRepository {
             .where((s) => _normalizeDirPath(_parentDirPath(s.path)) == target)
             .toList();
         return Right<AppFailure, List<SongsTableData>>(filtered);
-      }).handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
-          DatabaseFailure('Failed to watch folder songs', e)));
+      }).onResultError((error, stackTrace) =>
+          Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch folder songs', error)));
     } catch (e) {
       return Stream.value(
           Left(DatabaseFailure('Failed to watch folder songs', e)));
@@ -2412,6 +2413,21 @@ class MusicRepository implements IMusicRepository {
 
   /// Cache of container path -> cue content hash to skip re-parsing unchanged cue sheets.
   static final Map<String, int> _cueContentHashCache = {};
+  static const int _cueContentHashCacheMax = 20000;
+
+  /// Bounded write-through for [_cueContentHashCache]. Without the trim this
+  /// static map lives for the whole process and grows with every CUE-backed
+  /// container ever seen.
+  static void _rememberCueContentHash(String path, int hash) {
+    if (!_cueContentHashCache.containsKey(path) &&
+        _cueContentHashCache.length >= _cueContentHashCacheMax) {
+      final toRemove = (_cueContentHashCacheMax * 0.25).toInt();
+      for (final key in _cueContentHashCache.keys.take(toRemove).toList()) {
+        _cueContentHashCache.remove(key);
+      }
+    }
+    _cueContentHashCache[path] = hash;
+  }
 
   @visibleForTesting
   static void resetEmbeddedCueProbeState() {
@@ -2603,7 +2619,7 @@ class MusicRepository implements IMusicRepository {
           evaluatedPaths.add(container.path);
           continue;
         }
-        _cueContentHashCache[container.path] = contentHash;
+        _rememberCueContentHash(container.path, contentHash);
         companions.addAll(virtual);
         newIdsByPath[container.path] = virtual.map((c) => c.id.value).toList();
         coverByContainerId[container.id] = effectiveCuePath;
@@ -2673,8 +2689,31 @@ class MusicRepository implements IMusicRepository {
     }
   }
 
+  /// Case-insensitive, separator-normalized containment check matching the
+  /// scanner's own exclusion rule, so "hidden" and "missing" cannot disagree.
+  static bool _isUnderExcludedFolder(
+      String path, List<String> excludedFolderPrefixes) {
+    if (excludedFolderPrefixes.isEmpty || path.isEmpty) return false;
+    final normPath = path.toLowerCase();
+    for (final folder in excludedFolderPrefixes) {
+      if (folder.isEmpty) continue;
+      final normFolder = folder.toLowerCase();
+      // Accept both separators: the row may carry a MediaStore '/' path while
+      // the stored exclusion was built with the host separator (or vice versa).
+      for (final sep in const ['/', r'\']) {
+        final prefix =
+            normFolder.endsWith(sep) ? normFolder : '$normFolder$sep';
+        if (normPath == normFolder || normPath.startsWith(prefix)) return true;
+      }
+    }
+    return false;
+  }
+
   @override
-  Future<Result<int>> cleanupOrphanedSongs(Set<int> scannedSongIds) async {
+  Future<Result<int>> cleanupOrphanedSongs(
+    Set<int> scannedSongIds, {
+    List<String> excludedFolderPrefixes = const [],
+  }) async {
     try {
       // NEVER delete or mark missing on an empty scan result (protect against unmounted SD cards, OS indexing, permission drops)
       if (scannedSongIds.isEmpty) {
@@ -2686,8 +2725,14 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.id.isBiggerThanValue(0) & t.source.equals(SongSource.local)))
           .get();
-      final unscannedSongs =
-          allLocalSongs.where((s) => !scannedSongIds.contains(s.id)).toList();
+      // A user-excluded folder is *hidden*, not missing: the scanner drops
+      // those rows from `validSongIds` by design, so treating them as absent
+      // would mark them missing and let "remove missing files" hard-delete
+      // real library rows (favourites, play counts, ratings).
+      final unscannedSongs = allLocalSongs
+          .where((s) => !scannedSongIds.contains(s.id))
+          .where((s) => !_isUnderExcludedFolder(s.path, excludedFolderPrefixes))
+          .toList();
 
       // 2. Bounded async disk checks without blocking the UI isolate or DB
       // locks: 64-wide concurrency with a cooperative yield between chunks
@@ -2890,72 +2935,39 @@ class MusicRepository implements IMusicRepository {
   }
 
   /// Resolves the directories Pulsr is allowed to delete local audio from.
-  /// Any provider that fails (e.g. unsupported platform) is skipped.
-  Future<List<String>> _allowedDeleteRoots() async {
-    final roots = <String>[];
-    Future<void> add(Future<Directory?> Function() provider) async {
-      try {
-        final dir = await provider();
-        if (dir != null) roots.add(dir.path);
-      } catch (_) {}
-    }
-
-    await add(getApplicationDocumentsDirectory);
-    await add(getApplicationSupportDirectory);
-    await add(getTemporaryDirectory);
-    if (Platform.isAndroid) {
-      await add(getExternalStorageDirectory);
-    }
-    return roots;
-  }
+  /// Shared with the download-artifact path so both delete surfaces enforce
+  /// the same containment policy.
+  Future<List<String>> _allowedDeleteRoots() => allowedAppDeleteRoots();
 
   /// Defensive containment check before deleting a local file. Requires the
   /// path to be a non-empty absolute audio file whose canonical location sits
   /// under an allowed app root. If no root can be resolved, the delete is
   /// refused (fail safe).
   Future<bool> _isSafeLocalDeletePath(String path) async {
-    final trimmed = path.trim();
-    if (trimmed.isEmpty || !p.isAbsolute(trimmed)) return false;
-
-    final file = SafeFilePath.validate(
-      trimmed,
+    final file = await resolveDeletableAudioFile(
+      path,
       allowedExtensions: AudioFormats.supportedExtensions.toList(),
-      checkExists: true,
+      roots: await _allowedDeleteRoots(),
+      logCategory: 'MusicRepository',
     );
-    if (file == null) return false;
+    return file != null;
+  }
 
-    final roots = await _allowedDeleteRoots();
-    if (roots.isEmpty) {
-      ErrorLogger.log(
-        'Refusing to delete "$path": no allowed root could be resolved',
-        category: 'Security',
-      );
-      return false;
-    }
-
+  /// Asks the platform to delete a MediaStore row (and the file behind it).
+  /// Returns false on non-Android hosts, when the plugin is missing, or when
+  /// the platform reports that it removed nothing.
+  Future<bool> _deleteViaMediaStore(String path) async {
+    if (!Platform.isAndroid) return false;
     try {
-      final canonicalFile = await file.resolveSymbolicLinks();
-      for (final root in roots) {
-        String canonicalRoot;
-        try {
-          canonicalRoot = await Directory(root).resolveSymbolicLinks();
-        } catch (_) {
-          continue;
-        }
-        if (p.equals(canonicalFile, canonicalRoot)) continue;
-        if (p.isWithin(canonicalRoot, canonicalFile)) return true;
-      }
+      final deleted = await const MethodChannel(PulsrChannels.ytDownload)
+          .invokeMethod<bool>('deleteFromMusic', {'path': path}).timeout(
+              const Duration(seconds: 2));
+      return deleted ?? false;
     } catch (e, st) {
-      ErrorLogger.log('Failed to canonicalize delete path "$path"',
-          error: e, stackTrace: st, category: 'Security');
+      ErrorLogger.log('MediaStore delete failed for "$path"',
+          error: e, stackTrace: st, category: 'MusicRepository');
       return false;
     }
-
-    ErrorLogger.log(
-      'Refusing to delete file outside allowed roots: $path',
-      category: 'Security',
-    );
-    return false;
   }
 
   @override
@@ -3008,10 +3020,20 @@ class MusicRepository implements IMusicRepository {
         final path = song.path;
         if (path.isEmpty || path.startsWith('ytmusic://')) continue;
         try {
-          if (!await _isSafeLocalDeletePath(path)) continue;
-          final file = File(path);
-          if (await file.exists()) {
-            await file.delete();
+          // App-owned files (downloads, cache) are removed directly under the
+          // containment guard. Library files in a shared collection cannot be
+          // File.delete()'d under scoped storage, so they go through the same
+          // MediaStore request the download path uses. Without this the row was
+          // deleted but the file survived, and the next scan re-indexed the
+          // track with no favourites, ratings or play count.
+          if (await _isSafeLocalDeletePath(path)) {
+            final file = File(path);
+            if (await file.exists()) await file.delete();
+          } else if (!await _deleteViaMediaStore(path)) {
+            ErrorLogger.log(
+              'Deleted song ${song.id} from the library but left its file in place: $path',
+              category: 'MusicRepository',
+            );
           }
         } catch (e, st) {
           ErrorLogger.log('Failed to delete file for song ${song.id}',

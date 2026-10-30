@@ -36,13 +36,18 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
     if (uri == null) return false;
     final path = uri.path.toLowerCase();
     if (path.contains('signin/blocked')) return true;
-    final hasErrorParam = uri.queryParameters.containsKey('error') ||
-        uri.queryParameters.containsKey('errorCode');
-    if (hasErrorParam &&
-        (path.contains('servicelogin') || path.contains('signin'))) {
-      return true;
-    }
-    return false;
+    // An `error` / `errorCode` parameter is extremely common on ordinary
+    // sign-in failures (wrong password, disabled account); treating any of
+    // them as the embedded-browser block put the recovery card — and its
+    // cookie wipe — over a page that was still perfectly usable. Only the
+    // UA-refusal codes count; everything else is left to the page-text scan.
+    const blockErrorValues = <String>{
+      'disallowed_useragent',
+      'browser_not_supported',
+      'blocked',
+    };
+    final error = uri.queryParameters['error']?.toLowerCase();
+    return error != null && blockErrorValues.contains(error);
   }
 
   bool _shouldScanForBlockPage() {
@@ -91,7 +96,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
       return '';
     }
 
-    if (window.__googleBlockDetected) return "couldn't sign you in";
+    if (window.__googleBlockDetected) return "this browser or app may not be secure";
     return full;
   } catch (e) { return ''; }
 })()''');
@@ -111,6 +116,12 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
       }
       for (final phrase in _YtmWebLoginSheetState._blockPhrases) {
         if (text.contains(phrase)) return true;
+      }
+      // The generic heading only counts together with a companion phrase.
+      if (text.contains(_YtmWebLoginSheetState._blockHeading) &&
+          _YtmWebLoginSheetState._blockHeadingCompanions
+              .any(text.contains)) {
+        return true;
       }
     } catch (e, st) {
       _handleWebViewError('_scanPageForBlockText failed', e, st);
@@ -148,19 +159,43 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
   /// `useShouldOverrideUrlLoading` (which the OAuth redirect chain runs through).
   /// So the block-recovery path, whose entire job is to look *less* like a bot,
   /// was making the next attempt look more like one.
+  /// Returns [base] with [userAgent] (and optionally [contentMode]) applied,
+  /// creating a properly configured settings object when there is no base.
+  ///
+  /// `setSettings` replaces the whole object, so this must start from the
+  /// installed settings — a bare `InAppWebViewSettings(userAgent: …)` wiped the
+  /// flags the login flow depends on (see [_applyWebViewIdentity]).
+  InAppWebViewSettings _settingsWithIdentity(
+    InAppWebViewSettings? base, {
+    required String userAgent,
+    UserPreferredContentMode? contentMode,
+  }) {
+    final next = base?.copy() ??
+        YtmWebLoginSheet.buildDefaultSettings(userAgent: userAgent);
+    next.userAgent = userAgent;
+    if (contentMode != null) next.preferredContentMode = contentMode;
+    return next;
+  }
+
   Future<void> _applyWebViewIdentity(
     InAppWebViewController? controller, {
     required String userAgent,
     UserPreferredContentMode? contentMode,
   }) async {
-    final base = _settings?.copy() ??
-        YtmWebLoginSheet.buildDefaultSettings(userAgent: userAgent);
-    base.userAgent = userAgent;
-    if (contentMode != null) base.preferredContentMode = contentMode;
+    final base = _settingsWithIdentity(
+      _settings,
+      userAgent: userAgent,
+      contentMode: contentMode,
+    );
     // Keep the field in step with the WebView, so the next call copies from what
     // is actually installed rather than from the initial value.
     _settings = base;
-    await controller?.setSettings(settings: base);
+    // No live handle: the identity is stored in _settings and a restarted
+    // WebView will be created with it. Calling setSettings on a disposed
+    // controller throws invalid_instance_id and made the recovery card look
+    // like it had failed.
+    if (controller == null || _webViewGone) return;
+    await controller.setSettings(settings: base);
   }
 
   /// Recovery card "Retry": manual full ladder — reset attempts, clean

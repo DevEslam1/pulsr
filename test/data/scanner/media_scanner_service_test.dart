@@ -40,7 +40,8 @@ void main() {
             albums: any(named: 'albums'),
             artists: any(named: 'artists')))
         .thenAnswer((_) async => const Right(null));
-    when(() => repo.cleanupOrphanedSongs(any()))
+    when(() => repo.cleanupOrphanedSongs(any(),
+            excludedFolderPrefixes: any(named: 'excludedFolderPrefixes')))
         .thenAnswer((_) async => const Right(0));
     when(() => repo.expandCueSheets()).thenAnswer((_) async => const Right(0));
     when(() => repo.updateAudioQuality(
@@ -173,7 +174,9 @@ void main() {
           songs: any(named: 'songs'),
           albums: any(named: 'albums'),
           artists: any(named: 'artists'))).called(1);
-      verify(() => repo.cleanupOrphanedSongs(any())).called(1);
+      verify(() => repo.cleanupOrphanedSongs(any(),
+              excludedFolderPrefixes: any(named: 'excludedFolderPrefixes')))
+          .called(1);
       verify(() => repo.expandCueSheets()).called(1);
       await sub.cancel();
     });

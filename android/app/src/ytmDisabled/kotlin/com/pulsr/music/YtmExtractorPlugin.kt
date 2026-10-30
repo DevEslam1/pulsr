@@ -69,7 +69,8 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "getCharts",
             "getMoods",
             "getPlaylist",
-            "resolveStream" -> result.error("YTM_DISABLED", DISABLED_REASON, null)
+            "resolveStream",
+            "resolveAgeGatedStream" -> result.error("YTM_DISABLED", DISABLED_REASON, null)
             "getCookies" -> {
                 // YouTube hosts only. Folding accounts.google.com into the same
                 // name-keyed jar sent Google account-management cookies to

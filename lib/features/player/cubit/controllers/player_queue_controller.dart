@@ -76,6 +76,11 @@ class PlayerQueueController {
 
   bool _isSwitchingSlot = false;
 
+  /// Single-flight latch for the autoplay radio fetch. Two overlapping
+  /// triggers (track change + settings toggle) used to fetch and append the
+  /// same recommendations twice.
+  bool _autoplayFetchInFlight = false;
+
   PlayerQueueController({
     required PulsrAudioHandler audioHandler,
     required IMusicRepository repository,

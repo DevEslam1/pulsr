@@ -66,6 +66,12 @@ class PlayerPlaybackOptionsController {
   int _reciterStyleGen = 0;
   int _quranWarmthGen = 0;
   int _quranAmbienceGen = 0;
+
+  /// Cached copy of the user's explicit Quran Mode choice (see
+  /// `QuranModeService.getUserOverride`). `null` is a meaningful value: the
+  /// user has never toggled the mode, so automatic activation may still run.
+  bool? _quranUserOverride;
+  bool _quranUserOverrideLoaded = false;
   StreamSubscription<bool>? _abLoopSub;
 
   bool get isClosed => _isClosed();

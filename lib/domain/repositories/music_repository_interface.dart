@@ -230,7 +230,15 @@ abstract class IMusicRepository {
     required List<ArtistsTableCompanion> artists,
   });
 
-  Future<Result<int>> cleanupOrphanedSongs(Set<int> scannedSongIds);
+  /// Marks library rows the scan did not see as missing.
+  ///
+  /// [excludedFolderPrefixes] are user-hidden folders: rows inside them are
+  /// intentionally absent from [scannedSongIds] and must be left untouched,
+  /// otherwise hiding a folder would slowly destroy the rows behind it.
+  Future<Result<int>> cleanupOrphanedSongs(
+    Set<int> scannedSongIds, {
+    List<String> excludedFolderPrefixes = const [],
+  });
 
   /// Expands single-file CUE sheets into virtual song rows that share the
   /// backing audio file's `path`. Real file rows covered by a cue keep their

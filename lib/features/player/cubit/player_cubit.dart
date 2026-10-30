@@ -708,7 +708,14 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         return;
       }
       final gen = _queueSyncGuard.next();
-      final ids = mediaItems.map((m) => _resolveMediaItemId(m.id)).toList();
+      // Resolve each media-item id exactly once. Resolving again inside the
+      // loop could disagree with the batch above once the negative-id cache
+      // evicts an entry (the item then missed its DB row and a synthetic
+      // ghost row was appended to the queue).
+      final resolvedItems = [
+        for (final m in mediaItems) (item: m, id: _resolveMediaItemId(m.id)),
+      ];
+      final ids = resolvedItems.map((e) => e.id).toList();
       if (ids.isEmpty) return;
       final songsRes = await _repository.getSongsByIds(ids);
       if (isClosed || !_queueSyncGuard.isValid(gen)) return;
@@ -717,13 +724,14 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           s.id: s
       };
       final restored = <SongsTableData>[];
-      for (final m in mediaItems) {
+      for (final resolved in resolvedItems) {
+        final m = resolved.item;
         final parsedId = int.tryParse(m.id);
         if (parsedId == null) {
           ErrorLogger.log('Restoring non-numeric queue media item id=${m.id}',
               category: 'PlayerCubit');
         }
-        final mid = _resolveMediaItemId(m.id);
+        final mid = resolved.id;
         if (songsMap.containsKey(mid)) {
           restored.add(songsMap[mid]!);
         } else {

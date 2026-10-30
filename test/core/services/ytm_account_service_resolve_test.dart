@@ -405,6 +405,26 @@ void main() {
               'block, so ANDROID_VR + ANDROID_MUSIC trip the threshold');
     });
 
+    test('a guest age gate does not short-circuit the chain', () async {
+      final service = await loggedIn(dataSyncId: 'dsid||');
+      // What YouTube answers a *guest* client for a +18 track. It contains the
+      // bot phrase "sign in to confirm", but it is a track property: skipping
+      // the remaining clients on it is what kept the authenticated WEB_REMIX
+      // from ever being tried.
+      handler = (request) async => _playability('LOGIN_REQUIRED',
+          reason: 'Sign in to confirm your age. '
+              'This video may be inappropriate for some users.');
+
+      final stream = await service.resolvePlayerStream('dQw4w9WgXcQ');
+
+      expect(stream, isNull);
+      final playerRequests =
+          requests.where((r) => r.url.path.contains('/player')).toList();
+      expect(playerRequests, hasLength(9),
+          reason: 'an age gate is not an egress verdict — every client must '
+              'still get its turn');
+    });
+
     test('a bot-word reason counts as a block signal', () async {
       final service = await loggedIn(dataSyncId: 'dsid||');
       handler = (request) async => _playability('UNPLAYABLE',

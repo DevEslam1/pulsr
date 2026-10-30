@@ -93,11 +93,34 @@ class AuthService {
       }
 
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-      final authz = await googleUser.authorizationClient
-          .authorizationForScopes(['email']).timeout(_operationTimeout);
+      // `authorizationForScopes` returns null whenever the cached grant needs
+      // user interaction, so dereferencing it crashed the whole sign-in with a
+      // null-check error before Firebase was ever called. The ID token is what
+      // Firebase actually needs; the access token is optional.
+      String? accessToken;
+      try {
+        final authz = await googleUser.authorizationClient
+            .authorizationForScopes(['email']).timeout(_operationTimeout);
+        accessToken = authz?.accessToken;
+      } catch (e) {
+        // Authorization is optional here: a valid ID token is sufficient.
+      }
+
+      final idToken = googleAuth.idToken;
+      if ((idToken == null || idToken.isEmpty) &&
+          (accessToken == null || accessToken.isEmpty)) {
+        throw const AuthFailure(
+          code: 'AUTH_GOOGLE_NO_CREDENTIAL',
+          userMessage:
+              'Google did not return a sign-in credential. Please try again.',
+          kind: AuthFailureKind.googleUnavailable,
+          recovery: AuthRecoveryAction.retry,
+        );
+      }
+
       final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: authz?.accessToken,
-        idToken: googleAuth.idToken,
+        accessToken: accessToken,
+        idToken: idToken,
       );
 
       final UserCredential userCredential = await FirebaseAuth.instance

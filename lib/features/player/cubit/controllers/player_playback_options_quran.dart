@@ -185,8 +185,46 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     }
   }
 
+  /// Reads the user's explicit on/off choice once per controller lifetime.
+  /// The cache is kept in sync by [_rememberQuranUserOverride] so an auto
+  /// trigger fired right after a manual toggle sees the new decision.
+  Future<bool?> _loadQuranUserOverride() async {
+    if (_quranUserOverrideLoaded) return _quranUserOverride;
+    try {
+      _quranUserOverride = await _quranManager.getUserOverride();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read Quran Mode user override',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsQuran');
+      _quranUserOverride = null;
+    }
+    _quranUserOverrideLoaded = true;
+    return _quranUserOverride;
+  }
+
+  Future<void> _rememberQuranUserOverride(bool enabled) async {
+    _quranUserOverride = enabled;
+    _quranUserOverrideLoaded = true;
+    try {
+      await _quranManager.setUserOverride(enabled);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist Quran Mode user override',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsQuran');
+    }
+  }
+
   Future<void> setQuranModeEnabled(bool enabled,
       {bool isAutoTriggered = false}) async {
+    // Automatic activation is a metadata heuristic (`isQuranTrack` matches
+    // "quran", "surah", reciter names, ...). It may switch the mode on and off
+    // for a user who never touched the toggle, but it must never override a
+    // decision the user made by hand: otherwise a manually enabled mode is
+    // switched off (and persisted as off) by the next unrelated track, and a
+    // manually disabled mode comes back on its own.
+    if (isAutoTriggered) {
+      final override = await _loadQuranUserOverride();
+      if (override != null && override != enabled) return;
+    }
+
     final s = _getState();
     if (_targetQuranModeEnabled == enabled ||
         (_targetQuranModeEnabled == null && enabled == s.isQuranModeEnabled)) {
@@ -198,6 +236,9 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     final gen = ++_quranToggleGen;
 
     try {
+      if (!isAutoTriggered) {
+        await _rememberQuranUserOverride(enabled);
+      }
       if (enabled) {
         final currentSnapshot =
             _quranManager.restoreSnapshot ?? await loadQuranSnapshot();

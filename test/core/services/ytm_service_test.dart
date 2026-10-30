@@ -389,6 +389,47 @@ void main() {
       expect(stream.url, equals('https://example.com/clean.m4a'));
     });
 
+    test('resolveAgeGatedStream returns the session-bound native stream',
+        () async {
+      _mockChannel((call) async {
+        if (call.method == 'resolveAgeGatedStream') {
+          expect(call.arguments['videoId'], equals('DuQGokwsWF8'));
+          return {
+            'videoId': 'DuQGokwsWF8',
+            'url': 'https://rr1.googlevideo.com/age.m4a',
+            'mimeType': 'audio/mp4',
+            'container': 'm4a',
+            'bitrateKbps': 128,
+            'durationMs': 180000,
+            'cookies': 'SAPISID=x',
+          };
+        }
+        return null;
+      });
+
+      final stream =
+          await YtmService().resolveAgeGatedStream('DuQGokwsWF8');
+
+      expect(stream, isNotNull);
+      expect(stream!.url, equals('https://rr1.googlevideo.com/age.m4a'));
+      expect(stream.cookies, equals('SAPISID=x'));
+    });
+
+    test('resolveAgeGatedStream returns null when the account is refused',
+        () async {
+      _mockChannel((call) async {
+        if (call.method == 'resolveAgeGatedStream') {
+          throw PlatformException(
+            code: 'AGE_RESTRICTED',
+            message: 'Age-gate resolution failed on WEB for age18Restricted',
+          );
+        }
+        return null;
+      });
+
+      expect(await YtmService().resolveAgeGatedStream('DuQGokwsWF8'), isNull);
+    });
+
     test('isWifiConnected returns true or false from channel', () async {
       _mockChannel((call) async {
         if (call.method == 'isWifiConnected') return false;

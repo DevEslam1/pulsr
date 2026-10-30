@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/services.dart';
 
+import '../../core/constants/audio_formats.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/local_delete_guard.dart';
 import '../db/app_database.dart';
 
 /// Single place that removes a library row and the file behind it.
@@ -16,11 +18,17 @@ class LibraryMaintenanceService {
   LibraryMaintenanceService({
     required AppDatabase? Function() database,
     required MethodChannel channel,
+    Future<List<String>> Function()? allowedDeleteRoots,
   })  : _database = database,
-        _channel = channel;
+        _channel = channel,
+        _allowedDeleteRoots = allowedDeleteRoots ?? allowedAppDeleteRoots;
 
   final AppDatabase? Function() _database;
   final MethodChannel _channel;
+
+  /// Roots a direct `File.delete()` may touch. Injectable so tests can grant a
+  /// sandbox directory without mocking path_provider.
+  final Future<List<String>> Function() _allowedDeleteRoots;
 
   static Future<void> tombstoneSong(AppDatabase db, int songId) {
     return (db.update(db.songsTable)..where((t) => t.id.equals(songId)))
@@ -75,15 +83,35 @@ class LibraryMaintenanceService {
       return;
     }
 
+    // A download path is untrusted input: it can arrive from a restored task
+    // JSON or a stale database row. Only files that resolve inside an
+    // app-owned root are deleted directly; everything else is left to the
+    // MediaStore request above.
+    final file = await resolveDeletableAudioFile(
+      path,
+      allowedExtensions: AudioFormats.supportedExtensions.toList(),
+      roots: await _allowedDeleteRoots(),
+      logCategory: 'LibraryMaintenance',
+    );
+    if (file == null) return;
+
     try {
-      final f = File(path);
-      if (await f.exists()) await f.delete();
-    } catch (_) {}
+      if (await file.exists()) await file.delete();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to delete downloaded file "$path"',
+          error: e, stackTrace: st, category: 'LibraryMaintenance');
+    }
+
+    // Partial artifacts sit next to the audio file, so they are covered by the
+    // same containment decision.
     for (final suffix in const ['.part', '.parts', '.part.stamp']) {
       try {
-        final part = File('$path$suffix');
+        final part = File('${file.path}$suffix');
         if (await part.exists()) await part.delete();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to delete partial artifact "$suffix"',
+            error: e, stackTrace: st, category: 'LibraryMaintenance');
+      }
     }
   }
 }

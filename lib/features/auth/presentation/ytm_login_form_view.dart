@@ -112,7 +112,7 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
             tooltip: context.l10n.browseRefreshPage,
             padding: const EdgeInsets.all(AppSpacing.s6),
             constraints: const BoxConstraints(),
-            onPressed: () => _webViewController?.reload(),
+            onPressed: _reloadPage,
           ),
           const SizedBox(width: AppSpacing.s2),
           PopupMenuButton<String>(

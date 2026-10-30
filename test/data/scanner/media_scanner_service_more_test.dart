@@ -76,7 +76,9 @@ void main() {
           as List<SongsTableCompanion>;
       return const Right(null);
     });
-    when(() => repo.cleanupOrphanedSongs(any())).thenAnswer((invocation) async {
+    when(() => repo.cleanupOrphanedSongs(any(),
+            excludedFolderPrefixes: any(named: 'excludedFolderPrefixes')))
+        .thenAnswer((invocation) async {
       capturedValidIds = invocation.positionalArguments.first as Set<int>;
       return const Right(0);
     });
@@ -320,7 +322,8 @@ void main() {
       final count = await scanner.scanDeviceLibrary(incremental: true);
       expect(count, 1);
       expect(capturedSongs!.single.id.value, 1);
-      verifyNever(() => repo.cleanupOrphanedSongs(any()));
+      verifyNever(() => repo.cleanupOrphanedSongs(any(),
+          excludedFolderPrefixes: any(named: 'excludedFolderPrefixes')));
     });
 
     test('only syncs when starting permission is granted', () async {

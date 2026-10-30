@@ -121,12 +121,15 @@ class DatabaseHealthCheck {
     var ftsHealthy = !AppDatabase.ftsRebuildFailed;
     if (ftsHealthy) {
       try {
-        final ftsCheck = await _db
-            .customSelect('SELECT COUNT(*) AS c FROM songs_fts;')
-            .getSingleOrNull();
-        if (ftsCheck == null) {
-          ftsHealthy = false;
-        }
+        // `songs_fts` is an external-content FTS5 table, so COUNT(*) is
+        // answered from the content table and passes even when the index is
+        // empty or stale. `integrity-check` with rank=1 also verifies the index
+        // against the content table (rank=0 checks internal consistency only);
+        // it throws SQLITE_CORRUPT when the two drifted apart, e.g. after a
+        // partial migration left the sync triggers missing for a few rows.
+        await _db.customStatement(
+          "INSERT INTO songs_fts(songs_fts, rank) VALUES('integrity-check', 1);",
+        );
       } catch (_) {
         ftsHealthy = false;
       }
@@ -295,6 +298,8 @@ class DatabaseMigrationValidator {
     'play_history',
     'queue_items',
     'excluded_folders',
+    'online_playlists',
+    'online_playlist_entries',
   ];
 
   static const Map<String, List<String>> requiredColumns = {

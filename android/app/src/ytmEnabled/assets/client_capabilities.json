@@ -66,6 +66,17 @@
       "requiresJsSignature": true,
       "priority": 6
     },
+    "WEB": {
+      "clientNameId": "1",
+      "clientVersion": "1.20260825.01.00",
+      "requiresPoToken": true,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": false,
+      "supportsBrowse": false,
+      "requiresJsSignature": true,
+      "priority": 0
+    },
     "WEB_REMIX": {
       "clientNameId": "67",
       "clientVersion": "1.20260825.01.00",

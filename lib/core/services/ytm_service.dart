@@ -1263,6 +1263,35 @@ class YtmService {
     });
   }
 
+  /// Rescues an age-gated (+18) track with the signed-in account.
+  ///
+  /// Runs a single authenticated `WEB` player request natively. It exists
+  /// because an age gate is decided by the *account*, not by the egress or the
+  /// client protocol: with no session attached every client answers
+  /// LOGIN_REQUIRED / "Sign in to confirm your age" for the same video, so
+  /// rotating clients can never pass one. Returns null when the gate holds
+  /// (the account itself is not age-verified) or the native side is absent.
+  Future<YtmStream?> resolveAgeGatedStream(String videoId,
+      {String quality = 'high', bool preferM4a = false}) async {
+    try {
+      final raw = await _guard(
+        () => _channel
+            .invokeMethod<Map<Object?, Object?>>('resolveAgeGatedStream', {
+          'videoId': videoId,
+          'quality': quality,
+          if (preferM4a) 'preferM4a': true,
+        }),
+        timeout: _defaultResolveTimeout,
+        maxRetries: 0,
+      );
+      if (raw == null) return null;
+      return YtmStream.fromChannel(raw);
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Age-gate rescue failed for $videoId: $e');
+      return null;
+    }
+  }
+
   Future<YtmStream> _resolveStreamInner(String videoId,
       {String quality = 'high',
       bool forceRefresh = false,
@@ -1632,6 +1661,44 @@ class YtmService {
         debugPrint('[YTM_SERVICE] Tier-2.5 retry failed: $e');
         if (e is YtmException) breaker.classifyAndRecord(e);
       }
+    }
+
+    // 2.4 Age-gate rescue (+18).
+    // An age gate is not evidence that the *account* is refused: every tier
+    // above may have asked as a guest (Tier-1 demotes itself to a guest pass
+    // when it cannot mint an account-bound poToken, and the native chain only
+    // carries the session on WEB_REMIX). When the accumulated verdict is
+    // AGE_RESTRICTED while signed in, ask once more with the session attached
+    // on WEB — the client YouTube runs age verification on. If that also
+    // refuses, the gate really is account-level and the UI copy is right.
+    final nativeAge = nativeErr;
+    final tierAge = firstError;
+    final YtmException? ageVerdict = nativeAge is YtmException &&
+            nativeAge.isAgeRestricted
+        ? nativeAge
+        : (tierAge is YtmException && tierAge.isAgeRestricted ? tierAge : null);
+    if (ageVerdict != null &&
+        getIt.isRegistered<YtmAccountService>() &&
+        getIt<YtmAccountService>().isLoggedIn) {
+      debugPrint(
+          '[YTM_SERVICE] $videoId is age-gated — retrying with the signed-in WEB session');
+      final rescued = await resolveAgeGatedStream(videoId,
+          quality: quality, preferM4a: preferM4a);
+      if (rescued != null) {
+        try {
+          _tracker?.markStage(PlaybackStage.urlObtained);
+        } catch (e, st) {
+          ErrorLogger.log('Non-critical YTM operation failed',
+              error: e, stackTrace: st, category: 'YTM');
+        }
+        urlCache?.putStream(rescued, quality: cacheQuality);
+        _noteResolveSuccess(videoId: videoId);
+        recordLoudness(videoId, rescued.loudnessDb);
+        return rescued;
+      }
+      debugPrint(
+          '[YTM_SERVICE] Age gate held with the session attached for $videoId — '
+          'the account itself is not age-verified; no client can pass it');
     }
 
     // 2.9 While an egress block is active, the pure-Dart sweep below pays three
