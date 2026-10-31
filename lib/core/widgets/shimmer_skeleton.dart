@@ -49,47 +49,29 @@ class _SkeletonShimmerState extends State<SkeletonShimmer>
 
   @override
   Widget build(BuildContext context) {
-    final scope = _SkeletonShimmerScope(present: true, child: widget.child);
-    if (!context.motionEnabled) return scope;
-
-    final isDark = context.palette.isDark;
-    final highlight =
-        (isDark ? Colors.white : Colors.black).withValues(alpha: 0.10);
-
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final t = _controller.value;
-        return ShaderMask(
-          blendMode: BlendMode.srcATop,
-          shaderCallback: (bounds) {
-            if (bounds.isEmpty) {
-              return const LinearGradient(
-                colors: [Colors.transparent, Colors.transparent],
-              ).createShader(bounds);
-            }
-            return LinearGradient(
-              begin: Alignment(-1.6 + 3.2 * t, 0),
-              end: Alignment(-0.6 + 3.2 * t, 0),
-              colors: [Colors.transparent, highlight, Colors.transparent],
-              stops: const [0.15, 0.5, 0.85],
-            ).createShader(bounds);
-          },
-          child: child,
-        );
-      },
-      child: scope,
-    );
+    // The shared sweep is painted inside each box instead of via a ShaderMask:
+    // a ShaderMask forces one offscreen layer for the whole list on every
+    // frame, while a per-box gradient is a cheap paint with no layer.
+    final animation = context.motionEnabled ? _controller : null;
+    return _SkeletonShimmerScope(animation: animation, child: widget.child);
   }
 }
 
 class _SkeletonShimmerScope extends InheritedWidget {
-  final bool present;
+  final Animation<double>? animation;
 
-  const _SkeletonShimmerScope({required this.present, required super.child});
+  const _SkeletonShimmerScope({
+    required this.animation,
+    required super.child,
+  });
+
+  static Animation<double>? of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_SkeletonShimmerScope>()
+      ?.animation;
 
   @override
-  bool updateShouldNotify(_SkeletonShimmerScope oldWidget) => false;
+  bool updateShouldNotify(_SkeletonShimmerScope oldWidget) =>
+      oldWidget.animation != animation;
 }
 
 /// A placeholder block used by list/grid loading states.
@@ -141,9 +123,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
     }
   }
 
-  bool get _hasSharedShimmer =>
-      context.dependOnInheritedWidgetOfExactType<_SkeletonShimmerScope>() !=
-      null;
+  bool get _hasSharedShimmer => _SkeletonShimmerScope.of(context) != null;
 
   @override
   void dispose() {
@@ -156,16 +136,28 @@ class _SkeletonBoxState extends State<SkeletonBox>
     final p = context.palette;
     final base = p.surfaceContainerHigh;
 
-    // Shared shimmer: flat surface, ancestor sweeps the highlight.
-    if (_hasSharedShimmer) {
+    // Shared shimmer: paint the moving highlight inside this box (no layer).
+    final shimmer = _SkeletonShimmerScope.of(context);
+    if (shimmer != null) {
       return SizedBox(
         width: widget.width,
         height: widget.height,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: AppRadii.circular(widget.radius),
-            color: base,
-          ),
+        child: AnimatedBuilder(
+          animation: shimmer,
+          builder: (context, _) {
+            final t = shimmer.value;
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: AppRadii.circular(widget.radius),
+                gradient: LinearGradient(
+                  begin: Alignment(-1.8 + 3.6 * t, 0),
+                  end: Alignment(-0.8 + 3.6 * t, 0),
+                  colors: [base, p.surfaceContainer, base],
+                  stops: const [0.20, 0.50, 0.80],
+                ),
+              ),
+            );
+          },
         ),
       );
     }

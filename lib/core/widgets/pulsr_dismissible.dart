@@ -196,7 +196,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
     super.initState();
     _offsetController = AnimationController(
       vsync: this,
-      duration: PulsrMotion.standard,
+      duration: Duration.zero,
       lowerBound: -1.0,
       upperBound: 1.0,
       value: 0.0,
@@ -204,7 +204,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
 
     _resizeController = AnimationController(
       vsync: this,
-      duration: PulsrMotion.layout,
+      duration: Duration.zero,
       value: 0.0,
     );
 

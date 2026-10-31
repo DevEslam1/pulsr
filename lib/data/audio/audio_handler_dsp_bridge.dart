@@ -5,6 +5,8 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   EqPreset get currentPreset => _equalizerManager.currentPreset;
 
+  List<double> get activeFrequencies => _equalizerManager.activeFrequencies;
+
   bool get isVirtualizerEnabled => _equalizerManager.isVirtualizerEnabled;
 
   double get virtualizerStrength => _equalizerManager.virtualizerStrength;
@@ -197,6 +199,8 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   double get crossfeedFeedDb => _equalizerManager.crossfeedFeedDb;
 
+  double get crossfeedFcut => _equalizerManager.crossfeedFcut;
+
   int get crossfeedMode => _equalizerManager.crossfeedMode;
 
   Future<void> setCrossfeed(bool enabled,
@@ -234,8 +238,26 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   double get reverbWetDry => _equalizerManager.reverbWetDry;
 
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) =>
-      _equalizerManager.setReverb(enabled, preset: preset, wetDry: wetDry);
+  double get reverbPredelayMs => _equalizerManager.reverbPredelayMs;
+
+  double get reverbDamping => _equalizerManager.reverbDamping;
+
+  double get reverbCrossChannel => _equalizerManager.reverbCrossChannel;
+
+  Future<void> setReverb(
+    bool enabled, {
+    int? preset,
+    double? wetDry,
+    double? predelayMs,
+    double? damping,
+  }) =>
+      _equalizerManager.setReverb(
+        enabled,
+        preset: preset,
+        wetDry: wetDry,
+        predelayMs: predelayMs,
+        damping: damping,
+      );
 
   Future<void> setBypassCompare({
     required bool bypass,
@@ -291,6 +313,8 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   double get saturationTilt => _equalizerManager.saturationTilt;
 
+  int get saturationMode => _equalizerManager.saturationMode;
+
   bool get saturationMultiband => _equalizerManager.saturationMultiband;
 
   Future<void> setSaturation(
@@ -316,6 +340,20 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   bool get isStereoWidthEnabled => _equalizerManager.isStereoWidthEnabled;
 
   double get stereoWidth => _equalizerManager.stereoWidth;
+
+  bool get stereoWidthMultiband => _equalizerManager.stereoWidthMultiband;
+
+  double get stereoWidthLow => _equalizerManager.stereoWidthLow;
+
+  double get stereoWidthMid => _equalizerManager.stereoWidthMid;
+
+  double get stereoWidthHigh => _equalizerManager.stereoWidthHigh;
+
+  double get stereoWidthLowCrossoverHz =>
+      _equalizerManager.stereoWidthLowCrossoverHz;
+
+  double get stereoWidthHighCrossoverHz =>
+      _equalizerManager.stereoWidthHighCrossoverHz;
 
   Future<void> setStereoWidth(
     bool enabled, {
@@ -355,6 +393,19 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
       _equalizerManager.subCrossoverSlopeDbPerOct;
 
   double get subCrossoverGain => _equalizerManager.subCrossoverGain;
+
+  bool get subCrossoverBassMono => _equalizerManager.subCrossoverBassMono;
+
+  bool get subCrossoverAntiPop => _equalizerManager.subCrossoverAntiPop;
+
+  bool get isMultibandCompressorEnabled =>
+      _equalizerManager.isMultibandCompressorEnabled;
+
+  double get multibandCompressorF0 => _equalizerManager.multibandCompressorF0;
+
+  double get multibandCompressorF1 => _equalizerManager.multibandCompressorF1;
+
+  double get multibandCompressorF2 => _equalizerManager.multibandCompressorF2;
 
   Future<void> setSubCrossover(
     bool enabled, {

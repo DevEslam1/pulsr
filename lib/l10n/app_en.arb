@@ -290,6 +290,29 @@
   "apply": "Apply",
   "increase": "Increase",
   "decrease": "Decrease",
+  "quranSurahIndex": "Surah Index",
+  "quranReadingOnly": "Reading only",
+  "quranBookmarkFailed": "Could not update the Quran bookmark. Please try again.",
+  "quranTextUnavailable": "Text for this surah is not bundled yet. Audio playback is still available.",
+  "quranShowText": "Show Text",
+  "quranBlindRecall": "Hifz Blind Recall Mode",
+  "quranTapToReveal": "Tap to reveal (Hifz recall)",
+  "quranRepeatMode": "AYAH REPEAT MODE",
+  "karaokePitchGuideHighway": "Pitch Guide Highway",
+  "playlistImportSpotify": "Import Spotify Playlist",
+  "marqueePause": "Pause scrolling title",
+  "marqueeResume": "Resume scrolling title",
+  "settingsMinDurationFilter": "Min {seconds}s filter",
+  "@settingsMinDurationFilter": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsProxyOnStatus": "Proxy ON",
+  "settingsProxyOffStatus": "Proxy OFF",
+  "downloadAction": "Download",
   "sheetDragHandle": "Sheet drag handle",
   "sheetDragDownToDismiss": "Drag down to dismiss",
   "vinylDisc": "Vinyl disc",

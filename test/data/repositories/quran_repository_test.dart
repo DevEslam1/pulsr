@@ -1,8 +1,11 @@
 // test/data/repositories/quran_repository_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/domain/models/quran_metadata.dart';
 import 'package:pulsr/data/repositories/quran_repository_impl.dart';
+
+class _MockPrefs extends Mock implements SharedPreferences {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +15,43 @@ void main() {
   });
 
   group('QuranRepositoryImpl', () {
+    test('reports bookmark storage rejection instead of claiming success',
+        () async {
+      final prefs = _MockPrefs();
+      when(() => prefs.setString(any(), any())).thenAnswer((_) async => false);
+      final repo = QuranRepositoryImpl.withPrefs(prefs);
+      final bookmark = QuranBookmark(
+          trackUri: 'quran://1',
+          metadata: const QuranMetadata(
+              surahNumber: 1,
+              surahName: 'Al-Fatihah',
+              ayahStart: 1,
+              ayahEnd: 7,
+              reciter: 'Reciter'),
+          currentAyah: 1,
+          position: Duration.zero,
+          timestamp: DateTime(2026));
+      await expectLater(repo.saveBookmark(bookmark), throwsStateError);
+    });
+
+    test('provides real offline text for every canonical verse', () {
+      final repo = QuranRepositoryImpl();
+      var total = 0;
+      for (final surah in repo.getSurahs()) {
+        final verses = repo.getAyahsForSurah(surah.number);
+        expect(verses, hasLength(surah.totalAyahs));
+        for (var i = 0; i < verses.length; i++) {
+          expect(verses[i].ayahNumber, i + 1);
+          expect(verses[i].textArabic, isNotEmpty);
+          expect(verses[i].textArabic, isNot(contains('الآية ')));
+        }
+        total += verses.length;
+      }
+      expect(total, 6236);
+      expect(repo.getAyahsForSurah(0), isEmpty);
+      expect(repo.getAyahsForSurah(115), isEmpty);
+    });
+
     test('returns null when no metadata exists (no inference/guessing)',
         () async {
       final repo = QuranRepositoryImpl();
@@ -94,11 +134,11 @@ void main() {
       final fatihahAyahs = repo.getAyahsForSurah(1);
       expect(fatihahAyahs.length, 7);
       expect(
-          fatihahAyahs.first.textArabic, contains('الرَّحْمَٰنِ الرَّحِيمِ'));
+          fatihahAyahs.first.textArabic, contains('ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ'));
 
       final nasAyahs = repo.getAyahsForSurah(114);
       expect(nasAyahs.length, 6);
-      expect(nasAyahs.last.textArabic, contains('النَّاسِ'));
+      expect(nasAyahs.last.textArabic, contains('ٱلنَّاسِ'));
     });
   });
 }

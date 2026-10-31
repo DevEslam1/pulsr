@@ -144,16 +144,17 @@ class StackedBottomDockState extends State<StackedBottomDock> {
     required double navBarTotalHeight,
     double keyboardInset = 0.0,
     bool isKeyboardVisible = false,
+    double miniPlayerHeight = _miniPlayerHeight,
   }) {
     if (isKeyboardVisible || keyboardInset > 0) return 0.0;
     if (!hasSong) return navBarTotalHeight;
     if (mode == DockStackMode.system) {
-      return navBarTotalHeight + _miniPlayerHeight + 4.0;
+      return navBarTotalHeight + miniPlayerHeight + 4.0;
     }
     final isStacked = mode != DockStackMode.defaultLayout;
     return !isStacked
-        ? (navBarTotalHeight + _dockPillGap + _miniPlayerHeight)
-        : (_peekOffset + _miniPlayerHeight);
+        ? (navBarTotalHeight + _dockPillGap + miniPlayerHeight)
+        : (_peekOffset + miniPlayerHeight);
   }
 
   void _syncDock({required bool hasSong}) {
@@ -177,6 +178,10 @@ class StackedBottomDockState extends State<StackedBottomDock> {
       mode: widget.mode,
       navBarTotalHeight: navBarTotalHeight,
       keyboardInset: keyboardInset,
+      // The mini player grows with the user's text scale (clamped to 1.5x) so
+      // 200 % type does not overflow its fixed 52 dp content box.
+      miniPlayerHeight: _miniPlayerHeight *
+          MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.5),
     );
     _maybeUpdateDock(
       height: dockHeight,

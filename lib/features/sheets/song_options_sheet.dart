@@ -769,38 +769,42 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     Color? textColor,
   }) {
     final p = context.palette;
-    return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        Navigator.of(context).pop();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s20,
-          vertical: AppSpacing.s12,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color: iconColor ?? p.textPrimary,
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: AppFontSize.callout,
-                  fontWeight: FontWeight.w500,
-                  color: textColor ?? p.textPrimary,
+    return Semantics(
+      button: true,
+      label: title,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.of(context).pop();
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s20,
+            vertical: AppSpacing.s12,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 24,
+                color: iconColor ?? p.textPrimary,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppFontSize.callout,
+                    fontWeight: FontWeight.w500,
+                    color: textColor ?? p.textPrimary,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

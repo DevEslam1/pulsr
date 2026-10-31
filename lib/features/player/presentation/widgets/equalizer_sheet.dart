@@ -79,6 +79,7 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
       x.isSpatializerSupported != y.isSpatializerSupported ||
       x.isSpatializerEnabled != y.isSpatializerEnabled ||
       x.volumeBoost != y.volumeBoost ||
+      x.preampDb != y.preampDb ||
       x.isVolumeBoostSupported != y.isVolumeBoostSupported ||
       x.isBassBoostSupported != y.isBassBoostSupported ||
       x.isCrossfeedEnabled != y.isCrossfeedEnabled ||
@@ -117,6 +118,7 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
       x.stereoWidthHigh != y.stereoWidthHigh ||
       x.stereoWidthLowCrossoverHz != y.stereoWidthLowCrossoverHz ||
       x.stereoWidthHighCrossoverHz != y.stereoWidthHighCrossoverHz ||
+      x.isMultibandCompressorEnabled != y.isMultibandCompressorEnabled ||
       x.multibandCompressorF0 != y.multibandCompressorF0 ||
       x.multibandCompressorF1 != y.multibandCompressorF1 ||
       x.multibandCompressorF2 != y.multibandCompressorF2 ||
@@ -126,6 +128,7 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
       x.viperDdcProfileName != y.viperDdcProfileName ||
       x.isArbitraryEqEnabled != y.isArbitraryEqEnabled ||
       x.arbitraryEqString != y.arbitraryEqString ||
+      x.arbitraryEqLinearPhase != y.arbitraryEqLinearPhase ||
       x.isLiveProgEnabled != y.isLiveProgEnabled ||
       x.liveProgCode != y.liveProgCode ||
       x.liveProgStatus != y.liveProgStatus ||

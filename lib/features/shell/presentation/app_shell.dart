@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/motion/pulsr_motion.dart';
@@ -22,7 +21,6 @@ import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
-import 'nav_destinations.dart';
 import 'widgets/landscape_sidebar.dart';
 import 'widgets/player_shortcut_scope.dart';
 import 'widgets/stacked_bottom_dock.dart';
@@ -59,14 +57,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  static const String _lastTabPrefKey = 'setting_last_shell_tab';
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     PulsrModalTracker.isModalOpen.addListener(_onModalStateChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreLastShellTab());
     DockStyleController.load();
     _downloadEffectsSub =
         context.read<YtmDownloadCubit?>()?.effects.listen(_showDownloadEffect);
@@ -80,31 +75,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       icon: Icons.error_outline_rounded,
       isError: true,
     );
-  }
-
-  /// Re-opens the branch that was active when the app was last closed.
-  Future<void> _restoreLastShellTab() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getInt(_lastTabPrefKey);
-      if (!mounted || saved == null) return;
-      final destinations = pulsrDestinations(context);
-      if (saved < 0 ||
-          saved >= destinations.length ||
-          saved == widget.navigationShell.currentIndex) {
-        return;
-      }
-      widget.navigationShell.goBranch(saved);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to restore last shell tab',
-          error: e, stackTrace: st, category: 'Shell');
-    }
-  }
-
-  void _persistActiveTab(int index) {
-    unawaited(SharedPreferences.getInstance().then((prefs) async {
-      await prefs.setInt(_lastTabPrefKey, index);
-    }).catchError((_) {}));
   }
 
   @override
@@ -185,7 +155,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         index,
         initialLocation: isSameTab,
       );
-      _persistActiveTab(index);
     } catch (e, st) {
       ErrorLogger.log('Failed to navigate to branch $index',
           error: e, stackTrace: st, category: 'Shell');
@@ -261,7 +230,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       final prevIndex = _tabHistory.last;
       try {
         widget.navigationShell.goBranch(prevIndex);
-        _persistActiveTab(prevIndex);
       } catch (e, st) {
         ErrorLogger.log('Failed to navigate back to branch $prevIndex',
             error: e, stackTrace: st, category: 'Shell');
@@ -282,7 +250,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _tabHistory.addLast(0);
       try {
         widget.navigationShell.goBranch(0);
-        _persistActiveTab(0);
       } catch (_) {}
       setState(() {});
       return;

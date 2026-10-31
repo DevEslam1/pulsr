@@ -383,10 +383,11 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
 }
 
 void HarmonicSaturation::processInterleaved(float* buffer, int frames, int channels) {
-    channels = std::clamp(channels, 1, MAX_CHANNELS);
     const float targetEnabledMix = enabled_ ? 1.0f : 0.0f;
     if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
     if (!buffer || frames <= 0 || channels <= 0) return;
+    const int stride = channels;
+    channels = std::clamp(channels, 1, MAX_CHANNELS);
 
     // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
     const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
@@ -400,7 +401,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
     float currentEnabledMix = startEnabledMix;
 
     smoothParameters(frames);
-    if (channels == 2) {
+    if (stride == 2) {
         const double k = smoothedDrive_ * kMaxDrive;
         const float mix = static_cast<float>(smoothedMix_);
         const float tilt = static_cast<float>(smoothedTilt_);
@@ -434,7 +435,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 const int ch0 = p * 2;
                 const int ch1 = ch0 + 1;
                 double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
-                crossover_[p].process(buffer[i * channels + ch0], buffer[i * channels + ch1],
+                crossover_[p].process(buffer[i * stride + ch0], buffer[i * stride + ch1],
                                       outLpL, outLpR, outHpL, outHpR);
                 subArr[ch0] = static_cast<float>(outLpL);
                 subArr[ch1] = static_cast<float>(outLpR);
@@ -446,7 +447,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 const int p = chLast / 2;
                 if (p < MAX_CHANNELS / 2) {
                     double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
-                    crossover_[p].process(buffer[i * channels + chLast], buffer[i * channels + chLast],
+                    crossover_[p].process(buffer[i * stride + chLast], buffer[i * stride + chLast],
                                           outLpL, outLpR, outHpL, outHpR);
                     subArr[chLast] = static_cast<float>(outLpL);
                     satInArr[chLast] = static_cast<float>(outHpL);
@@ -455,7 +456,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
         }
 
         for (int ch = 0; ch < channels; ++ch) {
-            const int idx = i * channels + ch;
+            const int idx = i * stride + ch;
             float inSample = multiband_ ? satInArr[ch] : buffer[idx];
             if (!std::isfinite(inSample)) inSample = 0.0f;
             float subSample = multiband_ ? subArr[ch] : 0.0f;
@@ -546,7 +547,6 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
             const float midHigh = (1.0f - mix) * dryTap + mix * wet;
             const float outCh = multiband_ ? (subTap + midHigh) : midHigh;
-            const float inOrig = buffer[idx];
 
             // Equal-power crossfading for wet/dry enable/disable
             float dryW, wetW;
@@ -562,7 +562,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 wetW = std::sin(angle);
             }
 
-            buffer[idx] = dryW * inOrig + wetW * outCh;
+            buffer[idx] = dryW * buffer[idx] + wetW * outCh;
         }
         currentEnabledMix += mixStep;
         // FIX M-13: advance the shared dry-delay position once per frame.

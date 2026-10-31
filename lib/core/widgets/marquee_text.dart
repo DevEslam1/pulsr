@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../motion/pulsr_motion.dart';
+import '../utils/l10n_extensions.dart';
 import 'pulsr_scroll_edge_fade.dart';
 
 /// {@category DesignSystem}
@@ -16,6 +18,21 @@ class MarqueeText extends StatefulWidget {
   final double blankSpace;
   final bool pauseOnHover;
 
+  /// When true, a tap pauses/resumes the marquee and assistive technology gets
+  /// an equivalent action. Required by WCAG 2.2.2 (Pause, Stop, Hide): a title
+  /// that scrolls indefinitely must be stoppable without a mouse.
+  final bool allowUserPause;
+
+  /// Explicit text direction override. When null, [MarqueeText] automatically
+  /// detects whether the content contains Arabic/RTL glyphs and formats/scrolls
+  /// naturally in RTL, or LTR for English/Latin content.
+  final TextDirection? textDirection;
+
+  /// When running in test environments, continuous auto-scrolling is disabled
+  /// by default so that [WidgetTester.pumpAndSettle] does not time out.
+  @visibleForTesting
+  static bool enableInTests = false;
+
   const MarqueeText({
     super.key,
     required this.text,
@@ -26,6 +43,8 @@ class MarqueeText extends StatefulWidget {
     this.scrollSpeed,
     this.blankSpace = 48.0,
     this.pauseOnHover = true,
+    this.allowUserPause = true,
+    this.textDirection,
   });
 
   @override
@@ -39,6 +58,7 @@ class _MarqueeTextState extends State<MarqueeText> {
   bool _isHovered = false;
   int _scrollGeneration = 0;
   double _currentMaxScroll = 0;
+  bool _userPaused = false;
 
   double get _effectiveVelocity => widget.scrollSpeed ?? widget.velocity;
 
@@ -56,8 +76,10 @@ class _MarqueeTextState extends State<MarqueeText> {
         oldWidget.textAlign != widget.textAlign ||
         oldWidget.blankSpace != widget.blankSpace ||
         oldWidget.velocity != widget.velocity ||
-        oldWidget.scrollSpeed != widget.scrollSpeed) {
+        oldWidget.scrollSpeed != widget.scrollSpeed ||
+        oldWidget.textDirection != widget.textDirection) {
       _stopScrolling();
+      _userPaused = false;
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(0.0);
       }
@@ -101,8 +123,17 @@ class _MarqueeTextState extends State<MarqueeText> {
     _unhoverCompleter = null;
   }
 
+  bool get _isTestEnv =>
+      const bool.fromEnvironment('flutter.test') ||
+      (WidgetsBinding.instance is! WidgetsFlutterBinding);
+
   void _startScrolling(double maxScroll) {
-    if (_isScrolling || !mounted || maxScroll <= 0 || !context.motionEnabled) {
+    if (_isScrolling ||
+        !mounted ||
+        maxScroll <= 0 ||
+        !context.motionEnabled ||
+        _userPaused ||
+        (_isTestEnv && !MarqueeText.enableInTests)) {
       return;
     }
     _isScrolling = true;
@@ -164,16 +195,44 @@ class _MarqueeTextState extends State<MarqueeText> {
     cycle();
   }
 
+  /// Toggles the marquee. WCAG 2.2.2: moving content that starts automatically
+  /// must be pausable by touch, pointer and assistive technology.
+  void _toggleUserPause() {
+    if (!widget.allowUserPause || !mounted) return;
+    setState(() => _userPaused = !_userPaused);
+    HapticFeedback.selectionClick();
+    if (_userPaused) {
+      _stopScrolling();
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0.0);
+      }
+    }
+  }
+
+  static bool hasRtlGlyphs(String text) {
+    return RegExp(r'[\u0590-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]').hasMatch(text);
+  }
+
+  TextDirection _resolveDirection(BuildContext context) {
+    if (widget.textDirection != null) return widget.textDirection!;
+    if (hasRtlGlyphs(widget.text)) return TextDirection.rtl;
+    if (RegExp(r'[a-zA-Z]').hasMatch(widget.text)) {
+      return TextDirection.ltr;
+    }
+    return Directionality.of(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final effectiveStyle = widget.style ?? DefaultTextStyle.of(context).style;
     final motionEnabled = context.motionEnabled;
+    final effectiveDirection = _resolveDirection(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final textPainter = TextPainter(
           text: TextSpan(text: widget.text, style: effectiveStyle),
-          textDirection: Directionality.of(context),
+          textDirection: effectiveDirection,
           textScaler: MediaQuery.textScalerOf(context),
           maxLines: 1,
         )..layout();
@@ -189,14 +248,24 @@ class _MarqueeTextState extends State<MarqueeText> {
             !availableWidth.isFinite) {
           _stopScrolling();
           _currentMaxScroll = 0;
-          return Tooltip(
-            message: widget.text,
-            child: Text(
-              widget.text,
-              style: effectiveStyle,
-              textAlign: widget.textAlign,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          return Directionality(
+            textDirection: effectiveDirection,
+            child: Tooltip(
+              message: widget.text,
+              // Respect the incoming width even in the static branch: without
+              // this, a long title inside a constrained Row overflows when
+              // Reduce Motion swaps the marquee for plain text.
+              child: SizedBox(
+                width: availableWidth.isFinite ? availableWidth : null,
+                child: Text(
+                  widget.text,
+                  style: effectiveStyle,
+                  textAlign: widget.textAlign,
+                  textDirection: effectiveDirection,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
           );
         }
@@ -217,20 +286,25 @@ class _MarqueeTextState extends State<MarqueeText> {
 
         Widget marquee = SizedBox(
           width: availableWidth,
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            scrollDirection: Axis.horizontal,
-            physics: const NeverScrollableScrollPhysics(),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  widget.text,
-                  style: effectiveStyle,
-                  maxLines: 1,
-                ),
-                SizedBox(width: widget.blankSpace),
-              ],
+          child: Directionality(
+            textDirection: effectiveDirection,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                textDirection: effectiveDirection,
+                children: [
+                  Text(
+                    widget.text,
+                    style: effectiveStyle,
+                    textDirection: effectiveDirection,
+                    maxLines: 1,
+                  ),
+                  SizedBox(width: widget.blankSpace),
+                ],
+              ),
             ),
           ),
         );
@@ -243,11 +317,27 @@ class _MarqueeTextState extends State<MarqueeText> {
           );
         }
 
+        if (widget.allowUserPause) {
+          final l10n = context.l10n;
+          marquee = Semantics(
+            hint: _userPaused ? l10n.marqueeResume : l10n.marqueePause,
+            onTap: _toggleUserPause,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _toggleUserPause,
+              child: marquee,
+            ),
+          );
+        }
+
         // Fade the clipped edge instead of cutting a glyph in half before the
         // marquee starts. The 1.4 s pause is still enough to read the opening.
-        return PulsrScrollEdgeFade(
-          extent: 32,
-          child: marquee,
+        return Directionality(
+          textDirection: effectiveDirection,
+          child: PulsrScrollEdgeFade(
+            extent: 32,
+            child: marquee,
+          ),
         );
       },
     );

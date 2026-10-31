@@ -123,15 +123,13 @@ void main() {
 
   testWidgets('a failed quick-action fetch plays nothing and reports the error',
       (tester) async {
-    when(() => getSongs.getAllSongs(
-          sortBy: any(named: 'sortBy'),
-          ascending: any(named: 'ascending'),
+    when(() => getSongs.watchTopPlayed(
           limit: any(named: 'limit'),
           excludedFolders: any(named: 'excludedFolders'),
-        )).thenAnswer((_) async => const Left(DatabaseFailure('offline')));
+        )).thenAnswer((_) => Stream.value(const Left(DatabaseFailure('offline'))));
 
     await pumpScreen(tester);
-    await tester.tap(find.text('Daily Drive'));
+    await tester.tap(find.text('Focus Flow'));
     await tester.pumpAndSettle();
 
     verifyNever(() => player.playSong(any(), queue: any(named: 'queue')));

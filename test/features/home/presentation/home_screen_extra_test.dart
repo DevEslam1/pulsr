@@ -157,23 +157,20 @@ void main() {
 
   testWidgets('the quick-action song cache is reused within its TTL',
       (tester) async {
-    when(() => getSongs.getAllSongs(
-              sortBy: any(named: 'sortBy'),
-              ascending: any(named: 'ascending'),
+    when(() => getSongs.watchTopPlayed(
               limit: any(named: 'limit'),
+              excludedFolders: any(named: 'excludedFolders'),
             ))
-        .thenAnswer((_) async =>
-            Right([createTestSong(id: 1, title: 'A', playCount: 1)]));
+        .thenAnswer((_) =>
+            Stream.value(Right([createTestSong(id: 1, title: 'A', playCount: 1)])));
 
     await pumpScreen(tester);
-    await tester.tap(find.text('Daily Drive'));
+    await tester.tap(find.text('Focus Flow'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Daily Drive'));
+    await tester.tap(find.text('Focus Flow'));
     await tester.pumpAndSettle();
 
-    verify(() => getSongs.getAllSongs(
-          sortBy: any(named: 'sortBy'),
-          ascending: any(named: 'ascending'),
+    verify(() => getSongs.watchTopPlayed(
           limit: any(named: 'limit'),
           excludedFolders: any(named: 'excludedFolders'),
         )).called(1);

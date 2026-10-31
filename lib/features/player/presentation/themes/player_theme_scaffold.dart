@@ -302,7 +302,7 @@ class PlayerHeaderBar extends StatelessWidget {
               minHeight: AppSpacing.minTouchTarget),
           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
           color: p.textPrimary,
-          tooltip: 'Close',
+          tooltip: context.l10n.close,
           onPressed: onBack ?? () => Navigator.of(context).maybePop(),
         ),
         Expanded(

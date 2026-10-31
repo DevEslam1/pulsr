@@ -4,6 +4,20 @@ import 'package:pulsr/domain/models/quran_surah.dart';
 
 void main() {
   group('QuranAyahTiming', () {
+    test('rejects negative and empty timing intervals', () {
+      expect(
+          const QuranAyahTiming(
+                  ayahNumber: 1,
+                  start: Duration(seconds: -1),
+                  end: Duration(seconds: 2))
+              .isValid,
+          isFalse);
+      expect(
+          const QuranAyahTiming(
+                  ayahNumber: 1, start: Duration.zero, end: Duration.zero)
+              .isValid,
+          isFalse);
+    });
     test('instantiates and serializes accurately', () {
       const timing = QuranAyahTiming(
         ayahNumber: 1,
@@ -20,6 +34,38 @@ void main() {
   });
 
   group('QuranMetadata', () {
+    test('rejects verses beyond the canonical surah length', () {
+      const meta = QuranMetadata(
+          surahNumber: 1,
+          surahName: 'Al-Fatihah',
+          ayahStart: 1,
+          ayahEnd: 8,
+          reciter: 'Reciter');
+      expect(meta.isValid, isFalse);
+    });
+
+    test('rejects overlapping, unordered, and out-of-range verse timings', () {
+      const meta = QuranMetadata(
+          surahNumber: 1,
+          surahName: 'Al-Fatihah',
+          ayahStart: 1,
+          ayahEnd: 7,
+          reciter: 'Reciter');
+      const first = QuranAyahTiming(
+          ayahNumber: 1, start: Duration.zero, end: Duration(seconds: 5));
+      const overlap = QuranAyahTiming(
+          ayahNumber: 2,
+          start: Duration(seconds: 4),
+          end: Duration(seconds: 8));
+      const outside = QuranAyahTiming(
+          ayahNumber: 8,
+          start: Duration(seconds: 6),
+          end: Duration(seconds: 9));
+      expect(meta.copyWith(ayahTimings: [first, overlap]).isValid, isFalse);
+      expect(meta.copyWith(ayahTimings: [outside]).isValid, isFalse);
+      expect(meta.copyWith(ayahTimings: [overlap, first]).isValid, isFalse);
+    });
+
     test('validates correct Surah range and fields', () {
       const valid = QuranMetadata(
         surahNumber: 1,

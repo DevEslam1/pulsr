@@ -126,7 +126,7 @@ class SettingSliderRow extends StatelessWidget {
               padding: const EdgeInsetsDirectional.only(end: AppSpacing.xxs),
               child: Text(subtitle!,
                   style: TextStyle(
-                      color: p.error,
+                      color: p.textSecondary,
                       fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w600)),
             ),
@@ -141,7 +141,8 @@ class SettingSliderRow extends StatelessWidget {
                 max: max,
                 divisions: divisions,
                 isWavy: isWavy,
-                semanticLabel: '$label ${_fmt(value)}',
+                semanticLabel: label,
+                semanticFormatterCallback: _fmt,
                 onChanged: onChanged,
               ),
             ),

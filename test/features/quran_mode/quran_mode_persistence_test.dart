@@ -106,7 +106,8 @@ class _QuranAudioHandler extends TestPulsrAudioHandler {
   }
 
   @override
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
+  Future<void> setReverb(bool enabled,
+      {int? preset, double? wetDry, double? predelayMs, double? damping}) async {
     if (rejectReverb) throw StateError('Native reverb rejected');
     lastReverbEnabled = enabled;
     lastReverbWetDry = wetDry;
@@ -136,6 +137,20 @@ class _OutOfOrderSaturationHandler extends _QuranAudioHandler {
     }
     await super.setSaturation(enabled,
         drive: drive, mix: mix, tilt: tilt, mode: mode, multiband: multiband);
+  }
+}
+
+class _OutOfOrderSpeedHandler extends _QuranAudioHandler {
+  final firstCallGate = Completer<void>();
+  bool delayNextCall = false;
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    if (delayNextCall) {
+      delayNextCall = false;
+      await firstCallGate.future;
+      throw StateError('Speed request failed late');
+    }
   }
 }
 
@@ -486,6 +501,18 @@ void main() {
           QuranModeProfile.forStyle(state.quranReciterStyle).reverbWetDry);
     });
 
+    test('successful profile retry clears the Quran audio error', () async {
+      final handler = _QuranAudioHandler()..rejectReverb = true;
+      var state = const PlayerState();
+      final controller = _controller(
+          handler: handler, getState: () => state, emit: (s) => state = s);
+      await controller.setQuranModeEnabled(true);
+      expect(state.errorMessage, contains('Failed to apply Quran'));
+      handler.rejectReverb = false;
+      await controller.reapplyQuranProfile();
+      expect(state.errorMessage, isNull);
+    });
+
     test('a late failed warmth request cannot roll back a newer value',
         () async {
       final handler = _OutOfOrderSaturationHandler();
@@ -507,6 +534,41 @@ void main() {
 
       expect(state.saturationMix, 0.5);
       expect(state.isSaturationEnabled, isTrue);
+    });
+
+    test('late warmth failure cannot overwrite a newly selected style',
+        () async {
+      final handler = _OutOfOrderSaturationHandler();
+      var state = const PlayerState();
+      final controller = _controller(
+          handler: handler, getState: () => state, emit: (s) => state = s);
+      await controller.setQuranModeEnabled(true);
+      handler.delayNextCall = true;
+      final request = controller.setQuranWarmth(0.2);
+      await pumpEventQueue();
+      await controller.setQuranReciterStyle(QuranReciterStyle.murattal);
+      final selectedDsp = state.dsp;
+      handler.firstCallGate.complete();
+      await request;
+      expect(state.dsp, selectedDsp);
+      expect(state.errorMessage, isNull);
+    });
+
+    test('late speed failure cannot roll back a newer learning speed',
+        () async {
+      final handler = _OutOfOrderSpeedHandler();
+      var state = const PlayerState();
+      final controller = _controller(
+          handler: handler, getState: () => state, emit: (s) => state = s);
+      await controller.setQuranModeEnabled(true);
+      handler.delayNextCall = true;
+      final request = controller.setQuranPlaybackSpeed(0.5);
+      await pumpEventQueue();
+      await controller.setQuranPlaybackSpeed(0.75);
+      handler.firstCallGate.complete();
+      await request;
+      expect(state.playbackSpeed, 0.75);
+      expect(state.errorMessage, isNull);
     });
 
     test('warmth activates a dry style, clamps, and zero disables processing',
@@ -916,6 +978,160 @@ void main() {
       expect(handler.preampValues, isNotEmpty);
       expect(handler.currentEqPreset.name, contains('Quran'));
       expect(state.isQuranModeEnabled, isTrue);
+    });
+  });
+
+  group('Quran Mode hardening', () {
+    PlayerPlaybackOptionsController build(
+      _QuranAudioHandler handler,
+      PlayerState Function() getState,
+      void Function(PlayerState) emit, {
+      QuranModeService? service,
+      EarbudOptimizationService? earbud,
+      HiResAudioService? hiRes,
+    }) =>
+        _controller(
+          handler: handler,
+          getState: getState,
+          emit: emit,
+          service: service ?? QuranModeService(),
+          earbudOptimizationService: earbud,
+          hiResAudioService: hiRes,
+        );
+
+    test('only the mode\'s own presets are recognised as Quran presets', () {
+      expect(QuranModeProfile.isQuranPresetName('Quran night'), isFalse);
+      expect(QuranModeProfile.isQuranPresetName('Quran • Unknown'), isFalse);
+      expect(QuranModeProfile.isQuranPresetName(null), isFalse);
+      for (final style in QuranReciterStyle.values) {
+        expect(
+          QuranModeProfile.isQuranPresetName(
+              QuranModeProfile.forStyle(style).eqPresetName),
+          isTrue,
+        );
+      }
+    });
+
+    test('adjusting one slider persists only that adjustment', () async {
+      final service = QuranModeService();
+      var state = const PlayerState();
+      final controller = build(
+        _QuranAudioHandler(),
+        () => state,
+        (s) => state = s,
+        service: service,
+      );
+
+      await controller.setQuranModeEnabled(true);
+      await controller.setQuranAmbience(0.3);
+
+      final tuning = await service.getStyleTuning(state.quranReciterStyle);
+      expect(tuning.ambience, closeTo(0.3, 1e-9));
+      expect(tuning.warmth, isNull);
+      expect(tuning.playbackSpeed, isNull);
+    });
+
+    test('earbud reverb compensation is not baked into saved ambience',
+        () async {
+      final service = QuranModeService();
+      await service.setStyle(QuranReciterStyle.murattal);
+      await service.setStyleTuning(
+        QuranReciterStyle.murattal,
+        const QuranStyleTuning(ambience: 0.2),
+      );
+      final hiRes = _FakeHiResAudioService(AudioOutputInfo(
+        deviceName: 'realme Buds',
+        isUsbDac: false,
+        sampleRate: 44100,
+        bitDepth: 16,
+        isBitPerfectActive: false,
+        isBluetooth: true,
+        btCodecName: 'sbc',
+      ));
+      var state = const PlayerState();
+      final controller = build(
+        _QuranAudioHandler(),
+        () => state,
+        (s) => state = s,
+        service: service,
+        earbud: EarbudOptimizationService(),
+        hiRes: hiRes,
+      );
+
+      await controller.setQuranModeEnabled(true);
+      expect(state.reverbWetDry, closeTo(0.2 * 0.65, 0.001));
+
+      await controller.setQuranWarmth(0.1);
+      await controller.setQuranPlaybackSpeed(0.9);
+
+      final tuning = await service.getStyleTuning(QuranReciterStyle.murattal);
+      expect(tuning.ambience, closeTo(0.2, 1e-9));
+    });
+
+    test('a failed profile apply rolls the mode back and reports it',
+        () async {
+      final service = QuranModeService();
+      final handler = _QuranAudioHandler()..rejectReverb = true;
+      var state = const PlayerState();
+      final controller = build(
+        handler,
+        () => state,
+        (s) => state = s,
+        service: service,
+      );
+
+      await controller.setQuranModeEnabled(true);
+      await pumpEventQueue();
+
+      expect(state.isQuranModeEnabled, isFalse);
+      expect(await service.isEnabled(), isFalse);
+      expect(state.errorMessage, 'Failed to apply Quran audio profile');
+    });
+
+    test('resetting to auto clears the manual decision', () async {
+      final service = QuranModeService();
+      var state = const PlayerState();
+      final controller = build(
+        _QuranAudioHandler(),
+        () => state,
+        (s) => state = s,
+        service: service,
+      );
+
+      await controller.setQuranModeEnabled(true);
+      await controller.setQuranModeEnabled(false);
+      expect(await service.getUserOverride(), isFalse);
+
+      await controller.resetQuranAutoMode();
+      expect(await service.getUserOverride(), isNull);
+    });
+
+    test('an interrupted disable is finished on the next launch', () async {
+      final service = QuranModeService();
+      final handler = _QuranAudioHandler();
+      var state = const PlayerState();
+      final controller = build(
+        handler,
+        () => state,
+        (s) => state = s,
+        service: service,
+      );
+      await controller.setQuranModeEnabled(true);
+      // Simulate a crash after the flag was cleared but before the restore.
+      await service.setEnabled(false);
+
+      var relaunched = const PlayerState();
+      final fresh = build(
+        _QuranAudioHandler(),
+        () => relaunched,
+        (s) => relaunched = s,
+        service: QuranModeService(),
+      );
+      await fresh.restoreQuranMode();
+
+      expect(relaunched.isQuranModeEnabled, isFalse);
+      expect(relaunched.eqPreset.name, isNot(contains('Quran')));
+      expect(await fresh.loadQuranSnapshot(), isNull);
     });
   });
 }

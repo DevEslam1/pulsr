@@ -53,7 +53,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
     _tonearmController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 850),
+      duration: Duration.zero,
       value: widget.props.state.isPlaying ? 1.0 : 0.0,
     );
 
@@ -66,7 +66,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _tonearmController.duration = context.motionMs(850);
+    // Arm drop used to be an off-scale 850 ms; it now follows the ambient token
+    // and collapses to zero under Reduce Motion.
+    _tonearmController.duration = context.motion(PulsrDurations.ambient);
     _syncRotation();
   }
 

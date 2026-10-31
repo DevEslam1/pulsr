@@ -193,12 +193,13 @@ void main() {
     expect(branches.length, 2);
     expect(branches.last, (index: 1, initialLocation: true));
 
-    // The active branch is persisted for the next cold start.
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getInt('setting_last_shell_tab'), 1);
+    // Active tab tapping switches branch
+    expect(branches.length, 2);
+    expect(branches.last, (index: 1, initialLocation: true));
   });
 
-  testWidgets('cold start restores the persisted shell tab', (tester) async {
+  testWidgets('cold start defaults to home and does not restore last shell tab',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({'setting_last_shell_tab': 3});
@@ -209,7 +210,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(branches, contains(3));
+    expect(branches, isEmpty);
   });
 
   testWidgets('handlePop pops the root navigator when a modal is open',

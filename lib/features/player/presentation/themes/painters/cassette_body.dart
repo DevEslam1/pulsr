@@ -138,69 +138,73 @@ class _CassetteBody extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Left: Side & Tape Formulation
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                context.l10n.cassetteSideA,
-                style: const TextStyle(
-                  fontSize: AppFontSize.tiny,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: AppTracking.wide,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: AlignmentDirectional.centerStart,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Left: Side & Tape Formulation
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  context.l10n.cassetteSideA,
+                  style: const TextStyle(
+                    fontSize: AppFontSize.tiny,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: AppTracking.wide,
+                  ),
                 ),
-              ),
-              Text(
-                context.l10n.cassetteTapeType,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white60,
-                  letterSpacing: 0.8,
+                Text(
+                  context.l10n.cassetteTapeType,
+                  style: const TextStyle(
+                    fontSize: AppFontSize.tiny,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white60,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
-            ],
-          ),
-
-          // Center: Stereo Dancing VU Meters (Isolated in RepaintBoundary for 120fps)
-          RepaintBoundary(
-            child: _CassetteStereoVuMeter(
-              activeColor: activeColor,
-              isPlaying: isPlaying,
+              ],
             ),
-          ),
 
-          // Right: Pulsr Branding & EQ Specs
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                context.l10n.cassettePulsrTape,
-                style: TextStyle(
-                  fontSize: AppFontSize.tiny,
-                  fontWeight: FontWeight.w900,
-                  color: activeColor,
-                  letterSpacing: AppTracking.wide,
-                ),
+            // Center: Stereo Dancing VU Meters (Isolated in RepaintBoundary for 120fps)
+            RepaintBoundary(
+              child: _CassetteStereoVuMeter(
+                activeColor: activeColor,
+                isPlaying: isPlaying,
               ),
-              Text(
-                context.l10n.cassetteEqSpec,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white60,
-                  letterSpacing: 0.8,
+            ),
+
+            // Right: Pulsr Branding & EQ Specs
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  context.l10n.cassettePulsrTape,
+                  style: TextStyle(
+                    fontSize: AppFontSize.tiny,
+                    fontWeight: FontWeight.w900,
+                    color: activeColor,
+                    letterSpacing: AppTracking.wide,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                Text(
+                  context.l10n.cassetteEqSpec,
+                  style: const TextStyle(
+                    fontSize: AppFontSize.tiny,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white60,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -457,7 +461,7 @@ class _CassetteBody extends StatelessWidget {
             child: const Text(
               'NR • OFF',
               style: TextStyle(
-                fontSize: 8.5,
+                fontSize: AppFontSize.tiny,
                 fontWeight: FontWeight.w800,
                 color: Colors.white54,
                 letterSpacing: 0.6,

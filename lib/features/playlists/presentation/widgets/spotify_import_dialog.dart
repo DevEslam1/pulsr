@@ -114,7 +114,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
       title: Text(
         _stage == _ImportStage.result
             ? 'Import Complete'
-            : 'Import Spotify Playlist',
+            : context.l10n.playlistImportSpotify,
         style: const TextStyle(
           fontWeight: FontWeight.w800,
           fontSize: AppFontSize.title,

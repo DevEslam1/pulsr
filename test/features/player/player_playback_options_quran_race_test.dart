@@ -14,12 +14,14 @@ import 'player_test_support.dart';
 
 class _GatedTransitionHandler extends RecordingAudioHandler {
   Completer<void>? transitionGate;
+  bool failTransition = false;
 
   @override
   Future<void> setPreamp(double value) async {}
 
   @override
   Future<T> withSmoothDspTransition<T>(Future<T> Function() action) async {
+    if (failTransition) throw StateError('Audio device unavailable');
     final gate = transitionGate;
     if (gate != null) {
       transitionGate = null;
@@ -34,6 +36,25 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  test('failed music restore retains snapshot for retry', () async {
+    final handler = _GatedTransitionHandler();
+    var state = const PlayerState();
+    final controller = PlayerPlaybackOptionsController(
+        audioHandler: handler,
+        getState: () => state,
+        emit: (s) => state = s,
+        isClosed: () => false);
+    await controller.setQuranModeEnabled(true);
+    handler.failTransition = true;
+    await controller.setQuranModeEnabled(false);
+    expect(state.errorMessage, contains('Failed to restore'));
+    expect(await controller.loadQuranSnapshot(), isNotNull);
+    handler.failTransition = false;
+    await controller.reapplyQuranProfile();
+    expect(state.errorMessage, isNull);
+    expect(await controller.loadQuranSnapshot(), isNull);
   });
 
   test('re-enable during an in-flight disable keeps the restore snapshot',

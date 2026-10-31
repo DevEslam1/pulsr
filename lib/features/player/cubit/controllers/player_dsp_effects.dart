@@ -269,6 +269,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
             isViperDdcEnabled: snap.isViperDdcEnabled,
             viperDdcProfileName: snap.viperDdcProfileName,
             isArbitraryEqEnabled: snap.isArbitraryEqEnabled,
+            arbitraryEqLinearPhase: snap.arbitraryEqLinearPhase,
             arbitraryEqString: snap.arbitraryEqString,
             isLiveProgEnabled: snap.isLiveProgEnabled,
             liveProgCode: snap.liveProgCode,
@@ -346,8 +347,11 @@ extension PlayerDspEffectsExtension on PlayerDspController {
                 profileName: snap.viperDdcProfileName);
           }
           if (snap.isArbitraryEqEnabled) {
-            await _audioHandler.setArbitraryEq(true,
-                eqString: snap.arbitraryEqString);
+            await _audioHandler.setArbitraryEq(
+              true,
+              eqString: snap.arbitraryEqString,
+              linearPhase: snap.arbitraryEqLinearPhase,
+            );
           }
           if (snap.isLiveProgEnabled) {
             await _audioHandler.setLiveProg(true, code: snap.liveProgCode);
@@ -927,6 +931,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         updateDsp: (dsp) => dsp.copyWith(
           isArbitraryEqEnabled: enabled,
           arbitraryEqString: eqString ?? dsp.arbitraryEqString,
+          arbitraryEqLinearPhase: linearPhase ?? dsp.arbitraryEqLinearPhase,
         ),
         applyAudioHandler: () => _audioHandler.setArbitraryEq(enabled,
             eqString: eqString, linearPhase: linearPhase),

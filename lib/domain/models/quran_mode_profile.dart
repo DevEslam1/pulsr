@@ -101,7 +101,18 @@ class QuranModeProfile {
     this.preampDb = -1.0,
   });
 
-  String get eqPresetName => 'Quran • ${style.label}';
+  static const String _eqPresetPrefix = 'Quran • ';
+
+  String get eqPresetName => '$_eqPresetPrefix${style.label}';
+
+  /// True only for the presets Quran Mode itself generates
+  /// (`Quran • <style label>`). A user preset that merely starts with "Quran"
+  /// must never be mistaken for the mode's own curve.
+  static bool isQuranPresetName(String? name) {
+    if (name == null || !name.startsWith(_eqPresetPrefix)) return false;
+    final label = name.substring(_eqPresetPrefix.length);
+    return QuranReciterStyle.values.any((s) => s.label == label);
+  }
 
   EqPreset toEqPreset([List<double>? gainsOverride]) => EqPreset(
         name: eqPresetName,

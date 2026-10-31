@@ -1048,35 +1048,45 @@ class _RecentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return InkWell(
-      borderRadius: AppRadii.circular(12),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: p.textTertiary),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                term,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: p.textPrimary,
-                    fontSize: AppFontSize.body,
-                    fontWeight: FontWeight.w500),
+    return Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: term,
+            child: InkWell(
+              borderRadius: AppRadii.circular(12),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 18, color: p.textTertiary),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        term,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.body,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: context.l10n.remove,
-              icon: Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
-              onPressed: onRemove,
-            ),
-          ],
+          ),
         ),
-      ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: context.l10n.remove,
+          icon: Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
+          onPressed: onRemove,
+        ),
+      ],
     );
   }
 }

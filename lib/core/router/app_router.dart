@@ -6,6 +6,7 @@ import '../../data/scanner/media_scanner_service.dart';
 import '../config/app_config.dart';
 import '../errors/failures.dart';
 import '../utils/l10n_extensions.dart';
+import '../widgets/ticker_gated_branch_container.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
 import '../../domain/usecases/folder_usecases.dart';
@@ -389,7 +390,16 @@ GoRouter createRouter(MediaScannerService scannerService,
         builder: (context, state) =>
             OnboardingScreen(scannerService: scannerService),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
+        // Branch container is built here (instead of .indexedStack) so hidden
+        // tabs can be wrapped in TickerMode: IndexedStack keeps every branch
+        // mounted, and without this any endless animation in an invisible tab
+        // keeps ticking (battery/GPU waste).
+        navigatorContainerBuilder: (context, navigationShell, children) =>
+            TickerGatedBranchContainer(
+          currentIndex: navigationShell.currentIndex,
+          children: children,
+        ),
         builder: (context, state, navigationShell) {
           return AppShell(navigationShell: navigationShell);
         },
@@ -892,3 +902,4 @@ GoRouter createRouter(MediaScannerService scannerService,
     ],
   );
 }
+

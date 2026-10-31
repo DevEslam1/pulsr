@@ -500,7 +500,7 @@ class _CdOpticalDisplayHud extends StatelessWidget {
           Text(
             _formatAudioSpec(state.currentSong),
             style: const TextStyle(
-              fontSize: 9,
+              fontSize: AppFontSize.tiny,
               fontWeight: FontWeight.w700,
               color: Colors.white60,
               letterSpacing: 0.6,

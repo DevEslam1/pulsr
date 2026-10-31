@@ -16,6 +16,7 @@ import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../../core/widgets/spinning_vinyl_disc.dart';
 import '../../../core/widgets/waveform_logo.dart';
+import '../../../core/widgets/marquee_text.dart';
 import '../../../data/db/app_database.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
@@ -600,7 +601,11 @@ class MiniPlayerState extends State<MiniPlayer> {
                                             // Interactive Swipeable Track Info Carousel
                                             Expanded(
                                               child: SizedBox(
-                                                height: 52,
+                                                height: 52 *
+                                                    MediaQuery.textScalerOf(
+                                                            context)
+                                                        .scale(1.0)
+                                                        .clamp(1.0, 1.5),
                                                 child: NotificationListener<
                                                     ScrollNotification>(
                                                   onNotification:
@@ -780,7 +785,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                         minScaleFactor:
                                                                             0.8,
                                                                         maxScaleFactor:
-                                                                            1.3,
+                                                                            2.0,
                                                                         child:
                                                                             Column(
                                                                           mainAxisSize:
@@ -887,7 +892,8 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                   ? context.l10n.pause
                                                   : context.l10n.play,
                                               icon: AnimatedSwitcher(
-                                                duration: PulsrMotion.state,
+                                                duration: context
+                                                    .motion(PulsrMotion.state),
                                                 transitionBuilder:
                                                     (child, anim) =>
                                                         ScaleTransition(
@@ -1574,15 +1580,17 @@ class MiniPlayerHorizontal extends StatelessWidget {
                   Expanded(
                     child: MediaQuery.withClampedTextScaling(
                       minScaleFactor: 0.8,
-                      maxScaleFactor: 1.3,
+                      maxScaleFactor: 2.0,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            song.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          MarqueeText(
+                            text: song.title,
+                            textAlign: TextAlign.start,
+                            allowUserPause: false,
+                            velocity: 28.0,
+                            blankSpace: 36.0,
                             style: TextStyle(
                               fontSize: AppFontSize.bodySmall,
                               fontWeight: FontWeight.w700,
@@ -1590,10 +1598,12 @@ class MiniPlayerHorizontal extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 1),
-                          Text(
-                            song.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          MarqueeText(
+                            text: song.artist,
+                            textAlign: TextAlign.start,
+                            allowUserPause: false,
+                            velocity: 24.0,
+                            blankSpace: 32.0,
                             style: TextStyle(
                               fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w500,

@@ -121,8 +121,11 @@ class QueueScreen extends StatelessWidget {
                           // Auto-DJ: append tracks similar to the current song.
                           final seed = playerState.currentSong;
                           if (seed == null) break;
-                          final songsRes =
-                              await getIt<GetSongsUseCase>().getAllSongs();
+                          // Auto-DJ only needs a similarity pool, not the
+                          // whole table: bound the UI-isolate fetch so a
+                          // 20k-track library cannot stall the tap.
+                          final songsRes = await getIt<GetSongsUseCase>()
+                              .getAllSongs(limit: 1500);
                           if (!context.mounted) break;
                           final all = songsRes.fold<List<SongsTableData>?>(
                               (l) => null, (r) => r);

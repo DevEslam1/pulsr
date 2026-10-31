@@ -19,10 +19,10 @@ abstract class QuranRepository {
   /// Returns the Quran bookmark for a track, or null if unset.
   Future<QuranBookmark?> getBookmark(String trackUri);
 
-  /// Persists a Quran bookmark.
+  /// Persists a Quran bookmark. Throws if storage rejects the write.
   Future<void> saveBookmark(QuranBookmark bookmark);
 
-  /// Clears the Quran bookmark for a track.
+  /// Clears the Quran bookmark for a track. Throws if storage rejects deletion.
   Future<void> clearBookmark(String trackUri);
 
   /// Returns all persisted Quran bookmarks.

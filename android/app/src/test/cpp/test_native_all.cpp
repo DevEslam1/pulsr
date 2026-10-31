@@ -824,7 +824,18 @@ void runLiveProgElseAndExpressionsTest() {
     assert(std::abs(buf[0] - 0.25f) < 1e-4f);
     assert(std::abs(buf[1] - 0.125f) < 1e-4f);
 
-    std::cout << "  ✓ LiveProg compiled and correctly executed if-else and slider8." << std::endl;
+    // Test 0-arg rand() builtin both standalone and in binary expression
+    LiveProg progRand;
+    progRand.setSampleRate(48000.0);
+    assert(progRand.loadCode("@sample\nspl0 = rand();\nspl1 = 0.5 + rand();\n"));
+    progRand.setEnabled(true, /*immediate=*/true);
+    buf[0] = -1.0f;
+    buf[1] = -1.0f;
+    progRand.processInterleaved(buf, 1, 2);
+    assert(buf[0] >= 0.0f && buf[0] <= 1.0f);
+    assert(buf[1] >= 0.5f && buf[1] <= 1.5f);
+
+    std::cout << "  ✓ LiveProg compiled and correctly executed if-else, slider8, and rand()." << std::endl;
 }
 
 void runDvcLimiterHeadroomTest() {
@@ -1133,10 +1144,9 @@ void runEngineSubCrossoverRampOutTest() {
     std::vector<float> buf(frames * 2, 0.5f);
     engine->processInterleaved(buf.data(), frames, 2);
 
-    // Drop STAGE_CROSSOVER bit from activeStages
+    // Drop STAGE_CROSSOVER bit from activeStages while subCrossover.enabled stays true
     auto dropSnap = std::make_shared<DspParamSnapshot>(*snap);
-    dropSnap->activeStages = 0; // Drop all stages
-    dropSnap->subCrossover.enabled = false;
+    dropSnap->activeStages = 0; // Drop stage bit only
     engine->publishParams(dropSnap);
 
     // Next buffer should still be processed by SubCrossover while ramping out
@@ -1144,6 +1154,13 @@ void runEngineSubCrossoverRampOutTest() {
     engine->processInterleaved(buf2.data(), frames, 2);
     float firstSample = buf2[0];
     assert(std::isfinite(firstSample));
+
+    // After ~150 ms of blocks, SubCrossover must have ramped down to 0 and stopped ramping
+    for (int k = 0; k < 20; ++k) {
+        std::fill(buf2.begin(), buf2.end(), 0.5f);
+        engine->processInterleaved(buf2.data(), frames, 2);
+    }
+    assert(!engine->subCrossover().isRamping());
 
     std::cout << "  ✓ Engine successfully ramped SubCrossover even when STAGE_CROSSOVER bit was dropped." << std::endl;
 }

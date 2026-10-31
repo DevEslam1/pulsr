@@ -1040,7 +1040,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               size: isShort ? 36 : 40,
               iconSize: isShort ? 18 : 20,
               p: p,
-              tooltip: 'Folder Details',
+              tooltip: context.l10n.browseOpenFolderDetails,
               onTap: () => _showFolderOptionsMenu(context, songs, p),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -1209,7 +1209,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     surfaceTintColor: Colors.transparent,
                     leading: const PulsrBackButton(),
                     title: AnimatedOpacity(
-                      duration: PulsrMotion.state,
+                      duration: context.motion(PulsrMotion.state),
                       opacity: _showCollapsedTitle ? 1.0 : 0.0,
                       child: Text(
                         folder.name,
@@ -1309,7 +1309,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                             size: 40,
                                             iconSize: 20,
                                             p: p,
-                                            tooltip: 'Folder Details',
+                                            tooltip: context.l10n.browseOpenFolderDetails,
                                             onTap: () => _showFolderOptionsMenu(
                                                 context, songs, p),
                                           ),

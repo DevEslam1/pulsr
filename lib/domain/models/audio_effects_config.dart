@@ -39,6 +39,7 @@ class AudioEffectsConfig {
   final double saturationMix; // 0.0 to 1.0 wet/dry
   final double saturationTilt; // 0.0 to 1.0 HF pre-emphasis
   final int saturationMode; // 0=Tape, 1=Tube, 2=Analog Class-A
+  final bool saturationMultiband;
   final bool isStereoWidthEnabled;
   final double stereoWidth; // 0.0 mono … 1.0 normal … 2.0 widened
   final bool stereoWidthMultiband;
@@ -80,6 +81,7 @@ class AudioEffectsConfig {
     this.saturationMix = 0.5,
     this.saturationTilt = 0.3,
     this.saturationMode = 0,
+    this.saturationMultiband = false,
     this.isStereoWidthEnabled = false,
     this.stereoWidth = 1.0,
     this.stereoWidthMultiband = false,
@@ -126,6 +128,7 @@ class AudioEffectsConfig {
           saturationMix == other.saturationMix &&
           saturationTilt == other.saturationTilt &&
           saturationMode == other.saturationMode &&
+          saturationMultiband == other.saturationMultiband &&
           isStereoWidthEnabled == other.isStereoWidthEnabled &&
           stereoWidth == other.stereoWidth &&
           stereoWidthMultiband == other.stereoWidthMultiband &&
@@ -169,6 +172,7 @@ class AudioEffectsConfig {
         saturationMix,
         saturationTilt,
         saturationMode,
+        saturationMultiband,
         isStereoWidthEnabled,
         stereoWidth,
         stereoWidthMultiband,
@@ -211,6 +215,7 @@ class AudioEffectsConfig {
     double? saturationMix,
     double? saturationTilt,
     int? saturationMode,
+    bool? saturationMultiband,
     bool? isStereoWidthEnabled,
     double? stereoWidth,
     bool? stereoWidthMultiband,
@@ -252,6 +257,7 @@ class AudioEffectsConfig {
       saturationMix: saturationMix ?? this.saturationMix,
       saturationTilt: saturationTilt ?? this.saturationTilt,
       saturationMode: saturationMode ?? this.saturationMode,
+      saturationMultiband: saturationMultiband ?? this.saturationMultiband,
       isStereoWidthEnabled: isStereoWidthEnabled ?? this.isStereoWidthEnabled,
       stereoWidth: stereoWidth ?? this.stereoWidth,
       stereoWidthMultiband: stereoWidthMultiband ?? this.stereoWidthMultiband,

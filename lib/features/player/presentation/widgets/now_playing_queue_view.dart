@@ -245,7 +245,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                     const SizedBox(width: AppSpacing.s6),
                     IconButton(
                       icon: const Icon(Icons.group_rounded, size: 20),
-                      tooltip: 'Listen Together',
+                      tooltip: context.l10n.partyListenTogether,
                       visualDensity: VisualDensity.compact,
                       onPressed: () {
                         HapticFeedback.lightImpact();

@@ -1,5 +1,6 @@
 // lib/domain/models/quran_metadata.dart
 import 'package:flutter/foundation.dart';
+import 'quran_surah.dart';
 
 /// Accurate timestamp boundaries for a specific Ayah within an audio track.
 @immutable
@@ -14,7 +15,7 @@ class QuranAyahTiming {
     required this.end,
   }) : assert(ayahNumber >= 1, 'Ayah number must be >= 1');
 
-  bool get isValid => ayahNumber >= 1 && end >= start;
+  bool get isValid => ayahNumber >= 1 && start >= Duration.zero && end > start;
 
   Map<String, dynamic> toMap() => {
         'ayahNumber': ayahNumber,
@@ -80,13 +81,30 @@ class QuranMetadata {
   });
 
   /// Strict validation ensuring no corrupted or out-of-bounds Quran records exist.
-  bool get isValid =>
-      surahNumber >= 1 &&
-      surahNumber <= 114 &&
-      ayahStart >= 1 &&
-      ayahEnd >= ayahStart &&
-      surahName.trim().isNotEmpty &&
-      reciter.trim().isNotEmpty;
+  bool get isValid {
+    final surah = QuranSurah.byNumber(surahNumber);
+    if (surah == null ||
+        ayahStart < 1 ||
+        ayahEnd < ayahStart ||
+        ayahEnd > surah.totalAyahs ||
+        surahName.trim().isEmpty ||
+        reciter.trim().isEmpty) {
+      return false;
+    }
+    QuranAyahTiming? previous;
+    for (final timing in ayahTimings) {
+      if (!timing.isValid ||
+          timing.ayahNumber < ayahStart ||
+          timing.ayahNumber > ayahEnd ||
+          (previous != null &&
+              (timing.ayahNumber <= previous.ayahNumber ||
+                  timing.start < previous.end))) {
+        return false;
+      }
+      previous = timing;
+    }
+    return true;
+  }
 
   /// Total number of Ayahs in this recitation segment.
   int get totalAyahs => (ayahEnd - ayahStart) + 1;

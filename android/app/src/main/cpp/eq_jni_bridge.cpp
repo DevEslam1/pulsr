@@ -74,7 +74,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeResyncForTrack(
 JNIEXPORT jlong JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetLastAppliedGeneration(
         JNIEnv* /* env */, jobject /* thiz */) {
-    return static_cast<jlong>(AudioDspEngine::instance().getLastAppliedGeneration());
+    return static_cast<jlong>(DspEngineRegistry::instance().getLastAppliedGeneration());
 }
 
 JNIEXPORT jlong JNICALL

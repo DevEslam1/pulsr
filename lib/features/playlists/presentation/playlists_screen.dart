@@ -544,7 +544,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       minWidth: AppSpacing.minTouchTarget,
                       minHeight: AppSpacing.minTouchTarget),
                   icon: const Icon(Icons.playlist_play_rounded),
-                  tooltip: 'Import Spotify Playlist',
+                  tooltip: context.l10n.playlistImportSpotify,
                   onPressed: () => _showImportSpotifyDialog(context, cubit),
                 ),
                 IconButton(
@@ -1633,16 +1633,27 @@ class _AccountPlaylistCard extends StatelessWidget {
                       PositionedDirectional(
                         top: 8,
                         end: 8,
-                        child: GestureDetector(
-                          onTap: onDownload,
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.s6),
-                            decoration: BoxDecoration(
-                              color: AppColors.scrimAt(0.55),
-                              shape: BoxShape.circle,
+                        child: Semantics(
+                          button: true,
+                          label: context.l10n.downloadAction,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onDownload,
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(AppSpacing.s6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.scrimAt(0.55),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.download_rounded,
+                                      color: Colors.white, size: 16),
+                                ),
+                              ),
                             ),
-                            child: const Icon(Icons.download_rounded,
-                                color: Colors.white, size: 16),
                           ),
                         ),
                       ),

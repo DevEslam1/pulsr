@@ -13,6 +13,7 @@ import '../../core/telemetry/dsp_reliability_tracker.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
+import '../../domain/models/quran_mode_profile.dart';
 import '../../domain/models/reverb_preset.dart';
 import 'async_lock.dart';
 import 'audio_effects_channel.dart';
@@ -496,7 +497,8 @@ class EqualizerManager {
   }
 
   Map<String, dynamic> _buildSavePreferencesMap() {
-    final isQuranPreset = currentPreset.name.startsWith('Quran');
+    final isQuranPreset =
+        QuranModeProfile.isQuranPresetName(currentPreset.name);
     return <String, dynamic>{
       if (!isQuranPreset) ...{
         PrefsKeys.eqEnabled: isEnabled,
@@ -806,6 +808,7 @@ class EqualizerManager {
   }
 
   Future<void> _setPresetCore(EqPreset preset) async {
+    final hadHeadphoneProfile = selectedHeadphoneProfile != null;
     selectedHeadphoneProfile = null;
     final targetFreqs = activeFrequencies;
     final gains = EqPreset.interpolateGains(
@@ -819,6 +822,9 @@ class EqualizerManager {
     try {
       await _applyCurrentPresetCore();
       await setBassBoost(preset.bassBoost);
+      if (hadHeadphoneProfile) {
+        await setPreamp(0.0);
+      }
       _debouncedSavePreferences();
     } catch (e, st) {
       ErrorLogger.log(
@@ -1105,10 +1111,12 @@ class EqualizerManager {
         final sourceGains = isParametric
             ? profile.gainsFromFilters(centers: targetFreqs)
             : profile.gains;
-        final gains = EqPreset.interpolateGains(
-          sourceGains,
-          targetFrequencies: targetFreqs,
-        );
+        final gains = sourceGains.length == targetFreqs.length
+            ? List<double>.from(sourceGains)
+            : EqPreset.interpolateGains(
+                sourceGains,
+                targetFrequencies: targetFreqs,
+              );
         currentPreset = EqPreset(
           name: profile.name,
           gains: gains,
@@ -1135,7 +1143,17 @@ class EqualizerManager {
             isParametric ? profile.computeSafePreamp() : profile.preampGain;
         await setPreamp(preamp);
       } else {
+        if (prevProfile == null) return;
         selectedHeadphoneProfile = null;
+        final targetFreqs = activeFrequencies;
+        currentPreset = EqPreset(
+          name: 'Flat',
+          gains: List<double>.filled(targetFreqs.length, 0.0),
+          bassBoost: 0.0,
+        );
+        comparisonSlots[activeComparisonSlot] = currentPreset;
+        await _applyCurrentPresetCore();
+        await setBassBoost(0.0);
         await setPreamp(0.0);
       }
     } catch (e, st) {
@@ -1333,6 +1351,7 @@ class EqualizerManager {
         await setArbitraryEq(
           true,
           eqString: arbitraryEqString.isNotEmpty ? arbitraryEqString : null,
+          linearPhase: arbitraryEqLinearPhase,
         );
       }
       if (_savedLiveProgEnabled &&

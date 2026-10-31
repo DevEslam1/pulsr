@@ -64,7 +64,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
   bool _isApplying = false;
   QuranMetadata? _metadata;
   QuranBookmark? _bookmark;
-  QuranRepeatMode _repeatMode = QuranRepeatMode.off;
+  bool _bookmarkBusy = false;
+  String? _bookmarkError;
   String? _lastLoadedTrackUri;
 
   @override
@@ -84,13 +85,15 @@ class _QuranModePanelState extends State<QuranModePanel> {
   Future<void> _checkMetadata(String? uri) async {
     if (uri == _lastLoadedTrackUri) return;
     _lastLoadedTrackUri = uri;
+    // Drop the previous track's actions before starting asynchronous reads.
+    if (mounted) {
+      setState(() {
+        _metadata = null;
+        _bookmark = null;
+        _bookmarkError = null;
+      });
+    }
     if (uri == null || uri.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _metadata = null;
-          _bookmark = null;
-        });
-      }
       return;
     }
     try {
@@ -106,7 +109,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && _lastLoadedTrackUri == uri) {
         setState(() {
           _metadata = null;
           _bookmark = null;
@@ -119,6 +122,26 @@ class _QuranModePanelState extends State<QuranModePanel> {
     final m = d.inMinutes;
     final s = d.inSeconds % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<bool> _runBookmarkAction(
+      String uri, Future<void> Function() action) async {
+    if (_bookmarkBusy) return false;
+    setState(() {
+      _bookmarkBusy = true;
+      _bookmarkError = null;
+    });
+    try {
+      await action();
+      return mounted && _lastLoadedTrackUri == uri;
+    } catch (_) {
+      if (mounted && _lastLoadedTrackUri == uri) {
+        setState(() => _bookmarkError = context.l10n.quranBookmarkFailed);
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _bookmarkBusy = false);
+    }
   }
 
   Future<void> _runQuranAction(Future<void> action) async {
@@ -151,6 +174,10 @@ class _QuranModePanelState extends State<QuranModePanel> {
           a.saturationMix != b.saturationMix ||
           a.playbackSpeed != b.playbackSpeed ||
           a.errorMessage != b.errorMessage ||
+          a.position != b.position ||
+          a.abLoopEnabled != b.abLoopEnabled ||
+          a.abPointA != b.abPointA ||
+          a.abPointB != b.abPointB ||
           a.currentSong != b.currentSong,
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
@@ -217,6 +244,28 @@ class _QuranModePanelState extends State<QuranModePanel> {
               ),
             ),
             const SizedBox(height: AppSpacing.s14),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: _isApplying
+                      ? null
+                      : () => unawaited(
+                            _runQuranAction(cubit.resetQuranAutoMode()),
+                          ),
+                  icon: const Icon(Icons.auto_mode_rounded, size: 18),
+                  label: const Text('Auto-detect recitations'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: p.textSecondary,
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s6),
 
             // Reciter styles
             Padding(
@@ -293,7 +342,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                 child: QuranErrorCard(
                   message: state.errorMessage!,
-                  onRetry: enabled
+                  onRetry: !_isApplying
                       ? () => unawaited(
                             _runQuranAction(cubit.reapplyQuranProfile()),
                           )
@@ -555,30 +604,11 @@ class _QuranModePanelState extends State<QuranModePanel> {
             if (state.isQuranModeEnabled) ...[
               const SizedBox(height: AppSpacing.md),
               QuranMushafView(
-                metadata: _metadata,
+                key: ValueKey(currentTrackUri),
+                metadata:
+                    currentTrackUri == _lastLoadedTrackUri ? _metadata : null,
                 currentPosition: state.position,
                 onSeek: (pos) => cubit.seek(pos),
-                onSelectSurah: (surahNum) async {
-                  final repo = getIt.isRegistered<QuranRepository>()
-                      ? getIt<QuranRepository>()
-                      : QuranRepositoryImpl();
-                  final surah = repo.getSurah(surahNum);
-                  if (surah != null) {
-                    final newMeta = QuranMetadata(
-                      surahNumber: surah.number,
-                      surahName: surah.nameTransliteration,
-                      ayahStart: 1,
-                      ayahEnd: surah.totalAyahs,
-                      reciter: style.label,
-                    );
-                    final uri = _lastLoadedTrackUri ??
-                        state.currentSong?.uri ??
-                        state.currentSong?.path ??
-                        'quran://surah${surah.number}';
-                    await repo.saveMetadataForTrack(uri, newMeta);
-                    if (mounted) setState(() => _metadata = newMeta);
-                  }
-                },
               ),
             ],
           ],
@@ -593,7 +623,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
     PlayerState state,
     PlayerCubit cubit,
   ) {
-    final meta = _metadata;
+    final currentUri = state.currentSong?.uri ?? state.currentSong?.path;
+    final meta = currentUri == _lastLoadedTrackUri ? _metadata : null;
     if (meta == null || !meta.isValid) {
       // Empty-state card for non-Quran tracks or tracks without Quran catalog metadata
       return Container(
@@ -641,6 +672,16 @@ class _QuranModePanelState extends State<QuranModePanel> {
     // Valid Quran Metadata card
     final bm = _bookmark;
     final hasTimings = meta.ayahTimings.isNotEmpty;
+    var repeatMode = QuranRepeatMode.off;
+    if (state.abLoopEnabled && hasTimings) {
+      if (meta.ayahTimings
+          .any((t) => t.start == state.abPointA && t.end == state.abPointB)) {
+        repeatMode = QuranRepeatMode.singleAyah;
+      } else if (meta.ayahTimings.first.start == state.abPointA &&
+          meta.ayahTimings.last.end == state.abPointB) {
+        repeatMode = QuranRepeatMode.range;
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
@@ -700,35 +741,41 @@ class _QuranModePanelState extends State<QuranModePanel> {
             runSpacing: 8,
             children: [
               OutlinedButton.icon(
-                onPressed: () async {
-                  final uri = _lastLoadedTrackUri;
-                  if (uri == null) return;
-                  final currentAyah = meta.ayahAt(state.position);
-                  final newBookmark = QuranBookmark(
-                    trackUri: uri,
-                    metadata: meta,
-                    currentAyah: currentAyah,
-                    position: state.position,
-                    timestamp: DateTime.now(),
-                  );
-                  final repo = getIt.isRegistered<QuranRepository>()
-                      ? getIt<QuranRepository>()
-                      : QuranRepositoryImpl();
-                  final messenger = ScaffoldMessenger.of(context);
-                  final l10n = context.l10n;
-                  await repo.saveBookmark(newBookmark);
-                  if (mounted) {
-                    setState(() => _bookmark = newBookmark);
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.quranBookmarkSaved(
-                            meta.surahName, currentAyah)),
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
+                onPressed: _bookmarkBusy
+                    ? null
+                    : () async {
+                        final uri = _lastLoadedTrackUri;
+                        if (uri == null) return;
+                        final currentAyah = meta.ayahAt(state.position);
+                        final newBookmark = QuranBookmark(
+                          trackUri: uri,
+                          metadata: meta,
+                          currentAyah: currentAyah,
+                          position: state.position,
+                          timestamp: DateTime.now(),
+                        );
+                        final repo = getIt.isRegistered<QuranRepository>()
+                            ? getIt<QuranRepository>()
+                            : QuranRepositoryImpl();
+                        final messenger = ScaffoldMessenger.of(context);
+                        final l10n = context.l10n;
+                        final saved = await _runBookmarkAction(
+                            uri, () => repo.saveBookmark(newBookmark));
+                        if (!saved) return;
+                        if (mounted &&
+                            _lastLoadedTrackUri == uri &&
+                            cubit.state.currentSong == state.currentSong) {
+                          setState(() => _bookmark = newBookmark);
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.quranBookmarkSaved(
+                                  meta.surahName, currentAyah)),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
                 icon: const Icon(Icons.bookmark_add_outlined, size: 16),
                 label: Text(context.l10n.quranSaveBookmark,
                     style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -755,25 +802,37 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   tooltip: context.l10n.quranClearBookmark,
                   icon: Icon(Icons.bookmark_remove_outlined,
                       color: p.error, size: 18),
-                  onPressed: () async {
-                    final uri = _lastLoadedTrackUri;
-                    if (uri == null) return;
-                    final repo = getIt.isRegistered<QuranRepository>()
-                        ? getIt<QuranRepository>()
-                        : QuranRepositoryImpl();
-                    await repo.clearBookmark(uri);
-                    if (mounted) setState(() => _bookmark = null);
-                  },
+                  onPressed: _bookmarkBusy
+                      ? null
+                      : () async {
+                          final uri = _lastLoadedTrackUri;
+                          if (uri == null) return;
+                          final repo = getIt.isRegistered<QuranRepository>()
+                              ? getIt<QuranRepository>()
+                              : QuranRepositoryImpl();
+                          final cleared = await _runBookmarkAction(
+                              uri, () => repo.clearBookmark(uri));
+                          if (!cleared) return;
+                          if (mounted && _lastLoadedTrackUri == uri) {
+                            setState(() => _bookmark = null);
+                          }
+                        },
                 ),
               ],
             ],
           ),
 
+          if (_bookmarkError != null)
+            Semantics(
+              liveRegion: true,
+              child: Text(_bookmarkError!, style: TextStyle(color: p.error)),
+            ),
+
           // Repeat controls (only active when accurate timings exist)
           if (hasTimings) ...[
             const SizedBox(height: AppSpacing.s10),
             Text(
-              'AYAH REPEAT MODE',
+              context.l10n.quranRepeatMode,
               style: TextStyle(
                 fontSize: AppFontSize.tiny,
                 fontWeight: FontWeight.w800,
@@ -787,25 +846,24 @@ class _QuranModePanelState extends State<QuranModePanel> {
               children: [
                 ChoiceChip(
                   label: Text(context.l10n.quranRepeatOff),
-                  selected: _repeatMode == QuranRepeatMode.off,
+                  selected: repeatMode == QuranRepeatMode.off,
                   onSelected: (_) {
-                    setState(() => _repeatMode = QuranRepeatMode.off);
                     cubit.clearAbLoop();
                   },
                   labelStyle: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w600,
-                    color: _repeatMode == QuranRepeatMode.off
+                    color: repeatMode == QuranRepeatMode.off
                         ? p.onAccent
                         : p.textPrimary,
                   ),
                 ),
                 ChoiceChip(
                   label: Text(context.l10n.quranRepeatAyah),
-                  selected: _repeatMode == QuranRepeatMode.singleAyah,
+                  selected: repeatMode == QuranRepeatMode.singleAyah,
                   onSelected: (_) {
-                    setState(() => _repeatMode = QuranRepeatMode.singleAyah);
-                    final active = meta.timingForAyah(meta.ayahStart);
+                    final active =
+                        meta.timingForAyah(meta.ayahAt(cubit.state.position));
                     if (active != null) {
                       cubit.setAbLoopRange(active.start, active.end);
                     }
@@ -813,16 +871,15 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   labelStyle: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w600,
-                    color: _repeatMode == QuranRepeatMode.singleAyah
+                    color: repeatMode == QuranRepeatMode.singleAyah
                         ? p.onAccent
                         : p.textPrimary,
                   ),
                 ),
                 ChoiceChip(
                   label: Text(context.l10n.quranRepeatRange),
-                  selected: _repeatMode == QuranRepeatMode.range,
+                  selected: repeatMode == QuranRepeatMode.range,
                   onSelected: (_) {
-                    setState(() => _repeatMode = QuranRepeatMode.range);
                     if (meta.ayahTimings.isNotEmpty) {
                       cubit.setAbLoopRange(meta.ayahTimings.first.start,
                           meta.ayahTimings.last.end);
@@ -831,7 +888,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   labelStyle: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w600,
-                    color: _repeatMode == QuranRepeatMode.range
+                    color: repeatMode == QuranRepeatMode.range
                         ? p.onAccent
                         : p.textPrimary,
                   ),

@@ -66,12 +66,29 @@ class PlayerPlaybackOptionsController {
   int _reciterStyleGen = 0;
   int _quranWarmthGen = 0;
   int _quranAmbienceGen = 0;
+  int _quranSpeedGen = 0;
 
   /// Cached copy of the user's explicit Quran Mode choice (see
   /// `QuranModeService.getUserOverride`). `null` is a meaningful value: the
   /// user has never toggled the mode, so automatic activation may still run.
   bool? _quranUserOverride;
   bool _quranUserOverrideLoaded = false;
+
+  /// Earbud reverb compensation currently baked into the live Quran reverb
+  /// (1.0 when none). Persisted ambience is stored un-scaled so the
+  /// compensation is never applied twice.
+  double _quranReverbScale = 1.0;
+
+  /// The last error text raised by Quran Mode itself. Only that exact message
+  /// is cleared on success, so unrelated errors are never wiped.
+  String? _lastQuranError;
+
+  /// Latest automatic (track-change) request; older ones are dropped so a
+  /// burst of skips does not thrash the DSP chain.
+  int _quranAutoGen = 0;
+
+  /// How long a track must stay current before auto-activation reacts.
+  Duration quranAutoDebounce = const Duration(milliseconds: 400);
   StreamSubscription<bool>? _abLoopSub;
 
   bool get isClosed => _isClosed();

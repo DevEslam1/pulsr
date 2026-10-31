@@ -46,6 +46,7 @@ public:
     void setPreamp(double preampDb);
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const { return fadeOutActive_; }
     void applyParams(const EqParamSet& params);
     void reset();
 

@@ -19,7 +19,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../cubit/home_cubit.dart';
-import 'widgets/hero_mix_card.dart';
+import 'widgets/quran_radio_hero_carousel.dart';
 import 'widgets/quick_tile.dart';
 import 'widgets/online_category_section.dart';
 import 'widgets/quick_discovery_header.dart';
@@ -28,6 +28,7 @@ import 'widgets/recently_played_section.dart';
 
 export 'widgets/quick_actions_row.dart';
 export 'widgets/quick_card.dart';
+export 'widgets/quran_radio_hero_carousel.dart';
 
 import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -95,17 +96,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
   late final HomeCubit _homeCubit;
 
-  // Separate caches for the two quick actions (Daily Drive & Focus Flow) with
-  // a 60-second TTL. They read different sources, so they cannot share one.
-  List<SongsTableData>? _cachedDailyDriveSongs;
-  Stopwatch? _cachedDailyDriveStopwatch;
+  // Cache for Focus Flow with a 60-second TTL.
   List<SongsTableData>? _cachedFocusFlowSongs;
   Stopwatch? _cachedFocusFlowStopwatch;
   StreamSubscription? _librarySub;
 
   static const Duration _quickActionCacheTtl = Duration(seconds: 60);
-  static const int _dailyDriveLimit = 200;
-
   /// Focus Flow: a broad top-played window (200 rows) so playback is not
   /// confined to the first 50 titles, same rationale as Daily Drive.
   static const int _focusFlowLimit = 200;
@@ -124,32 +120,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
       for (final folder in cubit.state.folders)
         if (folder.isExcluded) folder.path,
     ];
-  }
-
-  /// Daily Drive: a broad, recently-played-first window (200 rows) so the
-  /// shuffle is not confined to the first 50 titles.
-  Future<List<SongsTableData>?> _fetchDailyDriveSongs(
-      GetSongsUseCase useCase) async {
-    if (_cachedDailyDriveSongs != null &&
-        _cacheFresh(_cachedDailyDriveStopwatch)) {
-      return _cachedDailyDriveSongs;
-    }
-    final res = await useCase.getAllSongs(
-      sortBy: 'lastPlayed',
-      ascending: false,
-      limit: _dailyDriveLimit,
-      excludedFolders: _currentExcludedFolders(),
-    );
-    return res.fold(
-      // Null means failure (distinct from a genuinely empty library) so the
-      // caller can surface an error instead of silently playing nothing.
-      (_) => null,
-      (songs) {
-        _cachedDailyDriveSongs = songs;
-        _cachedDailyDriveStopwatch = Stopwatch()..start();
-        return songs;
-      },
-    );
   }
 
   /// Focus Flow: the top-played source, not a title-ordered page.
@@ -183,9 +153,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   }
 
   void _invalidateQuickActionCaches() {
-    _cachedDailyDriveSongs = null;
-    _cachedDailyDriveStopwatch?.stop();
-    _cachedDailyDriveStopwatch = null;
     _cachedFocusFlowSongs = null;
     _cachedFocusFlowStopwatch?.stop();
     _cachedFocusFlowStopwatch = null;
@@ -202,34 +169,15 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
       );
   }
 
-  /// Daily Drive/Focus Flow used to no-op when their queue came back empty.
-  /// Surface why (empty library vs no play history) and offer a scan CTA for
-  /// the empty-library case.
-  void _showQuickActionEmpty(BuildContext context, {required bool dailyDrive}) {
+  /// Surfaces empty history when Focus Flow has no played songs.
+  void _showQuickActionEmpty(BuildContext context) {
     final messenger = ScaffoldMessenger.of(context);
     messenger
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text(dailyDrive
-              ? context.l10n.browseNoSongsInLibrary
-              : context.l10n.noPlayHistory),
+          content: Text(context.l10n.noPlayHistory),
           behavior: SnackBarBehavior.floating,
-          action: dailyDrive
-              ? SnackBarAction(
-                  label: context.l10n.scanStorage,
-                  onPressed: () async {
-                    final count =
-                        await context.read<SettingsCubit>().rescanLibrary();
-                    if (!context.mounted) return;
-                    messenger
-                      ..clearSnackBars()
-                      ..showSnackBar(
-                        SnackBar(content: Text(context.l10n.scanResult(count))),
-                      );
-                  },
-                )
-              : null,
         ),
       );
   }
@@ -298,9 +246,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   @override
   void dispose() {
     _librarySub?.cancel();
-    _cachedDailyDriveStopwatch?.stop();
-    _cachedDailyDriveStopwatch = null;
-    _cachedDailyDriveSongs = null;
     _cachedFocusFlowStopwatch?.stop();
     _cachedFocusFlowStopwatch = null;
     _cachedFocusFlowSongs = null;
@@ -595,7 +540,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
                       // ---------- Content (Local vs Online) ----------
                       AnimatedSwitcher(
-                        duration: context.motion(PulsrMotion.standard),
+                        duration: context.motion(PulsrDurations.layout),
                         switchInCurve: context.motionCurve(Curves.easeOutCubic),
                         switchOutCurve: context.motionCurve(Curves.easeInCubic),
                         child: KeyedSubtree(
@@ -749,21 +694,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
               0, Adaptive.pagePadding(context), AppSpacing.md),
           child: Builder(
             builder: (context) {
-              Future<void> onDailyDriveTap() async {
-                final list = await _fetchDailyDriveSongs(getSongsUseCase);
-                if (!context.mounted) return;
-                if (list == null) {
-                  _showQuickActionLoadError(context);
-                  return;
-                }
-                if (list.isNotEmpty) {
-                  final shuffled = List<SongsTableData>.from(list)..shuffle();
-                  playerCubit.playSong(shuffled.first, queue: shuffled);
-                } else {
-                  _showQuickActionEmpty(context, dailyDrive: true);
-                }
-              }
-
               Future<void> onFocusFlowTap() async {
                 final list = await _fetchTopPlayedSongs(getSongsUseCase);
                 if (!context.mounted) return;
@@ -776,7 +706,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                     ..sort((a, b) => b.playCount.compareTo(a.playCount));
                   playerCubit.playSong(top.first, queue: top);
                 } else {
-                  _showQuickActionEmpty(context, dailyDrive: false);
+                  _showQuickActionEmpty(context);
                 }
               }
 
@@ -806,12 +736,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   children: [
                     Expanded(
                       flex: 11,
-                      child: HeroMixCard(
-                        height: 132,
-                        overline: context.l10n.localMusic,
-                        title: context.l10n.dailyDrive,
-                        subtitle: context.l10n.autoMix,
-                        onTap: onDailyDriveTap,
+                      child: QuranRadioHeroCarousel(
+                        height: 148,
+                        playerCubit: playerCubit,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s12),
@@ -831,11 +758,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
               return Column(
                 children: [
-                  HeroMixCard(
-                    overline: context.l10n.localMusic,
-                    title: context.l10n.dailyDrive,
-                    subtitle: context.l10n.autoMix,
-                    onTap: onDailyDriveTap,
+                  QuranRadioHeroCarousel(
+                    height: 142,
+                    playerCubit: playerCubit,
                   ),
                   const SizedBox(height: AppSpacing.s10),
                   Row(
@@ -1019,7 +944,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
         // ---------- Online Category Content (Carousel + Top Charts) ----------
         AnimatedSwitcher(
-          duration: context.motion(PulsrMotion.standard),
+          duration: context.motion(PulsrDurations.layout),
           switchInCurve: context.motionCurve(Curves.easeOutCubic),
           switchOutCurve: context.motionCurve(Curves.easeInCubic),
           child: OnlineCategorySection(

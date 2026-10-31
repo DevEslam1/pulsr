@@ -1464,39 +1464,43 @@ class _LayoutToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Material(
-      color: selected ? p.accent : p.surfaceContainer,
-      borderRadius: AppRadii.r12All,
-      child: InkWell(
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? p.accent : p.surfaceContainer,
         borderRadius: AppRadii.r12All,
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minWidth: AppSpacing.minTouchTarget,
-            minHeight: AppSpacing.minTouchTarget,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 16,
-                  color: selected ? p.onAccent : p.textSecondary,
-                ),
-                const SizedBox(width: AppSpacing.s6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: AppFontSize.label,
-                    fontWeight: FontWeight.w700,
+        child: InkWell(
+          borderRadius: AppRadii.r12All,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 16,
                     color: selected ? p.onAccent : p.textSecondary,
                   ),
-                ),
-              ],
+                  const SizedBox(width: AppSpacing.s6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? p.onAccent : p.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

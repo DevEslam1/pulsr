@@ -1090,6 +1090,102 @@ abstract class AppLocalizations {
   /// **'Decrease'**
   String get decrease;
 
+  /// No description provided for @quranSurahIndex.
+  ///
+  /// In en, this message translates to:
+  /// **'Surah Index'**
+  String get quranSurahIndex;
+
+  /// No description provided for @quranReadingOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading only'**
+  String get quranReadingOnly;
+
+  /// No description provided for @quranBookmarkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update the Quran bookmark. Please try again.'**
+  String get quranBookmarkFailed;
+
+  /// No description provided for @quranTextUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Text for this surah is not bundled yet. Audio playback is still available.'**
+  String get quranTextUnavailable;
+
+  /// No description provided for @quranShowText.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Text'**
+  String get quranShowText;
+
+  /// No description provided for @quranBlindRecall.
+  ///
+  /// In en, this message translates to:
+  /// **'Hifz Blind Recall Mode'**
+  String get quranBlindRecall;
+
+  /// No description provided for @quranTapToReveal.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to reveal (Hifz recall)'**
+  String get quranTapToReveal;
+
+  /// No description provided for @quranRepeatMode.
+  ///
+  /// In en, this message translates to:
+  /// **'AYAH REPEAT MODE'**
+  String get quranRepeatMode;
+
+  /// No description provided for @karaokePitchGuideHighway.
+  ///
+  /// In en, this message translates to:
+  /// **'Pitch Guide Highway'**
+  String get karaokePitchGuideHighway;
+
+  /// No description provided for @playlistImportSpotify.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Spotify Playlist'**
+  String get playlistImportSpotify;
+
+  /// No description provided for @marqueePause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause scrolling title'**
+  String get marqueePause;
+
+  /// No description provided for @marqueeResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume scrolling title'**
+  String get marqueeResume;
+
+  /// No description provided for @settingsMinDurationFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Min {seconds}s filter'**
+  String settingsMinDurationFilter(int seconds);
+
+  /// No description provided for @settingsProxyOnStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy ON'**
+  String get settingsProxyOnStatus;
+
+  /// No description provided for @settingsProxyOffStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy OFF'**
+  String get settingsProxyOffStatus;
+
+  /// No description provided for @downloadAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get downloadAction;
+
   /// No description provided for @sheetDragHandle.
   ///
   /// In en, this message translates to:

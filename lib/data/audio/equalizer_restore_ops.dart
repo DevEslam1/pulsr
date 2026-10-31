@@ -25,7 +25,7 @@ extension EqualizerRestoreOps on EqualizerManager {
       }
       final rawPresetName = prefs.getString(PrefsKeys.eqPresetName);
       final isPersistedQuran =
-          rawPresetName != null && rawPresetName.startsWith('Quran');
+          QuranModeProfile.isQuranPresetName(rawPresetName);
       var presetName = rawPresetName ?? 'Flat';
       if (isPersistedQuran) {
         presetName = 'Flat';

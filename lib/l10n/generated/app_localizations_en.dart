@@ -539,6 +539,58 @@ class AppLocalizationsEn extends AppLocalizations {
   String get decrease => 'Decrease';
 
   @override
+  String get quranSurahIndex => 'Surah Index';
+
+  @override
+  String get quranReadingOnly => 'Reading only';
+
+  @override
+  String get quranBookmarkFailed =>
+      'Could not update the Quran bookmark. Please try again.';
+
+  @override
+  String get quranTextUnavailable =>
+      'Text for this surah is not bundled yet. Audio playback is still available.';
+
+  @override
+  String get quranShowText => 'Show Text';
+
+  @override
+  String get quranBlindRecall => 'Hifz Blind Recall Mode';
+
+  @override
+  String get quranTapToReveal => 'Tap to reveal (Hifz recall)';
+
+  @override
+  String get quranRepeatMode => 'AYAH REPEAT MODE';
+
+  @override
+  String get karaokePitchGuideHighway => 'Pitch Guide Highway';
+
+  @override
+  String get playlistImportSpotify => 'Import Spotify Playlist';
+
+  @override
+  String get marqueePause => 'Pause scrolling title';
+
+  @override
+  String get marqueeResume => 'Resume scrolling title';
+
+  @override
+  String settingsMinDurationFilter(int seconds) {
+    return 'Min ${seconds}s filter';
+  }
+
+  @override
+  String get settingsProxyOnStatus => 'Proxy ON';
+
+  @override
+  String get settingsProxyOffStatus => 'Proxy OFF';
+
+  @override
+  String get downloadAction => 'Download';
+
+  @override
   String get sheetDragHandle => 'Sheet drag handle';
 
   @override

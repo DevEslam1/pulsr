@@ -1099,8 +1099,10 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
         const float effectiveDryL = curMix * delayedDryL + (1.0f - curMix) * inL[i];
         const float effectiveDryR = curMix * delayedDryR + (1.0f - curMix) * inR[i];
 
-        float wetL = (i < outWetFrames) ? resampleOutL_[i] : 0.0f;
-        float wetR = (i < outWetFrames) ? resampleOutR_[i] : 0.0f;
+        const float wetL = (i < outWetFrames) ? resampleOutL_[i]
+                         : (outWetFrames > 0 ? resampleOutL_[outWetFrames - 1] : 0.0f);
+        const float wetR = (i < outWetFrames) ? resampleOutR_[i]
+                         : (outWetFrames > 0 ? resampleOutR_[outWetFrames - 1] : 0.0f);
         outL[i] = effectiveDryL * dryGain + wetL * wetGain;
         outR[i] = effectiveDryR * dryGain + wetR * wetGain;
     }

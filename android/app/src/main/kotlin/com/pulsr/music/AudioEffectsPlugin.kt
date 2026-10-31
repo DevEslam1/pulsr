@@ -188,6 +188,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var isViperDdcEnabled = false
     @Volatile private var isArbitraryEqEnabled = false
     @Volatile private var isLiveProgEnabled = false
+    @Volatile private var isHeadphoneSafetyEnabled = false
 
     @Volatile private var isSincResamplerEnabled = true
     @Volatile private var resamplerInRate = 48000.0
@@ -443,6 +444,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeTriggerStageAutoDegrade(stageBitmask: Int)
     private external fun nativeRecoverStageAutoDegrade(stageBitmask: Int)
     private external fun nativeSetBypassCompare(enabled: Boolean, gainCompensationDb: Double)
+    private external fun nativeSetPerformanceProfile(profile: Int)
+    private external fun nativeSetThermalLevel(level: Int)
+    private external fun nativeSetReverbThreadingMode(mode: Int)
 
     @Volatile private var isRtfGovernorEnabled = true
     @Volatile private var consecutiveHighRtfCount = 0
@@ -560,6 +564,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             val pm = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
             val listener = PowerManager.OnThermalStatusChangedListener { status ->
                 currentThermalStatus = status
+                if (isNativeDspLoaded) {
+                    try { nativeSetThermalLevel(status) } catch (_: Exception) {}
+                }
                 Log.w(TAG, "[ThermalGovernor] Thermal status changed to $status")
                 if (status >= PowerManager.THERMAL_STATUS_MODERATE) {
                     proactivelyDemoteCheapestHeavyStage()
@@ -654,6 +661,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if ((stages and STAGE_VIPER_DDC) != 0) activeStagesList.add("VIPER_DDC")
         if ((stages and STAGE_ARBITRARY_EQ) != 0) activeStagesList.add("ARBITRARY_EQ")
         if ((stages and STAGE_LIVE_PROG) != 0) activeStagesList.add("LIVE_PROG")
+        if ((stages and STAGE_HEADPHONE_SAFETY) != 0) activeStagesList.add("HEADPHONE_SAFETY")
+        if ((stages and STAGE_CHANNEL_MANAGER) != 0) activeStagesList.add("CHANNEL_MANAGER")
 
         val rtf = if (isNativeDspLoaded) {
             try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
@@ -668,8 +677,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         } else 0
 
         val lookahead = if ((stages and STAGE_LIMITER) != 0) limiterLookaheadMs else 0.0
-        val estimatedLatencyMs = if (appliedSampleRate > 0) {
-            ((latencyFrames.toDouble() / appliedSampleRate) * 1000.0) + lookahead
+        val estimatedLatencyMs = if (latencyFrames > 0 && appliedSampleRate > 0) {
+            (latencyFrames.toDouble() / appliedSampleRate) * 1000.0
         } else {
             lookahead
         }
@@ -791,6 +800,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isViperDdcEnabled) mask = mask or STAGE_VIPER_DDC
         if (isArbitraryEqEnabled) mask = mask or STAGE_ARBITRARY_EQ
         if (isLiveProgEnabled) mask = mask or STAGE_LIVE_PROG
+        if (isHeadphoneSafetyEnabled) mask = mask or STAGE_HEADPHONE_SAFETY
         // Dither is a standalone stage: it must run even with every other
         // effect off, so it is gated by its own bit rather than by chain gain.
         if (isDitherEnabled) mask = mask or STAGE_DITHER
@@ -841,6 +851,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_VIPER_DDC = 1 shl 14
         const val STAGE_ARBITRARY_EQ = 1 shl 15
         const val STAGE_LIVE_PROG = 1 shl 16
+        const val STAGE_HEADPHONE_SAFETY = 1 shl 17
+        const val STAGE_CHANNEL_MANAGER = 1 shl 18
 
         /**
          * Ordinal of `ReverbPreset::Custom` in ConvolutionReverb.h — the one
@@ -2317,14 +2329,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val enabled = call.argument<Boolean>("enabled") ?: true
                     val threshold = (call.argument<Number>("doseThreshold"))?.toDouble() ?: 1.0
                     val ceilingDb = (call.argument<Number>("safetyCeilingDb"))?.toDouble() ?: -6.0
+                    isHeadphoneSafetyEnabled = enabled
                     if (isNativeDspLoaded) {
                         try {
                             nativeSetHeadphoneSafetyParams(enabled, threshold, ceilingDb)
+                            recalculateActiveStages()
                             result.success(true)
                         } catch (e: Exception) {
                             result.success(notApplied("Failed to set headphone safety: ${e.message}"))
                         }
                     } else {
+                        recalculateActiveStages()
                         result.success(true)
                     }
                 }
@@ -3165,7 +3180,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 // Fade down before changing system stream volume to max
                                 if (isNativeDspLoaded) {
                                     try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
-                                    try { Thread.sleep(20) } catch (_: InterruptedException) {}
                                 }
                                 val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                                 if (max > 0) {
@@ -3183,7 +3197,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             if (dvcSavedSystemVolume >= 0 && am != null) {
                                 if (isNativeDspLoaded) {
                                     try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
-                                    try { Thread.sleep(20) } catch (_: InterruptedException) {}
                                 }
                                 am.setStreamVolume(AudioManager.STREAM_MUSIC, dvcSavedSystemVolume, 0)
                             }
@@ -3230,7 +3243,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 dvcActive = false
                                 if (isNativeDspLoaded) {
                                     try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
-                                    try { Thread.sleep(20) } catch (_: InterruptedException) {}
                                 }
                                 if (dvcSavedSystemVolume >= 0) {
                                     try {
@@ -3278,7 +3290,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                             val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                                             if (max > 0) {
                                                 try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
-                                                try { Thread.sleep(20) } catch (_: InterruptedException) {}
                                                 am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
                                             }
                                         }

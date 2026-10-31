@@ -191,7 +191,7 @@ class SettingsHeroCard extends StatelessWidget {
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: AppTracking.title,
                                             ),
-                                            maxLines: 1,
+                                            maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),

@@ -18,14 +18,10 @@ void SubCrossover::setSampleRate(double sampleRate) {
 }
 
 void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGain, bool bassMono, bool antiPop) {
-    const double newCorner = std::clamp(cornerHz, 30.0, 300.0);
+    const double newCorner = std::clamp(cornerHz, 20.0, 500.0);
     const bool newCascade = !(slopeDbPerOct < 18.0); // 12 dB/oct below 18, else 24
-    // A corner/slope change is a structural change: recompute the coefficients
-    // and clear the old filter state (retained registers belong to the previous
-    // cutoff and would otherwise ring/click). Pure gain/mono/anti-pop changes
-    // skip the recompute entirely.
-    const bool structural =
-        std::abs(newCorner - cornerHz_) > 0.01 || newCascade != cascade_;
+    const bool cornerChanged = std::abs(newCorner - cornerHz_) > 0.01;
+    const bool cascadeChanged = (newCascade != cascade_);
     const bool bassMonoChanged = (bassMono != bassMono_);
     cornerHz_ = newCorner;
     slopeDbPerOct_ = newCascade ? 24.0 : 12.0;
@@ -38,10 +34,16 @@ void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGa
     subGain_ = targetSubGain_;   // FIX M-5: keep getter in sync
     bassMono_ = bassMono;
     antiPop_ = antiPop;
-    if (structural) {
+    if (cornerChanged || cascadeChanged) {
         computeCoeffs();
-        reset();
-    } else if (bassMonoChanged) {
+        if (cascadeChanged) {
+            for (int p = 0; p < MAX_PAIRS; ++p) {
+                stage2_[p].z1 = stage2_[p].z2 = 0.0;
+                stageSide2_[p].z1 = stageSide2_[p].z2 = 0.0;
+            }
+        }
+    }
+    if (bassMonoChanged) {
         // The side-channel low-pass only runs while Bass Mono is on. Clear its
         // dormant state so re-enabling cannot replay samples from an old run.
         for (int p = 0; p < MAX_PAIRS; ++p) {

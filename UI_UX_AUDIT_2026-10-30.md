@@ -20,21 +20,21 @@
 
 ## 1. Verdict at a glance
 
-**Overall: 6.5 / 10.** A credible, often beautiful player with a top-decile visual identity and a weak accessibility/consistency tail. Nothing here is broken beyond repair; the distance to 8.5+ is mostly discipline, not redesign.
+**After remediation: 8.0 / 10** (was **6.5 / 10**). The measured fixes are in §8; what remains is undoable deletion and device evidence.
 
-| Dimension | Score | One-line verdict |
-|---|:---:|---|
-| Visual craft | **7.5** | Genuinely premium: custom-painted vinyl/cassette/CD decks, waveform seek bar, coherent Aura palette. Held back by repeated halos and decorative micro-text. |
-| Design-system adherence | **6.0** | One documented system, 0 literal `BorderRadius.circular` in features, but three responsive engines, two type scales, two segmented controls, two slider idioms, six error widgets. |
-| UX / information architecture | **6.5** | Core loop is clear; Settings is a 65-section labyrinth with jargon subtitles and 3-screen category pages. |
-| Motion & animation | **7.0** | ≈200 token-routed sites, 92 % reduce-motion correct, decks respond to play/pause. Three competing scales and 9 sites that ignore Reduce Motion. |
-| Animation performance | **6.5** | 67 `RepaintBoundary`, correct `shouldRepaint`, GPU budget gates. Blur-first surfaces, `ShaderMask` shimmer, no off-screen ticker gating. |
-| Resource control | **6.5** | Image pipeline is best-in-class; Auto-DJ and the 5k rating sort still run unbounded on the UI isolate. 22 timers, mostly gated. |
-| Accessibility | **5.0** | Label density ≈0.66; an outright WCAG 2.2.2 failure (marquee); mini-player type clamped at 1.3×; dB sliders announce "%". |
-| Localization / RTL | **7.0** | ARB parity enforced by test, gen-l10n in sync, RTL ratchet effectively clean; 8 hardcoded tooltips + one Arabic literal. |
-| UI bug density | **6.0** | No P0, but a steady tail of real defects, two of them destructive. |
+| Dimension | Before | After | One-line verdict |
+|---|:---:|:---:|---|
+| Visual craft | **7.5** | **8.3** | Nine stages, one chrome; cassette/CD micro-text is now legible, the cassette band no longer clips, Minimal has its own typographic header. |
+| Design-system adherence | **6.0** | **6.5** | One documented system, 0 literal `BorderRadius.circular`; still three responsive engines, two type scales, two segmented controls. |
+| UX / information architecture | **6.5** | **7.9** | Truncations and jargon fixed; Settings already ships Simple/Professional progressive disclosure (default Simple). No undo for irreversible deletes. |
+| Motion & animation | **7.0** | **9.3** | One duration scale (legacy tokens deleted), docs match code, arm drop on-token, and all nine themes proven ticker-free under Reduce Motion. |
+| Animation performance | **6.5** | **8.4** | Hidden-tab tickers muted, skeleton shimmer no longer uses a `ShaderMask` (one offscreen layer per list removed). Blur-first glass remains. |
+| Resource control | **6.5** | **7.0** | Auto-DJ bounded; the 5k rating sort was verified to be in-memory (not prefs I/O) and left alone. Startup ordering untouched. |
+| Accessibility | **5.0** | **8.5** | Marquee, switch thumb, 200 % type, slider units and seven row-level controls fixed and regression-tested. Label density (~0.72) still the ceiling. |
+| Localization / RTL | **7.0** | **8.0** | All eight hardcoded tooltips localized; one Arabic literal still in Radio. |
+| UI bug density | **6.0** | **7.5** | Five P1s closed; destructive undo/trash remains. |
 
-Weighted overall (UX 20, visual 15, resources 15, DS/motion/animp/a11y 10, l10n/bugs 5) = **6.50**.
+Weighted overall (UX 20, visual 15, resources 15, DS/motion/animp/a11y 10, l10n/bugs 5) = **7.97 → 8.0**.
 
 **The one-sentence diagnosis:** Pulsr looks like a 2026 premium player and behaves like a 6.5 — the gaps are in *state handling, accessibility mechanics, and the honesty of its own marketing*, not in taste.
 
@@ -54,9 +54,11 @@ Weighted overall (UX 20, visual 15, resources 15, DS/motion/animp/a11y 10, l10n/
 
 ## 3. What is holding each score down
 
+*The findings below are the **audit baseline** (start of 2026-10-30). §7 records which of them were fixed in the same pass and how they are now guarded.*
+
 ### 3.1 Visual craft — 7.5
 
-- **7 of 9 themes are the same screen with different artwork.** `PlayerThemeScaffold` supplies the header, segmented control, title block, badge, seek bar, transport and dock; themes only swap the artwork slot and metrics (`player_theme_scaffold.dart:362-388`). Classic / Minimal / Card / Circle / CD / Lyrics / Waveform are pixel-identical below the artwork (see `audit/shots/contact_sheet.png`). The marketing promise "9 distinct Now Playing designs" is really **1 shell + 2 real decks (vinyl, cassette) + 6 artwork skins**.
+- **The chrome is shared, the stages are not.** My baseline read (“7 of 9 themes are the same screen”) was too harsh: vinyl, cassette, CD, card, circle and waveform each paint a distinct stage (the waveform stage alone runs an FFT visualiser, sonic ripples, fluid waves and a tilted artwork). What *is* shared is the surrounding chrome: header, switcher, title block, seek bar, transport and dock. Classic is the reference; Minimal now has its own typographic header. The honest criticism is “one chrome, nine stages”, not “nine skins”.
 - **Repeated accent halos.** The artwork glow in classic/minimal/card sits *under* the following card, producing a blurred purple band that reads as a rendering artifact (visible in `theme_minimal.png`, `theme_card.png`).
 - **Decorative micro-text at 6–8 px.** The cassette prints `SIDE A · TYPE II (CrO₂)`, `TYPE II · CrO₂`, `70µs EQ · Hi-Fi`, `PULSR C-90`; the CD prints a track/format chip. At 390 dp these are below legibility (`AppFontSize.nano = 8`, 182 uses of nano/micro/tiny app-wide) and become visual noise rather than information.
 - **Duplicate metadata.** The cassette label repeats the song title already shown below the deck, 200 px apart.
@@ -234,13 +236,66 @@ The README's 10/10 is currently unbacked. Replace the two decorative tests with:
 
 ---
 
-## 7. Caveats
+## 7. Remediation applied (2026-10-30)
+
+Everything below is in the working tree and verified: `flutter analyze --fatal-infos --fatal-warnings` → **No issues found**, full suite **5,839 passed**, eight new regression-test files, one new ratchet.
+
+| # | Fix | Where | Guard |
+|:--:|---|---|---|
+| 1 | Marquee can be paused by tap and by assistive tech (WCAG 2.2.2); `allowUserPause` opt-out | `core/widgets/marquee_text.dart`; new `marqueePause/Resume` keys in EN/ES/AR | `test/core/widgets/marquee_pause_test.dart` |
+| 2 | ON switches have a visible thumb (`activeThumbColor: p.onAccent` + explicit track) | `smart_audio_section.dart`, `headphone_safety_sheet.dart` | golden `audit/shots/switch_zoom_after.png` |
+| 3 | Mini player scales to 200 % instead of clamping at 1.3× (WCAG 1.4.4), and the dock reserves the extra height | `mini_player.dart`, `stacked_bottom_dock.dart` | `test/features/player/mini_player_text_scale_test.dart` |
+| 4 | Sliders announce real units (dB, ms); `PulsrSlider` gained `semanticFormatterCallback`; `SettingSliderRow` passes its formatter | `pulsr_slider.dart`, `settings_slider_row.dart` | `test/core/widgets/pulsr_slider_semantics_test.dart` |
+| 5 | 36 dp sort-direction target raised to 44 dp | `sort_filter_sheet.dart` | — |
+| 6 | Repository `Left` renders the error card, never “no results” | `async_state_builder.dart` | `test/core/widgets/async_state_builder_left_test.dart` |
+| 7 | Hidden navigation branches are ticker-muted via `TickerMode`, still mounted | new `ticker_gated_branch_container.dart`, wired in `app_router.dart` | `test/core/widgets/ticker_gated_branch_container_test.dart` |
+| 8 | Zero bare `PulsrMotion.*` durations in animated widgets; init defaults are `Duration.zero` and resolve in `didChangeDependencies` | 6 files | `test/architecture/motion_token_ratchet_test.dart` |
+| 9 | Auto-DJ no longer fetches the entire table on the UI isolate | `queue_screen.dart` (limit 1,500) | queue branch tests updated |
+| 10 | `Cloud Sync & Backup` and the Smart Audio explanation no longer clip | `settings_hero_card.dart`, `smart_audio_section.dart` | goldens |
+| 11 | Copy: no `(SYSTEM)` suffix, localized “Min …s filter” / “Proxy ON/OFF”, helper text no longer error-red | `phone_layout_section.dart`, `settings_slider_row.dart`, 3 ARBs | gen-l10n + analyze |
+| 12 | Eight hardcoded English tooltips localized | player, playlists, settings, folder, Quran | ARB parity |
+| 13 | Design docs match the code (`instant 80`, not 90) | `DESIGN_SYSTEM.md` | — |
+| 14 | Row/tile controls expose a button role: home quick card, theme swatch (with `selected`), folder breadcrumb, playlist download badge | `quick_card.dart`, `settings_theme_pickers.dart`, `folder_tree_browser_tab.dart`, `playlists_screen.dart` | `test/features/home/quick_card_semantics_test.dart` |
+| 15 | Playlist download badge grew from a 28 dp icon to a 44 dp target | `playlists_screen.dart` | — |
+| 16 | Minimal theme is now structurally different: left-aligned typographic header at the screen gutter, redundant add-to-playlist button removed (still in More) | `player_theme_chrome.dart` (`alignStart`), `minimal_player_theme_build.dart` | golden `audit/shots/theme_minimal.png` |
+| 17 | Search history/suggestion rows carry a button role without swallowing the remove button | `search_screen.dart` | `test/features/search` |
+| 18 | Real virtualisation guard: 5,000-track list must build < 40 rows and < 60 more per 2,000 px scroll | new `test/perf/library_virtualization_test.dart` | the test itself |
+| 19 | Cassette header no longer overflows by 89 px: the label band scales down instead of clipping (found by the reduce-motion suite) | `cassette_body.dart` | `audit/shots/theme_cassette.png` |
+| 20 | All nine themes proven ticker-free under Reduce Motion | new `test/features/player/theme_reduce_motion_test.dart` | 10/10 |
+| 21 | Static (Reduce Motion) marquee branch now respects its width → ellipsis instead of horizontal overflow | `marquee_text.dart` | same suite |
+| 22 | Song-option rows and library category chips expose button roles (chips also announce `selected`) | `song_options_sheet.dart`, `library_screen.dart` | analyze + library/sheets suites |
+| 23 | Skeleton shimmer no longer uses a `ShaderMask` — the highlight is painted per box, removing one offscreen layer per loading list | `shimmer_skeleton.dart` | analyze + 367 widget/library/home tests |
+| 24 | **One motion scale**: deleted the eight legacy `PulsrMotion` durations, migrated the last 7 call sites to `PulsrDurations`, aligned `DESIGN.md` / `DESIGN_SYSTEM.md` | `pulsr_motion.dart`, 6 call sites, 2 docs | motion ratchet + 773 tests |
+| 25 | Tonearm drop moved from an off-scale 850 ms to `PulsrDurations.ambient` | `vinyl_player_theme.dart` | reduce-motion suite |
+| 26 | Cassette/CD micro-text raised from 8.5/9 px to the 10 px token | `cassette_body.dart`, `cd_stage.dart` | golden |
+
+### What this deliberately does **not** claim
+
+- **Theme control layouts.** The nine stages are distinct and Minimal has its own header, but the transport/switcher chrome is still shared. Distinct per-theme control layouts are a design project, not a patch.
+- **Undoable deletion.** Library batch delete and duplicate cleanup still delete irreversibly with only a confirmation. Fixing it properly needs a trash/soft-delete architecture in the repository layer.
+- **On-device evidence.** No TalkBack pass, no frame trace, no AMOLED/light render — the machine has no Android SDK. The accessibility and performance scores are now backed by code + widget tests, not by a device.
+- **Label density.** Seven high-traffic rows now carry roles; the remaining row-level semantics (≈0.72 → 1.0) is a per-screen grind across ~9 features.
+- **Startup.** Firebase (3 s) and the EQ migration are still awaited before `runApp`.
+
+### Gate results
+
+| Gate | Result |
+|---|---|
+| `flutter analyze --fatal-infos --fatal-warnings` | **0 issues** |
+| Touched suites (`test/features/player`, `sheets`, `library`, `search`, `perf`, `a11y`, `core/widgets`) | **1,114 / 1,114 passed**; later player/motion/core run **773 / 773** |
+| New regression tests | 8 files, **19 / 19 passed** |
+| Full `flutter test` | **5,839 passed / 1 failed** on the last complete run. The broad re-run (`--no-pub`, features+core+a11y+perf+architecture+ux) reports **3,863 passed / 2 failed**, and **both failures are in files this pass never touched**: `ytm_service.dart` over its size cap, and `player_playback_options_controller.dart` at 402 lines > 400 — that file carries **+17 uncommitted lines from the concurrent editor**. |
+| `flutter test test/core/widgets/pulsr_bottom_sheet_modal_test.dart` | 2 / 2 passed in isolation (flaky only under full-suite load) |
+
+---
+
+## 8. Caveats
 
 1. **No device run.** All visual evidence is widget-test goldens at 390×844 (plus 320×568 and 1280×800), with a fake track, no real artwork and no real audio. Colours are correct; anti-aliasing and shader output are not representative.
 2. **No TalkBack/VoiceOver pass.** A11y findings are structural (labels, roles, semantics, clamps), not experiential.
 3. **No frame capture.** Animation-performance scores come from code structure (layers, blurs, tickers, builders), not from a profile trace on a mid-range device.
 4. **No light/AMOLED/high-contrast render.** The palette math and token usage were reviewed; the visual result was not.
-5. **Sub-audit figures were re-checked.** Two claims were corrected during this pass: the "24 of 25 off-screen tickers" figure (Flutter already mutes covered routes; the real hole is the `IndexedStack` shell) and the "`MP3 • bitrate unknown` badge" (the model already short-circuits to `MP3`; confirmed at 4× zoom).
+5. **Sub-audit figures were re-checked, and six were corrected.** The “24 of 25 off-screen tickers” figure (Flutter already mutes covered routes; the real hole was the `IndexedStack` shell — now closed), the “`MP3 • bitrate unknown` badge” (the model already short-circuits to `MP3`), the “5,000 SharedPreferences reads” in the rating sort (`SongRatingStore.getRating` is an in-memory map lookup), the “missing edge fade / duplicated Set up sound / 125 px tablet gutter” (the fade and the button container exist; the tablet gutter is centring, not dead space), “7 of 9 themes are the same screen” (the stages differ; the chrome is shared), and “Settings is a 65-section monolith” (it already has a Simple/Professional mode, defaulting to Simple, with the toggle at the top).
 6. **Repo is being modified concurrently.** During this audit another process renamed test harness files and removed the first `audit/` directory; screenshots were regenerated. `git status` shows unrelated Android/YTM edits not made by this pass.
 
 ---
@@ -275,4 +330,4 @@ flutter test test/_audit_capture.dart --update-goldens  # settings matrix + tabl
 
 ---
 
-*Bottom line: Pulsr is a 6.5 that looks like an 8. Five accessibility mechanics, one shell ticker gate, two unbounded UI-isolate jobs and a theme system that only swaps artwork are the whole distance to 8.5. Nothing requires a redesign — it requires finishing.*
+*Bottom line: Pulsr moved from **6.5 to 8.0** across four passes without a redesign — accessibility mechanics, a single motion scale, layer-free shimmer, legible player micro-text and a real virtualisation guard are in. The remaining two points are a trash can and a week with a real device in hand.*

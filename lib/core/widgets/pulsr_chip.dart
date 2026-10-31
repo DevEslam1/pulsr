@@ -72,7 +72,7 @@ class PulsrChip extends StatelessWidget {
           child: Center(
             widthFactor: 1.0,
             child: AnimatedContainer(
-              duration: context.motion(PulsrMotion.fast),
+              duration: context.motion(PulsrDurations.tap),
               curve: Curves.easeOutCubic,
               constraints: const BoxConstraints(minWidth: 44, minHeight: 36),
               padding: const EdgeInsets.symmetric(

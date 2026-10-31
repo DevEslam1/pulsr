@@ -6,6 +6,7 @@ import '../../core/utils/error_logger.dart';
 import '../../domain/models/quran_metadata.dart';
 import '../../domain/models/quran_surah.dart';
 import '../../domain/repositories/quran_repository.dart';
+import '../quran/quran_uthmani_text.dart';
 
 @LazySingleton(as: QuranRepository)
 class QuranRepositoryImpl implements QuranRepository {
@@ -62,7 +63,9 @@ class QuranRepositoryImpl implements QuranRepository {
         if (decoded is Map) catalog.addAll(Map<String, dynamic>.from(decoded));
       }
       catalog[trackUri] = metadata.toMap();
-      await prefs.setString(prefsMetadataKey, jsonEncode(catalog));
+      if (!await prefs.setString(prefsMetadataKey, jsonEncode(catalog))) {
+        throw StateError('Quran metadata storage rejected the write');
+      }
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to save Quran metadata for track $trackUri',
@@ -70,6 +73,7 @@ class QuranRepositoryImpl implements QuranRepository {
         stackTrace: st,
         category: 'QuranRepository',
       );
+      rethrow;
     }
   }
 
@@ -84,7 +88,9 @@ class QuranRepositoryImpl implements QuranRepository {
       if (decoded is! Map) return;
       final catalog = Map<String, dynamic>.from(decoded);
       catalog.remove(trackUri);
-      await prefs.setString(prefsMetadataKey, jsonEncode(catalog));
+      if (!await prefs.setString(prefsMetadataKey, jsonEncode(catalog))) {
+        throw StateError('Quran metadata storage rejected the deletion');
+      }
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to remove Quran metadata for track $trackUri',
@@ -92,6 +98,7 @@ class QuranRepositoryImpl implements QuranRepository {
         stackTrace: st,
         category: 'QuranRepository',
       );
+      rethrow;
     }
   }
 
@@ -135,7 +142,9 @@ class QuranRepositoryImpl implements QuranRepository {
         }
       }
       bookmarks[bookmark.trackUri] = bookmark.toMap();
-      await prefs.setString(prefsBookmarksKey, jsonEncode(bookmarks));
+      if (!await prefs.setString(prefsBookmarksKey, jsonEncode(bookmarks))) {
+        throw StateError('Quran bookmark storage rejected the write');
+      }
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to save Quran bookmark for track ${bookmark.trackUri}',
@@ -143,6 +152,7 @@ class QuranRepositoryImpl implements QuranRepository {
         stackTrace: st,
         category: 'QuranRepository',
       );
+      rethrow;
     }
   }
 
@@ -157,7 +167,9 @@ class QuranRepositoryImpl implements QuranRepository {
       if (decoded is! Map) return;
       final bookmarks = Map<String, dynamic>.from(decoded);
       bookmarks.remove(trackUri);
-      await prefs.setString(prefsBookmarksKey, jsonEncode(bookmarks));
+      if (!await prefs.setString(prefsBookmarksKey, jsonEncode(bookmarks))) {
+        throw StateError('Quran bookmark storage rejected the deletion');
+      }
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to clear Quran bookmark for track $trackUri',
@@ -165,6 +177,7 @@ class QuranRepositoryImpl implements QuranRepository {
         stackTrace: st,
         category: 'QuranRepository',
       );
+      rethrow;
     }
   }
 
@@ -206,6 +219,22 @@ class QuranRepositoryImpl implements QuranRepository {
 
   @override
   List<QuranAyahText> getAyahsForSurah(int surahNumber) {
+    final verses = quranUthmaniText[surahNumber];
+    if (verses == null) return const [];
+    final translations = _getBundledTranslations(surahNumber);
+    return List.unmodifiable([
+      for (var i = 0; i < verses.length; i++)
+        QuranAyahText(
+          surahNumber: surahNumber,
+          ayahNumber: i + 1,
+          textArabic: verses[i],
+          textEnglish:
+              i < translations.length ? translations[i].textEnglish : '',
+        ),
+    ]);
+  }
+
+  List<QuranAyahText> _getBundledTranslations(int surahNumber) {
     if (surahNumber == 1) {
       return const [
         QuranAyahText(
@@ -355,16 +384,8 @@ class QuranRepositoryImpl implements QuranRepository {
       ];
     }
 
-    final surah = QuranSurah.byNumber(surahNumber);
-    if (surah == null) return const [];
-    return List.generate(
-      surah.totalAyahs,
-      (i) => QuranAyahText(
-        surahNumber: surahNumber,
-        ayahNumber: i + 1,
-        textArabic: 'الآية ${i + 1} من سورة ${surah.nameArabic}',
-        textEnglish: 'Verse ${i + 1} of Surah ${surah.nameTransliteration}',
-      ),
-    );
+    // Only return bundled scripture. A descriptive placeholder must never be
+    // presented as an ayah or offered for memorization.
+    return const [];
   }
 }

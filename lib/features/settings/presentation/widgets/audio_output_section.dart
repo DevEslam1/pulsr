@@ -22,13 +22,19 @@ class _AdvancedDisclosureState extends State<_AdvancedDisclosure>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: PulsrMotion.standard,
+      duration: Duration.zero,
     );
     _animation = CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.duration = context.motion(PulsrDurations.layout);
   }
 
   @override
@@ -513,9 +519,9 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 label: context.l10n.settingsAaudioBufferSize,
                 subtitle: context.l10n.settingsAaudioBufferSizeDesc,
                 value: state.aaudioTargetBufferMs.toDouble(),
-                min: 20,
-                max: 500,
-                divisions: 24,
+                min: 8,
+                max: 1000,
+                divisions: 62,
                 defaultValue: 150,
                 formatValue: (v) => '${v.round()} ms',
                 enabled: isAndroid && state.aaudioOutputEnabled,
@@ -662,9 +668,9 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                     label: context.l10n.settingsAaudioBufferSize,
                     subtitle: context.l10n.settingsAaudioBufferSizeDesc,
                     value: state.aaudioTargetBufferMs.toDouble(),
-                    min: 20,
-                    max: 500,
-                    divisions: 24,
+                    min: 8,
+                    max: 1000,
+                    divisions: 62,
                     defaultValue: 150,
                     formatValue: (v) => '${v.round()} ms',
                     enabled: true,

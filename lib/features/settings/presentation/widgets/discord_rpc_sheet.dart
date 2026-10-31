@@ -295,7 +295,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                         ),
                         IconButton(
                           icon: Icon(Icons.logout_rounded, color: p.error),
-                          tooltip: 'Disconnect',
+                          tooltip: context.l10n.disconnect,
                           onPressed: _disconnect,
                         ),
                       ],

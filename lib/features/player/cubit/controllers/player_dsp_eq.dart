@@ -24,11 +24,13 @@ extension PlayerDspEqExtension on PlayerDspController {
     }
     final state = _getState();
     final previousDsp = state.dsp;
+    final hadHeadphoneProfile = state.dsp.selectedHeadphoneProfile != null;
     _emit(state.copyWith(
       dsp: state.dsp.copyWith(
         isEqEnabled: true,
         eqPreset: preset,
         selectedHeadphoneProfile: null,
+        preampDb: hadHeadphoneProfile ? 0.0 : state.dsp.preampDb,
       ),
       playback: state.playback.copyWith(errorMessage: null),
     ));
@@ -60,6 +62,7 @@ extension PlayerDspEqExtension on PlayerDspController {
     String? perSongPresetName,
   }) async {
     if (_isClosed()) return;
+    if (_getState().isQuranModeEnabled) return;
     final generation = ++_trackDspStateGen;
     final normalized = perSongPresetName?.trim();
     final hasOverride = normalized != null &&
@@ -232,10 +235,28 @@ extension PlayerDspEqExtension on PlayerDspController {
     final state = _getState();
     final previousDsp = state.dsp;
     if (profile != null) {
+      final isParametric = profile.hasParametricFilters;
+      List<double> targetFreqs = EqPreset.centerFrequencies;
+      try {
+        targetFreqs = _audioHandler.activeFrequencies;
+      } catch (_) {}
+      final sourceGains = isParametric
+          ? profile.gainsFromFilters(centers: targetFreqs)
+          : profile.gains;
+      final resolvedGains = sourceGains.length == targetFreqs.length
+          ? List<double>.unmodifiable(sourceGains)
+          : List<double>.unmodifiable(
+              EqPreset.interpolateGains(
+                sourceGains,
+                targetFrequencies: targetFreqs,
+              ),
+            );
+      final resolvedPreamp =
+          isParametric ? profile.computeSafePreamp() : profile.preampGain;
       if (perSongOverrideActive && !isPerSongRestore) {
         globalEqBackup = state.eqPreset.copyWith(
           name: profile.name,
-          gains: List<double>.unmodifiable(profile.gains),
+          gains: resolvedGains,
           bassBoost: profile.bassBoost,
         );
         globalHeadphoneProfileBackup = profile;
@@ -244,9 +265,10 @@ extension PlayerDspEqExtension on PlayerDspController {
         dsp: state.dsp.copyWith(
           isEqEnabled: true,
           selectedHeadphoneProfile: profile,
+          preampDb: resolvedPreamp,
           eqPreset: state.eqPreset.copyWith(
             name: profile.name,
-            gains: List<double>.unmodifiable(profile.gains),
+            gains: resolvedGains,
             bassBoost: profile.bassBoost,
           ),
         ),
@@ -269,8 +291,31 @@ extension PlayerDspEqExtension on PlayerDspController {
         return false;
       }
     } else {
+      final hadProfile = state.dsp.selectedHeadphoneProfile != null;
+      if (!hadProfile) {
+        try {
+          await _audioHandler.applyHeadphoneProfile(null);
+          return true;
+        } catch (e, st) {
+          ErrorLogger.log('Failed to reset headphone profile',
+              error: e, stackTrace: st, category: 'PlayerDspController');
+          return false;
+        }
+      }
+      List<double> targetFreqs = EqPreset.centerFrequencies;
+      try {
+        targetFreqs = _audioHandler.activeFrequencies;
+      } catch (_) {}
       _emit(state.copyWith(
-        dsp: state.dsp.copyWith(selectedHeadphoneProfile: null),
+        dsp: state.dsp.copyWith(
+          selectedHeadphoneProfile: null,
+          preampDb: 0.0,
+          eqPreset: EqPreset(
+            name: 'Flat',
+            gains: List<double>.filled(targetFreqs.length, 0.0),
+            bassBoost: 0.0,
+          ),
+        ),
       ));
       try {
         await _audioHandler.applyHeadphoneProfile(null);
@@ -332,6 +377,7 @@ extension PlayerDspEqExtension on PlayerDspController {
       dsp: state.dsp.copyWith(
         eqPreset: EqPreset.defaultPresets.first,
         selectedHeadphoneProfile: null,
+        preampDb: 0.0,
       ),
     ));
     try {

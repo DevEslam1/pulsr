@@ -1,5 +1,6 @@
 // lib/core/widgets/async_state_builder.dart
 import 'package:flutter/material.dart';
+import 'package:fpdart/fpdart.dart' show Either;
 
 import '../errors/error_message_resolver.dart';
 import '../utils/l10n_extensions.dart';
@@ -50,6 +51,13 @@ class AsyncStateBuilder<T> extends StatelessWidget {
           _AsyncErrorCard(error: error, onRetry: onRetry);
     }
     final data = snapshot.data;
+    // Repository failures arrive as a `Left` *value*, not as a stream error
+    // (see DESIGN.md §10). Without this, a failed query renders as "no results".
+    final leftFailure = _leftFailureOf(data);
+    if (leftFailure != null) {
+      return onError?.call(leftFailure) ??
+          _AsyncErrorCard(error: leftFailure, onRetry: onRetry);
+    }
     if (data == null || (isEmpty?.call(data) ?? false)) {
       return emptyWidget ?? const _AsyncEmptyCard();
     }
@@ -57,8 +65,14 @@ class AsyncStateBuilder<T> extends StatelessWidget {
   }
 }
 
-class _AsyncErrorCard extends StatelessWidget {
-  const _AsyncErrorCard({required this.error, this.onRetry});
+Object? _leftFailureOf(Object? data) {
+  if (data is Either) {
+    return data.fold<Object?>((left) => left, (right) => null);
+  }
+  return null;
+}
+
+class _AsyncErrorCard extends StatelessWidget {  const _AsyncErrorCard({required this.error, this.onRetry});
 
   final Object error;
   final VoidCallback? onRetry;

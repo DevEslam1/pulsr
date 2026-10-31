@@ -41,10 +41,34 @@ class RadioStationStore {
     'cur-quran-cairo': quranCairoArtwork,
     'cur-quran-cairo-backup': quranCairoArtwork,
     'cur-quran-hussary': hussaryArtwork,
+    'cur-quran-hussary-mojawwad': hussaryArtwork,
     'cur-quran-minshawi': minshawiArtwork,
+    'cur-quran-minshawi-rare': minshawiArtwork,
+    'cur-quran-minshawi-murattal': minshawiArtwork,
     'cur-quran-mustafa': mustafaIsmailArtwork,
     'cur-quran-abdulbasit': abdulBasitArtwork,
+    'cur-quran-abdulbasit-murattal': abdulBasitArtwork,
     'cur-quran-tarteel': tarteelArtwork,
+    'cur-quran-khashia': tarteelArtwork,
+    'cur-quran-sakeenah': tarteelArtwork,
+    'cur-quran-banna-mojawwad': quranCairoArtwork,
+    'cur-quran-banna-murattal': quranCairoArtwork,
+    'cur-quran-tablaway': quranCairoArtwork,
+    'cur-quran-makkah': quranCairoArtwork,
+    'cur-quran-alafasi': tarteelArtwork,
+    'cur-quran-muaiqly': tarteelArtwork,
+    'cur-quran-dosari': tarteelArtwork,
+    'cur-quran-qatami': tarteelArtwork,
+    'cur-quran-sudaes': tarteelArtwork,
+    'cur-quran-shuraim': tarteelArtwork,
+    'cur-quran-ali-jaber': tarteelArtwork,
+    'cur-quran-idrees-abkr': tarteelArtwork,
+    'cur-quran-fares-abbad': tarteelArtwork,
+    'cur-quran-ghamdi': tarteelArtwork,
+    'cur-quran-shatri': tarteelArtwork,
+    'cur-quran-ajmy': tarteelArtwork,
+    'cur-quran-jileel': tarteelArtwork,
+    'cur-quran-nourin': tarteelArtwork,
     'cur-lofi': lofiArtwork,
     'cur-ambient': ambientArtwork,
     'cur-paradise': paradiseArtwork,
@@ -66,9 +90,10 @@ class RadioStationStore {
     final lowerUrl = url?.toLowerCase().trim() ?? '';
     final lowerName = name?.toLowerCase().trim() ?? '';
 
-    // Cairo Quran Radio
+    // Cairo Quran Radio & Makkah
     if (lowerId == 'cur-quran-cairo' ||
         lowerId == 'cur-quran-cairo-backup' ||
+        lowerId == 'cur-quran-makkah' ||
         lowerUrl.contains('8s5u') ||
         lowerUrl.contains('quran-cairo') ||
         lowerName.contains('القاهرة') ||
@@ -79,6 +104,7 @@ class RadioStationStore {
 
     // Hussary
     if (lowerId == 'cur-quran-hussary' ||
+        lowerId == 'cur-quran-hussary-mojawwad' ||
         lowerUrl.contains('hussary') ||
         lowerUrl.contains('alhussary') ||
         lowerName.contains('الحصري') ||
@@ -89,6 +115,7 @@ class RadioStationStore {
 
     // Minshawi
     if (lowerId == 'cur-quran-minshawi' ||
+        lowerId == 'cur-quran-minshawi-murattal' ||
         lowerUrl.contains('minshawi') ||
         lowerName.contains('منشاوي') ||
         lowerName.contains('المنشاوي') ||
@@ -98,6 +125,7 @@ class RadioStationStore {
 
     // Abdulbasit
     if (lowerId == 'cur-quran-abdulbasit' ||
+        lowerId == 'cur-quran-abdulbasit-murattal' ||
         lowerUrl.contains('abdulbasit') ||
         lowerUrl.contains('abdulsamad') ||
         lowerName.contains('عبد الباسط') ||
@@ -119,11 +147,25 @@ class RadioStationStore {
       return mustafaIsmailArtwork;
     }
 
-    // Quran Tarateel
+    // Quran Tarateel & Khashia / Sakeenah & Other Reciters fallback
     if (lowerId == 'cur-quran-tarteel' ||
+        lowerId == 'cur-quran-khashia' ||
+        lowerId == 'cur-quran-sakeenah' ||
         lowerUrl.contains('tarteel') ||
         lowerUrl.contains('tarateel') ||
-        lowerName.contains('تراتيل')) {
+        lowerUrl.contains('salma') ||
+        lowerUrl.contains('sakeenah') ||
+        lowerName.contains('تراتيل') ||
+        lowerName.contains('خاشع') ||
+        lowerName.contains('سكينة')) {
+      return tarteelArtwork;
+    }
+
+    // Any other Quran station fallback to quranCairoArtwork or tarteelArtwork
+    if (lowerId.startsWith('cur-quran') ||
+        lowerUrl.contains('qurango.net') ||
+        lowerName.contains('القرآن') ||
+        lowerName.contains('القران')) {
       return tarteelArtwork;
     }
 
@@ -222,6 +264,24 @@ class RadioStationStore {
         name.contains('الحصري') ||
         name.contains('حصري') ||
         name.contains('مصطفى إسماعيل') ||
+        name.contains('البنا') ||
+        name.contains('الطبلاوي') ||
+        name.contains('خاشع') ||
+        name.contains('سكينة') ||
+        name.contains('العفاسي') ||
+        name.contains('المعيقلي') ||
+        name.contains('الدوسري') ||
+        name.contains('القطامي') ||
+        name.contains('السديس') ||
+        name.contains('الشريم') ||
+        name.contains('علي جابر') ||
+        name.contains('إدريس أبكر') ||
+        name.contains('فارس عباد') ||
+        name.contains('الغامدي') ||
+        name.contains('الشاطري') ||
+        name.contains('العجمي') ||
+        name.contains('خالد الجليل') ||
+        name.contains('نورين') ||
         name.contains('تراتيل')) {
       return true;
     }
@@ -249,9 +309,33 @@ class RadioStationStore {
       'cur-quran-cairo-backup',
       'cur-quran-hussary',
       'cur-quran-minshawi',
+      'cur-quran-minshawi-rare',
       'cur-quran-abdulbasit',
       'cur-quran-mustafa',
       'cur-quran-tarteel',
+      'cur-quran-khashia',
+      'cur-quran-minshawi-murattal',
+      'cur-quran-abdulbasit-murattal',
+      'cur-quran-hussary-mojawwad',
+      'cur-quran-banna-mojawwad',
+      'cur-quran-banna-murattal',
+      'cur-quran-tablaway',
+      'cur-quran-sakeenah',
+      'cur-quran-makkah',
+      'cur-quran-alafasi',
+      'cur-quran-muaiqly',
+      'cur-quran-dosari',
+      'cur-quran-qatami',
+      'cur-quran-sudaes',
+      'cur-quran-shuraim',
+      'cur-quran-ali-jaber',
+      'cur-quran-idrees-abkr',
+      'cur-quran-fares-abbad',
+      'cur-quran-ghamdi',
+      'cur-quran-shatri',
+      'cur-quran-ajmy',
+      'cur-quran-jileel',
+      'cur-quran-nourin',
     ];
     quran.sort((a, b) {
       final idxA = curatedOrder.indexOf(a.id);
@@ -540,7 +624,7 @@ class RadioStationStore {
             artworkUrl: quranCairoArtwork),
         RadioStation(
             id: 'cur-quran-hussary',
-            name: 'إذاعة الشيخ محمود خليل الحصري',
+            name: 'إذاعة الشيخ محمود خليل الحصري (مرتل)',
             url: 'https://backup.qurango.net/radio/mahmoud_khalil_alhussary',
             genre: 'Quran',
             artworkUrl: hussaryArtwork),
@@ -552,6 +636,12 @@ class RadioStationStore {
             genre: 'Quran',
             artworkUrl: minshawiArtwork),
         RadioStation(
+            id: 'cur-quran-minshawi-rare',
+            name: 'إذاعة الشيخ محمد صديق المنشاوي (تلاوات نادرة)',
+            url: 'https://radio.xecod.com/station/alminshawi',
+            genre: 'Quran',
+            artworkUrl: minshawiArtwork),
+        RadioStation(
             id: 'cur-quran-abdulbasit',
             name: 'إذاعة الشيخ عبد الباسط عبد الصمد (مجود)',
             url:
@@ -560,14 +650,157 @@ class RadioStationStore {
             artworkUrl: abdulBasitArtwork),
         RadioStation(
             id: 'cur-quran-mustafa',
-            name: 'إذاعة الشيخ مصطفى إسماعيل',
+            name: 'إذاعة الشيخ مصطفى إسماعيل (مجود)',
             url: 'https://backup.qurango.net/radio/mustafa_ismail',
             genre: 'Quran',
             artworkUrl: mustafaIsmailArtwork),
         RadioStation(
             id: 'cur-quran-tarteel',
-            name: 'إذاعة تراتيل القرآن الكريم',
+            name: 'إذاعة تراتيل قصيرة متميزة',
             url: 'https://backup.qurango.net/radio/tarateel',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-khashia',
+            name: 'إذاعة تلاوات خاشعة نادرة',
+            url: 'https://backup.qurango.net/radio/salma',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-minshawi-murattal',
+            name: 'إذاعة الشيخ محمد صديق المنشاوي (مرتل)',
+            url:
+                'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi',
+            genre: 'Quran',
+            artworkUrl: minshawiArtwork),
+        RadioStation(
+            id: 'cur-quran-abdulbasit-murattal',
+            name: 'إذاعة الشيخ عبد الباسط عبد الصمد (مرتل)',
+            url:
+                'https://backup.qurango.net/radio/abdulbasit_abdulsamad',
+            genre: 'Quran',
+            artworkUrl: abdulBasitArtwork),
+        RadioStation(
+            id: 'cur-quran-hussary-mojawwad',
+            name: 'إذاعة الشيخ محمود خليل الحصري (مجود)',
+            url:
+                'https://backup.qurango.net/radio/mahmoud_khalil_alhussary_mojawwad',
+            genre: 'Quran',
+            artworkUrl: hussaryArtwork),
+        RadioStation(
+            id: 'cur-quran-banna-mojawwad',
+            name: 'إذاعة الشيخ محمود علي البنا (مجود)',
+            url:
+                'https://backup.qurango.net/radio/mahmoud_ali__albanna_mojawwad',
+            genre: 'Quran',
+            artworkUrl: quranCairoArtwork),
+        RadioStation(
+            id: 'cur-quran-banna-murattal',
+            name: 'إذاعة الشيخ محمود علي البنا (مرتل)',
+            url:
+                'https://backup.qurango.net/radio/mahmoud_ali__albanna',
+            genre: 'Quran',
+            artworkUrl: quranCairoArtwork),
+        RadioStation(
+            id: 'cur-quran-tablaway',
+            name: 'إذاعة الشيخ محمد محمود الطبلاوي',
+            url: 'https://backup.qurango.net/radio/mohammad_altablaway',
+            genre: 'Quran',
+            artworkUrl: quranCairoArtwork),
+        RadioStation(
+            id: 'cur-quran-sakeenah',
+            name: 'إذاعة آيات السكينة وتلاوات خاشعة',
+            url: 'https://backup.qurango.net/radio/sakeenah',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-makkah',
+            name: 'إذاعة القرآن الكريم - مكة المكرمة (السعودية)',
+            url: 'https://stream.radiojar.com/0tpy1h0kxtzuv',
+            genre: 'Quran',
+            artworkUrl: quranCairoArtwork),
+        RadioStation(
+            id: 'cur-quran-alafasi',
+            name: 'إذاعة الشيخ مشاري العفاسي',
+            url: 'https://backup.qurango.net/radio/mishary_alafasi',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-muaiqly',
+            name: 'إذاعة الشيخ ماهر المعيقلي',
+            url: 'https://backup.qurango.net/radio/maher',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-dosari',
+            name: 'إذاعة الشيخ ياسر الدوسري',
+            url: 'https://backup.qurango.net/radio/yasser_aldosari',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-qatami',
+            name: 'إذاعة الشيخ ناصر القطامي',
+            url: 'https://backup.qurango.net/radio/nasser_alqatami',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-sudaes',
+            name: 'إذاعة الشيخ عبد الرحمن السديس',
+            url: 'https://backup.qurango.net/radio/abdulrahman_alsudaes',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-shuraim',
+            name: 'إذاعة الشيخ سعود الشريم',
+            url: 'https://backup.qurango.net/radio/saud_alshuraim',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-ali-jaber',
+            name: 'إذاعة الشيخ علي جابر',
+            url: 'https://backup.qurango.net/radio/ali_jaber',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-idrees-abkr',
+            name: 'إذاعة الشيخ إدريس أبكر',
+            url: 'https://backup.qurango.net/radio/idrees_abkr',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-fares-abbad',
+            name: 'إذاعة الشيخ فارس عباد',
+            url: 'https://backup.qurango.net/radio/fares_abbad',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-ghamdi',
+            name: 'إذاعة الشيخ سعد الغامدي',
+            url: 'https://backup.qurango.net/radio/saad_alghamdi',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-shatri',
+            name: 'إذاعة الشيخ أبو بكر الشاطري',
+            url: 'https://backup.qurango.net/radio/shaik_abu_bakr_al_shatri',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-ajmy',
+            name: 'إذاعة الشيخ أحمد العجمي',
+            url: 'https://backup.qurango.net/radio/ahmad_alajmy',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-jileel',
+            name: 'إذاعة الشيخ خالد الجليل',
+            url: 'https://backup.qurango.net/radio/khalid_aljileel',
+            genre: 'Quran',
+            artworkUrl: tarteelArtwork),
+        RadioStation(
+            id: 'cur-quran-nourin',
+            name: 'إذاعة الشيخ نورين محمد صديق',
+            url: 'https://backup.qurango.net/radio/nourin_siddig',
             genre: 'Quran',
             artworkUrl: tarteelArtwork),
         RadioStation(

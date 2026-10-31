@@ -83,6 +83,14 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.subCrossover.slopeDbPerOct = clampFinite(s.subCrossover.slopeDbPerOct, 6.0, 48.0, 24.0);
     s.subCrossover.subGain = clampFinite(s.subCrossover.subGain, 0.0, 2.0, 0.8);
 
+    s.channelManager.channelCount = clampInt(s.channelManager.channelCount, 2, ChannelManager::MAX_CHANNELS);
+    for (int ch = 0; ch < ChannelManager::MAX_CHANNELS; ++ch) {
+        s.channelManager.trimDb[ch] =
+            static_cast<float>(clampFinite(s.channelManager.trimDb[ch], -30.0, 12.0, 0.0));
+        s.channelManager.delayMs[ch] =
+            static_cast<float>(clampFinite(s.channelManager.delayMs[ch], 0.0, 50.0, 0.0));
+    }
+
     // NOTE: bandCount may legitimately be 0 (nativeSetDynamicEqBandCount clamps
     // to [0, MAX_BANDS]), so do not force a minimum of 1 here.
     s.dynamicEq.bandCount = clampInt(s.dynamicEq.bandCount, 0, DynamicEqParamSet::MAX_BANDS);
@@ -350,10 +358,31 @@ void DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
     if (!engine) return;
     std::lock_guard<std::mutex> lock(mutex_);
     engines_.push_back(engine);
-    auto current = AudioDspEngine::instance().getParams();
+    auto& tmpl = AudioDspEngine::instance();
+    auto current = tmpl.getParams();
     if (current) {
         engine->publishParams(current);
     }
+    engine->setWeeklyDose(tmpl.getWeeklyDose());
+    engine->setPerformanceProfile(tmpl.getPerformanceProfile());
+    engine->setThermalLevel(tmpl.getThermalLevel());
+    engine->setReverbThreadingMode(tmpl.getReverbThreadingMode());
+    const uint32_t deg = tmpl.getAutoDegradedStages();
+    if (deg != 0) {
+        engine->triggerStageAutoDegrade(deg);
+    }
+}
+
+AudioDspEngine* DspEngineRegistry::selectActiveEngineLocked() const {
+    for (auto it = engines_.rbegin(); it != engines_.rend(); ++it) {
+        if (*it && (*it)->getLastAppliedGeneration() > 0) {
+            return *it;
+        }
+    }
+    for (auto it = engines_.rbegin(); it != engines_.rend(); ++it) {
+        if (*it) return *it;
+    }
+    return &AudioDspEngine::instance();
 }
 
 void DspEngineRegistry::unregisterEngine(AudioDspEngine* engine) {
@@ -407,18 +436,12 @@ bool DspEngineRegistry::isLimiterActive() {
 
 float DspEngineRegistry::getDynEqGrDb(int band) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!engines_.empty() && engines_.back()) {
-        return engines_.back()->getDynEqGrDb(band);
-    }
-    return AudioDspEngine::instance().getDynEqGrDb(band);
+    return selectActiveEngineLocked()->getDynEqGrDb(band);
 }
 
 float DspEngineRegistry::getMultibandGrDb(int band) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!engines_.empty() && engines_.back()) {
-        return engines_.back()->getMultibandGrDb(band);
-    }
-    return AudioDspEngine::instance().getMultibandGrDb(band);
+    return selectActiveEngineLocked()->getMultibandGrDb(band);
 }
 
 double DspEngineRegistry::getRollingRtf() {
@@ -481,7 +504,7 @@ void DspEngineRegistry::setBypassCompare(bool enabled, double gainCompensationDb
 void DspEngineRegistry::getTelemetry(double* outArray, int size) {
     if (!outArray || size < 15) return;
     std::lock_guard<std::mutex> lock(mutex_);
-    AudioDspEngine* eng = engines_.empty() ? &AudioDspEngine::instance() : engines_.back();
+    AudioDspEngine* eng = selectActiveEngineLocked();
     outArray[0] = static_cast<double>(eng->getLimiterGrDb());
     for (int i = 0; i < DynamicEqParamSet::MAX_BANDS; ++i) {
         outArray[1 + i] = static_cast<double>(eng->getDynEqGrDb(i));
@@ -543,10 +566,18 @@ bool DspEngineRegistry::isSafetyAttenuationActive() {
 
 double DspEngineRegistry::getAppliedSampleRate() {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!engines_.empty() && engines_.back()) {
-        return engines_.back()->getSampleRate();
+    return selectActiveEngineLocked()->getSampleRate();
+}
+
+uint64_t DspEngineRegistry::getLastAppliedGeneration() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    uint64_t maxGen = AudioDspEngine::instance().getLastAppliedGeneration();
+    for (auto* engine : engines_) {
+        if (engine) {
+            maxGen = std::max(maxGen, engine->getLastAppliedGeneration());
+        }
     }
-    return AudioDspEngine::instance().getSampleRate();
+    return maxGen;
 }
 
 void DspEngineRegistry::setPerformanceProfile(DspPerformanceProfile profile) {
@@ -915,6 +946,13 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     const uint32_t degraded = autoDegradedStages_.load();
     const uint32_t stages = rawStages & ~degraded;
 
+    eq_.setEnabled((stages & STAGE_EQ) && snapshot->eq.enabled);
+    dynamicEq_.setEnabled((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled);
+    crossfeed_.setEnabled((stages & STAGE_CROSSFEED) && snapshot->crossfeed.enabled);
+    stereoWidth_.setEnabled((stages & STAGE_WIDTH) && snapshot->stereoWidth.enabled);
+    subCrossover_.setEnabled((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled);
+    dynamicBass_.setEnabled((stages & STAGE_DYNAMIC_BASS) && snapshot->dynamicBass.enabled);
+    loudnessContour_.setEnabled((stages & STAGE_LOUDNESS) && snapshot->loudness.enabled);
     reverb_.setEnabled((stages & STAGE_REVERB) && snapshot->reverb.enabled);
     saturation_.setEnabled((stages & STAGE_SATURATION) && snapshot->saturation.enabled);
     arbitraryEq_.setEnabled((stages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled);
@@ -981,11 +1019,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     const bool runLimiter = limiterRequested || limiter_.isDraining();
     const bool dvcActive = snapshot->directVolume.enabled &&
         (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(snapshot->directVolume.gainLinear - 1.0) > 1e-4);
-    const bool nonUnityGain = (stages != 0) ||
+    const bool nonUnityGain = ((stages & ~static_cast<uint32_t>(STAGE_DITHER)) != 0) ||
                               (std::abs(smoothedReplayGain_ - 1.0) > 1e-4) ||
                               (std::abs(startReplayGain - 1.0) > 1e-4) ||
                               dvcActive ||
                               (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4) ||
+                              eq_.isRamping() ||
                               crossfeed_.isRamping() || stereoWidth_.isRamping() ||
                               reverb_.isRamping() ||
                               loudnessContour_.isRamping() || dynamicEq_.isRamping() ||
@@ -1021,7 +1060,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 1. Parametric EQ Stage
-        if (stages & STAGE_EQ) {
+        if ((stages & STAGE_EQ) || (!(degraded & STAGE_EQ) && eq_.isRamping())) {
             eq_.processInterleaved(buffer, frames, channels);
         }
 
@@ -1084,12 +1123,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 8. Subwoofer / LFE Crossover Stage (bass redirection sum, stereo pairs)
-        if ((stages & STAGE_CROSSOVER) || subCrossover_.isRamping()) {
+        if ((stages & STAGE_CROSSOVER) || (!(degraded & STAGE_CROSSOVER) && subCrossover_.isRamping())) {
             subCrossover_.processInterleaved(buffer, frames, channels);
         }
 
         // 8b. Dynamic Bass Stage (ViPER-modeled Dynamic System, stereo channels 0 and 1)
-        if (((stages & STAGE_DYNAMIC_BASS) || dynamicBass_.isRamping()) && channels >= 2) {
+        if (((stages & STAGE_DYNAMIC_BASS) || (!(degraded & STAGE_DYNAMIC_BASS) && dynamicBass_.isRamping())) && channels >= 2) {
             dynamicBass_.processInterleaved(buffer, frames, channels);
         }
 
@@ -1335,9 +1374,23 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                 recoveryThreshold = 0.50f;
             }
 
-            // Sustained high load (RTF > degradeThreshold over window): degrade ONE stage at a time in cost order
+            // Wall-clock RTF includes time the audio thread is descheduled
+            // during screen lock / CPU power transitions. One delayed callback
+            // can dominate the mean for the whole window, making Quran reverb
+            // disappear until the recovery window elapses even though all later
+            // callbacks are healthy. Require at least half the window to be
+            // over budget, so only sustained pressure changes the audible chain.
+            // Alternating overloaded callbacks still qualify; they need not be
+            // consecutive. Keep the mean threshold for overall load as well.
+            int overBudgetBlocks = 0;
+            for (int i = 0; i < kRtfWindowSize; ++i) {
+                if (rtfRingBuffer_[i] > degradeThreshold) ++overBudgetBlocks;
+            }
+
+            // Sustained high load: degrade ONE stage at a time in cost order.
             // Note: Limiter output protection and Headphone Safety are NEVER disabled during auto-degrade to prevent clipping/hearing injury.
-            if (avgRtf > degradeThreshold) {
+            if (avgRtf > degradeThreshold &&
+                overBudgetBlocks >= kRtfWindowSize / 2) {
                 recoveryConsecutiveBlocks_ = 0;
                 // Cost order: REVERB -> LIVE_PROG -> ARBITRARY_EQ -> MULTIBAND_COMPRESSOR -> DYNAMIC_BASS -> SATURATION -> VIPER_DDC -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
                 if ((rawStages & STAGE_REVERB) && snapshot->reverb.enabled && !(currentDegraded & STAGE_REVERB)) {

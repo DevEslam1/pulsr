@@ -96,9 +96,10 @@ The app font is **Manrope**; responsive scaling helpers live in
 |---|--:|--:|--:|--:|--:|
 | ms | 120 | 200 | 260 | 320 | 400 |
 
-`PulsrMotion` (`lib/core/motion/pulsr_motion.dart`) adds
-`instant 90`, `fast/snappy 150`, `standard 250`, `slow 400`,
-`expressive 600`, the aliases above, and the reduce-motion API:
+`PulsrMotion` (`lib/core/motion/pulsr_motion.dart`) exposes the same five
+(`tap`, `state`, `layout`, `page`, `ambient`) plus the curves and the
+reduce-motion API. The legacy aliases (`instant/fast/standard/slow/expressive`)
+were removed in Oct 2026 so there is one scale, not three:
 
 ```dart
 context.motion(PulsrMotion.state); // Duration.zero when reduce motion is on

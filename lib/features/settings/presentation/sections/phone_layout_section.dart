@@ -239,8 +239,13 @@ mixin PhoneLayoutSection
             AppThemeMode.amoled => context.l10n.amoledLabel,
           };
           final langName = getLanguageTitle(state.languageCode, context.l10n);
+          // "English (SYSTEM)" was noise: only show the code when the user
+          // actually picked a language instead of following the system.
+          final langLabel = state.languageCode == 'system'
+              ? langName
+              : '$langName (${state.languageCode.toUpperCase()})';
           statusLine = Text(
-            '$themeName • $langName (${state.languageCode.toUpperCase()})',
+            '$themeName • $langLabel',
             style: TextStyle(
               color: p.textSecondary,
               fontSize: AppFontSize.caption,
@@ -255,7 +260,7 @@ mixin PhoneLayoutSection
           statusLine = Text(
             state.scanResultCount != null
                 ? context.l10n.lastScanTracks(state.scanResultCount!)
-                : 'Min ${state.minDurationSec}s filter',
+                : context.l10n.settingsMinDurationFilter(state.minDurationSec),
             style: TextStyle(
               color: p.textSecondary,
               fontSize: AppFontSize.caption,
@@ -268,7 +273,7 @@ mixin PhoneLayoutSection
 
         case 'network':
           statusLine = Text(
-            '${state.proxyEnabled ? "Proxy ON" : "Proxy OFF"} • ${getQualityTitle(state.streamingQuality, context.l10n)}',
+            '${state.proxyEnabled ? context.l10n.settingsProxyOnStatus : context.l10n.settingsProxyOffStatus} • ${getQualityTitle(state.streamingQuality, context.l10n)}',
             style: TextStyle(
               color: p.textSecondary,
               fontSize: AppFontSize.caption,

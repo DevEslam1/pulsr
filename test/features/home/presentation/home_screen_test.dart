@@ -13,6 +13,7 @@ import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
 import 'package:pulsr/features/home/presentation/home_screen.dart';
+import 'package:pulsr/domain/models/radio_station.dart';
 import 'package:pulsr/features/home/presentation/widgets/empty_library.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';
@@ -34,6 +35,8 @@ class _LibraryCubit extends Mock implements LibraryCubit {}
 
 class _SettingsCubit extends Mock implements SettingsCubit {}
 
+class _FakeRadioStation extends Fake implements RadioStation {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -49,6 +52,7 @@ void main() {
     registerFallbackValue(createTestSong(id: -1));
     registerFallbackValue(<SongsTableData>[]);
     registerFallbackValue(<String>[]);
+    registerFallbackValue(_FakeRadioStation());
   });
 
   setUp(() {
@@ -62,6 +66,7 @@ void main() {
     player = stubPlayerCubit();
     when(() => player.playSong(any(), queue: any(named: 'queue')))
         .thenAnswer((_) async {});
+    when(() => player.playRadioStation(any())).thenAnswer((_) async {});
 
     when(() => account.loginState).thenReturn(loginState);
     when(() => account.isLoggedIn).thenReturn(false);
@@ -116,32 +121,22 @@ void main() {
       (tester) async {
     await pumpScreen(tester);
 
-    expect(find.text('Daily Drive'), findsOneWidget);
+    expect(find.byType(QuranRadioHeroCarousel), findsOneWidget);
+    expect(find.text('الشيخ محمد صديق المنشاوي'), findsWidgets);
     expect(find.text('Focus Flow'), findsOneWidget);
     expect(find.text('Favorites'), findsWidgets);
   });
 
-  testWidgets('the Daily Drive hero starts a shuffled queue', (tester) async {
-    when(() => getSongs.getAllSongs(
-              sortBy: any(named: 'sortBy'),
-              ascending: any(named: 'ascending'),
-              limit: any(named: 'limit'),
-              excludedFolders: any(named: 'excludedFolders'),
-            ))
-        .thenAnswer((_) async =>
-            Right([createTestSong(id: 1, title: 'A'), createTestSong(id: 2)]));
-
+  testWidgets('the Quran Radio hero starts Minshawi radio stream on tap',
+      (tester) async {
     await pumpScreen(tester);
-    await tester.tap(find.text('Daily Drive'));
+    await tester.tap(find.byIcon(Icons.play_arrow_rounded).first);
     await tester.pumpAndSettle();
 
-    verify(() => getSongs.getAllSongs(
-          sortBy: 'lastPlayed',
-          ascending: false,
-          limit: 200,
-          excludedFolders: any(named: 'excludedFolders'),
-        )).called(1);
-    verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(1);
+    verify(() => player.playRadioStation(any(
+          that: isA<RadioStation>()
+              .having((s) => s.id, 'id', 'cur-quran-minshawi'),
+        ))).called(1);
   });
 
   testWidgets('the Favorites quick tile navigates', (tester) async {

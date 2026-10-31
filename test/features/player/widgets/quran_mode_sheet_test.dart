@@ -9,6 +9,7 @@ import 'package:pulsr/core/services/earbud_optimization_service.dart';
 import 'package:pulsr/core/widgets/pulsr_switch.dart';
 import 'package:pulsr/domain/models/quran_metadata.dart';
 import 'package:pulsr/domain/models/quran_mode_profile.dart';
+import 'package:pulsr/domain/models/quran_surah.dart';
 import 'package:pulsr/domain/repositories/quran_repository.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/quran_mode_sheet.dart';
@@ -73,6 +74,12 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() {
+    registerFallbackValue(const QuranMetadata(
+        surahNumber: 1,
+        surahName: 'Al-Fatihah',
+        ayahStart: 1,
+        ayahEnd: 7,
+        reciter: 'Reciter'));
     registerFallbackValue(QuranReciterStyle.murattal);
     registerFallbackValue(QuranBookmark(
       trackUri: 'test',
@@ -89,7 +96,102 @@ void main() {
     ));
   });
 
+  tearDown(() async {
+    if (getIt.isRegistered<QuranRepository>()) {
+      await getIt.unregister<QuranRepository>();
+    }
+  });
+
   group('QuranModePanel', () {
+    testWidgets('failed bookmark save shows an error without a success message',
+        (tester) async {
+      final repo = MockQuranRepository();
+      const meta = QuranMetadata(
+          surahNumber: 1,
+          surahName: 'Al-Fatihah',
+          ayahStart: 1,
+          ayahEnd: 7,
+          reciter: 'Reciter');
+      when(() => repo.getMetadataForTrack(any())).thenAnswer((_) async => meta);
+      when(() => repo.getBookmark(any())).thenAnswer((_) async => null);
+      when(() => repo.saveBookmark(any()))
+          .thenThrow(StateError('Storage full'));
+      getIt.registerSingleton<QuranRepository>(repo);
+      final cubit = quranCubit(quranState()
+          .copyWith(playback: const PlaybackSlice(currentSong: testSong)));
+      await tester.pumpWidget(sheetHost(
+          playerCubit: cubit,
+          child: const SingleChildScrollView(child: QuranModePanel())));
+      await tester.pumpAndSettle();
+      final save = find.text('Save Quran Bookmark');
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(
+          find.text('Could not update the Quran bookmark. Please try again.'),
+          findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('repeat ayah uses the current playback verse', (tester) async {
+      final repo = MockQuranRepository();
+      const meta = QuranMetadata(
+          surahNumber: 1,
+          surahName: 'Al-Fatihah',
+          ayahStart: 1,
+          ayahEnd: 7,
+          reciter: 'Reciter',
+          ayahTimings: [
+            QuranAyahTiming(
+                ayahNumber: 1, start: Duration.zero, end: Duration(seconds: 5)),
+            QuranAyahTiming(
+                ayahNumber: 2,
+                start: Duration(seconds: 5),
+                end: Duration(seconds: 10)),
+          ]);
+      when(() => repo.getMetadataForTrack(any())).thenAnswer((_) async => meta);
+      when(() => repo.getBookmark(any())).thenAnswer((_) async => null);
+      getIt.registerSingleton<QuranRepository>(repo);
+      final cubit = quranCubit(quranState().copyWith(
+          playback: const PlaybackSlice(
+              currentSong: testSong, position: Duration(seconds: 7))));
+      await tester.pumpWidget(sheetHost(
+          playerCubit: cubit,
+          child: const SingleChildScrollView(child: QuranModePanel())));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Repeat Ayah'));
+      await tester.tap(find.text('Repeat Ayah'));
+      verify(() => cubit.setAbLoopRange(
+          const Duration(seconds: 5), const Duration(seconds: 10))).called(1);
+    });
+
+    testWidgets('browsing surahs never rewrites the playing track metadata',
+        (tester) async {
+      final repo = MockQuranRepository();
+      when(() => repo.getMetadataForTrack(any())).thenAnswer((_) async => null);
+      when(() => repo.getBookmark(any())).thenAnswer((_) async => null);
+      when(() => repo.getSurahs()).thenReturn(QuranSurah.canonicalSurahs);
+      when(() => repo.getSurah(any())).thenAnswer(
+          (i) => QuranSurah.byNumber(i.positionalArguments.first as int));
+      when(() => repo.getAyahsForSurah(any())).thenReturn([]);
+      getIt.registerSingleton<QuranRepository>(repo);
+      final cubit = quranCubit(quranState(enabled: true)
+          .copyWith(playback: const PlaybackSlice(currentSong: testSong)));
+      await tester.pumpWidget(sheetHost(
+          playerCubit: cubit,
+          child: const SingleChildScrollView(child: QuranModePanel())));
+      await tester.pumpAndSettle();
+      final picker = find.byTooltip('Surah Index');
+      await tester.ensureVisible(picker);
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Al-Baqarah (البقرة)'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      verifyNever(() => repo.saveMetadataForTrack(any(), any()));
+    });
+
     testWidgets('renders and forwards enable + reciter style changes',
         (tester) async {
       final cubit = quranCubit(quranState());

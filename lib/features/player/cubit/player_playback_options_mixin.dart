@@ -142,6 +142,10 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> resetQuranProfile() =>
       playbackOptionsController.resetQuranProfile();
 
+  /// Hands Quran Mode back to automatic detection after a manual on/off.
+  Future<void> resetQuranAutoMode() =>
+      playbackOptionsController.resetQuranAutoMode();
+
   Future<bool> updateLyrics(List<LyricsLine> lines, {int? expectedSongId}) =>
       playbackOptionsController.updateLyrics(lines,
           expectedSongId: expectedSongId);

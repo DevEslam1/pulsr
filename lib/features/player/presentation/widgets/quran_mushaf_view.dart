@@ -5,6 +5,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../../domain/models/quran_metadata.dart';
@@ -12,8 +13,10 @@ import '../../../../domain/models/quran_surah.dart';
 import '../../../../domain/repositories/quran_repository.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../data/repositories/quran_repository_impl.dart';
+import '../../../../data/quran/quran_uthmani_text.dart';
+import 'quran_text_attribution.dart';
 
-/// Full Uthmani Mushaf reader with active verse highlighting, tap-to-seek,
+/// Bundled Quran reader with timing-based highlighting, tap-to-seek,
 /// and Hifz (memorization) blind recall masking.
 class QuranMushafView extends StatefulWidget {
   final QuranMetadata? metadata;
@@ -39,6 +42,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
   bool _blindRecallMode = false;
   final Set<int> _revealedAyahs = {};
   int _lastActiveAyah = -1;
+  int? _browsedSurah;
 
   QuranRepository get _repo => getIt.isRegistered<QuranRepository>()
       ? getIt<QuranRepository>()
@@ -50,15 +54,20 @@ class _QuranMushafViewState extends State<QuranMushafView> {
     super.dispose();
   }
 
-  int _findActiveAyah(List<QuranAyahTiming> timings, Duration pos) {
-    if (timings.isEmpty) return widget.metadata?.ayahStart ?? 1;
-    for (final t in timings) {
-      if (pos >= t.start && pos < t.end) {
-        return t.ayahNumber;
-      }
+  @override
+  void didUpdateWidget(covariant QuranMushafView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.metadata != widget.metadata) {
+      _browsedSurah = null;
+      _resetReadingState();
     }
-    if (pos >= timings.last.end) return timings.last.ayahNumber;
-    return timings.first.ayahNumber;
+  }
+
+  void _resetReadingState() {
+    _revealedAyahs.clear();
+    _ayahKeys.clear();
+    _lastActiveAyah = -1;
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
   }
 
   void _scrollToActiveAyah(int ayah) {
@@ -67,10 +76,11 @@ class _QuranMushafViewState extends State<QuranMushafView> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
-      final target = ((ayah - 1) * 64.0)
-          .clamp(0.0, _scrollController.position.maxScrollExtent);
-      _scrollController.animateTo(
-        target,
+      final target = _ayahKeys[ayah]?.currentContext;
+      if (target == null) return;
+      _scrollController.position.ensureVisible(
+        target.findRenderObject()!,
+        alignment: 0.15,
         duration: context.motionMs(300),
         curve: Curves.easeOutCubic,
       );
@@ -81,7 +91,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
     final surahs = _repo.getSurahs();
     PulsrAdaptiveSheet.show<void>(
       context: context,
-      titleText: 'Select Surah (فهرس السور)',
+      titleText: context.l10n.quranSurahIndex,
       builder: (ctx) {
         return ListView.separated(
           shrinkWrap: true,
@@ -90,7 +100,9 @@ class _QuranMushafViewState extends State<QuranMushafView> {
           separatorBuilder: (_, __) => Divider(height: 1, color: p.hairline),
           itemBuilder: (_, i) {
             final s = surahs[i];
-            final isSelected = widget.metadata?.surahNumber == s.number;
+            final isSelected =
+                (_browsedSurah ?? widget.metadata?.surahNumber ?? 1) ==
+                    s.number;
             return ListTile(
               selected: isSelected,
               selectedTileColor: p.accent.withValues(alpha: 0.12),
@@ -128,6 +140,10 @@ class _QuranMushafViewState extends State<QuranMushafView> {
               ),
               onTap: () {
                 Navigator.of(ctx).pop();
+                setState(() {
+                  _browsedSurah = s.number;
+                  _resetReadingState();
+                });
                 widget.onSelectSurah?.call(s.number);
               },
             );
@@ -140,15 +156,18 @@ class _QuranMushafViewState extends State<QuranMushafView> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final meta = widget.metadata;
-    final surahNumber = meta?.surahNumber ?? 1;
+    final surahNumber = _browsedSurah ?? widget.metadata?.surahNumber ?? 1;
+    final meta =
+        widget.metadata?.surahNumber == surahNumber && widget.metadata!.isValid
+            ? widget.metadata
+            : null;
     final surah = _repo.getSurah(surahNumber) ?? QuranSurah.byNumber(1)!;
     final ayahs = _repo.getAyahsForSurah(surahNumber);
     final activeAyah = meta != null && meta.ayahTimings.isNotEmpty
-        ? _findActiveAyah(meta.ayahTimings, widget.currentPosition)
-        : 1;
+        ? meta.ayahAt(widget.currentPosition)
+        : null;
 
-    _scrollToActiveAyah(activeAyah);
+    if (activeAyah != null) _scrollToActiveAyah(activeAyah);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
@@ -178,20 +197,19 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Text(
-                            '${surah.nameTransliteration} • ${surah.nameArabic}',
-                            style: TextStyle(
-                              fontSize: AppFontSize.body,
-                              fontWeight: FontWeight.w800,
-                              color: p.textPrimary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          '${surah.nameTransliteration} • ${surah.nameArabic}',
+                          style: TextStyle(
+                            fontSize: AppFontSize.body,
+                            fontWeight: FontWeight.w800,
+                            color: p.textPrimary,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(width: AppSpacing.xs),
+                        const SizedBox(height: AppSpacing.xs),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
@@ -200,7 +218,9 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                             borderRadius: AppRadii.r6All,
                           ),
                           child: Text(
-                            'Ayah $activeAyah / ${surah.totalAyahs}',
+                            activeAyah == null
+                                ? context.l10n.quranReadingOnly
+                                : 'Ayah $activeAyah / ${surah.totalAyahs}',
                             style: TextStyle(
                               fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w700,
@@ -221,14 +241,15 @@ class _QuranMushafViewState extends State<QuranMushafView> {
               ),
               // Index button
               IconButton(
-                tooltip: 'Surah Index',
+                tooltip: context.l10n.quranSurahIndex,
                 icon: Icon(Icons.list_alt_rounded, color: p.accent, size: 22),
                 onPressed: () => _showSurahPicker(context, p),
               ),
               // Hifz Blind Recall Toggle
               IconButton(
-                tooltip:
-                    _blindRecallMode ? 'Show Text' : 'Hifz Blind Recall Mode',
+                tooltip: _blindRecallMode
+                    ? context.l10n.quranShowText
+                    : context.l10n.quranBlindRecall,
                 icon: Icon(
                   _blindRecallMode
                       ? Icons.visibility_off_rounded
@@ -251,12 +272,12 @@ class _QuranMushafViewState extends State<QuranMushafView> {
           const SizedBox(height: AppSpacing.s12),
 
           // Basmalah (except for Surah At-Tawbah 9)
-          if (surahNumber != 9) ...[
+          if (surahNumber != 1 && surahNumber != 9 && ayahs.isNotEmpty) ...[
             Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                 child: Text(
-                  'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                  quranUthmaniText[1]!.first,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: AppFontSize.title,
@@ -272,129 +293,141 @@ class _QuranMushafViewState extends State<QuranMushafView> {
           ],
 
           // Ayah List Container
+          if (ayahs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.s12),
+              child: Text(context.l10n.quranTextUnavailable,
+                  style: TextStyle(color: p.textSecondary)),
+            ),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 340),
-            child: ListView.separated(
+            child: SingleChildScrollView(
               controller: _scrollController,
-              itemCount: ayahs.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppSpacing.s8),
-              itemBuilder: (context, idx) {
+              child: Column(
+                  children: List.generate(ayahs.length, (idx) {
                 final ayah = ayahs[idx];
                 final isCurrent = ayah.ayahNumber == activeAyah;
                 final isRevealed = _revealedAyahs.contains(ayah.ayahNumber);
-                final shouldBlur =
-                    _blindRecallMode && !isRevealed && !isCurrent;
+                final shouldBlur = _blindRecallMode && !isRevealed;
 
                 _ayahKeys[ayah.ayahNumber] ??= GlobalKey();
 
-                return GestureDetector(
-                  key: _ayahKeys[ayah.ayahNumber],
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    if (_blindRecallMode && !isRevealed) {
-                      setState(() => _revealedAyahs.add(ayah.ayahNumber));
-                    }
-                    if (meta != null && meta.ayahTimings.isNotEmpty) {
-                      final timing = meta.timingForAyah(ayah.ayahNumber);
-                      if (timing != null) {
-                        widget.onSeek?.call(timing.start);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                  child: GestureDetector(
+                    key: _ayahKeys[ayah.ayahNumber],
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      if (_blindRecallMode && !isRevealed) {
+                        setState(() => _revealedAyahs.add(ayah.ayahNumber));
                       }
-                    }
-                  },
-                  child: AnimatedContainer(
-                    duration: context.motionMs(250),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.all(AppSpacing.s12),
-                    decoration: BoxDecoration(
-                      color: isCurrent
-                          ? p.accent.withValues(alpha: 0.14)
-                          : p.surfaceContainerHigh.withValues(alpha: 0.5),
-                      borderRadius: AppRadii.r14All,
-                      border: Border.all(
-                        color: isCurrent ? p.accent : p.hairline,
-                        width: isCurrent ? 1.6 : 1.0,
+                      if (meta != null && meta.ayahTimings.isNotEmpty) {
+                        final timing = meta.timingForAyah(ayah.ayahNumber);
+                        if (timing != null) {
+                          widget.onSeek?.call(timing.start);
+                        }
+                      }
+                    },
+                    child: AnimatedContainer(
+                      duration: context.motionMs(250),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.all(AppSpacing.s12),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? p.accent.withValues(alpha: 0.14)
+                            : p.surfaceContainerHigh.withValues(alpha: 0.5),
+                        borderRadius: AppRadii.r14All,
+                        border: Border.all(
+                          color: isCurrent ? p.accent : p.hairline,
+                          width: isCurrent ? 1.6 : 1.0,
+                        ),
+                        boxShadow: isCurrent
+                            ? [
+                                BoxShadow(
+                                  color: p.accent.withValues(alpha: 0.15),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                )
+                              ]
+                            : null,
                       ),
-                      boxShadow: isCurrent
-                          ? [
-                              BoxShadow(
-                                color: p.accent.withValues(alpha: 0.15),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Verse Arabic Text
-                        Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: Stack(
-                            children: [
-                              Text(
-                                '${ayah.textArabic} ﴿${ayah.ayahNumber}﴾',
-                                style: TextStyle(
-                                  fontSize: AppFontSize.titleLarge,
-                                  fontWeight: FontWeight.w700,
-                                  color: isCurrent ? p.accent : p.textPrimary,
-                                  fontFamily: 'serif',
-                                  height: 1.8,
-                                ),
-                              ),
-                              if (shouldBlur)
-                                Positioned.fill(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: p.surfaceContainer,
-                                      borderRadius: AppRadii.r10All,
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.touch_app_rounded,
-                                            size: 16, color: p.accent),
-                                        const SizedBox(width: AppSpacing.xxs),
-                                        Text(
-                                          'Tap to reveal (Hifz recall)',
-                                          style: TextStyle(
-                                            fontSize: AppFontSize.caption,
-                                            fontWeight: FontWeight.w700,
-                                            color: p.accent,
-                                          ),
-                                        ),
-                                      ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Verse Arabic Text
+                          Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: Stack(
+                              children: [
+                                ExcludeSemantics(
+                                  excluding: shouldBlur,
+                                  child: Text(
+                                    '${ayah.textArabic} ﴿${ayah.ayahNumber}﴾',
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.titleLarge,
+                                      fontWeight: FontWeight.w700,
+                                      color:
+                                          isCurrent ? p.accent : p.textPrimary,
+                                      fontFamily: 'serif',
+                                      height: 1.8,
                                     ),
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                        if (ayah.textEnglish.isNotEmpty) ...[
-                          const SizedBox(height: AppSpacing.xs),
-                          Directionality(
-                            textDirection: TextDirection.ltr,
-                            child: Text(
-                              ayah.textEnglish,
-                              style: TextStyle(
-                                fontSize: AppFontSize.caption,
-                                color:
-                                    isCurrent ? p.textPrimary : p.textSecondary,
-                                fontStyle: FontStyle.italic,
-                                height: 1.35,
-                              ),
+                                if (shouldBlur)
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: p.surfaceContainer,
+                                        borderRadius: AppRadii.r10All,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.touch_app_rounded,
+                                              size: 16, color: p.accent),
+                                          const SizedBox(width: AppSpacing.xxs),
+                                          Text(
+                                            context.l10n.quranTapToReveal,
+                                            style: TextStyle(
+                                              fontSize: AppFontSize.caption,
+                                              fontWeight: FontWeight.w700,
+                                              color: p.accent,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
+                          if (!shouldBlur && ayah.textEnglish.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Text(
+                                ayah.textEnglish,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.caption,
+                                  color: isCurrent
+                                      ? p.textPrimary
+                                      : p.textSecondary,
+                                  fontStyle: FontStyle.italic,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 );
-              },
+              })),
             ),
           ),
+          const QuranTextAttribution(),
         ],
       ),
     );

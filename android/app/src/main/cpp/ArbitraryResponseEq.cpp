@@ -644,6 +644,14 @@ inline void ArbitraryResponseEq::processFrame(
                 oldOutL = dL;
                 oldOutR = dR;
                 phaseDelayIdx_ = (phaseDelayIdx_ + 1) % PHASE_DELAY_TAPS;
+            } else if (oldLinearPhase_ && !linearPhase_) {
+                const float dL = phaseDelayL_[phaseDelayIdx_];
+                const float dR = phaseDelayR_[phaseDelayIdx_];
+                phaseDelayL_[phaseDelayIdx_] = convL;
+                phaseDelayR_[phaseDelayIdx_] = convR;
+                convL = dL;
+                convR = dR;
+                phaseDelayIdx_ = (phaseDelayIdx_ + 1) % PHASE_DELAY_TAPS;
             }
         }
 

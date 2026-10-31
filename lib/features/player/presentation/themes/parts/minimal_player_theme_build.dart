@@ -224,6 +224,7 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                 props: props,
                 isTablet: isTablet,
                 metrics: metrics,
+                alignStart: true,
               ),
               scaleMainButtonByHeight: true,
               dock: bottomDock,

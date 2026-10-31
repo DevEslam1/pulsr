@@ -756,9 +756,15 @@ class ViperDdcParser {
         throw 'Invalid VDC coefficient structure (expected biquad stages)';
       }
 
-      for (int i = 0; i <= coeffs.length - 5; i += 5) {
-        final a1 = coeffs[i + 3];
-        final a2 = coeffs[i + 4];
+      final startIdx = (coeffs.length % 5 == 0)
+          ? 0
+          : ((coeffs.length - 1) % 5 == 0 ? 1 : 0);
+      final stride = (coeffs.length % 5 == 0 || (coeffs.length - 1) % 5 == 0)
+          ? 5
+          : 6;
+      for (int i = startIdx; i <= coeffs.length - stride; i += stride) {
+        final a1 = coeffs[i + stride - 2];
+        final a2 = coeffs[i + stride - 1];
         if (!validateFilterStability(a1, a2)) {
           throw 'Unstable IIR filter detected: poles outside unit circle';
         }

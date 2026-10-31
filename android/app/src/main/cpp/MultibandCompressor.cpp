@@ -39,6 +39,7 @@ void MultibandCompressor::setSampleRate(double sampleRate) {
 }
 
 void MultibandCompressor::applyParams(const MultibandCompressorParamSet& params) {
+    enabled_ = params.enabled;
     pendingParams_ = params;
     paramsChanged_.store(true, std::memory_order_release);
 }
@@ -92,23 +93,18 @@ void MultibandCompressor::reset() {
 
 double MultibandCompressor::computeBandGain(int band, double envDb) {
     const auto& bp = params_.bands[band];
-    const bool active = enabled_ && bp.enabled && bp.ratio > 1.001;
+    const bool bandEnabled = enabled_ && bp.enabled;
+    const bool compressing = bandEnabled && bp.ratio > 1.001;
 
-    const double makeupTarget = active ? bp.makeupGainDb : 0.0;
+    const double makeupTarget = bandEnabled ? bp.makeupGainDb : 0.0;
     smoothedMakeupDb_[band] = makeupSmoothCoeff_ * smoothedMakeupDb_[band] +
                               (1.0 - makeupSmoothCoeff_) * makeupTarget;
     if (std::abs(smoothedMakeupDb_[band] - makeupTarget) < 0.001) {
         smoothedMakeupDb_[band] = makeupTarget;
     }
 
-    if (!active) {
-        // Release the applied gain to unity instead of snapping to 0 dB, so
-        // toggling a band off (or its ratio to 1, or disabling the whole stage)
-        // ramps out rather than clicks.
-        smoothedGainDb_[band] += (1.0 - releaseCoeff_[band]) * (0.0 - smoothedGainDb_[band]);
-        if (std::abs(smoothedGainDb_[band]) < 0.01) smoothedGainDb_[band] = 0.0;
-        currentGainReductionDb_[band] = smoothedGainDb_[band];
-        return smoothedGainDb_[band] + smoothedMakeupDb_[band];
+    if (!compressing) {
+        return 0.0;
     }
 
     const double T = bp.thresholdDb;

@@ -20,6 +20,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/marquee_text.dart';
 import 'widgets/radio_directory_sheet.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 
@@ -129,6 +130,38 @@ class _RadioScreenState extends State<RadioScreen> {
     final uri = Uri.tryParse(url);
     if (uri == null || uri.host.isEmpty) return url; // fallback to full URL
     return uri.host;
+  }
+
+  String _stationFallbackSubtitle(RadioStation station) {
+    if (RadioStationStore.isQuranStation(station)) {
+      final name = station.name;
+      if (name.contains('نادرة') || name.contains('نادر')) {
+        return 'تلاوات نادرة ومحافل خاشعة • تسجيلات تاريخية';
+      }
+      if (name.contains('خاشعة') || name.contains('خاشع')) {
+        return 'تلاوات خاشعة ومؤثرة • كبار القراء';
+      }
+      if (name.contains('مجود')) {
+        return 'المصحف المجود • تلاوة متقنة';
+      }
+      if (name.contains('مرتل') || name.contains('ترتيل')) {
+        return 'المصحف المرتل • تلاوة خاشعة';
+      }
+      if (name.contains('القاهرة')) {
+        return 'بث مباشر من القاهرة • عبر الأثير';
+      }
+      if (name.contains('السعودية') || name.contains('مكة')) {
+        return 'بث مباشر من الحرم المكي الشريف';
+      }
+      if (name.contains('تراتيل')) {
+        return 'تراتيل قصيرة عذبة على مدار الساعة';
+      }
+      if (name.contains('سكينة')) {
+        return 'آيات السكينة والطمأنينة';
+      }
+      return 'إذاعة القرآن الكريم • بث مباشر';
+    }
+    return station.url;
   }
 
   Future<void> _showAddDialog({RadioStation? initial}) async {
@@ -610,11 +643,12 @@ class _RadioScreenState extends State<RadioScreen> {
                                                     station: station,
                                                     isPlaying: isPlaying,
                                                   ),
-                                                  title: Text(
-                                                    station.name,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                  title: MarqueeText(
+                                                    text: station.name,
+                                                    textAlign: TextAlign.start,
+                                                    allowUserPause: false,
+                                                    velocity: 28.0,
+                                                    blankSpace: 36.0,
                                                     style: TextStyle(
                                                       color: isCurrent
                                                           ? p.accent
@@ -666,14 +700,17 @@ class _RadioScreenState extends State<RadioScreen> {
                                                         ),
                                                       ],
                                                       Expanded(
-                                                        child: Text(
-                                                          icyNowPlaying
+                                                        child: MarqueeText(
+                                                          text: icyNowPlaying
                                                                   .isNotEmpty
                                                               ? '♫ $icyNowPlaying'
-                                                              : station.url,
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
+                                                              : _stationFallbackSubtitle(
+                                                                  station),
+                                                          textAlign:
+                                                              TextAlign.start,
+                                                          allowUserPause: false,
+                                                          velocity: 24.0,
+                                                          blankSpace: 32.0,
                                                           style: TextStyle(
                                                               color: icyNowPlaying
                                                                       .isNotEmpty

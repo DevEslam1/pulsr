@@ -512,7 +512,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                           ),
                           // Pitch Highway Toggle
                           IconButton.filledTonal(
-                            tooltip: 'Pitch Guide Highway',
+                            tooltip: context.l10n.karaokePitchGuideHighway,
                             isSelected: _showPitchHighway,
                             icon:
                                 const Icon(Icons.graphic_eq_rounded, size: 18),

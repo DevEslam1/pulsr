@@ -403,12 +403,14 @@ public:
     void setWeeklyDose(double dose);
     bool isSafetyAttenuationActive();
     double getAppliedSampleRate();
+    uint64_t getLastAppliedGeneration();
     void setPerformanceProfile(DspPerformanceProfile profile);
     void setThermalLevel(int level);
     void setReverbThreadingMode(ReverbThreadingMode mode);
     void drainRetireQueues();
 
 private:
+    AudioDspEngine* selectActiveEngineLocked() const;
     std::mutex mutex_;
     std::vector<AudioDspEngine*> engines_;
 };

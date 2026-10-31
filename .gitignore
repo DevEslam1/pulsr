@@ -65,3 +65,10 @@ app.*.map.json
 # prebuilt libflacJNI.so, is relocated to third_party/media3-flac-decoder/ and
 # committed from there.
 third_party/media3/
+DESIGN_SYSTEM.md
+QURAN_MODE_AUDIT_2026-10-31.md
+assets/quran/README.md
+audit/shots/contact_sheet.png
+audit/shots/screen_settings.png
+.gitignore
+audit/shots/theme_cd.png

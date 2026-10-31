@@ -34,7 +34,10 @@ public:
     double getSlopeDbPerOct() const { return slopeDbPerOct_; }
     double getSubGain() const { return subGain_; }
     double getSmoothedEnabledMix() const { return smoothedEnabledMix_; }
-    bool isRamping() const { return smoothedEnabledMix_ > 1e-4; }
+    bool isRamping() const {
+        return (!enabled_ && smoothedEnabledMix_ > 1e-4) ||
+               (enabled_ && smoothedEnabledMix_ < 0.9999);
+    }
     bool isBassMono() const { return bassMono_; }
     bool isAntiPop() const { return antiPop_; }
 

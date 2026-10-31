@@ -36,7 +36,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
       if (_breadcrumbController.hasClients) {
         _breadcrumbController.animateTo(
           _breadcrumbController.position.maxScrollExtent,
-          duration: PulsrMotion.standard,
+          duration: context.motion(PulsrDurations.layout),
           curve: Curves.easeOutCubic,
         );
       }
@@ -263,21 +263,24 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                       final isLast = index == breadcrumbs.length - 1;
 
                       return Center(
-                        child: InkWell(
-                          onTap: isLast ? null : () => _navigateTo(crumbPath),
-                          borderRadius: AppRadii.r8All,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s6,
-                                vertical: AppSpacing.xxs),
-                            child: Text(
-                              breadcrumbs[index],
-                              style: TextStyle(
-                                color: isLast ? p.primary : p.textSecondary,
-                                fontWeight: isLast
-                                    ? FontWeight.w700
-                                    : FontWeight.normal,
-                                fontSize: AppFontSize.bodySmall,
+                        child: Semantics(
+                          button: !isLast,
+                          child: InkWell(
+                            onTap: isLast ? null : () => _navigateTo(crumbPath),
+                            borderRadius: AppRadii.r8All,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s6,
+                                  vertical: AppSpacing.xxs),
+                              child: Text(
+                                breadcrumbs[index],
+                                style: TextStyle(
+                                  color: isLast ? p.primary : p.textSecondary,
+                                  fontWeight: isLast
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  fontSize: AppFontSize.bodySmall,
+                                ),
                               ),
                             ),
                           ),

@@ -22,31 +22,6 @@ export 'motion_durations.dart';
 abstract class PulsrMotion {
   PulsrMotion._();
 
-  /// 80ms — micro-interactions, toggles.
-  static const Duration instant = Duration(milliseconds: 80);
-
-  /// 150ms — press states, chip select, icon swap.
-  static const Duration fast = Duration(milliseconds: 150);
-  static const Duration snappy = fast;
-
-  /// 220ms — card press, tab switch, sheet peek.
-  static const Duration normal = Duration(milliseconds: 220);
-
-  /// 250ms — standard transitions (nav indicator, switches).
-  static const Duration standard = Duration(milliseconds: 250);
-
-  /// 300ms — page transition, list reorder.
-  static const Duration moderate = Duration(milliseconds: 300);
-
-  /// 400ms — now-playing open/close, theme switch, larger surface changes.
-  static const Duration slow = Duration(milliseconds: 400);
-
-  /// 500ms — full screen route transitions.
-  static const Duration pageTransition = Duration(milliseconds: 500);
-
-  /// 600ms — expressive entrance choreography.
-  static const Duration expressive = Duration(milliseconds: 600);
-
   // ── Canonical Curves ────────────────────────────────────────────────────
   /// Elements appearing / entering the viewport.
   static const Curve enter = Curves.easeOutCubic;
@@ -63,8 +38,10 @@ abstract class PulsrMotion {
   /// Deceleration for scroll-linked or settling motion.
   static const Curve decelerate = Curves.easeOutQuart;
 
-  // ── Canonical semantic tokens (see [PulsrDurations]) ─────────────────────
-  // Prefer these five in new code; they map the whole app onto one rhythm.
+  // ── Canonical tokens (see [PulsrDurations]) ──────────────────────────────
+  // There is exactly one duration scale. Legacy aliases (instant/fast/
+  // standard/slow/expressive) were removed so a stray literal cannot bypass
+  // Reduce Motion through a const that never collapses.
   /// 120ms — direct-manipulation feedback (tap, press, selection).
   static const Duration tap = PulsrDurations.tap;
 

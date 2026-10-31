@@ -222,7 +222,7 @@ class _ToastWidgetState extends State<_ToastWidget>
 
     _animController = AnimationController(
       vsync: this,
-      duration: PulsrMotion.layout,
+      duration: Duration.zero,
     );
 
     _fadeAnimation = CurvedAnimation(

@@ -56,6 +56,7 @@ void DynamicBass::getPresetValues(int preset, int& xLow, int& xHigh,
 void DynamicBass::setParams(bool enabled, double strength, int xLow, int xHigh,
                             int yLow, int yHigh, double sideGainLow, double sideGainHigh,
                             int devicePreset) {
+    enabled_ = enabled;
     pendingEnabled_ = enabled;
     pendingStrength_ = strength;
     pendingXLow_ = xLow;
@@ -90,14 +91,18 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
             xHigh_ = std::clamp(pendingXHigh_, 500, 12000);
             yLow_ = std::clamp(pendingYLow_, 20, 200);
             yHigh_ = std::clamp(pendingYHigh_, 30, 300);
-            sideGainLow_ = std::clamp(pendingSideGainLow_, 0.0, 1.0);
-            sideGainHigh_ = std::clamp(pendingSideGainHigh_, 0.0, 1.0);
+            sideGainLow_ = std::clamp(pendingSideGainLow_, 0.0, 2.0);
+            sideGainHigh_ = std::clamp(pendingSideGainHigh_, 0.0, 2.0);
         }
 
         strength_ = std::clamp(pendingStrength_, 0.0, 8.0);
         updateFilters();
         if (presetChanged) {
-            reset();
+            yHpMid_.reset();
+            yLpMid_.reset();
+            yLpSide_.reset();
+            xLpBass_.reset();
+            envelope_ = 0.0;
         }
         paramsChanged_.store(false, std::memory_order_release);
     }
@@ -174,12 +179,13 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         const double effHigh = 1.0 + strNorm * (sHigh - 1.0);
         const double sideLow = yLpSide_.process(S);
         const double sideHigh = S - sideLow;
-        const double sideProcessed = sideLow * effLow + sideHigh * effHigh;
+        double sideProcessed = sideLow * effLow + sideHigh * effHigh;
 
         // 6. Recombine Mid and Side
         double midOut = M + bassBoost;
         if (!std::isfinite(midOut) || !std::isfinite(sideProcessed)) {
             midOut = M;
+            sideProcessed = S;
         }
         buffer[idx] = static_cast<float>(midOut + sideProcessed);
         buffer[idx + 1] = static_cast<float>(midOut - sideProcessed);

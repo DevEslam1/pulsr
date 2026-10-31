@@ -1195,6 +1195,10 @@ class PlayerTrackHeader extends StatelessWidget {
   final double? actionButtonSize;
   final PlayerThemeMetrics? metrics;
 
+  /// Left-aligns title/artist instead of centering them. Minimal uses this to
+  /// read as a typographic layout rather than a re-skinned Classic.
+  final bool alignStart;
+
   const PlayerTrackHeader({
     super.key,
     required this.props,
@@ -1212,6 +1216,7 @@ class PlayerTrackHeader extends StatelessWidget {
     this.subtitleFontSize,
     this.actionButtonSize,
     this.metrics,
+    this.alignStart = false,
   });
 
   @override
@@ -1259,7 +1264,10 @@ class PlayerTrackHeader extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              SizedBox(
+              // Minimal distils the header: add-to-playlist lives in the More
+              // sheet, so the title can start at the screen gutter.
+              if (!alignStart)
+                SizedBox(
                 width: resolvedActionButtonSize,
                 height: resolvedActionButtonSize,
                 child: Material(
@@ -1306,26 +1314,37 @@ class PlayerTrackHeader extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: alignStart
+                        ? CrossAxisAlignment.start
+                        : CrossAxisAlignment.center,
                     children: [
-                      MarqueeText(
-                        text: song?.title ?? context.l10n.noTrackSelected,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: resolvedTitleFontSize,
-                          fontWeight: FontWeight.w900,
-                          color: resolvedTitle,
-                          height: 1.22,
-                          letterSpacing: AppTracking.title,
+                      SizedBox(
+                        width: double.infinity,
+                        child: MarqueeText(
+                          text: song?.title ?? context.l10n.noTrackSelected,
+                          textAlign:
+                              alignStart ? TextAlign.start : TextAlign.center,
+                          style: TextStyle(
+                            fontSize: resolvedTitleFontSize,
+                            fontWeight: FontWeight.w900,
+                            color: resolvedTitle,
+                            height: 1.22,
+                            letterSpacing: AppTracking.title,
+                          ),
                         ),
                       ),
                       SizedBox(height: titleArtistGap),
-                      MarqueeText(
-                        text: song?.artist ?? context.l10n.unknownArtist,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: resolvedSubtitleFontSize,
-                          fontWeight: FontWeight.w600,
-                          color: resolvedSubtitle,
+                      SizedBox(
+                        width: double.infinity,
+                        child: MarqueeText(
+                          text: song?.artist ?? context.l10n.unknownArtist,
+                          textAlign:
+                              alignStart ? TextAlign.start : TextAlign.center,
+                          style: TextStyle(
+                            fontSize: resolvedSubtitleFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: resolvedSubtitle,
+                          ),
                         ),
                       ),
                     ],
@@ -1366,7 +1385,10 @@ class PlayerTrackHeader extends StatelessWidget {
           ),
           if (showQualityBadge && qualityBadge != null) ...[
             SizedBox(height: badgeGap),
-            Center(
+            Align(
+              alignment: alignStart
+                  ? AlignmentDirectional.centerStart
+                  : AlignmentDirectional.center,
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(

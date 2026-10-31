@@ -292,7 +292,8 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     if (st == nullptr || releasing_.load(std::memory_order_acquire)) return -1;
 
     const float curVol = volume_.load(std::memory_order_relaxed);
-    const bool applyVol = (!bitPerfect_ && curVol != 1.0f);
+    const bool applyVol =
+        (!bitPerfect_ && config_.encoding != Encoding::I24Packed && curVol != 1.0f);
 
     alignas(16) uint8_t stackScratch[2048];
     uint8_t* scratchPtr = nullptr;
@@ -402,7 +403,9 @@ void AAudioSink::Flush() {
     aaudio_stream_state_t nextState = AAUDIO_STREAM_STATE_UNINITIALIZED;
     AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_PAUSING, &nextState, 100000000LL);
     // requestFlush is unsupported on some MMAP streams; ignore the result.
-    AAudioStream_requestFlush(st);
+    if (AAudioStream_requestFlush(st) == AAUDIO_OK) {
+        AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_FLUSHING, &nextState, 50000000LL);
+    }
     readBase_ = AAudioStream_getFramesRead(st);
     readOffset_ = 0;
     framesWrittenBase_ = framesWritten_.load(std::memory_order_relaxed);

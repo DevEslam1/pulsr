@@ -50,7 +50,7 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
               size: 20,
               color: p.textSecondary,
             ),
-            tooltip: isMuted ? 'Unmute' : 'Mute',
+            tooltip: isMuted ? context.l10n.unmute : context.l10n.mute,
             visualDensity: VisualDensity.compact,
             onPressed: () {
               setState(() => _dragVolume = null);

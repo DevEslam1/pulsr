@@ -32,6 +32,10 @@ public:
     void setParams(bool enabled, double strength, int xLow, int xHigh,
                    int yLow, int yHigh, double sideGainLow, double sideGainHigh,
                    int devicePreset);
+    void setEnabled(bool enabled) {
+        enabled_ = enabled;
+        pendingEnabled_ = enabled;
+    }
 
     void processInterleaved(float* buffer, int frames, int channels);
 

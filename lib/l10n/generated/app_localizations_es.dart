@@ -544,6 +544,58 @@ class AppLocalizationsEs extends AppLocalizations {
   String get decrease => 'Disminuir';
 
   @override
+  String get quranSurahIndex => 'Índice de suras';
+
+  @override
+  String get quranReadingOnly => 'Solo lectura';
+
+  @override
+  String get quranBookmarkFailed =>
+      'No se pudo actualizar el marcador del Corán. Inténtalo de nuevo.';
+
+  @override
+  String get quranTextUnavailable =>
+      'El texto de esta sura aún no está incluido. La reproducción de audio sigue disponible.';
+
+  @override
+  String get quranShowText => 'Mostrar texto';
+
+  @override
+  String get quranBlindRecall => 'Modo de memorización Hifz';
+
+  @override
+  String get quranTapToReveal => 'Toca para mostrar la aleya';
+
+  @override
+  String get quranRepeatMode => 'REPETICIÓN DE ALEYAS';
+
+  @override
+  String get karaokePitchGuideHighway => 'Guía de tono';
+
+  @override
+  String get playlistImportSpotify => 'Importar lista de Spotify';
+
+  @override
+  String get marqueePause => 'Pausar título en desplazamiento';
+
+  @override
+  String get marqueeResume => 'Reanudar título en desplazamiento';
+
+  @override
+  String settingsMinDurationFilter(int seconds) {
+    return 'Mín. $seconds s de filtro';
+  }
+
+  @override
+  String get settingsProxyOnStatus => 'Proxy activado';
+
+  @override
+  String get settingsProxyOffStatus => 'Proxy desactivado';
+
+  @override
+  String get downloadAction => 'Descargar';
+
+  @override
   String get sheetDragHandle => 'Control de arrastre de la hoja';
 
   @override

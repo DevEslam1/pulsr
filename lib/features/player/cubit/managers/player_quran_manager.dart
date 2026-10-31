@@ -19,113 +19,102 @@ class PlayerQuranManager {
     _restoreSnapshot = snapshot;
   }
 
-  Future<QuranModeProfile?> restoreInitialState() async {
+  /// Runs [action] against the service. A missing service yields
+  /// [whenMissing]; a throwing one is logged and yields [onError], so callers
+  /// never see a preference failure as an exception.
+  Future<T> _guard<T>(
+    String what, {
+    required T whenMissing,
+    required T onError,
+    required Future<T> Function(QuranModeService service) action,
+  }) async {
     final service = _service;
-    if (service == null) return null;
+    if (service == null) return whenMissing;
     try {
-      final profile = await service.loadActiveProfile();
-      return profile;
+      return await action(service);
     } catch (e, st) {
-      ErrorLogger.log('Failed to restore Quran Mode profile',
+      ErrorLogger.log(what,
           error: e, stackTrace: st, category: 'PlayerQuranManager');
-      return null;
+      return onError;
     }
   }
+
+  Future<QuranModeProfile?> restoreInitialState() => _guard(
+        'Failed to restore Quran Mode profile',
+        whenMissing: null,
+        onError: null,
+        action: (s) => s.loadActiveProfile(),
+      );
 
   /// Persists the enabled flag. Returns false when the write failed so callers
   /// never flip the in-memory mode to a state the service did not record.
   /// A missing service is treated as a successful no-op.
-  Future<bool> setEnabled(bool enabled) async {
-    final service = _service;
-    if (service == null) return true;
-    try {
-      await service.setEnabled(enabled);
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to set Quran Mode enabled: $enabled',
-          error: e, stackTrace: st, category: 'PlayerQuranManager');
-      return false;
-    }
-  }
+  Future<bool> setEnabled(bool enabled) => _guard(
+        'Failed to set Quran Mode enabled: $enabled',
+        whenMissing: true,
+        onError: false,
+        action: (s) async {
+          await s.setEnabled(enabled);
+          return true;
+        },
+      );
 
   /// Returns the persisted reciter style, falling back to Mujawwad.
-  Future<QuranReciterStyle> getStyle() async {
-    final service = _service;
-    if (service == null) return QuranReciterStyle.mujawwad;
-    try {
-      return await service.getStyle();
-    } catch (e, st) {
-      ErrorLogger.log('Failed to get Quran reciter style',
-          error: e, stackTrace: st, category: 'PlayerQuranManager');
-      return QuranReciterStyle.mujawwad;
-    }
-  }
+  Future<QuranReciterStyle> getStyle() => _guard(
+        'Failed to get Quran reciter style',
+        whenMissing: QuranReciterStyle.mujawwad,
+        onError: QuranReciterStyle.mujawwad,
+        action: (s) => s.getStyle(),
+      );
 
   /// Persists the reciter style. Returns false when the write failed.
-  Future<bool> setStyle(QuranReciterStyle style) async {
-    final service = _service;
-    if (service == null) return true;
-    try {
-      await service.setStyle(style);
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to set Quran reciter style: $style',
-          error: e, stackTrace: st, category: 'PlayerQuranManager');
-      return false;
-    }
-  }
+  Future<bool> setStyle(QuranReciterStyle style) => _guard(
+        'Failed to set Quran reciter style: $style',
+        whenMissing: true,
+        onError: false,
+        action: (s) async {
+          await s.setStyle(style);
+          return true;
+        },
+      );
 
   /// The user's explicit on/off choice, or `null` when they never made one.
   /// A missing service (tests, pure builds) reports "no choice".
-  Future<bool?> getUserOverride() async {
-    final service = _service;
-    if (service == null) return null;
-    try {
-      return await service.getUserOverride();
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read Quran Mode user override',
-          error: e, stackTrace: st, category: 'PlayerQuranManager');
-      return null;
-    }
-  }
+  Future<bool?> getUserOverride() => _guard<bool?>(
+        'Failed to read Quran Mode user override',
+        whenMissing: null,
+        onError: null,
+        action: (s) => s.getUserOverride(),
+      );
 
-  /// Persists the user's explicit choice. Returns false when the write failed.
-  Future<bool> setUserOverride(bool? value) async {
-    final service = _service;
-    if (service == null) return true;
-    try {
-      await service.setUserOverride(value);
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to persist Quran Mode user override',
-          error: e, stackTrace: st, category: 'PlayerQuranManager');
-      return false;
-    }
-  }
+  /// Persists the user's explicit choice (`null` clears it). Returns false
+  /// when the write failed.
+  Future<bool> setUserOverride(bool? value) => _guard(
+        'Failed to persist Quran Mode user override',
+        whenMissing: true,
+        onError: false,
+        action: (s) async {
+          await s.setUserOverride(value);
+          return true;
+        },
+      );
 
-  Future<QuranStyleTuning> getStyleTuning(QuranReciterStyle style) async {
-    final service = _service;
-    if (service == null) return const QuranStyleTuning();
-    try {
-      return await service.getStyleTuning(style);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to load Quran style tuning',
-          error: e, stackTrace: st, category: 'PlayerQuranManager');
-      return const QuranStyleTuning();
-    }
-  }
+  Future<QuranStyleTuning> getStyleTuning(QuranReciterStyle style) => _guard(
+        'Failed to load Quran style tuning',
+        whenMissing: const QuranStyleTuning(),
+        onError: const QuranStyleTuning(),
+        action: (s) => s.getStyleTuning(style),
+      );
 
   Future<bool> setStyleTuning(
-      QuranReciterStyle style, QuranStyleTuning tuning) async {
-    final service = _service;
-    if (service == null) return true;
-    try {
-      await service.setStyleTuning(style, tuning);
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to save Quran style tuning',
-          error: e, stackTrace: st, category: 'PlayerQuranManager');
-      return false;
-    }
-  }
+          QuranReciterStyle style, QuranStyleTuning tuning) =>
+      _guard(
+        'Failed to save Quran style tuning',
+        whenMissing: true,
+        onError: false,
+        action: (s) async {
+          await s.setStyleTuning(style, tuning);
+          return true;
+        },
+      );
 }

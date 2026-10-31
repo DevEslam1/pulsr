@@ -182,13 +182,19 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: PulsrMotion.state,
+      duration: Duration.zero,
     );
     _animation = CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.duration = context.motion(PulsrMotion.state);
   }
 
   @override

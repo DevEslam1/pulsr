@@ -536,8 +536,6 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
      */
     public void resetNativeState() {
         resetNativeEngineLocked();
-        lastResyncSampleRate = -1;
-        lastResyncChannels = -1;
     }
 
     private void resetNativeEngineLocked() {

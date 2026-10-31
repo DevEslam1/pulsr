@@ -327,7 +327,7 @@ class DownloadTile extends StatelessWidget {
               task.status == DownloadStatus.paused) ...[
             const SizedBox(height: AppSpacing.sm),
             TweenAnimationBuilder<double>(
-              duration: PulsrMotion.standard,
+              duration: context.motion(PulsrDurations.layout),
               curve: Curves.easeOut,
               tween: Tween<double>(
                 begin: 0.0,

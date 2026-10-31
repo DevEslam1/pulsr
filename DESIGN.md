@@ -176,17 +176,19 @@ Never call `BorderRadius.circular(<literal>)`.
 
 | Token | ms | Use |
 |---|---|---|
-| `instant` | 80 | icon tint / selection feedback |
-| `fast` | 150 | press states, small fades |
-| `standard` | 250 | standard transitions |
-| `slow` | 400 | sheets, hero, artwork |
-| `expressive` | 600 | entrance choreography |
+| `PulsrDurations.tap` | 120 | press, selection, icon tint |
+| `PulsrDurations.state` | 200 | small fades, chips, status swaps |
+| `PulsrDurations.layout` | 260 | reflows, size/position changes |
+| `PulsrDurations.page` | 320 | routes, sheets, dock mode changes |
+| `PulsrDurations.ambient` | 400 | hero artwork, decorative loops |
+
+One scale only: the old `instant/fast/standard/slow/expressive` aliases are gone.
 
 **Always resolve through context** so Reduce Motion is honoured:
 
 ```dart
 AnimatedContainer(
-  duration: context.motionMs(250),          // collapses to 0 when reduced
+  duration: context.motion(PulsrDurations.layout), // zero when reduced
   curve: context.motionCurve(Curves.easeOutCubic),
   ...
 )

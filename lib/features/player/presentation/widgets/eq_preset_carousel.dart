@@ -12,12 +12,17 @@ extension _EqPresetCarousel on _EqualizerSheetState {
     await cubit.setCrossfeed(false, delayUs: 350.0, feedDb: -9.0);
     await cubit.setLookaheadLimiter(false, thresholdDb: -0.2, releaseMs: 50.0);
     await cubit.setStereoBalance(0.0);
+    await cubit.setMonoMix(false);
     await cubit.setReverb(false, preset: 0, wetDry: 0.20);
     await cubit.setSaturation(false, drive: 0.3, mix: 0.5, tilt: 0.3);
     await cubit.setStereoWidth(false, width: 1.0);
     await cubit.setSubCrossover(false, cornerHz: 80.0, gain: 0.8);
     await cubit.setDynamicEq(false);
     await cubit.setLoudnessContour(false, intensity: 0.0);
+    await cubit.setDynamicBass(false, strength: 1.0, preset: 0);
+    await cubit.setViperDdcEnabled(false);
+    await cubit.setArbitraryEqEnabled(false);
+    await cubit.setLiveProgEnabled(false);
     HapticFeedback.mediumImpact();
     if (!context.mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(

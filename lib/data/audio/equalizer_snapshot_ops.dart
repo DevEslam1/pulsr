@@ -63,6 +63,7 @@ extension EqualizerSnapshotOps on EqualizerManager {
       // Dynamics (HAL preset)
       'dynamicsEnabled': isDynamicsEnabled,
       'dynamicsPreset': dynamicsPreset.name,
+      'dynamicsBypassed': _isDynamicsBypassed,
       // Crossfeed: capture the USER preference, not the route-gated engine
       // value, so recalling an album off a headphone route cannot silently
       // disable crossfeed for later headphone listening.
@@ -84,6 +85,8 @@ extension EqualizerSnapshotOps on EqualizerManager {
       'reverbEnabled': isReverbEnabled,
       'reverbPreset': reverbPreset,
       'reverbWetDry': reverbWetDry,
+      'reverbPredelayMs': reverbPredelayMs,
+      'reverbDamping': reverbDamping,
       'reverbCrossChannel': reverbCrossChannel,
       // Custom-reverb IR reference (prefer the small WAV path; only embed the
       // raw samples when no backing file exists). Restored on apply via
@@ -272,6 +275,7 @@ extension EqualizerSnapshotOps on EqualizerManager {
     await setSpatializerEnabled(b('spatializerEnabled', isSpatializerEnabled));
 
     // Dynamics HAL preset.
+    _isDynamicsBypassed = b('dynamicsBypassed', _isDynamicsBypassed);
     final dynName = s('dynamicsPreset', dynamicsPreset.name);
     final dynPreset = DynamicsPreset.values.firstWhere(
       (p) => p.name == dynName,
@@ -279,17 +283,21 @@ extension EqualizerSnapshotOps on EqualizerManager {
     );
     await setDynamicsPreset(dynPreset,
         enabled: b('dynamicsEnabled', isDynamicsEnabled));
+    if (_isDynamicsBypassed && PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setDynamicsPreset(DynamicsPreset.off, false);
+    }
 
     // Crossfeed. Restore the stored user preference and let the setter derive
     // the route-gated engine value; otherwise a recall on speakers would
     // overwrite the preference with the temporarily-disabled engine state.
+    final recalledCrossfeedPref = b('crossfeedEnabled', crossfeedUserEnabled);
     await setCrossfeed(
-      crossfeedUserEnabled,
+      recalledCrossfeedPref,
       delayUs: d('crossfeedDelayUs', crossfeedDelayUs),
       feedDb: d('crossfeedFeedDb', crossfeedFeedDb),
       fcut: d('crossfeedFcut', crossfeedFcut),
       mode: i('crossfeedMode', crossfeedMode),
-      preferenceEnabled: b('crossfeedEnabled', crossfeedUserEnabled),
+      preferenceEnabled: recalledCrossfeedPref,
     );
 
     // Lookahead limiter (+ compressor knobs when the snapshot owns them).
@@ -334,6 +342,8 @@ extension EqualizerSnapshotOps on EqualizerManager {
       b('reverbEnabled', isReverbEnabled),
       preset: effectiveReverbPreset,
       wetDry: d('reverbWetDry', reverbWetDry),
+      predelayMs: d('reverbPredelayMs', reverbPredelayMs),
+      damping: d('reverbDamping', reverbDamping),
     );
     if (PlatformCapabilities.isAndroid && isReverbEnabled) {
       await _effectsChannel.setReverbCrossChannel(reverbCrossChannel);
@@ -472,6 +482,7 @@ extension EqualizerSnapshotOps on EqualizerManager {
     );
     final sliders = m['liveProgSliders'];
     if (sliders is Map) {
+      liveProgSliders.clear();
       for (final entry in sliders.entries) {
         final idx = int.tryParse(entry.key.toString());
         final val = (entry.value as num?)?.toDouble();

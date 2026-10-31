@@ -186,8 +186,10 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
           ),
         ),
         const SizedBox(height: AppSpacing.s10),
-        SizedBox(
-          height: 38,
+        // Let the explanation grow instead of clipping it at two lines
+        // (the old fixed 38 px height cut the AutoEQ sentence mid-word).
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 38),
           child: AnimatedSwitcher(
             duration: context.motionMs(200),
             child: Text(
@@ -198,7 +200,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                 fontSize: AppFontSize.label,
                 height: 1.35,
               ),
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -381,7 +383,8 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
           child: SwitchListTile.adaptive(
             value: _autoDacSelectBitPerfect,
             onChanged: _setAutoDacSelect,
-            activeThumbColor: p.accent,
+            activeTrackColor: p.accent,
+            activeThumbColor: p.onAccent,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.xxs,

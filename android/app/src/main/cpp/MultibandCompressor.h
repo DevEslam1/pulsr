@@ -18,7 +18,11 @@ public:
 
     void setSampleRate(double sampleRate);
     void applyParams(const MultibandCompressorParamSet& params);
-    void setEnabled(bool enabled) { enabled_ = enabled; }
+    void setEnabled(bool enabled) {
+        enabled_ = enabled;
+        pendingParams_.enabled = enabled;
+        params_.enabled = enabled;
+    }
     bool isEnabled() const { return enabled_; }
     bool isRamping() const {
         return (!enabled_ && smoothedEnabledMix_ >= 1e-4f) ||

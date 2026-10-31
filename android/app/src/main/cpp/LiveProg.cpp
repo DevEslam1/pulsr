@@ -870,6 +870,15 @@ void LiveProg::executeBytecode(const std::vector<Instruction>& program, std::vec
                 if (instr.targetPc >= 0) pc = instr.targetPc;
                 break;
             case OpCode::FuncCall: {
+                if (instr.funcId == 12) {
+                    if (sp < 127) {
+                        rngState_ ^= rngState_ << 13;
+                        rngState_ ^= rngState_ >> 17;
+                        rngState_ ^= rngState_ << 5;
+                        stack[sp++] = static_cast<double>(rngState_ & 0xFFFFFFu) / 16777216.0;
+                    }
+                    break;
+                }
                 if (sp >= 1) {
                     switch (instr.funcId) {
                         case 0: stack[sp - 1] = std::sin(stack[sp - 1]); break;
@@ -884,15 +893,9 @@ void LiveProg::executeBytecode(const std::vector<Instruction>& program, std::vec
                         case 9: if (sp >= 2) { double b = stack[--sp]; stack[sp - 1] = std::pow(stack[sp - 1], b); } break;
                         case 10: stack[sp - 1] = std::floor(stack[sp - 1]); break;
                         case 11: stack[sp - 1] = std::ceil(stack[sp - 1]); break;
-                        case 12: {
-                            rngState_ ^= rngState_ << 13;
-                            rngState_ ^= rngState_ >> 17;
-                            rngState_ ^= rngState_ << 5;
-                            stack[sp - 1] = static_cast<double>(rngState_ & 0xFFFFFFu) / 16777216.0;
-                            break;
-                        }
                         default: break;
                     }
+                    if (!std::isfinite(stack[sp - 1])) stack[sp - 1] = 0.0;
                 }
                 break;
             }
@@ -925,10 +928,10 @@ void LiveProg::process(float* L, float* R, int frames) {
     const float crossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
 
     const int prevMem = static_cast<int>(prevMemory_.size());
-    const bool canRunPrev = (programCrossfadeProgress_ < 1.0f &&
-                             !prevSampleBytecode_.empty() &&
-                             prevIdxSpl0_ >= 0 && prevIdxSpl0_ < prevMem &&
-                             prevIdxSpl1_ >= 0 && prevIdxSpl1_ < prevMem);
+    bool canRunPrev = (programCrossfadeProgress_ < 1.0f &&
+                       !prevSampleBytecode_.empty() &&
+                       prevIdxSpl0_ >= 0 && prevIdxSpl0_ < prevMem &&
+                       prevIdxSpl1_ >= 0 && prevIdxSpl1_ < prevMem);
 
     for (int i = 0; i < frames; ++i) {
         const float inL = L[i];
@@ -967,6 +970,7 @@ void LiveProg::process(float* L, float* R, int frames) {
             if (programCrossfadeProgress_ >= 1.0f) {
                 prevSampleBytecode_.clear();
                 prevMemory_.clear();
+                canRunPrev = false;
             }
         }
 
@@ -1012,10 +1016,10 @@ void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
     const float crossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
 
     const int prevMem = static_cast<int>(prevMemory_.size());
-    const bool canRunPrev = (programCrossfadeProgress_ < 1.0f &&
-                             !prevSampleBytecode_.empty() &&
-                             prevIdxSpl0_ >= 0 && prevIdxSpl0_ < prevMem &&
-                             prevIdxSpl1_ >= 0 && prevIdxSpl1_ < prevMem);
+    bool canRunPrev = (programCrossfadeProgress_ < 1.0f &&
+                       !prevSampleBytecode_.empty() &&
+                       prevIdxSpl0_ >= 0 && prevIdxSpl0_ < prevMem &&
+                       prevIdxSpl1_ >= 0 && prevIdxSpl1_ < prevMem);
 
     for (int i = 0; i < frames; ++i) {
         const float inL = buffer[i * channels];
@@ -1054,6 +1058,7 @@ void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
             if (programCrossfadeProgress_ >= 1.0f) {
                 prevSampleBytecode_.clear();
                 prevMemory_.clear();
+                canRunPrev = false;
             }
         }
 

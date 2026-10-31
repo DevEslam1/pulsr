@@ -6,7 +6,6 @@ import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
-import '../utils/l10n_extensions.dart';
 
 /// {@category DesignSystem}
 /// A premium, interactive custom-painted slider with an organic wavy track.
@@ -20,6 +19,10 @@ class PulsrSlider extends StatefulWidget {
   final ValueChanged<double>? onChangeEnd;
   final VoidCallback? onChangeCancel;
   final String? semanticLabel;
+
+  /// Formats the value announced to assistive technology (e.g. "+6.0 dB",
+  /// "250 ms"). Defaults to a percentage of the range.
+  final String Function(double value)? semanticFormatterCallback;
   final double height;
   final Color? activeColor;
   final Color? inactiveColor;
@@ -38,6 +41,7 @@ class PulsrSlider extends StatefulWidget {
     this.onChangeCancel,
     this.divisions,
     this.semanticLabel,
+    this.semanticFormatterCallback,
     this.height = 32,
     this.activeColor,
     this.inactiveColor,
@@ -191,11 +195,22 @@ class _PulsrSliderState extends State<PulsrSlider>
   Widget build(BuildContext context) {
     final p = context.palette;
     final direction = Directionality.of(context);
-    final l10n = context.l10n;
     final range = widget.max - widget.min;
     final t = range <= 0
         ? 0.0
         : ((widget.value - widget.min) / range).clamp(0.0, 1.0);
+    final step = (widget.divisions != null && widget.divisions! > 0)
+        ? range / widget.divisions!
+        : range / 20.0;
+
+    String formatValue(double value) {
+      final formatter = widget.semanticFormatterCallback;
+      if (formatter != null) return formatter(value);
+      final fraction = range <= 0
+          ? 0.0
+          : ((value - widget.min) / range).clamp(0.0, 1.0);
+      return '${(fraction * 100).round()}%';
+    }
 
     return FocusableActionDetector(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
@@ -222,9 +237,11 @@ class _PulsrSliderState extends State<PulsrSlider>
       child: Semantics(
         label: widget.semanticLabel,
         slider: true,
-        value: '${(t * 100).round()}%',
-        increasedValue: l10n.increase,
-        decreasedValue: l10n.decrease,
+        value: formatValue(widget.value),
+        increasedValue: formatValue(
+            (widget.value + step).clamp(widget.min, widget.max)),
+        decreasedValue: formatValue(
+            (widget.value - step).clamp(widget.min, widget.max)),
         onIncrease: () => _stepValue(1),
         onDecrease: () => _stepValue(-1),
         child: Container(

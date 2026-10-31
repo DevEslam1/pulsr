@@ -123,7 +123,7 @@ void main() {
     final player = buildPlayer([seed]);
     final getSongs = _GetSongs();
     final suggestions = _Suggestions();
-    when(() => getSongs.getAllSongs())
+    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
         .thenAnswer((_) async => Right([seed, other]));
     when(() => suggestions.buildAutoDjQueue(any(), any(),
         limit: any(named: 'limit'),
@@ -143,7 +143,7 @@ void main() {
   testWidgets('auto-mix reports a library read failure', (tester) async {
     final player = buildPlayer([createTestSong(id: 1, title: 'Seed')]);
     final getSongs = _GetSongs();
-    when(() => getSongs.getAllSongs())
+    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
         .thenAnswer((_) async => const Left(DatabaseFailure('boom')));
     getIt.registerSingleton<GetSongsUseCase>(getSongs);
 
@@ -159,7 +159,7 @@ void main() {
   testWidgets('auto-mix reports an empty library', (tester) async {
     final player = buildPlayer([createTestSong(id: 1, title: 'Seed')]);
     final getSongs = _GetSongs();
-    when(() => getSongs.getAllSongs())
+    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
         .thenAnswer((_) async => const Right(<SongsTableData>[]));
     getIt.registerSingleton<GetSongsUseCase>(getSongs);
 
@@ -177,7 +177,7 @@ void main() {
     final player = buildPlayer([seed]);
     final getSongs = _GetSongs();
     final suggestions = _Suggestions();
-    when(() => getSongs.getAllSongs())
+    when(() => getSongs.getAllSongs(limit: any(named: 'limit')))
         .thenAnswer((_) async => Right([seed, createTestSong(id: 2)]));
     when(() => suggestions.buildAutoDjQueue(any(), any(),
             limit: any(named: 'limit'), excludeIds: any(named: 'excludeIds')))

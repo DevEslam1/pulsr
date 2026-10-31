@@ -135,6 +135,8 @@ void main() {
         RadioStationStore.abdulBasitArtwork);
     expect(byId['cur-quran-tarteel']!.artworkUrl,
         RadioStationStore.tarteelArtwork);
+    expect(byId['cur-quran-khashia']!.artworkUrl,
+        RadioStationStore.tarteelArtwork);
     expect(byId['cur-lofi']!.artworkUrl, RadioStationStore.lofiArtwork);
     expect(byId['cur-ambient']!.artworkUrl, RadioStationStore.ambientArtwork);
     expect(byId['cur-news']!.artworkUrl, RadioStationStore.newsArtwork);
@@ -148,7 +150,7 @@ void main() {
     // Verify first stations are all Quran stations
     final quranCount =
         store.list.where(RadioStationStore.isQuranStation).length;
-    expect(quranCount, 7);
+    expect(quranCount, 31);
     for (var i = 0; i < quranCount; i++) {
       expect(RadioStationStore.isQuranStation(store.list[i]), isTrue,
           reason: 'Station at index $i should be a Quran station');
@@ -158,9 +160,10 @@ void main() {
     expect(store.list[1].id, 'cur-quran-cairo-backup');
     expect(store.list[2].id, 'cur-quran-hussary');
     expect(store.list[3].id, 'cur-quran-minshawi');
-    expect(store.list[4].id, 'cur-quran-abdulbasit');
-    expect(store.list[5].id, 'cur-quran-mustafa');
-    expect(store.list[6].id, 'cur-quran-tarteel');
+    expect(store.list[4].id, 'cur-quran-minshawi-rare');
+    expect(store.list[5].id, 'cur-quran-abdulbasit');
+    expect(store.list[6].id, 'cur-quran-mustafa');
+    expect(store.list[7].id, 'cur-quran-tarteel');
   });
 
   test('loading a persisted curated station backfills missing artwork',

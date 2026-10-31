@@ -11,6 +11,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_empty_state.dart';
 import '../../../../core/widgets/pulsr_search_field.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
+import '../../../../core/widgets/marquee_text.dart';
 import '../../../../domain/models/radio_station.dart';
 
 /// Search-and-add sheet for the live radio-browser.info directory.
@@ -253,10 +254,12 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
                     )
                   : Icon(Icons.radio_rounded, color: p.textTertiary),
             ),
-            title: Text(
-              station.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            title: MarqueeText(
+              text: station.name,
+              textAlign: TextAlign.start,
+              allowUserPause: false,
+              velocity: 28.0,
+              blankSpace: 36.0,
               style: TextStyle(
                 color: p.textPrimary,
                 fontWeight: FontWeight.w700,

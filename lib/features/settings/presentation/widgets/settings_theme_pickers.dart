@@ -385,19 +385,24 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                   final isSelected = t.mode == _selectedMode;
                   return AnimatedScale(
                     scale: isSelected ? 1.0 : 0.92,
-                    duration: PulsrMotion.state,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() => _selectedMode = t.mode);
-                        widget.cubit.setPlayerThemeMode(t.mode);
-                      },
-                      child: _ThemeMockupCard(
-                        mode: t.mode,
-                        title: t.title,
-                        isSelected: isSelected,
-                        primaryColor: widget.primaryColor,
-                        cardColor: widget.cardColor,
-                        textPrimary: widget.textPrimary,
+                    duration: context.motion(PulsrMotion.state),
+                    child: Semantics(
+                      button: true,
+                      selected: isSelected,
+                      label: t.title,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _selectedMode = t.mode);
+                          widget.cubit.setPlayerThemeMode(t.mode);
+                        },
+                        child: _ThemeMockupCard(
+                          mode: t.mode,
+                          title: t.title,
+                          isSelected: isSelected,
+                          primaryColor: widget.primaryColor,
+                          cardColor: widget.cardColor,
+                          textPrimary: widget.textPrimary,
+                        ),
                       ),
                     ),
                   );
@@ -463,7 +468,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                           widget.cubit.setPlayerThemeMode(t.mode);
                           _pageController.animateToPage(
                             index,
-                            duration: PulsrMotion.standard,
+                            duration: context.motion(PulsrDurations.layout),
                             curve: Curves.easeOutCubic,
                           );
                         },

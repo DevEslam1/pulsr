@@ -130,6 +130,18 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   double get stereoWidth => 1.0;
   @override
+  bool get stereoWidthMultiband => false;
+  @override
+  double get stereoWidthLow => 1.0;
+  @override
+  double get stereoWidthMid => 1.0;
+  @override
+  double get stereoWidthHigh => 1.0;
+  @override
+  double get stereoWidthLowCrossoverHz => 250.0;
+  @override
+  double get stereoWidthHighCrossoverHz => 4000.0;
+  @override
   bool get isLoudnessContourEnabled => false;
   @override
   double get loudnessContourIntensity => 0.0;
@@ -141,6 +153,18 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   double get subCrossoverSlopeDbPerOct => 24.0;
   @override
   double get subCrossoverGain => 0.8;
+  @override
+  bool get subCrossoverBassMono => true;
+  @override
+  bool get subCrossoverAntiPop => true;
+  @override
+  bool get isMultibandCompressorEnabled => false;
+  @override
+  double get multibandCompressorF0 => 120.0;
+  @override
+  double get multibandCompressorF1 => 1200.0;
+  @override
+  double get multibandCompressorF2 => 6000.0;
   @override
   bool get isDynamicEqEnabled => false;
   @override
@@ -157,6 +181,8 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   bool get isArbitraryEqEnabled => false;
   @override
   String get arbitraryEqString => '';
+  @override
+  bool get arbitraryEqLinearPhase => false;
   @override
   bool get isLiveProgEnabled => false;
   @override
@@ -234,7 +260,7 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
   @override
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
+  Future<void> setReverb(bool enabled, {int? preset, double? wetDry, double? predelayMs, double? damping}) async {}
   @override
   Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
   @override
