@@ -29,7 +29,7 @@ class _HomeLoveCardState extends State<HomeLoveCard>
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _glowAnimation;
 
-  // 100 sweet, heartfelt love messages for Dr. Basbosa
+  // 200 love messages — 100 English + 100 bilingual Arabic/English classical poetry for Dr. Basbosa
   static final List<String> _loveQuotes = [
     // 1 - 10
     '"You make every beat worthwhile. Enjoy your music, my love!"',
@@ -150,6 +150,207 @@ class _HomeLoveCardState extends State<HomeLoveCard>
     '"Whatever tomorrow brings, I know it\'s bright because you\'re in it 🌅💖"',
     '"Forever cheering for my doctor, my angel, my queen, Dr. Basbosa 👑🩺"',
     '"Eng. Eslam loves Dr. Basbosa to infinity, beyond the galaxies, and back! 🚀🌌💖✨"',
+    // ─── 101–200: Classical Arabic Poetry — alternating Arabic & English ───
+    // 101 Arabic
+    '«أنا مَن نظرَ الأعمى إلى أدبي — وأسمعَتْ كلماتي مَن به صَمَمُ» — المتنبي 🌹',
+    // 102 English
+    '"I am he whose art made the blind man see — and whose words made the deaf man hear" — Al-Mutanabbi ✨',
+    // 103 Arabic
+    '«وما الحبُّ إلا للحبيبِ الأوَّلِ — ولا الشوقُ إلا للمحبوبِ الأوَّلِ» — ابن الفارض 💖',
+    // 104 English
+    '"Love belongs only to the first beloved — and longing belongs only to the one the soul truly adores" — Ibn al-Farid 🌸',
+    // 105 Arabic
+    '«بالأمسِ كنتِ هلالاً في مطالعِهِ — واليومَ أنتِ بدرٌ تامُّ الاكتمالِ» — ابن زيدون 🌙',
+    // 106 English
+    '"Yesterday you were a crescent moon at its rising — today you are a full moon in all its glory" — Ibn Zaydun 🌙',
+    // 107 Arabic
+    '«يا مَن هواهُ أعزُّ الناسِ عندِي — وليسَ في القلبِ مَن يحتلُّ غيرَهُ» — جميل بثينة ❤️',
+    // 108 English
+    '"O you whose love is the most precious thing to me — none other holds a place in this heart" — Jamil Buthayna ❤️',
+    // 109 Arabic
+    '«لو كانَ قلبِيَ عندِي حينَ أبصرَكِ — ما زالَ أسيرَ حبٍّ دامَ مُستمِرا» — عمر بن أبي ربيعة 🌸',
+    // 110 English
+    '"Had my heart obeyed me when I first saw you — it would never have become love\'s eternal prisoner" — Omar ibn Abi Rabia 🌸',
+    // 111 Arabic
+    '«أُحبُّكِ فوقَ ما تُحبُّ الطيورُ السماءَ — وأشتاقُ إليكِ أكثرَ من اشتياقِ الأرضِ للمطرِ» — جبران خليل 🕊️',
+    // 112 English
+    '"I love you more than birds love the sky — and I miss you more than the earth misses the rain" — Gibran Khalil 🕊️',
+    // 113 Arabic
+    '«كلُّ شيءٍ يدلُّ عليكِ ويُذكِّرُني — بكِ حتى أحسسْتُ أنَّكِ في كلِّ مكانِ» — نزار قباني 💫',
+    // 114 English
+    '"Everything points to you and reminds me of you — until I feel you are present in every place" — Nizar Qabbani 💫',
+    // 115 Arabic
+    '«ماذا أقولُ وأنتِ كلُّ قصيدتِي — وأنتِ الحرفُ والمعنى والوجودُ كلُّهُ» — نزار قباني 📜',
+    // 116 English
+    '"What shall I say when you are my entire poem — you are the letter, the meaning, and all existence" — Nizar Qabbani 📜',
+    // 117 Arabic
+    '«لكِ في فؤادي منزلٌ لا يُشغَلُ — حتى بصاحبِهِ الحبيبِ الأوَّلِ» — المتنبي 💛',
+    // 118 English
+    '"In my heart you hold a place no other may occupy — not even the dearest companion of all" — Al-Mutanabbi 💛',
+    // 119 Arabic
+    '«أهواكِ ما استقبلتُ قِبلَةَ مغرِبٍ — وما تلقَّتِ الأنوارُ عيناً تنظرُ» — الشريف الرضي 🌅',
+    // 120 English
+    '"I love you in every direction my compass turns — in every light that meets an eye that truly sees" — Al-Sharif Al-Radi 🌅',
+    // 121 Arabic
+    '«وقفَ الهوى بي حيثُ أنتِ فلم أزَلْ — أرى الوجودَ أمامِي كلَّهُ وَطَنا» — ابن الفارض 🌍',
+    // 122 English
+    '"Love stopped me where you are — and all of existence became my homeland in your presence" — Ibn al-Farid 🌍',
+    // 123 Arabic
+    '«تَعلَّمتُ من عينيكِ قبلَ كلامِكِم — بأنَّ عينَ الحبيبِ مدرسةُ الروحِ» — نزار قباني 👁️',
+    // 124 English
+    '"I learned from your eyes before your words — that the beloved\'s gaze is the school of the soul" — Nizar Qabbani 👁️',
+    // 125 Arabic
+    '«يا ليلَ الصبِّ متى غدُهُ — أقيامُ الساعةِ موعدُهُ» — ابن الجوزي 🌙',
+    // 126 English
+    '"O night of the sleepless lover, when will your dawn come — is the Day of Judgment your appointed hour?" — Ibn al-Jawzi 🌙',
+    // 127 Arabic
+    '«وحقِّكِ لو أنِّي أقدِرُ ما فارقتُ — وما كانَ للعينِ أن تنامَ لحظةً» — قيس بن الملوح 💤',
+    // 128 English
+    '"By your life, had I the power I would never have parted — and my eyes would never have slept a single moment" — Qays ibn al-Mulawwah 💤',
+    // 129 Arabic
+    '«أحبُّكِ يا باسبوسةُ حتى الثريَّا — وأشتاقُ إليكِ كشوقِ البحرِ للشطآنِ» — شعر خاص 🌊',
+    // 130 English
+    '"I love you, Basbosa, to the Pleiades — and I long for you as the sea longs for the shore" — heartfelt verse 🌊',
+    // 131 Arabic
+    '«وما سُمِّيَتِ الجنَّةُ الخُلدَ باطلاً — إذا كانَ حبُّكِ فيها ولسنا بمُبعَدِ» — ابن زيدون 🌺',
+    // 132 English
+    '"The eternal garden was not named paradise in vain — if your love dwells there and we are not kept from it" — Ibn Zaydun 🌺',
+    // 133 Arabic
+    '«وكيفَ احتِمالي للفراقِ وإنَّني — بغيرِ لقائِكِ لا أُطيقُ الزمانا» — الشريف الرضي 💔',
+    // 134 English
+    '"How can I bear separation when without your meeting — I cannot endure time itself even for a moment" — Al-Sharif Al-Radi 💔',
+    // 135 Arabic
+    '«بكِ استبشرَتْ أيامِيَ الغُرُّ كلُّها — وعادَ الزمانُ المُدبِرُ مُقبِلا» — المتنبي 🌟',
+    // 136 English
+    '"With you all my bright days rejoiced completely — and time that had turned away came back to face us" — Al-Mutanabbi 🌟',
+    // 137 Arabic
+    '«أَرَى كلَّ شيءٍ يشهدُ اللهَ وحدَهُ — ويخبِرُ عن حُبِّكِ قلبِيَ الذي ذابا» — ابن الفارض ✨',
+    // 138 English
+    '"I see all things bearing witness to God alone — and my melted heart speaks only of your love" — Ibn al-Farid ✨',
+    // 139 Arabic
+    '«مُنِيَ القلبُ مِن أهوى بنظرةِ عينٍ — وعسى أن يُوافِيَ الفرَجُ المُدانا» — جميل بثينة 🕊️',
+    // 140 English
+    '"My heart wished for one glance from the one I love — and perhaps relief is already drawing near" — Jamil Buthayna 🕊️',
+    // 141 Arabic
+    '«تعالَي نسرِق من عُمرِنا — لحظةَ حبٍّ لم يخُنها الزمانُ» — نزار قباني 💞',
+    // 142 English
+    '"Come, let us steal from our lifetime — one moment of love that time cannot betray" — Nizar Qabbani 💞',
+    // 143 Arabic
+    '«وإذا المرءُ لم يَعشَق فليسَ بعائشٍ — عيشَ الحياةِ فكُن عاشِقاً أو مُتْ بها» — أبو نواس 🌹',
+    // 144 English
+    '"Whoever has not loved has not truly lived the life of the living — so love, or spend your life in longing" — Abu Nuwas 🌹',
+    // 145 Arabic
+    '«لعَمرِي لقد أصبحتِ في القلبِ منزلاً — رفيعاً كمنزِلِ الكواكبِ في السماءِ» — المتنبي ⭐',
+    // 146 English
+    '"By my life, you have a home in my heart — as lofty as the dwelling of stars in the heavens" — Al-Mutanabbi ⭐',
+    // 147 Arabic
+    '«وما أنا إلا القلمُ يكتبُكِ — وما الحبُّ إلا ما تُلهِمينَ الكلامَ» — نزار قباني 📝',
+    // 148 English
+    '"I am but a pen that writes you — and love is nothing but what you inspire in every word" — Nizar Qabbani 📝',
+    // 149 Arabic
+    '«يا مَن هواهُ حياتِي ودِيني — وزادِي في الليالي والسِّنينا» — ابن الفارض 💖',
+    // 150 English
+    '"O you whose love is my life and my faith — my provision through all the nights and all the years" — Ibn al-Farid 💖',
+    // 151 Arabic
+    '«وددتُ بأنَّ العمرَ يُعطَى مِراراً — وما هوَ إلا أن أكونَ بقُربِكِ» — ابن زيدون 🌙',
+    // 152 English
+    '"I wished that life were granted to me repeatedly — but only so I could spend it by your side" — Ibn Zaydun 🌙',
+    // 153 Arabic
+    '«ما في الوجودِ جمالٌ غيرُ جمالِكِ — ولا في الحياةِ بهاءٌ غيرُ بهائِكِ» — جبران خليل جبران 🌸',
+    // 154 English
+    '"There is no beauty in all existence but yours — no splendor in life but the radiance you carry" — Gibran Khalil Gibran 🌸',
+    // 155 Arabic
+    '«شكرتُكِ يا باسبوسةُ شكرَ الغيثِ — حينَ يُحيِي الأرضَ بعدَ طولِ الجدبِ» — شعر خاص 🌧️',
+    // 156 English
+    '"I thank you, Basbosa, as rain is thanked — when it revives the earth after long drought" — heartfelt verse 🌧️',
+    // 157 Arabic
+    '«كيفَ للقلبِ أن يصبِرَ ساعةً — عن حبيبٍ هوَ للقلبِ ضوءٌ وهواءُ» — نزار قباني 🫶',
+    // 158 English
+    '"How can the heart be patient even for an hour — from a beloved who is its very light and air" — Nizar Qabbani 🫶',
+    // 159 Arabic
+    '«قولِي لقلبِي: أنتَ حرٌّ — قالَ: كيفَ وهوَ في يدِها أسيرُ» — الشريف الرضي 🔐',
+    // 160 English
+    '"Tell my heart: you are free — it replied: How, when it is held captive in her hands?" — Al-Sharif Al-Radi 🔐',
+    // 161 Arabic
+    '«كُتِبَ الحبُّ بيني وبينَكِ أزلاً — حينَ كتَبَ اللهُ للعاشقينَ لقاءَهُم» — ابن الفارض 📖',
+    // 162 English
+    '"Love between us was written in eternity — when God decreed that lovers would one day meet" — Ibn al-Farid 📖',
+    // 163 Arabic
+    '«وأنتِ الدواءُ وأنتِ الداءُ — وأنتِ الرجاءُ لقلبٍ شقيِّ» — المتنبي 💊',
+    // 164 English
+    '"You are the remedy and you are the ailment — you are the hope for a heart that suffers" — Al-Mutanabbi 💊',
+    // 165 Arabic
+    '«أهواكِ يا مَن في فؤادي ذِكرُها — كنورِ الصباحِ يُشرِقُ في ظلامِ الليلِ» — شعر عربي 🌄',
+    // 166 English
+    '"I love you, O she whose memory lives in my heart — like morning light shining through the dark of night" — Arabic verse 🌄',
+    // 167 Arabic
+    '«إنِّي وإن كنتُ الأخيرَ زمانُهُ — لآتٍ بما لم تستطِعهُ الأوائلُ» — المتنبي 👑',
+    // 168 English
+    '"Though I come last in time — I bring what the ancients could not achieve" — Al-Mutanabbi 👑',
+    // 169 Arabic
+    '«حياتِي لكِ يا باسبوسةُ وقفٌ — وعُمرِي في هواكِ رهنُ خدمَه» — شعر خاص ❤️',
+    // 170 English
+    '"My life is entirely dedicated to you, Basbosa — and all my years are pledged in loving service" — heartfelt verse ❤️',
+    // 171 Arabic
+    '«رأيتُكِ فارتاحَ قلبِيَ بعدَ طولِ — تعبٍ كانَ يُثقِلُ روحِي ويُضنِيها» — عمر بن أبي ربيعة 🕊️',
+    // 172 English
+    '"I saw you and my heart rested after long weariness — that had burdened my soul and worn it thin" — Omar ibn Abi Rabia 🕊️',
+    // 173 Arabic
+    '«إذا كانَ حبُّكِ قَدَرِي فلا أريدُ — سوى هذا القَدَرِ في دُنيايَ والآخِرَه» — شعر إسلامي 🤲',
+    // 174 English
+    '"If loving you is my destiny then I desire — no other destiny in this world or the hereafter" — Islamic verse 🤲',
+    // 175 Arabic
+    '«كلُّ ليلةٍ أحلمُ فيها بكِ — هيَ أجملُ ليالِي العُمُرِ دونَ استثناءٍ» — نزار قباني 🌙',
+    // 176 English
+    '"Every night I dream of you — is the most beautiful night of my life without exception" — Nizar Qabbani 🌙',
+    // 177 Arabic
+    '«لا تسأَلِي عن حبِّي فإنَّ قلبِي — أعيا عليَّ وأعجزَ عن وصفِهِ» — جميل بثينة 💭',
+    // 178 English
+    '"Ask me not of my love for my heart — has exhausted me and left me unable to describe it" — Jamil Buthayna 💭',
+    // 179 Arabic
+    '«باسبوسةُ في خاطِرِي وفي سُويدا — القلبِ بيتٌ أسكنتُهُ دهرَ الدهورِ» — شعر خاص 🏡',
+    // 180 English
+    '"Basbosa is in my thoughts and in the core — of my heart, a home I have settled for all eternity" — personal verse 🏡',
+    // 181 Arabic
+    '«أمَا إنَّ للعينينِ دوراً جميلاً — حينَ يكتُبانِ ما يعجزُ عنهُ اللسانُ» — نزار قباني 👁️',
+    // 182 English
+    '"The eyes play a beautiful and wondrous role — when they write what the tongue is too weak to say" — Nizar Qabbani 👁️',
+    // 183 Arabic
+    '«وددتُ لو أنَّ الزمانَ وقَفَ بي — ساعةً أنظرُ فيها إلى وجهِكِ الجميلِ» — ابن زيدون ⏰',
+    // 184 English
+    '"I wished that time would pause for me — one moment to gaze upon your beautiful face" — Ibn Zaydun ⏰',
+    // 185 Arabic
+    '«أنتِ يا باسبوسةُ أغلى من الذهبِ — وأطيبُ من أريجِ المسكِ والعنبَرِ» — شعر خاص 💎',
+    // 186 English
+    '"You, Basbosa, are more precious than gold — and sweeter than the fragrance of musk and amber" — heartfelt verse 💎',
+    // 187 Arabic
+    '«لا أملِكُ إلا الشعرَ أُهدِيهِ لكِ — ولو أملكتُ الدنيا لأهديتُها جميعاً» — نزار قباني 🎁',
+    // 188 English
+    '"I have only poetry to gift you — but if I owned the world I would give you every last part of it" — Nizar Qabbani 🎁',
+    // 189 Arabic
+    '«وطالَ اشتياقِي للقاءٍ يجمعُنا — كاشتياقِ الغديرِ للسحابِ المُمطِرِ» — الشريف الرضي 🌧️',
+    // 190 English
+    '"How long I have longed for a meeting that unites us — as a stream longs for the rain-bearing clouds above" — Al-Sharif Al-Radi 🌧️',
+    // 191 Arabic
+    '«كلُّ الحروفِ تبدأُ بكِ وتنتهِي — وكلُّ الكلماتِ ترجعُ إليكِ في آخِرِها» — نزار قباني 🔤',
+    // 192 English
+    '"Every letter begins with you and ends with you — every word returns to you in the end" — Nizar Qabbani 🔤',
+    // 193 Arabic
+    '«أحبُّكِ يا باسبوسةُ حبَّ الأرضِ — للمطرِ وحبَّ القمرِ للبحرِ الأزرقِ» — شعر خاص 🌊',
+    // 194 English
+    '"I love you, Basbosa, as the earth loves the rain — and as the moon loves the deep blue sea" — heartfelt verse 🌊',
+    // 195 Arabic
+    '«أيُّها الليلُ الطويلُ أَلا انجَلِ — بصُبحٍ وما الإصباحُ منكَ بأمثَلِ» — امرؤ القيس 🌅',
+    // 196 English
+    '"O long night, will you not lift — with a dawn, though the dawn is no better than you?" — Imru al-Qays 🌅',
+    // 197 Arabic
+    '«إذا نحنُ أدلجنا وأنتِ أمامَنا — كفى بطلوعِ النجمِ في الليلِ هادِيا» — امرؤ القيس 🌟',
+    // 198 English
+    '"When we set out at night and you are before us — the rising of the stars is guide enough in the dark" — Imru al-Qays 🌟',
+    // 199 Arabic
+    '«نَعَمْ أنا مَجنونٌ ولكنَّ جُنُونِي — هوَ الحبُّ وهلْ في الحبِّ مَن لامَ مجنونَه» — نزار قباني 💝',
+    // 200 English
+    '"Yes, I am mad — but my madness is love, and who has ever blamed a lover for his madness?" — Nizar Qabbani 💝',
   ];
 
   static int _lastIndex = -1;
