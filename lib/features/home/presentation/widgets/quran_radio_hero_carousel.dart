@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'home_love_card.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -59,12 +60,14 @@ class QuranRadioHeroCarousel extends StatefulWidget {
   final PlayerCubit? playerCubit;
   final double height;
   final VoidCallback? onMoreStations;
+  final bool showLoveCard;
 
   const QuranRadioHeroCarousel({
     super.key,
     this.playerCubit,
     this.height = 142.0,
     this.onMoreStations,
+    this.showLoveCard = false,
   });
 
   /// The curated list of Quran stations ordered specifically with Minshawi first.
@@ -332,7 +335,8 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final total = _stations.length;
+    final hasLoveCard = widget.showLoveCard;
+    final totalCards = _stations.length + (hasLoveCard ? 1 : 0);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -345,7 +349,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
             key: const PageStorageKey('quran_radio_hero_carousel_pv'),
             controller: _pageController,
             physics: const BouncingScrollPhysics(),
-            itemCount: total,
+            itemCount: totalCards,
             onPageChanged: (index) {
               if (index != _currentPage) {
                 HapticFeedback.selectionClick();
@@ -353,7 +357,30 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
               }
             },
             itemBuilder: (context, index) {
-              final item = _stations[index];
+              final Widget card;
+              if (hasLoveCard && index == 0) {
+                card = const HomeLoveCard(
+                  margin: EdgeInsets.zero,
+                  borderRadius: AppRadii.r24All,
+                );
+              } else {
+                final stationIndex = hasLoveCard ? index - 1 : index;
+                final item = _stations[stationIndex];
+                card = _QuranHeroCard(
+                  item: item,
+                  index: stationIndex,
+                  total: _stations.length,
+                  onTap: () {
+                    final player = _resolvePlayerCubit(context);
+                    final isCurrent =
+                        player.state.currentSong?.path == item.station.url;
+                    _onPlayStation(item, isCurrent);
+                  },
+                  onPlayPressed: (isCurrent) =>
+                      _onPlayStation(item, isCurrent),
+                );
+              }
+
               return AnimatedBuilder(
                 animation: _pageController,
                 builder: (context, child) {
@@ -378,19 +405,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: _QuranHeroCard(
-                    item: item,
-                    index: index,
-                    total: total,
-                    onTap: () {
-                      final player = _resolvePlayerCubit(context);
-                      final isCurrent =
-                          player.state.currentSong?.path == item.station.url;
-                      _onPlayStation(item, isCurrent);
-                    },
-                    onPlayPressed: (isCurrent) =>
-                        _onPlayStation(item, isCurrent),
-                  ),
+                  child: card,
                 ),
               );
             },
@@ -407,7 +422,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
               // Dots
               Row(
                 mainAxisSize: MainAxisSize.min,
-                children: List.generate(total, (i) {
+                children: List.generate(totalCards, (i) {
                   final isActive = i == _currentPage;
                   return GestureDetector(
                     onTap: () {
@@ -428,7 +443,9 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                         height: 5.0,
                         decoration: BoxDecoration(
                           color: isActive
-                              ? p.accent
+                              ? (hasLoveCard && i == 0
+                                  ? const Color(0xFFFF2A85)
+                                  : p.accent)
                               : p.textTertiary.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(2.5),
                         ),

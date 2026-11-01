@@ -25,7 +25,6 @@ import 'widgets/online_category_section.dart';
 import 'widgets/quick_discovery_header.dart';
 import 'widgets/recently_added_section.dart';
 import 'widgets/recently_played_section.dart';
-import 'widgets/home_love_card.dart';
 
 export 'widgets/quick_actions_row.dart';
 export 'widgets/quick_card.dart';
@@ -732,32 +731,27 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
               );
 
               if (isTablet) {
-                return Column(
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const HomeLoveCard(),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 11,
-                          child: QuranRadioHeroCarousel(
-                            height: 148,
-                            playerCubit: playerCubit,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.s12),
-                        Expanded(
-                          flex: 9,
-                          child: Column(
-                            children: [
-                              favTile,
-                              const SizedBox(height: AppSpacing.s10),
-                              focusTile,
-                            ],
-                          ),
-                        ),
-                      ],
+                    Expanded(
+                      flex: 11,
+                      child: QuranRadioHeroCarousel(
+                        height: 148,
+                        playerCubit: playerCubit,
+                        showLoveCard: true,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s12),
+                    Expanded(
+                      flex: 9,
+                      child: Column(
+                        children: [
+                          favTile,
+                          const SizedBox(height: AppSpacing.s10),
+                          focusTile,
+                        ],
+                      ),
                     ),
                   ],
                 );
@@ -765,11 +759,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
               return Column(
                 children: [
-                  const HomeLoveCard(),
-                  const SizedBox(height: AppSpacing.s10),
                   QuranRadioHeroCarousel(
                     height: 142,
                     playerCubit: playerCubit,
+                    showLoveCard: true,
                   ),
                   const SizedBox(height: AppSpacing.s10),
                   Row(

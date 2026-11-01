@@ -10,7 +10,14 @@ import '../../../../core/utils/adaptive.dart';
 /// for Dr. Basbosa that rotate on every visit or tap, with smooth animated transitions,
 /// ambient breathing glow, responsive adaptive sizing, and burst waves of floating love emojis!
 class HomeLoveCard extends StatefulWidget {
-  const HomeLoveCard({super.key});
+  final EdgeInsetsGeometry? margin;
+  final BorderRadius? borderRadius;
+
+  const HomeLoveCard({
+    super.key,
+    this.margin,
+    this.borderRadius,
+  });
 
   @override
   State<HomeLoveCard> createState() => _HomeLoveCardState();
@@ -238,14 +245,17 @@ class _HomeLoveCardState extends State<HomeLoveCard>
     final cardPaddingV = isTablet ? 18.0 : (isCompact ? 11.0 : 14.0);
     final heartSize = isTablet ? 24.0 : (isCompact ? 18.0 : 21.0);
     final quoteFontSize = isTablet ? 14.0 : (isCompact ? 11.5 : 12.8);
+    final effectiveMargin =
+        widget.margin ?? const EdgeInsets.only(top: 14, bottom: 6);
+    final effectiveRadius = widget.borderRadius ?? BorderRadius.circular(22);
 
     return AnimatedBuilder(
       animation: _glowAnimation,
       builder: (context, child) {
         return Container(
-          margin: const EdgeInsets.only(top: 14, bottom: 6),
+          margin: effectiveMargin,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: effectiveRadius,
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFFFF2A85)
@@ -262,17 +272,30 @@ class _HomeLoveCardState extends State<HomeLoveCard>
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: effectiveRadius,
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  final isHeightConstrained = constraints.maxHeight.isFinite &&
+                      constraints.maxHeight < 160;
+                  final effectivePaddingV = isHeightConstrained
+                      ? (isCompact ? 8.0 : 10.0)
+                      : cardPaddingV;
+                  final effectiveQuoteSize = isHeightConstrained
+                      ? (isCompact ? 11.0 : 12.0)
+                      : quoteFontSize;
+                  final effectiveGap = isHeightConstrained ? 3.0 : 5.0;
+
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
                       Container(
+                        height: constraints.maxHeight.isFinite
+                            ? constraints.maxHeight
+                            : null,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: effectiveRadius,
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -291,7 +314,7 @@ class _HomeLoveCardState extends State<HomeLoveCard>
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: effectiveRadius,
                             onTapUp: (details) => _triggerEmojiWave(
                               details,
                               Size(constraints.maxWidth, 120),
@@ -302,7 +325,7 @@ class _HomeLoveCardState extends State<HomeLoveCard>
                             child: Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: cardPaddingH,
-                                vertical: cardPaddingV,
+                                vertical: effectivePaddingV,
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -347,20 +370,28 @@ class _HomeLoveCardState extends State<HomeLoveCard>
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text(
-                                              'MELODY OF MY HEART',
-                                              style: TextStyle(
-                                                color: const Color(0xFFFF85BC),
-                                                fontSize: isCompact ? 8.5 : 10,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: 1.2,
+                                            Flexible(
+                                              child: Text(
+                                                'MELODY OF MY HEART',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: const Color(0xFFFF85BC),
+                                                  fontSize: isCompact ? 8.5 : 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  letterSpacing: 1.2,
+                                                ),
                                               ),
                                             ),
-                                            const Spacer(),
+                                            const SizedBox(width: 6),
                                             Container(
                                               padding: EdgeInsets.symmetric(
                                                 horizontal: isCompact ? 6 : 8,
@@ -401,7 +432,7 @@ class _HomeLoveCardState extends State<HomeLoveCard>
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 5),
+                                        SizedBox(height: effectiveGap),
 
                                         // Animated quote message
                                         AnimatedSwitcher(
@@ -426,38 +457,50 @@ class _HomeLoveCardState extends State<HomeLoveCard>
                                           child: Text(
                                             _loveQuotes[_currentIndex],
                                             key: ValueKey<int>(_currentIndex),
+                                            maxLines: isHeightConstrained ? 2 : 4,
+                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               color: Colors.white,
-                                              fontSize: quoteFontSize,
+                                              fontSize: effectiveQuoteSize,
                                               fontWeight: FontWeight.w600,
                                               fontStyle: FontStyle.italic,
-                                              height: 1.35,
+                                              height: 1.3,
                                             ),
                                           ),
                                         ),
 
-                                        const SizedBox(height: 5),
+                                        SizedBox(height: effectiveGap),
                                         Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text(
-                                              '— Eng. Eslam ✨',
-                                              style: TextStyle(
-                                                color: const Color(0xFFFF85BC),
-                                                fontSize: isCompact ? 9.5 : 11,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 0.4,
+                                            Flexible(
+                                              child: Text(
+                                                '— Eng. Eslam ✨',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: const Color(0xFFFF85BC),
+                                                  fontSize: isCompact ? 9.5 : 11,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: 0.4,
+                                                ),
                                               ),
                                             ),
-                                            Text(
-                                              'Tap for wave of love 💌',
-                                              style: TextStyle(
-                                                color: p.textTertiary
-                                                    .withValues(alpha: 0.70),
-                                                fontSize:
-                                                    isCompact ? 8.5 : 9.5,
-                                                fontWeight: FontWeight.w600,
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                              child: Text(
+                                                'Tap for wave of love 💌',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.end,
+                                                style: TextStyle(
+                                                  color: p.textTertiary
+                                                      .withValues(alpha: 0.70),
+                                                  fontSize:
+                                                      isCompact ? 8.5 : 9.5,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
                                             ),
                                           ],

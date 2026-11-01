@@ -13,6 +13,7 @@ import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
 import 'package:pulsr/features/home/presentation/home_screen.dart';
+import 'package:pulsr/features/home/presentation/widgets/home_love_card.dart';
 import 'package:pulsr/domain/models/radio_station.dart';
 import 'package:pulsr/features/home/presentation/widgets/empty_library.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
@@ -122,12 +123,7 @@ void main() {
     await pumpScreen(tester);
 
     expect(find.byType(QuranRadioHeroCarousel), findsOneWidget);
-    expect(
-        find.byWidgetPredicate((w) =>
-            w is Text &&
-            (w.data?.contains('المنشاوي') == true ||
-                w.data?.contains('Minshawi') == true)),
-        findsWidgets);
+    expect(find.byType(HomeLoveCard), findsOneWidget);
     expect(find.text('Focus Flow'), findsOneWidget);
     expect(find.text('Favorites'), findsWidgets);
   });
@@ -135,6 +131,10 @@ void main() {
   testWidgets('the Quran Radio hero starts Minshawi radio stream on tap',
       (tester) async {
     await pumpScreen(tester);
+    // Swipe from page 0 (love card) to page 1 (Minshawi)
+    await tester.drag(find.byType(PageView), const Offset(-400, 0));
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byIcon(Icons.play_arrow_rounded).first);
     await tester.pumpAndSettle();
 
