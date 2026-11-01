@@ -42,6 +42,12 @@ android {
 
     flavorDimensions += "default"
     productFlavors {
+        create("bb") {
+            dimension = "default"
+            applicationIdSuffix = ".bb"
+            manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
+            proguardFile(file("src/bb/proguard-rules.pro"))
+        }
         create("dev") {
             dimension = "default"
             applicationIdSuffix = ".plus"
@@ -78,6 +84,10 @@ android {
     // The assets dir carries the BotGuard page the poToken WebView runs, which is
     // likewise GPL and so likewise kept out of prod.
     sourceSets {
+        getByName("bb") {
+            kotlin.srcDir("src/ytmEnabled/kotlin")
+            assets.srcDir("src/ytmEnabled/assets")
+        }
         getByName("dev") {
             kotlin.srcDir("src/ytmEnabled/kotlin")
             assets.srcDir("src/ytmEnabled/assets")
@@ -171,10 +181,12 @@ dependencies {
     // kept out of the prod (Play Store) variant. Pulls in Mozilla Rhino, which
     // solves YouTube's JS signature challenges on-device.
     val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.26.5"
+    "bbImplementation"(newPipeExtractor)
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
 
     val rhino = "org.mozilla:rhino:1.8.1"
+    "bbImplementation"(rhino)
     "devImplementation"(rhino)
     "ytmImplementation"(rhino)
 
@@ -182,6 +194,7 @@ dependencies {
     // "Pure" variant strips INTERNET and must not ship Cast or Play Services
     // routing. The matching code lives in sourceSets dev/ytm (src/ytmEnabled).
     val castFramework = "com.google.android.gms:play-services-cast-framework:21.5.0"
+    "bbImplementation"(castFramework)
     "devImplementation"(castFramework)
     "ytmImplementation"(castFramework)
 

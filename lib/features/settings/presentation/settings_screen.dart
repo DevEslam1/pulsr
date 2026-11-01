@@ -47,6 +47,7 @@ import 'widgets/smart_audio_section.dart';
 import 'widgets/playback_section.dart';
 import 'widgets/scrobbler_settings_modal.dart';
 import 'widgets/settings_hero_card.dart';
+import 'widgets/love_dedication_card.dart';
 import 'widgets/settings_picker_sheets.dart';
 import 'widgets/settings_section.dart';
 import 'widgets/storage_cache_section.dart';

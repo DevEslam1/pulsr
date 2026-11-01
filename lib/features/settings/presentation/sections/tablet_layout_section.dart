@@ -227,6 +227,7 @@ mixin TabletLayoutSection
               ),
               physics: const BouncingScrollPhysics(),
               children: [
+                const LoveDedicationCard(),
                 _buildCategoryHeroHeader(context, currentCat),
                 const SizedBox(height: AppSpacing.md),
                 ..._buildCategoryWidgets(context, effectiveId, state, cubit),

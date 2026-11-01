@@ -66,6 +66,7 @@ mixin PhoneLayoutSection
           end: horizontalPad,
         ),
         children: [
+          const LoveDedicationCard(),
           if (!context.isLandscape &&
               (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)) ...[
             const SettingsHeroCard(),
