@@ -997,7 +997,7 @@ void LiveProg::process(float* L, float* R, int frames) {
 void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
     const float targetEnabledMix = (enabled_ && isCompiled_ && !sampleBytecode_.empty()) ? 1.0f : 0.0f;
     if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
-    if (!buffer || frames <= 0 || channels < 2) return;
+    if (!buffer || frames <= 0 || channels < 1) return;
 
     const int mem = static_cast<int>(memory_.size());
     if (idxSpl0_ < 0 || idxSpl0_ >= mem || idxSpl1_ < 0 || idxSpl1_ >= mem) return;
@@ -1023,7 +1023,7 @@ void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
 
     for (int i = 0; i < frames; ++i) {
         const float inL = buffer[i * channels];
-        const float inR = buffer[i * channels + 1];
+        const float inR = (channels > 1) ? buffer[i * channels + 1] : inL;
 
         memory_[idxSpl0_] = static_cast<double>(inL);
         memory_[idxSpl1_] = static_cast<double>(inR);
@@ -1077,7 +1077,9 @@ void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
         }
 
         buffer[i * channels] = dryW * inL + wetW * wetL;
-        buffer[i * channels + 1] = dryW * inR + wetW * wetR;
+        if (channels > 1) {
+            buffer[i * channels + 1] = dryW * inR + wetW * wetR;
+        }
         currentEnabledMix += mixStep;
     }
 }

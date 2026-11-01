@@ -443,7 +443,7 @@ void ViperDdc::process(float* L, float* R, int frames) {
 void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
     const float targetEnabledMix = (enabled_ && !activeSections_.empty()) ? 1.0f : 0.0f;
     if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
-    if (!buffer || frames <= 0 || channels < 2) return;
+    if (!buffer || frames <= 0 || channels < 1) return;
 
     // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
     const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
@@ -460,7 +460,7 @@ void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
 
     for (int i = 0; i < frames; ++i) {
         const float inL = buffer[i * channels];
-        const float inR = buffer[i * channels + 1];
+        const float inR = (channels > 1) ? buffer[i * channels + 1] : inL;
 
 #if defined(PULSR_F32_BIQUADS)
         float curL = std::isfinite(inL) ? inL : 0.0f;
@@ -511,7 +511,9 @@ void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
         }
 
         buffer[i * channels] = dryW * inL + wetW * wetL;
-        buffer[i * channels + 1] = dryW * inR + wetW * wetR;
+        if (channels > 1) {
+            buffer[i * channels + 1] = dryW * inR + wetW * wetR;
+        }
         currentEnabledMix += mixStep;
     }
 }

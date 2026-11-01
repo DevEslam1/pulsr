@@ -1192,32 +1192,36 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
               ),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
-                child: InkWell(
-                  onTap: () =>
-                      _showEqPresetPicker(context, playerCubit, currentEq),
-                  borderRadius: AppRadii.r8All,
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s6),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            currentEqLabel,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                            textAlign: TextAlign.end,
-                            style: TextStyle(
-                              color:
-                                  currentEq != null ? p.accent : p.textPrimary,
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w600,
+                child: Semantics(
+                  button: true,
+                  label: '${context.l10n.trackEqOverride}: $currentEqLabel',
+                  child: InkWell(
+                    onTap: () =>
+                        _showEqPresetPicker(context, playerCubit, currentEq),
+                    borderRadius: AppRadii.r8All,
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.s6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              currentEqLabel,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                color:
+                                    currentEq != null ? p.accent : p.textPrimary,
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                        Icon(Icons.arrow_drop_down, color: p.accent),
-                      ],
+                          Icon(Icons.arrow_drop_down, color: p.accent),
+                        ],
+                      ),
                     ),
                   ),
                 ),

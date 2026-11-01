@@ -132,34 +132,61 @@ class _RadioScreenState extends State<RadioScreen> {
     return uri.host;
   }
 
-  String _stationFallbackSubtitle(RadioStation station) {
+  String _stationFallbackSubtitle(RadioStation station, {bool? isArabic}) {
+    final arabic =
+        isArabic ?? (Localizations.localeOf(context).languageCode == 'ar');
     if (RadioStationStore.isQuranStation(station)) {
       final name = station.name;
-      if (name.contains('نادرة') || name.contains('نادر')) {
-        return 'تلاوات نادرة ومحافل خاشعة • تسجيلات تاريخية';
+      final id = station.id;
+      if (id == 'cur-quran-minshawi-rare' ||
+          name.contains('نادرة') ||
+          name.contains('نادر')) {
+        return arabic
+            ? 'تلاوات نادرة ومحافل خاشعة • تسجيلات تاريخية'
+            : 'Rare Historic Recitations & Concerts';
       }
-      if (name.contains('خاشعة') || name.contains('خاشع')) {
-        return 'تلاوات خاشعة ومؤثرة • كبار القراء';
+      if (id == 'cur-quran-khashia' ||
+          name.contains('خاشعة') ||
+          name.contains('خاشع')) {
+        return arabic
+            ? 'تلاوات خاشعة ومؤثرة • كبار القراء'
+            : 'Rare Reverent Recitations • Master Reciters';
       }
       if (name.contains('مجود')) {
-        return 'المصحف المجود • تلاوة متقنة';
+        return arabic
+            ? 'المصحف المجود • تلاوة متقنة'
+            : 'Holy Quran • Mujawwad Recitation';
       }
       if (name.contains('مرتل') || name.contains('ترتيل')) {
-        return 'المصحف المرتل • تلاوة خاشعة';
+        return arabic
+            ? 'المصحف المرتل • تلاوة خاشعة'
+            : 'Holy Quran • Murattal Recitation';
       }
-      if (name.contains('القاهرة')) {
-        return 'بث مباشر من القاهرة • عبر الأثير';
+      if (name.contains('القاهرة') || id.contains('cairo')) {
+        return arabic
+            ? 'بث مباشر من القاهرة • عبر الأثير'
+            : 'Live Broadcast from Cairo • Over the Air';
       }
-      if (name.contains('السعودية') || name.contains('مكة')) {
-        return 'بث مباشر من الحرم المكي الشريف';
+      if (name.contains('السعودية') ||
+          name.contains('مكة') ||
+          id.contains('makkah')) {
+        return arabic
+            ? 'بث مباشر من الحرم المكي الشريف'
+            : 'Live from the Holy Mosque in Mecca';
       }
-      if (name.contains('تراتيل')) {
-        return 'تراتيل قصيرة عذبة على مدار الساعة';
+      if (name.contains('تراتيل') || id.contains('tarteel')) {
+        return arabic
+            ? 'تراتيل قصيرة عذبة على مدار الساعة'
+            : 'Sweet Short Recitations 24/7';
       }
-      if (name.contains('سكينة')) {
-        return 'آيات السكينة والطمأنينة';
+      if (name.contains('سكينة') || id.contains('sakeenah')) {
+        return arabic
+            ? 'آيات السكينة والطمأنينة'
+            : 'Verses of Serenity & Tranquility';
       }
-      return 'إذاعة القرآن الكريم • بث مباشر';
+      return arabic
+          ? 'إذاعة القرآن الكريم • بث مباشر'
+          : 'Holy Quran Radio • Live Stream';
     }
     return station.url;
   }
@@ -631,6 +658,16 @@ class _RadioScreenState extends State<RadioScreen> {
                                                         '')
                                                     : '';
 
+                                                final langCode = Localizations.localeOf(context).languageCode;
+                                                final isArabic = langCode == 'ar';
+                                                final displayStationName =
+                                                    RadioStationStore
+                                                        .localizedStationName(
+                                                            station, langCode);
+                                                final localizedStation =
+                                                    station.copyWith(
+                                                        name: displayStationName);
+
                                                 return ListTile(
                                                   contentPadding:
                                                       const EdgeInsets
@@ -644,7 +681,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                                     isPlaying: isPlaying,
                                                   ),
                                                   title: MarqueeText(
-                                                    text: station.name,
+                                                    text: displayStationName,
                                                     textAlign: TextAlign.start,
                                                     allowUserPause: false,
                                                     velocity: 28.0,
@@ -705,7 +742,9 @@ class _RadioScreenState extends State<RadioScreen> {
                                                                   .isNotEmpty
                                                               ? '♫ $icyNowPlaying'
                                                               : _stationFallbackSubtitle(
-                                                                  station),
+                                                                  station,
+                                                                  isArabic:
+                                                                      isArabic),
                                                           textAlign:
                                                               TextAlign.start,
                                                           allowUserPause: false,
@@ -778,7 +817,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                                           } else {
                                                             playerCubit
                                                                 .playRadioStation(
-                                                                    station);
+                                                                    localizedStation);
                                                           }
                                                         },
                                                       ),
@@ -791,7 +830,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                                     } else {
                                                       playerCubit
                                                           .playRadioStation(
-                                                              station);
+                                                              localizedStation);
                                                     }
                                                   },
                                                   onLongPress: () =>

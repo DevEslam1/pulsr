@@ -14,6 +14,7 @@ import '../router/app_router.dart';
 import '../utils/error_logger.dart';
 import 'package:fpdart/fpdart.dart';
 import '../../data/db/app_database.dart';
+import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
@@ -51,6 +52,14 @@ class FileIntentHandler {
           final query = call.arguments as String?;
           if (query != null) {
             await handleVoiceSearch(query);
+          }
+        } else if (call.method == 'onMediaStoreChanged') {
+          try {
+            final scanner = getIt<MediaScannerService>();
+            await scanner.scanDeviceLibrary(incremental: true);
+          } catch (e, st) {
+            ErrorLogger.log('Media store rescan failed',
+                error: e, stackTrace: st, category: 'FileIntentHandler');
           }
         }
       } catch (e, st) {
@@ -190,14 +199,49 @@ class FileIntentHandler {
 
   Future<void> handleAudioUri(String uriOrPath) async {
     try {
-      // Cold-start Assistant entry queued by MainActivity as
-      // `pulsr://voice-search?query=...`.
+      // Handle pulsr:// deep links and launcher shortcuts
       final voiceUri = Uri.tryParse(uriOrPath);
-      if (voiceUri != null &&
-          voiceUri.scheme == 'pulsr' &&
-          voiceUri.host == 'voice-search') {
-        await handleVoiceSearch(voiceUri.queryParameters['query'] ?? '');
-        return;
+      if (voiceUri != null && voiceUri.scheme == 'pulsr') {
+        if (voiceUri.host == 'voice-search') {
+          await handleVoiceSearch(voiceUri.queryParameters['query'] ?? '');
+          return;
+        }
+        if (voiceUri.host == 'play') {
+          await _playerCubit.play();
+          final navCtx = rootNavigatorKey.currentContext;
+          if (navCtx != null && navCtx.mounted) {
+            navCtx.push('/now-playing');
+          }
+          return;
+        }
+        if (voiceUri.host == 'shuffle') {
+          final res = await _repository.watchAllSongs(limit: 200).first;
+          res.fold((_) {}, (songs) async {
+            if (songs.isNotEmpty) {
+              final shuffled = List<SongsTableData>.from(songs)..shuffle();
+              await _playerCubit.playSong(shuffled.first, queue: shuffled);
+              final navCtx = rootNavigatorKey.currentContext;
+              if (navCtx != null && navCtx.mounted) {
+                navCtx.push('/now-playing');
+              }
+            }
+          });
+          return;
+        }
+        if (voiceUri.host == 'favorites') {
+          final navCtx = rootNavigatorKey.currentContext;
+          if (navCtx != null && navCtx.mounted) {
+            navCtx.go('/library');
+          }
+          return;
+        }
+        if (voiceUri.host == 'search') {
+          final navCtx = rootNavigatorKey.currentContext;
+          if (navCtx != null && navCtx.mounted) {
+            navCtx.go('/search');
+          }
+          return;
+        }
       }
 
       final videoId = extractYouTubeVideoId(uriOrPath);

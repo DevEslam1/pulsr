@@ -58,4 +58,17 @@
     <string name="download_notification_action_resume">Resume</string>
     <string name="download_notification_degraded">Limited background protection — keep Pulsr open</string>
     <string name="download_notification_timeout">Downloads paused — Android reached its background time limit. Open Pulsr to continue.</string>
+
+    <!-- App launcher shortcuts -->
+    <string name="shortcut_play_short">Play</string>
+    <string name="shortcut_play_long">Resume playback</string>
+    <string name="shortcut_shuffle_short">Shuffle</string>
+    <string name="shortcut_shuffle_long">Shuffle all songs</string>
+    <string name="shortcut_favorites_short">Favorites</string>
+    <string name="shortcut_favorites_long">Open favorite tracks</string>
+    <string name="shortcut_search_short">Search</string>
+    <string name="shortcut_search_long">Search music library</string>
+
+    <!-- Quick Settings Tile -->
+    <string name="tile_playback_label">Pulsr Music</string>
 </resources>

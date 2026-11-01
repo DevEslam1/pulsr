@@ -227,6 +227,20 @@ class AudioIntentClassifierTest {
     }
 
     @Test
+    fun pulsrSchemeIsRecognisedAsIntent() {
+        assertTrue(
+            AudioIntentClassifier.isAudioIntentParts(
+                action = "android.intent.action.VIEW",
+                scheme = "pulsr",
+                path = null,
+                host = "play",
+                mimeType = null,
+                textExtra = null,
+            )
+        )
+    }
+
+    @Test
     fun nullSchemeIsNotAnAudioIntent() {
         assertFalse(
             AudioIntentClassifier.isAudioIntentParts(

@@ -461,6 +461,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                               max: maxDuration > 0 ? maxDuration : 1.0,
                               height: isDragging ? 38.0 : 32.0,
                               semanticLabel: semanticLabel,
+                              semanticFormatterCallback: (val) =>
+                                  labelFor(Duration(milliseconds: val.round())),
                               activeColor: widget.activeColor,
                               inactiveColor: Theme.of(context).brightness ==
                                       Brightness.dark

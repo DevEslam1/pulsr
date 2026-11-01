@@ -896,15 +896,21 @@ class _LibraryScreenState extends State<LibraryScreen>
     }
 
     return Tab(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: Semantics(
+        onLongPressHint: context.l10n.libraryManageTabs,
         onLongPress: () {
-          HapticFeedback.mediumImpact();
           _showManageTabsSheet(context, state);
         },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-          child: content,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            _showManageTabsSheet(context, state);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+            child: content,
+          ),
         ),
       ),
     );
@@ -1029,7 +1035,19 @@ class _LibraryScreenState extends State<LibraryScreen>
                   if (confirmed != true || !context.mounted) return;
                   SoundFeedbackService.playWarning(mirrorHaptics: true);
                   final removed = await cubit.deleteSelectedSongs();
-                  if (!context.mounted || removed <= 0) return;
+                  if (!context.mounted) return;
+                  if (removed <= 0) {
+                    final err = cubit.state.errorMessage;
+                    if (err != null && err.isNotEmpty) {
+                      ScaffoldMessenger.of(context)
+                        ..clearSnackBars()
+                        ..showSnackBar(SnackBar(
+                          content: Text(context.l10n.failedToDelete(err)),
+                          backgroundColor: p.error,
+                        ));
+                    }
+                    return;
+                  }
                   ScaffoldMessenger.of(context)
                     ..clearSnackBars()
                     ..showSnackBar(SnackBar(

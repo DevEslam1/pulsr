@@ -1,5 +1,6 @@
 package com.pulsr.music
  
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.MediaMetadataRetriever
@@ -53,6 +54,7 @@ class MainActivity : AudioServiceActivity() {
     private var roomCorrectionPlugin: RoomCorrectionPlugin? = null
     private var updaterChannel: MethodChannel? = null
     private val lyricsExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
+    private var mediaReceiver: android.content.BroadcastReceiver? = null
  
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +66,7 @@ class MainActivity : AudioServiceActivity() {
             window.setDecorFitsSystemWindows(false)
         }
         applyHighRefreshRateDisplayMode()
+        registerStorageReceiver()
         handleAudioIntent(intent, fromColdStart = true)
     }
  
@@ -126,6 +129,10 @@ class MainActivity : AudioServiceActivity() {
         } catch (e: Exception) {
             Log.w("MainActivity", "Error shutting down lyrics executor: ${e.message}")
         }
+        try {
+            mediaReceiver?.let { unregisterReceiver(it) }
+            mediaReceiver = null
+        } catch (_: Exception) {}
         super.onDestroy()
     }
  
@@ -421,6 +428,10 @@ class MainActivity : AudioServiceActivity() {
                 "getDeviceManufacturer" -> {
                     result.success(Build.MANUFACTURER ?: "")
                 }
+                "openOemBatterySettings" -> {
+                    val opened = tryOpenOemBatterySettings()
+                    result.success(opened)
+                }
                 "getBatteryLevel" -> {
                     val bm = getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
                     val level = bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
@@ -534,4 +545,83 @@ class MainActivity : AudioServiceActivity() {
         lyricsChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
+
+    private fun tryOpenOemBatterySettings(): Boolean {
+        val oemIntents = listOf(
+            // Xiaomi / POCO / Redmi (MIUI / HyperOS)
+            Intent().setComponent(ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"))
+                .putExtra("package_name", packageName)
+                .putExtra("package_label", applicationInfo.loadLabel(packageManager).toString()),
+            Intent().setComponent(ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsContainerManagementActivity")),
+            Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+            // Samsung (One UI)
+            Intent().setComponent(ComponentName("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity")),
+            Intent().setComponent(ComponentName("com.samsung.android.sm", "com.samsung.android.sm.ui.battery.BatteryActivity")),
+            Intent("com.samsung.android.lool.ACTION_BATTERY_OPTIMIZATION"),
+            // Huawei / Honor
+            Intent().setComponent(ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity")),
+            Intent().setComponent(ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity")),
+            // Oppo / Realme (ColorOS / RealmeUI)
+            Intent().setComponent(ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")),
+            Intent().setComponent(ComponentName("com.oplus.battery", "com.oplus.battery.AppListActivity")),
+            Intent().setComponent(ComponentName("com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerUsageModelActivity")),
+            // Vivo / iQOO
+            Intent().setComponent(ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity")),
+            Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.PurviewTabActivity")),
+            // OnePlus (OxygenOS)
+            Intent().setComponent(ComponentName("com.oneplus.security", "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity")),
+            // Standard App Details Settings (Works on all Android versions)
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+        )
+
+        for (intent in oemIntents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (intent.resolveActivity(packageManager) != null) {
+                    startActivity(intent)
+                    return true
+                }
+            } catch (_: Exception) {}
+        }
+        return false
+    }
+
+
+    private fun registerStorageReceiver() {
+        val filter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_MEDIA_MOUNTED)
+            addAction(Intent.ACTION_MEDIA_UNMOUNTED)
+            addAction(Intent.ACTION_MEDIA_EJECT)
+            addDataScheme("file")
+        }
+        mediaReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                runOnUiThread {
+                    fileOpenerChannel?.invokeMethod("onMediaStoreChanged", null)
+                }
+            }
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(mediaReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(mediaReceiver, filter)
+            }
+        } catch (_: Exception) {}
+    }
+
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            synchronized(pendingAudioUris) {
+                while (pendingAudioUris.size > 4) {
+                    pendingAudioUris.removeFirstOrNull()
+                }
+            }
+        }
+    }
+
 }

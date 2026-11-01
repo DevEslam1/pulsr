@@ -80,6 +80,180 @@ class RadioStationStore {
     'cur-news': newsArtwork,
   };
 
+  static const Map<String, ({String ar, String en})> _localizedStationNames = {
+    'cur-quran-minshawi': (
+      ar: 'إذاعة الشيخ محمد صديق المنشاوي (مجود)',
+      en: 'Sheikh Mohamed Siddiq El-Minshawi (Mujawwad)',
+    ),
+    'cur-quran-khashia': (
+      ar: 'إذاعة تلاوات خاشعة نادرة',
+      en: 'Rare Khashia Recitations Radio',
+    ),
+    'cur-quran-minshawi-rare': (
+      ar: 'إذاعة الشيخ محمد صديق المنشاوي (تلاوات نادرة)',
+      en: 'Sheikh Mohamed Siddiq El-Minshawi (Rare Recitations)',
+    ),
+    'cur-quran-cairo': (
+      ar: 'إذاعة القرآن الكريم المصرية - القاهرة',
+      en: 'Holy Quran Radio - Cairo',
+    ),
+    'cur-quran-cairo-backup': (
+      ar: 'إذاعة القرآن الكريم - القاهرة (بث بديل)',
+      en: 'Holy Quran Radio - Cairo (Backup)',
+    ),
+    'cur-quran-abdulbasit': (
+      ar: 'إذاعة الشيخ عبد الباسط عبد الصمد (مجود)',
+      en: 'Sheikh Abdulbasit Abdulsamad (Mujawwad)',
+    ),
+    'cur-quran-hussary': (
+      ar: 'إذاعة الشيخ محمود خليل الحصري (مرتل)',
+      en: 'Sheikh Mahmoud Khalil Al-Hussary (Murattal)',
+    ),
+    'cur-quran-mustafa': (
+      ar: 'إذاعة الشيخ مصطفى إسماعيل (مجود)',
+      en: 'Sheikh Mustafa Ismail (Mujawwad)',
+    ),
+    'cur-quran-tarteel': (
+      ar: 'إذاعة تراتيل قصيرة متميزة',
+      en: 'Distinguished Short Recitations Radio',
+    ),
+    'cur-quran-minshawi-murattal': (
+      ar: 'إذاعة الشيخ محمد صديق المنشاوي (مرتل)',
+      en: 'Sheikh Mohamed Siddiq El-Minshawi (Murattal)',
+    ),
+    'cur-quran-abdulbasit-murattal': (
+      ar: 'إذاعة الشيخ عبد الباسط عبد الصمد (مرتل)',
+      en: 'Sheikh Abdulbasit Abdulsamad (Murattal)',
+    ),
+    'cur-quran-hussary-mojawwad': (
+      ar: 'إذاعة الشيخ محمود خليل الحصري (مجود)',
+      en: 'Sheikh Mahmoud Khalil Al-Hussary (Mujawwad)',
+    ),
+    'cur-quran-banna-mojawwad': (
+      ar: 'إذاعة الشيخ محمود علي البنا (مجود)',
+      en: 'Sheikh Mahmoud Ali Al-Banna (Mujawwad)',
+    ),
+    'cur-quran-banna-murattal': (
+      ar: 'إذاعة الشيخ محمود علي البنا (مرتل)',
+      en: 'Sheikh Mahmoud Ali Al-Banna (Murattal)',
+    ),
+    'cur-quran-tablaway': (
+      ar: 'إذاعة الشيخ محمد محمود الطبلاوي',
+      en: 'Sheikh Mohammad Al-Tablaway Radio',
+    ),
+    'cur-quran-sakeenah': (
+      ar: 'إذاعة آيات السكينة وتلاوات خاشعة',
+      en: 'Verses of Serenity & Tranquility Radio',
+    ),
+    'cur-quran-makkah': (
+      ar: 'إذاعة القرآن الكريم - مكة المكرمة (السعودية)',
+      en: 'Holy Quran Radio - Mecca Live Stream',
+    ),
+    'cur-quran-alafasi': (
+      ar: 'إذاعة الشيخ مشاري العفاسي',
+      en: 'Sheikh Mishary Alafasi Radio',
+    ),
+    'cur-quran-muaiqly': (
+      ar: 'إذاعة الشيخ ماهر المعيقلي',
+      en: 'Sheikh Maher Al-Muaiqly Radio',
+    ),
+    'cur-quran-dosari': (
+      ar: 'إذاعة الشيخ ياسر الدوسري',
+      en: 'Sheikh Yasser Al-Dosari Radio',
+    ),
+    'cur-quran-qatami': (
+      ar: 'إذاعة الشيخ ناصر القطامي',
+      en: 'Sheikh Nasser Al-Qatami Radio',
+    ),
+    'cur-quran-sudaes': (
+      ar: 'إذاعة الشيخ عبد الرحمن السديس',
+      en: 'Sheikh Abdulrahman Al-Sudais Radio',
+    ),
+    'cur-quran-shuraim': (
+      ar: 'إذاعة الشيخ سعود الشريم',
+      en: 'Sheikh Saud Al-Shuraim Radio',
+    ),
+    'cur-quran-ali-jaber': (
+      ar: 'إذاعة الشيخ علي جابر',
+      en: 'Sheikh Ali Jaber Radio',
+    ),
+    'cur-quran-idrees-abkr': (
+      ar: 'إذاعة الشيخ إدريس أبكر',
+      en: 'Sheikh Idrees Abkar Radio',
+    ),
+    'cur-quran-fares-abbad': (
+      ar: 'إذاعة الشيخ فارس عباد',
+      en: 'Sheikh Fares Abbad Radio',
+    ),
+    'cur-quran-ghamdi': (
+      ar: 'إذاعة الشيخ سعد الغامدي',
+      en: 'Sheikh Saad Al-Ghamdi Radio',
+    ),
+    'cur-quran-shatri': (
+      ar: 'إذاعة الشيخ أبو بكر الشاطري',
+      en: 'Sheikh Abu Bakr Al-Shatri Radio',
+    ),
+    'cur-quran-ajmy': (
+      ar: 'إذاعة الشيخ أحمد بن علي العجمي',
+      en: 'Sheikh Ahmed Al-Ajmy Radio',
+    ),
+    'cur-quran-jileel': (
+      ar: 'إذاعة الشيخ خالد الجليل',
+      en: 'Sheikh Khalid Al-Jaleel Radio',
+    ),
+    'cur-quran-nourin': (
+      ar: 'إذاعة الشيخ نورين محمد صديق',
+      en: 'Sheikh Nourin Mohamed Siddig Radio',
+    ),
+    'cur-lofi': (
+      ar: 'سوما إف إم - سالاد لوفاي هادئ',
+      en: 'SomaFM Groove Salad (Lofi Chill)',
+    ),
+    'cur-ambient': (
+      ar: 'سوما إف إم - دروون زون (أمبينت)',
+      en: 'SomaFM Drone Zone (Ambient)',
+    ),
+    'cur-paradise': (
+      ar: 'راديو بارادايس (الميكس الرئيسي)',
+      en: 'Radio Paradise (Main Mix)',
+    ),
+    'cur-classic': (
+      ar: 'الموسيقى الكلاسيكية والفلكلور',
+      en: 'The Thistle & Shamrock (Classical Folk)',
+    ),
+    'cur-jazz': (
+      ar: 'سوما إف إم - سونيك يونيفرس (جاز)',
+      en: 'SomaFM Sonic Universe (Jazz)',
+    ),
+    'cur-electro': (
+      ar: 'سوما إف إم - ديف كون (إلكتروني)',
+      en: 'SomaFM DEF CON (Electronic)',
+    ),
+    'cur-rock': (
+      ar: 'سوما إف إم - روك السبعينيات الكلاسيكي',
+      en: 'SomaFM Left Coast 70s (Classic Rock)',
+    ),
+    'cur-indie': (
+      ar: 'سوما إف إم - إندي بوب روكس',
+      en: 'SomaFM Indie Pop Rocks',
+    ),
+    'cur-news': (
+      ar: 'بي بي سي الإخبارية العالمية',
+      en: 'BBC World Service News',
+    ),
+  };
+
+  /// Resolves the localized display name for a curated station according to the
+  /// given language code ('ar', 'en', etc.). For custom stations or unmapped IDs,
+  /// returns [station.name].
+  static String localizedStationName(RadioStation station, String languageCode) {
+    final entry = _localizedStationNames[station.id];
+    if (entry != null) {
+      return languageCode == 'ar' ? entry.ar : entry.en;
+    }
+    return station.name;
+  }
+
   /// Resolves matching curated Sheikh/station artwork from assets by ID, URL, or name keywords.
   static String? resolveArtworkForStation({
     String? id,

@@ -2,6 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 17 (API 37+): Gating local network device discovery (Cast, mDNS, LAN group sync) -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
@@ -92,6 +94,15 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="pulsrWidget" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pulsr" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
             <!-- Unified intent filter to view/play audio files from file managers, downloads, etc. (BUG-012) -->
             <intent-filter android:label="${appName}">
                 <action android:name="android.intent.action.VIEW" />
@@ -206,6 +217,16 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+            <service
+            android:name=".PulsrPlaybackTileService"
+            android:label="@string/tile_playback_label"
+            android:icon="@drawable/ic_notification"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
     <queries>
         <intent>

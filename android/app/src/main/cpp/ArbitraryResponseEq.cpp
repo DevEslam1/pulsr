@@ -726,7 +726,7 @@ void ArbitraryResponseEq::process(float* L, float* R, int frames) {
 void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int channels) {
     const float targetEnabledMix = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
     if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
-    if (!buffer || frames <= 0 || channels < 2) return;
+    if (!buffer || frames <= 0 || channels < 1) return;
 
     // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
     const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
@@ -741,10 +741,19 @@ void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int chan
 
     const float crossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
 
-    for (int i = 0; i < frames; ++i) {
-        processFrame(buffer[i * channels], buffer[i * channels + 1],
-                     buffer[i * channels], buffer[i * channels + 1],
-                     currentEnabledMix, crossfadeStep);
-        currentEnabledMix += mixStep;
+    if (channels == 1) {
+        float dummyR = 0.0f;
+        for (int i = 0; i < frames; ++i) {
+            processFrame(buffer[i], buffer[i], buffer[i], dummyR,
+                         currentEnabledMix, crossfadeStep);
+            currentEnabledMix += mixStep;
+        }
+    } else {
+        for (int i = 0; i < frames; ++i) {
+            processFrame(buffer[i * channels], buffer[i * channels + 1],
+                         buffer[i * channels], buffer[i * channels + 1],
+                         currentEnabledMix, crossfadeStep);
+            currentEnabledMix += mixStep;
+        }
     }
 }

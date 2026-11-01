@@ -31,6 +31,16 @@ class BatteryOptimizationService {
     }
   }
 
+  static Future<bool> openOemBatterySettings() async {
+    if (kIsWeb || !Platform.isAndroid) return false;
+    try {
+      final res = await _channel.invokeMethod<bool>('openOemBatterySettings');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<String> getDeviceManufacturer() async {
     if (kIsWeb || !Platform.isAndroid) return '';
     try {

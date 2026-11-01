@@ -227,14 +227,52 @@ abstract class SettingsState with _$SettingsState {
   bool get dynamicThemingEnabled =>
       themeColorSource == ThemeColorSource.artwork;
 
+  /// Returns estimated transmission latency in milliseconds based on the Bluetooth codec.
+  static int estimateCodecLatencyMs(String? codecName) {
+    if (codecName == null || codecName.isEmpty) return 140;
+    final c = codecName.toUpperCase();
+    if (c.contains('APTX ADAPTIVE') ||
+        c.contains('APTX LL') ||
+        c.contains('LOW LATENCY')) {
+      return 40;
+    }
+    if (c.contains('LC3') || c.contains('LE AUDIO')) {
+      return 45;
+    }
+    if (c.contains('APTX HD')) {
+      return 120;
+    }
+    if (c.contains('APTX')) {
+      return 75;
+    }
+    if (c.contains('LDAC')) {
+      return 100;
+    }
+    if (c.contains('AAC')) {
+      return 150;
+    }
+    if (c.contains('SBC')) {
+      return 200;
+    }
+    return 140;
+  }
+
   /// How far the audible signal trails the position the player reports.
   ///
   /// Every Bluetooth sink (A2DP or LE Audio) buffers audio downstream, so the
   /// listener hears a moment that was decoded [bluetoothLatencyOffsetMs] ago.
   /// Anything syncing visuals to sound (lyrics, karaoke) must follow the
-  /// audible position; wired and speaker output have no comparable lag. The
-  /// amount is user-calibrated because Android exposes no sink-latency API.
-  Duration get audibleLatencyOffset => currentOutputDevice?.isBluetooth == true
-      ? Duration(milliseconds: bluetoothLatencyOffsetMs)
-      : Duration.zero;
+  /// audible position; wired and speaker output have no comparable lag.
+  /// If the user has not set a custom manual calibration ([bluetoothLatencyOffsetMs] == 0),
+  /// the offset dynamically tracks the negotiated Bluetooth codec (e.g. SBC ~200ms, AAC ~150ms,
+  /// LDAC ~100ms, aptX ~75ms, aptX Adaptive/LC3 ~40-45ms).
+  Duration get audibleLatencyOffset {
+    if (currentOutputDevice?.isBluetooth != true) return Duration.zero;
+    if (bluetoothLatencyOffsetMs > 0) {
+      return Duration(milliseconds: bluetoothLatencyOffsetMs);
+    }
+    return Duration(
+      milliseconds: estimateCodecLatencyMs(currentOutputDevice?.btCodecName),
+    );
+  }
 }

@@ -35,7 +35,9 @@ extension PlayerDspEqExtension on PlayerDspController {
       playback: state.playback.copyWith(errorMessage: null),
     ));
     try {
-      await _audioHandler.setEqualizerEnabled(true);
+      if (!previousDsp.isEqEnabled) {
+        await _audioHandler.setEqualizerEnabled(true);
+      }
       await _audioHandler.applyPreset(preset);
       return true;
     } catch (e, st) {

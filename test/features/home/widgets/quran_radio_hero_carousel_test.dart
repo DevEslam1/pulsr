@@ -37,6 +37,7 @@ void main() {
   Widget buildHarness({
     required Widget child,
     VoidCallback? onMoreStations,
+    Locale locale = const Locale('ar'),
   }) {
     final router = GoRouter(
       initialLocation: '/',
@@ -56,6 +57,7 @@ void main() {
       value: playerCubit,
       child: MaterialApp.router(
         theme: AuraTheme.darkTheme,
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router,
@@ -110,21 +112,23 @@ void main() {
 
     expect(find.text('1/11'), findsOneWidget);
 
-    // Swipe left (drag left) to view next station
-    await tester.drag(
-      find.byType(QuranRadioHeroCarousel),
-      const Offset(-400, 0),
+    // In RTL (Arabic), swiping forward to next page is dragging to the right (positive dx)
+    await tester.fling(
+      find.byType(PageView),
+      const Offset(400, 0),
+      1000,
     );
     await tester.pumpAndSettle();
 
-    // Now page 2/11 is shown (Rare Khashia Recitations)
+    // Now page 2/11 is centered (Rare Khashia Recitations)
     expect(find.text('2/11'), findsOneWidget);
     expect(find.text('إذاعة تلاوات خاشعة نادرة'), findsOneWidget);
 
     // Swipe again to view 3rd station: Sheikh Minshawi rare recitations
-    await tester.drag(
-      find.byType(QuranRadioHeroCarousel),
-      const Offset(-400, 0),
+    await tester.fling(
+      find.byType(PageView),
+      const Offset(400, 0),
+      1000,
     );
     await tester.pumpAndSettle();
 
@@ -182,6 +186,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       buildHarness(
+        locale: const Locale('en'),
         child: QuranRadioHeroCarousel(playerCubit: playerCubit),
       ),
     );
@@ -194,5 +199,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('radio-directory-route'), findsOneWidget);
+  });
+
+  testWidgets('renders English text when locale is English',
+      (tester) async {
+    await tester.pumpWidget(
+      buildHarness(
+        locale: const Locale('en'),
+        child: QuranRadioHeroCarousel(playerCubit: playerCubit),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sheikh Mohamed Siddiq El-Minshawi'), findsWidgets);
+    expect(
+      find.textContaining('Holy Quran • Reverent Mujawwad Recitation'),
+      findsWidgets,
+    );
+    expect(find.text('Listen Now'), findsWidgets);
   });
 }

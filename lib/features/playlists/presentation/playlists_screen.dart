@@ -1814,17 +1814,30 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (onDownload != null) ...[
-                    GestureDetector(
-                      onTap: onDownload,
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.specularAt(0.2),
-                          shape: BoxShape.circle,
+                    Semantics(
+                      button: true,
+                      label: context.l10n.downloadAction,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onDownload,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 44,
+                            minHeight: 44,
+                          ),
+                          child: Center(
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.specularAt(0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.download_rounded,
+                                  color: Colors.white, size: 22),
+                            ),
+                          ),
                         ),
-                        child: const Icon(Icons.download_rounded,
-                            color: Colors.white, size: 22),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s10),

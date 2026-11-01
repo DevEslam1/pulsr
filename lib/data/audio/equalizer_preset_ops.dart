@@ -84,6 +84,7 @@ extension EqualizerPresetOps on EqualizerManager {
         frequencies: targetFreqs,
         gains: flatGains,
         qs: graphicEqQs(targetFreqs),
+        types: graphicEqTypes(targetFreqs.length),
       );
       if (legacyMirrorEnabled) {
         final halFlatGains = List<double>.filled(customFrequencies.length, 0.0);
@@ -120,6 +121,7 @@ extension EqualizerPresetOps on EqualizerManager {
             frequencies: targetFreqs,
             gains: merged,
             qs: graphicEqQs(targetFreqs),
+            types: graphicEqTypes(targetFreqs.length),
           );
           if (legacyMirrorEnabled) {
             if (eqBandCount != 10) {

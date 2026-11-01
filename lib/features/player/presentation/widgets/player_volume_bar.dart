@@ -62,6 +62,8 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
               min: 0.0,
               max: 1.0,
               value: effectiveVolume,
+              semanticLabel: context.l10n.volume,
+              semanticFormatterCallback: (v) => '${(v * 100).round()}%',
               activeColor: widget.activeColor,
               onChangeStart: (v) => setState(() => _dragVolume = v),
               onChanged: (v) {

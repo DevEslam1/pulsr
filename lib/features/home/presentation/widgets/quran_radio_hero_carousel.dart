@@ -20,18 +20,33 @@ import '../../../player/cubit/player_state.dart';
 /// Data descriptor for a Quran radio station presented in the hero card carousel.
 class QuranHeroItem {
   final RadioStation station;
-  final String reciterTitle;
-  final String subtitle;
+  final String reciterTitleAr;
+  final String reciterTitleEn;
+  final String subtitleAr;
+  final String subtitleEn;
   final String artworkAsset;
-  final String? badgeText;
+  final String? badgeTextAr;
+  final String? badgeTextEn;
 
   const QuranHeroItem({
     required this.station,
-    required this.reciterTitle,
-    required this.subtitle,
+    required this.reciterTitleAr,
+    required this.reciterTitleEn,
+    required this.subtitleAr,
+    required this.subtitleEn,
     required this.artworkAsset,
-    this.badgeText,
+    this.badgeTextAr,
+    this.badgeTextEn,
   });
+
+  String get reciterTitle => reciterTitleAr;
+  String get subtitle => subtitleAr;
+  String? get badgeText => badgeTextAr;
+
+  String getReciterTitle(bool isArabic) =>
+      isArabic ? reciterTitleAr : reciterTitleEn;
+  String getSubtitle(bool isArabic) => isArabic ? subtitleAr : subtitleEn;
+  String? getBadgeText(bool isArabic) => isArabic ? badgeTextAr : badgeTextEn;
 }
 
 /// Swipeable Quran Radio Hero Carousel for the HomeScreen.
@@ -64,10 +79,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.minshawiArtwork,
         ),
-        reciterTitle: 'الشيخ محمد صديق المنشاوي',
-        subtitle: 'المصحف المجود • تلاوة خاشعة',
+        reciterTitleAr: 'الشيخ محمد صديق المنشاوي',
+        reciterTitleEn: 'Sheikh Mohamed Siddiq El-Minshawi',
+        subtitleAr: 'المصحف المجود • تلاوة خاشعة',
+        subtitleEn: 'Holy Quran • Reverent Mujawwad Recitation',
         artworkAsset: RadioStationStore.minshawiArtwork,
-        badgeText: 'تلاوة خاشعة',
+        badgeTextAr: 'تلاوة خاشعة',
+        badgeTextEn: 'Khashia Recitation',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -77,10 +95,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.tarteelArtwork,
         ),
-        reciterTitle: 'إذاعة تلاوات خاشعة نادرة',
-        subtitle: 'تلاوات خاشعة ومؤثرة • كبار القراء',
+        reciterTitleAr: 'إذاعة تلاوات خاشعة نادرة',
+        reciterTitleEn: 'Rare Khashia Recitations Radio',
+        subtitleAr: 'تلاوات خاشعة ومؤثرة • كبار القراء',
+        subtitleEn: 'Rare Reverent Recitations • Master Reciters',
         artworkAsset: RadioStationStore.tarteelArtwork,
-        badgeText: 'تلاوات خاشعة',
+        badgeTextAr: 'تلاوات خاشعة',
+        badgeTextEn: 'Rare Recitations',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -90,10 +111,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.minshawiArtwork,
         ),
-        reciterTitle: 'الشيخ محمد صديق المنشاوي',
-        subtitle: 'تلاوات نادرة ومحافل خاشعة',
+        reciterTitleAr: 'الشيخ محمد صديق المنشاوي',
+        reciterTitleEn: 'Sheikh Mohamed Siddiq El-Minshawi',
+        subtitleAr: 'تلاوات نادرة ومحافل خاشعة',
+        subtitleEn: 'Rare Historic Recitations & Concerts',
         artworkAsset: RadioStationStore.minshawiArtwork,
-        badgeText: 'تلاوات نادرة',
+        badgeTextAr: 'تلاوات نادرة',
+        badgeTextEn: 'Historic Recitations',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -103,10 +127,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.quranCairoArtwork,
         ),
-        reciterTitle: 'إذاعة القرآن الكريم - القاهرة',
-        subtitle: 'بث مباشر من القاهرة • عبر الأثير',
+        reciterTitleAr: 'إذاعة القرآن الكريم - القاهرة',
+        reciterTitleEn: 'Holy Quran Radio - Cairo',
+        subtitleAr: 'بث مباشر من القاهرة • عبر الأثير',
+        subtitleEn: 'Live from Cairo • Over the Air',
         artworkAsset: RadioStationStore.quranCairoArtwork,
-        badgeText: 'بث مباشر',
+        badgeTextAr: 'بث مباشر',
+        badgeTextEn: 'Live Broadcast',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -117,10 +144,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.abdulBasitArtwork,
         ),
-        reciterTitle: 'الشيخ عبد الباسط عبد الصمد',
-        subtitle: 'صوت مكة • المصحف المجود',
+        reciterTitleAr: 'الشيخ عبد الباسط عبد الصمد',
+        reciterTitleEn: 'Sheikh Abdulbasit Abdulsamad',
+        subtitleAr: 'صوت مكة • المصحف المجود',
+        subtitleEn: 'Voice of Mecca • Holy Quran Mujawwad',
         artworkAsset: RadioStationStore.abdulBasitArtwork,
-        badgeText: 'المصحف المجود',
+        badgeTextAr: 'المصحف المجود',
+        badgeTextEn: 'Mujawwad Mushaf',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -130,10 +160,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.hussaryArtwork,
         ),
-        reciterTitle: 'الشيخ محمود خليل الحصري',
-        subtitle: 'شيخ عموم المقارئ المصرية • المصحف المعلم',
+        reciterTitleAr: 'الشيخ محمود خليل الحصري',
+        reciterTitleEn: 'Sheikh Mahmoud Khalil Al-Hussary',
+        subtitleAr: 'شيخ عموم المقارئ المصرية • المصحف المعلم',
+        subtitleEn: 'Master of Reciters • Teaching Mushaf',
         artworkAsset: RadioStationStore.hussaryArtwork,
-        badgeText: 'المصحف المعلم',
+        badgeTextAr: 'المصحف المعلم',
+        badgeTextEn: 'Teacher Mushaf',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -143,10 +176,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.mustafaIsmailArtwork,
         ),
-        reciterTitle: 'الشيخ مصطفى إسماعيل',
-        subtitle: 'قارئ الملوك والرؤساء • إعجاز التلاوة',
+        reciterTitleAr: 'الشيخ مصطفى إسماعيل',
+        reciterTitleEn: 'Sheikh Mustafa Ismail',
+        subtitleAr: 'قارئ الملوك والرؤساء • إعجاز التلاوة',
+        subtitleEn: 'Legendary Reciter • Miraculous Recitation',
         artworkAsset: RadioStationStore.mustafaIsmailArtwork,
-        badgeText: 'المصحف المجود',
+        badgeTextAr: 'المصحف المجود',
+        badgeTextEn: 'Mujawwad Mushaf',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -157,10 +193,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.quranCairoArtwork,
         ),
-        reciterTitle: 'الشيخ محمود علي البنا',
-        subtitle: 'المصحف المجود • صوت شجي خاشع',
+        reciterTitleAr: 'الشيخ محمود علي البنا',
+        reciterTitleEn: 'Sheikh Mahmoud Ali Al-Banna',
+        subtitleAr: 'المصحف المجود • صوت شجي خاشع',
+        subtitleEn: 'Holy Quran Mujawwad • Melodious Voice',
         artworkAsset: RadioStationStore.quranCairoArtwork,
-        badgeText: 'المصحف المجود',
+        badgeTextAr: 'المصحف المجود',
+        badgeTextEn: 'Mujawwad Mushaf',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -170,10 +209,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.quranCairoArtwork,
         ),
-        reciterTitle: 'الشيخ محمد محمود الطبلاوي',
-        subtitle: 'تلاوات خاشعة نادرة • نبرة مميزة',
+        reciterTitleAr: 'الشيخ محمد محمود الطبلاوي',
+        reciterTitleEn: 'Sheikh Mohammad Al-Tablaway',
+        subtitleAr: 'تلاوات خاشعة نادرة • نبرة مميزة',
+        subtitleEn: 'Rare Recitations • Distinctive Tone',
         artworkAsset: RadioStationStore.quranCairoArtwork,
-        badgeText: 'تلاوات خاشعة',
+        badgeTextAr: 'تلاوات خاشعة',
+        badgeTextEn: 'Khashia Recitations',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -183,10 +225,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.tarteelArtwork,
         ),
-        reciterTitle: 'إذاعة تراتيل القرآن الكريم',
-        subtitle: 'تلاوات عذبة مختارة على مدار الساعة',
+        reciterTitleAr: 'إذاعة تراتيل القرآن الكريم',
+        reciterTitleEn: 'Holy Quran Short Recitations Radio',
+        subtitleAr: 'تلاوات عذبة مختارة على مدار الساعة',
+        subtitleEn: 'Sweet Recitations 24/7',
         artworkAsset: RadioStationStore.tarteelArtwork,
-        badgeText: 'تراتيل عذبة',
+        badgeTextAr: 'تراتيل عذبة',
+        badgeTextEn: 'Sweet Tarteel',
       ),
       const QuranHeroItem(
         station: RadioStation(
@@ -196,10 +241,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           genre: 'Quran',
           artworkUrl: RadioStationStore.quranCairoArtwork,
         ),
-        reciterTitle: 'إذاعة القرآن الكريم - القاهرة',
-        subtitle: 'بث بديل عالي الجودة',
+        reciterTitleAr: 'إذاعة القرآن الكريم - القاهرة',
+        reciterTitleEn: 'Holy Quran Radio - Cairo',
+        subtitleAr: 'بث بديل عالي الجودة',
+        subtitleEn: 'High Quality Backup Stream',
         artworkAsset: RadioStationStore.quranCairoArtwork,
-        badgeText: 'بث بديل',
+        badgeTextAr: 'بث بديل',
+        badgeTextEn: 'Backup Stream',
       ),
     ];
   }
@@ -234,13 +282,17 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
       for (final s in storeList) {
         if (!existingUrls.contains(s.url)) {
           existingUrls.add(s.url);
+          final fallbackGenre = s.genre?.isNotEmpty == true ? s.genre! : null;
           extraItems.add(
             QuranHeroItem(
               station: s,
-              reciterTitle: s.name,
-              subtitle: s.genre ?? 'إذاعة القرآن الكريم',
+              reciterTitleAr: s.name,
+              reciterTitleEn: s.name,
+              subtitleAr: fallbackGenre ?? 'إذاعة القرآن الكريم',
+              subtitleEn: fallbackGenre ?? 'Holy Quran Radio',
               artworkAsset: s.artworkUrl ?? RadioStationStore.minshawiArtwork,
-              badgeText: 'إذاعة مخصصة',
+              badgeTextAr: 'إذاعة مخصصة',
+              badgeTextEn: 'Custom Station',
             ),
           );
         }
@@ -269,7 +321,11 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
     if (isCurrent) {
       playerCubit.togglePlayPause();
     } else {
-      playerCubit.playRadioStation(item.station);
+      final lang = Localizations.localeOf(context).languageCode;
+      final localizedStation = item.station.copyWith(
+        name: RadioStationStore.localizedStationName(item.station, lang),
+      );
+      playerCubit.playRadioStation(localizedStation);
     }
   }
 
@@ -471,19 +527,25 @@ class _QuranHeroCard extends StatelessWidget {
                     prev.currentSong?.album != curr.currentSong?.album));
       },
       builder: (context, playerState) {
+        final isArabic = Localizations.localeOf(context).languageCode == 'ar';
         final isCurrent = playerState.currentSong?.path == item.station.url;
         final isPlaying = isCurrent && playerState.isPlaying;
         final isBuffering = isCurrent && playerState.isBuffering;
         final rawIcyTitle = isCurrent
             ? (playerState.currentSong?.album.trim() ?? '')
             : '';
+        final defaultSubtitle = item.getSubtitle(isArabic);
         final displaySubtitle =
-            rawIcyTitle.isNotEmpty ? rawIcyTitle : item.subtitle;
+            rawIcyTitle.isNotEmpty ? rawIcyTitle : defaultSubtitle;
+        final reciterTitle = item.getReciterTitle(isArabic);
+        final badgeText = item.getBadgeText(isArabic);
+        final defaultBadge =
+            isArabic ? 'إذاعة القرآن الكريم' : 'Holy Quran Radio';
 
         return Semantics(
           button: true,
           label:
-              '${item.reciterTitle}, ${item.subtitle}. ${isPlaying ? "Playing, double tap to pause" : "Double tap to play live stream"}',
+              '$reciterTitle, $displaySubtitle. ${isPlaying ? (isArabic ? "قيد التشغيل، اضغط للإيقاف" : "Playing, double tap to pause") : (isArabic ? "اضغط للتشغيل" : "Double tap to play live stream")}',
           child: Material(
             color: Colors.transparent,
             borderRadius: AppRadii.r24All,
@@ -639,7 +701,7 @@ class _QuranHeroCard extends StatelessWidget {
                                       const _PulsingLiveDot(),
                                       const SizedBox(width: 4),
                                       Text(
-                                        'بث مباشر',
+                                        isArabic ? 'بث مباشر' : 'LIVE ON AIR',
                                         style: TextStyle(
                                           color: AppColors.mint,
                                           fontSize: AppFontSize.tiny,
@@ -655,7 +717,7 @@ class _QuranHeroCard extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        item.badgeText ?? 'إذاعة القرآن الكريم',
+                                        badgeText ?? defaultBadge,
                                         style: TextStyle(
                                           color: p.accent,
                                           fontSize: AppFontSize.tiny,
@@ -684,7 +746,7 @@ class _QuranHeroCard extends StatelessWidget {
 
                           // Station/Reciter Title
                           MarqueeText(
-                            text: item.reciterTitle,
+                            text: reciterTitle,
                             textAlign: TextAlign.start,
                             allowUserPause: false,
                             velocity: 28.0,
@@ -791,7 +853,7 @@ class _QuranHeroCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'بث حي',
+                                  isArabic ? 'بث حي' : 'LIVE',
                                   style: TextStyle(
                                     color: AppColors.mint,
                                     fontSize: 11,
@@ -806,7 +868,7 @@ class _QuranHeroCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'استمع الآن',
+                                  isArabic ? 'استمع الآن' : 'Listen Now',
                                   style: TextStyle(
                                     color: p.textSecondary,
                                     fontSize: 11,

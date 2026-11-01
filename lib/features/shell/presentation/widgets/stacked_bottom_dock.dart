@@ -566,12 +566,12 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               );
             }
 
-            final Widget miniPlayerCard = AnimatedPositioned(
+            final Widget miniPlayerCard = AnimatedPositionedDirectional(
               key: const ValueKey('dock_mini_player_positioned'),
               duration: animDuration,
               curve: animCurve,
-              left: 0,
-              right: 0,
+              start: 0,
+              end: 0,
               bottom: miniPlayerBottom,
               child: _AnimatedCardTransform(
                 duration: animDuration,
@@ -615,12 +615,12 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               );
             }
 
-            final Widget navBarCard = AnimatedPositioned(
+            final Widget navBarCard = AnimatedPositionedDirectional(
               key: const ValueKey('dock_nav_bar_positioned'),
               duration: animDuration,
               curve: animCurve,
-              left: 0,
-              right: 0,
+              start: 0,
+              end: 0,
               bottom: navBarBottom,
               child: _AnimatedCardTransform(
                 duration: animDuration,

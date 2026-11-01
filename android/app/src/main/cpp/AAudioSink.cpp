@@ -368,6 +368,7 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
             framesWritten_.fetch_add(w, std::memory_order_relaxed);
             retries = 0;
         } else if (w == AAUDIO_ERROR_TIMEOUT) {
+            CheckAndAdaptBuffer(st);
             if (++retries > kMaxRetries) break;
             continue;  // loop re-checks releasing_ so Close() is never blocked
         } else if (w == AAUDIO_ERROR_DISCONNECTED) {
@@ -452,6 +453,23 @@ int32_t AAudioSink::XRunCount() const {
     return xruns;
 }
 
+void AAudioSink::CheckAndAdaptBuffer(AAudioStream* st) {
+    if (st == nullptr || releasing_.load(std::memory_order_acquire)) return;
+    const int32_t currentSize = AAudioStream_getBufferSizeInFrames(st);
+    const int32_t capacity = AAudioStream_getBufferCapacityInFrames(st);
+    const int32_t burst = AAudioStream_getFramesPerBurst(st);
+    if (burst <= 0 || currentSize >= capacity) return;
+
+    // Expand buffer by 2 bursts to prevent recurring xruns on lower-power SoCs (MediaTek/Exynos)
+    const int32_t step = std::max(burst * 2, burst);
+    const int32_t newSize = std::min(currentSize + step, capacity);
+    if (newSize > currentSize) {
+        const int32_t applied = AAudioStream_setBufferSizeInFrames(st, newSize);
+        LOGI("AAudio adaptive governor: expanded buffer: %d -> %d frames (capacity=%d)",
+             currentSize, applied, capacity);
+    }
+}
+
 int32_t AAudioSink::XRunDelta() const {
     activeReaders_.fetch_add(1, std::memory_order_acquire);
     AAudioStream* st = stream_.load(std::memory_order_acquire);
@@ -460,6 +478,9 @@ int32_t AAudioSink::XRunDelta() const {
         const int32_t cur = AAudioStream_getXRunCount(st);
         const int32_t prev = lastXRunCount_.exchange(cur, std::memory_order_relaxed);
         delta = cur > prev ? (cur - prev) : 0;
+        if (delta > 0) {
+            const_cast<AAudioSink*>(this)->CheckAndAdaptBuffer(st);
+        }
     }
     activeReaders_.fetch_sub(1, std::memory_order_release);
     return delta;

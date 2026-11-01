@@ -61,3 +61,5 @@ target_link_libraries(flacJNI
     z
     m
 )
+
+target_link_options(flacJNI PRIVATE -Wl,-z,max-page-size=16384)

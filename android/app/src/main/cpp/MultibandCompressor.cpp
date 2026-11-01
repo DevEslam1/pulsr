@@ -137,7 +137,7 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
 
     const float targetEnabledMix = enabled_ ? 1.0f : 0.0f;
     if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
-    if (!buffer || frames <= 0 || channels < 2) return;
+    if (!buffer || frames <= 0 || channels < 1) return;
 
     // Smooth stage bypass/enable over 20 ms to prevent clicks and phase jumps against dry signal
     constexpr double kTau = 0.020;
@@ -161,7 +161,7 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         for (int i = 0; i < chunkFrames; ++i) {
             const int inIdx = (offset + i) * channels;
             const double inL = buffer[inIdx];
-            const double inR = buffer[inIdx + 1];
+            const double inR = (channels > 1) ? buffer[inIdx + 1] : inL;
 
             double lowHalfL, lowHalfR, highHalfL, highHalfR;
             crossoverMid_.process(inL, inR, lowHalfL, lowHalfR, highHalfL, highHalfR);
@@ -219,7 +219,7 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         for (int i = 0; i < chunkFrames; ++i) {
             const int outIdx = (offset + i) * channels;
             const float inL = buffer[outIdx];
-            const float inR = buffer[outIdx + 1];
+            const float inR = (channels > 1) ? buffer[outIdx + 1] : inL;
 
             const float wetL = bandBufferL_[0][i] + bandBufferL_[1][i] + bandBufferL_[2][i] + bandBufferL_[3][i];
             const float wetR = bandBufferR_[0][i] + bandBufferR_[1][i] + bandBufferR_[2][i] + bandBufferR_[3][i];
@@ -238,7 +238,9 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
             }
 
             buffer[outIdx] = dryW * inL + wetW * wetL;
-            buffer[outIdx + 1] = dryW * inR + wetW * wetR;
+            if (channels > 1) {
+                buffer[outIdx + 1] = dryW * inR + wetW * wetR;
+            }
             currentEnabledMix += mixStep;
         }
 

@@ -1332,7 +1332,7 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
 }
 
 void ConvolutionReverb::processInterleaved(float* buffer, int frames, int channels) {
-    if (!buffer || frames <= 0 || channels < 2 || !preparedIr_ || preparedIr_->totalTaps == 0) return;
+    if (!buffer || frames <= 0 || channels < 1 || !preparedIr_ || preparedIr_->totalTaps == 0) return;
     if (!isRamping() && targetEnabledMix_.load(std::memory_order_relaxed) < 1e-4f) return;
     if (frames > static_cast<int>(scratchInL_.size())) return; // Safety guard: capacity exceeded, bypass
 
@@ -1341,15 +1341,24 @@ void ConvolutionReverb::processInterleaved(float* buffer, int frames, int channe
     float* outL = scratchOutL_.data();
     float* outR = scratchOutR_.data();
 
-    for (int i = 0; i < frames; ++i) {
-        inL[i] = buffer[i * channels];
-        inR[i] = buffer[i * channels + 1];
-    }
-
-    process(inL, inR, outL, outR, frames);
-
-    for (int i = 0; i < frames; ++i) {
-        buffer[i * channels] = outL[i];
-        buffer[i * channels + 1] = outR[i];
+    if (channels == 1) {
+        for (int i = 0; i < frames; ++i) {
+            inL[i] = buffer[i];
+            inR[i] = buffer[i];
+        }
+        process(inL, inR, outL, outR, frames);
+        for (int i = 0; i < frames; ++i) {
+            buffer[i] = 0.5f * (outL[i] + outR[i]);
+        }
+    } else {
+        for (int i = 0; i < frames; ++i) {
+            inL[i] = buffer[i * channels];
+            inR[i] = buffer[i * channels + 1];
+        }
+        process(inL, inR, outL, outR, frames);
+        for (int i = 0; i < frames; ++i) {
+            buffer[i * channels] = outL[i];
+            buffer[i * channels + 1] = outR[i];
+        }
     }
 }

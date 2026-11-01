@@ -111,7 +111,7 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
     if (!enabled_ && smoothedStrength_ < 1e-4) {
         return;
     }
-    if (buffer == nullptr || frames <= 0 || channels < 2) {
+    if (buffer == nullptr || frames <= 0 || channels < 1) {
         return;
     }
 
@@ -131,7 +131,7 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
     for (int i = 0; i < frames; ++i) {
         const int idx = i * channels;
         const double L = buffer[idx];
-        const double R = buffer[idx + 1];
+        const double R = (channels > 1) ? buffer[idx + 1] : L;
 
         // 1. Mid-Side decomposition
         const double M = 0.5 * (L + R);
@@ -188,7 +188,9 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
             sideProcessed = S;
         }
         buffer[idx] = static_cast<float>(midOut + sideProcessed);
-        buffer[idx + 1] = static_cast<float>(midOut - sideProcessed);
+        if (channels > 1) {
+            buffer[idx + 1] = static_cast<float>(midOut - sideProcessed);
+        }
         currentStr += strStep;
     }
 }

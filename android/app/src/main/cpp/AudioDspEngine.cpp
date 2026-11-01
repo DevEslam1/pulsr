@@ -1082,8 +1082,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             dynamicEq_.processInterleaved(buffer, frames, channels);
         }
 
-        // 2b. Native Multiband Compressor Stage — 4-band LR4 dynamics (stereo channels 0 and 1)
-        if (((stages & STAGE_MULTIBAND_COMPRESSOR) || multibandCompressor_.isRamping()) && channels >= 2) {
+        // 2b. Native Multiband Compressor Stage — 4-band LR4 dynamics
+        if (((stages & STAGE_MULTIBAND_COMPRESSOR) || multibandCompressor_.isRamping()) && channels >= 1) {
             multibandCompressor_.processInterleaved(buffer, frames, channels);
         }
 
@@ -1105,8 +1105,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             blockLatency += saturation_.getLatencyFrames();
         }
 
-        // 6. Convolution Reverb Stage (Stereo channels 0 and 1)
-        if ((((stages & STAGE_REVERB) && snapshot->reverb.enabled) || reverb_.isRamping()) && channels >= 2) {
+        // 6. Convolution Reverb Stage
+        if ((((stages & STAGE_REVERB) && snapshot->reverb.enabled) || reverb_.isRamping()) && channels >= 1) {
             reverb_.processInterleaved(buffer, frames, channels);
             blockLatency += reverb_.getReverbLatencyFrames();
         }
@@ -1127,8 +1127,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             subCrossover_.processInterleaved(buffer, frames, channels);
         }
 
-        // 8b. Dynamic Bass Stage (ViPER-modeled Dynamic System, stereo channels 0 and 1)
-        if (((stages & STAGE_DYNAMIC_BASS) || (!(degraded & STAGE_DYNAMIC_BASS) && dynamicBass_.isRamping())) && channels >= 2) {
+        // 8b. Dynamic Bass Stage (ViPER-modeled Dynamic System)
+        if (((stages & STAGE_DYNAMIC_BASS) || (!(degraded & STAGE_DYNAMIC_BASS) && dynamicBass_.isRamping())) && channels >= 1) {
             dynamicBass_.processInterleaved(buffer, frames, channels);
         }
 

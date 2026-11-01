@@ -165,6 +165,14 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
                             onPressed: () => Navigator.of(ctx).pop(),
                             child: Text(context.l10n.close),
                           ),
+                          FilledButton.tonal(
+                            onPressed: () async {
+                              Navigator.of(ctx).pop();
+                              await BatteryOptimizationService
+                                  .openOemBatterySettings();
+                            },
+                            child: Text(context.l10n.openSettings),
+                          ),
                         ],
                       ),
                     );

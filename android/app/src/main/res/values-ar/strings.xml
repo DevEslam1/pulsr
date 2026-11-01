@@ -60,4 +60,17 @@
     <string name="download_notification_action_resume">استئناف</string>
     <string name="download_notification_degraded">حماية محدودة في الخلفية — أبقِ Pulsr مفتوحًا</string>
     <string name="download_notification_timeout">تم إيقاف التنزيلات مؤقتًا — انتهى وقت التشغيل في الخلفية المسموح به في Android. افتح Pulsr للمتابعة.</string>
+
+    <!-- اختصارات المشغل -->
+    <string name="shortcut_play_short">تشغيل</string>
+    <string name="shortcut_play_long">استئناف التشغيل</string>
+    <string name="shortcut_shuffle_short">عشوائي</string>
+    <string name="shortcut_shuffle_long">تشغيل الكل عشوائياً</string>
+    <string name="shortcut_favorites_short">المفضلة</string>
+    <string name="shortcut_favorites_long">فتح الأغاني المفضلة</string>
+    <string name="shortcut_search_short">بحث</string>
+    <string name="shortcut_search_long">البحث في المكتبة</string>
+
+    <!-- بلاطة الإعدادات السريعة -->
+    <string name="tile_playback_label">موسيقى Pulsr</string>
 </resources>

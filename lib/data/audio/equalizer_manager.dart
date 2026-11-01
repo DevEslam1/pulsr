@@ -86,6 +86,16 @@ List<double> graphicEqQs(List<double> freqs) {
   return qs;
 }
 
+/// Filter types for graphic EQ bands (LowShelf for band 0, HighShelf for band N-1, Peaking for interior).
+/// FilterType enum values: 0 = Peaking, 1 = LowShelf, 2 = HighShelf.
+List<int> graphicEqTypes(int count) {
+  if (count < 5) return List<int>.filled(count, 0);
+  final types = List<int>.filled(count, 0);
+  types[0] = 1; // LowShelf
+  types[count - 1] = 2; // HighShelf
+  return types;
+}
+
 /// Numeric DSP-parameter sanitation lives in `dsp_param_ranges.dart`:
 /// [DspParamRanges] is the single source of truth for every parameter's valid
 /// range, and [clampFinite] / [DspRange.clamp] are the NaN/Inf-safe clamps the
@@ -725,6 +735,7 @@ class EqualizerManager {
       final nativeOk = await _pushNativeBands(targetFreqs);
       if (!nativeOk) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
+        final types = graphicEqTypes(targetFreqs.length);
         final futures = <Future<bool>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
           futures.add(
@@ -733,6 +744,7 @@ class EqualizerManager {
               targetFreqs[i],
               currentPreset.gains[i],
               graphicEqQs(targetFreqs)[i],
+              type: types[i],
             ),
           );
           if (futures.length >= 8) {
@@ -769,6 +781,7 @@ class EqualizerManager {
   }
 
   Future<void> _setEnabledCore(bool enabled) async {
+    if (isEnabled == enabled) return;
     final previous = isEnabled;
     isEnabled = enabled;
     try {
@@ -814,6 +827,7 @@ class EqualizerManager {
     final gains = EqPreset.interpolateGains(
       preset.gains,
       targetFrequencies: targetFreqs,
+      sourceFrequencies: preset.customFrequencies,
     );
     final previousPreset = currentPreset;
     final previousSlotPreset = comparisonSlots[activeComparisonSlot];
@@ -875,6 +889,7 @@ class EqualizerManager {
       if (valid.isEmpty) return;
       try {
         if (PlatformCapabilities.isAndroid && isEnabled) {
+          final types = graphicEqTypes(targetFreqs.length);
           if (eqBandCount != 10) {
             var nativeOk = true;
             if (valid.length > 1) {
@@ -882,6 +897,7 @@ class EqualizerManager {
                 frequencies: targetFreqs,
                 gains: currentPreset.gains,
                 qs: graphicEqQs(targetFreqs),
+                types: types,
               );
             } else {
               for (final entry in valid.entries) {
@@ -890,6 +906,7 @@ class EqualizerManager {
                   targetFreqs[entry.key],
                   entry.value,
                   graphicEqQs(targetFreqs)[entry.key],
+                  type: types[entry.key],
                 );
                 if (!ok) nativeOk = false;
               }
@@ -911,6 +928,7 @@ class EqualizerManager {
                 frequencies: targetFreqs,
                 gains: currentPreset.gains,
                 qs: graphicEqQs(targetFreqs),
+                types: types,
               );
             } else {
               for (final entry in valid.entries) {
@@ -920,6 +938,7 @@ class EqualizerManager {
                   targetFreqs[entry.key],
                   entry.value,
                   graphicEqQs(targetFreqs)[entry.key],
+                  type: types[entry.key],
                 );
               }
             }
@@ -971,6 +990,7 @@ class EqualizerManager {
       frequencies: targetFreqs,
       gains: currentPreset.gains,
       qs: graphicEqQs(targetFreqs),
+      types: graphicEqTypes(targetFreqs.length),
     );
   }
 
@@ -1009,6 +1029,7 @@ class EqualizerManager {
         'Native bulk EQ apply failed; falling back to per-band writes',
         category: 'DSP',
       );
+      final types = graphicEqTypes(targetFreqs.length);
       // Fallback to legacy per-band if bulk unavailable (old APK)
       if (eqBandCount != 10) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
@@ -1020,6 +1041,7 @@ class EqualizerManager {
               targetFreqs[i],
               currentPreset.gains[i],
               graphicEqQs(targetFreqs)[i],
+              type: types[i],
             ),
           );
           if (futures.length >= 8) {
@@ -1040,6 +1062,7 @@ class EqualizerManager {
               targetFreqs[i],
               currentPreset.gains[i],
               graphicEqQs(targetFreqs)[i],
+              type: types[i],
             ),
           );
           if (futures2.length >= 8) {

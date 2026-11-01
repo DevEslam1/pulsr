@@ -85,6 +85,7 @@ private:
     void CloseLocked(bool waitForWriters = true);
     static void ErrorCallback(AAudioStream* stream, void* userData, aaudio_result_t error);
     bool RecoverDisconnected();
+    void CheckAndAdaptBuffer(AAudioStream* st);
 
     Config config_{};
     std::atomic<AAudioStream*> stream_{nullptr};

@@ -56,4 +56,17 @@
     <string name="download_notification_action_resume">Reanudar</string>
     <string name="download_notification_degraded">Protección en segundo plano limitada — mantén Pulsr abierto</string>
     <string name="download_notification_timeout">Descargas en pausa — se agotó el tiempo de ejecución en segundo plano de Android. Abre Pulsr para continuar.</string>
+
+    <!-- Accesos directos -->
+    <string name="shortcut_play_short">Reproducir</string>
+    <string name="shortcut_play_long">Reanudar reproducción</string>
+    <string name="shortcut_shuffle_short">Aleatorio</string>
+    <string name="shortcut_shuffle_long">Reproducción aleatoria</string>
+    <string name="shortcut_favorites_short">Favoritos</string>
+    <string name="shortcut_favorites_long">Abrir canciones favoritas</string>
+    <string name="shortcut_search_short">Buscar</string>
+    <string name="shortcut_search_long">Buscar en la biblioteca</string>
+
+    <!-- Mosaico de ajustes rápidos -->
+    <string name="tile_playback_label">Pulsr Música</string>
 </resources>

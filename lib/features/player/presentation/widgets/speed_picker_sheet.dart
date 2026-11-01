@@ -247,6 +247,8 @@ class SpeedPickerSheet extends StatelessWidget {
                     max: 2.0,
                     divisions: 30,
                     semanticLabel: context.l10n.pitchShift,
+                    semanticFormatterCallback: (val) =>
+                        '${val.toStringAsFixed(2)}x',
                     onChanged: (value) {
                       cubit.setPlaybackPitch(value);
                     },

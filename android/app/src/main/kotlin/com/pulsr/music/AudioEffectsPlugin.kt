@@ -351,7 +351,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetEqEnabled(enabled: Boolean)
     private external fun nativeSetEqBandCount(count: Int)
     private external fun nativeSetEqBand(index: Int, freq: Double, gainDb: Double, q: Double, type: Int, enabled: Boolean)
-    private external fun nativeSetEqBandsBulk(freqs: DoubleArray, gains: DoubleArray, qs: DoubleArray, types: IntArray)
+    private external fun nativeSetEqBandsBulk(freqs: DoubleArray, gains: DoubleArray, qs: DoubleArray?, types: IntArray?)
     private external fun nativeSetBandSolo(index: Int, solo: Boolean)
     private external fun nativeSetBandMute(index: Int, mute: Boolean)
     private external fun nativeSetEqPreamp(preampDb: Double)
@@ -809,8 +809,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isNativeDspLoaded) {
             try {
                 nativeSetActiveStages(activeDspStages)
+                val nativeEqTarget = isEqEnabled && currentEqOwner == EqOwner.NATIVE
+                nativeSetEqEnabled(nativeEqTarget)
+                lastNativeEqEnabled = nativeEqTarget
             } catch (e: Exception) {
-                Log.w(TAG, "nativeSetActiveStages failed: ${e.message}")
+                Log.w(TAG, "nativeSetActiveStages/nativeSetEqEnabled failed: ${e.message}")
             }
 
             val ctx = context
@@ -1712,10 +1715,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setNativeEqBandsBulk" -> {
                     val freqs = (call.argument<List<*>>("frequencies")?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList())
                     val gains = (call.argument<List<*>>("gains")?.mapNotNull { (it as? Number)?.toDouble() } ?: emptyList())
-                    val qs = (call.argument<List<*>>("qs")?.mapNotNull { (it as? Number)?.toDouble() } ?: freqs.map { 1.414 })
-                    val types = (call.argument<List<*>>("types")?.mapNotNull { (it as? Number)?.toInt() } ?: freqs.map { 0 })
-                    if (freqs.isEmpty() || freqs.size != gains.size || freqs.size != qs.size || freqs.size != types.size) {
-                        result.error("INVALID_ARGUMENT", "EQ bulk arrays must be non-empty and of equal length (f:${freqs.size}, g:${gains.size}, q:${qs.size}, t:${types.size})", null)
+                    val qs = call.argument<List<*>>("qs")?.mapNotNull { (it as? Number)?.toDouble() }
+                    val types = call.argument<List<*>>("types")?.mapNotNull { (it as? Number)?.toInt() }
+                    if (freqs.isEmpty() || freqs.size != gains.size ||
+                        (qs != null && freqs.size != qs.size) ||
+                        (types != null && freqs.size != types.size)) {
+                        result.error("INVALID_ARGUMENT", "EQ bulk arrays must be non-empty and of equal length", null)
                         return
                     }
                     if (freqs.size > MAX_NATIVE_EQ_BANDS) {
@@ -1726,13 +1731,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         try {
                             val freqArr = DoubleArray(freqs.size) { clamp(freqs[it], 20.0, 22000.0) }
                             val gainArr = DoubleArray(gains.size) { clamp(gains[it], -36.0, 36.0) }
-                            val qArr = DoubleArray(qs.size) { clamp(qs[it], 0.1, 25.0) }
-                            val typeArr = IntArray(types.size) { types[it].coerceIn(0, 7) }
+                            val qArr = qs?.let { DoubleArray(it.size) { idx -> clamp(it[idx], 0.1, 25.0) } }
+                            val typeArr = types?.let { IntArray(it.size) { idx -> it[idx].coerceIn(0, 7) } }
                             nativeSetEqBandCount(freqs.size)
                             nativeSetEqBandsBulk(freqArr, gainArr, qArr, typeArr)
                             lastNativeEqBandCount = freqs.size
                             for (i in freqs.indices) {
-                                lastNativeEqBands[i] = String.format(java.util.Locale.US, "%.1f:%.2f:%.2f:%d:true", freqArr[i], gainArr[i], qArr[i], typeArr[i])
+                                val qVal = qArr?.get(i) ?: (if (freqs.size >= 5 && (i == 0 || i == freqs.size - 1)) 0.7071 else if (freqs.size <= 12) 1.0 else 2.0)
+                                val typeVal = typeArr?.get(i) ?: (if (freqs.size >= 5 && i == 0) 1 else if (freqs.size >= 5 && i == freqs.size - 1) 2 else 0)
+                                lastNativeEqBands[i] = String.format(java.util.Locale.US, "%.1f:%.2f:%.2f:%d:true", freqArr[i], gainArr[i], qVal, typeVal)
                             }
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeSetEqBandsBulk failed: ${e.message}")

@@ -98,6 +98,7 @@ object AudioIntentClassifier {
     ): Boolean {
         val s = scheme?.lowercase() ?: return false
         if (s == "pulsrwidget") return false
+        if (s == "pulsr") return true
         if (isYouTubeHost(host)) return true
         if (action == Intent.ACTION_SEND) {
             if (!textExtra.isNullOrEmpty() &&

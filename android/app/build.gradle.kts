@@ -26,7 +26,7 @@ android {
         // 28 (Android 9) is the floor for the true 10-band graphic EQ, which is
         // built on DynamicsProcessing postEq — added in API 28.
         minSdk = 28
-        targetSdk = 36
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appName"] = "Pulsr Music"

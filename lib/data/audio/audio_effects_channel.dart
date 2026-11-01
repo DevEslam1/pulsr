@@ -745,11 +745,16 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return true;
     try {
+      final defaultTypes = frequencies.length >= 5
+          ? (List<int>.filled(frequencies.length, 0)
+            ..[0] = 1
+            ..[frequencies.length - 1] = 2)
+          : List<int>.filled(frequencies.length, 0);
       await _channel.invokeMethod('setNativeEqBandsBulk', {
         'frequencies': frequencies,
         'gains': gains,
         'qs': qs ?? List<double>.filled(frequencies.length, 1.414),
-        'types': types ?? List<int>.filled(frequencies.length, 0),
+        'types': types ?? defaultTypes,
       }).timeout(const Duration(seconds: 5));
       return true;
     } catch (e, st) {
