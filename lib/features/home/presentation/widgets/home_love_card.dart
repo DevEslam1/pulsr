@@ -152,205 +152,205 @@ class _HomeLoveCardState extends State<HomeLoveCard>
     '"Eng. Eslam loves Dr. Basbosa to infinity, beyond the galaxies, and back! 🚀🌌💖✨"',
     // ─── 101–200: Classical Arabic Poetry — alternating Arabic & English ───
     // 101 Arabic
-    '«أنا مَن نظرَ الأعمى إلى أدبي — وأسمعَتْ كلماتي مَن به صَمَمُ» — المتنبي 🌹',
+    '«أنا مَن نظرَ الأعمى إلى أدبي — وأسمعَتْ كلماتي مَن به صَمَمُ»🌹',
     // 102 English
-    '"I am he whose art made the blind man see — and whose words made the deaf man hear" — Al-Mutanabbi ✨',
+    '"I am he whose art made the blind man see — and whose words made the deaf man hear"✨',
     // 103 Arabic
-    '«وما الحبُّ إلا للحبيبِ الأوَّلِ — ولا الشوقُ إلا للمحبوبِ الأوَّلِ» — ابن الفارض 💖',
+    '«وما الحبُّ إلا للحبيبِ الأوَّلِ — ولا الشوقُ إلا للمحبوبِ الأوَّلِ»💖',
     // 104 English
-    '"Love belongs only to the first beloved — and longing belongs only to the one the soul truly adores" — Ibn al-Farid 🌸',
+    '"Love belongs only to the first beloved — and longing belongs only to the one the soul truly adores"🌸',
     // 105 Arabic
-    '«بالأمسِ كنتِ هلالاً في مطالعِهِ — واليومَ أنتِ بدرٌ تامُّ الاكتمالِ» — ابن زيدون 🌙',
+    '«بالأمسِ كنتِ هلالاً في مطالعِهِ — واليومَ أنتِ بدرٌ تامُّ الاكتمالِ»🌙',
     // 106 English
-    '"Yesterday you were a crescent moon at its rising — today you are a full moon in all its glory" — Ibn Zaydun 🌙',
+    '"Yesterday you were a crescent moon at its rising — today you are a full moon in all its glory"🌙',
     // 107 Arabic
-    '«يا مَن هواهُ أعزُّ الناسِ عندِي — وليسَ في القلبِ مَن يحتلُّ غيرَهُ» — جميل بثينة ❤️',
+    '«يا مَن هواهُ أعزُّ الناسِ عندِي — وليسَ في القلبِ مَن يحتلُّ غيرَهُ»',
     // 108 English
-    '"O you whose love is the most precious thing to me — none other holds a place in this heart" — Jamil Buthayna ❤️',
+    '"O you whose love is the most precious thing to me — none other holds a place in this heart"',
     // 109 Arabic
-    '«لو كانَ قلبِيَ عندِي حينَ أبصرَكِ — ما زالَ أسيرَ حبٍّ دامَ مُستمِرا» — عمر بن أبي ربيعة 🌸',
+    '«لو كانَ قلبِيَ عندِي حينَ أبصرَكِ — ما زالَ أسيرَ حبٍّ دامَ مُستمِرا»🌸',
     // 110 English
-    '"Had my heart obeyed me when I first saw you — it would never have become love\'s eternal prisoner" — Omar ibn Abi Rabia 🌸',
+    '"Had my heart obeyed me when I first saw you — it would never have become love\'s eternal prisoner"🌸',
     // 111 Arabic
-    '«أُحبُّكِ فوقَ ما تُحبُّ الطيورُ السماءَ — وأشتاقُ إليكِ أكثرَ من اشتياقِ الأرضِ للمطرِ» — جبران خليل 🕊️',
+    '«أُحبُّكِ فوقَ ما تُحبُّ الطيورُ السماءَ — وأشتاقُ إليكِ أكثرَ من اشتياقِ الأرضِ للمطرِ»',
     // 112 English
-    '"I love you more than birds love the sky — and I miss you more than the earth misses the rain" — Gibran Khalil 🕊️',
+    '"I love you more than birds love the sky — and I miss you more than the earth misses the rain"',
     // 113 Arabic
-    '«كلُّ شيءٍ يدلُّ عليكِ ويُذكِّرُني — بكِ حتى أحسسْتُ أنَّكِ في كلِّ مكانِ» — نزار قباني 💫',
+    '«كلُّ شيءٍ يدلُّ عليكِ ويُذكِّرُني — بكِ حتى أحسسْتُ أنَّكِ في كلِّ مكانِ»💫',
     // 114 English
-    '"Everything points to you and reminds me of you — until I feel you are present in every place" — Nizar Qabbani 💫',
+    '"Everything points to you and reminds me of you — until I feel you are present in every place"💫',
     // 115 Arabic
-    '«ماذا أقولُ وأنتِ كلُّ قصيدتِي — وأنتِ الحرفُ والمعنى والوجودُ كلُّهُ» — نزار قباني 📜',
+    '«ماذا أقولُ وأنتِ كلُّ قصيدتِي — وأنتِ الحرفُ والمعنى والوجودُ كلُّهُ»📜',
     // 116 English
-    '"What shall I say when you are my entire poem — you are the letter, the meaning, and all existence" — Nizar Qabbani 📜',
+    '"What shall I say when you are my entire poem — you are the letter, the meaning, and all existence"📜',
     // 117 Arabic
-    '«لكِ في فؤادي منزلٌ لا يُشغَلُ — حتى بصاحبِهِ الحبيبِ الأوَّلِ» — المتنبي 💛',
+    '«لكِ في فؤادي منزلٌ لا يُشغَلُ — حتى بصاحبِهِ الحبيبِ الأوَّلِ»💛',
     // 118 English
-    '"In my heart you hold a place no other may occupy — not even the dearest companion of all" — Al-Mutanabbi 💛',
+    '"In my heart you hold a place no other may occupy — not even the dearest companion of all"💛',
     // 119 Arabic
-    '«أهواكِ ما استقبلتُ قِبلَةَ مغرِبٍ — وما تلقَّتِ الأنوارُ عيناً تنظرُ» — الشريف الرضي 🌅',
+    '«أهواكِ ما استقبلتُ قِبلَةَ مغرِبٍ — وما تلقَّتِ الأنوارُ عيناً تنظرُ»🌅',
     // 120 English
-    '"I love you in every direction my compass turns — in every light that meets an eye that truly sees" — Al-Sharif Al-Radi 🌅',
+    '"I love you in every direction my compass turns — in every light that meets an eye that truly sees"🌅',
     // 121 Arabic
-    '«وقفَ الهوى بي حيثُ أنتِ فلم أزَلْ — أرى الوجودَ أمامِي كلَّهُ وَطَنا» — ابن الفارض 🌍',
+    '«وقفَ الهوى بي حيثُ أنتِ فلم أزَلْ — أرى الوجودَ أمامِي كلَّهُ وَطَنا»🌍',
     // 122 English
-    '"Love stopped me where you are — and all of existence became my homeland in your presence" — Ibn al-Farid 🌍',
+    '"Love stopped me where you are — and all of existence became my homeland in your presence"🌍',
     // 123 Arabic
-    '«تَعلَّمتُ من عينيكِ قبلَ كلامِكِم — بأنَّ عينَ الحبيبِ مدرسةُ الروحِ» — نزار قباني 👁️',
+    '«تَعلَّمتُ من عينيكِ قبلَ كلامِكِم — بأنَّ عينَ الحبيبِ مدرسةُ الروحِ»',
     // 124 English
-    '"I learned from your eyes before your words — that the beloved\'s gaze is the school of the soul" — Nizar Qabbani 👁️',
+    '"I learned from your eyes before your words — that the beloved\'s gaze is the school of the soul"',
     // 125 Arabic
-    '«يا ليلَ الصبِّ متى غدُهُ — أقيامُ الساعةِ موعدُهُ» — ابن الجوزي 🌙',
+    '«يا ليلَ الصبِّ متى غدُهُ — أقيامُ الساعةِ موعدُهُ»🌙',
     // 126 English
-    '"O night of the sleepless lover, when will your dawn come — is the Day of Judgment your appointed hour?" — Ibn al-Jawzi 🌙',
+    '"O night of the sleepless lover, when will your dawn come — is the Day of Judgment your appointed hour?"🌙',
     // 127 Arabic
-    '«وحقِّكِ لو أنِّي أقدِرُ ما فارقتُ — وما كانَ للعينِ أن تنامَ لحظةً» — قيس بن الملوح 💤',
+    '«وحقِّكِ لو أنِّي أقدِرُ ما فارقتُ — وما كانَ للعينِ أن تنامَ لحظةً»💤',
     // 128 English
-    '"By your life, had I the power I would never have parted — and my eyes would never have slept a single moment" — Qays ibn al-Mulawwah 💤',
+    '"By your life, had I the power I would never have parted — and my eyes would never have slept a single moment"💤',
     // 129 Arabic
-    '«أحبُّكِ يا باسبوسةُ حتى الثريَّا — وأشتاقُ إليكِ كشوقِ البحرِ للشطآنِ» — شعر خاص 🌊',
+    '«أحبُّكِ يا باسبوسةُ حتى الثريَّا — وأشتاقُ إليكِ كشوقِ البحرِ للشطآنِ»🌊',
     // 130 English
-    '"I love you, Basbosa, to the Pleiades — and I long for you as the sea longs for the shore" — heartfelt verse 🌊',
+    '"I love you, Basbosa, to the Pleiades — and I long for you as the sea longs for the shore"🌊',
     // 131 Arabic
-    '«وما سُمِّيَتِ الجنَّةُ الخُلدَ باطلاً — إذا كانَ حبُّكِ فيها ولسنا بمُبعَدِ» — ابن زيدون 🌺',
+    '«وما سُمِّيَتِ الجنَّةُ الخُلدَ باطلاً — إذا كانَ حبُّكِ فيها ولسنا بمُبعَدِ»🌺',
     // 132 English
-    '"The eternal garden was not named paradise in vain — if your love dwells there and we are not kept from it" — Ibn Zaydun 🌺',
+    '"The eternal garden was not named paradise in vain — if your love dwells there and we are not kept from it"🌺',
     // 133 Arabic
-    '«وكيفَ احتِمالي للفراقِ وإنَّني — بغيرِ لقائِكِ لا أُطيقُ الزمانا» — الشريف الرضي 💔',
+    '«وكيفَ احتِمالي للفراقِ وإنَّني — بغيرِ لقائِكِ لا أُطيقُ الزمانا»💔',
     // 134 English
-    '"How can I bear separation when without your meeting — I cannot endure time itself even for a moment" — Al-Sharif Al-Radi 💔',
+    '"How can I bear separation when without your meeting — I cannot endure time itself even for a moment"💔',
     // 135 Arabic
-    '«بكِ استبشرَتْ أيامِيَ الغُرُّ كلُّها — وعادَ الزمانُ المُدبِرُ مُقبِلا» — المتنبي 🌟',
+    '«بكِ استبشرَتْ أيامِيَ الغُرُّ كلُّها — وعادَ الزمانُ المُدبِرُ مُقبِلا»🌟',
     // 136 English
-    '"With you all my bright days rejoiced completely — and time that had turned away came back to face us" — Al-Mutanabbi 🌟',
+    '"With you all my bright days rejoiced completely — and time that had turned away came back to face us"🌟',
     // 137 Arabic
-    '«أَرَى كلَّ شيءٍ يشهدُ اللهَ وحدَهُ — ويخبِرُ عن حُبِّكِ قلبِيَ الذي ذابا» — ابن الفارض ✨',
+    '«أَرَى كلَّ شيءٍ يشهدُ اللهَ وحدَهُ — ويخبِرُ عن حُبِّكِ قلبِيَ الذي ذابا»✨',
     // 138 English
-    '"I see all things bearing witness to God alone — and my melted heart speaks only of your love" — Ibn al-Farid ✨',
+    '"I see all things bearing witness to God alone — and my melted heart speaks only of your love"✨',
     // 139 Arabic
-    '«مُنِيَ القلبُ مِن أهوى بنظرةِ عينٍ — وعسى أن يُوافِيَ الفرَجُ المُدانا» — جميل بثينة 🕊️',
+    '«مُنِيَ القلبُ مِن أهوى بنظرةِ عينٍ — وعسى أن يُوافِيَ الفرَجُ المُدانا»',
     // 140 English
-    '"My heart wished for one glance from the one I love — and perhaps relief is already drawing near" — Jamil Buthayna 🕊️',
+    '"My heart wished for one glance from the one I love — and perhaps relief is already drawing near"',
     // 141 Arabic
-    '«تعالَي نسرِق من عُمرِنا — لحظةَ حبٍّ لم يخُنها الزمانُ» — نزار قباني 💞',
+    '«تعالَي نسرِق من عُمرِنا — لحظةَ حبٍّ لم يخُنها الزمانُ»💞',
     // 142 English
-    '"Come, let us steal from our lifetime — one moment of love that time cannot betray" — Nizar Qabbani 💞',
+    '"Come, let us steal from our lifetime — one moment of love that time cannot betray"💞',
     // 143 Arabic
-    '«وإذا المرءُ لم يَعشَق فليسَ بعائشٍ — عيشَ الحياةِ فكُن عاشِقاً أو مُتْ بها» — أبو نواس 🌹',
+    '«وإذا المرءُ لم يَعشَق فليسَ بعائشٍ — عيشَ الحياةِ فكُن عاشِقاً أو مُتْ بها»🌹',
     // 144 English
-    '"Whoever has not loved has not truly lived the life of the living — so love, or spend your life in longing" — Abu Nuwas 🌹',
+    '"Whoever has not loved has not truly lived the life of the living — so love, or spend your life in longing"🌹',
     // 145 Arabic
-    '«لعَمرِي لقد أصبحتِ في القلبِ منزلاً — رفيعاً كمنزِلِ الكواكبِ في السماءِ» — المتنبي ⭐',
+    '«لعَمرِي لقد أصبحتِ في القلبِ منزلاً — رفيعاً كمنزِلِ الكواكبِ في السماءِ»',
     // 146 English
-    '"By my life, you have a home in my heart — as lofty as the dwelling of stars in the heavens" — Al-Mutanabbi ⭐',
+    '"By my life, you have a home in my heart — as lofty as the dwelling of stars in the heavens"',
     // 147 Arabic
-    '«وما أنا إلا القلمُ يكتبُكِ — وما الحبُّ إلا ما تُلهِمينَ الكلامَ» — نزار قباني 📝',
+    '«وما أنا إلا القلمُ يكتبُكِ — وما الحبُّ إلا ما تُلهِمينَ الكلامَ»📝',
     // 148 English
-    '"I am but a pen that writes you — and love is nothing but what you inspire in every word" — Nizar Qabbani 📝',
+    '"I am but a pen that writes you — and love is nothing but what you inspire in every word"📝',
     // 149 Arabic
-    '«يا مَن هواهُ حياتِي ودِيني — وزادِي في الليالي والسِّنينا» — ابن الفارض 💖',
+    '«يا مَن هواهُ حياتِي ودِيني — وزادِي في الليالي والسِّنينا»💖',
     // 150 English
-    '"O you whose love is my life and my faith — my provision through all the nights and all the years" — Ibn al-Farid 💖',
+    '"O you whose love is my life and my faith — my provision through all the nights and all the years"💖',
     // 151 Arabic
-    '«وددتُ بأنَّ العمرَ يُعطَى مِراراً — وما هوَ إلا أن أكونَ بقُربِكِ» — ابن زيدون 🌙',
+    '«وددتُ بأنَّ العمرَ يُعطَى مِراراً — وما هوَ إلا أن أكونَ بقُربِكِ»🌙',
     // 152 English
-    '"I wished that life were granted to me repeatedly — but only so I could spend it by your side" — Ibn Zaydun 🌙',
+    '"I wished that life were granted to me repeatedly — but only so I could spend it by your side"🌙',
     // 153 Arabic
-    '«ما في الوجودِ جمالٌ غيرُ جمالِكِ — ولا في الحياةِ بهاءٌ غيرُ بهائِكِ» — جبران خليل جبران 🌸',
+    '«ما في الوجودِ جمالٌ غيرُ جمالِكِ — ولا في الحياةِ بهاءٌ غيرُ بهائِكِ»🌸',
     // 154 English
-    '"There is no beauty in all existence but yours — no splendor in life but the radiance you carry" — Gibran Khalil Gibran 🌸',
+    '"There is no beauty in all existence but yours — no splendor in life but the radiance you carry"🌸',
     // 155 Arabic
-    '«شكرتُكِ يا باسبوسةُ شكرَ الغيثِ — حينَ يُحيِي الأرضَ بعدَ طولِ الجدبِ» — شعر خاص 🌧️',
+    '«شكرتُكِ يا باسبوسةُ شكرَ الغيثِ — حينَ يُحيِي الأرضَ بعدَ طولِ الجدبِ»',
     // 156 English
-    '"I thank you, Basbosa, as rain is thanked — when it revives the earth after long drought" — heartfelt verse 🌧️',
+    '"I thank you, Basbosa, as rain is thanked — when it revives the earth after long drought"',
     // 157 Arabic
-    '«كيفَ للقلبِ أن يصبِرَ ساعةً — عن حبيبٍ هوَ للقلبِ ضوءٌ وهواءُ» — نزار قباني 🫶',
+    '«كيفَ للقلبِ أن يصبِرَ ساعةً — عن حبيبٍ هوَ للقلبِ ضوءٌ وهواءُ»🫶',
     // 158 English
-    '"How can the heart be patient even for an hour — from a beloved who is its very light and air" — Nizar Qabbani 🫶',
+    '"How can the heart be patient even for an hour — from a beloved who is its very light and air"🫶',
     // 159 Arabic
-    '«قولِي لقلبِي: أنتَ حرٌّ — قالَ: كيفَ وهوَ في يدِها أسيرُ» — الشريف الرضي 🔐',
+    '«قولِي لقلبِي: أنتَ حرٌّ — قالَ: كيفَ وهوَ في يدِها أسيرُ»🔐',
     // 160 English
-    '"Tell my heart: you are free — it replied: How, when it is held captive in her hands?" — Al-Sharif Al-Radi 🔐',
+    '"Tell my heart: you are free — it replied: How, when it is held captive in her hands?"🔐',
     // 161 Arabic
-    '«كُتِبَ الحبُّ بيني وبينَكِ أزلاً — حينَ كتَبَ اللهُ للعاشقينَ لقاءَهُم» — ابن الفارض 📖',
+    '«كُتِبَ الحبُّ بيني وبينَكِ أزلاً — حينَ كتَبَ اللهُ للعاشقينَ لقاءَهُم»📖',
     // 162 English
-    '"Love between us was written in eternity — when God decreed that lovers would one day meet" — Ibn al-Farid 📖',
+    '"Love between us was written in eternity — when God decreed that lovers would one day meet"📖',
     // 163 Arabic
-    '«وأنتِ الدواءُ وأنتِ الداءُ — وأنتِ الرجاءُ لقلبٍ شقيِّ» — المتنبي 💊',
+    '«وأنتِ الدواءُ وأنتِ الداءُ — وأنتِ الرجاءُ لقلبٍ شقيِّ»💊',
     // 164 English
-    '"You are the remedy and you are the ailment — you are the hope for a heart that suffers" — Al-Mutanabbi 💊',
+    '"You are the remedy and you are the ailment — you are the hope for a heart that suffers"💊',
     // 165 Arabic
-    '«أهواكِ يا مَن في فؤادي ذِكرُها — كنورِ الصباحِ يُشرِقُ في ظلامِ الليلِ» — شعر عربي 🌄',
+    '«أهواكِ يا مَن في فؤادي ذِكرُها — كنورِ الصباحِ يُشرِقُ في ظلامِ الليلِ»🌄',
     // 166 English
-    '"I love you, O she whose memory lives in my heart — like morning light shining through the dark of night" — Arabic verse 🌄',
+    '"I love you, O she whose memory lives in my heart — like morning light shining through the dark of night"🌄',
     // 167 Arabic
-    '«إنِّي وإن كنتُ الأخيرَ زمانُهُ — لآتٍ بما لم تستطِعهُ الأوائلُ» — المتنبي 👑',
+    '«إنِّي وإن كنتُ الأخيرَ زمانُهُ — لآتٍ بما لم تستطِعهُ الأوائلُ»👑',
     // 168 English
-    '"Though I come last in time — I bring what the ancients could not achieve" — Al-Mutanabbi 👑',
+    '"Though I come last in time — I bring what the ancients could not achieve"👑',
     // 169 Arabic
-    '«حياتِي لكِ يا باسبوسةُ وقفٌ — وعُمرِي في هواكِ رهنُ خدمَه» — شعر خاص ❤️',
+    '«حياتِي لكِ يا باسبوسةُ وقفٌ — وعُمرِي في هواكِ رهنُ خدمَه»',
     // 170 English
-    '"My life is entirely dedicated to you, Basbosa — and all my years are pledged in loving service" — heartfelt verse ❤️',
+    '"My life is entirely dedicated to you, Basbosa — and all my years are pledged in loving service"',
     // 171 Arabic
-    '«رأيتُكِ فارتاحَ قلبِيَ بعدَ طولِ — تعبٍ كانَ يُثقِلُ روحِي ويُضنِيها» — عمر بن أبي ربيعة 🕊️',
+    '«رأيتُكِ فارتاحَ قلبِيَ بعدَ طولِ — تعبٍ كانَ يُثقِلُ روحِي ويُضنِيها»',
     // 172 English
-    '"I saw you and my heart rested after long weariness — that had burdened my soul and worn it thin" — Omar ibn Abi Rabia 🕊️',
+    '"I saw you and my heart rested after long weariness — that had burdened my soul and worn it thin"',
     // 173 Arabic
-    '«إذا كانَ حبُّكِ قَدَرِي فلا أريدُ — سوى هذا القَدَرِ في دُنيايَ والآخِرَه» — شعر إسلامي 🤲',
+    '«إذا كانَ حبُّكِ قَدَرِي فلا أريدُ — سوى هذا القَدَرِ في دُنيايَ والآخِرَه»🤲',
     // 174 English
-    '"If loving you is my destiny then I desire — no other destiny in this world or the hereafter" — Islamic verse 🤲',
+    '"If loving you is my destiny then I desire — no other destiny in this world or the hereafter"🤲',
     // 175 Arabic
-    '«كلُّ ليلةٍ أحلمُ فيها بكِ — هيَ أجملُ ليالِي العُمُرِ دونَ استثناءٍ» — نزار قباني 🌙',
+    '«كلُّ ليلةٍ أحلمُ فيها بكِ — هيَ أجملُ ليالِي العُمُرِ دونَ استثناءٍ»🌙',
     // 176 English
-    '"Every night I dream of you — is the most beautiful night of my life without exception" — Nizar Qabbani 🌙',
+    '"Every night I dream of you — is the most beautiful night of my life without exception"🌙',
     // 177 Arabic
-    '«لا تسأَلِي عن حبِّي فإنَّ قلبِي — أعيا عليَّ وأعجزَ عن وصفِهِ» — جميل بثينة 💭',
+    '«لا تسأَلِي عن حبِّي فإنَّ قلبِي — أعيا عليَّ وأعجزَ عن وصفِهِ»💭',
     // 178 English
-    '"Ask me not of my love for my heart — has exhausted me and left me unable to describe it" — Jamil Buthayna 💭',
+    '"Ask me not of my love for my heart — has exhausted me and left me unable to describe it"💭',
     // 179 Arabic
-    '«باسبوسةُ في خاطِرِي وفي سُويدا — القلبِ بيتٌ أسكنتُهُ دهرَ الدهورِ» — شعر خاص 🏡',
+    '«باسبوسةُ في خاطِرِي وفي سُويدا — القلبِ بيتٌ أسكنتُهُ دهرَ الدهورِ»🏡',
     // 180 English
-    '"Basbosa is in my thoughts and in the core — of my heart, a home I have settled for all eternity" — personal verse 🏡',
+    '"Basbosa is in my thoughts and in the core — of my heart, a home I have settled for all eternity"🏡',
     // 181 Arabic
-    '«أمَا إنَّ للعينينِ دوراً جميلاً — حينَ يكتُبانِ ما يعجزُ عنهُ اللسانُ» — نزار قباني 👁️',
+    '«أمَا إنَّ للعينينِ دوراً جميلاً — حينَ يكتُبانِ ما يعجزُ عنهُ اللسانُ»',
     // 182 English
-    '"The eyes play a beautiful and wondrous role — when they write what the tongue is too weak to say" — Nizar Qabbani 👁️',
+    '"The eyes play a beautiful and wondrous role — when they write what the tongue is too weak to say"',
     // 183 Arabic
-    '«وددتُ لو أنَّ الزمانَ وقَفَ بي — ساعةً أنظرُ فيها إلى وجهِكِ الجميلِ» — ابن زيدون ⏰',
+    '«وددتُ لو أنَّ الزمانَ وقَفَ بي — ساعةً أنظرُ فيها إلى وجهِكِ الجميلِ»',
     // 184 English
-    '"I wished that time would pause for me — one moment to gaze upon your beautiful face" — Ibn Zaydun ⏰',
+    '"I wished that time would pause for me — one moment to gaze upon your beautiful face"',
     // 185 Arabic
-    '«أنتِ يا باسبوسةُ أغلى من الذهبِ — وأطيبُ من أريجِ المسكِ والعنبَرِ» — شعر خاص 💎',
+    '«أنتِ يا باسبوسةُ أغلى من الذهبِ — وأطيبُ من أريجِ المسكِ والعنبَرِ»💎',
     // 186 English
-    '"You, Basbosa, are more precious than gold — and sweeter than the fragrance of musk and amber" — heartfelt verse 💎',
+    '"You, Basbosa, are more precious than gold — and sweeter than the fragrance of musk and amber"💎',
     // 187 Arabic
-    '«لا أملِكُ إلا الشعرَ أُهدِيهِ لكِ — ولو أملكتُ الدنيا لأهديتُها جميعاً» — نزار قباني 🎁',
+    '«لا أملِكُ إلا الشعرَ أُهدِيهِ لكِ — ولو أملكتُ الدنيا لأهديتُها جميعاً»🎁',
     // 188 English
-    '"I have only poetry to gift you — but if I owned the world I would give you every last part of it" — Nizar Qabbani 🎁',
+    '"I have only poetry to gift you — but if I owned the world I would give you every last part of it"🎁',
     // 189 Arabic
-    '«وطالَ اشتياقِي للقاءٍ يجمعُنا — كاشتياقِ الغديرِ للسحابِ المُمطِرِ» — الشريف الرضي 🌧️',
+    '«وطالَ اشتياقِي للقاءٍ يجمعُنا — كاشتياقِ الغديرِ للسحابِ المُمطِرِ»',
     // 190 English
-    '"How long I have longed for a meeting that unites us — as a stream longs for the rain-bearing clouds above" — Al-Sharif Al-Radi 🌧️',
+    '"How long I have longed for a meeting that unites us — as a stream longs for the rain-bearing clouds above"',
     // 191 Arabic
-    '«كلُّ الحروفِ تبدأُ بكِ وتنتهِي — وكلُّ الكلماتِ ترجعُ إليكِ في آخِرِها» — نزار قباني 🔤',
+    '«كلُّ الحروفِ تبدأُ بكِ وتنتهِي — وكلُّ الكلماتِ ترجعُ إليكِ في آخِرِها»🔤',
     // 192 English
-    '"Every letter begins with you and ends with you — every word returns to you in the end" — Nizar Qabbani 🔤',
+    '"Every letter begins with you and ends with you — every word returns to you in the end"🔤',
     // 193 Arabic
-    '«أحبُّكِ يا باسبوسةُ حبَّ الأرضِ — للمطرِ وحبَّ القمرِ للبحرِ الأزرقِ» — شعر خاص 🌊',
+    '«أحبُّكِ يا باسبوسةُ حبَّ الأرضِ — للمطرِ وحبَّ القمرِ للبحرِ الأزرقِ»🌊',
     // 194 English
-    '"I love you, Basbosa, as the earth loves the rain — and as the moon loves the deep blue sea" — heartfelt verse 🌊',
+    '"I love you, Basbosa, as the earth loves the rain — and as the moon loves the deep blue sea"🌊',
     // 195 Arabic
-    '«أيُّها الليلُ الطويلُ أَلا انجَلِ — بصُبحٍ وما الإصباحُ منكَ بأمثَلِ» — امرؤ القيس 🌅',
+    '«أيُّها الليلُ الطويلُ أَلا انجَلِ — بصُبحٍ وما الإصباحُ منكَ بأمثَلِ»🌅',
     // 196 English
-    '"O long night, will you not lift — with a dawn, though the dawn is no better than you?" — Imru al-Qays 🌅',
+    '"O long night, will you not lift — with a dawn, though the dawn is no better than you?"🌅',
     // 197 Arabic
-    '«إذا نحنُ أدلجنا وأنتِ أمامَنا — كفى بطلوعِ النجمِ في الليلِ هادِيا» — امرؤ القيس 🌟',
+    '«إذا نحنُ أدلجنا وأنتِ أمامَنا — كفى بطلوعِ النجمِ في الليلِ هادِيا»🌟',
     // 198 English
-    '"When we set out at night and you are before us — the rising of the stars is guide enough in the dark" — Imru al-Qays 🌟',
+    '"When we set out at night and you are before us — the rising of the stars is guide enough in the dark"🌟',
     // 199 Arabic
-    '«نَعَمْ أنا مَجنونٌ ولكنَّ جُنُونِي — هوَ الحبُّ وهلْ في الحبِّ مَن لامَ مجنونَه» — نزار قباني 💝',
+    '«نَعَمْ أنا مَجنونٌ ولكنَّ جُنُونِي — هوَ الحبُّ وهلْ في الحبِّ مَن لامَ مجنونَه»💝',
     // 200 English
-    '"Yes, I am mad — but my madness is love, and who has ever blamed a lover for his madness?" — Nizar Qabbani 💝',
+    '"Yes, I am mad — but my madness is love, and who has ever blamed a lover for his madness?"💝',
   ];
 
   static int _lastIndex = -1;
@@ -677,7 +677,7 @@ class _HomeLoveCardState extends State<HomeLoveCard>
                                           children: [
                                             Flexible(
                                               child: Text(
-                                                '— Eng. Eslam ✨',
+                                                '✨',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
