@@ -558,7 +558,7 @@ class _HomeLoveCardState extends State<HomeLoveCard>
                                           children: [
                                             Flexible(
                                               child: Text(
-                                                '✨',
+                                                '— Eng. Eslam ✨',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(

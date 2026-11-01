@@ -29,7 +29,7 @@ class CustomThemeBuilderScreen extends StatefulWidget {
 }
 
 class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
-  int _accentColor = 0xFF9B9EF5;
+  int _accentColor = 0xFFFF2A85;
   double _cornerRadius = 24.0;
   bool _glowEnabled = true;
   bool _initializedFromSettings = false;
@@ -50,7 +50,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
   }
 
   static const List<int> _paletteOptions = [
-    0xFF9B9EF5, // Lavender
+    0xFFFF2A85, // Pink
     0xFF00E5FF, // Cyan
     0xFFFF2A6D, // Neon Pink
     0xFF05FFA1, // Neon Green

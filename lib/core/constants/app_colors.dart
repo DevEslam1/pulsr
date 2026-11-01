@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 /// never these constants, so Light/Dark/AMOLED all resolve correctly.
 abstract class AppColors {
   // Brand accents
-  static const Color primary = Color(0xFF9B9EF5);
-  static const Color secondary = Color(0xFF6C70DC);
-  static const Color lightPrimary = Color(0xFF5E63E6);
-  static const Color ctaLavender = Color(0xFFB6B8F8);
+  static const Color primary = Color(0xFFFF2A85);
+  static const Color secondary = Color(0xFFBA085B);
+  static const Color lightPrimary = Color(0xFFFF2A85);
+  static const Color ctaLavender = Color(0xFFFF85BC);
 
   // Status
   static const Color error = Color(0xFFFF5252);
@@ -70,7 +70,7 @@ abstract class AppColors {
   static const Color textPrimary = Color(0xFFEDEFF7);
   static const Color textSecondary = Color(0xFF98A0B3);
   static const Color onPrimary = Color(0xFF12143A);
-  static const Color accentGlow = Color(0x339B9EF5);
+  static const Color accentGlow = Color(0x33FF2A85);
   static const Color divider = Color(0x1FFFFFFF);
 
   // Light surfaces (legacy)
@@ -103,7 +103,7 @@ abstract class AppColors {
   static const Color swatchPurple = Color(0xFFD500F9);
 
   static const List<Color> customAccents = [
-    Color(0xFF9B9EF5),
+    Color(0xFFFF2A85),
     Color(0xFF40C4FF),
     Color(0xFF00E676),
     Color(0xFFFF9100),

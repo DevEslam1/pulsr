@@ -104,7 +104,7 @@ class ExportBackupUseCase {
           prefs.getBool('setting_resume_after_interruption') ?? true,
       'themeMode': prefs.getString('setting_theme_mode') ?? 'dark',
       'customAccentColorValue':
-          prefs.getInt('setting_custom_accent') ?? 0xFF9B9EF5,
+          prefs.getInt('setting_custom_accent') ?? 0xFFFF2A85,
       'playerThemeMode':
           prefs.getString('setting_player_theme_mode') ?? 'classic',
       'visualizerStyle': prefs.getString('setting_visualizer_style') ?? 'bar',
@@ -639,7 +639,7 @@ class ImportBackupUseCase {
       if (settings.containsKey('customAccentColorValue')) {
         final rawAccent = settings['customAccentColorValue'];
         await prefs.setInt('setting_custom_accent',
-            rawAccent is num ? rawAccent.toInt() : 0xFF9B9EF5);
+            rawAccent is num ? rawAccent.toInt() : 0xFFFF2A85);
       }
       if (settings.containsKey('playerThemeMode')) {
         final rawPlayerTheme = settings['playerThemeMode'];

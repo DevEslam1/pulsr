@@ -79,7 +79,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
         borderStrong = borderStrong ??
             (isDark ? const Color(0x2EFFFFFF) : const Color(0x33000000)),
         accentSoft = accentSoft ?? accentContainer,
-        accentMedium = accentMedium ?? const Color(0x409B9EF5),
+        accentMedium = accentMedium ?? const Color(0x40FF2A85),
         successSoft = successSoft ?? const Color(0x264CAF50),
         errorSoft = errorSoft ?? const Color(0x26FF5252),
         warningSoft = warningSoft ?? const Color(0x26FFB300);

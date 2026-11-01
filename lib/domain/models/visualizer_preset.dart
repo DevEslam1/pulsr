@@ -76,7 +76,7 @@ class VisualizerPreset {
   const VisualizerPreset({
     required this.name,
     this.shape = VisualizerShape.bars,
-    this.primaryColor = 0xFF9B9EF5,
+    this.primaryColor = 0xFFFF2A85,
     this.secondaryColor = 0xFF3DDC97,
     this.backgroundColor = 0x00000000,
     this.barCount = 32,
@@ -108,7 +108,7 @@ class VisualizerPreset {
           : 'Custom Preset',
       shape: _shapeFromName(map['shape'] as String?),
       primaryColor:
-          _parseColor(map['primaryColor'] ?? map['color'], 0xFF9B9EF5),
+          _parseColor(map['primaryColor'] ?? map['color'], 0xFFFF2A85),
       secondaryColor: _parseColor(map['secondaryColor'], 0xFF3DDC97),
       backgroundColor: _parseColor(map['backgroundColor'], 0x00000000),
       barCount: map['barCount'] is num

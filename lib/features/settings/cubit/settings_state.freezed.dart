@@ -1616,7 +1616,7 @@ class _SettingsState extends SettingsState {
       this.reduceMotion = false,
       this.liquidGlassTint = 0.8,
       this.languageCode = 'system',
-      this.customAccentColorValue = 0xFF9B9EF5,
+      this.customAccentColorValue = 0xFFFF2A85,
       this.customThemeRadius = 24.0,
       this.customThemeGlow = true,
       this.playerThemeMode = PlayerThemeMode.classic,

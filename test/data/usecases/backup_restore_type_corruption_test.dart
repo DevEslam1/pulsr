@@ -80,7 +80,7 @@ void main() {
 
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('setting_theme_mode'), 'dark');
-    expect(prefs.getInt('setting_custom_accent'), 0xFF9B9EF5);
+    expect(prefs.getInt('setting_custom_accent'), 0xFFFF2A85);
     expect(prefs.getString('setting_player_theme_mode'), 'classic');
     expect(prefs.getString('setting_visualizer_style'), 'bar');
 
