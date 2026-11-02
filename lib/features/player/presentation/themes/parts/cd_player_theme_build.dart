@@ -8,35 +8,12 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
     final song = state.currentSong;
     final isTablet = context.isTablet;
 
-    return Stack(
-      children: [
-        // Ambient backdrop glow behind CD deck
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(0, -0.25),
-                    radius: 0.92,
-                    colors: [
-                      activeColor.withValues(
-                          alpha: state.isPlaying ? 0.26 : 0.15),
-                      activeColor.withValues(alpha: 0.06),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.54, 1.0],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isInSplitView = PlayerSplitViewScope.of(context);
-            final metrics = PlayerThemeMetrics.calculate(context, constraints);
-            final isLandscape = metrics.isLandscape;
+    final isInSplitView = PlayerSplitViewScope.of(context);
+
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics = PlayerThemeMetrics.calculate(context, constraints);
+        final isLandscape = metrics.isLandscape;
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -114,16 +91,14 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
 
             // 1. Tablet Dual-Pane Split-View layout
             if (isInSplitView) {
-              return SafeArea(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: Column(
-                    children: [
-                      Expanded(child: cdStage),
-                      controlsColumn,
-                    ],
-                  ),
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Column(
+                  children: [
+                    Expanded(child: cdStage),
+                    controlsColumn,
+                  ],
                 ),
               );
             }
@@ -271,7 +246,37 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
               ),
             );
           },
+        );
+
+    if (isInSplitView) {
+      return content;
+    }
+
+    return Stack(
+      children: [
+        // Ambient backdrop glow behind CD deck
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.25),
+                    radius: 0.92,
+                    colors: [
+                      activeColor.withValues(
+                          alpha: state.isPlaying ? 0.26 : 0.15),
+                      activeColor.withValues(alpha: 0.06),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.54, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
+        content,
       ],
     );
   }

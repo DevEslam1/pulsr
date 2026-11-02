@@ -10,18 +10,26 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import 'package:go_router/go_router.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/di/injection.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/services/sound_feedback_service.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
-import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/db/app_database.dart';
+import '../../../../data/party/listen_together_service.dart';
+import '../../../../data/party/party_models.dart';
+import '../../../../data/services/cast_service.dart';
+import '../../../../domain/models/audio_output_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
@@ -32,24 +40,15 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_quality_sheet.dart';
-import '../widgets/quran_mode_badge.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/player_controls.dart';
+import '../widgets/player_more_sheet.dart';
 import '../widgets/player_seek_bar.dart';
 import '../widgets/player_volume_bar.dart';
+import '../widgets/quran_mode_badge.dart';
 import '../widgets/speed_picker_sheet.dart';
-import '../../../../data/services/cast_service.dart';
-import '../../../../domain/models/audio_output_info.dart';
-import '../../../../core/di/injection.dart';
-import '../../../../data/party/listen_together_service.dart';
-import '../../../../data/party/party_models.dart';
-import '../widgets/player_more_sheet.dart';
 import 'player_theme.dart';
 import 'player_theme_scaffold.dart' show PlayerThemeMetrics;
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Readable foreground for a badge painted with an arbitrary (possibly
 /// artwork-derived) accent, instead of assuming every accent is dark.
@@ -197,6 +196,7 @@ class PlayerSwitcherItem extends StatelessWidget {
         : label;
     return Semantics(
       button: true,
+      selected: isSelected,
       label: semanticsLabel,
       excludeSemantics: true,
       child: ConstrainedBox(
@@ -206,6 +206,7 @@ class PlayerSwitcherItem extends StatelessWidget {
           borderRadius: AppRadii.r20All,
           child: Container(
             alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             decoration: const BoxDecoration(
               color: Colors.transparent,
               borderRadius: AppRadii.r20All,
@@ -214,35 +215,48 @@ class PlayerSwitcherItem extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  icon,
-                  size: isTablet ? 15.0 : 13.5,
-                  color: isSelected ? activeColor : p.textSecondary,
+                AnimatedScale(
+                  scale: isSelected ? 1.08 : 1.0,
+                  duration: context.motionMs(200),
+                  curve: context.motionCurve(Curves.easeOutCubic),
+                  child: Icon(
+                    icon,
+                    size: isTablet ? 15.0 : 13.5,
+                    color: isSelected ? activeColor : p.textSecondary,
+                  ),
                 ),
-                const SizedBox(width: AppSpacing.xxs),
+                const SizedBox(width: 5),
                 Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: AnimatedDefaultTextStyle(
+                    duration: context.motionMs(200),
+                    curve: context.motionCurve(Curves.easeOutCubic),
                     style: TextStyle(
+                      fontFamily: 'Manrope',
                       fontSize: isTablet ? 13.0 : 11.8,
                       fontWeight:
                           isSelected ? FontWeight.w800 : FontWeight.w600,
                       color: isSelected ? p.textPrimary : p.textSecondary,
                       letterSpacing: AppTracking.label,
                     ),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
                 if (badgeCount != null && badgeCount! > 0) ...[
-                  const SizedBox(width: AppSpacing.xxs),
-                  Container(
+                  const SizedBox(width: 5),
+                  AnimatedContainer(
+                    duration: context.motionMs(200),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 4.5, vertical: 1.5),
+                      horizontal: 5.0,
+                      vertical: 1.5,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? activeColor
-                          : p.textPrimary.withValues(alpha: 0.15),
+                          : p.textPrimary.withValues(alpha: 0.12),
                       borderRadius: AppRadii.r8All,
                     ),
                     child: Text(
@@ -382,21 +396,33 @@ class _PlayerDockIconButtonState extends State<PlayerDockIconButton> {
             padding: EdgeInsets.all(style.paddingFor(isTablet)),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isActive
-                  ? activeColor.withValues(alpha: style.activeFillAlpha)
-                  : Colors.transparent,
+              gradient: isActive
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        activeColor.withValues(
+                          alpha: (style.activeFillAlpha + 0.06).clamp(0.0, 1.0),
+                        ),
+                        activeColor.withValues(
+                          alpha: (style.activeFillAlpha * 0.65).clamp(0.0, 1.0),
+                        ),
+                      ],
+                    )
+                  : null,
               border: isActive
                   ? Border.all(
                       color: activeColor.withValues(
-                          alpha: style.activeBorder ? 0.50 : 0.32),
+                        alpha: style.activeBorder ? 0.52 : 0.36,
+                      ),
                       width: style.activeBorder ? 1.2 : 1.0,
                     )
                   : null,
               boxShadow: isActive
                   ? [
                       BoxShadow(
-                        color: activeColor.withValues(alpha: 0.20),
-                        blurRadius: 8,
+                        color: activeColor.withValues(alpha: 0.24),
+                        blurRadius: 10,
                         spreadRadius: -2,
                       ),
                     ]
@@ -408,13 +434,13 @@ class _PlayerDockIconButtonState extends State<PlayerDockIconButton> {
               color: isActive ? activeColor : inactiveColor,
             ),
           ),
-          if (badgeText != null)
+          if (badgeText != null && badgeText.isNotEmpty)
             PositionedDirectional(
               top: -3,
-              end: -1,
+              end: style.badgeRight,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4.0,
+                padding: EdgeInsets.symmetric(
+                  horizontal: style.badgeHPadding,
                   vertical: 1.5,
                 ),
                 decoration: BoxDecoration(
@@ -427,7 +453,7 @@ class _PlayerDockIconButtonState extends State<PlayerDockIconButton> {
                   boxShadow: style.badgeShadow
                       ? [
                           BoxShadow(
-                            color: AppColors.scrimAt(0.3),
+                            color: AppColors.scrimAt(0.32),
                             blurRadius: 4,
                           ),
                         ]
@@ -439,6 +465,7 @@ class _PlayerDockIconButtonState extends State<PlayerDockIconButton> {
                     color: _readableOn(activeColor),
                     fontSize: style.badgeFontSize,
                     fontWeight: FontWeight.w900,
+                    height: 1.05,
                   ),
                 ),
               ),
@@ -448,7 +475,7 @@ class _PlayerDockIconButtonState extends State<PlayerDockIconButton> {
     );
 
     final Widget buttonContent = AnimatedScale(
-      scale: _isPressed ? 0.90 : 1.0,
+      scale: _isPressed ? 0.88 : 1.0,
       duration: context.motionMs(120),
       curve: context.motionCurve(Curves.easeOutCubic),
       child: inner,
@@ -543,6 +570,7 @@ class PlayerViewSwitcher extends StatelessWidget {
               active: c.state.themeColorSource == ThemeColorSource.custom,
             ));
     final barRadius = custom.active ? custom.radius : 20.0;
+    final thumbRadius = math.max(4.0, barRadius - 3.0);
 
     return Center(
       child: ConstrainedBox(
@@ -554,103 +582,124 @@ class PlayerViewSwitcher extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: AppRadii.circular(barRadius),
-          child: Builder(
-            builder: (context) {
-              final pillContainer = Container(
-                padding: const EdgeInsets.all(3.0),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer,
-                  borderRadius: AppRadii.circular(barRadius),
-                  border: Border.all(
-                    color: p.hairline,
-                    width: 1.0,
-                  ),
-                  boxShadow: PulsrElevation.level1(context),
+          child: RepaintBoundary(
+            child: Container(
+              padding: const EdgeInsets.all(3.0),
+              decoration: BoxDecoration(
+                color: Color.lerp(
+                      p.surfaceContainer,
+                      Colors.white,
+                      p.isDark ? surfaceFillAlpha * 0.35 : 0.0,
+                    ) ??
+                    p.surfaceContainer,
+                borderRadius: AppRadii.circular(barRadius),
+                border: Border.all(
+                  color: p.isDark
+                      ? AppColors.specularAt(borderAlpha)
+                      : p.hairline,
+                  width: 1.0,
                 ),
-                child: Stack(
-                  children: [
-                    AnimatedAlign(
-                      duration: context.motionMs(250),
-                      curve: context.motionCurve(Curves.easeOutCubic),
-                      alignment: isTrack
-                          ? const AlignmentDirectional(-1.0, 0.0)
-                          : isLyrics
-                              ? const AlignmentDirectional(0.0, 0.0)
-                              : const AlignmentDirectional(1.0, 0.0),
-                      child: FractionallySizedBox(
-                        widthFactor: 1 / 3,
-                        heightFactor: 1.0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: p.accentContainer,
-                            borderRadius: AppRadii.circular(
-                                math.max(4.0, barRadius - 3.0)),
-                            border: Border.all(
-                              color: p.accent,
-                              width: 1.0,
-                            ),
+                boxShadow: PulsrElevation.level1(context),
+              ),
+              child: Stack(
+                children: [
+                  AnimatedAlign(
+                    duration: context.motionMs(260),
+                    curve: context.motionCurve(Curves.easeOutCubic),
+                    alignment: isTrack
+                        ? const AlignmentDirectional(-1.0, 0.0)
+                        : isLyrics
+                            ? const AlignmentDirectional(0.0, 0.0)
+                            : const AlignmentDirectional(1.0, 0.0),
+                    child: FractionallySizedBox(
+                      widthFactor: 1 / 3,
+                      heightFactor: 1.0,
+                      child: AnimatedContainer(
+                        duration: context.motionMs(260),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              activeColor.withValues(
+                                alpha: p.isDark ? 0.28 : 0.20,
+                              ),
+                              activeColor.withValues(
+                                alpha: p.isDark ? 0.14 : 0.10,
+                              ),
+                            ],
                           ),
+                          borderRadius: AppRadii.circular(thumbRadius),
+                          border: Border.all(
+                            color: activeColor.withValues(
+                              alpha: p.isDark ? 0.55 : 0.45,
+                            ),
+                            width: 1.0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: activeColor.withValues(alpha: 0.18),
+                              blurRadius: 10,
+                              spreadRadius: -2,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: PlayerSwitcherItem(
-                            label: l10n.trackNumber,
-                            icon: trackIcon,
-                            isSelected: isTrack,
-                            activeColor: activeColor,
-                            isTablet: isTablet,
-                            onTap: () {
-                              if (!isTrack) {
-                                HapticFeedback.selectionClick();
-                                cubit.resetOverlayViews();
-                              }
-                            },
-                          ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PlayerSwitcherItem(
+                          label: l10n.trackNumber,
+                          icon: trackIcon,
+                          isSelected: isTrack,
+                          activeColor: activeColor,
+                          isTablet: isTablet,
+                          onTap: () {
+                            if (!isTrack) {
+                              HapticFeedback.selectionClick();
+                              cubit.resetOverlayViews();
+                            }
+                          },
                         ),
-                        Expanded(
-                          child: PlayerSwitcherItem(
-                            label: l10n.lyrics,
-                            icon: Icons.lyrics_rounded,
-                            isSelected: isLyrics,
-                            activeColor: activeColor,
-                            isTablet: isTablet,
-                            onTap: () {
-                              if (!isLyrics) {
-                                HapticFeedback.selectionClick();
-                                cubit.toggleLyricsVisibility();
-                              }
-                            },
-                          ),
+                      ),
+                      Expanded(
+                        child: PlayerSwitcherItem(
+                          label: l10n.lyrics,
+                          icon: Icons.lyrics_rounded,
+                          isSelected: isLyrics,
+                          activeColor: activeColor,
+                          isTablet: isTablet,
+                          onTap: () {
+                            if (!isLyrics) {
+                              HapticFeedback.selectionClick();
+                              cubit.toggleLyricsVisibility();
+                            }
+                          },
                         ),
-                        Expanded(
-                          child: PlayerSwitcherItem(
-                            label: l10n.queue,
-                            icon: Icons.queue_music_rounded,
-                            isSelected: isQueue,
-                            badgeCount: state.queue.length,
-                            activeColor: activeColor,
-                            isTablet: isTablet,
-                            onTap: () {
-                              if (!isQueue) {
-                                HapticFeedback.selectionClick();
-                                cubit.toggleQueueVisibility();
-                              }
-                            },
-                          ),
+                      ),
+                      Expanded(
+                        child: PlayerSwitcherItem(
+                          label: l10n.queue,
+                          icon: Icons.queue_music_rounded,
+                          isSelected: isQueue,
+                          badgeCount: state.queue.length,
+                          activeColor: activeColor,
+                          isTablet: isTablet,
+                          onTap: () {
+                            if (!isQueue) {
+                              HapticFeedback.selectionClick();
+                              cubit.toggleQueueVisibility();
+                            }
+                          },
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-
-              return RepaintBoundary(
-                child: pillContainer,
-              );
-            },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -716,6 +765,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                   active: c.state.themeColorSource == ThemeColorSource.custom,
                 ));
     final barRadius = custom.active ? custom.radius : 24.0;
+    final showCustomGlow = custom.active && custom.glow;
 
     final IconData outputIcon = isCast
         ? Icons.cast_connected_rounded
@@ -738,139 +788,151 @@ class PlayerBottomActionDock extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: AppRadii.circular(barRadius),
-          child: Builder(
-            builder: (context) {
-              final dockContainer = Container(
-                padding: const EdgeInsets.all(3.0),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer,
-                  borderRadius: AppRadii.circular(barRadius),
-                  border: Border.all(
-                    color: p.hairline,
-                    width: 1.0,
+          child: RepaintBoundary(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 3.0),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color.lerp(
+                          p.surfaceContainer,
+                          Colors.white,
+                          p.isDark ? 0.03 : 0.0,
+                        ) ??
+                        p.surfaceContainer,
+                    p.surfaceContainer,
+                  ],
+                ),
+                borderRadius: AppRadii.circular(barRadius),
+                border: Border.all(
+                  color: showCustomGlow
+                      ? props.activeColor.withValues(alpha: 0.42)
+                      : (p.isDark ? AppColors.specularAt(0.12) : p.hairline),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black
+                        .withValues(alpha: p.isDark ? 0.28 : 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
-                  boxShadow: [
+                  if (showCustomGlow)
                     BoxShadow(
-                      color: Colors.black
-                          .withValues(alpha: p.isDark ? 0.20 : 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+                      color: props.activeColor.withValues(alpha: 0.20),
+                      blurRadius: 18,
+                      spreadRadius: -2,
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // 1. Equalizer & DSP
-                    Expanded(
-                      child: PlayerDockIconButton(
-                        icon: Icons.tune_rounded,
-                        tooltip: l10n.equalizer,
-                        isActive: isEqActive,
-                        activeColor: props.activeColor,
-                        inactiveColor: p.textSecondary,
-                        isTablet: isTablet,
-                        style: dockIconStyle,
-                        onTap: () {
+                ],
+              ),
+              child: Row(
+                children: [
+                  // 1. Equalizer & DSP
+                  Expanded(
+                    child: PlayerDockIconButton(
+                      icon: Icons.tune_rounded,
+                      tooltip: l10n.equalizer,
+                      isActive: isEqActive,
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      style: dockIconStyle,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        EqualizerSheet.show(context);
+                      },
+                    ),
+                  ),
+
+                  // 2. Audio Output & DAC
+                  Expanded(
+                    child: PlayerDockIconButton(
+                      icon: outputIcon,
+                      tooltip: isCast ? 'Google Cast' : l10n.audioOutputAndDac,
+                      badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
+                      isActive: isCast || isUsb,
+                      activeColor:
+                          isCast ? AppColors.accentCyan : AppColors.dacGold,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      style: dockIconStyle,
+                      onTap: () {
+                        if (song != null) {
                           HapticFeedback.lightImpact();
-                          EqualizerSheet.show(context);
-                        },
-                      ),
+                          AudioQualitySheet.show(
+                              context, song, props.activeColor);
+                        }
+                      },
                     ),
+                  ),
 
-                    // 2. Audio Output & DAC
-                    Expanded(
-                      child: PlayerDockIconButton(
-                        icon: outputIcon,
-                        tooltip:
-                            isCast ? 'Google Cast' : l10n.audioOutputAndDac,
-                        badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
-                        isActive: isCast || isUsb,
-                        activeColor:
-                            isCast ? AppColors.accentCyan : AppColors.dacGold,
-                        inactiveColor: p.textSecondary,
-                        isTablet: isTablet,
-                        style: dockIconStyle,
-                        onTap: () {
-                          if (song != null) {
-                            HapticFeedback.lightImpact();
-                            AudioQualitySheet.show(
-                                context, song, props.activeColor);
-                          }
-                        },
-                      ),
+                  // 3. Playback Speed
+                  Expanded(
+                    child: PlayerDockIconButton(
+                      icon: Icons.speed_rounded,
+                      tooltip: l10n.playbackSpeed,
+                      badgeText:
+                          speed != 1.0 ? '${speed.toStringAsFixed(1)}x' : null,
+                      isActive: speed != 1.0,
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      style: dockIconStyle,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        SpeedPickerSheet.show(context);
+                      },
                     ),
+                  ),
 
-                    // 3. Playback Speed
-                    Expanded(
-                      child: PlayerDockIconButton(
-                        icon: Icons.speed_rounded,
-                        tooltip: l10n.playbackSpeed,
-                        badgeText: speed != 1.0
-                            ? '${speed.toStringAsFixed(1)}x'
-                            : null,
-                        isActive: speed != 1.0,
-                        activeColor: props.activeColor,
-                        inactiveColor: p.textSecondary,
-                        isTablet: isTablet,
-                        style: dockIconStyle,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          SpeedPickerSheet.show(context);
-                        },
-                      ),
+                  // 4. Sleep Timer
+                  Expanded(
+                    child: PlayerDockIconButton(
+                      icon: Icons.timer_outlined,
+                      tooltip: isEndQ
+                          ? 'Sleep Timer: End of Queue'
+                          : (remainingTracks != null
+                              ? 'Sleep Timer: $remainingTracks tracks remaining'
+                              : (props.state.sleepTimerRemaining != null
+                                  ? 'Sleep Timer: ${formatSleepTimerRemaining(props.state.sleepTimerRemaining!)} remaining'
+                                  : l10n.sleepTimer)),
+                      badgeText: hasTimer
+                          ? (remainingTracks != null
+                              ? '$remainingTracks tr'
+                              : (isEndQ
+                                  ? 'End'
+                                  : (props.state.sleepTimerRemaining != null
+                                      ? formatSleepTimerRemaining(
+                                          props.state.sleepTimerRemaining!)
+                                      : '')))
+                          : null,
+                      isActive: hasTimer,
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      style: dockIconStyle,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        SleepTimerSheet.show(context);
+                      },
                     ),
+                  ),
 
-                    // 4. Sleep Timer
-                    Expanded(
-                      child: PlayerDockIconButton(
-                        icon: Icons.timer_outlined,
-                        tooltip: isEndQ
-                            ? 'Sleep Timer: End of Queue'
-                            : (remainingTracks != null
-                                ? 'Sleep Timer: $remainingTracks tracks remaining'
-                                : (props.state.sleepTimerRemaining != null
-                                    ? 'Sleep Timer: ${formatSleepTimerRemaining(props.state.sleepTimerRemaining!)} remaining'
-                                    : l10n.sleepTimer)),
-                        badgeText: hasTimer
-                            ? (remainingTracks != null
-                                ? '$remainingTracks tr'
-                                : (isEndQ
-                                    ? 'End'
-                                    : (props.state.sleepTimerRemaining != null
-                                        ? formatSleepTimerRemaining(
-                                            props.state.sleepTimerRemaining!)
-                                        : '')))
-                            : null,
-                        isActive: hasTimer,
-                        activeColor: props.activeColor,
-                        inactiveColor: p.textSecondary,
-                        isTablet: isTablet,
-                        style: dockIconStyle,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          SleepTimerSheet.show(context);
-                        },
-                      ),
+                  // 5. Secondary actions (party / Quran / canvas / playlist)
+                  Expanded(
+                    child: _MoreDockButton(
+                      song: song,
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      style: dockIconStyle,
                     ),
-
-                    // 5. Secondary actions (party / Quran / canvas / playlist)
-                    Expanded(
-                      child: _MoreDockButton(
-                        song: song,
-                        activeColor: props.activeColor,
-                        inactiveColor: p.textSecondary,
-                        isTablet: isTablet,
-                        style: dockIconStyle,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-              return RepaintBoundary(
-                child: dockContainer,
-              );
-            },
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -979,11 +1041,11 @@ class PlayerPlayHandle extends StatelessWidget {
       padding: padding,
       child: Center(
         child: Container(
-          width: 38,
+          width: 40,
           height: 4,
           decoration: BoxDecoration(
             color: (p.isDark ? Colors.white : Colors.black)
-                .withValues(alpha: 0.22),
+                .withValues(alpha: 0.24),
             borderRadius: AppRadii.r2All,
           ),
         ),
@@ -1040,16 +1102,16 @@ class PlayerTopBar extends StatelessWidget {
       required VoidCallback onTap,
     }) {
       return SizedBox(
-        width: 48,
-        height: 48,
+        width: 46,
+        height: 46,
         child: Material(
-          // Specular white disappears on a light backdrop; use a real
-          // surface + hairline there so the dismiss/options buttons read as
-          // buttons in both themes.
-          color: p.isDark ? AppColors.specular : p.surfaceContainer,
-          shape: p.isDark
-              ? const CircleBorder()
-              : CircleBorder(side: BorderSide(color: p.hairline)),
+          color: p.isDark ? AppColors.specularAt(0.08) : p.surfaceContainer,
+          shape: CircleBorder(
+            side: BorderSide(
+              color: p.isDark ? AppColors.specularAt(0.14) : p.hairline,
+              width: 1.0,
+            ),
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
@@ -1091,7 +1153,7 @@ class PlayerTopBar extends StatelessWidget {
               },
             )
           else if (showMore)
-            const SizedBox(width: 48, height: 48),
+            const SizedBox(width: 46, height: 46),
           Expanded(
             child: centerWidget != null
                 ? Center(child: centerWidget!)
@@ -1101,36 +1163,56 @@ class PlayerTopBar extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            WaveformLogo(
-                              size: 13,
-                              color: state.isPlaying
-                                  ? props.activeColor
-                                  : resolvedSubtitle,
-                              animate: state.isPlaying,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: p.isDark
+                                ? AppColors.specularAt(0.05)
+                                : p.surfaceContainer.withValues(alpha: 0.6),
+                            borderRadius: AppRadii.r12All,
+                            border: Border.all(
+                              color: p.isDark
+                                  ? AppColors.specularAt(0.09)
+                                  : p.hairline,
+                              width: 0.8,
                             ),
-                            const SizedBox(width: AppSpacing.s6),
-                            Flexible(
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              WaveformLogo(
+                                size: 12,
+                                color: state.isPlaying
+                                    ? props.activeColor
+                                    : resolvedSubtitle,
+                                animate: state.isPlaying,
+                              ),
+                              const SizedBox(width: AppSpacing.s6),
+                              Flexible(
                                 child: Text(
-                              context.l10n.playingFrom.toUpperCase(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    fontSize: AppFontSize.tiny,
-                                    letterSpacing: AppTracking.wide,
-                                    fontWeight: FontWeight.w800,
-                                    color: resolvedSubtitle.withValues(
-                                        alpha: p.isDark ? 0.8 : 1.0),
-                                  ),
-                            )),
-                          ],
+                                  context.l10n.playingFrom.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        fontSize: AppFontSize.tiny,
+                                        letterSpacing: AppTracking.wide,
+                                        fontWeight: FontWeight.w800,
+                                        color: resolvedSubtitle.withValues(
+                                          alpha: p.isDark ? 0.85 : 1.0,
+                                        ),
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: AppSpacing.s2),
+                        const SizedBox(height: 3),
                         Text(
                           (song?.album != null && song!.album.trim().isNotEmpty)
                               ? song.album.trim()
@@ -1169,7 +1251,7 @@ class PlayerTopBar extends StatelessWidget {
               },
             )
           else if (showDismiss)
-            const SizedBox(width: 48, height: 48),
+            const SizedBox(width: 46, height: 46),
         ],
       ),
     );
@@ -1224,6 +1306,7 @@ class PlayerTrackHeader extends StatelessWidget {
     final p = context.palette;
     final state = props.state;
     final song = state.currentSong;
+    final isFav = song?.isFavorite == true;
     final resolvedTitle = titleColor ?? p.textPrimary;
     final resolvedSubtitle = subtitleColor ?? p.textSecondary;
     final hasDownload = song != null &&
@@ -1268,50 +1351,53 @@ class PlayerTrackHeader extends StatelessWidget {
               // sheet, so the title can start at the screen gutter.
               if (!alignStart)
                 SizedBox(
-                width: resolvedActionButtonSize,
-                height: resolvedActionButtonSize,
-                child: Material(
-                  color: p.isDark
-                      ? AppColors.specularAt(0.07)
-                      : p.surfaceContainer,
-                  shape: CircleBorder(
-                    side: BorderSide(
-                      color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
-                      width: 1.0,
+                  width: resolvedActionButtonSize,
+                  height: resolvedActionButtonSize,
+                  child: Material(
+                    color: p.isDark
+                        ? AppColors.specularAt(0.07)
+                        : p.surfaceContainer,
+                    shape: CircleBorder(
+                      side: BorderSide(
+                        color:
+                            p.isDark ? AppColors.specularAt(0.13) : p.hairline,
+                        width: 1.0,
+                      ),
                     ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: hasDownload
-                      ? Center(
-                          child: YtmDownloadButton(
-                            song: song,
-                            activeColor: props.activeColor,
-                            iconColor: resolvedSubtitle,
-                            iconSize: iconSize,
-                          ),
-                        )
-                      : InkWell(
-                          onTap: () {
-                            if (song != null) {
-                              HapticFeedback.lightImpact();
-                              AddToPlaylistSheet.show(context, song: song);
-                            }
-                          },
-                          child: Center(
-                            child: Icon(
-                              Icons.playlist_add_rounded,
-                              semanticLabel: context.l10n.addToPlaylist,
-                              size: iconSize,
-                              color: resolvedSubtitle,
+                    clipBehavior: Clip.antiAlias,
+                    child: hasDownload
+                        ? Center(
+                            child: YtmDownloadButton(
+                              song: song,
+                              activeColor: props.activeColor,
+                              iconColor: resolvedSubtitle,
+                              iconSize: iconSize,
+                            ),
+                          )
+                        : InkWell(
+                            onTap: () {
+                              if (song != null) {
+                                HapticFeedback.lightImpact();
+                                AddToPlaylistSheet.show(context, song: song);
+                              }
+                            },
+                            child: Center(
+                              child: Icon(
+                                Icons.playlist_add_rounded,
+                                semanticLabel: context.l10n.addToPlaylist,
+                                size: iconSize,
+                                color: resolvedSubtitle,
+                              ),
                             ),
                           ),
-                        ),
+                  ),
                 ),
-              ),
               Expanded(
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                  padding: EdgeInsetsDirectional.only(
+                    start: alignStart ? 0 : AppSpacing.s10,
+                    end: AppSpacing.s10,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: alignStart
@@ -1351,25 +1437,40 @@ class PlayerTrackHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(
+              AnimatedContainer(
+                duration: context.motionMs(220),
                 width: resolvedActionButtonSize,
                 height: resolvedActionButtonSize,
-                child: Material(
-                  color: p.isDark
-                      ? AppColors.specularAt(0.07)
-                      : p.surfaceContainer,
-                  shape: CircleBorder(
-                    side: BorderSide(
-                      color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
-                      width: 1.0,
-                    ),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isFav
+                      ? p.favorite.withValues(alpha: p.isDark ? 0.16 : 0.12)
+                      : (p.isDark
+                          ? AppColors.specularAt(0.07)
+                          : p.surfaceContainer),
+                  border: Border.all(
+                    color: isFav
+                        ? p.favorite.withValues(alpha: 0.45)
+                        : (p.isDark ? AppColors.specularAt(0.13) : p.hairline),
+                    width: 1.0,
                   ),
-                  clipBehavior: Clip.antiAlias,
+                  boxShadow: isFav
+                      ? [
+                          BoxShadow(
+                            color: p.favorite.withValues(alpha: 0.20),
+                            blurRadius: 10,
+                            spreadRadius: -2,
+                          ),
+                        ]
+                      : null,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Material(
+                  color: Colors.transparent,
                   child: PlayerAnimatedFavoriteButton(
-                    isFavorite: song?.isFavorite == true,
-                    semanticLabel: song?.isFavorite == true
-                        ? context.l10n.unlike
-                        : context.l10n.like,
+                    isFavorite: isFav,
+                    semanticLabel:
+                        isFav ? context.l10n.unlike : context.l10n.like,
                     favoriteColor: p.favorite,
                     inactiveColor: resolvedSubtitle,
                     iconSize: iconSize,
@@ -1410,6 +1511,117 @@ class PlayerTrackHeader extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Shared studio-styled bookmark resume prompt banner used by both
+/// [PlayerControlsColumn] and [PlayerThemeScaffold].
+class PlayerBookmarkPromptBanner extends StatelessWidget {
+  final PlayerCubit cubit;
+  final Duration position;
+
+  const PlayerBookmarkPromptBanner({
+    super.key,
+    required this.cubit,
+    required this.position,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final p = context.palette;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xxs,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm + 2,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              p.warning.withValues(alpha: p.isDark ? 0.20 : 0.14),
+              p.warning.withValues(alpha: p.isDark ? 0.08 : 0.06),
+            ],
+          ),
+          borderRadius: AppRadii.r16All,
+          border: Border.all(
+            color: p.warning.withValues(alpha: 0.42),
+            width: 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: p.warning.withValues(alpha: 0.22),
+              ),
+              child: Icon(
+                Icons.bookmark_rounded,
+                size: 16,
+                color: p.warning,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                l10n.resumeFromPrompt(Formatters.formatDuration(position)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: AppFontSize.bodySmall,
+                  fontWeight: FontWeight.w700,
+                  color: p.textPrimary,
+                ),
+              ),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: p.warning,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(48, 34),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: const TextStyle(
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                cubit.seekToBookmark();
+              },
+              child: Text(l10n.resume),
+            ),
+            SizedBox(
+              width: 34,
+              height: 34,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip: l10n.close,
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  cubit.dismissBookmark();
+                },
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 17,
+                  color: p.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1529,7 +1741,10 @@ class PlayerControlsColumn extends StatelessWidget {
         ),
         if (state.bookmarkPosition != null) ...[
           SizedBox(height: spacingSeekToAdvanced),
-          _buildBookmarkPrompt(context, cubit, state.bookmarkPosition!),
+          PlayerBookmarkPromptBanner(
+            cubit: cubit,
+            position: state.bookmarkPosition!,
+          ),
           SizedBox(height: spacingAdvancedToControls),
         ] else ...[
           SizedBox(height: spacingSeekToControls),
@@ -1566,39 +1781,6 @@ class PlayerControlsColumn extends StatelessWidget {
         dock,
         if (!dense) SizedBox(height: spacingBelowDock),
       ],
-    );
-  }
-
-  Widget _buildBookmarkPrompt(
-      BuildContext context, PlayerCubit cubit, Duration pos) {
-    final l10n = context.l10n;
-    final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-      child: Material(
-        color: p.warning.withValues(alpha: 0.15),
-        borderRadius: AppRadii.r12All,
-        child: ListTile(
-          dense: true,
-          leading: Icon(Icons.bookmark, color: p.warning),
-          title: Text(l10n.resumeFromPrompt(Formatters.formatDuration(pos))),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextButton(
-                  onPressed: cubit.seekToBookmark, child: Text(l10n.resume)),
-              IconButton(
-                  constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
-                  tooltip: l10n.close,
-                  onPressed: cubit.dismissBookmark,
-                  icon: const Icon(Icons.close, size: 18)),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

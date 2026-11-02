@@ -26,11 +26,18 @@ class PlayerThemeProps {
     this.heroTag = 'now_playing_art_full',
   });
 
-  PlayerThemeProps copyWith({String? heroTag}) => PlayerThemeProps(
-        state: state,
-        cubit: cubit,
-        activeColor: activeColor,
-        bgColor: bgColor,
+  PlayerThemeProps copyWith({
+    PlayerState? state,
+    PlayerCubit? cubit,
+    Color? activeColor,
+    Color? bgColor,
+    String? heroTag,
+  }) =>
+      PlayerThemeProps(
+        state: state ?? this.state,
+        cubit: cubit ?? this.cubit,
+        activeColor: activeColor ?? this.activeColor,
+        bgColor: bgColor ?? this.bgColor,
         heroTag: heroTag ?? this.heroTag,
       );
 }

@@ -164,17 +164,26 @@ class _PulsrPressableState extends State<PulsrPressable>
     );
 
     if (_focused) {
+      final accent = context.palette.accent;
       animatedChild = DecoratedBox(
         position: DecorationPosition.foreground,
         decoration: BoxDecoration(
-          border: Border.all(color: context.palette.accent, width: 2),
+          border: Border.all(color: accent, width: 2),
           borderRadius: widget.focusBorderRadius,
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.24),
+              blurRadius: 10,
+              spreadRadius: -1,
+            ),
+          ],
         ),
         child: animatedChild,
       );
     }
 
     return FocusableActionDetector(
+      mouseCursor: SystemMouseCursors.click,
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
         SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
@@ -202,6 +211,7 @@ class _PulsrPressableState extends State<PulsrPressable>
           onTapCancel: _handleTapCancel,
           onLongPress: widget.onLongPress != null
               ? () {
+                  _release();
                   if (widget.enableHaptics) {
                     switch (widget.hapticStyle) {
                       case PulsrHapticStyle.heavy:

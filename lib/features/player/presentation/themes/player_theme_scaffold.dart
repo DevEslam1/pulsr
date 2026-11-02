@@ -410,20 +410,12 @@ class PlayerThemeScaffold extends StatelessWidget {
     final cubit = props.cubit;
     final song = state.currentSong;
     final activeColor = props.activeColor;
+    final isInSplitView = PlayerSplitViewScope.of(context);
 
-    return AnimatedContainer(
-      duration: context.motionMs(400),
-      curve: context.motionCurve(Curves.easeInOut),
-      color: props.bgColor,
-      child: Stack(
-        children: [
-          if (background != null) Positioned.fill(child: background!),
-          if (ambientGlow != null) Positioned.fill(child: ambientGlow!),
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final metrics =
-                    PlayerThemeMetrics.calculate(context, constraints);
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics =
+            PlayerThemeMetrics.calculate(context, constraints);
 
                 final resolvedSwitcher = viewSwitcher != null
                     ? viewSwitcher!(context, metrics)
@@ -680,8 +672,21 @@ class PlayerThemeScaffold extends StatelessWidget {
                   ),
                 );
               },
-            ),
-          ),
+            );
+
+    if (isInSplitView) {
+      return content;
+    }
+
+    return AnimatedContainer(
+      duration: context.motionMs(400),
+      curve: context.motionCurve(Curves.easeInOut),
+      color: props.bgColor,
+      child: Stack(
+        children: [
+          if (background != null) Positioned.fill(child: background!),
+          if (ambientGlow != null) Positioned.fill(child: ambientGlow!),
+          SafeArea(child: content),
         ],
       ),
     );

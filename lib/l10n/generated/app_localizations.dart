@@ -15204,6 +15204,30 @@ abstract class AppLocalizations {
   /// **'Repeat: Off'**
   String get quranRepeatOff;
 
+  /// Section title for relaxing ambient sound effects in Quran Mode
+  ///
+  /// In en, this message translates to:
+  /// **'Ambient Sounds'**
+  String get ambientSounds;
+
+  /// Subtitle for ambient sounds section
+  ///
+  /// In en, this message translates to:
+  /// **'Relaxing background sound while listening'**
+  String get ambientSoundsDesc;
+
+  /// Volume label for ambient sound slider
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get ambientSoundVolume;
+
+  /// Error shown when ambient sound fails to load
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load ambient sound. Check your connection.'**
+  String get ambientSoundError;
+
   /// Batch download toast suffix for tracks not queued because of the per-batch cap
   ///
   /// In en, this message translates to:

@@ -18,28 +18,12 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
         ));
     final isTablet = context.isTablet;
+    final isInSplitView = PlayerSplitViewScope.of(context);
 
-    return AnimatedContainer(
-      duration: context.motionMs(400),
-      curve: context.motionCurve(Curves.easeInOut),
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(0, -0.26),
-          radius: 1.25,
-          colors: [
-            Color.lerp(bgColor, activeColor, 0.14) ?? bgColor,
-            bgColor,
-            p.bg,
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ),
-      ),
-      child: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isInSplitView = PlayerSplitViewScope.of(context);
-            final metrics = PlayerThemeMetrics.calculate(context, constraints);
-            final isLandscape = metrics.isLandscape;
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics = PlayerThemeMetrics.calculate(context, constraints);
+        final isLandscape = metrics.isLandscape;
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -288,8 +272,28 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
               ],
             );
           },
+        );
+
+    if (isInSplitView) {
+      return content;
+    }
+
+    return AnimatedContainer(
+      duration: context.motionMs(400),
+      curve: context.motionCurve(Curves.easeInOut),
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.26),
+          radius: 1.25,
+          colors: [
+            Color.lerp(bgColor, activeColor, 0.14) ?? bgColor,
+            bgColor,
+            p.bg,
+          ],
+          stops: const [0.0, 0.45, 1.0],
         ),
       ),
+      child: SafeArea(child: content),
     );
   }
 }

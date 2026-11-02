@@ -1,3 +1,4 @@
+// lib/features/library/presentation/tabs/library_songs_tab.dart
 part of '../library_screen.dart';
 
 final RegExp _railAsciiLetter = RegExp(r'^[A-Z]$');
@@ -28,7 +29,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
   int? _warmedHeadSignature;
 
   void _warmHeadOnlineIfNeeded(
-      List<SongsTableData> songs, PlayerCubit playerCubit) {
+    List<SongsTableData> songs,
+    PlayerCubit playerCubit,
+  ) {
     if (songs.isEmpty) return;
     final signature = Object.hashAll(songs.take(20).map((s) => s.id));
     if (_warmedHeadOnline && _warmedHeadSignature == signature) return;
@@ -46,26 +49,37 @@ mixin LibrarySongsTab on State<LibraryScreen> {
   }
 
   // ================= SONGS =================
-  Widget _buildSongsTab(BuildContext context, LibraryState state,
-      LibraryCubit cubit, PlayerCubit playerCubit) {
+  Widget _buildSongsTab(
+    BuildContext context,
+    LibraryState state,
+    LibraryCubit cubit,
+    PlayerCubit playerCubit,
+  ) {
     final p = context.palette;
     final songs = state.songs;
     _warmHeadOnlineIfNeeded(songs, playerCubit);
     if (songs.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-              16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            Adaptive.pagePadding(context),
+            AppSpacing.md,
+            Adaptive.pagePadding(context),
+            PulsrLayoutMetrics.scrollBottom(context),
+          ),
         );
       }
-      return _buildEmpty(context,
-          title: context.l10n.noSongsFound,
-          subtitle: context.l10n.noSongsSubtitle,
-          icon: Icons.music_note_rounded);
+      return _buildEmpty(
+        context,
+        title: context.l10n.noSongsFound,
+        subtitle: context.l10n.noSongsSubtitle,
+        icon: Icons.music_note_rounded,
+      );
     }
 
     final isGrid = state.viewMode == LibraryViewMode.grid;
     final hasMore = cubit.hasMoreSongs;
+    final losslessCount = songs.where(isLosslessSong).length;
 
     Widget buildLoadMoreTile() {
       if (!state.isLoadingMore) return const SizedBox.shrink();
@@ -74,136 +88,280 @@ mixin LibrarySongsTab on State<LibraryScreen> {
       );
     }
 
+    Widget buildQuickActionBar() {
+      return Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          Adaptive.pagePadding(context),
+          AppSpacing.xs,
+          Adaptive.pagePadding(context),
+          AppSpacing.xxs,
+        ),
+        child: Row(
+          children: [
+            Text(
+              context.l10n.tracksCount(songs.length),
+              style: TextStyle(
+                color: p.textSecondary,
+                fontSize: AppFontSize.label,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (losslessCount > 0) ...[
+              const SizedBox(width: AppSpacing.xs),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 1,
+                ),
+                decoration: BoxDecoration(
+                  color: p.info.withValues(alpha: 0.15),
+                  borderRadius: AppRadii.r4All,
+                ),
+                child: Text(
+                  '$losslessCount Lossless',
+                  style: TextStyle(
+                    fontSize: AppFontSize.tiny,
+                    fontWeight: FontWeight.w800,
+                    color: p.info,
+                  ),
+                ),
+              ),
+            ],
+            const Spacer(),
+            FilledButton.tonalIcon(
+              onPressed: () => playerCubit.playSong(songs.first, queue: songs),
+              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              label: Text(context.l10n.playAll),
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                backgroundColor: p.accent.withValues(alpha: 0.15),
+                foregroundColor: p.accent,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xxs),
+            IconButton.filledTonal(
+              onPressed: () {
+                final shuffled = List<SongsTableData>.from(songs)..shuffle();
+                playerCubit.playSong(shuffled.first, queue: shuffled);
+              },
+              icon: const Icon(Icons.shuffle_rounded, size: 18),
+              style: IconButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                backgroundColor: p.surfaceContainerHigh,
+                foregroundColor: p.textPrimary,
+              ),
+              tooltip: context.l10n.shuffle,
+            ),
+          ],
+        ),
+      );
+    }
+
     if (isGrid) {
       return RefreshIndicator(
         color: p.accent,
         backgroundColor: p.surfaceContainer,
         onRefresh: () => _handleRefresh(context),
-        child: GridView.builder(
-          // Grid shares the list's scroll controller so the same near-bottom
-          // listener grows the paginated window instead of hard-stopping at
-          // the first page (500 rows).
-          controller: _songsScrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          addAutomaticKeepAlives: false,
-          addRepaintBoundaries: true,
-          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-              16, Adaptive.pagePadding(context), 160),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(
-              context,
-              minItemWidth: 160,
-              minColumns: 2,
-              maxColumns: 6,
-            ),
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 18,
-            childAspectRatio: 0.76,
-          ),
-          itemCount: songs.length + (hasMore ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (index >= songs.length) {
-              return Center(child: buildLoadMoreTile());
-            }
-            final song = songs[index];
-            final isSelected = state.selectedSongIds.contains(song.id);
-            return Semantics(
-              button: true,
-              selected: isSelected,
-              label: '${song.title}, ${song.artist}',
-              child: InkWell(
-                borderRadius: AppRadii.r18All,
-                onTap: () {
-                  if (state.isMultiSelectMode) {
-                    cubit.toggleSongSelection(song.id);
-                  } else {
-                    playerCubit.playSong(song, queue: songs);
+        child: Column(
+          children: [
+            buildQuickActionBar(),
+            Expanded(
+              child: GridView.builder(
+                // Grid shares the list's scroll controller so the same near-bottom
+                // listener grows the paginated window instead of hard-stopping at
+                // the first page (500 rows).
+                controller: _songsScrollController,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                padding: EdgeInsetsDirectional.fromSTEB(
+                  Adaptive.pagePadding(context),
+                  AppSpacing.xs,
+                  Adaptive.pagePadding(context),
+                  PulsrLayoutMetrics.scrollBottom(context),
+                ),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(
+                    context,
+                    minItemWidth: 160,
+                    minColumns: 2,
+                    maxColumns: 6,
+                  ),
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.76,
+                ),
+                itemCount: songs.length + (hasMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index >= songs.length) {
+                    return Center(child: buildLoadMoreTile());
                   }
-                },
-                onLongPress: () => cubit.toggleSongSelection(song.id),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: CachedArtwork(
-                              id: song.id,
-                              remoteUrl:
-                                  song.remoteArtworkUrl ?? song.artworkUri,
-                              albumId: song.albumId,
-                              type: ArtworkType.AUDIO,
-                              size: double.infinity,
-                              borderRadius: 18,
+                  final song = songs[index];
+                  final isSelected = state.selectedSongIds.contains(song.id);
+                  final badge = songQualityBadge(song);
+
+                  return Semantics(
+                    button: true,
+                    selected: isSelected,
+                    label: '${song.title}, ${song.artist}',
+                    child: Material(
+                      color: p.surfaceCard,
+                      borderRadius: AppRadii.r18All,
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        borderRadius: AppRadii.r18All,
+                        onTap: () {
+                          if (state.isMultiSelectMode) {
+                            cubit.toggleSongSelection(song.id);
+                          } else {
+                            playerCubit.playSong(song, queue: songs);
+                          }
+                        },
+                        onLongPress: () => cubit.toggleSongSelection(song.id),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadii.r18All,
+                            border: Border.all(
+                              color: isSelected
+                                  ? p.accent
+                                  : p.hairline.withValues(alpha: 0.5),
+                              width: isSelected ? 1.5 : 1.0,
                             ),
                           ),
-                          if (isSelected)
-                            Positioned.fill(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: p.accent.withValues(alpha: 0.45),
-                                  borderRadius: AppRadii.r18All,
-                                ),
-                                child: const Center(
-                                  child: Icon(Icons.check_circle_rounded,
-                                      color: Colors.white, size: 36),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: CachedArtwork(
+                                        id: song.id,
+                                        remoteUrl: song.remoteArtworkUrl ??
+                                            song.artworkUri,
+                                        albumId: song.albumId,
+                                        type: ArtworkType.AUDIO,
+                                        size: double.infinity,
+                                        borderRadius: 17,
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      Positioned.fill(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: p.accent
+                                                .withValues(alpha: 0.45),
+                                            borderRadius: AppRadii.r16All,
+                                          ),
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.check_circle_rounded,
+                                              color: Colors.white,
+                                              size: 36,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    if (badge != null && isLosslessSong(song))
+                                      PositionedDirectional(
+                                        start: 8,
+                                        bottom: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.scrimAt(0.68),
+                                            borderRadius: AppRadii.r6All,
+                                          ),
+                                          child: Text(
+                                            badge,
+                                            style: TextStyle(
+                                              fontSize: AppFontSize.tiny,
+                                              fontWeight: FontWeight.w800,
+                                              color: p.info,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    PositionedDirectional(
+                                      end: 6,
+                                      top: 6,
+                                      child: Material(
+                                        color: AppColors.scrimAt(0.55),
+                                        shape: const CircleBorder(),
+                                        child: InkWell(
+                                          customBorder: const CircleBorder(),
+                                          onTap: () => SongOptionsSheet.show(
+                                            context,
+                                            song: song,
+                                          ),
+                                          child: const SizedBox(
+                                            width: AppSpacing.minTouchTarget,
+                                            height: AppSpacing.minTouchTarget,
+                                            child: Center(
+                                              child: Icon(
+                                                Icons.more_vert_rounded,
+                                                color: Colors.white,
+                                                size: 18,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                          PositionedDirectional(
-                            end: 6,
-                            top: 6,
-                            child: Material(
-                              color: AppColors.scrimAt(0.5),
-                              shape: const CircleBorder(),
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: () =>
-                                    SongOptionsSheet.show(context, song: song),
-                                child: const SizedBox(
-                                  width: AppSpacing.minTouchTarget,
-                                  height: AppSpacing.minTouchTarget,
-                                  child: Center(
-                                    child: Icon(Icons.more_vert_rounded,
-                                        color: Colors.white, size: 18),
-                                  ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.xs,
+                                  vertical: AppSpacing.s6,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      song.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppFontSize.bodySmall,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 1),
+                                    Text(
+                                      song.artist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.label,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      song.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: AppFontSize.bodySmall),
-                    ),
-                    const SizedBox(height: AppSpacing.s2),
-                    Text(
-                      song.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: p.textSecondary, fontSize: AppFontSize.label),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         ),
       );
     }
 
     final alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
-
     final trackCols = PulsrAdaptiveGrid.songColumns(context);
 
     Widget buildSongItem(SongsTableData song, int index) {
@@ -256,77 +414,97 @@ mixin LibrarySongsTab on State<LibraryScreen> {
 
     // BUG-13: gate the A–Z rail on the space actually available to the list
     // area, not the full window height.
-    return LayoutBuilder(builder: (context, constraints) {
-      final showAlphabet = songs.length >= 15 &&
-          state.sortBy == 'title' &&
-          constraints.maxHeight >= 500;
-      return RefreshIndicator(
-        color: p.accent,
-        backgroundColor: p.surfaceContainer,
-        onRefresh: () => _handleRefresh(context),
-        child: Stack(
-          children: [
-            trackCols > 1
-                ? GridView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    controller: _songsScrollController,
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: true,
-                    padding: EdgeInsetsDirectional.only(
-                        bottom: PulsrLayoutMetrics.scrollBottom(context),
-                        top: AppSpacing.xs,
-                        start: AppSpacing.s6,
-                        end: AppSpacing.s6),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: trackCols,
-                      mainAxisExtent: 72,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 4,
-                    ),
-                    itemCount: songs.length + (hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index >= songs.length) return buildLoadMoreTile();
-                      return StaggeredReveal(
-                        index: index,
-                        groupKey: '${state.sortBy}-${state.ascending}',
-                        child: buildSongItem(songs[index], index),
-                      );
-                    },
-                  )
-                : ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    controller: _songsScrollController,
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: true,
-                    padding: EdgeInsetsDirectional.only(
-                        bottom: PulsrLayoutMetrics.scrollBottom(context),
-                        top: AppSpacing.xs,
-                        start: AppSpacing.xxs,
-                        end: AppSpacing.xxs),
-                    itemCount: songs.length + (hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index >= songs.length) return buildLoadMoreTile();
-                      return StaggeredReveal(
-                        index: index,
-                        groupKey: '${state.sortBy}-${state.ascending}',
-                        child: buildSongItem(songs[index], index),
-                      );
-                    },
-                  ),
-            if (showAlphabet)
-              PositionedDirectional(
-                end: 4,
-                top: 8,
-                bottom: 150,
-                child: AlphabetQuickScroll(
-                  availableLetters: alphabet,
-                  onLetterSelected: (l) => _scrollToLetter(l, songs),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showAlphabet = songs.length >= 15 &&
+            state.sortBy == 'title' &&
+            constraints.maxHeight >= 500;
+        return RefreshIndicator(
+          color: p.accent,
+          backgroundColor: p.surfaceContainer,
+          onRefresh: () => _handleRefresh(context),
+          child: Column(
+            children: [
+              buildQuickActionBar(),
+              Expanded(
+                child: Stack(
+                  children: [
+                    trackCols > 1
+                        ? GridView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            controller: _songsScrollController,
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
+                            padding: EdgeInsetsDirectional.only(
+                              bottom: PulsrLayoutMetrics.scrollBottom(context),
+                              top: AppSpacing.xs,
+                              start: AppSpacing.s6,
+                              end: AppSpacing.s6,
+                            ),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: trackCols,
+                              mainAxisExtent: 72,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 4,
+                            ),
+                            itemCount: songs.length + (hasMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index >= songs.length) {
+                                return buildLoadMoreTile();
+                              }
+                              return StaggeredReveal(
+                                index: index,
+                                groupKey: '${state.sortBy}-${state.ascending}',
+                                child: buildSongItem(songs[index], index),
+                              );
+                            },
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            controller: _songsScrollController,
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
+                            padding: EdgeInsetsDirectional.only(
+                              bottom: PulsrLayoutMetrics.scrollBottom(context),
+                              top: AppSpacing.xs,
+                              start: AppSpacing.xxs,
+                              end: AppSpacing.xxs,
+                            ),
+                            itemCount: songs.length + (hasMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index >= songs.length) {
+                                return buildLoadMoreTile();
+                              }
+                              return StaggeredReveal(
+                                index: index,
+                                groupKey: '${state.sortBy}-${state.ascending}',
+                                child: buildSongItem(songs[index], index),
+                              );
+                            },
+                          ),
+                    if (showAlphabet)
+                      PositionedDirectional(
+                        end: 4,
+                        top: 8,
+                        bottom: 150,
+                        child: AlphabetQuickScroll(
+                          availableLetters: alphabet,
+                          onLetterSelected: (l) => _scrollToLetter(l, songs),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-          ],
-        ),
-      );
-    });
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // ================= DOWNLOADED =================
@@ -354,6 +532,12 @@ mixin LibrarySongsTab on State<LibraryScreen> {
       );
     }
 
+    final totalSizeBytes = downloaded.fold<int>(
+      0,
+      (acc, s) => acc + (s.fileSize ?? 0),
+    );
+    final totalMb = (totalSizeBytes / (1024 * 1024)).toStringAsFixed(1);
+
     return RefreshIndicator(
       color: p.accent,
       backgroundColor: p.surfaceContainer,
@@ -363,34 +547,38 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           // ---------- Header Card with Play All & Shuffle ----------
           Padding(
             padding: EdgeInsetsDirectional.fromSTEB(
-                Adaptive.pagePadding(context),
-                12,
-                Adaptive.pagePadding(context),
-                8),
+              Adaptive.pagePadding(context),
+              AppSpacing.sm,
+              Adaptive.pagePadding(context),
+              AppSpacing.xs,
+            ),
             child: Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    p.accent.withValues(alpha: 0.15),
-                    p.surfaceContainer,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                color: (p.isDark ? Colors.white : Colors.black)
+                    .withValues(alpha: 0.05),
+                borderRadius: AppRadii.r18All,
+                border: Border.all(
+                  color: (p.isDark ? Colors.white : Colors.black)
+                      .withValues(alpha: 0.08),
                 ),
-                borderRadius: AppRadii.r20All,
-                border: Border.all(color: p.accent.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(AppSpacing.s10),
                     decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
+                      color: AppColors.tabDownloaded.withValues(alpha: 0.16),
+                      borderRadius: AppRadii.r12All,
                     ),
-                    child: Icon(Icons.download_done_rounded,
-                        color: p.accent, size: 24),
+                    child: const Icon(
+                      Icons.download_done_rounded,
+                      color: AppColors.tabDownloaded,
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.s14),
                   Expanded(
@@ -407,7 +595,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                         ),
                         const SizedBox(height: AppSpacing.s2),
                         Text(
-                          context.l10n.tracksCount(downloaded.length),
+                          totalSizeBytes > 0
+                              ? '${context.l10n.tracksCount(downloaded.length)} • $totalMb MB'
+                              : context.l10n.tracksCount(downloaded.length),
                           style: TextStyle(
                             color: p.textSecondary,
                             fontSize: AppFontSize.label,
@@ -416,29 +606,33 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                       ],
                     ),
                   ),
-                  IconButton.filled(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    style: IconButton.styleFrom(
-                      backgroundColor: p.accent,
-                      foregroundColor: p.onAccent,
-                    ),
-                    icon: const Icon(Icons.play_arrow_rounded, size: 24),
-                    tooltip: context.l10n.playAll,
-                    onPressed: () => playerCubit.playSong(downloaded.first,
-                        queue: downloaded),
-                  ),
-                  const SizedBox(width: AppSpacing.s6),
                   IconButton.filledTonal(
                     constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: p.accent.withValues(alpha: 0.15),
+                      foregroundColor: p.accent,
+                    ),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                    tooltip: context.l10n.playAll,
+                    onPressed: () => playerCubit.playSong(
+                      downloaded.first,
+                      queue: downloaded,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xxs),
+                  IconButton.filledTonal(
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
                     style: IconButton.styleFrom(
                       backgroundColor: p.surfaceContainerHigh,
                       foregroundColor: p.textPrimary,
                     ),
-                    icon: const Icon(Icons.shuffle_rounded, size: 20),
+                    icon: const Icon(Icons.shuffle_rounded, size: 18),
                     tooltip: context.l10n.shuffle,
                     onPressed: () {
                       final shuffled = List<SongsTableData>.from(downloaded)
@@ -455,14 +649,17 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           Expanded(
             child: trackCols > 1
                 ? GridView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
                     padding: EdgeInsetsDirectional.only(
-                        bottom: PulsrLayoutMetrics.scrollBottom(context),
-                        top: AppSpacing.xxs,
-                        start: AppSpacing.s6,
-                        end: AppSpacing.s6),
+                      bottom: PulsrLayoutMetrics.scrollBottom(context),
+                      top: AppSpacing.xxs,
+                      start: AppSpacing.s6,
+                      end: AppSpacing.s6,
+                    ),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: trackCols,
                       mainAxisExtent: 72,
@@ -472,118 +669,105 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     itemCount: downloaded.length,
                     itemBuilder: (context, index) {
                       final song = downloaded[index];
-                      return PulsrDismissible(
-                        key: ValueKey('dl_${song.id}'),
-                        startToEndLabel: context.l10n.playNext,
-                        endToStartLabel: context.l10n.favorite,
-                        backgroundBuilder: (context, isConfirming) =>
-                            PulsrDismissible.buildActionBackground(
-                          context: context,
-                          icon: Icons.playlist_play_rounded,
-                          label: context.l10n.playNext,
-                          color: p.accent,
-                          backgroundColor: p.accentContainer,
-                          isConfirming: isConfirming,
-                        ),
-                        secondaryBackgroundBuilder: (context, isConfirming) =>
-                            PulsrDismissible.buildActionBackground(
-                          context: context,
-                          icon: Icons.favorite_rounded,
-                          label: context.l10n.favorite,
-                          color: p.favorite,
-                          backgroundColor: p.favorite.withValues(alpha: 0.2),
-                          isConfirming: isConfirming,
-                          isEnd: true,
-                        ),
-                        onConfirm: (direction) async {
-                          if (direction == DismissDirection.startToEnd) {
-                            playerCubit.playNext(song);
-                          } else {
-                            cubit.toggleFavorite(song.id);
-                          }
-                          return false;
-                        },
-                        child: SongTile(
-                          song: song,
-                          index: index,
-                          selected: state.selectedSongIds.contains(song.id),
-                          onTap: () {
-                            if (state.isMultiSelectMode) {
-                              cubit.toggleSongSelection(song.id);
-                            } else {
-                              playerCubit.playSong(song, queue: downloaded);
-                            }
-                          },
-                          onLongPress: () => cubit.toggleSongSelection(song.id),
-                          onMorePressed: () =>
-                              SongOptionsSheet.show(context, song: song),
-                        ),
+                      return _buildDownloadedSongTile(
+                        context,
+                        song: song,
+                        index: index,
+                        downloaded: downloaded,
+                        state: state,
+                        cubit: cubit,
+                        playerCubit: playerCubit,
+                        p: p,
                       );
                     },
                   )
                 : ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
                     padding: EdgeInsetsDirectional.only(
-                        bottom: PulsrLayoutMetrics.scrollBottom(context),
-                        top: AppSpacing.xxs,
-                        start: AppSpacing.xxs,
-                        end: AppSpacing.xxs),
+                      bottom: PulsrLayoutMetrics.scrollBottom(context),
+                      top: AppSpacing.xxs,
+                      start: AppSpacing.xxs,
+                      end: AppSpacing.xxs,
+                    ),
                     itemCount: downloaded.length,
                     itemBuilder: (context, index) {
                       final song = downloaded[index];
-                      return PulsrDismissible(
-                        key: ValueKey('dl_${song.id}'),
-                        startToEndLabel: context.l10n.playNext,
-                        endToStartLabel: context.l10n.favorite,
-                        backgroundBuilder: (context, isConfirming) =>
-                            PulsrDismissible.buildActionBackground(
-                          context: context,
-                          icon: Icons.playlist_play_rounded,
-                          label: context.l10n.playNext,
-                          color: p.accent,
-                          backgroundColor: p.accentContainer,
-                          isConfirming: isConfirming,
-                        ),
-                        secondaryBackgroundBuilder: (context, isConfirming) =>
-                            PulsrDismissible.buildActionBackground(
-                          context: context,
-                          icon: Icons.favorite_rounded,
-                          label: context.l10n.favorite,
-                          color: p.favorite,
-                          backgroundColor: p.favorite.withValues(alpha: 0.2),
-                          isConfirming: isConfirming,
-                          isEnd: true,
-                        ),
-                        onConfirm: (direction) async {
-                          if (direction == DismissDirection.startToEnd) {
-                            playerCubit.playNext(song);
-                          } else {
-                            cubit.toggleFavorite(song.id);
-                          }
-                          return false;
-                        },
-                        child: SongTile(
-                          song: song,
-                          index: index,
-                          selected: state.selectedSongIds.contains(song.id),
-                          onTap: () {
-                            if (state.isMultiSelectMode) {
-                              cubit.toggleSongSelection(song.id);
-                            } else {
-                              playerCubit.playSong(song, queue: downloaded);
-                            }
-                          },
-                          onLongPress: () => cubit.toggleSongSelection(song.id),
-                          onMorePressed: () =>
-                              SongOptionsSheet.show(context, song: song),
-                        ),
+                      return _buildDownloadedSongTile(
+                        context,
+                        song: song,
+                        index: index,
+                        downloaded: downloaded,
+                        state: state,
+                        cubit: cubit,
+                        playerCubit: playerCubit,
+                        p: p,
                       );
                     },
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDownloadedSongTile(
+    BuildContext context, {
+    required SongsTableData song,
+    required int index,
+    required List<SongsTableData> downloaded,
+    required LibraryState state,
+    required LibraryCubit cubit,
+    required PlayerCubit playerCubit,
+    required PulsrPalette p,
+  }) {
+    return PulsrDismissible(
+      key: ValueKey('dl_${song.id}'),
+      startToEndLabel: context.l10n.playNext,
+      endToStartLabel: context.l10n.favorite,
+      backgroundBuilder: (context, isConfirming) =>
+          PulsrDismissible.buildActionBackground(
+        context: context,
+        icon: Icons.playlist_play_rounded,
+        label: context.l10n.playNext,
+        color: p.accent,
+        backgroundColor: p.accentContainer,
+        isConfirming: isConfirming,
+      ),
+      secondaryBackgroundBuilder: (context, isConfirming) =>
+          PulsrDismissible.buildActionBackground(
+        context: context,
+        icon: Icons.favorite_rounded,
+        label: context.l10n.favorite,
+        color: p.favorite,
+        backgroundColor: p.favorite.withValues(alpha: 0.2),
+        isConfirming: isConfirming,
+        isEnd: true,
+      ),
+      onConfirm: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          playerCubit.playNext(song);
+        } else {
+          cubit.toggleFavorite(song.id);
+        }
+        return false;
+      },
+      child: SongTile(
+        song: song,
+        index: index,
+        selected: state.selectedSongIds.contains(song.id),
+        onTap: () {
+          if (state.isMultiSelectMode) {
+            cubit.toggleSongSelection(song.id);
+          } else {
+            playerCubit.playSong(song, queue: downloaded);
+          }
+        },
+        onLongPress: () => cubit.toggleSongSelection(song.id),
+        onMorePressed: () => SongOptionsSheet.show(context, song: song),
       ),
     );
   }

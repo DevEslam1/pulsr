@@ -3,21 +3,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
+
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_dock_tracker.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/services/ytm_account_service.dart';
+import '../../../core/services/ytm_service.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
-import '../../../core/widgets/pulsr_bottom_sheet.dart';
-import '../../../core/config/app_config.dart';
-import '../../../core/services/ytm_account_service.dart';
-import '../../../core/services/ytm_service.dart';
 import '../cubit/home_cubit.dart';
 import 'widgets/quran_radio_hero_carousel.dart';
 import 'widgets/quick_tile.dart';
@@ -29,16 +39,6 @@ import 'widgets/recently_played_section.dart';
 export 'widgets/quick_actions_row.dart';
 export 'widgets/quick_card.dart';
 export 'widgets/quran_radio_hero_carousel.dart';
-
-import 'package:go_router/go_router.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
-import 'package:pulsr/core/motion/pulsr_motion.dart';
-import 'package:flutter/services.dart';
-import '../../../core/widgets/pulsr_dock_tracker.dart';
-import '../../../core/responsive/pulsr_layout_metrics.dart';
 
 class HomeScreen extends StatelessWidget {
   final YtmService? ytmService;
@@ -404,22 +404,42 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                                   visualDensity: VisualDensity.compact,
                                 ),
                               ),
-                            // Logo in a soft badge so the header has a visual anchor.
+                            // Logo in a soft badge with specular outline so the header has an elevated anchor.
                             Container(
-                              width: 44,
-                              height: 44,
+                              width: 46,
+                              height: 46,
                               decoration: BoxDecoration(
-                                color: p.accentContainer,
-                                borderRadius: AppRadii.r14All,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    p.accentContainer,
+                                    Color.alphaBlend(
+                                      p.accent.withValues(alpha: 0.12),
+                                      p.surfaceContainerHighest,
+                                    ),
+                                  ],
+                                ),
+                                borderRadius: AppRadii.r16All,
                                 border: Border.all(
-                                    color: p.accent.withValues(alpha: 0.25)),
+                                  color: p.accent.withValues(alpha: 0.32),
+                                  width: 1.0,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: p.accent.withValues(alpha: 0.12),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
                               child: Center(
                                 child: PulsrLogo(
-                                    size: 24,
-                                    color: p.accent,
-                                    glowColor: p.glow,
-                                    animate: false),
+                                  size: 24,
+                                  color: p.accent,
+                                  glowColor: p.glow,
+                                  animate: false,
+                                ),
                               ),
                             ),
                           ],
@@ -481,9 +501,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                                       minHeight: AppSpacing.minTouchTarget),
                                   icon: const Icon(Icons.close, size: 16),
                                   tooltip: context.l10n.close,
-                                  // Hide for this session only. Clearing the
-                                  // persisted denial flag here made a genuine
-                                  // denial disappear permanently.
                                   onPressed: () {
                                     if (mounted) {
                                       setState(() =>
@@ -724,8 +741,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 icon: Icons.headphones_rounded,
                 color: AppColors.mint,
                 onTap: onFocusFlowTap,
-                // Focus Flow starts playback immediately; a play glyph sets
-                // the right expectation next to Favorites' navigation chevron.
                 trailingIcon: Icons.play_arrow_rounded,
                 trailingIconSize: 20,
               );
@@ -783,12 +798,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         ),
         const SizedBox(height: AppSpacing.sm),
 
-        // ---------- Recently played (50 by 50 smooth lazy load) ----------
-        // Section isolation (gap 04-02): each stream section is wrapped in a
-        // RepaintBoundary so one emission never repaints unrelated sections.
-        // Note: this screen has no whole-dashboard BlocBuilder; the 57KB
-        // rebuild claim (04-01) was overstated â€” emissions are already scoped
-        // to the StreamBuilders below.
+        // ---------- Recently played ----------
         RepaintBoundary(
           child: RecentlyPlayedSection(
             getSongsUseCase: getSongsUseCase,
@@ -796,7 +806,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           ),
         ),
 
-        // ---------- Recently added (lazy loaded in 50-song batches) ----------
+        // ---------- Recently added ----------
         RepaintBoundary(
           child: RecentlyAddedSection(
             getSongsUseCase: getSongsUseCase,
@@ -942,7 +952,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
         const SizedBox(height: AppSpacing.md),
 
-        // ---------- Online Category Content (Carousel + Top Charts) ----------
+        // ---------- Online Category Content ----------
         AnimatedSwitcher(
           duration: context.motion(PulsrDurations.layout),
           switchInCurve: context.motionCurve(Curves.easeOutCubic),

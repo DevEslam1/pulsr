@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fpdart/fpdart.dart' hide State;
 import 'package:go_router/go_router.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
+
 import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
@@ -17,10 +20,11 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
@@ -29,9 +33,13 @@ import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../sheets/song_options_sheet.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
-import 'package:pulsr/core/motion/pulsr_motion.dart';
-import '../../../core/widgets/pulsr_toast.dart';
+
+enum _FolderSortMode {
+  natural,
+  title,
+  artist,
+  duration,
+}
 
 class FolderDetailScreen extends StatefulWidget {
   final FolderItem folder;
@@ -54,13 +62,13 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   late bool _isExcluded;
   bool _showCollapsedTitle = false;
   bool _favoriteAllBusy = false;
+  _FolderSortMode _sortMode = _FolderSortMode.natural;
+  bool _sortAscending = true;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.folderUseCases ?? getIt<FolderUseCases>();
-    // Recreated only on retry so rebuilds (scroll-collapse, exclusion toggle)
-    // do not resubscribe to the folder's DB watch stream.
     _updateStream();
     _isExcluded = widget.folder.isExcluded;
     _scrollController = ScrollController()..addListener(_onScroll);
@@ -83,6 +91,65 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final show = offset > 160;
     if (show != _showCollapsedTitle) {
       setState(() => _showCollapsedTitle = show);
+    }
+  }
+
+  List<SongsTableData> _sortedSongs(List<SongsTableData> raw) {
+    if (_sortMode == _FolderSortMode.natural && _sortAscending) {
+      return raw;
+    }
+    final copy = List<SongsTableData>.from(raw);
+    copy.sort((a, b) {
+      int cmp;
+      switch (_sortMode) {
+        case _FolderSortMode.natural:
+          cmp = 0;
+          break;
+        case _FolderSortMode.title:
+          cmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          break;
+        case _FolderSortMode.artist:
+          cmp = a.artist.toLowerCase().compareTo(b.artist.toLowerCase());
+          if (cmp == 0) {
+            cmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          }
+          break;
+        case _FolderSortMode.duration:
+          cmp = a.durationMs.compareTo(b.durationMs);
+          break;
+      }
+      return _sortAscending ? cmp : -cmp;
+    });
+    if (_sortMode == _FolderSortMode.natural && !_sortAscending) {
+      return copy.reversed.toList();
+    }
+    return copy;
+  }
+
+  void _cycleSortMode() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      const values = _FolderSortMode.values;
+      final nextIndex = (_sortMode.index + 1) % values.length;
+      _sortMode = values[nextIndex];
+    });
+  }
+
+  void _toggleSortDirection() {
+    HapticFeedback.selectionClick();
+    setState(() => _sortAscending = !_sortAscending);
+  }
+
+  IconData _sortIcon(_FolderSortMode mode) {
+    switch (mode) {
+      case _FolderSortMode.natural:
+        return Icons.format_list_numbered_rounded;
+      case _FolderSortMode.title:
+        return Icons.sort_by_alpha_rounded;
+      case _FolderSortMode.artist:
+        return Icons.person_outline_rounded;
+      case _FolderSortMode.duration:
+        return Icons.schedule_rounded;
     }
   }
 
@@ -154,12 +221,18 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     return '$minutes min';
   }
 
+  String _formatTrackDuration(int ms) {
+    if (ms <= 0) return '--:--';
+    final totalSeconds = ms ~/ 1000;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
   bool _isAllFavorited(List<SongsTableData> songs) =>
       songs.isNotEmpty && songs.every((s) => s.isFavorite);
 
   Future<void> _toggleFavoriteFolder(List<SongsTableData> songs) async {
-    // The listed songs are the DB truth for this folder; the possibly stale or
-    // not-yet-loaded library favorites list must not drive the direction.
     if (songs.isEmpty || _favoriteAllBusy) return;
     _favoriteAllBusy = true;
     HapticFeedback.lightImpact();
@@ -202,6 +275,16 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     } finally {
       _favoriteAllBusy = false;
     }
+  }
+
+  void _copyFolderPath() {
+    HapticFeedback.selectionClick();
+    Clipboard.setData(ClipboardData(text: widget.folder.path));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${context.l10n.browseCopy}: ${widget.folder.name}'),
+      ),
+    );
   }
 
   void _showFolderOptionsMenu(
@@ -274,13 +357,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               ),
               onTap: () {
                 Navigator.pop(ctx);
-                Clipboard.setData(ClipboardData(text: widget.folder.path));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        '${context.l10n.browseCopy}: ${widget.folder.name}'),
-                  ),
-                );
+                _copyFolderPath();
               },
             ),
             const SizedBox(height: AppSpacing.md),
@@ -296,11 +373,14 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     required PulsrPalette p,
     Color? iconColor,
     String? tooltip,
-    double size = 42,
+    double size = 44,
     double iconSize = 20,
+    bool active = false,
   }) {
-    final surface = p.surfaceContainerHigh;
-    final border = p.hairline;
+    final surface = active
+        ? p.accent.withValues(alpha: 0.16)
+        : p.surfaceContainerHigh.withValues(alpha: 0.88);
+    final border = active ? p.accent.withValues(alpha: 0.45) : p.hairline;
 
     final button = Material(
       color: Colors.transparent,
@@ -312,7 +392,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                 onTap();
               }
             : null,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           width: size,
           height: size,
           decoration: BoxDecoration(
@@ -321,9 +402,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             border: Border.all(color: border, width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: p.isDark ? 0.20 : 0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
+                color: Colors.black.withValues(alpha: p.isDark ? 0.24 : 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -331,7 +412,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             child: Icon(
               icon,
               size: iconSize,
-              color: iconColor ?? Colors.white,
+              color: iconColor ?? p.textPrimary,
             ),
           ),
         ),
@@ -344,38 +425,61 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     return button;
   }
 
-  Widget _buildBigWhitePlayButton(
+  Widget _buildPrimaryPlayButton(
     BuildContext context,
     PulsrPalette p,
     List<SongsTableData> songs, {
-    double size = 56,
+    double size = 58,
     double iconSize = 34,
   }) {
     final isEnabled = songs.isNotEmpty;
+    final bgColor =
+        isEnabled ? p.accent : p.surfaceContainerHigh.withValues(alpha: 0.5);
+    final fgColor = isEnabled
+        ? (ThemeData.estimateBrightnessForColor(p.accent) == Brightness.dark
+            ? Colors.white
+            : Colors.black)
+        : p.textTertiary;
 
-    return Material(
-      color: isEnabled ? Colors.white : AppColors.specularAt(0.45),
-      shape: const CircleBorder(),
-      elevation: isEnabled ? 8 : 0,
-      shadowColor: AppColors.scrimAt(0.4),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: isEnabled
-            ? () {
-                HapticFeedback.mediumImpact();
-                context.read<PlayerCubit>().playSong(songs.first, queue: songs);
-              }
-            : null,
-        child: Container(
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          child: Padding(
-            padding: const EdgeInsetsDirectional.only(start: 3),
-            child: Icon(
-              Icons.play_arrow_rounded,
-              color: Colors.black,
-              size: iconSize,
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: isEnabled
+            ? [
+                BoxShadow(
+                  color: p.accent.withValues(alpha: 0.38),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : const [],
+      ),
+      child: Material(
+        color: bgColor,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: isEnabled
+              ? () {
+                  HapticFeedback.mediumImpact();
+                  context
+                      .read<PlayerCubit>()
+                      .playSong(songs.first, queue: songs);
+                }
+              : null,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(start: 3),
+                child: Icon(
+                  Icons.play_arrow_rounded,
+                  color: fgColor,
+                  size: iconSize,
+                ),
+              ),
             ),
           ),
         ),
@@ -383,11 +487,32 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     );
   }
 
+  List<({int id, int? albumId, String? remoteUrl})> _extractDistinctArts(
+    List<SongsTableData> songs,
+  ) {
+    final List<({int id, int? albumId, String? remoteUrl})> distinctArts = [];
+    final Set<String> seen = {};
+    for (final s in songs) {
+      final key = s.artworkUri ?? '${s.albumId ?? s.id}';
+      if (seen.add(key)) {
+        distinctArts.add((
+          id: s.id,
+          albumId: s.albumId,
+          remoteUrl: s.remoteArtworkUrl ?? s.artworkUri,
+        ));
+        if (distinctArts.length == 4) break;
+      }
+    }
+    return distinctArts;
+  }
+
   Widget _buildImmersiveCover(
     BuildContext context,
     List<SongsTableData> songs,
     PulsrPalette p,
   ) {
+    Widget backgroundArt;
+
     if (songs.isNotEmpty) {
       final featuredSong = songs.firstWhere(
         (s) =>
@@ -397,7 +522,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         orElse: () => songs.first,
       );
 
-      final artworkWidget = SizedBox.expand(
+      backgroundArt = SizedBox.expand(
         child: FittedBox(
           fit: BoxFit.cover,
           child: CachedArtwork(
@@ -410,73 +535,79 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           ),
         ),
       );
-
-      if (!_isExcluded) return artworkWidget;
-
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          artworkWidget,
-          PositionedDirectional(
-            top: MediaQuery.paddingOf(context).top + 12,
-            end: AppSpacing.md,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: AppSpacing.xs,
-              ),
-              decoration: BoxDecoration(
-                color: p.error.withValues(alpha: 0.92),
-                borderRadius: AppRadii.r10All,
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black45,
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.visibility_off_rounded,
-                      size: 14, color: Colors.white),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    context.l10n.folderPersistentExcludedBadge,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: AppFontSize.tiny,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    } else {
+      backgroundArt = Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              p.accentContainer,
+              p.surfaceContainer,
+              p.bg,
+            ],
           ),
-        ],
+        ),
+        child: Center(
+          child: Icon(
+            Icons.folder_rounded,
+            size: 100,
+            color: p.accent.withValues(alpha: 0.35),
+          ),
+        ),
       );
     }
 
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        backgroundArt,
+        if (_isExcluded)
+          PositionedDirectional(
+            top: MediaQuery.paddingOf(context).top + 12,
+            end: AppSpacing.md,
+            child: _buildExcludedBadge(context, p),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildExcludedBadge(BuildContext context, PulsrPalette p) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            p.accentContainer,
-            p.surfaceContainer,
-            p.bg,
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
       ),
-      child: Center(
-        child: Icon(
-          Icons.folder_rounded,
-          size: 100,
-          color: p.accent.withValues(alpha: 0.4),
-        ),
+      decoration: BoxDecoration(
+        color: p.error.withValues(alpha: 0.94),
+        borderRadius: AppRadii.r10All,
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black38,
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.visibility_off_rounded,
+            size: 14,
+            color: Colors.white,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            context.l10n.folderPersistentExcludedBadge,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: AppFontSize.tiny,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -487,20 +618,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     PulsrPalette p,
     double size,
   ) {
-    final List<({int id, int? albumId, String? remoteUrl})> distinctArts = [];
-    final Set<String> seen = {};
-    for (final s in songs) {
-      final key = s.artworkUri ?? '${s.albumId ?? s.id}';
-      if (!seen.contains(key)) {
-        seen.add(key);
-        distinctArts.add((
-          id: s.id,
-          albumId: s.albumId,
-          remoteUrl: s.remoteArtworkUrl ?? s.artworkUri,
-        ));
-        if (distinctArts.length == 4) break;
-      }
-    }
+    final distinctArts = _extractDistinctArts(songs);
 
     Widget content;
     if (distinctArts.length >= 4) {
@@ -591,20 +709,19 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         decoration: BoxDecoration(
           borderRadius: AppRadii.r20All,
           border: Border.all(
-            color:
-                (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+            color: p.hairline,
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.scrimAt(0.35),
-              blurRadius: 28,
+              color: AppColors.scrimAt(0.32),
+              blurRadius: 24,
               spreadRadius: -4,
-              offset: const Offset(0, 14),
+              offset: const Offset(0, 12),
             ),
             BoxShadow(
               color: p.accent.withValues(alpha: 0.14),
-              blurRadius: 40,
+              blurRadius: 36,
               spreadRadius: -6,
               offset: const Offset(0, 8),
             ),
@@ -619,34 +736,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               if (_isExcluded)
                 Container(
                   color: AppColors.scrimAt(0.55),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: AppSpacing.xs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.error.withValues(alpha: 0.92),
-                        borderRadius: AppRadii.r8All,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.visibility_off_rounded,
-                              size: 14, color: Colors.white),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            context.l10n.folderPersistentExcludedBadge,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: AppFontSize.caption,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  child: Center(child: _buildExcludedBadge(context, p)),
                 ),
             ],
           ),
@@ -672,24 +762,21 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       orElse: () => songs.first,
     );
 
-    final hPadding = compact ? AppSpacing.sm : AppSpacing.sm;
-    final vPadding = compact ? AppSpacing.xs : AppSpacing.sm;
-    final artSize = compact ? 46.0 : 54.0;
+    final artSize = compact ? 44.0 : 50.0;
 
     return Container(
       margin: EdgeInsets.symmetric(
         horizontal: compact ? AppSpacing.sm : Adaptive.pagePadding(context),
         vertical: compact ? AppSpacing.xxs : AppSpacing.xs,
       ),
-      padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: vPadding),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: compact ? AppSpacing.xs : AppSpacing.s10,
+      ),
       decoration: BoxDecoration(
-        color: (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+        color: p.surfaceContainer.withValues(alpha: 0.65),
         borderRadius: AppRadii.r16All,
-        border: Border.all(
-          color:
-              (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
-          width: 1,
-        ),
+        border: Border.all(color: p.hairline, width: 1),
       ),
       child: Row(
         children: [
@@ -700,20 +787,34 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             size: artSize,
             borderRadius: AppRadii.r12,
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '${context.l10n.tracksCount(songs.length).toUpperCase()} • ${_formatTotalDuration(totalDurationMs).toUpperCase()}',
-                  style: TextStyle(
-                    fontSize: AppFontSize.tiny,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: p.textTertiary,
-                  ),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome_mosaic_rounded,
+                      size: 12,
+                      color: p.accent,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        '${context.l10n.tracksCount(songs.length).toUpperCase()} • ${_formatTotalDuration(totalDurationMs).toUpperCase()}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: AppFontSize.tiny,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: p.accent,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -722,13 +823,14 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       : featuredSong.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: AppFontSize.body,
                     fontWeight: FontWeight.w700,
+                    color: p.textPrimary,
                     letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   featuredSong.artist,
                   maxLines: 1,
@@ -741,29 +843,19 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Material(
-            color:
-                (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                final shuffled = List<SongsTableData>.from(songs)..shuffle();
-                context
-                    .read<PlayerCubit>()
-                    .playSong(shuffled.first, queue: shuffled);
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Icon(
-                  Icons.shuffle_rounded,
-                  size: 18,
-                  color: p.textPrimary,
-                ),
-              ),
-            ),
+          const SizedBox(width: AppSpacing.xs),
+          _buildGlassCircleButton(
+            icon: Icons.shuffle_rounded,
+            size: 38,
+            iconSize: 18,
+            p: p,
+            iconColor: p.accent,
+            onTap: () {
+              final shuffled = List<SongsTableData>.from(songs)..shuffle();
+              context
+                  .read<PlayerCubit>()
+                  .playSong(shuffled.first, queue: shuffled);
+            },
           ),
         ],
       ),
@@ -771,8 +863,6 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   }
 
   bool _isPathExcluded(String path) {
-    // Reconstructed breadcrumb folders must carry the real exclusion state,
-    // otherwise excluding/including from the opened folder flips the wrong way.
     try {
       final folders = context.read<LibraryCubit>().state.folders;
       final normalized = path.replaceAll('\\', '/');
@@ -795,78 +885,195 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final parts = cleanPath.split('/').where((s) => s.isNotEmpty).toList();
     if (parts.isEmpty) return const SizedBox.shrink();
 
-    // Preserve the original root so breadcrumb taps navigate the *same* tree.
-    // Previously every crumb was rebuilt as an absolute UNIX path ('/C:' for a
-    // Windows drive), which dropped the drive/root and broke navigation.
     final isUnixAbsolute = cleanPath.startsWith('/');
     final isWindowsDrive = RegExp(r'^[A-Za-z]:$').hasMatch(parts.first);
 
-    return Container(
-      height: compact ? 28 : 32,
-      margin: EdgeInsets.symmetric(
-        horizontal: compact ? AppSpacing.sm : Adaptive.pagePadding(context),
-        vertical: AppSpacing.xxs,
-      ),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: parts.length,
-        separatorBuilder: (_, __) => Icon(
-          Icons.chevron_right_rounded,
-          size: 13,
-          color: p.textTertiary.withValues(alpha: 0.5),
+    return GestureDetector(
+      onLongPress: _copyFolderPath,
+      child: Container(
+        height: compact ? 32 : 36,
+        margin: EdgeInsets.symmetric(
+          horizontal: compact ? AppSpacing.sm : Adaptive.pagePadding(context),
+          vertical: AppSpacing.xxs,
         ),
-        itemBuilder: (context, index) {
-          final isLast = index == parts.length - 1;
-          final name = parts[index];
-          final joined = parts.sublist(0, index + 1).join('/');
-          final subPath = isWindowsDrive && index == 0
-              ? '$joined/'
-              : isUnixAbsolute
-                  ? '/$joined'
-                  : joined;
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer.withValues(alpha: 0.45),
+          borderRadius: AppRadii.r12All,
+          border: Border.all(color: p.hairline),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.folder_open_rounded,
+              size: 15,
+              color: p.accent,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: parts.length,
+                separatorBuilder: (_, __) => Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14,
+                  color: p.textTertiary.withValues(alpha: 0.55),
+                ),
+                itemBuilder: (context, index) {
+                  final isLast = index == parts.length - 1;
+                  final name = parts[index];
+                  final joined = parts.sublist(0, index + 1).join('/');
+                  final subPath = isWindowsDrive && index == 0
+                      ? '$joined/'
+                      : isUnixAbsolute
+                          ? '/$joined'
+                          : joined;
 
-          return Center(
-            child: Material(
-              color: isLast
-                  ? p.accent.withValues(alpha: 0.16)
-                  : (p.isDark ? Colors.white : Colors.black)
-                      .withValues(alpha: 0.05),
-              borderRadius: AppRadii.r8All,
-              child: InkWell(
-                borderRadius: AppRadii.r8All,
-                onTap: isLast
-                    ? null
-                    : () {
-                        HapticFeedback.selectionClick();
-                        context.push(
-                          '/folder',
-                          extra: FolderItem(
-                            path: subPath,
-                            name: name,
-                            songCount: 0,
-                            isExcluded: _isPathExcluded(subPath),
+                  return Center(
+                    child: Material(
+                      color: isLast
+                          ? p.accent.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                      borderRadius: AppRadii.r8All,
+                      child: InkWell(
+                        borderRadius: AppRadii.r8All,
+                        onTap: isLast
+                            ? null
+                            : () {
+                                HapticFeedback.selectionClick();
+                                context.push(
+                                  '/folder',
+                                  extra: FolderItem(
+                                    path: subPath,
+                                    name: name,
+                                    songCount: 0,
+                                    isExcluded: _isPathExcluded(subPath),
+                                  ),
+                                );
+                              },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s6,
+                            vertical: 3,
                           ),
-                        );
-                      },
-                child: Padding(
+                          child: Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight:
+                                  isLast ? FontWeight.w700 : FontWeight.w500,
+                              color: isLast ? p.accent : p.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrackSectionHeader(
+    BuildContext context,
+    List<SongsTableData> songs,
+    PulsrPalette p, {
+    required EdgeInsetsGeometry padding,
+  }) {
+    return Padding(
+      padding: padding,
+      child: Row(
+        children: [
+          Text(
+            context.l10n.browseTopTracks,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: AppFontSize.title,
+                  letterSpacing: -0.3,
+                  color: p.textPrimary,
+                ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s8,
+              vertical: 2,
+            ),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.r10All,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Text(
+              '${songs.length}',
+              style: TextStyle(
+                color: p.textSecondary,
+                fontSize: AppFontSize.tiny,
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          const Spacer(),
+          if (songs.length > 1) ...[
+            Material(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.r10All,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: _cycleSortMode,
+                child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s8,
-                    vertical: AppSpacing.xxs,
+                    vertical: 5,
                   ),
-                  child: Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: AppFontSize.caption,
-                      fontWeight: isLast ? FontWeight.w700 : FontWeight.w500,
-                      color: isLast ? p.accent : p.textSecondary,
-                    ),
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadii.r10All,
+                    border: Border.all(color: p.hairline),
+                  ),
+                  child: Icon(
+                    _sortIcon(_sortMode),
+                    size: 16,
+                    color: _sortMode == _FolderSortMode.natural
+                        ? p.textSecondary
+                        : p.accent,
                   ),
                 ),
               ),
             ),
-          );
-        },
+            const SizedBox(width: AppSpacing.xxs),
+            Material(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.r10All,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: _toggleSortDirection,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s6,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadii.r10All,
+                    border: Border.all(color: p.hairline),
+                  ),
+                  child: Icon(
+                    _sortAscending
+                        ? Icons.arrow_upward_rounded
+                        : Icons.arrow_downward_rounded,
+                    size: 16,
+                    color: _sortAscending ? p.textSecondary : p.accent,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -888,99 +1095,149 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         final isActive = playback.isActive;
         final isPlaying = playback.isPlaying;
 
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              context.read<PlayerCubit>().playSong(song, queue: songs);
-            },
-            onLongPress: () {
-              HapticFeedback.mediumImpact();
-              SongOptionsSheet.show(context, song: song);
-            },
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: Adaptive.pagePadding(context),
-                vertical: AppSpacing.s8,
+        return Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: Adaptive.pagePadding(context),
+            vertical: 2,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? p.accent.withValues(alpha: 0.10)
+                  : Colors.transparent,
+              borderRadius: AppRadii.r14All,
+              border: Border.all(
+                color: isActive
+                    ? p.accent.withValues(alpha: 0.32)
+                    : Colors.transparent,
+                width: 1,
               ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CachedArtwork(
-                          id: song.id,
-                          albumId: song.albumId,
-                          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                          size: 48,
-                          borderRadius: AppRadii.r10,
-                        ),
-                        if (isActive)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.scrimAt(0.52),
-                              borderRadius: AppRadii.r10All,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: AppRadii.r14All,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  context.read<PlayerCubit>().playSong(song, queue: songs);
+                },
+                onLongPress: () {
+                  HapticFeedback.mediumImpact();
+                  SongOptionsSheet.show(context, song: song);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs,
+                    vertical: AppSpacing.s6,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedArtwork(
+                              id: song.id,
+                              albumId: song.albumId,
+                              remoteUrl:
+                                  song.remoteArtworkUrl ?? song.artworkUri,
+                              size: 48,
+                              borderRadius: AppRadii.r10,
                             ),
-                            child: Center(
-                              child: NowPlayingIndicator(
-                                color: p.accent,
-                                isPlaying: isPlaying,
+                            if (isActive)
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.scrimAt(0.52),
+                                  borderRadius: AppRadii.r10All,
+                                ),
+                                child: Center(
+                                  child: NowPlayingIndicator(
+                                    color: p.accent,
+                                    isPlaying: isPlaying,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              song.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isActive ? p.accent : p.textPrimary,
+                                fontWeight: isActive
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                fontSize: AppFontSize.callout,
+                                letterSpacing: -0.2,
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${song.artist} • ${song.album.isNotEmpty ? song.album : 'Single'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (song.isFavorite) ...[
+                        const SizedBox(width: AppSpacing.xxs),
+                        Icon(
+                          Icons.favorite_rounded,
+                          size: 14,
+                          color: p.favorite,
+                        ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                      if (song.durationMs > 0) ...[
+                        const SizedBox(width: AppSpacing.xs),
                         Text(
-                          song.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          _formatTrackDuration(song.durationMs),
                           style: TextStyle(
-                            color: isActive ? p.accent : p.textPrimary,
+                            color: isActive ? p.accent : p.textTertiary,
+                            fontSize: AppFontSize.tiny,
                             fontWeight: FontWeight.w600,
-                            fontSize: AppFontSize.callout,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${song.artist} • ${song.album.isNotEmpty ? song.album : 'Single'}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.bodySmall,
+                            fontFeatures: const [
+                              FontFeature.tabularFigures(),
+                            ],
                           ),
                         ),
                       ],
-                    ),
+                      IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        tooltip:
+                            MaterialLocalizations.of(context).moreButtonTooltip,
+                        icon: Icon(
+                          Icons.more_horiz_rounded,
+                          size: 20,
+                          color: isActive ? p.accent : p.textTertiary,
+                        ),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          SongOptionsSheet.show(context, song: song);
+                        },
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    tooltip:
-                        MaterialLocalizations.of(context).moreButtonTooltip,
-                    icon: Icon(
-                      Icons.more_horiz_rounded,
-                      size: 20,
-                      color: p.textTertiary,
-                    ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      SongOptionsSheet.show(context, song: song);
-                    },
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -1000,7 +1257,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final allFavorited = _isAllFavorited(songs);
     final coverSize = isShort
         ? (screenHeight * 0.28).clamp(96.0, 130.0)
-        : (screenHeight * 0.28).clamp(130.0, 240.0);
+        : (screenHeight * 0.28).clamp(130.0, 230.0);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1018,6 +1275,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   fontWeight: FontWeight.w800,
                   fontSize: isShort ? 17 : 20,
                   letterSpacing: -0.3,
+                  color: p.textPrimary,
                 ),
           ),
         ),
@@ -1031,24 +1289,23 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        // Action Row: [ ( i ) ] [ ( ▶ ) ] [ ( ♥ ) ]
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _buildGlassCircleButton(
               icon: Icons.info_outline_rounded,
-              size: isShort ? 36 : 40,
+              size: isShort ? 38 : 42,
               iconSize: isShort ? 18 : 20,
               p: p,
               tooltip: context.l10n.browseOpenFolderDetails,
               onTap: () => _showFolderOptionsMenu(context, songs, p),
             ),
             const SizedBox(width: AppSpacing.md),
-            _buildBigWhitePlayButton(
+            _buildPrimaryPlayButton(
               context,
               p,
               songs,
-              size: isShort ? 46 : 52,
+              size: isShort ? 48 : 54,
               iconSize: isShort ? 26 : 30,
             ),
             const SizedBox(width: AppSpacing.md),
@@ -1056,8 +1313,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               icon: allFavorited
                   ? Icons.favorite_rounded
                   : Icons.favorite_border_rounded,
-              iconColor: allFavorited ? p.favorite : Colors.white,
-              size: isShort ? 36 : 40,
+              iconColor: allFavorited ? p.favorite : p.textPrimary,
+              active: allFavorited,
+              size: isShort ? 38 : 42,
               iconSize: isShort ? 18 : 20,
               p: p,
               tooltip: allFavorited
@@ -1098,46 +1356,22 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
+            _buildTrackSectionHeader(
+              context,
+              songs,
+              p,
               padding: const EdgeInsetsDirectional.fromSTEB(
                 AppSpacing.md,
                 AppSpacing.sm,
                 AppSpacing.md,
                 AppSpacing.xs,
               ),
-              child: Row(
-                children: [
-                  Text(
-                    context.l10n.browseTopTracks,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontSize: AppFontSize.title,
-                          letterSpacing: -0.3,
-                        ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 20,
-                    color: p.textTertiary,
-                  ),
-                  const Spacer(),
-                  Text(
-                    context.l10n.tracksCount(songs.length),
-                    style: TextStyle(
-                      color: p.textTertiary,
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
             ),
             for (int i = 0; i < songs.length; i++) ...[
               _buildSongRow(context, songs, i, p),
               if (i < songs.length - 1)
                 Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 64),
+                  padding: const EdgeInsetsDirectional.only(start: 68),
                   child: Divider(
                     height: 1,
                     thickness: 0.5,
@@ -1161,11 +1395,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final isTablet = Adaptive.isTablet(context);
     final isWide = screenWidth >= 800;
 
-    // Responsive split threshold:
-    // Any landscape mode, or any tablet in landscape, or wide tablet/desktop (>= 800dp)
     final shouldSplit = isLandscape || (isTablet && isWide);
 
-    // Fluid height for portrait header based on screen dimensions and text scaler
     final textScale =
         MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.3);
     final headerHeight = (screenHeight * (isTablet ? 0.34 : 0.38) * textScale)
@@ -1177,12 +1408,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         body: StreamBuilder<Result<List<SongsTableData>>>(
           stream: _songsStream,
           builder: (context, snapshot) {
-            Widget buildContent(List<SongsTableData> songs) {
+            Widget buildContent(List<SongsTableData> rawSongs) {
+              final songs = _sortedSongs(rawSongs);
               final totalDurationMs =
                   songs.fold<int>(0, (sum, s) => sum + s.durationMs);
               final allFavorited = _isAllFavorited(songs);
 
-              // Responsive Layout: Tablet / Landscape Master-Detail Split
               if (shouldSplit) {
                 return DetailScaffold(
                   leading: const PulsrBackButton(),
@@ -1193,14 +1424,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                 );
               }
 
-              // Portrait Phone / Narrow View: Collapsing Immersive Apple Music layout
               return CustomScrollView(
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
                 slivers: [
-                  // Apple Music Immersive Header (Hero Artwork + Blur Fade + Title + Round Action Buttons)
                   SliverAppBar(
                     expandedHeight: headerHeight,
                     pinned: true,
@@ -1213,13 +1442,54 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       opacity: _showCollapsedTitle ? 1.0 : 0.0,
                       child: Text(
                         folder.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
                           fontSize: AppFontSize.subtitle,
+                          color: p.textPrimary,
                         ),
                       ),
                     ),
                     centerTitle: true,
+                    actions: [
+                      IgnorePointer(
+                        ignoring: !_showCollapsedTitle,
+                        child: AnimatedOpacity(
+                          duration: context.motion(PulsrMotion.state),
+                          opacity: _showCollapsedTitle ? 1.0 : 0.0,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (songs.isNotEmpty)
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.play_circle_fill_rounded,
+                                    color: p.accent,
+                                    size: 28,
+                                  ),
+                                  onPressed: () {
+                                    HapticFeedback.mediumImpact();
+                                    context
+                                        .read<PlayerCubit>()
+                                        .playSong(songs.first, queue: songs);
+                                  },
+                                ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.more_horiz_rounded,
+                                  color: p.textPrimary,
+                                ),
+                                tooltip: context.l10n.browseOpenFolderDetails,
+                                onPressed: () =>
+                                    _showFolderOptionsMenu(context, songs, p),
+                              ),
+                              const SizedBox(width: AppSpacing.xxs),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     flexibleSpace: LayoutBuilder(
                       builder: (context, constraints) {
                         final safeTop = MediaQuery.paddingOf(context).top;
@@ -1239,10 +1509,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           background: Stack(
                             fit: StackFit.expand,
                             children: [
-                              // 1. Full-bleed Artwork
                               _buildImmersiveCover(context, songs, p),
-
-                              // 2. Multi-stop Apple Music gradient overlay
                               Positioned.fill(
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
@@ -1251,7 +1518,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                       end: Alignment.bottomCenter,
                                       stops: const [
                                         0.0,
-                                        0.30,
+                                        0.28,
                                         0.55,
                                         0.82,
                                         1.0,
@@ -1259,16 +1526,14 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                       colors: [
                                         AppColors.scrimLight,
                                         Colors.transparent,
-                                        p.bg.withValues(alpha: 0.35),
-                                        p.bg.withValues(alpha: 0.88),
+                                        p.bg.withValues(alpha: 0.42),
+                                        p.bg.withValues(alpha: 0.92),
                                         p.bg,
                                       ],
                                     ),
                                   ),
                                 ),
                               ),
-
-                              // 3. Title & Apple Music Action Row [ (i) ] [ (▶) ] [ (★) ]
                               PositionedDirectional(
                                 start: AppSpacing.lg,
                                 end: AppSpacing.lg,
@@ -1289,14 +1554,16 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                               : (isTablet ? 30.0 : 26.0),
                                           fontWeight: FontWeight.w800,
                                           letterSpacing: -0.5,
-                                          color: Colors.white,
-                                          shadows: const [
-                                            Shadow(
-                                              color: Colors.black54,
-                                              blurRadius: 14,
-                                              offset: Offset(0, 2),
-                                            ),
-                                          ],
+                                          color: p.textPrimary,
+                                          shadows: p.isDark
+                                              ? const [
+                                                  Shadow(
+                                                    color: Colors.black54,
+                                                    blurRadius: 14,
+                                                    offset: Offset(0, 2),
+                                                  ),
+                                                ]
+                                              : null,
                                         ),
                                       ),
                                       const SizedBox(height: AppSpacing.sm),
@@ -1306,20 +1573,27 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                         children: [
                                           _buildGlassCircleButton(
                                             icon: Icons.info_outline_rounded,
-                                            size: 40,
+                                            size: 42,
                                             iconSize: 20,
                                             p: p,
-                                            tooltip: context.l10n.browseOpenFolderDetails,
+                                            tooltip: context
+                                                .l10n.browseOpenFolderDetails,
                                             onTap: () => _showFolderOptionsMenu(
-                                                context, songs, p),
+                                              context,
+                                              songs,
+                                              p,
+                                            ),
                                           ),
                                           SizedBox(
                                             width: screenWidth < 360
                                                 ? AppSpacing.md
                                                 : AppSpacing.xl,
                                           ),
-                                          _buildBigWhitePlayButton(
-                                              context, p, songs),
+                                          _buildPrimaryPlayButton(
+                                            context,
+                                            p,
+                                            songs,
+                                          ),
                                           SizedBox(
                                             width: screenWidth < 360
                                                 ? AppSpacing.md
@@ -1331,9 +1605,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                                 : Icons.favorite_border_rounded,
                                             iconColor: allFavorited
                                                 ? p.favorite
-                                                : Colors.white,
-                                            size: 40,
-                                            iconSize: 22,
+                                                : p.textPrimary,
+                                            active: allFavorited,
+                                            size: 42,
+                                            iconSize: 21,
                                             p: p,
                                             tooltip: allFavorited
                                                 ? context
@@ -1354,8 +1629,6 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       },
                     ),
                   ),
-
-                  // Featured Card & Breadcrumbs & Section Header (Centered with content constraints)
                   SliverToBoxAdapter(
                     child: Center(
                       child: ConstrainedBox(
@@ -1366,47 +1639,22 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           children: [
                             const SizedBox(height: AppSpacing.xs),
                             _buildFeaturedCard(
-                                context, songs, p, totalDurationMs),
+                              context,
+                              songs,
+                              p,
+                              totalDurationMs,
+                            ),
                             _buildBreadcrumbs(context, p, folder.path),
                             const SizedBox(height: AppSpacing.xs),
-
-                            // Top Songs > Header
-                            Padding(
+                            _buildTrackSectionHeader(
+                              context,
+                              songs,
+                              p,
                               padding: EdgeInsetsDirectional.fromSTEB(
                                 Adaptive.pagePadding(context),
                                 AppSpacing.sm,
                                 Adaptive.pagePadding(context),
                                 AppSpacing.xs,
-                              ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    context.l10n.browseTopTracks,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: AppFontSize.title,
-                                          letterSpacing: -0.3,
-                                        ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 20,
-                                    color: p.textTertiary,
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    context.l10n.tracksCount(songs.length),
-                                    style: TextStyle(
-                                      color: p.textTertiary,
-                                      fontSize: AppFontSize.caption,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
                               ),
                             ),
                           ],
@@ -1414,8 +1662,6 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       ),
                     ),
                   ),
-
-                  // Song List Items
                   if (songs.isEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -1440,7 +1686,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                 PulsrLayoutMetrics.contentConstraints(context),
                             child: Padding(
                               padding: EdgeInsetsDirectional.only(
-                                start: 64 + Adaptive.pagePadding(context),
+                                start: 68 + Adaptive.pagePadding(context),
                               ),
                               child: Divider(
                                 height: 1,

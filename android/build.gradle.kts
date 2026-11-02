@@ -13,6 +13,7 @@ import org.gradle.api.tasks.compile.JavaCompile
 allprojects {
     repositories {
         google()
+        maven { url = uri("https://maven.google.com") }
         mavenCentral()
     }
 }

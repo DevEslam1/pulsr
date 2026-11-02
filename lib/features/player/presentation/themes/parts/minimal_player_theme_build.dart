@@ -25,27 +25,12 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
           waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
         ));
     final isTablet = context.isTablet;
+    final isInSplitView = PlayerSplitViewScope.of(context);
 
-    return AnimatedContainer(
-      duration: context.motionMs(400),
-      curve: context.motionCurve(Curves.easeInOut),
-      decoration: BoxDecoration(
-        color: props.bgColor,
-        gradient: RadialGradient(
-          center: const Alignment(0, -0.35),
-          radius: 1.1,
-          colors: [
-            Color.lerp(props.bgColor, activeColor, 0.10) ?? props.bgColor,
-            props.bgColor,
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isInSplitView = PlayerSplitViewScope.of(context);
-            final metrics = PlayerThemeMetrics.calculate(context, constraints);
-            final isLandscape = metrics.isLandscape;
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics = PlayerThemeMetrics.calculate(context, constraints);
+        final isLandscape = metrics.isLandscape;
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -365,8 +350,27 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
               ],
             );
           },
+        );
+
+    if (isInSplitView) {
+      return content;
+    }
+
+    return AnimatedContainer(
+      duration: context.motionMs(400),
+      curve: context.motionCurve(Curves.easeInOut),
+      decoration: BoxDecoration(
+        color: props.bgColor,
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.35),
+          radius: 1.1,
+          colors: [
+            Color.lerp(props.bgColor, activeColor, 0.10) ?? props.bgColor,
+            props.bgColor,
+          ],
         ),
       ),
+      child: SafeArea(child: content),
     );
   }
 }

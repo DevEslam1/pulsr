@@ -1,5 +1,6 @@
 // lib/core/widgets/pulsr_refresh_indicator.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/aura_theme.dart';
 import '../utils/pulsr_haptics.dart';
 
@@ -32,13 +33,18 @@ class PulsrRefreshIndicator extends StatelessWidget {
     final p = context.palette;
     return RefreshIndicator(
       color: color ?? p.accent,
-      backgroundColor: backgroundColor ?? p.surfaceContainer,
+      backgroundColor: backgroundColor ?? p.surfaceContainerHigh,
+      strokeWidth: 2.4,
       displacement: displacement,
       edgeOffset: edgeOffset,
       semanticsLabel: semanticLabel,
       onRefresh: () async {
         PulsrHaptics.light();
-        await onRefresh();
+        try {
+          await onRefresh();
+        } finally {
+          HapticFeedback.selectionClick();
+        }
       },
       child: child,
     );

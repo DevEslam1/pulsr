@@ -1,9 +1,13 @@
+// lib/features/library/presentation/tabs/library_favorites_tab.dart
 part of '../library_screen.dart';
 
 mixin LibraryFavoritesTab on State<LibraryScreen> {
   // ================= FAVORITES =================
   Widget _buildFavoritesTab(
-      BuildContext context, LibraryState state, PlayerCubit playerCubit) {
+    BuildContext context,
+    LibraryState state,
+    PlayerCubit playerCubit,
+  ) {
     final p = context.palette;
     final cubit = context.read<LibraryCubit>();
     final allFavorites = state.favorites;
@@ -14,6 +18,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
     final currentFavorites =
         _favTabFilter == 0 ? localFavorites : onlineFavorites;
+    final losslessCount = currentFavorites.where(isLosslessSong).length;
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
     return RefreshIndicator(
@@ -27,10 +32,11 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
           // ---------- Sub Tabs Switcher (Local / Online) ----------
           Padding(
             padding: EdgeInsetsDirectional.fromSTEB(
-                Adaptive.pagePadding(context),
-                12,
-                Adaptive.pagePadding(context),
-                8),
+              Adaptive.pagePadding(context),
+              AppSpacing.sm,
+              Adaptive.pagePadding(context),
+              AppSpacing.xs,
+            ),
             child: PulsrSegmentedControl(
               selectedIndex: _favTabFilter,
               onChanged: (i) => setState(() => _favTabFilter = i),
@@ -49,166 +55,249 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
             ),
           ),
 
-          // ---------- Link to Dedicated Favorites Surface ----------
+          // ---------- Unified Favorites Banner + Quick Actions ----------
           Padding(
             padding: EdgeInsetsDirectional.fromSTEB(
               Adaptive.pagePadding(context),
               0,
               Adaptive.pagePadding(context),
-              8,
+              AppSpacing.xs,
             ),
-            child: Material(
-              color: p.surfaceCard,
-              borderRadius: AppRadii.r18All,
-              child: InkWell(
+            child: Container(
+              decoration: BoxDecoration(
+                color: p.surfaceCard,
                 borderRadius: AppRadii.r18All,
-                onTap: () => context.push('/favorites'),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.xs),
-                        decoration: BoxDecoration(
-                          color: p.favorite.withValues(alpha: 0.15),
-                          borderRadius: AppRadii.r12All,
+                border: Border.all(color: p.hairline),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: currentFavorites.isNotEmpty
+                          ? const BorderRadius.vertical(
+                              top: Radius.circular(AppRadii.r18),
+                            )
+                          : AppRadii.r18All,
+                      onTap: () => context.push('/favorites'),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
                         ),
-                        child: Icon(Icons.favorite_rounded,
-                            color: p.favorite, size: 22),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              context.l10n.unifiedFavoritesHeader,
-                              style: TextStyle(
-                                fontSize: AppFontSize.callout,
-                                fontWeight: FontWeight.w700,
-                                color: p.textPrimary,
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.xs),
+                              decoration: BoxDecoration(
+                                color: p.favorite.withValues(alpha: 0.15),
+                                borderRadius: AppRadii.r12All,
+                              ),
+                              child: Icon(
+                                Icons.favorite_rounded,
+                                color: p.favorite,
+                                size: 22,
                               ),
                             ),
-                            Text(
-                              context.l10n.unifiedFavoritesHeaderSubtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: AppFontSize.caption,
-                                color: p.textSecondary,
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    context.l10n.unifiedFavoritesHeader,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.callout,
+                                      fontWeight: FontWeight.w800,
+                                      color: p.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    context.l10n.unifiedFavoritesHeaderSubtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      color: p.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.s10,
+                                vertical: AppSpacing.xxs,
+                              ),
+                              decoration: BoxDecoration(
+                                color: p.accent.withValues(alpha: 0.14),
+                                borderRadius: AppRadii.r8All,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    context.l10n.unifiedFavoritesViewAll,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.accent,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.xxs),
+                                  Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 11,
+                                    color: p.accent,
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                      Text(
-                        context.l10n.unifiedFavoritesViewAll,
-                        style: TextStyle(
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w700,
-                          color: p.accent,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xxs),
-                      Icon(Icons.arrow_forward_ios_rounded,
-                          size: 12, color: p.accent),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ---------- Quick Play Header (if songs exist in current tab) ----------
-          if (currentFavorites.isNotEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: Adaptive.pagePadding(context),
-                vertical: 4,
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    context.l10n.tracksCount(currentFavorites.length),
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.bodySmall,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const Spacer(),
-                  FilledButton.tonalIcon(
-                    onPressed: () => playerCubit.playSong(
-                        currentFavorites.first,
-                        queue: currentFavorites),
-                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                    label: Text(context.l10n.playAll),
-                    style: FilledButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      backgroundColor: p.accent.withValues(alpha: 0.15),
-                      foregroundColor: p.accent,
+                  if (currentFavorites.isNotEmpty ||
+                      (_favTabFilter == 1 && AppConfig.ytmEnabled)) ...[
+                    Divider(
+                      height: 1,
+                      color: p.hairline.withValues(alpha: 0.6),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  IconButton.filledTonal(
-                    onPressed: () {
-                      final shuffled =
-                          List<SongsTableData>.from(currentFavorites)
-                            ..shuffle();
-                      playerCubit.playSong(shuffled.first, queue: shuffled);
-                    },
-                    icon: const Icon(Icons.shuffle_rounded, size: 18),
-                    style: IconButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      backgroundColor: p.surfaceContainerHigh,
-                      foregroundColor: p.textPrimary,
-                    ),
-                    tooltip: context.l10n.shuffle,
-                  ),
-                  if (AppConfig.ytmEnabled) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    IconButton.filledTonal(
-                      onPressed: () =>
-                          _downloadFavorites(context, currentFavorites),
-                      icon: const Icon(Icons.download_rounded, size: 20),
-                      style: IconButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: p.accent.withValues(alpha: 0.15),
-                        foregroundColor: p.accent,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
                       ),
-                      tooltip: context.l10n.browseDownloadAllLikedSongs,
-                    ),
-                  ],
-                  if (_favTabFilter == 1 && AppConfig.ytmEnabled) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    IconButton.filledTonal(
-                      onPressed: () => _syncYtmLikes(context),
-                      icon: const Icon(Icons.sync_rounded, size: 20),
-                      style: IconButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: p.accent.withValues(alpha: 0.15),
-                        foregroundColor: p.accent,
+                      child: Row(
+                        children: [
+                          Text(
+                            context.l10n.tracksCount(currentFavorites.length),
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (losslessCount > 0) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: p.info.withValues(alpha: 0.15),
+                                borderRadius: AppRadii.r4All,
+                              ),
+                              child: Text(
+                                '$losslessCount Lossless',
+                                style: TextStyle(
+                                  fontSize: AppFontSize.tiny,
+                                  fontWeight: FontWeight.w800,
+                                  color: p.info,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          if (currentFavorites.isNotEmpty) ...[
+                            FilledButton.tonalIcon(
+                              onPressed: () => playerCubit.playSong(
+                                currentFavorites.first,
+                                queue: currentFavorites,
+                              ),
+                              icon: const Icon(
+                                Icons.play_arrow_rounded,
+                                size: 18,
+                              ),
+                              label: Text(context.l10n.playAll),
+                              style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor:
+                                    p.accent.withValues(alpha: 0.15),
+                                foregroundColor: p.accent,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xxs),
+                            IconButton.filledTonal(
+                              onPressed: () {
+                                final shuffled =
+                                    List<SongsTableData>.from(currentFavorites)
+                                      ..shuffle();
+                                playerCubit.playSong(
+                                  shuffled.first,
+                                  queue: shuffled,
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.shuffle_rounded,
+                                size: 18,
+                              ),
+                              style: IconButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: p.surfaceContainerHigh,
+                                foregroundColor: p.textPrimary,
+                              ),
+                              tooltip: context.l10n.shuffle,
+                            ),
+                            if (AppConfig.ytmEnabled) ...[
+                              const SizedBox(width: AppSpacing.xxs),
+                              IconButton.filledTonal(
+                                onPressed: () => _downloadFavorites(
+                                  context,
+                                  currentFavorites,
+                                ),
+                                icon: const Icon(
+                                  Icons.download_rounded,
+                                  size: 18,
+                                ),
+                                style: IconButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  backgroundColor:
+                                      p.accent.withValues(alpha: 0.15),
+                                  foregroundColor: p.accent,
+                                ),
+                                tooltip:
+                                    context.l10n.browseDownloadAllLikedSongs,
+                              ),
+                            ],
+                          ],
+                          if (_favTabFilter == 1 && AppConfig.ytmEnabled) ...[
+                            const SizedBox(width: AppSpacing.xxs),
+                            IconButton.filledTonal(
+                              onPressed: () => _syncYtmLikes(context),
+                              icon: const Icon(Icons.sync_rounded, size: 18),
+                              style: IconButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor:
+                                    p.accent.withValues(alpha: 0.15),
+                                foregroundColor: p.accent,
+                              ),
+                              tooltip: context.l10n.syncYouTubeMusic,
+                            ),
+                            const SizedBox(width: AppSpacing.xxs),
+                            IconButton.filledTonal(
+                              onPressed: () =>
+                                  _showImportYtmFavoritesDialog(context),
+                              icon: const Icon(Icons.link_rounded, size: 18),
+                              style: IconButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: p.surfaceContainerHigh,
+                                foregroundColor: p.textPrimary,
+                              ),
+                              tooltip: context.l10n.importByPlaylistLink,
+                            ),
+                          ],
+                        ],
                       ),
-                      tooltip: context.l10n.syncYouTubeMusic,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    IconButton.filledTonal(
-                      onPressed: () => _showImportYtmFavoritesDialog(context),
-                      icon: const Icon(Icons.link_rounded, size: 20),
-                      style: IconButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: p.surfaceContainerHigh,
-                        foregroundColor: p.textPrimary,
-                      ),
-                      tooltip: context.l10n.importByPlaylistLink,
                     ),
                   ],
                 ],
               ),
             ),
+          ),
 
           // ---------- Content (List / Grid or Empty State) ----------
           Expanded(
@@ -217,9 +306,9 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     ? SkeletonList(
                         padding: EdgeInsetsDirectional.fromSTEB(
                           Adaptive.pagePadding(context),
-                          16,
+                          AppSpacing.md,
                           Adaptive.pagePadding(context),
-                          160,
+                          PulsrLayoutMetrics.scrollBottom(context),
                         ),
                       )
                     : _buildEmpty(
@@ -243,14 +332,16 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       ))
                 : (isGrid
                     ? GridView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
                         addAutomaticKeepAlives: false,
                         addRepaintBoundaries: true,
                         padding: EdgeInsetsDirectional.fromSTEB(
                           Adaptive.pagePadding(context),
-                          8,
+                          AppSpacing.xs,
                           Adaptive.pagePadding(context),
-                          160,
+                          PulsrLayoutMetrics.scrollBottom(context),
                         ),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(
@@ -260,7 +351,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                             maxColumns: 5,
                           ),
                           crossAxisSpacing: 14,
-                          mainAxisSpacing: 18,
+                          mainAxisSpacing: 16,
                           childAspectRatio: 0.76,
                         ),
                         itemCount: currentFavorites.length,
@@ -271,104 +362,117 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                             groupKey: currentFavorites.isEmpty
                                 ? ''
                                 : '${currentFavorites.first.id}-${currentFavorites.length}',
-                            child: _buildFavoriteGridCard(context, song,
-                                currentFavorites, p, playerCubit, state, cubit),
+                            child: _buildFavoriteGridCard(
+                              context,
+                              song,
+                              currentFavorites,
+                              p,
+                              playerCubit,
+                              state,
+                              cubit,
+                            ),
                           );
                         },
                       )
                     : ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
                         addAutomaticKeepAlives: false,
                         addRepaintBoundaries: true,
                         padding: EdgeInsetsDirectional.only(
-                            bottom: PulsrLayoutMetrics.scrollBottom(context),
-                            top: AppSpacing.xxs,
-                            start: AppSpacing.xxs,
-                            end: AppSpacing.xxs),
+                          bottom: PulsrLayoutMetrics.scrollBottom(context),
+                          top: AppSpacing.xxs,
+                          start: AppSpacing.xxs,
+                          end: AppSpacing.xxs,
+                        ),
                         itemCount: currentFavorites.length,
                         itemBuilder: (context, index) {
                           final song = currentFavorites[index];
                           return StaggeredReveal(
-                              index: index,
-                              groupKey: currentFavorites.isEmpty
-                                  ? ''
-                                  : '${currentFavorites.first.id}-${currentFavorites.length}',
-                              child: PulsrDismissible(
-                                key: ValueKey('fav_${song.id}'),
-                                startToEndLabel: context.l10n.playNext,
-                                endToStartLabel:
-                                    context.l10n.removeFromFavorites,
-                                backgroundBuilder: (context, isConfirming) =>
-                                    PulsrDismissible.buildActionBackground(
-                                  context: context,
-                                  icon: Icons.playlist_play_rounded,
-                                  label: context.l10n.playNext,
-                                  color: p.accent,
-                                  backgroundColor: p.accentContainer,
-                                  isConfirming: isConfirming,
-                                ),
-                                secondaryBackgroundBuilder:
-                                    (context, isConfirming) =>
-                                        PulsrDismissible.buildActionBackground(
-                                  context: context,
-                                  icon: Icons.favorite_border_rounded,
-                                  label: context.l10n.removeFromFavorites,
-                                  color: p.favorite,
-                                  backgroundColor:
-                                      p.favorite.withValues(alpha: 0.2),
-                                  isConfirming: isConfirming,
-                                  isEnd: true,
-                                ),
-                                onConfirm: (direction) async {
-                                  if (direction ==
-                                      DismissDirection.startToEnd) {
-                                    HapticFeedback.lightImpact();
-                                    playerCubit.playNext(song);
-                                  } else {
-                                    HapticFeedback.mediumImpact();
-                                    cubit.toggleFavorite(song.id);
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .hideCurrentSnackBar();
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(context.l10n
-                                              .removedFavorite(song.title)),
-                                          duration: const Duration(seconds: 4),
-                                          action: SnackBarAction(
-                                            label: context.l10n.undo,
-                                            onPressed: () {
-                                              cubit.toggleFavorite(song.id);
-                                            },
-                                          ),
+                            index: index,
+                            groupKey: currentFavorites.isEmpty
+                                ? ''
+                                : '${currentFavorites.first.id}-${currentFavorites.length}',
+                            child: PulsrDismissible(
+                              key: ValueKey('fav_${song.id}'),
+                              startToEndLabel: context.l10n.playNext,
+                              endToStartLabel: context.l10n.removeFromFavorites,
+                              backgroundBuilder: (context, isConfirming) =>
+                                  PulsrDismissible.buildActionBackground(
+                                context: context,
+                                icon: Icons.playlist_play_rounded,
+                                label: context.l10n.playNext,
+                                color: p.accent,
+                                backgroundColor: p.accentContainer,
+                                isConfirming: isConfirming,
+                              ),
+                              secondaryBackgroundBuilder:
+                                  (context, isConfirming) =>
+                                      PulsrDismissible.buildActionBackground(
+                                context: context,
+                                icon: Icons.favorite_border_rounded,
+                                label: context.l10n.removeFromFavorites,
+                                color: p.favorite,
+                                backgroundColor:
+                                    p.favorite.withValues(alpha: 0.2),
+                                isConfirming: isConfirming,
+                                isEnd: true,
+                              ),
+                              onConfirm: (direction) async {
+                                if (direction == DismissDirection.startToEnd) {
+                                  HapticFeedback.lightImpact();
+                                  playerCubit.playNext(song);
+                                } else {
+                                  HapticFeedback.mediumImpact();
+                                  cubit.toggleFavorite(song.id);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          context.l10n
+                                              .removedFavorite(song.title),
                                         ),
-                                      );
-                                    }
+                                        duration: const Duration(seconds: 4),
+                                        action: SnackBarAction(
+                                          label: context.l10n.undo,
+                                          onPressed: () {
+                                            cubit.toggleFavorite(song.id);
+                                          },
+                                        ),
+                                      ),
+                                    );
                                   }
-                                  return false;
+                                }
+                                return false;
+                              },
+                              child: SongTile(
+                                song: song,
+                                index: index,
+                                selected:
+                                    state.selectedSongIds.contains(song.id),
+                                onTap: () {
+                                  if (state.isMultiSelectMode) {
+                                    cubit.toggleSongSelection(song.id);
+                                  } else {
+                                    playerCubit.playSong(
+                                      song,
+                                      queue: currentFavorites,
+                                    );
+                                  }
                                 },
-                                child: SongTile(
+                                onLongPress: () =>
+                                    cubit.toggleSongSelection(song.id),
+                                onMorePressed: () => SongOptionsSheet.show(
+                                  context,
                                   song: song,
-                                  index: index,
-                                  selected:
-                                      state.selectedSongIds.contains(song.id),
-                                  onTap: () {
-                                    if (state.isMultiSelectMode) {
-                                      cubit.toggleSongSelection(song.id);
-                                    } else {
-                                      playerCubit.playSong(song,
-                                          queue: currentFavorites);
-                                    }
-                                  },
-                                  onLongPress: () =>
-                                      cubit.toggleSongSelection(song.id),
-                                  onMorePressed: () => SongOptionsSheet.show(
-                                      context,
-                                      song: song,
-                                      isFavoriteScreen: true),
+                                  isFavoriteScreen: true,
                                 ),
-                              ));
+                              ),
+                            ),
+                          );
                         },
                       )),
           ),
@@ -380,7 +484,9 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
   bool _isOnlineFavorite(SongsTableData s) => isOnlineFavorite(s);
 
   Future<void> _downloadFavorites(
-      BuildContext context, List<SongsTableData> songs) async {
+    BuildContext context,
+    List<SongsTableData> songs,
+  ) async {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.noFavToDownload)),
@@ -524,11 +630,16 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
           final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
           return Container(
             padding: EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.lg, AppSpacing.md, AppSpacing.lg, bottomInset + 24),
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              bottomInset + 24,
+            ),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppRadii.r28)),
+                top: Radius.circular(AppRadii.r28),
+              ),
               border: Border.all(color: p.hairline),
             ),
             child: Column(
@@ -555,8 +666,11 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                         color: p.accent.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.cloud_download_rounded,
-                          color: p.accent, size: 22),
+                      child: Icon(
+                        Icons.cloud_download_rounded,
+                        color: p.accent,
+                        size: 22,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.s14),
                     Expanded(
@@ -568,7 +682,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                             style: TextStyle(
                               color: p.textPrimary,
                               fontSize: AppFontSize.bodyLarge,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                           Text(
@@ -590,22 +704,32 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                   decoration: InputDecoration(
                     hintText: 'https://music.youtube.com/playlist?list=...',
                     hintStyle: TextStyle(
-                        color: p.textTertiary, fontSize: AppFontSize.bodySmall),
-                    prefixIcon: Icon(Icons.link_rounded,
-                        color: p.textTertiary, size: 20),
+                      color: p.textTertiary,
+                      fontSize: AppFontSize.bodySmall,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.link_rounded,
+                      color: p.textTertiary,
+                      size: 20,
+                    ),
                     suffixIcon: IconButton(
                       constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
-                      icon: Icon(Icons.content_paste_rounded,
-                          color: p.accent, size: 18),
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      icon: Icon(
+                        Icons.content_paste_rounded,
+                        color: p.accent,
+                        size: 18,
+                      ),
                       tooltip: context.l10n.browsePasteFromClipboard,
                       onPressed: () async {
                         final data = await Clipboard.getData('text/plain');
                         if (!ctx.mounted) return;
                         if (data?.text != null) {
                           setSheetState(
-                              () => controller.text = data!.text!.trim());
+                            () => controller.text = data!.text!.trim(),
+                          );
                         }
                       },
                     ),
@@ -625,8 +749,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     errorText!,
-                    style:
-                        TextStyle(color: p.error, fontSize: AppFontSize.label),
+                    style: TextStyle(
+                      color: p.error,
+                      fontSize: AppFontSize.label,
+                    ),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.s20),
@@ -636,8 +762,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       : () async {
                           final text = controller.text.trim();
                           if (text.isEmpty) {
-                            setSheetState(() => errorText =
-                                context.l10n.browseEnterPlaylistUrl);
+                            setSheetState(
+                              () => errorText =
+                                  context.l10n.browseEnterPlaylistUrl,
+                            );
                             return;
                           }
                           setSheetState(() {
@@ -711,30 +839,35 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                             setSheetState(() {
                               isLoading = false;
                               errorText =
-                                  '${context.l10n.playlistLoadFailed} $e';
+                                  '${context.l10n.playlistLoadFailed}$e';
                             });
                           }
                         },
                   style: FilledButton.styleFrom(
                     backgroundColor: p.accent,
                     foregroundColor: p.onAccent,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s14),
-                    shape:
-                        RoundedRectangleBorder(borderRadius: AppRadii.r14All),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.s14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r14All,
+                    ),
                   ),
                   child: isLoading
                       ? SizedBox(
                           width: AppSpacing.s20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: p.onAccent),
+                            strokeWidth: 2,
+                            color: p.onAccent,
+                          ),
                         )
                       : Text(
                           context.l10n.importTracks,
-                          style: TextStyle(
-                              fontSize: AppFontSize.callout,
-                              fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: AppFontSize.callout,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                 ),
               ],
@@ -755,108 +888,168 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
     LibraryCubit cubit,
   ) {
     final isSelected = state.selectedSongIds.contains(song.id);
-    return InkWell(
+    final badge = songQualityBadge(song);
+
+    return Material(
+      color: p.surfaceCard,
       borderRadius: AppRadii.r18All,
-      onTap: () {
-        if (state.isMultiSelectMode) {
-          cubit.toggleSongSelection(song.id);
-        } else {
-          playerCubit.playSong(song, queue: currentFavorites);
-        }
-      },
-      onLongPress: () => cubit.toggleSongSelection(song.id),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: CachedArtwork(
-                    id: song.id,
-                    remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                    albumId: song.albumId,
-                    type: ArtworkType.AUDIO,
-                    size: double.infinity,
-                    borderRadius: 18,
-                  ),
-                ),
-                if (isSelected)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.45),
-                        borderRadius: AppRadii.r18All,
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.check_circle_rounded,
-                            color: Colors.white, size: 36),
-                      ),
-                    ),
-                  ),
-                if (AppConfig.ytmEnabled &&
-                    song.remoteId != null &&
-                    song.remoteId!.isNotEmpty)
-                  PositionedDirectional(
-                    start: 6,
-                    top: 6,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.scrimAt(0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: YtmDownloadButton(
-                        song: song,
-                        activeColor: Colors.white,
-                        iconColor: Colors.white,
-                        iconSize: 18,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: AppRadii.r18All,
+        onTap: () {
+          if (state.isMultiSelectMode) {
+            cubit.toggleSongSelection(song.id);
+          } else {
+            playerCubit.playSong(song, queue: currentFavorites);
+          }
+        },
+        onLongPress: () => cubit.toggleSongSelection(song.id),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.r18All,
+            border: Border.all(
+              color: isSelected
+                  ? p.accent
+                  : p.hairline.withValues(alpha: 0.5),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CachedArtwork(
+                        id: song.id,
+                        remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                        albumId: song.albumId,
+                        type: ArtworkType.AUDIO,
+                        size: double.infinity,
+                        borderRadius: 17,
                       ),
                     ),
-                  ),
-                PositionedDirectional(
-                  end: 6,
-                  top: 6,
-                  child: Material(
-                    color: AppColors.scrimAt(0.5),
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () =>
-                          context.read<LibraryCubit>().toggleFavorite(song.id),
-                      child: SizedBox(
-                        width: AppSpacing.minTouchTarget,
-                        height: AppSpacing.minTouchTarget,
-                        child: Center(
-                          child: Icon(Icons.favorite_rounded,
-                              color: p.favorite, size: 18),
+                    if (isSelected)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: p.accent.withValues(alpha: 0.45),
+                            borderRadius: AppRadii.r16All,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              color: Colors.white,
+                              size: 36,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (AppConfig.ytmEnabled &&
+                        song.remoteId != null &&
+                        song.remoteId!.isNotEmpty)
+                      PositionedDirectional(
+                        start: 6,
+                        top: 6,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.scrimAt(0.55),
+                            shape: BoxShape.circle,
+                          ),
+                          child: YtmDownloadButton(
+                            song: song,
+                            activeColor: Colors.white,
+                            iconColor: Colors.white,
+                            iconSize: 18,
+                          ),
+                        ),
+                      ),
+                    if (badge != null && isLosslessSong(song))
+                      PositionedDirectional(
+                        start: 8,
+                        bottom: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.scrimAt(0.68),
+                            borderRadius: AppRadii.r6All,
+                          ),
+                          child: Text(
+                            badge,
+                            style: TextStyle(
+                              fontSize: AppFontSize.tiny,
+                              fontWeight: FontWeight.w800,
+                              color: p.info,
+                            ),
+                          ),
+                        ),
+                      ),
+                    PositionedDirectional(
+                      end: 6,
+                      top: 6,
+                      child: Material(
+                        color: AppColors.scrimAt(0.55),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => context
+                              .read<LibraryCubit>()
+                              .toggleFavorite(song.id),
+                          child: SizedBox(
+                            width: AppSpacing.minTouchTarget,
+                            height: AppSpacing.minTouchTarget,
+                            child: Center(
+                              child: Icon(
+                                Icons.favorite_rounded,
+                                color: p.favorite,
+                                size: 18,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xs,
+                  vertical: AppSpacing.s6,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      song.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: AppFontSize.bodySmall,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      song.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            song.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: p.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: AppFontSize.bodySmall,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s2),
-          Text(
-            song.artist,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style:
-                TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
-          ),
-        ],
+        ),
       ),
     );
   }

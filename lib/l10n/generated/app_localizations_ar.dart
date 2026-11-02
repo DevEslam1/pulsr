@@ -8472,6 +8472,18 @@ class AppLocalizationsAr extends AppLocalizations {
   String get quranRepeatOff => 'التكرار: متوقف';
 
   @override
+  String get ambientSounds => 'الأصوات المحيطة';
+
+  @override
+  String get ambientSoundsDesc => 'صوت خلفي مريح أثناء الاستماع';
+
+  @override
+  String get ambientSoundVolume => 'مستوى الصوت';
+
+  @override
+  String get ambientSoundError => 'تعذر تحميل الصوت المحيط. تحقق من اتصالك.';
+
+  @override
   String batchCappedTracks(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

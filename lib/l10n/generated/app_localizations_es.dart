@@ -8596,6 +8596,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get quranRepeatOff => 'Repetir: Apagado';
 
   @override
+  String get ambientSounds => 'Sonidos Ambientales';
+
+  @override
+  String get ambientSoundsDesc => 'Sonido de fondo relajante mientras escuchas';
+
+  @override
+  String get ambientSoundVolume => 'Volumen';
+
+  @override
+  String get ambientSoundError =>
+      'No se pudo cargar el sonido ambiente. Verifica tu conexión.';
+
+  @override
   String batchCappedTracks(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

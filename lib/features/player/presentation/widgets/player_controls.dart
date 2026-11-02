@@ -1,16 +1,17 @@
 // lib/features/player/presentation/widgets/player_controls.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/utils/l10n_extensions.dart';
-import '../../cubit/player_state.dart';
-import '../../../../core/widgets/pulsr_toast.dart';
-import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../../core/utils/formatters.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
+import '../../cubit/player_state.dart';
 
 class PlayerControls extends StatefulWidget {
   final bool isPlaying;
@@ -146,7 +147,7 @@ class _PlayerControlsState extends State<PlayerControls> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Shuffle Button with active indicator
+              // Shuffle Button with active LED indicator
               Semantics(
                 label: shuffleLabel,
                 button: true,
@@ -246,13 +247,23 @@ class _PlayerControlsState extends State<PlayerControls> {
                           height: resolvedSideSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: widget.hasPrevious
+                                ? LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      p.surfaceContainerHighest,
+                                      p.surfaceContainerHigh,
+                                    ],
+                                  )
+                                : null,
                             color: widget.hasPrevious
-                                ? p.surfaceContainerHigh
-                                : p.surfaceContainer.withValues(alpha: 0.5),
+                                ? null
+                                : p.surfaceContainer.withValues(alpha: 0.45),
                             border: Border.all(
                               color: widget.hasPrevious
                                   ? p.hairline
-                                  : p.hairline.withValues(alpha: 0.5),
+                                  : p.hairline.withValues(alpha: 0.4),
                               width: 1.0,
                             ),
                             boxShadow: widget.hasPrevious
@@ -277,7 +288,7 @@ class _PlayerControlsState extends State<PlayerControls> {
 
               SizedBox(width: buttonSpacing),
 
-              // Main Play / Pause Button
+              // Main Play / Pause Hardware Button
               Semantics(
                 label: widget.isPlaying ? l10n.pause : l10n.play,
                 button: true,
@@ -302,13 +313,33 @@ class _PlayerControlsState extends State<PlayerControls> {
                       height: widget.mainButtonSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: widget.primaryColor,
-                        boxShadow: PulsrElevation.level2(context),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color.alphaBlend(
+                              Colors.white.withValues(alpha: 0.16),
+                              widget.primaryColor,
+                            ),
+                            widget.primaryColor,
+                          ],
+                        ),
+                        boxShadow: [
+                          ...PulsrElevation.level2(context),
+                          BoxShadow(
+                            color: widget.primaryColor.withValues(
+                              alpha: widget.isPlaying ? 0.36 : 0.18,
+                            ),
+                            blurRadius: widget.isPlaying ? 18 : 10,
+                            spreadRadius: -2,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                         border: Border.all(
                           color: widget.abLoopActive
                               ? p.accent
-                              : Colors.transparent,
-                          width: widget.abLoopActive ? 2.0 : 0.0,
+                              : onPrimaryColor.withValues(alpha: 0.18),
+                          width: widget.abLoopActive ? 2.0 : 1.0,
                         ),
                       ),
                       child: Center(
@@ -396,13 +427,23 @@ class _PlayerControlsState extends State<PlayerControls> {
                           height: resolvedSideSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: widget.hasNext
+                                ? LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      p.surfaceContainerHighest,
+                                      p.surfaceContainerHigh,
+                                    ],
+                                  )
+                                : null,
                             color: widget.hasNext
-                                ? p.surfaceContainerHigh
-                                : p.surfaceContainer.withValues(alpha: 0.5),
+                                ? null
+                                : p.surfaceContainer.withValues(alpha: 0.45),
                             border: Border.all(
                               color: widget.hasNext
                                   ? p.hairline
-                                  : p.hairline.withValues(alpha: 0.5),
+                                  : p.hairline.withValues(alpha: 0.4),
                               width: 1.0,
                             ),
                             boxShadow: widget.hasNext
@@ -473,7 +514,7 @@ class _PlayerControlsState extends State<PlayerControls> {
 
               SizedBox(width: buttonSpacing),
 
-              // Repeat Button with active indicator
+              // Repeat Button with active LED indicator
               Semantics(
                 label: repeatLabel,
                 button: true,
@@ -552,7 +593,9 @@ class _ControlButton extends StatelessWidget {
           borderRadius: AppRadii.r20All,
           child: Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+              horizontal: AppSpacing.s10,
+              vertical: AppSpacing.xs,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -566,7 +609,7 @@ class _ControlButton extends StatelessWidget {
                         : Colors.transparent,
                     border: isActive
                         ? Border.all(
-                            color: activeColor.withValues(alpha: 0.35),
+                            color: activeColor.withValues(alpha: 0.38),
                             width: 1.0,
                           )
                         : null,
@@ -577,14 +620,22 @@ class _ControlButton extends StatelessWidget {
                     size: iconSize,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.s2),
+                const SizedBox(height: 3),
                 AnimatedContainer(
                   duration: context.motionMs(200),
-                  width: isActive ? 4 : 0,
-                  height: isActive ? 4 : 0,
+                  width: isActive ? 10 : 0,
+                  height: isActive ? 3 : 0,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: AppRadii.r2All,
                     color: activeColor,
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: activeColor.withValues(alpha: 0.55),
+                              blurRadius: 4,
+                            ),
+                          ]
+                        : null,
                   ),
                 ),
               ],
@@ -624,9 +675,8 @@ class _AbPointButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final Color effectiveColor = isLoopActive
-        ? context.palette.success
-        : (isActive ? activeColor : inactiveColor);
+    final Color effectiveColor =
+        isLoopActive ? p.success : (isActive ? activeColor : inactiveColor);
 
     return Tooltip(
       message: tooltip,
@@ -639,7 +689,9 @@ class _AbPointButton extends StatelessWidget {
           borderRadius: AppRadii.r20All,
           child: Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xxs, vertical: AppSpacing.xs),
+              horizontal: AppSpacing.xxs,
+              vertical: AppSpacing.xs,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -669,14 +721,22 @@ class _AbPointButton extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.s2),
+                const SizedBox(height: 3),
                 AnimatedContainer(
                   duration: context.motionMs(200),
-                  width: isActive ? 4 : 0,
-                  height: isActive ? 4 : 0,
+                  width: isActive ? 8 : 0,
+                  height: isActive ? 2.5 : 0,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: AppRadii.r2All,
                     color: effectiveColor,
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: effectiveColor.withValues(alpha: 0.5),
+                              blurRadius: 4,
+                            ),
+                          ]
+                        : null,
                   ),
                 ),
               ],

@@ -1,29 +1,30 @@
-import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/library/presentation/library_stats_screen.dart
-import 'package:flutter/material.dart';
 import 'package:drift/drift.dart' show Value;
-import '../../../core/utils/l10n_extensions.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../sheets/song_info_sheet.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/widgets/pulsr_segmented_control.dart';
-import '../../sheets/song_info_sheet.dart';
 import 'library_quality_utils.dart';
 
 class LibraryStatsScreen extends StatefulWidget {
@@ -254,28 +255,35 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
 
     return PulsrPagePopScope(
       child: Scaffold(
-        backgroundColor: p.surface,
+        backgroundColor: p.bg,
         appBar: AppBar(
-          backgroundColor: p.surface,
+          backgroundColor: p.bg,
           elevation: 0,
+          scrolledUnderElevation: 0,
           leading: const PulsrBackButton(),
           title: Text(
             context.l10n.listeningStats,
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: p.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: AppFontSize.bodyLarge,
+            ),
           ),
           actions: [
             IconButton(
               constraints: const BoxConstraints(
-                  minWidth: AppSpacing.minTouchTarget,
-                  minHeight: AppSpacing.minTouchTarget),
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
               icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
               tooltip: context.l10n.refresh,
               onPressed: _loadAllSongs,
             ),
             IconButton(
               constraints: const BoxConstraints(
-                  minWidth: AppSpacing.minTouchTarget,
-                  minHeight: AppSpacing.minTouchTarget),
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
               icon: Icon(Icons.delete_sweep_rounded, color: p.textSecondary),
               tooltip: context.l10n.browseClearPlayHistory,
               onPressed: () => _confirmClearHistory(context),
@@ -300,63 +308,82 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                 (stats.totalDurationMs / (1000 * 60 * 60)).toStringAsFixed(1);
             final totalGb = (stats.totalSizeBytes / (1024 * 1024 * 1024))
                 .toStringAsFixed(2);
+            final losslessPct = songs.isEmpty
+                ? 0
+                : ((losslessCount / songs.length) * 100).round();
 
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 860),
-                child: ListView(
-                  padding: EdgeInsetsDirectional.fromSTEB(
+            return RefreshIndicator(
+              color: p.accent,
+              backgroundColor: p.surfaceContainer,
+              onRefresh: _loadAllSongs,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: Adaptive.contentConstraints(context),
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: EdgeInsetsDirectional.fromSTEB(
                       AppSpacing.s20,
                       AppSpacing.sm,
                       AppSpacing.s20,
-                      PulsrLayoutMetrics.scrollBottom(context)),
-                  children: [
-                    // BUG-15: surface a failed full-library load with a retry.
-                    if (_loadError != null)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: AppRadii.r16All,
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline_rounded,
-                                color: p.error, size: 22),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Text(
-                                '${context.l10n.browseFailedToFetch}: $_loadError',
-                                style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label),
+                      PulsrLayoutMetrics.scrollBottom(context),
+                    ),
+                    children: [
+                      // BUG-15: surface a failed full-library load with a retry.
+                      if (_loadError != null)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: p.surfaceContainer,
+                            borderRadius: AppRadii.r16All,
+                            border: Border.all(color: p.hairline),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                color: p.error,
+                                size: 22,
                               ),
-                            ),
-                            TextButton(
-                              onPressed: _loadAllSongs,
-                              child: Text(context.l10n.retry),
-                            ),
-                          ],
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  '${context.l10n.browseFailedToFetch}: $_loadError',
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _loadAllSongs,
+                                child: Text(context.l10n.retry),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    LayoutBuilder(builder: (context, constraints) {
-                      final scale =
-                          MediaQuery.textScalerOf(context).scale(14) / 14;
-                      final columns = scale > 1.5 || constraints.maxWidth < 340
-                          ? 1
-                          : constraints.maxWidth >= 700 && scale <= 1.2
-                              ? 4
-                              : 2;
-                      final width = (constraints.maxWidth -
-                              AppSpacing.sm * (columns - 1)) /
-                          columns;
-                      return Wrap(
-                          spacing: AppSpacing.sm,
-                          runSpacing: AppSpacing.sm,
-                          children: [
-                            SizedBox(
+
+                      // ---------- 4-Metric Bento Grid ----------
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final scale =
+                              MediaQuery.textScalerOf(context).scale(14) / 14;
+                          final columns =
+                              scale > 1.5 || constraints.maxWidth < 340
+                                  ? 1
+                                  : constraints.maxWidth >= 700 && scale <= 1.2
+                                      ? 4
+                                      : 2;
+                          final width = (constraints.maxWidth -
+                                  AppSpacing.sm * (columns - 1)) /
+                              columns;
+                          return Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.sm,
+                            children: [
+                              SizedBox(
                                 width: width,
                                 child: _buildMetricCard(
                                   context,
@@ -365,8 +392,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                   value: songs.length.toString(),
                                   color: p.primary,
                                   p: p,
-                                )),
-                            SizedBox(
+                                ),
+                              ),
+                              SizedBox(
                                 width: width,
                                 child: _buildMetricCard(
                                   context,
@@ -375,8 +403,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                   value: stats.totalPlays.toString(),
                                   color: p.accent,
                                   p: p,
-                                )),
-                            SizedBox(
+                                ),
+                              ),
+                              SizedBox(
                                 width: width,
                                 child: _buildMetricCard(
                                   context,
@@ -386,8 +415,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                       '$totalHours ${context.l10n.browseHoursShort}',
                                   color: p.warning,
                                   p: p,
-                                )),
-                            SizedBox(
+                                ),
+                              ),
+                              SizedBox(
                                 width: width,
                                 child: _buildMetricCard(
                                   context,
@@ -396,256 +426,340 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                   value: '$totalGb GB',
                                   color: p.success,
                                   p: p,
-                                ))
-                          ]);
-                    }),
-                    const SizedBox(height: AppSpacing.lg),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.s18),
-                      decoration: BoxDecoration(
-                        color: p.surfaceCard,
-                        borderRadius: AppRadii.r20All,
-                        border: Border.all(color: p.hairline),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.high_quality_rounded,
-                                  color: p.primary, size: 22),
-                              const SizedBox(width: AppSpacing.xs),
-                              Expanded(
-                                  child: Text(context.l10n.audioQualityTiers,
-                                      style: TextStyle(
-                                          fontSize: AppFontSize.callout,
-                                          fontWeight: FontWeight.w700,
-                                          color: p.textPrimary))),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                              '${albums.length} ${context.l10n.albums} · ${artists.length} ${context.l10n.artists}',
-                              style: TextStyle(
-                                  fontSize: AppFontSize.label,
-                                  color: p.textSecondary)),
-                          const SizedBox(height: AppSpacing.s14),
-                          ClipRRect(
-                            borderRadius: AppRadii.r8All,
-                            child: Row(
-                              children: [
-                                if (songs.isNotEmpty) ...[
-                                  Expanded(
-                                    flex: losslessCount > 0 ? losslessCount : 1,
-                                    child: Container(
-                                      height: 12,
-                                      color: p.info,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: lossyCount > 0 ? lossyCount : 1,
-                                    child: Container(
-                                      height: 12,
-                                      color: p.surfaceContainer,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          Wrap(
-                            spacing: 16,
-                            runSpacing: 8,
-                            children: [
-                              Text(
-                                '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
-                                style: TextStyle(
-                                  fontSize: AppFontSize.label,
-                                  color: p.info,
-                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              Text(
-                                '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
-                                style: TextStyle(
-                                    fontSize: AppFontSize.label,
-                                    color: p.textSecondary),
-                              ),
                             ],
-                          ),
-                        ],
+                          );
+                        },
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.lg),
 
-                    // Top Played Songs Section
-                    _buildSectionHeader(
-                      title: context.l10n.browseMostPlayedTracks,
-                      subtitle: context.l10n.browseMostPlayedTracksSubtitle,
-                      icon: Icons.leaderboard_rounded,
-                      p: p,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    PulsrSegmentedControl(
-                      segments: [
-                        PulsrSegment(
-                          label: context.l10n.statsTimeRange7Days,
-                          icon: Icons.date_range_rounded,
-                        ),
-                        PulsrSegment(
-                          label: context.l10n.statsTimeRange30Days,
-                          icon: Icons.calendar_month_rounded,
-                        ),
-                        PulsrSegment(
-                          label: context.l10n.statsTimeRangeAllTime,
-                          icon: Icons.all_inclusive_rounded,
-                        ),
-                      ],
-                      selectedIndex: _timeRangeIndex,
-                      onChanged: _setTimeRange,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    if (topSongs.isEmpty)
+                      // ---------- Audio Quality Tiers Card ----------
                       Container(
-                        padding: const EdgeInsets.all(AppSpacing.s20),
+                        padding: const EdgeInsets.all(AppSpacing.s18),
                         decoration: BoxDecoration(
                           color: p.surfaceCard,
-                          borderRadius: AppRadii.r16All,
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: Center(
-                          child: Text(
-                            context.l10n.noPlayHistory,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.bodySmall),
-                          ),
-                        ),
-                      )
-                    else
-                      ...List.generate(topSongs.length, (index) {
-                        final song = topSongs[index];
-                        return _buildSongLeaderboardTile(
-                          context,
-                          rank: index + 1,
-                          song: song,
-                          queue: topSongs,
-                          p: p,
-                        );
-                      }),
-                    const SizedBox(height: AppSpacing.lg),
-
-                    // Top Artists Section
-                    if (topArtists.isNotEmpty) ...[
-                      _buildSectionHeader(
-                        title: context.l10n.browseTopArtists,
-                        subtitle: context.l10n.browseTopArtistsSubtitle,
-                        icon: Icons.person_search_rounded,
-                        p: p,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: p.surfaceCard,
-                          borderRadius: AppRadii.r18All,
+                          borderRadius: AppRadii.r20All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Column(
-                          children: List.generate(topArtists.length, (idx) {
-                            final entry = topArtists[idx];
-                            final artistName = entry.key;
-                            final plays = entry.value;
-                            final trackCount =
-                                artistTrackCounts[artistName] ?? 0;
-                            final isLast = idx == topArtists.length - 1;
-
-                            return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                ListTile(
-                                  leading: CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor: _getRankColor(idx + 1, p)
-                                        .withValues(alpha: 0.15),
-                                    child: Text(
-                                      '#${idx + 1}',
-                                      style: TextStyle(
-                                        color: _getRankColor(idx + 1, p),
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: AppFontSize.label,
+                                Container(
+                                  padding: const EdgeInsets.all(AppSpacing.xs),
+                                  decoration: BoxDecoration(
+                                    color: p.info.withValues(alpha: 0.15),
+                                    borderRadius: AppRadii.r10All,
+                                  ),
+                                  child: Icon(
+                                    Icons.high_quality_rounded,
+                                    color: p.info,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        context.l10n.audioQualityTiers,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.callout,
+                                          fontWeight: FontWeight.w800,
+                                          color: p.textPrimary,
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    artistName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: AppFontSize.body,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    '$trackCount ${context.l10n.browseTracksInLibrary}',
-                                    style: TextStyle(
-                                        color: p.textSecondary,
-                                        fontSize: AppFontSize.label),
-                                  ),
-                                  trailing: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.s10,
-                                        vertical: AppSpacing.xxs),
-                                    decoration: BoxDecoration(
-                                      color: p.accent.withValues(alpha: 0.15),
-                                      borderRadius: AppRadii.r12All,
-                                    ),
-                                    child: Text(
-                                      '$plays ${context.l10n.browsePlays}',
-                                      style: TextStyle(
-                                        color: p.accent,
-                                        fontSize: AppFontSize.label,
-                                        fontWeight: FontWeight.w700,
+                                      Text(
+                                        '${albums.length} ${context.l10n.albums} · ${artists.length} ${context.l10n.artists}',
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.label,
+                                          color: p.textSecondary,
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.s10,
+                                    vertical: AppSpacing.xxs,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: p.info.withValues(alpha: 0.15),
+                                    borderRadius: AppRadii.r8All,
+                                  ),
+                                  child: Text(
+                                    '$losslessPct%',
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.label,
+                                      fontWeight: FontWeight.w800,
+                                      color: p.info,
                                     ),
                                   ),
                                 ),
-                                if (!isLast)
-                                  Divider(
-                                    color: p.hairline.withValues(alpha: 0.5),
-                                    height: 1,
-                                    indent: 56,
-                                  ),
                               ],
-                            );
-                          }),
+                            ),
+                            const SizedBox(height: AppSpacing.s14),
+                            ClipRRect(
+                              borderRadius: AppRadii.r8All,
+                              child: SizedBox(
+                                height: 12,
+                                child: Row(
+                                  children: [
+                                    if (songs.isNotEmpty) ...[
+                                      if (losslessCount > 0)
+                                        Expanded(
+                                          flex: losslessCount,
+                                          child: Container(color: p.info),
+                                        ),
+                                      if (lossyCount > 0)
+                                        Expanded(
+                                          flex: lossyCount,
+                                          child: Container(
+                                            color: p.surfaceContainerHigh,
+                                          ),
+                                        ),
+                                    ] else
+                                      Expanded(
+                                        child: Container(
+                                          color: p.surfaceContainer,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Wrap(
+                              spacing: 16,
+                              runSpacing: 8,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: p.info,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.label,
+                                        color: p.info,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: p.textTertiary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.label,
+                                        color: p.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                    ],
 
-                    // Recently Played Section
-                    if (recentlyPlayed.isNotEmpty) ...[
+                      // ---------- Top Played Songs Section ----------
                       _buildSectionHeader(
-                        title: context.l10n.recentlyPlayed,
-                        subtitle: context.l10n.browseLatestTracksSubtitle,
-                        icon: Icons.history_rounded,
+                        title: context.l10n.browseMostPlayedTracks,
+                        subtitle: context.l10n.browseMostPlayedTracksSubtitle,
+                        icon: Icons.leaderboard_rounded,
                         p: p,
                       ),
+                      const SizedBox(height: AppSpacing.xs),
+                      PulsrSegmentedControl(
+                        segments: [
+                          PulsrSegment(
+                            label: context.l10n.statsTimeRange7Days,
+                            icon: Icons.date_range_rounded,
+                          ),
+                          PulsrSegment(
+                            label: context.l10n.statsTimeRange30Days,
+                            icon: Icons.calendar_month_rounded,
+                          ),
+                          PulsrSegment(
+                            label: context.l10n.statsTimeRangeAllTime,
+                            icon: Icons.all_inclusive_rounded,
+                          ),
+                        ],
+                        selectedIndex: _timeRangeIndex,
+                        onChanged: _setTimeRange,
+                      ),
                       const SizedBox(height: AppSpacing.sm),
-                      ...List.generate(recentlyPlayed.length, (index) {
-                        final song = recentlyPlayed[index];
-                        return _buildSongLeaderboardTile(
-                          context,
-                          rank: null,
-                          song: song,
-                          queue: recentlyPlayed,
+                      if (topSongs.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.s20),
+                          decoration: BoxDecoration(
+                            color: p.surfaceCard,
+                            borderRadius: AppRadii.r16All,
+                            border: Border.all(color: p.hairline),
+                          ),
+                          child: Center(
+                            child: Text(
+                              context.l10n.noPlayHistory,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.bodySmall,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        ...List.generate(topSongs.length, (index) {
+                          final song = topSongs[index];
+                          return _buildSongLeaderboardTile(
+                            context,
+                            rank: index + 1,
+                            song: song,
+                            queue: topSongs,
+                            p: p,
+                          );
+                        }),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // ---------- Top Artists Section ----------
+                      if (topArtists.isNotEmpty) ...[
+                        _buildSectionHeader(
+                          title: context.l10n.browseTopArtists,
+                          subtitle: context.l10n.browseTopArtistsSubtitle,
+                          icon: Icons.person_search_rounded,
                           p: p,
-                        );
-                      }),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: p.surfaceCard,
+                            borderRadius: AppRadii.r18All,
+                            border: Border.all(color: p.hairline),
+                          ),
+                          child: Column(
+                            children: List.generate(topArtists.length, (idx) {
+                              final entry = topArtists[idx];
+                              final artistName = entry.key;
+                              final plays = entry.value;
+                              final trackCount =
+                                  artistTrackCounts[artistName] ?? 0;
+                              final isLast = idx == topArtists.length - 1;
+                              final rankColor = _getRankColor(idx + 1, p);
+
+                              return Column(
+                                children: [
+                                  ListTile(
+                                    leading: CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor:
+                                          rankColor.withValues(alpha: 0.15),
+                                      child: Text(
+                                        '#${idx + 1}',
+                                        style: TextStyle(
+                                          color: rankColor,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: AppFontSize.label,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      artistName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppFontSize.body,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '$trackCount ${context.l10n.browseTracksInLibrary}',
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.label,
+                                      ),
+                                    ),
+                                    trailing: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.s10,
+                                        vertical: AppSpacing.xxs,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: p.accent.withValues(alpha: 0.15),
+                                        borderRadius: AppRadii.r12All,
+                                      ),
+                                      child: Text(
+                                        '$plays ${context.l10n.browsePlays}',
+                                        style: TextStyle(
+                                          color: p.accent,
+                                          fontSize: AppFontSize.label,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (!isLast)
+                                    Divider(
+                                      color: p.hairline.withValues(alpha: 0.5),
+                                      height: 1,
+                                      indent: 56,
+                                    ),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                      ],
+
+                      // ---------- Recently Played Section ----------
+                      if (recentlyPlayed.isNotEmpty) ...[
+                        _buildSectionHeader(
+                          title: context.l10n.recentlyPlayed,
+                          subtitle: context.l10n.browseLatestTracksSubtitle,
+                          icon: Icons.history_rounded,
+                          p: p,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        ...List.generate(recentlyPlayed.length, (index) {
+                          final song = recentlyPlayed[index];
+                          return _buildSongLeaderboardTile(
+                            context,
+                            rank: null,
+                            song: song,
+                            queue: recentlyPlayed,
+                            p: p,
+                          );
+                        }),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             );
@@ -681,14 +795,16 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                 title,
                 style: TextStyle(
                   fontSize: AppFontSize.bodyLarge,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: p.textPrimary,
                 ),
               ),
               Text(
                 subtitle,
                 style: TextStyle(
-                    fontSize: AppFontSize.label, color: p.textSecondary),
+                  fontSize: AppFontSize.label,
+                  color: p.textSecondary,
+                ),
               ),
             ],
           ),
@@ -717,6 +833,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
     required List<SongsTableData> queue,
     required PulsrPalette p,
   }) {
+    final rankColor = rank != null ? _getRankColor(rank, p) : p.accent;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Material(
@@ -728,7 +846,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
           },
           child: Container(
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
             decoration: BoxDecoration(
               color: p.surfaceCard,
               borderRadius: AppRadii.r14All,
@@ -737,18 +857,26 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
             child: Row(
               children: [
                 if (rank != null) ...[
-                  SizedBox(
+                  Container(
                     width: AppSpacing.s28,
+                    height: AppSpacing.s28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: rank <= 3
+                          ? rankColor.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
                     child: Text(
                       '#$rank',
                       style: TextStyle(
-                        fontSize: AppFontSize.bodySmall,
-                        fontWeight: FontWeight.w700,
-                        color: _getRankColor(rank, p),
+                        fontSize: AppFontSize.label,
+                        fontWeight: FontWeight.w800,
+                        color: rankColor,
                       ),
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.s6),
+                  const SizedBox(width: AppSpacing.xs),
                 ],
                 CachedArtwork(
                   id: song.id,
@@ -779,8 +907,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: AppFontSize.label,
-                            color: p.textSecondary),
+                          fontSize: AppFontSize.label,
+                          color: p.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -789,7 +918,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                   const SizedBox(width: AppSpacing.xs),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.xxs,
+                    ),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.15),
                       borderRadius: AppRadii.r8All,
@@ -804,16 +935,17 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                     ),
                   ),
                 ],
-                const SizedBox(width: AppSpacing.s6),
+                const SizedBox(width: AppSpacing.xxs),
                 IconButton(
-                  icon: Icon(Icons.more_vert_rounded,
-                      color: p.textTertiary, size: 20),
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    color: p.textTertiary,
+                    size: 20,
+                  ),
                   visualDensity: VisualDensity.compact,
                   tooltip: context.l10n.browseMoreOptions,
                   onPressed: () => SongInfoSheet.show(context, song: song),
                 ),
-                Icon(Icons.play_circle_outline_rounded,
-                    color: p.accent, size: 22),
               ],
             ),
           ),
@@ -853,14 +985,17 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
             value,
             style: TextStyle(
               fontSize: AppFontSize.titleLarge,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               color: p.textPrimary,
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             title,
-            style:
-                TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+            style: TextStyle(
+              fontSize: AppFontSize.label,
+              color: p.textSecondary,
+            ),
           ),
         ],
       ),

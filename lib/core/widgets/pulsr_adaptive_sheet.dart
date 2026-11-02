@@ -2,6 +2,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
@@ -9,9 +12,9 @@ import '../performance/gpu_budget.dart';
 import '../responsive/breakpoints.dart';
 import '../responsive/pulsr_responsive_tokens.dart';
 import '../theme/aura_theme.dart';
+import '../utils/l10n_extensions.dart';
 import 'pulsr_bottom_sheet.dart';
 import 'pulsr_dialog.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// {@category DesignSystem}
 /// Viewport-aware adaptive modal container and launcher.
@@ -19,10 +22,11 @@ import 'package:pulsr/core/constants/app_colors.dart';
 /// Automatically switches between:
 /// - Compact bottom sheet on phone portrait (85% max height)
 /// - Floating centered dialog on landscape phones (compact height < 500dp)
-/// - Contained bottom sheet on tablet portrait (max width 600dp, 70% max height)
+/// - Contained bottom sheet on tablet portrait (max width 600dp, 72% max height)
 /// - Centered floating dialog on tablet landscape and large screens (max width 580dp)
 class PulsrAdaptiveSheet extends StatelessWidget {
   final Widget child;
+  final Widget? leading;
   final Widget? title;
   final String? titleText;
   final Widget? subtitle;
@@ -35,6 +39,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
   const PulsrAdaptiveSheet({
     super.key,
     required this.child,
+    this.leading,
     this.title,
     this.titleText,
     this.subtitle,
@@ -49,12 +54,14 @@ class PulsrAdaptiveSheet extends StatelessWidget {
   static Future<T?> show<T>({
     required BuildContext context,
     required WidgetBuilder builder,
+    Widget? leading,
     Widget? title,
     String? titleText,
     Widget? subtitle,
     Widget? trailing,
     bool isDismissible = true,
     bool enableDrag = true,
+    bool useRootNavigator = true,
     double? maxWidth,
     double? maxHeight,
   }) {
@@ -68,11 +75,13 @@ class PulsrAdaptiveSheet extends StatelessWidget {
       // Bottom sheet on phone portrait and tablet portrait
       return PulsrSheetHelper.showPulsrSheet<T>(
         context: context,
+        useRootNavigator: useRootNavigator,
         isDismissible: isDismissible,
         enableDrag: enableDrag,
         wrapWithContainer: false,
         builder: (ctx) => PulsrAdaptiveSheet(
           isDialog: false,
+          leading: leading,
           title: title,
           titleText: titleText,
           subtitle: subtitle,
@@ -91,40 +100,131 @@ class PulsrAdaptiveSheet extends StatelessWidget {
 
       return PulsrDialogHelper.showCustomDialog<T>(
         context,
+        useRootNavigator: useRootNavigator,
         barrierDismissible: isDismissible,
-        builder: (ctx) => Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: dialogWidth,
-              maxHeight: dialogHeight,
-            ),
-            child: Dialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              insetPadding: EdgeInsets.symmetric(
-                horizontal: vp.pagePadding,
-                vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.md,
+        builder: (ctx) {
+          final media = MediaQuery.of(ctx);
+          final keyboardInset = media.viewInsets.bottom;
+          final availableH = math.max(
+            AppSpacing.s56,
+            media.size.height -
+                keyboardInset -
+                media.padding.vertical -
+                (vp.isShortHeight ? AppSpacing.sm : AppSpacing.lg),
+          );
+          final effectiveMaxH = math.min(dialogHeight, availableH);
+
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: dialogWidth,
+                maxHeight: effectiveMaxH,
               ),
-              child: ClipRRect(
-                borderRadius: AppRadii.dialogRadius,
-                child: Material(
-                  color: Colors.transparent,
-                  child: PulsrAdaptiveSheet(
-                    isDialog: true,
-                    title: title,
-                    titleText: titleText,
-                    subtitle: subtitle,
-                    trailing: trailing,
-                    showDragHandle: false,
-                    child: builder(ctx),
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                insetPadding: EdgeInsets.symmetric(
+                  horizontal: vp.pagePadding,
+                  vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.md,
+                ),
+                child: ClipRRect(
+                  borderRadius: AppRadii.dialogRadius,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: PulsrAdaptiveSheet(
+                      isDialog: true,
+                      leading: leading,
+                      title: title,
+                      titleText: titleText,
+                      subtitle: subtitle,
+                      trailing: trailing,
+                      showDragHandle: false,
+                      child: builder(ctx),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       );
     }
+  }
+
+  Widget _buildHeader(
+    BuildContext context,
+    PulsrPalette p,
+    PulsrViewport vp,
+    Widget headerTitle, {
+    required bool effectiveIsDialog,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: vp.isShortHeight ? AppSpacing.sm : AppSpacing.s20,
+            vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DefaultTextStyle.merge(
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontSize: AppFontSize.title,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: AppTracking.title,
+                      ),
+                      child: headerTitle,
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: AppSpacing.s2),
+                      DefaultTextStyle.merge(
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        child: subtitle!,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (trailing != null) trailing!,
+              if (effectiveIsDialog && trailing == null)
+                IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: 20,
+                    color: p.textSecondary,
+                  ),
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).maybePop();
+                  },
+                ),
+            ],
+          ),
+        ),
+        Divider(color: p.hairline, height: 1),
+      ],
+    );
   }
 
   @override
@@ -132,6 +232,31 @@ class PulsrAdaptiveSheet extends StatelessWidget {
     final p = context.palette;
     final vp = PulsrViewport.of(context);
     final headerTitle = title ?? (titleText != null ? Text(titleText!) : null);
+
+    // Avoid double-wrapping if nested inside another PulsrSheetScope.
+    final parentScope = PulsrSheetScope.maybeOf(context);
+    if (parentScope != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (headerTitle != null)
+            _buildHeader(
+              context,
+              p,
+              vp,
+              headerTitle,
+              effectiveIsDialog: parentScope.isDialog || isDialog,
+            ),
+          Flexible(
+            child: Material(
+              type: MaterialType.transparency,
+              child: child,
+            ),
+          ),
+        ],
+      );
+    }
 
     final baseSurfaceColor = GpuBudget.isGpuSaverActive
         ? p.surface
@@ -148,117 +273,91 @@ class PulsrAdaptiveSheet extends StatelessWidget {
         ? AppRadii.dialogRadius
         : (vp.isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius);
 
-    final Widget content = Stack(
-      children: [
-        // Specular top edge highlight
-        PositionedDirectional(
-          top: 0,
-          start: 24,
-          end: 24,
-          height: 1.2,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.specularAt(0.0),
-                  AppColors.specularAt(p.isDark ? 0.38 : 0.65),
-                  AppColors.specularAt(0.0),
-                ],
-                stops: const [0.0, 0.5, 1.0],
+    final Widget content = PulsrSheetScope(
+      isDialog: isDialog,
+      child: Stack(
+        children: [
+          // Specular top edge highlight
+          PositionedDirectional(
+            top: 0,
+            start: 24,
+            end: 24,
+            height: 1.2,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.specularAt(0.0),
+                    AppColors.specularAt(p.isDark ? 0.38 : 0.65),
+                    AppColors.specularAt(0.0),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
               ),
             ),
           ),
-        ),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showDragHandle && !isDialog) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Center(
-                child: Container(
-                  width: AppSpacing.s40,
-                  height: 4.5,
-                  decoration: BoxDecoration(
-                    color: (p.isDark ? Colors.white : Colors.black)
-                        .withValues(alpha: 0.22),
-                    borderRadius: AppRadii.full,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showDragHandle && !isDialog) ...[
+                const SizedBox(height: AppSpacing.s10),
+                Center(
+                  child: Semantics(
+                    label: context.l10n.sheetDragHandle,
+                    hint: context.l10n.sheetDragDownToDismiss,
+                    child: Container(
+                      width: AppSpacing.s40,
+                      height: 4.5,
+                      decoration: BoxDecoration(
+                        color: (p.isDark ? Colors.white : Colors.black)
+                            .withValues(alpha: 0.24),
+                        borderRadius: AppRadii.full,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s8),
+              ],
+              if (headerTitle != null)
+                _buildHeader(
+                  context,
+                  p,
+                  vp,
+                  headerTitle,
+                  effectiveIsDialog: isDialog,
+                ),
+              Flexible(
+                child: SafeArea(
+                  top: false,
+                  left: false,
+                  right: false,
+                  bottom: !isDialog,
+                  // Give ListTile content a Material ancestor so its ink and tile
+                  // background paint above the sheet's decorated Container instead of
+                  // tripping Flutter's "invisible ListTile background" assertion.
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: child,
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.xs),
             ],
-            if (headerTitle != null) ...[
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: vp.isShortHeight ? AppSpacing.sm : AppSpacing.md,
-                  vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.sm,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DefaultTextStyle.merge(
-                            style: TextStyle(
-                              color: p.textPrimary,
-                              fontSize: AppFontSize.title,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: AppTracking.title,
-                            ),
-                            child: headerTitle,
-                          ),
-                          if (subtitle != null) ...[
-                            const SizedBox(height: AppSpacing.s2),
-                            DefaultTextStyle.merge(
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.label,
-                              ),
-                              child: subtitle!,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (trailing != null) trailing!,
-                    if (isDialog && trailing == null)
-                      IconButton(
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        icon: Icon(Icons.close_rounded,
-                            size: 20, color: p.textSecondary),
-                        tooltip: MaterialLocalizations.of(context)
-                            .closeButtonTooltip,
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
-                      ),
-                  ],
-                ),
-              ),
-              Divider(color: p.hairline, height: 1),
-            ],
-            Flexible(
-              child: SafeArea(
-                top: false,
-                left: false,
-                right: false,
-                // Give ListTile content a Material ancestor so its ink and tile
-                // background paint above the sheet's decorated Container instead of
-                // tripping Flutter's "invisible ListTile background" assertion.
-                child: Material(type: MaterialType.transparency, child: child),
-              ),
-            ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
 
     final sheet = RepaintBoundary(
       child: Container(
+        margin: (!isDialog && vp.isTablet)
+            ? const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.s20,
+                0,
+                AppSpacing.s20,
+                AppSpacing.md,
+              )
+            : EdgeInsets.zero,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,

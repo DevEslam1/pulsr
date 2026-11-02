@@ -45,19 +45,8 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
         !state.isLyricsVisible &&
         !state.isQueueVisible;
 
-    return Stack(
-      children: [
-        // 1. Flat Material Backdrop
-        Positioned.fill(
-          child: Container(
-            color: p.bg,
-          ),
-        ),
-
-        // 2. Main Foreground Layout
-        SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
+    final mainLayout = LayoutBuilder(
+      builder: (context, constraints) {
               final metrics =
                   PlayerThemeMetrics.calculate(context, constraints);
               final isLandscape = metrics.isLandscape;
@@ -458,8 +447,20 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 ],
               );
             },
+          );
+
+    if (isInSplitView) {
+      return mainLayout;
+    }
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            color: p.bg,
           ),
         ),
+        SafeArea(child: mainLayout),
       ],
     );
   }

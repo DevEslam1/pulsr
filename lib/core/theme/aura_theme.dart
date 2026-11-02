@@ -141,6 +141,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   Color get primary => accent;
   Color get surfaceCard => surfaceContainer;
   Color get surfaceVariant => surfaceContainerHigh;
+  Color get surfaceContainerHighest => surfaceContainerHigh;
 
   /// Guaranteed WCAG AA contrast (>= 4.5:1) against the accent color.
   Color get textOnAccent {

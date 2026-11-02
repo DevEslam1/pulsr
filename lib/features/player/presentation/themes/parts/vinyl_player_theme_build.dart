@@ -8,35 +8,12 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
     final song = state.currentSong;
     final isTablet = context.isTablet;
 
-    return Stack(
-      children: [
-        // Ambient backdrop glow behind turntable plinth
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(0, -0.2),
-                    radius: 0.90,
-                    colors: [
-                      activeColor.withValues(
-                          alpha: state.isPlaying ? 0.24 : 0.14),
-                      activeColor.withValues(alpha: 0.05),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.54, 1.0],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isInSplitView = PlayerSplitViewScope.of(context);
-            final metrics = PlayerThemeMetrics.calculate(context, constraints);
-            final isLandscape = metrics.isLandscape;
+    final isInSplitView = PlayerSplitViewScope.of(context);
+
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics = PlayerThemeMetrics.calculate(context, constraints);
+        final isLandscape = metrics.isLandscape;
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -113,16 +90,14 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
             );
 
             if (isInSplitView) {
-              return SafeArea(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: Column(
-                    children: [
-                      Expanded(child: turntableStage),
-                      controlsColumn,
-                    ],
-                  ),
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Column(
+                  children: [
+                    Expanded(child: turntableStage),
+                    controlsColumn,
+                  ],
                 ),
               );
             }
@@ -269,7 +244,37 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
               ),
             );
           },
+        );
+
+    if (isInSplitView) {
+      return content;
+    }
+
+    return Stack(
+      children: [
+        // Ambient backdrop glow behind turntable plinth
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.2),
+                    radius: 0.90,
+                    colors: [
+                      activeColor.withValues(
+                          alpha: state.isPlaying ? 0.24 : 0.14),
+                      activeColor.withValues(alpha: 0.05),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.54, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
+        content,
       ],
     );
   }

@@ -18,6 +18,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../../data/db/app_database.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../party/presentation/party_sheet.dart';
+import '../themes/player_theme.dart';
 
 class NowPlayingQueueView extends StatefulWidget {
   const NowPlayingQueueView({super.key});
@@ -179,11 +180,15 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
           slotKeys.add(ValueKey('${id}_#$count'));
         }
 
+        final isInSplit = PlayerSplitViewScope.of(context);
+
         return Container(
           decoration: BoxDecoration(
-            color: p.surfaceContainer.withValues(alpha: 0.85),
+            color: isInSplit
+                ? Colors.transparent
+                : p.surfaceContainer.withValues(alpha: 0.85),
             borderRadius: AppRadii.r24All,
-            border: Border.all(color: p.hairline),
+            border: isInSplit ? null : Border.all(color: p.hairline),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -256,7 +261,10 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                 ),
               ),
 
-              Divider(color: p.hairline, height: 1),
+              Divider(
+                color: p.hairline.withValues(alpha: isInSplit ? 0.35 : 1.0),
+                height: 1,
+              ),
 
               // Reorderable Queue List
               Expanded(

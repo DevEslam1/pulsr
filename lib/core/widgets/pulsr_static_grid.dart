@@ -1,3 +1,4 @@
+// lib/core/widgets/pulsr_static_grid.dart
 import 'package:flutter/material.dart';
 
 /// {@category DesignSystem}
@@ -16,6 +17,8 @@ class PulsrStaticGrid extends StatelessWidget {
   final double? childAspectRatio;
   final double? mainAxisExtent;
   final EdgeInsetsGeometry? padding;
+  final bool addRepaintBoundaries;
+  final CrossAxisAlignment rowCrossAxisAlignment;
   final IndexedWidgetBuilder itemBuilder;
 
   const PulsrStaticGrid({
@@ -27,6 +30,8 @@ class PulsrStaticGrid extends StatelessWidget {
     this.childAspectRatio,
     this.mainAxisExtent,
     this.padding,
+    this.addRepaintBoundaries = true,
+    this.rowCrossAxisAlignment = CrossAxisAlignment.start,
     required this.itemBuilder,
   });
 
@@ -42,7 +47,7 @@ class PulsrStaticGrid extends StatelessWidget {
         for (int r = 0; r < rowCount; r++) ...[
           if (r > 0) SizedBox(height: mainAxisSpacing),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: rowCrossAxisAlignment,
             children: [
               for (int c = 0; c < crossAxisCount; c++) ...[
                 if (c > 0) SizedBox(width: crossAxisSpacing),
@@ -66,7 +71,10 @@ class PulsrStaticGrid extends StatelessWidget {
   }
 
   Widget _buildItem(BuildContext context, int index) {
-    final item = itemBuilder(context, index);
+    Widget item = itemBuilder(context, index);
+    if (addRepaintBoundaries) {
+      item = RepaintBoundary(child: item);
+    }
     if (mainAxisExtent != null) {
       return SizedBox(
         height: mainAxisExtent,

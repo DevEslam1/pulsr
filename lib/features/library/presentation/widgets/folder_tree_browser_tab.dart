@@ -245,18 +245,31 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
               children: [
                 // Breadcrumbs bar
                 Container(
-                  height: 48,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  color: p.surfaceContainer.withValues(alpha: 0.4),
+                  height: 42,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xxs,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s8,
+                    vertical: AppSpacing.s4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainer,
+                    borderRadius: AppRadii.r12All,
+                    border: Border.all(
+                      color: p.hairline.withValues(alpha: 0.5),
+                    ),
+                  ),
                   child: ListView.separated(
                     controller: _breadcrumbController,
                     scrollDirection: Axis.horizontal,
                     itemCount: breadcrumbs.length,
                     separatorBuilder: (_, __) => Icon(
-                        Icons.chevron_right_rounded,
-                        size: 18,
-                        color: p.textSecondary),
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: p.textTertiary,
+                    ),
                     itemBuilder: (context, index) {
                       final crumbPath =
                           p_path.posix.joinAll(breadcrumbs.take(index + 1));
@@ -268,19 +281,39 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                           child: InkWell(
                             onTap: isLast ? null : () => _navigateTo(crumbPath),
                             borderRadius: AppRadii.r8All,
-                            child: Padding(
+                            child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s6,
-                                  vertical: AppSpacing.xxs),
-                              child: Text(
-                                breadcrumbs[index],
-                                style: TextStyle(
-                                  color: isLast ? p.primary : p.textSecondary,
-                                  fontWeight: isLast
-                                      ? FontWeight.w700
-                                      : FontWeight.normal,
-                                  fontSize: AppFontSize.bodySmall,
-                                ),
+                                horizontal: AppSpacing.s8,
+                                vertical: AppSpacing.s4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isLast
+                                    ? p.accent.withValues(alpha: 0.16)
+                                    : Colors.transparent,
+                                borderRadius: AppRadii.r8All,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (index == 0) ...[
+                                    Icon(
+                                      Icons.folder_open_rounded,
+                                      size: 13,
+                                      color: isLast ? p.accent : p.textSecondary,
+                                    ),
+                                    const SizedBox(width: AppSpacing.s4),
+                                  ],
+                                  Text(
+                                    breadcrumbs[index],
+                                    style: TextStyle(
+                                      color: isLast ? p.accent : p.textSecondary,
+                                      fontWeight: isLast
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                      fontSize: AppFontSize.caption,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -298,18 +331,59 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                     children: [
                       // Parent folder button
                       if (breadcrumbs.length > 1) ...[
-                        ListTile(
-                          leading: Icon(Icons.arrow_upward_rounded,
-                              color: p.primary),
-                          title: Text(context.l10n.parentDirectory,
-                              style: TextStyle(
+                        Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                          child: Material(
+                            color: p.surfaceContainer,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadii.r14All,
+                              side: BorderSide(
+                                color: p.hairline.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: ListTile(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadii.r14All,
+                              ),
+                              leading: Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: p.accent.withValues(alpha: 0.14),
+                                  borderRadius: AppRadii.r10All,
+                                ),
+                                child: Icon(
+                                  Icons.arrow_upward_rounded,
+                                  color: p.accent,
+                                  size: 20,
+                                ),
+                              ),
+                              title: Text(
+                                context.l10n.parentDirectory,
+                                style: TextStyle(
                                   color: p.textPrimary,
-                                  fontWeight: FontWeight.w600)),
-                          onTap: () {
-                            _navigateTo(p_path.posix.dirname(currentDir));
-                          },
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: AppFontSize.bodySmall,
+                                ),
+                              ),
+                              subtitle: Text(
+                                p_path.posix
+                                    .basename(p_path.posix.dirname(currentDir)),
+                                style: TextStyle(
+                                  color: p.textTertiary,
+                                  fontSize: AppFontSize.caption,
+                                ),
+                              ),
+                              trailing: Icon(
+                                Icons.chevron_left_rounded,
+                                color: p.textTertiary,
+                              ),
+                              onTap: () {
+                                _navigateTo(p_path.posix.dirname(currentDir));
+                              },
+                            ),
+                          ),
                         ),
-                        Divider(color: p.hairline),
                       ],
 
                       // Subfolders (all of them — ListView virtualizes, no cap).
@@ -328,57 +402,99 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                             final hasArtwork = (songId != null && songId > 0) ||
                                 (remoteUrl != null && remoteUrl.isNotEmpty);
 
-                            return ListTile(
-                              leading: hasArtwork
-                                  ? CachedArtwork(
-                                      id: songId ?? 0,
-                                      albumId: albumId,
-                                      remoteUrl: remoteUrl,
-                                      type: ArtworkType.AUDIO,
-                                      size: 40,
-                                      borderRadius: AppRadii.r10,
-                                      fallbackIcon: Icons.folder_rounded,
-                                    )
-                                  : Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: p.accentContainer,
-                                        borderRadius: AppRadii.r10All,
-                                      ),
-                                      child: Icon(Icons.folder_rounded,
-                                          color: p.accent, size: 20),
+                            return Container(
+                              margin:
+                                  const EdgeInsets.symmetric(vertical: 3),
+                              child: Material(
+                                color: p.surfaceContainer,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadii.r14All,
+                                  side: BorderSide(
+                                    color: p.hairline.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: AppRadii.r14All,
+                                  ),
+                                  leading: hasArtwork
+                                      ? CachedArtwork(
+                                          id: songId ?? 0,
+                                          albumId: albumId,
+                                          remoteUrl: remoteUrl,
+                                          type: ArtworkType.AUDIO,
+                                          size: 44,
+                                          borderRadius: AppRadii.r10,
+                                          fallbackIcon: Icons.folder_rounded,
+                                        )
+                                      : Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                p.accentContainer
+                                                    .withValues(alpha: 0.5),
+                                                p.surfaceContainerHigh,
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: AppRadii.r10All,
+                                            border: Border.all(
+                                              color: p.accent
+                                                  .withValues(alpha: 0.2),
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            Icons.folder_rounded,
+                                            color: p.accent,
+                                            size: 22,
+                                          ),
+                                        ),
+                                  title: Text(
+                                    p_path.posix.basename(sub),
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: AppFontSize.bodySmall,
                                     ),
-                              title: Text(
-                                p_path.posix.basename(sub),
-                                style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontWeight: FontWeight.w600),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (item != null)
-                                    IconButton(
-                                      icon: Icon(Icons.open_in_new_rounded,
-                                          color: p.textSecondary, size: 18),
-                                      tooltip:
-                                          context.l10n.browseOpenFolderDetails,
-                                      constraints: const BoxConstraints(
-                                        minWidth: AppSpacing.minTouchTarget,
-                                        minHeight: AppSpacing.minTouchTarget,
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (item != null)
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.open_in_new_rounded,
+                                            color: p.textSecondary,
+                                            size: 18,
+                                          ),
+                                          tooltip: context
+                                              .l10n.browseOpenFolderDetails,
+                                          constraints: const BoxConstraints(
+                                            minWidth:
+                                                AppSpacing.minTouchTarget,
+                                            minHeight:
+                                                AppSpacing.minTouchTarget,
+                                          ),
+                                          onPressed: () {
+                                            context.push(
+                                              '/folder?path=${Uri.encodeComponent(item.path)}&name=${Uri.encodeComponent(item.name)}',
+                                              extra: item,
+                                            );
+                                          },
+                                        ),
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: p.textTertiary,
+                                        size: 20,
                                       ),
-                                      onPressed: () {
-                                        context.push(
-                                            '/folder?path=${Uri.encodeComponent(item.path)}&name=${Uri.encodeComponent(item.name)}',
-                                            extra: item);
-                                      },
-                                    ),
-                                  Icon(Icons.chevron_right_rounded,
-                                      color: p.textSecondary),
-                                ],
+                                    ],
+                                  ),
+                                  onTap: () => _navigateTo(sub),
+                                ),
                               ),
-                              onTap: () => _navigateTo(sub),
                             );
                           },
                         ),

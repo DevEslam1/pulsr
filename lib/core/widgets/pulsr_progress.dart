@@ -1,5 +1,8 @@
+// lib/core/widgets/pulsr_progress_bar.dart
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
+import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 
 /// {@category DesignSystem}
@@ -71,6 +74,7 @@ class PulsrProgressBar extends StatelessWidget {
       height: size,
       child: CircularProgressIndicator(
         strokeWidth: strokeWidth,
+        strokeCap: StrokeCap.round,
         valueColor: color != null ? AlwaysStoppedAnimation<Color>(color) : null,
       ),
     );
@@ -80,17 +84,66 @@ class PulsrProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final activeColor = color ?? p.accent;
-    final trackColor = backgroundColor ?? p.surfaceContainerHigh;
+    final trackColor = backgroundColor ??
+        (p.isDark ? AppColors.specularAt(0.08) : p.surfaceContainerHigh);
     final radius = borderRadius ?? AppRadii.full;
+
+    // Indeterminate mode delegates to LinearProgressIndicator inside a recessed pill
+    if (value == null) {
+      return ClipRRect(
+        borderRadius: radius,
+        child: SizedBox(
+          height: height,
+          child: LinearProgressIndicator(
+            value: null,
+            valueColor: AlwaysStoppedAnimation<Color>(activeColor),
+            backgroundColor: trackColor,
+          ),
+        ),
+      );
+    }
+
+    final clamped = value!.clamp(0.0, 1.0);
 
     return ClipRRect(
       borderRadius: radius,
-      child: SizedBox(
+      child: Container(
         height: height,
-        child: LinearProgressIndicator(
-          value: value?.clamp(0.0, 1.0),
-          valueColor: AlwaysStoppedAnimation<Color>(activeColor),
-          backgroundColor: trackColor,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: trackColor,
+          borderRadius: radius,
+        ),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: clamped, end: clamped),
+          duration: context.motionMs(180),
+          curve: Curves.easeOutCubic,
+          builder: (context, animatedValue, _) {
+            if (animatedValue <= 0.0) {
+              return const SizedBox.shrink();
+            }
+            return FractionallySizedBox(
+              alignment: AlignmentDirectional.centerStart,
+              widthFactor: animatedValue.clamp(0.0, 1.0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  gradient: LinearGradient(
+                    colors: [
+                      activeColor.withValues(alpha: 0.78),
+                      activeColor,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.35),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

@@ -1,40 +1,42 @@
-import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
+
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
-import '../../../core/widgets/pulsr_empty_state.dart';
-import '../../../core/widgets/pulsr_artwork_header.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/highlighted_text.dart';
+import '../../../core/widgets/pulsr_artwork_header.dart';
 import '../../../core/widgets/pulsr_chip.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_progress.dart';
 import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
+import '../../../data/db/app_database.dart';
+import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
-import '../../library/cubit/library_cubit.dart';
 import '../../sheets/song_options_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_state.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
-import '../../../data/db/app_database.dart';
 import '../cubit/search_cubit.dart';
 import '../cubit/search_state.dart';
 import 'widgets/highlighted_song_tile.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
 
 const List<String> _onlineTags = [
   'Top Hits',
@@ -49,10 +51,6 @@ const List<String> _onlineTags = [
 
 /// Provider shell. Everything that talks to [YtmSearchCubit] lives in
 /// [_SearchView], which sits *below* these providers.
-///
-/// BUG FIX: the old State owned both the providers and the handlers, so its
-/// own `context` was above the YtmSearchCubit provider. Deep-link / initial
-/// queries therefore read a null online cubit and never searched online.
 class SearchScreen extends StatelessWidget {
   final String? initialQuery;
 
@@ -91,11 +89,9 @@ class _SearchViewState extends State<_SearchView> {
   /// 0 = All (Local + Online), 1 = Local, 2 = Online.
   int _tab = 0;
 
-  /// Mirrors the text field. BUG FIX: the body used to read
-  /// `_controller.text` during a SearchCubit-driven rebuild, so on the Online
-  /// tab (which never touches SearchCubit) typing did not switch the body
-  /// away from the start page.
+  /// Mirrors the text field so Online-tab typing triggers immediate UI updates.
   String _text = '';
+  bool _hasFocus = false;
 
   List<String> _suggestions = const [];
   bool _showSuggestions = false;
@@ -126,7 +122,6 @@ class _SearchViewState extends State<_SearchView> {
     super.didChangeDependencies();
     if (!AppConfig.ytmEnabled && _tab != 1) _tab = 1;
 
-    // Assistant / deep-link entry: `/search?q=...`
     String? q;
     try {
       q = GoRouterState.of(context).uri.queryParameters['q'];
@@ -161,8 +156,6 @@ class _SearchViewState extends State<_SearchView> {
       _isOnlineAvailable(listen: listen) ? _tab : 1;
 
   // ── Query handling ──────────────────────────────────────────────────
-  /// Sets the text and runs the query after the first frame (used for deep
-  /// links before the tree is fully built).
   void _prefill(String q) {
     _controller.value = TextEditingValue(
       text: q,
@@ -214,7 +207,7 @@ class _SearchViewState extends State<_SearchView> {
       _hideSuggestions();
       return;
     }
-    _suggestTimer = Timer(const Duration(milliseconds: 200), () async {
+    _suggestTimer = Timer(const Duration(milliseconds: 180), () async {
       if (!mounted) return;
       final results = await context.read<SearchCubit>().suggestionsFor(trimmed);
       if (!mounted || _controller.text.trim() != trimmed) return;
@@ -236,14 +229,32 @@ class _SearchViewState extends State<_SearchView> {
   }
 
   void _onFocusChanged() {
-    if (!_focus.hasFocus && _showSuggestions) {
-      setState(() => _showSuggestions = false);
+    final focused = _focus.hasFocus;
+    if (_hasFocus != focused || (!focused && _showSuggestions)) {
+      setState(() {
+        _hasFocus = focused;
+        if (!focused) _showSuggestions = false;
+      });
     }
   }
 
-  /// Runs [term] right now. [commit] stores it in the recent searches (not for
-  /// discovery tags, which the user did not type).
+  /// Populates the search box with [term] without unfocusing so the user can
+  /// keep refining their query.
+  void _fillQueryOnly(String term) {
+    HapticFeedback.selectionClick();
+    final next = '$term ';
+    _controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    setState(() => _text = next);
+    _focus.requestFocus();
+    _dispatchQuery(next);
+  }
+
+  /// Runs [term] immediately. [commit] stores it in recent searches.
   void _applySearch(String term, {bool commit = true}) {
+    HapticFeedback.selectionClick();
     _controller.value = TextEditingValue(
       text: term,
       selection: TextSelection.collapsed(offset: term.length),
@@ -257,10 +268,8 @@ class _SearchViewState extends State<_SearchView> {
     }
   }
 
-  /// BUG FIX: applying a saved search used to call `setFilter` first, which
-  /// searched the *old* query with the new filter, and it never reached the
-  /// online cubit in the All tab.
   void _applySavedSearch(String entry) {
+    HapticFeedback.selectionClick();
     final d = SearchCubit.decodeSavedSearch(entry);
     _controller.value = TextEditingValue(
       text: d.query,
@@ -276,6 +285,7 @@ class _SearchViewState extends State<_SearchView> {
   }
 
   void _clear() {
+    HapticFeedback.lightImpact();
     _controller.clear();
     _lastAppliedQueryParam = null;
     _hideSuggestions();
@@ -289,6 +299,7 @@ class _SearchViewState extends State<_SearchView> {
 
   void _onTabChanged(int index) {
     if (_tab == index) return;
+    HapticFeedback.selectionClick();
     setState(() => _tab = index);
     _hideSuggestions();
     if (_text.trim().isNotEmpty) _dispatchQuery(_text, immediate: true);
@@ -307,7 +318,6 @@ class _SearchViewState extends State<_SearchView> {
     } catch (_) {
       // Fallback to search query when LibraryCubit or GoRouter is unavailable.
     }
-    // Not in the library: search for the name, restricted to artists.
     context.read<SearchCubit>().applySavedSearch(name, 'Artists');
     _controller.text = name;
     setState(() => _text = name);
@@ -338,6 +348,7 @@ class _SearchViewState extends State<_SearchView> {
     final showOnline = _isOnlineAvailable();
     final tab = _effectiveTab();
     final pad = Adaptive.pagePadding(context);
+    final compactHeader = _hasFocus || _text.trim().isNotEmpty;
 
     return Scaffold(
       body: SafeArea(
@@ -348,41 +359,51 @@ class _SearchViewState extends State<_SearchView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                PulsrArtworkHeader(
-                  height: 96,
-                  title: context.l10n.search,
-                  albumIds: context.select<PlayerCubit, List<int>>(
-                    (c) => [
-                      for (final song in c.state.queueHistory.take(4))
-                        if (song.albumId != null) song.albumId!,
-                    ],
-                  ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: compactHeader
+                      ? const SizedBox(height: AppSpacing.xs)
+                      : PulsrArtworkHeader(
+                          height: 92,
+                          title: context.l10n.search,
+                          albumIds: context.select<PlayerCubit, List<int>>(
+                            (c) => [
+                              for (final song in c.state.queueHistory.take(4))
+                                if (song.albumId != null) song.albumId!,
+                            ],
+                          ),
+                        ),
                 ),
+                const SizedBox(height: AppSpacing.xs),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: pad),
+                  child: _buildSearchField(context, p, tab),
+                ),
+                _buildProgressBar(p, tab),
                 if (showOnline) ...[
-                  const SizedBox(height: AppSpacing.s14),
+                  const SizedBox(height: AppSpacing.xs),
                   PulsrSegmentedControl(
                     margin: EdgeInsets.symmetric(horizontal: pad),
                     selectedIndex: _tab,
                     onChanged: _onTabChanged,
                     segments: [
                       PulsrSegment(
-                          label: context.l10n.all,
-                          icon: Icons.dashboard_rounded),
+                        label: context.l10n.all,
+                        icon: Icons.dashboard_rounded,
+                      ),
                       PulsrSegment(
-                          label: context.l10n.localMusic,
-                          icon: Icons.library_music_rounded),
+                        label: context.l10n.localMusic,
+                        icon: Icons.library_music_rounded,
+                      ),
                       PulsrSegment(
-                          label: context.l10n.onlineStream,
-                          icon: Icons.public_rounded),
+                        label: context.l10n.onlineStream,
+                        icon: Icons.public_rounded,
+                      ),
                     ],
                   ),
                 ],
-                const SizedBox(height: AppSpacing.sm),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: pad),
-                  child: _buildSearchField(context, p, tab),
-                ),
-                _buildProgressBar(p, tab),
                 if (tab != 2) _buildFilterBar(p, pad),
                 Expanded(child: _buildBody(context, p, showOnline, tab)),
               ],
@@ -395,67 +416,97 @@ class _SearchViewState extends State<_SearchView> {
 
   Widget _buildSearchField(BuildContext context, PulsrPalette p, int tab) {
     OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
-          borderRadius: AppRadii.circular(16),
+          borderRadius: AppRadii.r16All,
           borderSide: BorderSide(color: c, width: w),
         );
 
-    return TextField(
-      controller: _controller,
-      focusNode: _focus,
-      textInputAction: TextInputAction.search,
-      autocorrect: false,
-      onChanged: _onChanged,
-      onSubmitted: _onSubmitted,
-      decoration: InputDecoration(
-        hintText: tab == 2
-            ? context.l10n.searchOnline
-            : tab == 1
-                ? context.l10n.searchPlaceholder
-                : context.l10n.searchLocalOnlineHint,
-        filled: true,
-        fillColor: p.surfaceContainer,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        border: border(p.hairline),
-        enabledBorder: border(p.hairline),
-        focusedBorder: border(p.accent, 1.5),
-        prefixIcon: Icon(Icons.search_rounded, color: p.textTertiary),
-        suffixIcon: ValueListenableBuilder<TextEditingValue>(
-          valueListenable: _controller,
-          builder: (context, val, _) {
-            if (val.text.isEmpty) {
-              if (!AppConfig.voiceSearchEnabled) return const SizedBox.shrink();
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      decoration: BoxDecoration(
+        borderRadius: AppRadii.r16All,
+        boxShadow: _hasFocus
+            ? [
+                BoxShadow(
+                  color: p.accent.withValues(alpha: 0.12),
+                  blurRadius: 14,
+                  spreadRadius: 1,
+                ),
+              ]
+            : const [],
+      ),
+      child: TextField(
+        controller: _controller,
+        focusNode: _focus,
+        textInputAction: TextInputAction.search,
+        autocorrect: false,
+        style: TextStyle(
+          color: p.textPrimary,
+          fontSize: AppFontSize.body,
+          fontWeight: FontWeight.w600,
+        ),
+        onChanged: _onChanged,
+        onSubmitted: _onSubmitted,
+        decoration: InputDecoration(
+          hintText: tab == 2
+              ? context.l10n.searchOnline
+              : tab == 1
+                  ? context.l10n.searchPlaceholder
+                  : context.l10n.searchLocalOnlineHint,
+          hintStyle: TextStyle(
+            color: p.textTertiary,
+            fontSize: AppFontSize.body,
+            fontWeight: FontWeight.w500,
+          ),
+          filled: true,
+          fillColor: p.surfaceContainer,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          border: border(p.hairline),
+          enabledBorder: border(p.hairline),
+          focusedBorder: border(p.accent, 1.5),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: _hasFocus ? p.accent : p.textTertiary,
+          ),
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _controller,
+            builder: (context, val, _) {
+              if (val.text.isEmpty) {
+                if (!AppConfig.voiceSearchEnabled) {
+                  return const SizedBox.shrink();
+                }
+                return IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
+                  icon: Icon(Icons.mic_rounded, color: p.textTertiary),
+                  tooltip: context.l10n.voiceSearch,
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    PulsrToast.show(
+                      context,
+                      message: context.l10n.voiceSearchUnavailable,
+                      icon: Icons.mic_rounded,
+                    );
+                  },
+                );
+              }
               return IconButton(
                 constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget),
-                icon: Icon(Icons.mic_rounded, color: p.textTertiary),
-                tooltip: context.l10n.voiceSearch,
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  PulsrToast.show(
-                    context,
-                    message: context.l10n.voiceSearchUnavailable,
-                    icon: Icons.mic_rounded,
-                  );
-                },
-              );
-            }
-            return IconButton(
-              constraints: const BoxConstraints(
                   minWidth: AppSpacing.minTouchTarget,
-                  minHeight: AppSpacing.minTouchTarget),
-              icon: Icon(Icons.clear_rounded, color: p.textTertiary),
-              tooltip: context.l10n.clear,
-              onPressed: _clear,
-            );
-          },
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                icon: Icon(Icons.cancel_rounded, color: p.textSecondary),
+                tooltip: context.l10n.clear,
+                onPressed: _clear,
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  /// Thin loading line under the field: results stay visible while a new
-  /// query loads, so there is no skeleton flicker per keystroke.
   Widget _buildProgressBar(PulsrPalette p, int tab) {
     return BlocBuilder<SearchCubit, SearchState>(
       buildWhen: (a, b) => a.isLoading != b.isLoading,
@@ -478,9 +529,6 @@ class _SearchViewState extends State<_SearchView> {
     );
   }
 
-  /// BUG FIX: filter chips were shown on the Local tab only, but the persisted
-  /// filter was also applied to the local section of the All tab, silently
-  /// hiding results (e.g. a leftover "FLAC") with no visible control.
   Widget _buildFilterBar(PulsrPalette p, double pad) {
     return BlocBuilder<SearchCubit, SearchState>(
       buildWhen: (a, b) =>
@@ -494,7 +542,9 @@ class _SearchViewState extends State<_SearchView> {
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(
-                  horizontal: pad, vertical: AppSpacing.xs),
+                horizontal: pad,
+                vertical: AppSpacing.xs,
+              ),
               children: [
                 for (final filter in SearchCubit.filterOptions)
                   Padding(
@@ -518,8 +568,11 @@ class _SearchViewState extends State<_SearchView> {
                           HapticFeedback.selectionClick();
                           if (saved) {
                             cubit.removeSavedSearch(
-                                SearchCubit.encodeSavedSearch(
-                                    state.query.trim(), state.selectedFilter));
+                              SearchCubit.encodeSavedSearch(
+                                state.query.trim(),
+                                state.selectedFilter,
+                              ),
+                            );
                           } else {
                             cubit.saveCurrentSearch();
                           }
@@ -577,6 +630,7 @@ class _SearchViewState extends State<_SearchView> {
           showOnline: showOnline,
           tab: tab,
           onRecent: _applySearch,
+          onFillQuery: _fillQueryOnly,
           onTag: (t) => _applySearch(t, commit: false),
           onSaved: _applySavedSearch,
         ),
@@ -586,6 +640,8 @@ class _SearchViewState extends State<_SearchView> {
         query: text,
         onClear: _clear,
         onCommit: () => context.read<SearchCubit>().commitQuery(text),
+        onOpenArtist: _openArtist,
+        onOpenAlbum: _openAlbum,
       );
     } else if (showOnline && tab == 2) {
       content = _OnlineResults(onSelectTag: (t) => _applySearch(t));
@@ -607,12 +663,14 @@ class _SearchViewState extends State<_SearchView> {
         Positioned.fill(child: content),
         if (showCard)
           PositionedDirectional(
-            top: 0,
+            top: AppSpacing.xxs,
             start: Adaptive.pagePadding(context),
             end: Adaptive.pagePadding(context),
             child: _SuggestionsCard(
+              query: text,
               suggestions: _suggestions,
               onSelect: (s) => _applySearch(s),
+              onFill: _fillQueryOnly,
             ),
           ),
       ],
@@ -621,50 +679,97 @@ class _SearchViewState extends State<_SearchView> {
 }
 
 // ==================== SUGGESTIONS OVERLAY ====================
-/// BUG FIX: suggestions used to *replace* the results list whenever any
-/// prefix matched, so results were effectively unreachable while typing.
-/// They are now a compact card floating above the results.
 class _SuggestionsCard extends StatelessWidget {
+  final String query;
   final List<String> suggestions;
   final ValueChanged<String> onSelect;
+  final ValueChanged<String> onFill;
 
-  const _SuggestionsCard({required this.suggestions, required this.onSelect});
+  const _SuggestionsCard({
+    required this.query,
+    required this.suggestions,
+    required this.onSelect,
+    required this.onFill,
+  });
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Material(
-      color: p.surfaceContainer,
-      elevation: 6,
-      shadowColor: Colors.black54,
-      borderRadius: AppRadii.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < suggestions.length; i++) ...[
-            if (i > 0) Divider(color: p.hairline, height: 1),
-            ListTile(
-              dense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-              leading:
-                  Icon(Icons.search_rounded, color: p.textTertiary, size: 20),
-              title: Text(
-                suggestions[i],
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: p.textPrimary,
-                    fontSize: AppFontSize.body,
-                    fontWeight: FontWeight.w500),
-              ),
-              trailing: Icon(Icons.north_west_rounded,
-                  size: 16, color: p.textTertiary),
-              onTap: () => onSelect(suggestions[i]),
-            ),
-          ],
+    final baseStyle = TextStyle(
+      color: p.textPrimary,
+      fontSize: AppFontSize.body,
+      fontWeight: FontWeight.w500,
+    );
+    final matchStyle = TextStyle(
+      color: p.accent,
+      fontSize: AppFontSize.body,
+      fontWeight: FontWeight.w800,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.r16All,
+        border: Border.all(color: p.accent.withValues(alpha: 0.28)),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
         ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < suggestions.length; i++) ...[
+              if (i > 0) Divider(color: p.hairline, height: 1),
+              InkWell(
+                onTap: () => onSelect(suggestions[i]),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    start: AppSpacing.sm,
+                    end: AppSpacing.xxs,
+                    top: AppSpacing.xxs,
+                    bottom: AppSpacing.xxs,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.search_rounded,
+                        color: p.textTertiary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: PulsrHighlightedText(
+                          text: suggestions[i],
+                          query: query,
+                          baseStyle: baseStyle,
+                          matchStyle: matchStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          Icons.north_west_rounded,
+                          size: 17,
+                          color: p.textTertiary,
+                        ),
+                        onPressed: () => onFill(suggestions[i]),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -676,6 +781,7 @@ class _StartPage extends StatelessWidget {
   final bool showOnline;
   final int tab;
   final ValueChanged<String> onRecent;
+  final ValueChanged<String> onFillQuery;
   final ValueChanged<String> onTag;
   final ValueChanged<String> onSaved;
 
@@ -684,6 +790,7 @@ class _StartPage extends StatelessWidget {
     required this.showOnline,
     required this.tab,
     required this.onRecent,
+    required this.onFillQuery,
     required this.onTag,
     required this.onSaved,
   });
@@ -698,15 +805,15 @@ class _StartPage extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: EdgeInsetsDirectional.fromSTEB(
-          Adaptive.pagePadding(context),
-          AppSpacing.sm,
-          Adaptive.pagePadding(context),
-          PulsrLayoutMetrics.scrollBottom(context)),
+        Adaptive.pagePadding(context),
+        AppSpacing.sm,
+        Adaptive.pagePadding(context),
+        PulsrLayoutMetrics.scrollBottom(context),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildRecentSearchesSection(context, p, local, ytm),
-          // Saved searches are local-only, so hide them on the Online tab
           if (tab != 2)
             ValueListenableBuilder<List<String>>(
               valueListenable: local.savedSearches,
@@ -715,29 +822,25 @@ class _StartPage extends StatelessWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _label(context.l10n.savedSearches, p),
+                    _sectionTitleRow(
+                      icon: Icons.bookmarks_rounded,
+                      title: context.l10n.savedSearches,
+                      p: p,
+                    ),
                     const SizedBox(height: AppSpacing.xs),
                     Wrap(
                       spacing: AppSpacing.xs,
-                      runSpacing: AppSpacing.xxs,
+                      runSpacing: AppSpacing.xs,
                       children: [
                         for (final entry in saved)
-                          InputChip(
-                            avatar: Icon(Icons.bookmark_outline_rounded,
-                                size: 14, color: p.accent),
-                            label: Text(
-                                SearchCubit.decodeSavedSearch(entry).query),
-                            backgroundColor: p.surfaceContainer,
-                            side: BorderSide(color: p.hairline),
-                            deleteIcon:
-                                const Icon(Icons.close_rounded, size: 14),
-                            deleteIconColor: p.textTertiary,
-                            labelStyle: TextStyle(
-                                color: p.textPrimary,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w600),
-                            onDeleted: () => local.removeSavedSearch(entry),
-                            onPressed: () => onSaved(entry),
+                          _SavedSearchChip(
+                            entry: entry,
+                            palette: p,
+                            onTap: () => onSaved(entry),
+                            onDelete: () {
+                              HapticFeedback.lightImpact();
+                              local.removeSavedSearch(entry);
+                            },
                           ),
                       ],
                     ),
@@ -759,7 +862,7 @@ class _StartPage extends StatelessWidget {
                   children: [
                     _buildRecentSectionHeader(
                       context: context,
-                      icon: Icons.history_rounded,
+                      icon: Icons.history_toggle_off_rounded,
                       title: context.l10n.recentlyPlayed,
                       onClear: () {
                         HapticFeedback.lightImpact();
@@ -767,39 +870,64 @@ class _StartPage extends StatelessWidget {
                       },
                       p: p,
                     ),
-                    for (final song in playedSongs.take(6))
-                      _SearchPlayedSongTile(
-                        song: song,
-                        isCurrent: currentSongId == song.id,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          local.recordPlayedSong(song);
-                          player.playSong(song, queue: playedSongs);
-                        },
-                        onRemove: () => local.removeSearchPlayedSong(song.id),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer.withValues(alpha: 0.45),
+                        borderRadius: AppRadii.r16All,
+                        border: Border.all(color: p.hairline),
                       ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          for (var i = 0;
+                              i < playedSongs.take(6).length;
+                              i++) ...[
+                            if (i > 0)
+                              Divider(
+                                color: p.hairline,
+                                height: 1,
+                                indent: 68,
+                              ),
+                            _SearchPlayedSongTile(
+                              song: playedSongs[i],
+                              isCurrent: currentSongId == playedSongs[i].id,
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                local.recordPlayedSong(playedSongs[i]);
+                                player.playSong(
+                                  playedSongs[i],
+                                  queue: playedSongs,
+                                );
+                              },
+                              onRemove: () => local
+                                  .removeSearchPlayedSong(playedSongs[i].id),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.md),
                   ],
                 );
               },
             ),
-          if (tab == 2) ...[
-            _label(context.l10n.popularSearches, p),
+          if (showOnline && (tab == 0 || tab == 2)) ...[
+            _sectionTitleRow(
+              icon: Icons.local_fire_department_rounded,
+              title: context.l10n.popularSearches,
+              p: p,
+            ),
             const SizedBox(height: AppSpacing.xs),
             Wrap(
               spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xxs,
+              runSpacing: AppSpacing.xs,
               children: [
                 for (final tag in _onlineTags)
-                  ActionChip(
-                    label: Text(_localizedTag(context, tag)),
-                    backgroundColor: p.surfaceContainer,
-                    side: BorderSide(color: p.hairline),
-                    labelStyle: TextStyle(
-                        color: p.accent,
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w700),
-                    onPressed: () => onTag(tag),
+                  PulsrChip(
+                    icon: Icons.trending_up_rounded,
+                    label: _localizedTag(context, tag),
+                    variant: PulsrChipVariant.action,
+                    onTap: () => onTag(tag),
                   ),
               ],
             ),
@@ -817,10 +945,10 @@ class _StartPage extends StatelessWidget {
   ) {
     if (ytm == null) {
       if (tab == 2 || history.isEmpty) return const SizedBox.shrink();
-      return _buildHistoryItems(
+      return _buildHistoryCard(
         context: context,
         p: p,
-        terms: history.take(5).toList(),
+        terms: history.take(6).toList(),
         onClear: () {
           HapticFeedback.lightImpact();
           local.clearHistory();
@@ -833,7 +961,6 @@ class _StartPage extends StatelessWidget {
       valueListenable: ytm.historyNotifier,
       builder: (context, onlineHistory, _) {
         if (tab == 0) {
-          // Unified recent searches for All tab: deduplicated and combined
           final combined = <String>[];
           final seen = <String>{};
           final maxLen = history.length > onlineHistory.length
@@ -855,10 +982,10 @@ class _StartPage extends StatelessWidget {
           }
           if (combined.isEmpty) return const SizedBox.shrink();
 
-          return _buildHistoryItems(
+          return _buildHistoryCard(
             context: context,
             p: p,
-            terms: combined.take(5).toList(),
+            terms: combined.take(6).toList(),
             onClear: () {
               HapticFeedback.lightImpact();
               local.clearHistory();
@@ -871,10 +998,10 @@ class _StartPage extends StatelessWidget {
           );
         } else if (tab == 1) {
           if (history.isEmpty) return const SizedBox.shrink();
-          return _buildHistoryItems(
+          return _buildHistoryCard(
             context: context,
             p: p,
-            terms: history.take(5).toList(),
+            terms: history.take(6).toList(),
             onClear: () {
               HapticFeedback.lightImpact();
               local.clearHistory();
@@ -883,10 +1010,10 @@ class _StartPage extends StatelessWidget {
           );
         } else {
           if (onlineHistory.isEmpty) return const SizedBox.shrink();
-          return _buildHistoryItems(
+          return _buildHistoryCard(
             context: context,
             p: p,
-            terms: onlineHistory.take(5).toList(),
+            terms: onlineHistory.take(6).toList(),
             onClear: () {
               HapticFeedback.lightImpact();
               ytm.clearHistory();
@@ -898,7 +1025,7 @@ class _StartPage extends StatelessWidget {
     );
   }
 
-  Widget _buildHistoryItems({
+  Widget _buildHistoryCard({
     required BuildContext context,
     required PulsrPalette p,
     required List<String> terms,
@@ -915,27 +1042,151 @@ class _StartPage extends StatelessWidget {
           onClear: onClear,
           p: p,
         ),
-        for (final term in terms)
-          _RecentRow(
-            icon: Icons.history_rounded,
-            term: term,
-            onTap: () => onRecent(term),
-            onRemove: () => onRemove(term),
+        Container(
+          decoration: BoxDecoration(
+            color: p.surfaceContainer.withValues(alpha: 0.45),
+            borderRadius: AppRadii.r16All,
+            border: Border.all(color: p.hairline),
           ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (var i = 0; i < terms.length; i++) ...[
+                if (i > 0) Divider(color: p.hairline, height: 1, indent: 42),
+                _RecentRow(
+                  icon: Icons.history_rounded,
+                  term: terms[i],
+                  onTap: () => onRecent(terms[i]),
+                  onFill: () => onFillQuery(terms[i]),
+                  onRemove: () => onRemove(terms[i]),
+                ),
+              ],
+            ],
+          ),
+        ),
         const SizedBox(height: AppSpacing.md),
       ],
     );
   }
 
-  Widget _label(String text, PulsrPalette p) => Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontSize: AppFontSize.tiny,
-          fontWeight: FontWeight.w800,
-          color: p.textTertiary,
-          letterSpacing: AppTracking.wide,
+  Widget _sectionTitleRow({
+    required IconData icon,
+    required String title,
+    required PulsrPalette p,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: p.textTertiary),
+        const SizedBox(width: AppSpacing.s6),
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(
+            fontSize: AppFontSize.tiny,
+            fontWeight: FontWeight.w800,
+            color: p.textTertiary,
+            letterSpacing: AppTracking.wide,
+          ),
         ),
-      );
+      ],
+    );
+  }
+}
+
+class _SavedSearchChip extends StatelessWidget {
+  final String entry;
+  final PulsrPalette palette;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _SavedSearchChip({
+    required this.entry,
+    required this.palette,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final decoded = SearchCubit.decodeSavedSearch(entry);
+    final hasCustomFilter =
+        decoded.filter.isNotEmpty && decoded.filter != 'All';
+
+    return Material(
+      color: palette.surfaceContainer,
+      borderRadius: AppRadii.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadii.circular(12),
+        child: Container(
+          padding: const EdgeInsetsDirectional.only(
+            start: AppSpacing.s10,
+            end: AppSpacing.s6,
+            top: AppSpacing.s6,
+            bottom: AppSpacing.s6,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.circular(12),
+            border: Border.all(color: palette.hairline),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.bookmark_rounded,
+                size: 14,
+                color: palette.accent,
+              ),
+              const SizedBox(width: AppSpacing.s6),
+              Flexible(
+                child: Text(
+                  decoded.query,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (hasCustomFilter) ...[
+                const SizedBox(width: AppSpacing.s6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s6,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.accent.withValues(alpha: 0.14),
+                    borderRadius: AppRadii.circular(6),
+                  ),
+                  child: Text(
+                    decoded.filter,
+                    style: TextStyle(
+                      color: palette.accent,
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: AppSpacing.s6),
+              GestureDetector(
+                onTap: onDelete,
+                behavior: HitTestBehavior.opaque,
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 15,
+                  color: palette.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _SearchPlayedSongTile extends StatelessWidget {
@@ -955,29 +1206,27 @@ class _SearchPlayedSongTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Material(
-      color: isCurrent ? p.surfaceContainer : Colors.transparent,
-      borderRadius: AppRadii.r12All,
+      color: isCurrent ? p.accent.withValues(alpha: 0.10) : Colors.transparent,
       child: InkWell(
-        borderRadius: AppRadii.r12All,
         onTap: onTap,
         onLongPress: () => SongOptionsSheet.show(context, song: song),
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xs,
+            horizontal: AppSpacing.s10,
             vertical: AppSpacing.s6,
           ),
           child: Row(
             children: [
               SizedBox(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 child: CachedArtwork(
                   id: song.id,
                   remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
                   albumId: song.albumId,
                   type: ArtworkType.AUDIO,
-                  size: 48,
-                  borderRadius: 12,
+                  size: 44,
+                  borderRadius: 10,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -1014,12 +1263,18 @@ class _SearchPlayedSongTile extends StatelessWidget {
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                  child:
-                      Icon(Icons.graphic_eq_rounded, size: 18, color: p.accent),
+                  child: Icon(
+                    Icons.graphic_eq_rounded,
+                    size: 18,
+                    color: p.accent,
+                  ),
                 ),
               IconButton(
-                icon:
-                    Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: p.textTertiary,
+                ),
                 visualDensity: VisualDensity.compact,
                 tooltip: context.l10n.remove,
                 onPressed: onRemove,
@@ -1036,57 +1291,70 @@ class _RecentRow extends StatelessWidget {
   final IconData icon;
   final String term;
   final VoidCallback onTap;
+  final VoidCallback onFill;
   final VoidCallback onRemove;
 
   const _RecentRow({
     required this.icon,
     required this.term,
     required this.onTap,
+    required this.onFill,
     required this.onRemove,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Row(
-      children: [
-        Expanded(
-          child: Semantics(
-            button: true,
-            label: term,
-            child: InkWell(
-              borderRadius: AppRadii.circular(12),
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-                child: Row(
-                  children: [
-                    Icon(icon, size: 18, color: p.textTertiary),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        term,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.body,
-                            fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(
+            start: AppSpacing.sm,
+            end: AppSpacing.xxs,
+            top: AppSpacing.xxs,
+            bottom: AppSpacing.xxs,
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: p.textTertiary),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  term,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: AppFontSize.body,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-            ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.north_west_rounded,
+                  size: 16,
+                  color: p.textTertiary,
+                ),
+                onPressed: onFill,
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: context.l10n.remove,
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: p.textTertiary,
+                ),
+                onPressed: onRemove,
+              ),
+            ],
           ),
         ),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          tooltip: context.l10n.remove,
-          icon: Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
-          onPressed: onRemove,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -1120,8 +1388,6 @@ class _LocalResults extends StatelessWidget {
       return PulsrEmptyState(
         icon: Icons.error_outline_rounded,
         title: context.l10n.somethingWentWrong,
-        // BUG FIX: the raw failure text was shown; the online tab already
-        // resolved it to a localized message.
         subtitle: resolveUiErrorMessage(context, error),
         primaryActionLabel: context.l10n.retry,
         primaryActionIcon: Icons.refresh_rounded,
@@ -1140,13 +1406,13 @@ class _LocalResults extends StatelessWidget {
     }
 
     final filter = state.selectedFilter;
-    final names = _deriveNames(state.results);
+    final entities = _deriveEntities(state.results);
     final artists = (filter == 'All' || filter == 'Artists')
-        ? names.artists.take(10).toList()
-        : const <String>[];
+        ? entities.artists.take(10).toList()
+        : const <_DerivedEntity>[];
     final albums = (filter == 'All' || filter == 'Albums')
-        ? names.albums.take(10).toList()
-        : const <String>[];
+        ? entities.albums.take(10).toList()
+        : const <_DerivedEntity>[];
 
     return RefreshIndicator(
       color: p.accent,
@@ -1154,7 +1420,8 @@ class _LocalResults extends StatelessWidget {
       onRefresh: cubit.refresh,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics()),
+          parent: BouncingScrollPhysics(),
+        ),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         slivers: [
           if (artists.isNotEmpty) ...[
@@ -1163,15 +1430,15 @@ class _LocalResults extends StatelessWidget {
                 context: context,
                 icon: Icons.person_rounded,
                 title: context.l10n.artists,
-                count: names.artists.length,
+                count: entities.artists.length,
                 isLoading: false,
                 p: p,
               ),
             ),
             SliverToBoxAdapter(
               child: _EntityRail(
-                names: artists,
-                icon: Icons.person_rounded,
+                entities: artists,
+                query: state.query,
                 round: true,
                 onTap: onOpenArtist,
               ),
@@ -1183,15 +1450,15 @@ class _LocalResults extends StatelessWidget {
                 context: context,
                 icon: Icons.album_rounded,
                 title: context.l10n.albums,
-                count: names.albums.length,
+                count: entities.albums.length,
                 isLoading: false,
                 p: p,
               ),
             ),
             SliverToBoxAdapter(
               child: _EntityRail(
-                names: albums,
-                icon: Icons.album_rounded,
+                entities: albums,
+                query: state.query,
                 round: false,
                 onTap: onOpenAlbum,
               ),
@@ -1231,61 +1498,80 @@ class _LocalResults extends StatelessWidget {
             child: ValueListenableBuilder<bool>(
               valueListenable: cubit.hasMoreResults,
               builder: (context, hasMore, _) => hasMore
-                  ? Center(
-                      child: Padding(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                        child: TextButton.icon(
-                          onPressed: cubit.showMoreResults,
-                          icon: Icon(Icons.expand_more_rounded,
-                              size: 18, color: p.accent),
-                          label: Text(
-                            context.l10n.showMore,
-                            style: TextStyle(
-                                color: p.accent,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
+                  ? _ShowMoreButton(
+                      expanded: false,
+                      onPressed: cubit.showMoreResults,
                     )
                   : const SizedBox.shrink(),
             ),
           ),
           SliverToBoxAdapter(
-              child:
-                  SizedBox(height: PulsrLayoutMetrics.scrollBottom(context))),
+            child: SizedBox(height: PulsrLayoutMetrics.scrollBottom(context)),
+          ),
         ],
       ),
     );
   }
 }
 
-({List<String> artists, List<String> albums}) _deriveNames(
-    List<SongsTableData> results) {
-  final artists = <String>[];
-  final albums = <String>[];
+class _DerivedEntity {
+  final String name;
+  final int songId;
+  final int? albumId;
+  final String? artworkUrl;
+
+  const _DerivedEntity({
+    required this.name,
+    required this.songId,
+    this.albumId,
+    this.artworkUrl,
+  });
+}
+
+({List<_DerivedEntity> artists, List<_DerivedEntity> albums}) _deriveEntities(
+  List<SongsTableData> results,
+) {
+  final artists = <_DerivedEntity>[];
+  final albums = <_DerivedEntity>[];
   final seenA = <String>{};
   final seenB = <String>{};
   for (final s in results) {
     final a = s.artist.trim();
-    if (a.isNotEmpty && seenA.add(a.toLowerCase())) artists.add(a);
+    if (a.isNotEmpty && seenA.add(a.toLowerCase())) {
+      artists.add(
+        _DerivedEntity(
+          name: a,
+          songId: s.id,
+          albumId: s.albumId,
+          artworkUrl: s.remoteArtworkUrl ?? s.artworkUri,
+        ),
+      );
+    }
     final b = s.album.trim();
-    if (b.isNotEmpty && seenB.add(b.toLowerCase())) albums.add(b);
+    if (b.isNotEmpty && seenB.add(b.toLowerCase())) {
+      albums.add(
+        _DerivedEntity(
+          name: b,
+          songId: s.id,
+          albumId: s.albumId,
+          artworkUrl: s.remoteArtworkUrl ?? s.artworkUri,
+        ),
+      );
+    }
   }
   return (artists: artists, albums: albums);
 }
 
-/// Horizontal rail of artist / album cards.
+/// Horizontal rail of artist / album cards with representative artwork.
 class _EntityRail extends StatelessWidget {
-  final List<String> names;
-  final IconData icon;
+  final List<_DerivedEntity> entities;
+  final String query;
   final bool round;
   final ValueChanged<String> onTap;
 
   const _EntityRail({
-    required this.names,
-    required this.icon,
+    required this.entities,
+    required this.query,
     required this.round,
     required this.onTap,
   });
@@ -1295,54 +1581,72 @@ class _EntityRail extends StatelessWidget {
     final p = context.palette;
     final scale = MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0);
     return SizedBox(
-      height: 118 + (scale - 1.0) * 30,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.symmetric(
+      height: 124 + (scale - 1.0) * 30,
+      child: PulsrScrollEdgeFade(
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(
             horizontal: Adaptive.pagePadding(context),
-            vertical: AppSpacing.xxs),
-        itemCount: names.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
-        itemBuilder: (context, i) {
-          final name = names[i];
-          return InkWell(
-            borderRadius: AppRadii.circular(12),
-            onTap: () => onTap(name),
-            child: SizedBox(
-              width: 76,
-              child: Column(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.15),
-                      shape: round ? BoxShape.circle : BoxShape.rectangle,
-                      borderRadius: round ? null : AppRadii.circular(16),
-                      border: Border.all(
-                        color: p.accent.withValues(alpha: 0.28),
-                        width: 1.0,
+            vertical: AppSpacing.xxs,
+          ),
+          itemCount: entities.length,
+          separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+          itemBuilder: (context, i) {
+            final item = entities[i];
+            return InkWell(
+              borderRadius: AppRadii.r16All,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onTap(item.name);
+              },
+              child: Container(
+                width: 88,
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer.withValues(alpha: 0.55),
+                  borderRadius: AppRadii.r16All,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: CachedArtwork(
+                        id: item.songId,
+                        remoteUrl: item.artworkUrl,
+                        albumId: item.albumId,
+                        type: ArtworkType.AUDIO,
+                        size: 56,
+                        borderRadius: round ? 28 : 14,
                       ),
                     ),
-                    child: Icon(icon, color: p.accent, size: 26),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    name,
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    const SizedBox(height: AppSpacing.xs),
+                    PulsrHighlightedText(
+                      text: item.name,
+                      query: query,
+                      baseStyle: TextStyle(
                         color: p.textPrimary,
                         fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ],
+                        fontWeight: FontWeight.w600,
+                      ),
+                      matchStyle: TextStyle(
+                        color: p.accent,
+                        fontSize: AppFontSize.label,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -1353,11 +1657,15 @@ class _UnifiedSearchResults extends StatefulWidget {
   final String query;
   final VoidCallback onClear;
   final VoidCallback onCommit;
+  final ValueChanged<String> onOpenArtist;
+  final ValueChanged<String> onOpenAlbum;
 
   const _UnifiedSearchResults({
     required this.query,
     required this.onClear,
     required this.onCommit,
+    required this.onOpenArtist,
+    required this.onOpenAlbum,
   });
 
   @override
@@ -1373,7 +1681,6 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
   @override
   void didUpdateWidget(covariant _UnifiedSearchResults old) {
     super.didUpdateWidget(old);
-    // A new query starts collapsed again.
     if (old.query != widget.query) {
       _expandLocal = false;
       _expandOnline = false;
@@ -1410,8 +1717,6 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                 subtitle: '${context.l10n.noResultsSubtitle} "${widget.query}"',
                 primaryActionLabel: context.l10n.clearSearchQuery,
                 primaryActionIcon: Icons.backspace_rounded,
-                // BUG FIX: this used to clear only the cubits and left the
-                // text in the field, so the button looked dead.
                 onPrimaryAction: widget.onClear,
               );
             }
@@ -1426,6 +1731,15 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                 ? onlineSongs.length
                 : onlineSongs.length.clamp(0, _onlinePreview);
 
+            final filter = local.selectedFilter;
+            final entities = _deriveEntities(localSongs);
+            final artists = (filter == 'All' || filter == 'Artists')
+                ? entities.artists.take(8).toList()
+                : const <_DerivedEntity>[];
+            final albums = (filter == 'All' || filter == 'Albums')
+                ? entities.albums.take(8).toList()
+                : const <_DerivedEntity>[];
+
             return RefreshIndicator(
               color: p.accent,
               backgroundColor: p.surfaceContainer,
@@ -1437,13 +1751,49 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics()),
+                  parent: BouncingScrollPhysics(),
+                ),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: EdgeInsets.only(
-                    bottom: PulsrLayoutMetrics.scrollBottom(context),
-                    top: AppSpacing.xxs),
+                  bottom: PulsrLayoutMetrics.scrollBottom(context),
+                  top: AppSpacing.xxs,
+                ),
                 children: [
+                  if (artists.isNotEmpty) ...[
+                    _buildSectionHeader(
+                      context: context,
+                      icon: Icons.person_rounded,
+                      title: context.l10n.artists,
+                      count: entities.artists.length,
+                      isLoading: false,
+                      p: p,
+                    ),
+                    _EntityRail(
+                      entities: artists,
+                      query: widget.query,
+                      round: true,
+                      onTap: widget.onOpenArtist,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ],
+                  if (albums.isNotEmpty) ...[
+                    _buildSectionHeader(
+                      context: context,
+                      icon: Icons.album_rounded,
+                      title: context.l10n.albums,
+                      count: entities.albums.length,
+                      isLoading: false,
+                      p: p,
+                    ),
+                    _EntityRail(
+                      entities: albums,
+                      query: widget.query,
+                      round: false,
+                      onTap: widget.onOpenAlbum,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ],
                   _buildSectionHeader(
                     context: context,
                     icon: Icons.library_music_rounded,
@@ -1452,7 +1802,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     isLoading: local.isLoading,
                     p: p,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.xxs),
                   if (local.errorMessage != null && localSongs.isEmpty)
                     _buildErrorSectionCard(
                       context: context,
@@ -1499,26 +1849,20 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                         valueListenable:
                             context.read<SearchCubit>().hasMoreResults,
                         builder: (context, hasMore, _) => hasMore
-                            ? TextButton.icon(
+                            ? _ShowMoreButton(
+                                expanded: false,
                                 onPressed: () => context
                                     .read<SearchCubit>()
                                     .showMoreResults(),
-                                icon: Icon(Icons.expand_more_rounded,
-                                    size: 18, color: p.accent),
-                                label: Text(
-                                  context.l10n.showMore,
-                                  style: TextStyle(
-                                      color: p.accent,
-                                      fontSize: AppFontSize.caption,
-                                      fontWeight: FontWeight.w700),
-                                ),
                               )
                             : const SizedBox.shrink(),
                       ),
                   ],
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Divider(color: p.hairline, height: 1),
                   ),
                   _buildSectionHeader(
@@ -1529,7 +1873,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     isLoading: ytm.isLoading,
                     p: p,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.xxs),
                   if (isOffline)
                     _buildEmptySectionCard(
                       context: context,
@@ -1572,6 +1916,10 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                               .recordPlayedSong(onlineSongs[i]);
                           player.playSong(onlineSongs[i], queue: onlineSongs);
                         },
+                        onLongPress: () => SongOptionsSheet.show(
+                          context,
+                          song: onlineSongs[i],
+                        ),
                         trailing: YtmDownloadButton(song: onlineSongs[i]),
                       ),
                     if (onlineSongs.length > _onlinePreview)
@@ -1603,21 +1951,46 @@ class _ShowMoreButton extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-        child: TextButton.icon(
-          onPressed: onPressed,
-          icon: Icon(
-            expanded
-                ? Icons.keyboard_arrow_up_rounded
-                : Icons.keyboard_arrow_down_rounded,
-            size: 18,
-            color: p.accent,
-          ),
-          label: Text(
-            expanded ? context.l10n.showLess : context.l10n.showMore,
-            style: TextStyle(
-                color: p.accent,
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w700),
+        child: Material(
+          color: p.surfaceContainer,
+          borderRadius: AppRadii.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onPressed();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.s6,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: AppRadii.circular(20),
+                border: Border.all(color: p.hairline),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: p.accent,
+                  ),
+                  const SizedBox(width: AppSpacing.s6),
+                  Text(
+                    expanded ? context.l10n.showLess : context.l10n.showMore,
+                    style: TextStyle(
+                      color: p.accent,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -1637,11 +2010,19 @@ Widget _buildSectionHeader({
   return Padding(
     padding: EdgeInsets.symmetric(
       horizontal: Adaptive.pagePadding(context),
-      vertical: AppSpacing.xxs,
+      vertical: AppSpacing.xs,
     ),
     child: Row(
       children: [
-        Icon(icon, size: 18, color: p.accent),
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: p.accent.withValues(alpha: 0.14),
+            borderRadius: AppRadii.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: p.accent),
+        ),
         const SizedBox(width: AppSpacing.s8),
         Text(
           title,
@@ -1664,7 +2045,9 @@ Widget _buildSectionHeader({
         else
           Container(
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s8, vertical: AppSpacing.xxs),
+              horizontal: AppSpacing.s8,
+              vertical: AppSpacing.s2,
+            ),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.r12All,
@@ -1676,6 +2059,7 @@ Widget _buildSectionHeader({
                 fontSize: AppFontSize.tiny,
                 fontWeight: FontWeight.w700,
                 color: p.textSecondary,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),
@@ -1696,7 +2080,9 @@ Widget _buildEmptySectionCard({
       vertical: AppSpacing.xs,
     ),
     padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      horizontal: AppSpacing.md,
+      vertical: AppSpacing.sm,
+    ),
     decoration: BoxDecoration(
       color: p.surfaceContainer.withValues(alpha: 0.5),
       borderRadius: AppRadii.r12All,
@@ -1710,9 +2096,10 @@ Widget _buildEmptySectionCard({
           child: Text(
             message,
             style: TextStyle(
-                fontSize: AppFontSize.caption,
-                color: p.textSecondary,
-                fontWeight: FontWeight.w500),
+              fontSize: AppFontSize.caption,
+              color: p.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -1747,7 +2134,9 @@ Widget _buildErrorSectionCard({
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-                fontSize: AppFontSize.caption, color: p.textSecondary),
+              fontSize: AppFontSize.caption,
+              color: p.textSecondary,
+            ),
           ),
         ),
         const SizedBox(width: AppSpacing.xs),
@@ -1756,9 +2145,10 @@ Widget _buildErrorSectionCard({
           child: Text(
             context.l10n.tryAgain,
             style: TextStyle(
-                color: p.accent,
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w700),
+              color: p.accent,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -1790,7 +2180,7 @@ Widget _buildRecentSectionHeader({
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: AppFontSize.tiny,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: AppTracking.wide,
                     color: p.textTertiary,
                   ),
@@ -1808,9 +2198,10 @@ Widget _buildRecentSectionHeader({
           child: Text(
             context.l10n.clear,
             style: TextStyle(
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w600,
-                color: p.accent),
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w700,
+              color: p.accent,
+            ),
           ),
         ),
       ],
@@ -1819,8 +2210,6 @@ Widget _buildRecentSectionHeader({
 }
 
 // ==================== ONLINE TAB ====================
-/// Live YouTube Music results with per-row download controls. Only mounted in
-/// an ENABLE_YTM build, under the providers created by [SearchScreen].
 class _OnlineResults extends StatelessWidget {
   final ValueChanged<String>? onSelectTag;
 
@@ -1847,7 +2236,8 @@ class _OnlineResults extends StatelessWidget {
 
         if ((state.isLoading || pending) && state.results.isEmpty) {
           return const SkeletonList(
-              padding: EdgeInsets.only(top: AppSpacing.xs));
+            padding: EdgeInsets.only(top: AppSpacing.xs),
+          );
         }
 
         if (state.errorMessage != null) {
@@ -1874,44 +2264,55 @@ class _OnlineResults extends StatelessWidget {
           return Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.xl,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.travel_explore_rounded,
-                      size: 48, color: p.textTertiary),
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.travel_explore_rounded,
+                      size: 32,
+                      color: p.accent,
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     context.l10n.searchYtm,
                     style: TextStyle(
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w800,
-                        color: p.textPrimary),
+                      fontSize: AppFontSize.title,
+                      fontWeight: FontWeight.w800,
+                      color: p.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.s6),
                   Text(
                     context.l10n.ytmSearchDesc,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.bodySmall),
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.bodySmall,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
                     alignment: WrapAlignment.center,
                     children: [
                       for (final tag in _onlineTags)
-                        ActionChip(
-                          label: Text(_localizedTag(context, tag)),
-                          backgroundColor: p.surfaceContainer,
-                          side: BorderSide(color: p.hairline),
-                          labelStyle: TextStyle(
-                              color: p.accent,
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w700),
-                          onPressed: () => onSelectTag?.call(tag),
+                        PulsrChip(
+                          icon: Icons.trending_up_rounded,
+                          label: _localizedTag(context, tag),
+                          variant: PulsrChipVariant.action,
+                          onTap: () => onSelectTag?.call(tag),
                         ),
                     ],
                   ),
@@ -1932,13 +2333,15 @@ class _OnlineResults extends StatelessWidget {
           },
           child: ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics()),
+              parent: BouncingScrollPhysics(),
+            ),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             addAutomaticKeepAlives: false,
             addRepaintBoundaries: true,
             padding: EdgeInsets.only(
-                bottom: PulsrLayoutMetrics.scrollBottom(context),
-                top: AppSpacing.xxs),
+              bottom: PulsrLayoutMetrics.scrollBottom(context),
+              top: AppSpacing.xxs,
+            ),
             itemCount: songs.length,
             itemBuilder: (context, index) {
               final song = songs[index];
@@ -1950,6 +2353,7 @@ class _OnlineResults extends StatelessWidget {
                   context.read<SearchCubit>().recordPlayedSong(song);
                   playerCubit.playSong(song, queue: songs);
                 },
+                onLongPress: () => SongOptionsSheet.show(context, song: song),
                 trailing: YtmDownloadButton(song: song),
               );
             },

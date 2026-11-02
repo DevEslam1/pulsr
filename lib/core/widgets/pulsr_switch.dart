@@ -1,14 +1,15 @@
 // lib/core/widgets/pulsr_switch.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
 import '../motion/pulsr_motion.dart';
 import '../services/sound_feedback_service.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
 
 /// {@category DesignSystem}
 enum PulsrSwitchSize {
@@ -20,8 +21,9 @@ enum PulsrSwitchSize {
 ///
 /// Features:
 /// - Smooth spring motion on track fill and thumb slide
+/// - Inward thumb stretch on press down (never overflows track bounds)
 /// - Dynamic luminous glow when active
-/// - Hairline border when inactive for crisp contrast on dark/light surfaces
+/// - Specular hairline border when inactive for crisp contrast on dark/light surfaces
 /// - Tactile micro-haptics on toggle
 /// - Full accessibility semantics and Reduce Motion support
 class PulsrSwitch extends StatefulWidget {
@@ -129,13 +131,19 @@ class _PulsrSwitchState extends State<PulsrSwitch>
         (p.isDark ? AppColors.specularAt(0.10) : AppColors.scrimAt(0.08));
     final thumbFill = widget.thumbColor ?? Colors.white;
 
-    final thumbRadius = (widget.height - 6.0) / 2.0;
-    final maxSlide = widget.width - widget.height;
-    final direction =
+    const double trackPadding = 3.0;
+    final double thumbDiameter = widget.height - (trackPadding * 2.0);
+    final double stretchWidth =
+        _isPressed ? thumbDiameter * 1.22 : thumbDiameter;
+    final double stretchDelta = stretchWidth - thumbDiameter;
+    final double maxSlide = widget.width - widget.height;
+    final double direction =
         Directionality.of(context) == TextDirection.rtl ? -1.0 : 1.0;
 
     return FocusableActionDetector(
       enabled: isEnabled,
+      mouseCursor:
+          isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
         SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
@@ -179,30 +187,47 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                 child: AnimatedBuilder(
                   animation: _controller,
                   builder: (context, _) {
-                    final t = _controller.value;
+                    final t = _controller.value.clamp(0.0, 1.0);
+                    final slideT = _slideAnimation.value;
                     final currentColor =
                         Color.lerp(inactiveFill, activeFill, t)!;
+                    final topTrackColor = Color.lerp(
+                      currentColor,
+                      Colors.white,
+                      0.08 * t,
+                    )!;
+
+                    // Compensate for thumb width expansion when at the active end
+                    // so the thumb stretches inward instead of overflowing the track.
+                    final double slideX = (slideT * maxSlide) -
+                        (slideT.clamp(0.0, 1.0) * stretchDelta);
 
                     return Container(
                       width: widget.width,
                       height: widget.height,
-                      padding: const EdgeInsets.all(3.0),
+                      padding: const EdgeInsets.all(trackPadding),
                       decoration: BoxDecoration(
                         borderRadius: AppRadii.circular(widget.height / 2.0),
-                        color: currentColor,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [topTrackColor, currentColor],
+                        ),
                         border: Border.all(
                           color: _focused
                               ? p.accent
                               : t > 0.5
-                                  ? activeFill.withValues(alpha: 0.20)
-                                  : p.hairline,
+                                  ? Colors.white.withValues(alpha: 0.22 * t)
+                                  : (p.isDark
+                                      ? AppColors.specularAt(0.14)
+                                      : p.hairline),
                           width: _focused ? 2.0 : 1.0,
                         ),
                         boxShadow: t > 0.01
                             ? [
                                 BoxShadow(
-                                  color: activeFill.withValues(alpha: 0.30 * t),
-                                  blurRadius: 10 * t,
+                                  color: activeFill.withValues(alpha: 0.34 * t),
+                                  blurRadius: 12 * t,
                                   spreadRadius: -1 * t,
                                   offset: Offset(0, 2 * t),
                                 ),
@@ -212,21 +237,24 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Transform.translate(
-                          offset: Offset(
-                              direction * _slideAnimation.value * maxSlide, 0),
+                          offset: Offset(direction * slideX, 0),
                           child: AnimatedContainer(
-                            duration: context.motionMs(140),
-                            width: _isPressed
-                                ? thumbRadius * 2.3
-                                : thumbRadius * 2.0,
-                            height: thumbRadius * 2.0,
+                            duration: context.motionMs(130),
+                            curve: Curves.easeOutCubic,
+                            width: stretchWidth,
+                            height: thumbDiameter,
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
+                              borderRadius:
+                                  AppRadii.circular(thumbDiameter / 2.0),
                               color: thumbFill,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.90),
+                                width: 0.8,
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.scrimAt(0.22),
-                                  blurRadius: 4.0,
+                                  color: AppColors.scrimAt(0.26),
+                                  blurRadius: 4.5,
                                   offset: const Offset(0, 1.5),
                                 ),
                               ],
@@ -281,7 +309,9 @@ class PulsrSwitchListTile extends StatelessWidget {
       child: Padding(
         padding: contentPadding ??
             const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: AppSpacing.s10),
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.s10,
+            ),
         child: Row(
           children: [
             if (leading != null) ...[
@@ -309,14 +339,29 @@ class PulsrSwitchListTile extends StatelessWidget {
                       if (onInfoTap != null) ...[
                         const SizedBox(width: AppSpacing.s6),
                         GestureDetector(
-                          onTap: onInfoTap,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            onInfoTap!();
+                          },
                           behavior: HitTestBehavior.opaque,
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.s2),
+                          child: Container(
+                            padding: const EdgeInsets.all(3.5),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: p.isDark
+                                  ? AppColors.specularAt(0.07)
+                                  : p.surfaceContainerHigh,
+                              border: Border.all(
+                                color: p.isDark
+                                    ? AppColors.specularAt(0.12)
+                                    : p.hairline,
+                                width: 0.8,
+                              ),
+                            ),
                             child: Icon(
                               Icons.info_outline_rounded,
-                              size: 16,
-                              color: p.textTertiary,
+                              size: 13.5,
+                              color: p.textSecondary,
                             ),
                           ),
                         ),
@@ -329,19 +374,33 @@ class PulsrSwitchListTile extends StatelessWidget {
                       style: TextStyle(
                         fontSize: AppFontSize.label,
                         color: p.textSecondary,
-                        height: 1.3,
+                        height: 1.32,
                       ),
                       child: subtitle!,
                     ),
                   ],
                   if (disabledReason != null) ...[
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      disabledReason!,
-                      style: TextStyle(
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w600,
-                        color: p.error,
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: p.error.withValues(alpha: 0.12),
+                        borderRadius: AppRadii.r8All,
+                        border: Border.all(
+                          color: p.error.withValues(alpha: 0.32),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Text(
+                        disabledReason!,
+                        style: TextStyle(
+                          fontSize: AppFontSize.tiny,
+                          fontWeight: FontWeight.w700,
+                          color: p.error,
+                        ),
                       ),
                     ),
                   ],

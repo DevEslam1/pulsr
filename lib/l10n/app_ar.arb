@@ -4596,6 +4596,10 @@
   "quranRepeatAyah": "تكرار الآية",
   "quranRepeatRange": "تكرار النطاق",
   "quranRepeatOff": "التكرار: متوقف",
+  "ambientSounds": "الأصوات المحيطة",
+  "ambientSoundsDesc": "صوت خلفي مريح أثناء الاستماع",
+  "ambientSoundVolume": "مستوى الصوت",
+  "ambientSoundError": "تعذر تحميل الصوت المحيط. تحقق من اتصالك.",
   "batchCappedTracks": "{count, plural, =1{تم تخطي مسار واحد (حد الدفعة)} other{تم تخطي {count} مسارات (حد الدفعة)}}",
   "@batchCappedTracks": {
     "description": "لاحقة إشعار تنزيل الدفعة للمسارات غير المضافة بسبب حد الدفعة",

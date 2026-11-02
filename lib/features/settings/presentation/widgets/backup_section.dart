@@ -64,8 +64,6 @@ class _BackupSectionState extends State<BackupSection> {
       final outputUri = await FilePicker.saveFile(
         dialogTitle: l10n.exportBackupDialogTitle,
         fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: ['json'],
         bytes: bytes,
       );
 

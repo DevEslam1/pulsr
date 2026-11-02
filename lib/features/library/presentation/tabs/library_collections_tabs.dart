@@ -1,3 +1,4 @@
+// lib/features/library/presentation/tabs/library_collections_tabs.dart
 // ignore_for_file: unused_element_parameter
 part of '../library_screen.dart';
 
@@ -10,8 +11,12 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     if (albums.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-              16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            Adaptive.pagePadding(context),
+            AppSpacing.md,
+            Adaptive.pagePadding(context),
+            PulsrLayoutMetrics.scrollBottom(context),
+          ),
         );
       }
       return _buildEmpty(
@@ -39,116 +44,203 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         child: isGrid
             ? GridView.builder(
                 key: const ValueKey('albums_grid'),
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
                 padding: EdgeInsetsDirectional.fromSTEB(
-                    Adaptive.pagePadding(context),
-                    16,
-                    Adaptive.pagePadding(context),
-                    160),
+                  Adaptive.pagePadding(context),
+                  AppSpacing.md,
+                  Adaptive.pagePadding(context),
+                  PulsrLayoutMetrics.scrollBottom(context),
+                ),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount:
                       PulsrAdaptiveGrid.columns(context, type: GridType.albums),
                   crossAxisSpacing: 14,
-                  mainAxisSpacing: 18,
+                  mainAxisSpacing: 16,
                   childAspectRatio: 0.78,
                 ),
                 itemCount: albums.length,
                 itemBuilder: (context, index) {
                   final album = albums[index];
                   return StaggeredReveal(
-                      index: index,
-                      groupKey: '${state.sortBy}-${state.ascending}',
+                    index: index,
+                    groupKey: '${state.sortBy}-${state.ascending}',
+                    child: Material(
+                      color: p.surfaceCard,
+                      borderRadius: AppRadii.r18All,
+                      clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         borderRadius: AppRadii.r18All,
                         onTap: () => context.pushDebounced(
-                            '/album?id=${album.id}',
-                            extra: album),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Hero(
-                                tag: 'album_${album.id}',
-                                child: CachedArtwork(
-                                    id: album.id,
-                                    type: ArtworkType.ALBUM,
-                                    remoteUrl: album.artworkUri,
-                                    size: double.infinity,
-                                    borderRadius: 18),
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(album.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.bodySmall)),
-                            const SizedBox(height: AppSpacing.s2),
-                            Text(
-                                '${album.artist} • ${context.l10n.tracksCount(album.songCount)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label)),
-                          ],
+                          '/album?id=${album.id}',
+                          extra: album,
                         ),
-                      ));
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadii.r18All,
+                            border: Border.all(
+                              color: p.hairline.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: Hero(
+                                        tag: 'album_${album.id}',
+                                        child: CachedArtwork(
+                                          id: album.id,
+                                          type: ArtworkType.ALBUM,
+                                          remoteUrl: album.artworkUri,
+                                          size: double.infinity,
+                                          borderRadius: 17,
+                                        ),
+                                      ),
+                                    ),
+                                    if (album.songCount > 0)
+                                      PositionedDirectional(
+                                        end: 8,
+                                        bottom: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.scrimAt(0.65),
+                                            borderRadius: AppRadii.r6All,
+                                          ),
+                                          child: Text(
+                                            '${album.songCount}',
+                                            style: const TextStyle(
+                                              fontSize: AppFontSize.tiny,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.xs,
+                                  vertical: AppSpacing.s6,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      album.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppFontSize.bodySmall,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 1),
+                                    Text(
+                                      '${album.artist} • ${context.l10n.tracksCount(album.songCount)}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.label,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
                 },
               )
             : ListView.builder(
                 key: const ValueKey('albums_list'),
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
                 padding: EdgeInsets.only(
-                    bottom: PulsrLayoutMetrics.scrollBottom(context),
-                    top: AppSpacing.xs),
+                  bottom: PulsrLayoutMetrics.scrollBottom(context),
+                  top: AppSpacing.xs,
+                ),
                 itemCount: albums.length,
                 itemBuilder: (context, index) {
                   final album = albums[index];
                   return StaggeredReveal(
-                      index: index,
-                      groupKey: '${state.sortBy}-${state.ascending}',
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: AppSpacing.xxs),
-                        child: Material(
-                          color: p.surfaceContainer,
+                    index: index,
+                    groupKey: '${state.sortBy}-${state.ascending}',
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xxs,
+                      ),
+                      child: Material(
+                        color: p.surfaceCard,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.r16All,
+                          side: BorderSide(color: p.hairline),
+                        ),
+                        child: ListTile(
                           shape: RoundedRectangleBorder(
                             borderRadius: AppRadii.r16All,
-                            side: BorderSide(color: p.hairline),
                           ),
-                          child: ListTile(
-                            leading: CachedArtwork(
-                                id: album.id,
-                                type: ArtworkType.ALBUM,
-                                remoteUrl: album.artworkUri,
-                                size: 48,
-                                borderRadius: 12),
-                            title: Text(album.title,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.body,
-                                    color: p.textPrimary)),
-                            subtitle: Text(
-                                '${album.artist} • ${context.l10n.tracksCount(album.songCount)}',
-                                style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label)),
-                            trailing: Icon(Icons.chevron_right_rounded,
-                                color: p.textTertiary),
-                            onTap: () => context.pushDebounced(
-                                '/album?id=${album.id}',
-                                extra: album),
+                          leading: Hero(
+                            tag: 'album_${album.id}',
+                            child: CachedArtwork(
+                              id: album.id,
+                              type: ArtworkType.ALBUM,
+                              remoteUrl: album.artworkUri,
+                              size: 48,
+                              borderRadius: 12,
+                            ),
+                          ),
+                          title: Text(
+                            album.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppFontSize.body,
+                              color: p.textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${album.artist} • ${context.l10n.tracksCount(album.songCount)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.label,
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right_rounded,
+                            color: p.textTertiary,
+                          ),
+                          onTap: () => context.pushDebounced(
+                            '/album?id=${album.id}',
+                            extra: album,
                           ),
                         ),
-                      ));
+                      ),
+                    ),
+                  );
                 },
               ),
       ),
@@ -163,8 +255,12 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     if (artists.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-              16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            Adaptive.pagePadding(context),
+            AppSpacing.md,
+            Adaptive.pagePadding(context),
+            PulsrLayoutMetrics.scrollBottom(context),
+          ),
         );
       }
       return _buildEmpty(
@@ -192,109 +288,159 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         child: isGrid
             ? GridView.builder(
                 key: const ValueKey('artists_grid_view'),
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
                 padding: EdgeInsetsDirectional.fromSTEB(
-                    Adaptive.pagePadding(context),
-                    16,
-                    Adaptive.pagePadding(context),
-                    160),
+                  Adaptive.pagePadding(context),
+                  AppSpacing.md,
+                  Adaptive.pagePadding(context),
+                  PulsrLayoutMetrics.scrollBottom(context),
+                ),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: PulsrAdaptiveGrid.columns(context,
-                      type: GridType.artists),
+                  crossAxisCount: PulsrAdaptiveGrid.columns(
+                    context,
+                    type: GridType.artists,
+                  ),
                   crossAxisSpacing: 14,
-                  mainAxisSpacing: 18,
-                  childAspectRatio: 0.82,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.80,
                 ),
                 itemCount: artists.length,
                 itemBuilder: (context, index) {
                   final artist = artists[index];
                   return StaggeredReveal(
-                      index: index,
-                      groupKey: '${state.sortBy}-${state.ascending}',
+                    index: index,
+                    groupKey: '${state.sortBy}-${state.ascending}',
+                    child: Material(
+                      color: p.surfaceCard,
+                      borderRadius: AppRadii.r18All,
+                      clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         borderRadius: AppRadii.r18All,
                         onTap: () => context.pushDebounced(
-                            '/artist?id=${artist.id}',
-                            extra: artist),
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: CachedArtwork(
+                          '/artist?id=${artist.id}',
+                          extra: artist,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.s10),
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadii.r18All,
+                            border: Border.all(
+                              color: p.hairline.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: CachedArtwork(
                                   id: artist.id,
                                   type: ArtworkType.ARTIST,
                                   size: double.infinity,
                                   borderRadius: 999,
-                                  fallbackIcon: Icons.person_rounded),
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(artist.name,
+                                  fallbackIcon: Icons.person_rounded,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                artist.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.bodySmall)),
-                            Text(context.l10n.tracksCount(artist.songCount),
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: AppFontSize.bodySmall,
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                context.l10n.tracksCount(artist.songCount),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.caption)),
-                          ],
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.caption,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ));
+                      ),
+                    ),
+                  );
                 },
               )
             : ListView.builder(
                 key: const ValueKey('artists_list_view'),
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
                 padding: EdgeInsets.only(
-                    bottom: PulsrLayoutMetrics.scrollBottom(context),
-                    top: AppSpacing.xs),
+                  bottom: PulsrLayoutMetrics.scrollBottom(context),
+                  top: AppSpacing.xs,
+                ),
                 itemCount: artists.length,
                 itemBuilder: (context, index) {
                   final artist = artists[index];
                   return StaggeredReveal(
-                      index: index,
-                      groupKey: '${state.sortBy}-${state.ascending}',
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: AppSpacing.xxs),
-                        child: Material(
-                          color: p.surfaceContainer,
+                    index: index,
+                    groupKey: '${state.sortBy}-${state.ascending}',
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xxs,
+                      ),
+                      child: Material(
+                        color: p.surfaceCard,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.r16All,
+                          side: BorderSide(color: p.hairline),
+                        ),
+                        child: ListTile(
                           shape: RoundedRectangleBorder(
                             borderRadius: AppRadii.r16All,
-                            side: BorderSide(color: p.hairline),
                           ),
-                          child: ListTile(
-                            leading: CachedArtwork(
-                                id: artist.id,
-                                type: ArtworkType.ARTIST,
-                                size: 48,
-                                borderRadius: 999,
-                                fallbackIcon: Icons.person_rounded),
-                            title: Text(artist.name,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.body,
-                                    color: p.textPrimary)),
-                            subtitle: Text(
-                                context.l10n.tracksCount(artist.songCount),
-                                style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label)),
-                            trailing: Icon(Icons.chevron_right_rounded,
-                                color: p.textTertiary),
-                            onTap: () => context.pushDebounced(
-                                '/artist?id=${artist.id}',
-                                extra: artist),
+                          leading: CachedArtwork(
+                            id: artist.id,
+                            type: ArtworkType.ARTIST,
+                            size: 48,
+                            borderRadius: 999,
+                            fallbackIcon: Icons.person_rounded,
+                          ),
+                          title: Text(
+                            artist.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppFontSize.body,
+                              color: p.textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            context.l10n.tracksCount(artist.songCount),
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.label,
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right_rounded,
+                            color: p.textTertiary,
+                          ),
+                          onTap: () => context.pushDebounced(
+                            '/artist?id=${artist.id}',
+                            extra: artist,
                           ),
                         ),
-                      ));
+                      ),
+                    ),
+                  );
                 },
               ),
       ),
@@ -303,16 +449,59 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
 
   // ================= FOLDERS / GENRES / YEARS =================
   Widget _buildFoldersTab(BuildContext context) {
+    final p = context.palette;
     return Column(
       children: [
-        _buildLayoutToggleHeader(
-          context,
-          hierarchySelected: _folderTree,
-          flatLabel: context.l10n.browseList,
-          hierarchyLabel: context.l10n.browseTree,
-          flatIcon: Icons.view_list_rounded,
-          hierarchyIcon: Icons.account_tree_rounded,
-          onChanged: _setFolderTree,
+        BlocBuilder<LibraryCubit, LibraryState>(
+          buildWhen: (prev, curr) => prev.folders.length != curr.folders.length,
+          builder: (context, state) {
+            final count = state.folders.length;
+            final countLabel = count == 1
+                ? '1 ${context.l10n.folders.toLowerCase().replaceAll('s', '')}'
+                : '$count ${context.l10n.folders.toLowerCase()}';
+            return _buildLayoutToggleHeader(
+              context,
+              hierarchySelected: _folderTree,
+              flatLabel: context.l10n.browseList,
+              hierarchyLabel: context.l10n.browseTree,
+              flatIcon: Icons.view_list_rounded,
+              hierarchyIcon: Icons.account_tree_rounded,
+              onChanged: _setFolderTree,
+              leading: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s10,
+                  vertical: AppSpacing.s6,
+                ),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer.withValues(alpha: 0.7),
+                  borderRadius: AppRadii.r12All,
+                  border: Border.all(
+                    color: p.hairline.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.folder_rounded,
+                      size: 15,
+                      color: p.accent,
+                    ),
+                    const SizedBox(width: AppSpacing.s6),
+                    Text(
+                      countLabel,
+                      style: TextStyle(
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
         Expanded(
           child: _folderTree
@@ -330,8 +519,12 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     if (genres.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-              16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            Adaptive.pagePadding(context),
+            AppSpacing.md,
+            Adaptive.pagePadding(context),
+            PulsrLayoutMetrics.scrollBottom(context),
+          ),
         );
       }
       return _buildEmpty(
@@ -352,6 +545,39 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
           flatIcon: Icons.grid_view_rounded,
           hierarchyIcon: Icons.category_rounded,
           onChanged: _setGenreHierarchy,
+          leading: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s10,
+              vertical: AppSpacing.s6,
+            ),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer.withValues(alpha: 0.7),
+              borderRadius: AppRadii.r12All,
+              border: Border.all(
+                color: p.hairline.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.category_rounded,
+                  size: 15,
+                  color: p.accent,
+                ),
+                const SizedBox(width: AppSpacing.s6),
+                Text(
+                  '${genres.length} ${context.l10n.genres.toLowerCase()}',
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w700,
+                    color: p.textPrimary,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         Expanded(
           child: _genreHierarchy
@@ -367,8 +593,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       subtitle: context.l10n.tracksCount(g.songCount),
                       color: p.accent,
                       onTap: () => context.pushDebounced(
-                          '/genre?name=${Uri.encodeComponent(g.name)}',
-                          extra: g),
+                        '/genre?name=${Uri.encodeComponent(g.name)}',
+                        extra: g,
+                      ),
                     );
                   },
                 ),
@@ -385,29 +612,49 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     required IconData flatIcon,
     required IconData hierarchyIcon,
     required ValueChanged<bool> onChanged,
+    Widget? leading,
   }) {
+    final p = context.palette;
     return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(
         Adaptive.pagePadding(context),
-        10,
+        AppSpacing.s8,
         Adaptive.pagePadding(context),
-        2,
+        AppSpacing.xxs,
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          _LayoutToggleButton(
-            icon: flatIcon,
-            label: flatLabel,
-            selected: !hierarchySelected,
-            onTap: () => onChanged(false),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          _LayoutToggleButton(
-            icon: hierarchyIcon,
-            label: hierarchyLabel,
-            selected: hierarchySelected,
-            onTap: () => onChanged(true),
+          if (leading != null) ...[
+            leading,
+            const Spacer(),
+          ] else
+            const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.r12All,
+              border: Border.all(
+                color: p.hairline.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _LayoutToggleButton(
+                  icon: flatIcon,
+                  label: flatLabel,
+                  selected: !hierarchySelected,
+                  onTap: () => onChanged(false),
+                ),
+                _LayoutToggleButton(
+                  icon: hierarchyIcon,
+                  label: hierarchyLabel,
+                  selected: hierarchySelected,
+                  onTap: () => onChanged(true),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -419,8 +666,12 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     if (years.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-              16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            Adaptive.pagePadding(context),
+            AppSpacing.md,
+            Adaptive.pagePadding(context),
+            PulsrLayoutMetrics.scrollBottom(context),
+          ),
         );
       }
       return _buildEmpty(
@@ -446,23 +697,34 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     );
   }
 
-  Widget _chipCategoryGrid(BuildContext context,
-      {required int count,
-      required Widget Function(BuildContext, int) builder}) {
+  Widget _chipCategoryGrid(
+    BuildContext context, {
+    required int count,
+    required Widget Function(BuildContext, int) builder,
+  }) {
     final p = context.palette;
     return RefreshIndicator(
       color: p.accent,
       backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
       child: GridView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         addAutomaticKeepAlives: false,
         addRepaintBoundaries: true,
-        padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-            16, Adaptive.pagePadding(context), 160),
+        padding: EdgeInsetsDirectional.fromSTEB(
+          Adaptive.pagePadding(context),
+          AppSpacing.md,
+          Adaptive.pagePadding(context),
+          PulsrLayoutMetrics.scrollBottom(context),
+        ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(context,
-              minItemWidth: 160, maxColumns: 6),
+          crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(
+            context,
+            minItemWidth: 160,
+            maxColumns: 6,
+          ),
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 3.4,

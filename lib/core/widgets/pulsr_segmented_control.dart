@@ -3,13 +3,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
 
 /// {@category DesignSystem}
 /// One option in a [PulsrSegmentedControl].
@@ -58,13 +59,21 @@ class PulsrSegmentedControl extends StatelessWidget {
     if (slidingIndicator) {
       return Container(
         margin: margin,
-        padding: const EdgeInsets.all(AppSpacing.xxs),
+        padding: const EdgeInsets.all(3.5),
         decoration: BoxDecoration(
           color: p.surfaceContainer,
           borderRadius: AppRadii.r16All,
           border: Border.all(
-            color: p.hairline,
+            color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
+            width: 1.0,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: p.isDark ? 0.22 : 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -95,9 +104,9 @@ class PulsrSegmentedControl extends StatelessWidget {
 
             return Stack(
               children: [
-                // Sliding flat indicator pill
+                // Dimensional sliding studio indicator pill
                 AnimatedPositionedDirectional(
-                  duration: context.motionMs(220),
+                  duration: context.motionMs(240),
                   curve: context.motionCurve(Curves.easeOutCubic),
                   start: fitLabels
                       ? fractionStart(clampedIndex) * innerWidth
@@ -109,9 +118,27 @@ class PulsrSegmentedControl extends StatelessWidget {
                       : segmentWidth,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: p.accent,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color.lerp(p.accent, Colors.white, 0.10) ?? p.accent,
+                          p.accent,
+                        ],
+                      ),
                       borderRadius: AppRadii.r12All,
-                      boxShadow: PulsrElevation.level1(context),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.24),
+                        width: 0.8,
+                      ),
+                      boxShadow: [
+                        ...PulsrElevation.level1(context),
+                        BoxShadow(
+                          color: p.accent.withValues(alpha: 0.28),
+                          blurRadius: 12,
+                          spreadRadius: -2,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -139,7 +166,11 @@ class PulsrSegmentedControl extends StatelessWidget {
                             },
                             child: fitLabels
                                 ? _fitContent(
-                                    context, i, clampedIndex, includeIcons)
+                                    context,
+                                    i,
+                                    clampedIndex,
+                                    includeIcons,
+                                  )
                                 : Padding(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: AppSpacing.xs,
@@ -154,12 +185,17 @@ class PulsrSegmentedControl extends StatelessWidget {
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          Icon(
-                                            segments[i].icon,
-                                            size: 16,
-                                            color: clampedIndex == i
-                                                ? p.onAccent
-                                                : p.textSecondary,
+                                          AnimatedScale(
+                                            scale:
+                                                clampedIndex == i ? 1.06 : 1.0,
+                                            duration: context.motionMs(180),
+                                            child: Icon(
+                                              segments[i].icon,
+                                              size: 16,
+                                              color: clampedIndex == i
+                                                  ? p.onAccent
+                                                  : p.textSecondary,
+                                            ),
                                           ),
                                           const SizedBox(width: AppSpacing.s6),
                                           Flexible(
@@ -198,11 +234,13 @@ class PulsrSegmentedControl extends StatelessWidget {
 
     return Container(
       margin: margin,
-      padding: const EdgeInsets.all(AppSpacing.xxs),
+      padding: const EdgeInsets.all(3.5),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.r16All,
-        border: Border.all(color: p.hairline),
+        border: Border.all(
+          color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
+        ),
       ),
       child: Row(
         children: [
@@ -286,7 +324,9 @@ class PulsrSegmentedControl extends StatelessWidget {
       fit: BoxFit.scaleDown,
       child: Padding(
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.s10,
+        ),
         child: ConstrainedBox(
           constraints:
               const BoxConstraints(minHeight: AppSpacing.minTouchTarget - 20),
@@ -340,13 +380,24 @@ class _SegmentButton extends StatelessWidget {
       duration: context.motionMs(200),
       curve: context.motionCurve(Curves.easeOutCubic),
       padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.s10,
+      ),
       decoration: BoxDecoration(
-        color: isSelected ? p.accentContainer : Colors.transparent,
+        gradient: isSelected
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  p.accent.withValues(alpha: 0.24),
+                  p.accent.withValues(alpha: 0.12),
+                ],
+              )
+            : null,
         borderRadius: AppRadii.r12All,
         border: Border.all(
           color: isSelected
-              ? p.accent.withValues(alpha: 0.38)
+              ? p.accent.withValues(alpha: 0.48)
               : Colors.transparent,
         ),
       ),

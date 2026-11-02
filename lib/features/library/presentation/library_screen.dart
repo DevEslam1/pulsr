@@ -1,56 +1,59 @@
-import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
+// lib/features/library/presentation/library_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/responsive/adaptive_grid.dart';
+import '../../../core/router/safe_navigation.dart';
 import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
-import '../../../core/motion/pulsr_motion.dart';
-import '../../../core/widgets/pulsr_switch.dart';
-import '../../auth/cubit/auth_cubit.dart';
-import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/song_classification.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/pulsr_empty_state.dart';
-import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
-import '../../../core/widgets/song_tile.dart';
-import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
+import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../../core/widgets/pulsr_switch.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
+import '../../../core/widgets/song_tile.dart';
+import '../../../core/widgets/staggered_reveal.dart';
 import '../../../data/db/app_database.dart';
+import '../../auth/cubit/auth_cubit.dart';
+import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/add_to_playlist_sheet.dart';
 import '../../sheets/song_options_sheet.dart';
 import '../../sheets/sort_filter_sheet.dart';
-import '../cubit/library_cubit.dart';
-import '../cubit/library_state.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import '../cubit/library_cubit.dart';
+import '../cubit/library_state.dart';
+import 'library_quality_utils.dart';
 import 'widgets/alphabet_quick_scroll.dart';
 import 'widgets/category_card.dart';
 import 'widgets/folder_browser_tab.dart';
 import 'widgets/folder_tree_browser_tab.dart';
 import 'widgets/genre_hierarchy_view.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
-import '../../../core/utils/error_logger.dart';
-import '../../../core/responsive/adaptive_grid.dart';
-import '../../../core/router/safe_navigation.dart';
+
 part 'tabs/library_songs_tab.dart';
 part 'tabs/library_collections_tabs.dart';
 part 'tabs/library_favorites_tab.dart';
@@ -220,8 +223,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   void _selectAllInCurrentTab(LibraryState state, LibraryCubit cubit) {
     switch (_activeTab) {
       case LibraryTabItem.favorites:
-        final favorites = state.favorites.where((s) =>
-            _favTabFilter == 0 ? !_isOnlineFavorite(s) : _isOnlineFavorite(s));
+        final favorites = state.favorites.where(
+          (s) =>
+              _favTabFilter == 0 ? !_isOnlineFavorite(s) : _isOnlineFavorite(s),
+        );
         cubit.selectSongs(favorites.map((s) => s.id));
       case LibraryTabItem.downloaded:
         cubit.selectSongs(state.downloadedSongs.map((s) => s.id));
@@ -264,8 +269,12 @@ class _LibraryScreenState extends State<LibraryScreen>
         await prefs.setString(_tabNamePrefKey, _activeTabs[index].name);
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to persist library tab index',
-          error: e, stackTrace: st, category: 'Library');
+      ErrorLogger.log(
+        'Failed to persist library tab index',
+        error: e,
+        stackTrace: st,
+        category: 'Library',
+      );
     }
   }
 
@@ -349,8 +358,12 @@ class _LibraryScreenState extends State<LibraryScreen>
         _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
       });
     } catch (e, st) {
-      ErrorLogger.log('Failed to load library preferences',
-          error: e, stackTrace: st, category: 'Library');
+      ErrorLogger.log(
+        'Failed to load library preferences',
+        error: e,
+        stackTrace: st,
+        category: 'Library',
+      );
     }
   }
 
@@ -463,12 +476,18 @@ class _LibraryScreenState extends State<LibraryScreen>
       if (_tabController.index >= 0 &&
           _tabController.index < _activeTabs.length) {
         await prefs.setString(
-            _tabNamePrefKey, _activeTabs[_tabController.index].name);
+          _tabNamePrefKey,
+          _activeTabs[_tabController.index].name,
+        );
         await prefs.setInt(_tabIndexPrefKey, _tabController.index);
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to persist active library tabs',
-          error: e, stackTrace: st, category: 'Library');
+      ErrorLogger.log(
+        'Failed to persist active library tabs',
+        error: e,
+        stackTrace: st,
+        category: 'Library',
+      );
     }
   }
 
@@ -500,8 +519,12 @@ class _LibraryScreenState extends State<LibraryScreen>
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(key, value);
     } catch (e, st) {
-      ErrorLogger.log('Failed to persist layout preference',
-          error: e, stackTrace: st, category: 'Library');
+      ErrorLogger.log(
+        'Failed to persist layout preference',
+        error: e,
+        stackTrace: st,
+        category: 'Library',
+      );
     }
   }
 
@@ -512,8 +535,12 @@ class _LibraryScreenState extends State<LibraryScreen>
       try {
         context.read<LibraryCubit>().loadMoreSongs();
       } catch (e, st) {
-        ErrorLogger.log('Failed to load more songs',
-            error: e, stackTrace: st, category: 'Library');
+        ErrorLogger.log(
+          'Failed to load more songs',
+          error: e,
+          stackTrace: st,
+          category: 'Library',
+        );
       }
     }
   }
@@ -562,12 +589,18 @@ class _LibraryScreenState extends State<LibraryScreen>
               SnackBar(
                 content: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        size: 16, color: Colors.white70),
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      size: 16,
+                      color: Colors.white70,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(error,
-                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                      child: Text(
+                        error,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -588,12 +621,18 @@ class _LibraryScreenState extends State<LibraryScreen>
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded,
-                      size: 16, color: Colors.white70),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child:
-                        Text(msg, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      msg,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -611,34 +650,52 @@ class _LibraryScreenState extends State<LibraryScreen>
         // nothing there. Keep it active only on Songs (and Favorites/Downloads,
         // which share the song ordering).
         final canSort = _activeTab == LibraryTabItem.songs;
+        final isSortedCustom = state.sortBy != 'title' || !state.ascending;
+        final isGridView = state.viewMode == LibraryViewMode.grid;
+        final losslessCount = state.songs.where(isLosslessSong).length;
         final p = context.palette;
 
         return Scaffold(
+          backgroundColor: p.bg,
           appBar: isMultiSelect
               ? AppBar(
-                  backgroundColor: p.background,
+                  backgroundColor: p.bg,
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   leading: IconButton(
                     constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
                     icon: const Icon(Icons.close_rounded),
                     tooltip: context.l10n.close,
                     onPressed: cubit.clearSelection,
                   ),
-                  title: Text(
-                    context.l10n.selectedCount(state.selectedSongIds.length),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
+                  title: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s10,
+                      vertical: AppSpacing.xxs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.14),
+                      borderRadius: AppRadii.r10All,
+                    ),
+                    child: Text(
+                      context.l10n.selectedCount(state.selectedSongIds.length),
+                      style: TextStyle(
+                        color: p.accent,
+                        fontSize: AppFontSize.body,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
                     ),
                   ),
                   actions: [
                     IconButton(
                       constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
                       icon: const Icon(Icons.select_all_rounded),
                       tooltip: context.l10n.selectAllAction,
                       onPressed: () => _selectAllInCurrentTab(state, cubit),
@@ -649,7 +706,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         backgroundColor: p.accent.withValues(alpha: 0.18),
                         foregroundColor: p.accent,
                         shape: RoundedRectangleBorder(
-                          borderRadius: AppRadii.r8All,
+                          borderRadius: AppRadii.r10All,
                         ),
                       ),
                       icon: const Icon(Icons.tune_rounded, size: 18),
@@ -658,7 +715,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       onPressed: () => _showBatchActionsSheet(
-                          context, state, cubit, playerCubit),
+                        context,
+                        state,
+                        cubit,
+                        playerCubit,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                   ],
@@ -667,7 +728,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   backgroundColor: p.bg,
                   elevation: 0,
                   scrolledUnderElevation: 0,
-                  toolbarHeight: 70,
+                  toolbarHeight: 72,
                   titleSpacing: Adaptive.pagePadding(context),
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -683,22 +744,53 @@ class _LibraryScreenState extends State<LibraryScreen>
                         ),
                       ),
                       const SizedBox(height: AppSpacing.s2),
-                      Text(
-                        '${context.l10n.songsCount(state.songs.length)} · '
-                        '${context.l10n.albumsCount(state.albums.length)}',
-                        style: TextStyle(
-                          color: p.textSecondary,
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '${context.l10n.songsCount(state.songs.length)} · '
+                              '${context.l10n.albumsCount(state.albums.length)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          if (losslessCount > 0) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: p.info.withValues(alpha: 0.15),
+                                borderRadius: AppRadii.r4All,
+                              ),
+                              child: Text(
+                                '$losslessCount FLAC/Hi-Res',
+                                style: TextStyle(
+                                  color: p.info,
+                                  fontSize: AppFontSize.tiny,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
                   actions: [
                     IconButton(
                       constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
                       icon: const Icon(Icons.dashboard_customize_rounded),
                       color: p.textSecondary,
                       tooltip:
@@ -707,14 +799,21 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     IconButton(
                       constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
-                      icon: Icon(state.viewMode == LibraryViewMode.list
-                          ? Icons.grid_view_rounded
-                          : Icons.view_list_rounded),
-                      color: state.viewMode == LibraryViewMode.grid
-                          ? p.accent
-                          : p.textSecondary,
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      style: isGridView
+                          ? IconButton.styleFrom(
+                              backgroundColor:
+                                  p.accent.withValues(alpha: 0.14),
+                            )
+                          : null,
+                      icon: Icon(
+                        state.viewMode == LibraryViewMode.list
+                            ? Icons.grid_view_rounded
+                            : Icons.view_list_rounded,
+                      ),
+                      color: isGridView ? p.accent : p.textSecondary,
                       tooltip: state.viewMode == LibraryViewMode.list
                           ? context.l10n.libraryGridView
                           : context.l10n.libraryListView,
@@ -722,12 +821,19 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     IconButton(
                       constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      style: canSort && isSortedCustom
+                          ? IconButton.styleFrom(
+                              backgroundColor:
+                                  p.accent.withValues(alpha: 0.14),
+                            )
+                          : null,
                       icon: const Icon(Icons.sort_rounded),
                       color: !canSort
                           ? p.textTertiary
-                          : (state.sortBy != 'title' || state.ascending)
+                          : isSortedCustom
                               ? p.accent
                               : p.textSecondary,
                       tooltip: context.l10n.sortBy,
@@ -749,7 +855,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                       enabled: true,
                       child: TabBar(
                         key: ValueKey(
-                            "library_tab_bar_${_activeTabs.map((t) => t.name).join('_')}"),
+                          'library_tab_bar_${_activeTabs.map((t) => t.name).join('_')}',
+                        ),
                         controller: _tabController,
                         isScrollable: true,
                         tabAlignment: TabAlignment.start,
@@ -796,8 +903,15 @@ class _LibraryScreenState extends State<LibraryScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: _activeTabs
-                    .map((tab) =>
-                        _buildTabView(context, tab, state, cubit, playerCubit))
+                    .map(
+                      (tab) => _buildTabView(
+                        context,
+                        tab,
+                        state,
+                        cubit,
+                        playerCubit,
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -813,6 +927,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     LibraryState state,
     PulsrPalette p,
   ) {
+    final tabAccent = tab.color(p);
     Widget content;
     switch (tab) {
       case LibraryTabItem.songs:
@@ -832,15 +947,15 @@ class _LibraryScreenState extends State<LibraryScreen>
                   vertical: AppSpacing.s2,
                 ),
                 decoration: BoxDecoration(
-                  color: p.accent.withValues(alpha: 0.18),
-                  borderRadius: AppRadii.r4All,
+                  color: tabAccent.withValues(alpha: 0.18),
+                  borderRadius: AppRadii.r6All,
                 ),
                 child: Text(
                   '$count',
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
-                    color: p.accent,
+                    fontWeight: FontWeight.w800,
+                    color: tabAccent,
                   ),
                 ),
               ),
@@ -868,15 +983,15 @@ class _LibraryScreenState extends State<LibraryScreen>
                   vertical: AppSpacing.s2,
                 ),
                 decoration: BoxDecoration(
-                  color: p.accent.withValues(alpha: 0.18),
-                  borderRadius: AppRadii.r4All,
+                  color: tabAccent.withValues(alpha: 0.18),
+                  borderRadius: AppRadii.r6All,
                 ),
                 child: Text(
                   '$favCount',
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
-                    color: p.accent,
+                    fontWeight: FontWeight.w800,
+                    color: tabAccent,
                   ),
                 ),
               ),
@@ -942,6 +1057,36 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
+  Widget _buildBatchActionTile({
+    required IconData icon,
+    required String title,
+    required Color iconColor,
+    required PulsrPalette p,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return ListTile(
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
+      leading: Container(
+        padding: const EdgeInsets.all(AppSpacing.xs),
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.14),
+          borderRadius: AppRadii.r10All,
+        ),
+        child: Icon(icon, color: iconColor, size: 20),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isDestructive ? p.error : p.textPrimary,
+          fontWeight: isDestructive ? FontWeight.w700 : FontWeight.w600,
+          fontSize: AppFontSize.body,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
   void _showBatchActionsSheet(
     BuildContext context,
     LibraryState state,
@@ -963,102 +1108,139 @@ class _LibraryScreenState extends State<LibraryScreen>
             context.l10n.batchActionsSelected(count),
             style: TextStyle(color: p.textSecondary),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.playlist_add_rounded),
-                title: Text(context.l10n.addToPlaylist),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  final selected = await cubit.getSelectedSongs();
-                  if (!context.mounted) return;
-                  if (selected.isNotEmpty) {
-                    AddToPlaylistSheet.show(
-                      context,
-                      song: selected.first,
-                      songs: selected,
-                    );
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.queue_music_rounded),
-                title: Text(context.l10n.addToQueue),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  final selected = await cubit.getSelectedSongs();
-                  if (!context.mounted) return;
-                  SoundFeedbackService.playSuccess(mirrorHaptics: true);
-                  for (final s in selected) {
-                    playerCubit.addToQueue(s);
-                  }
-                  cubit.clearSelection();
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content:
-                          Text(context.l10n.addedToQueue(selected.length))));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.edit_note_rounded),
-                title: Text(context.l10n.browseBatchEditTags),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  final selected = await cubit.getSelectedSongs();
-                  if (!context.mounted) return;
-                  if (selected.isNotEmpty) {
-                    cubit.clearSelection();
-                    context.push('/tag-editor', extra: selected);
-                  }
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.delete_outline_rounded, color: p.error),
-                title: Text(
-                  context.l10n.delete,
-                  style: TextStyle(
-                    color: p.error,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  final confirmed = await PulsrDialogHelper.showConfirmDialog(
-                    context,
-                    title: context.l10n.delete,
-                    message: context.l10n.deleteMultipleConfirmation(count),
-                    icon: Icons.delete_outline_rounded,
-                    confirmLabel: context.l10n.delete,
-                    cancelLabel: context.l10n.cancel,
-                    isDestructive: true,
-                  );
-                  if (confirmed != true || !context.mounted) return;
-                  SoundFeedbackService.playWarning(mirrorHaptics: true);
-                  final removed = await cubit.deleteSelectedSongs();
-                  if (!context.mounted) return;
-                  if (removed <= 0) {
-                    final err = cubit.state.errorMessage;
-                    if (err != null && err.isNotEmpty) {
-                      ScaffoldMessenger.of(context)
-                        ..clearSnackBars()
-                        ..showSnackBar(SnackBar(
-                          content: Text(context.l10n.failedToDelete(err)),
-                          backgroundColor: p.error,
-                        ));
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildBatchActionTile(
+                  icon: Icons.playlist_play_rounded,
+                  title: context.l10n.playNext,
+                  iconColor: p.accent,
+                  p: p,
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final selected = await cubit.getSelectedSongs();
+                    if (!context.mounted) return;
+                    SoundFeedbackService.playSuccess(mirrorHaptics: true);
+                    for (final s in selected.reversed) {
+                      playerCubit.playNext(s);
                     }
-                    return;
-                  }
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(SnackBar(
-                      content: Text(removed == 1
-                          ? context.l10n.songDeleted
-                          : context.l10n.songsDeleted),
-                    ));
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
+                    cubit.clearSelection();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text(context.l10n.addedToQueue(selected.length)),
+                      ),
+                    );
+                  },
+                ),
+                _buildBatchActionTile(
+                  icon: Icons.queue_music_rounded,
+                  title: context.l10n.addToQueue,
+                  iconColor: p.primary,
+                  p: p,
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final selected = await cubit.getSelectedSongs();
+                    if (!context.mounted) return;
+                    SoundFeedbackService.playSuccess(mirrorHaptics: true);
+                    for (final s in selected) {
+                      playerCubit.addToQueue(s);
+                    }
+                    cubit.clearSelection();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text(context.l10n.addedToQueue(selected.length)),
+                      ),
+                    );
+                  },
+                ),
+                _buildBatchActionTile(
+                  icon: Icons.playlist_add_rounded,
+                  title: context.l10n.addToPlaylist,
+                  iconColor: p.info,
+                  p: p,
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final selected = await cubit.getSelectedSongs();
+                    if (!context.mounted) return;
+                    if (selected.isNotEmpty) {
+                      AddToPlaylistSheet.show(
+                        context,
+                        song: selected.first,
+                        songs: selected,
+                      );
+                    }
+                  },
+                ),
+                _buildBatchActionTile(
+                  icon: Icons.edit_note_rounded,
+                  title: context.l10n.browseBatchEditTags,
+                  iconColor: p.warning,
+                  p: p,
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final selected = await cubit.getSelectedSongs();
+                    if (!context.mounted) return;
+                    if (selected.isNotEmpty) {
+                      cubit.clearSelection();
+                      context.push('/tag-editor', extra: selected);
+                    }
+                  },
+                ),
+                _buildBatchActionTile(
+                  icon: Icons.delete_outline_rounded,
+                  title: context.l10n.delete,
+                  iconColor: p.error,
+                  isDestructive: true,
+                  p: p,
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+                      context,
+                      title: context.l10n.delete,
+                      message: context.l10n.deleteMultipleConfirmation(count),
+                      icon: Icons.delete_outline_rounded,
+                      confirmLabel: context.l10n.delete,
+                      cancelLabel: context.l10n.cancel,
+                      isDestructive: true,
+                    );
+                    if (confirmed != true || !context.mounted) return;
+                    SoundFeedbackService.playWarning(mirrorHaptics: true);
+                    final removed = await cubit.deleteSelectedSongs();
+                    if (!context.mounted) return;
+                    if (removed <= 0) {
+                      final err = cubit.state.errorMessage;
+                      if (err != null && err.isNotEmpty) {
+                        ScaffoldMessenger.of(context)
+                          ..clearSnackBars()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(context.l10n.failedToDelete(err)),
+                              backgroundColor: p.error,
+                            ),
+                          );
+                      }
+                      return;
+                    }
+                    ScaffoldMessenger.of(context)
+                      ..clearSnackBars()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            removed == 1
+                                ? context.l10n.songDeleted
+                                : context.l10n.songsDeleted,
+                          ),
+                        ),
+                      );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+            ),
           ),
         );
       },
@@ -1098,7 +1280,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                         const SizedBox(height: AppSpacing.s2),
                         Text(
                           modalContext.l10n.libraryTabsReorder(
-                              _activeTabs.length, LibraryTabItem.values.length),
+                            _activeTabs.length,
+                            LibraryTabItem.values.length,
+                          ),
                           style: TextStyle(
                             fontSize: AppFontSize.caption,
                             color: p.textSecondary,
@@ -1139,7 +1323,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ),
                   child: ReorderableListView.builder(
                     key: ValueKey(
-                        'reorder_list_${_activeTabs.map((t) => t.name).join('_')}'),
+                      'reorder_list_${_activeTabs.map((t) => t.name).join('_')}',
+                    ),
                     shrinkWrap: true,
                     physics: const BouncingScrollPhysics(),
                     buildDefaultDragHandles: false,
@@ -1188,12 +1373,16 @@ class _LibraryScreenState extends State<LibraryScreen>
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(Icons.add_rounded,
-                                          size: 16, color: p.textSecondary),
+                                      Icon(
+                                        Icons.add_rounded,
+                                        size: 16,
+                                        color: p.textSecondary,
+                                      ),
                                       const SizedBox(width: AppSpacing.xs),
                                       Text(
                                         modalContext.l10n.libraryInactiveTabs(
-                                            inactiveTabs.length),
+                                          inactiveTabs.length,
+                                        ),
                                         style: TextStyle(
                                           color: p.textSecondary,
                                           fontSize: AppFontSize.caption,
@@ -1367,8 +1556,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                 color: itemColor.withValues(alpha: 0.12),
                 borderRadius: AppRadii.r12All,
               ),
-              child: Icon(item.icon,
-                  color: itemColor.withValues(alpha: 0.7), size: 20),
+              child: Icon(
+                item.icon,
+                color: itemColor.withValues(alpha: 0.7),
+                size: 20,
+              ),
             ),
             const SizedBox(width: AppSpacing.s10),
             Expanded(
@@ -1485,35 +1677,50 @@ class _LayoutToggleButton extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: Material(
-        color: selected ? p.accent : p.surfaceContainer,
-        borderRadius: AppRadii.r12All,
-        child: InkWell(
-          borderRadius: AppRadii.r12All,
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: AppSpacing.minTouchTarget,
-              minHeight: AppSpacing.minTouchTarget,
-            ),
+      child: AnimatedContainer(
+        duration: context.motionMs(200),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: selected ? p.accent : Colors.transparent,
+          borderRadius: AppRadii.r10All,
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: p.accent.withValues(alpha: 0.22),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: AppRadii.r10All,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+                horizontal: AppSpacing.s10,
+                vertical: AppSpacing.s6,
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     icon,
-                    size: 16,
+                    size: 15,
                     color: selected ? p.onAccent : p.textSecondary,
                   ),
                   const SizedBox(width: AppSpacing.s6),
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w700,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                       color: selected ? p.onAccent : p.textSecondary,
                     ),
                   ),

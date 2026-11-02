@@ -1,3 +1,4 @@
+// lib/core/widgets/marquee_text.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -330,13 +331,23 @@ class _MarqueeTextState extends State<MarqueeText> {
           );
         }
 
-        // Fade the clipped edge instead of cutting a glyph in half before the
-        // marquee starts. The 1.4 s pause is still enough to read the opening.
+        // Dynamically fade the leading edge once scrolling begins so glyphs
+        // never clip against a hard vertical boundary on either side.
         return Directionality(
           textDirection: effectiveDirection,
-          child: PulsrScrollEdgeFade(
-            extent: 32,
+          child: AnimatedBuilder(
+            animation: _scrollController,
             child: marquee,
+            builder: (context, child) {
+              final offset =
+                  _scrollController.hasClients ? _scrollController.offset : 0.0;
+              final showLeadingFade = offset > 2.0;
+              return PulsrScrollEdgeFade(
+                extent: 28,
+                fadeLeading: showLeadingFade,
+                child: child!,
+              );
+            },
           ),
         );
       },

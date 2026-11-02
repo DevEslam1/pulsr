@@ -4,20 +4,21 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/widgets/gesture_hint_overlay.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
+import 'responsive_player_layout.dart';
 import 'themes/player_theme.dart';
 import 'themes/theme_registry.dart';
-import 'responsive_player_layout.dart';
 import 'widgets/canvas_backdrop.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
@@ -196,40 +197,82 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             _safePop(context);
           },
           child: Scaffold(
-            backgroundColor: bgColor,
-            body: _SwipeDownToDismiss(
-              onDismiss: () => _safePop(context),
-              child: Stack(
-                children: [
-                  if (settingsConfig.canvasEnabled &&
-                      settingsConfig.canvasAsBackdrop)
-                    Positioned.fill(
-                      child: CanvasBackdrop(
-                        song: state.currentSong,
-                        isPlaying: state.isPlaying,
-                        isBackdropMode: true,
+            backgroundColor: Colors.transparent,
+            body: AnimatedContainer(
+              duration: context.motionMs(420),
+              curve: context.motionCurve(Curves.easeOutCubic),
+              color: bgColor,
+              child: _SwipeDownToDismiss(
+                activeColor: activeColor,
+                onDismiss: () => _safePop(context),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (settingsConfig.canvasEnabled &&
+                        settingsConfig.canvasAsBackdrop)
+                      Positioned.fill(
+                        child: CanvasBackdrop(
+                          song: state.currentSong,
+                          isPlaying: state.isPlaying,
+                          isBackdropMode: true,
+                        ),
+                      ),
+
+                    // Subtle top status-bar protection vignette for legibility
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 88,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black
+                                    .withValues(alpha: isDark ? 0.28 : 0.08),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ResponsivePlayerLayout(
-                    state: state,
-                    cubit: cubit,
-                    themeWidget: AnimatedSwitcher(
-                      duration: context.motionMs(350),
-                      switchInCurve: context.motionCurve(Curves.easeInOutCubic),
-                      switchOutCurve:
-                          context.motionCurve(Curves.easeInOutCubic),
-                      transitionBuilder: (child, animation) =>
-                          FadeTransition(opacity: animation, child: child),
-                      child: KeyedSubtree(
-                        key: ValueKey(settingsConfig.playerThemeMode),
-                        child: themeWidget,
+
+                    ResponsivePlayerLayout(
+                      state: state,
+                      cubit: cubit,
+                      themeWidget: AnimatedSwitcher(
+                        duration: context.motionMs(380),
+                        switchInCurve: context.motionCurve(Curves.easeOutCubic),
+                        switchOutCurve: context.motionCurve(Curves.easeInCubic),
+                        transitionBuilder: (child, animation) {
+                          final scale = Tween<double>(
+                            begin: 0.965,
+                            end: 1.0,
+                          ).animate(animation);
+                          return FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(
+                              scale: scale,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: KeyedSubtree(
+                          key: ValueKey(settingsConfig.playerThemeMode),
+                          child: themeWidget,
+                        ),
                       ),
+                      activeColor: activeColor,
+                      bgColor: bgColor,
                     ),
-                    activeColor: activeColor,
-                    bgColor: bgColor,
-                  ),
-                  const _NowPlayingGestureHintOverlay(),
-                ],
+
+                    const _NowPlayingGestureHintOverlay(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -242,10 +285,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
 class _SwipeDownToDismiss extends StatefulWidget {
   final Widget child;
   final VoidCallback onDismiss;
+  final Color activeColor;
 
   const _SwipeDownToDismiss({
     required this.child,
     required this.onDismiss,
+    required this.activeColor,
   });
 
   @override
@@ -254,6 +299,9 @@ class _SwipeDownToDismiss extends StatefulWidget {
 
 class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     with SingleTickerProviderStateMixin {
+  static const double _dismissThreshold = 108.0;
+  static const double _dismissVelocity = 450.0;
+
   late final AnimationController _animController;
   late final CurvedAnimation _curvedAnimation;
   late final Tween<double> _tween;
@@ -264,6 +312,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   /// Listener-based pointer set counted taps on child buttons as extra
   /// pointers, silently disabling the dismiss gesture.
   bool _isDragging = false;
+  bool _crossedThreshold = false;
 
   @override
   void initState() {
@@ -282,7 +331,10 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     // so the next drag does not begin from a stale offset.
     _animController.addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) {
-        setState(() => _dragOffset = 0.0);
+        setState(() {
+          _dragOffset = 0.0;
+          _crossedThreshold = false;
+        });
       }
     });
   }
@@ -290,7 +342,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _animController.duration = context.motionMs(240);
+    _animController.duration = context.motionMs(260);
   }
 
   @override
@@ -314,13 +366,22 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     _tween.begin = _dragOffset;
     _tween.end = _dragOffset;
     _isDragging = true;
+    _crossedThreshold = _dragOffset > _dismissThreshold;
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
     if (!_isDragging) return;
-    if (details.primaryDelta != null) {
-      final newOffset = _dragOffset + details.primaryDelta!;
+    final delta = details.primaryDelta;
+    if (delta != null) {
+      // Weighted physical resistance as the sheet pulls further down
+      final resistance = (1.0 - (_dragOffset / 900.0)).clamp(0.62, 1.0);
+      final newOffset = _dragOffset + (delta * resistance);
       if (newOffset >= 0) {
+        final nowCrossed = newOffset > _dismissThreshold;
+        if (nowCrossed != _crossedThreshold) {
+          _crossedThreshold = nowCrossed;
+          HapticFeedback.selectionClick();
+        }
         setState(() {
           _dragOffset = newOffset;
         });
@@ -340,7 +401,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   void _onVerticalDragEnd(DragEndDetails details) {
     _isDragging = false;
     final velocity = details.primaryVelocity ?? 0;
-    if (_dragOffset > 100 || velocity > 450) {
+    if (_dragOffset > _dismissThreshold || velocity > _dismissVelocity) {
+      HapticFeedback.lightImpact();
       widget.onDismiss();
     } else {
       _snapBack();
@@ -387,25 +449,101 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
             if (progress <= 0.0) {
               return child!;
             }
-            // Scale player container down slightly (1.0 -> 0.96) with rounded
-            // top corners during swipe-down dismissal.
-            final scale = (1.0 - progress * 0.04).clamp(0.96, 1.0);
-            final topRadius = Radius.circular(24.0 * progress);
-            final content = Opacity(
-              opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
-              child: child,
-            );
+
+            final thresholdRatio = (offset / _dismissThreshold).clamp(0.0, 1.0);
+            final scale = (1.0 - progress * 0.055).clamp(0.94, 1.0);
+            final radiusValue = (28.0 * thresholdRatio).clamp(0.0, 28.0);
+            final topRadius = Radius.circular(radiusValue);
+
             return Transform.translate(
               offset: Offset(0, offset),
               child: Transform.scale(
                 scale: scale,
                 alignment: Alignment.topCenter,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.only(
-                    topLeft: topRadius,
-                    topRight: topRadius,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.only(
+                      topLeft: topRadius,
+                      topRight: topRadius,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: (0.45 * thresholdRatio).clamp(0.0, 0.45),
+                        ),
+                        blurRadius: 32 * thresholdRatio,
+                        spreadRadius: 2,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
                   ),
-                  child: content,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.only(
+                      topLeft: topRadius,
+                      topRight: topRadius,
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Opacity(
+                          opacity: (1.0 - progress * 0.35).clamp(0.0, 1.0),
+                          child: child,
+                        ),
+                        // Top specular rim & dynamic grab pill during pull-down
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: IgnorePointer(
+                            child: Opacity(
+                              opacity: thresholdRatio,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    height: 1.2,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.transparent,
+                                          AppColors.specularAt(0.32),
+                                          widget.activeColor
+                                              .withValues(alpha: 0.55),
+                                          AppColors.specularAt(0.32),
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    width: _crossedThreshold ? 48 : 36,
+                                    height: 4.5,
+                                    decoration: BoxDecoration(
+                                      color: _crossedThreshold
+                                          ? widget.activeColor
+                                          : AppColors.specularAt(0.42),
+                                      borderRadius: BorderRadius.circular(99),
+                                      boxShadow: _crossedThreshold
+                                          ? [
+                                              BoxShadow(
+                                                color: widget.activeColor
+                                                    .withValues(alpha: 0.5),
+                                                blurRadius: 8,
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             );

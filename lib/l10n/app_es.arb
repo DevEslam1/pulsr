@@ -4596,6 +4596,10 @@
   "quranRepeatAyah": "Repetir Aya",
   "quranRepeatRange": "Repetir rango",
   "quranRepeatOff": "Repetir: Apagado",
+  "ambientSounds": "Sonidos Ambientales",
+  "ambientSoundsDesc": "Sonido de fondo relajante mientras escuchas",
+  "ambientSoundVolume": "Volumen",
+  "ambientSoundError": "No se pudo cargar el sonido ambiente. Verifica tu conexión.",
   "batchCappedTracks": "{count, plural, =1{1 pista omitida (límite del lote)} other{{count} pistas omitidas (límite del lote)}}",
   "@batchCappedTracks": {
     "description": "Sufijo del aviso de descarga por lotes para pistas no encoladas por el límite",

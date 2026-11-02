@@ -11,6 +11,7 @@ class PulsrHighlightedText extends StatelessWidget {
   final TextStyle matchStyle;
   final int? maxLines;
   final TextOverflow overflow;
+  final TextAlign? textAlign;
 
   const PulsrHighlightedText({
     super.key,
@@ -20,6 +21,7 @@ class PulsrHighlightedText extends StatelessWidget {
     required this.matchStyle,
     this.maxLines,
     this.overflow = TextOverflow.clip,
+    this.textAlign,
   });
 
   @override
@@ -30,6 +32,7 @@ class PulsrHighlightedText extends StatelessWidget {
         style: baseStyle,
         maxLines: maxLines,
         overflow: overflow,
+        textAlign: textAlign,
       );
     }
 
@@ -60,6 +63,7 @@ class PulsrHighlightedText extends StatelessWidget {
       TextSpan(children: spans),
       maxLines: maxLines,
       overflow: overflow,
+      textAlign: textAlign,
     );
   }
 }

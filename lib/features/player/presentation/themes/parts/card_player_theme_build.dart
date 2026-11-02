@@ -30,82 +30,12 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textTitleColor = isDark ? Colors.white : p.textPrimary;
     final textSubtitleColor = isDark ? Colors.white70 : p.textSecondary;
+    final isInSplitView = PlayerSplitViewScope.of(context);
 
-    return Stack(
-      children: [
-        // 1 & 2. Full-bleed Artwork Background & Adaptive Scrim (Isolated in RepaintBoundary)
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                song != null
-                    ? CanvasBackdrop(
-                        song: song,
-                        isPlaying: state.isPlaying,
-                        isBackdropMode: true,
-                        fallbackArtwork: CachedArtwork(
-                          id: song.id,
-                          albumId: song.albumId,
-                          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                          type: ArtworkType.AUDIO,
-                          size: double.infinity,
-                          highQuality: true,
-                        ),
-                      )
-                    : Container(color: p.bg),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isDark
-                          ? [
-                              AppColors.scrimLight,
-                              AppColors.scrimAt(0.72),
-                              AppColors.scrimAt(0.94),
-                            ]
-                          : [
-                              AppColors.specularAt(0.35),
-                              AppColors.specularAt(0.65),
-                              AppColors.specularAt(0.92),
-                            ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                ),
-                // Subtle accent aura behind the floating card
-                PositionedDirectional(
-                  bottom: -40,
-                  start: -20,
-                  end: -20,
-                  height: isTablet ? 440 : 340,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.center,
-                          radius: 0.85,
-                          colors: [
-                            activeColor.withValues(alpha: isDark ? 0.24 : 0.14),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // 3. Foreground Content
-        SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isInSplitView = PlayerSplitViewScope.of(context);
-              final metrics =
-                  PlayerThemeMetrics.calculate(context, constraints);
+    final foregroundContent = LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics =
+            PlayerThemeMetrics.calculate(context, constraints);
               final isLandscape = metrics.isLandscape;
 
               final viewSwitcher = PlayerViewSwitcher(
@@ -484,8 +414,82 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                 ],
               );
             },
+          );
+
+    if (isInSplitView) {
+      return foregroundContent;
+    }
+
+    return Stack(
+      children: [
+        // 1 & 2. Full-bleed Artwork Background & Adaptive Scrim (Isolated in RepaintBoundary)
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                song != null
+                    ? CanvasBackdrop(
+                        song: song,
+                        isPlaying: state.isPlaying,
+                        isBackdropMode: true,
+                        fallbackArtwork: CachedArtwork(
+                          id: song.id,
+                          albumId: song.albumId,
+                          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                          type: ArtworkType.AUDIO,
+                          size: double.infinity,
+                          highQuality: true,
+                        ),
+                      )
+                    : Container(color: p.bg),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [
+                              AppColors.scrimLight,
+                              AppColors.scrimAt(0.72),
+                              AppColors.scrimAt(0.94),
+                            ]
+                          : [
+                              AppColors.specularAt(0.35),
+                              AppColors.specularAt(0.65),
+                              AppColors.specularAt(0.92),
+                            ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+                // Subtle accent aura behind the floating card
+                PositionedDirectional(
+                  bottom: -40,
+                  start: -20,
+                  end: -20,
+                  height: isTablet ? 440 : 340,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 0.85,
+                          colors: [
+                            activeColor.withValues(alpha: isDark ? 0.24 : 0.14),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+
+        // 3. Foreground Content
+        SafeArea(child: foregroundContent),
       ],
     );
   }

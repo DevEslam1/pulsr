@@ -1,22 +1,24 @@
 // lib/features/library/presentation/artwork_grid_screen.dart
 import 'package:flutter/material.dart';
-import '../../../core/utils/l10n_extensions.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
-import '../../../core/widgets/pulsr_page_pop_scope.dart';
-import '../../../core/utils/error_logger.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
 
 class ArtworkGridScreen extends StatefulWidget {
   const ArtworkGridScreen({super.key});
@@ -28,7 +30,7 @@ class ArtworkGridScreen extends StatefulWidget {
 class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
   double _columnCount = 3.0;
   final ScrollController _scrollController = ScrollController();
-  int _visibleCount = 50;
+  int _visibleCount = 60;
 
   @override
   void initState() {
@@ -46,8 +48,12 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
     try {
       await context.read<SettingsCubit>().rescanLibrary();
     } catch (e, st) {
-      ErrorLogger.log('Failed to rescan library from artwork grid',
-          error: e, stackTrace: st, category: 'ArtworkGrid');
+      ErrorLogger.log(
+        'Failed to rescan library from artwork grid',
+        error: e,
+        stackTrace: st,
+        category: 'ArtworkGrid',
+      );
     }
   }
 
@@ -57,9 +63,19 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
       final total = context.read<LibraryCubit>().state.albums.length;
       if (mounted && _visibleCount < total) {
         setState(() {
-          _visibleCount = (_visibleCount + 50).clamp(0, total);
+          _visibleCount = (_visibleCount + 60).clamp(0, total);
         });
       }
+    }
+  }
+
+  void _updateColumns(double nextValue, double minCols, double maxCols) {
+    final prevRounded = _columnCount.round();
+    final clamped = nextValue.clamp(minCols, maxCols);
+    if (clamped == _columnCount) return;
+    setState(() => _columnCount = clamped);
+    if (clamped.round() != prevRounded) {
+      HapticFeedback.selectionClick();
     }
   }
 
@@ -68,48 +84,88 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
     final p = context.palette;
     final maxCols = context.isTablet ? 8.0 : 6.0;
     const minCols = 2.0;
+    final activeCols = _columnCount.round();
+    // High-density wall mode hides text labels when >= 5 columns for a clean
+    // mosaic view.
+    final isCompactWall = activeCols >= 5;
 
     return PulsrPagePopScope(
       child: Scaffold(
-        backgroundColor: p.surface,
+        backgroundColor: p.bg,
         appBar: AppBar(
-          backgroundColor: p.surface,
+          backgroundColor: p.bg,
           elevation: 0,
+          scrolledUnderElevation: 0,
           leading: const PulsrBackButton(),
           title: Text(
             context.l10n.artworkWall,
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: p.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: AppFontSize.bodyLarge,
+            ),
           ),
           actions: [
-            Row(
-              children: [
-                IconButton(
-                  constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
-                  icon: const Icon(Icons.zoom_out_rounded),
-                  tooltip: context.l10n.zoomOut,
-                  onPressed: () {
-                    if (_columnCount < maxCols) {
-                      setState(() => _columnCount =
-                          (_columnCount + 1).clamp(minCols, maxCols));
-                    }
-                  },
-                ),
-                IconButton(
-                  constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
-                  icon: const Icon(Icons.zoom_in_rounded),
-                  tooltip: context.l10n.zoomIn,
-                  onPressed: () {
-                    if (_columnCount > minCols) {
-                      setState(() => _columnCount =
-                          (_columnCount - 1).clamp(minCols, maxCols));
-                    }
-                  },
-                ),
-              ],
+            Container(
+              margin: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+              decoration: BoxDecoration(
+                color: p.surfaceContainer,
+                borderRadius: AppRadii.r12All,
+                border: Border.all(color: p.hairline),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
+                    icon: const Icon(Icons.zoom_out_rounded, size: 18),
+                    color: activeCols < maxCols ? p.textPrimary : p.textTertiary,
+                    tooltip: context.l10n.zoomOut,
+                    onPressed: activeCols < maxCols
+                        ? () => _updateColumns(
+                              activeCols + 1.0,
+                              minCols,
+                              maxCols,
+                            )
+                        : null,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xxs,
+                    ),
+                    child: Text(
+                      '$activeCols×',
+                      style: TextStyle(
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w800,
+                        color: p.accent,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
+                    icon: const Icon(Icons.zoom_in_rounded, size: 18),
+                    color: activeCols > minCols ? p.textPrimary : p.textTertiary,
+                    tooltip: context.l10n.zoomIn,
+                    onPressed: activeCols > minCols
+                        ? () => _updateColumns(
+                              activeCols - 1.0,
+                              minCols,
+                              maxCols,
+                            )
+                        : null,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -144,6 +200,9 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
 
             final displayCount =
                 albums.length > _visibleCount ? _visibleCount : albums.length;
+            final spacing = isCompactWall ? 6.0 : 10.0;
+            final cardRadius = isCompactWall ? AppRadii.r10All : AppRadii.r14All;
+            final artworkRadius = isCompactWall ? 10.0 : 14.0;
 
             return RefreshIndicator(
               onRefresh: _onRefresh,
@@ -155,27 +214,31 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                   constraints: Adaptive.contentConstraints(context),
                   child: GestureDetector(
                     onScaleUpdate: (details) {
-                      if (details.scale > 1.2 && _columnCount > minCols) {
-                        setState(() => _columnCount =
-                            (_columnCount - 0.05).clamp(minCols, maxCols));
-                      } else if (details.scale < 0.8 &&
+                      if (details.scale > 1.15 && _columnCount > minCols) {
+                        _updateColumns(_columnCount - 0.05, minCols, maxCols);
+                      } else if (details.scale < 0.85 &&
                           _columnCount < maxCols) {
-                        setState(() => _columnCount =
-                            (_columnCount + 0.05).clamp(minCols, maxCols));
+                        _updateColumns(_columnCount + 0.05, minCols, maxCols);
                       }
                     },
                     child: GridView.builder(
                       controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
                       addRepaintBoundaries: true,
                       addAutomaticKeepAlives: false,
                       padding: EdgeInsetsDirectional.fromSTEB(
-                          context.pagePadding, 8, context.pagePadding, 160),
+                        context.pagePadding,
+                        AppSpacing.xs,
+                        context.pagePadding,
+                        PulsrLayoutMetrics.scrollBottom(context),
+                      ),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: _columnCount.round(),
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 0.82,
+                        crossAxisCount: activeCols,
+                        crossAxisSpacing: spacing,
+                        mainAxisSpacing: spacing,
+                        childAspectRatio: isCompactWall ? 1.0 : 0.80,
                       ),
                       itemCount: displayCount,
                       itemBuilder: (context, index) {
@@ -183,59 +246,72 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                         return Semantics(
                           button: true,
                           label: '${album.title}, ${album.artist}',
-                          child: InkWell(
-                            onTap: () => context.push('/album?id=${album.id}',
-                                extra: album),
-                            borderRadius: AppRadii.r14All,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: p.surfaceCard,
-                                borderRadius: AppRadii.r14All,
+                          child: Material(
+                            color: p.surfaceCard,
+                            borderRadius: cardRadius,
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () => context.push(
+                                '/album?id=${album.id}',
+                                extra: album,
                               ),
-                              clipBehavior: Clip.antiAlias,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: CachedArtwork(
-                                      id: album.id,
-                                      type: ArtworkType.ALBUM,
-                                      remoteUrl: album.artworkUri,
-                                      size: 250,
-                                      borderRadius: 14,
-                                      fallbackIcon: Icons.album_rounded,
-                                    ),
+                              borderRadius: cardRadius,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: cardRadius,
+                                  border: Border.all(
+                                    color: p.hairline.withValues(alpha: 0.5),
                                   ),
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.all(AppSpacing.s6),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          album.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: AppFontSize.label,
-                                            fontWeight: FontWeight.w600,
-                                            color: p.textPrimary,
-                                          ),
-                                        ),
-                                        Text(
-                                          album.artist,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: AppFontSize.tiny,
-                                            color: p.textSecondary,
-                                          ),
-                                        ),
-                                      ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(
+                                      child: CachedArtwork(
+                                        id: album.id,
+                                        type: ArtworkType.ALBUM,
+                                        remoteUrl: album.artworkUri,
+                                        size: 250,
+                                        borderRadius: artworkRadius,
+                                        fallbackIcon: Icons.album_rounded,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    if (!isCompactWall)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.xs,
+                                          vertical: AppSpacing.s6,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              album.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: AppFontSize.label,
+                                                fontWeight: FontWeight.w700,
+                                                color: p.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 1),
+                                            Text(
+                                              album.artist,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: AppFontSize.tiny,
+                                                color: p.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),

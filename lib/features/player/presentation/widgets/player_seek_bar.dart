@@ -4,22 +4,23 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
 import '../../../../core/di/injection.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/services/waveform_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
-import '../../../../core/services/waveform_service.dart';
+import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
-import '../../../../core/widgets/pulsr_slider.dart';
 import 'waveform_seek_bar.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 class PlayerSeekBar extends StatefulWidget {
   /// Position shown by the bar.
@@ -287,7 +288,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
             !nextTrackInfo.title
                 .toLowerCase()
                 .contains(nextTrackInfo.artist!.toLowerCase()))
-        ? '${nextTrackInfo.artist} - ${nextTrackInfo.title}'
+        ? '${nextTrackInfo.artist} • ${nextTrackInfo.title}'
         : nextTrackInfo.title;
 
     final isCompact =
@@ -295,9 +296,10 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
 
     return Padding(
       padding: EdgeInsetsDirectional.only(
-          start: AppSpacing.lg,
-          end: AppSpacing.lg,
-          top: isCompact ? 2.0 : AppSpacing.xxs),
+        start: AppSpacing.lg,
+        end: AppSpacing.lg,
+        top: isCompact ? 3.0 : AppSpacing.xs,
+      ),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
@@ -305,16 +307,22 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           cubit.toggleQueueVisibility();
         },
         child: Container(
-          padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: isCompact ? 2.0 : AppSpacing.xxs),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.xs,
+            isCompact ? 3.0 : AppSpacing.xxs,
+            AppSpacing.s8,
+            isCompact ? 3.0 : AppSpacing.xxs,
+          ),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: AlignmentDirectional.centerStart,
               end: AlignmentDirectional.centerEnd,
               colors: [
-                widget.activeColor.withValues(alpha: 0.10),
-                AppColors.highlightSoft,
+                Color.alphaBlend(
+                  widget.activeColor.withValues(alpha: p.isDark ? 0.12 : 0.08),
+                  p.surfaceContainerHigh.withValues(alpha: 0.72),
+                ),
+                p.surfaceContainer.withValues(alpha: 0.50),
               ],
             ),
             borderRadius: AppRadii.r12All,
@@ -325,16 +333,34 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           ),
           child: Row(
             children: [
-              Icon(Icons.skip_next_rounded,
-                  size: 14, color: widget.activeColor.withValues(alpha: 0.90)),
-              const SizedBox(width: AppSpacing.s6),
-              Text(
-                context.l10n.upNext,
-                style: TextStyle(
-                  color: widget.activeColor.withValues(alpha: 0.90),
-                  fontSize: AppFontSize.tiny,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: AppTracking.overline,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s6,
+                  vertical: 2.0,
+                ),
+                decoration: BoxDecoration(
+                  color: widget.activeColor.withValues(alpha: 0.16),
+                  borderRadius: AppRadii.r6All,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.skip_next_rounded,
+                      size: 13,
+                      color: widget.activeColor,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      context.l10n.upNext,
+                      style: TextStyle(
+                        color: widget.activeColor,
+                        fontSize: AppFontSize.tiny,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: AppTracking.overline,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
@@ -352,7 +378,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
               ),
               const SizedBox(width: AppSpacing.xxs),
               Icon(
-                Icons.chevron_right_rounded,
+                Icons.queue_music_rounded,
                 size: 14,
                 color: p.textTertiary,
               ),
@@ -383,16 +409,18 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       isPlaying = fallback?.state.isPlaying ?? false;
     }
     return _withPosition((position) {
+      final p = context.palette;
       final double maxDuration = widget.duration.inMilliseconds.toDouble();
       final double currentPos = position.inMilliseconds.toDouble();
       final double effectiveValue = (_dragValue ?? currentPos)
           .clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
-      final currentDuration = _dragValue != null
-          ? Duration(milliseconds: _dragValue!.round())
-          : position;
+      final isDragging = _dragValue != null;
+      final currentDuration =
+          isDragging ? Duration(milliseconds: _dragValue!.round()) : position;
       final valueLabel =
           '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
       final semanticLabel = widget.semanticLabel ?? context.l10n.seekLabel;
+
       Duration clampDuration(Duration d) {
         if (d < Duration.zero) return Duration.zero;
         if (d > widget.duration) return widget.duration;
@@ -417,7 +445,6 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final trackWidth = constraints.maxWidth;
-                  final isDragging = _dragValue != null;
                   final ratio = maxDuration > 0
                       ? (effectiveValue / maxDuration).clamp(0.0, 1.0)
                       : 0.0;
@@ -467,8 +494,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                               inactiveColor: Theme.of(context).brightness ==
                                       Brightness.dark
                                   ? AppColors.specularStrong
-                                  : context.palette.hairline
-                                      .withValues(alpha: 0.8),
+                                  : p.hairline.withValues(alpha: 0.8),
                               isWavy: true,
                               animateWave: isPlaying && enabled,
                               onChangeStart: enabled
@@ -535,36 +561,38 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           ),
                         ),
                       ),
-                      // Floating glass timestamp pill above thumb while dragging
+                      // Floating dual-tone timestamp pill above thumb while dragging
                       if (isDragging && trackWidth > 70)
                         PositionedDirectional(
-                          top: -34,
-                          start: (ratio * trackWidth - 48).clamp(
-                              0.0, (trackWidth - 96).clamp(0.0, trackWidth)),
+                          top: -36,
+                          start: (ratio * trackWidth - 54).clamp(
+                              0.0, (trackWidth - 108).clamp(0.0, trackWidth)),
                           child: IgnorePointer(
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s8,
-                                  vertical: AppSpacing.s4),
+                                horizontal: AppSpacing.s8,
+                                vertical: AppSpacing.s4,
+                              ),
                               decoration: BoxDecoration(
-                                color: context.palette.surfaceContainerHigh,
+                                color: p.surfaceContainerHighest,
                                 borderRadius: AppRadii.r12All,
                                 border: Border.all(
-                                  color: context.palette.hairline,
+                                  color: widget.activeColor
+                                      .withValues(alpha: 0.45),
                                   width: 1.0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
+                                    color: Colors.black.withValues(alpha: 0.24),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
                                   ),
                                 ],
                               ),
                               child: Text(
                                 '${Formatters.formatDuration(currentDuration)} ($deltaStr)',
                                 style: TextStyle(
-                                  color: context.palette.textPrimary,
+                                  color: p.textPrimary,
                                   fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w700,
                                   fontFeatures: const [
@@ -579,56 +607,66 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   );
                 },
               ),
-              const SizedBox(height: AppSpacing.xs),
-              // Timestamps
+              const SizedBox(height: AppSpacing.xxs),
+              // Timestamps & Crossfade Pill
               RepaintBoundary(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      Formatters.formatDuration(
-                        _dragValue != null
-                            ? Duration(milliseconds: _dragValue!.round())
-                            : position,
-                      ),
+                    AnimatedDefaultTextStyle(
+                      duration: context.motionMs(150),
                       style: TextStyle(
-                        color: context.palette.textSecondary,
+                        color: isDragging ? widget.activeColor : p.textSecondary,
                         fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w600,
+                        fontWeight:
+                            isDragging ? FontWeight.w700 : FontWeight.w600,
                         fontFeatures: const [FontFeature.tabularFigures()],
                         letterSpacing: AppTracking.label,
                       ),
+                      child: Text(Formatters.formatDuration(currentDuration)),
                     ),
                     if (crossfadeSec > 0 &&
                         widget.duration.inSeconds > (crossfadeSec * 2))
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.auto_awesome_rounded,
-                            size: 11,
-                            color:
-                                context.palette.accent.withValues(alpha: 0.75),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s6,
+                          vertical: 1.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: p.accent.withValues(alpha: 0.10),
+                          borderRadius: AppRadii.r8All,
+                          border: Border.all(
+                            color: p.accent.withValues(alpha: 0.22),
+                            width: 0.75,
                           ),
-                          const SizedBox(width: AppSpacing.xxs),
-                          Text(
-                            '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${context.l10n.browseCrossfade}',
-                            style: TextStyle(
-                              color: context.palette.accent
-                                  .withValues(alpha: 0.75),
-                              fontSize: AppFontSize.tiny,
-                              fontWeight: FontWeight.w600,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures()
-                              ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 11,
+                              color: p.accent.withValues(alpha: 0.85),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: AppSpacing.xxs),
+                            Text(
+                              '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${context.l10n.browseCrossfade}',
+                              style: TextStyle(
+                                color: p.accent.withValues(alpha: 0.85),
+                                fontSize: AppFontSize.tiny,
+                                fontWeight: FontWeight.w700,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     Text(
                       Formatters.formatDuration(widget.duration),
                       style: TextStyle(
-                        color: context.palette.textSecondary,
+                        color: p.textSecondary,
                         fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w600,
                         fontFeatures: const [FontFeature.tabularFigures()],

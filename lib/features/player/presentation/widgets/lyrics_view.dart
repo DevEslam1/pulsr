@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_lyric/flutter_lyric.dart';
+import 'package:flutter_lyric/flutter_lyric.dart' hide LrcParser;
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -105,41 +105,38 @@ class _LyricsViewState extends State<LyricsView> {
   void initState() {
     super.initState();
     _lyricController = LyricController();
-    _setupTapCallback();
     _syncLyricsToController();
   }
 
-  void _setupTapCallback() {
-    _lyricController.setOnTapLineCallback((position) {
-      HapticFeedback.selectionClick();
-      if (!mounted) return;
-      final target =
-          position + _audibleOffset + Duration(milliseconds: _manualOffsetMs);
-      final effectiveSeek = target.isNegative ? Duration.zero : target;
+  void _onTapLine(Duration position) {
+    HapticFeedback.selectionClick();
+    if (!mounted) return;
+    final target =
+        position + _audibleOffset + Duration(milliseconds: _manualOffsetMs);
+    final effectiveSeek = target.isNegative ? Duration.zero : target;
 
-      if (widget.onLineTapped != null) {
-        widget.onLineTapped!(effectiveSeek);
-      } else {
-        try {
-          context.read<PlayerCubit>().seek(effectiveSeek);
-        } catch (e, st) {
-          ErrorLogger.log('Lyrics tap seek failed',
-              error: e, stackTrace: st, category: 'Lyrics');
-        }
+    if (widget.onLineTapped != null) {
+      widget.onLineTapped!(effectiveSeek);
+    } else {
+      try {
+        context.read<PlayerCubit>().seek(effectiveSeek);
+      } catch (e, st) {
+        ErrorLogger.log('Lyrics tap seek failed',
+            error: e, stackTrace: st, category: 'Lyrics');
       }
-      _updateProgress(effectiveSeek);
-    });
+    }
+    _updateProgress(effectiveSeek);
   }
 
   void _syncLyricsToController() {
     if (widget.lyrics.isEmpty) {
-      _lyricController.loadLyric('');
+      _lyricController.clear();
       return;
     }
 
     if (_isSynced) {
       final lrc = LrcParser.formatToLrc(widget.lyrics);
-      _lyricController.loadLyric(lrc);
+      _lyricController.load(lrc);
 
       // Push current position immediately so highlight appears without waiting
       // for the next 200ms tick. Works for both explicit currentPosition and
@@ -162,7 +159,7 @@ class _LyricsViewState extends State<LyricsView> {
     } else {
       // Plain-text lyrics: clear synced controller so stale synced data
       // doesn't leak when switching between synced/plain.
-      _lyricController.loadLyric('');
+      _lyricController.clear();
     }
   }
 
@@ -177,7 +174,7 @@ class _LyricsViewState extends State<LyricsView> {
     final effective = _effectivePosition(position);
     _advancedPosition.value = effective;
     try {
-      _lyricController.setProgress(effective);
+      _lyricController.setPosition(effective);
     } catch (e, st) {
       ErrorLogger.log('Failed to set lyrics progress',
           error: e, stackTrace: st, category: 'Lyrics');
@@ -662,14 +659,14 @@ class _LyricsViewState extends State<LyricsView> {
   Widget _buildSyncedLyricView(PulsrPalette p) {
     final activeCol =
         widget.activeColor == Colors.white ? p.accent : widget.activeColor;
-    final style = LyricStyles.default1.copyWith(
+    final preset = LyricPreset(
       textStyle: TextStyle(
         fontSize: 19.0,
         fontWeight: FontWeight.w500,
         color: p.textSecondary.withValues(alpha: 0.7),
         height: 1.4,
       ),
-      activeStyle: TextStyle(
+      activeTextStyle: TextStyle(
         fontSize: AppFontSize.headline,
         fontWeight: FontWeight.w800,
         color: activeCol,
@@ -681,16 +678,18 @@ class _LyricsViewState extends State<LyricsView> {
           ),
         ],
       ),
-      activeHighlightColor: activeCol,
+      highlight: LyricHighlight.solid(activeCol),
       textAlign: TextAlign.center,
-      lineGap: 20,
-      anchorPosition: 0.42,
-      activeAnchorPosition: 0.42,
-      fadeRange: FadeRange(top: 36, bottom: 36),
-      selectLineResumeDuration: const Duration(seconds: 2),
-      activeLineResumeDuration: const Duration(seconds: 4),
-      scrollDuration: context.motionMs(300),
-      enableSwitchAnimation: true,
+      contentAlignment: LyricContentAlignment.center,
+      lineSpacing: 20,
+      activeAnchor: const LyricAnchor.fraction(0.42),
+      selectionAnchor: const LyricAnchor.fraction(0.42),
+      edgeFade: const LyricEdgeFade.pixels(top: 36, bottom: 36),
+      selectionSnapDelay: const Duration(seconds: 2),
+      resumeDelay: const Duration(seconds: 4),
+      scrollAnimation: LyricScrollAnimation.fixed(
+        duration: context.motionMs(300),
+      ),
     );
 
     final effectiveLyrics = _displayLyrics;
@@ -708,7 +707,8 @@ class _LyricsViewState extends State<LyricsView> {
                     height: constraints.maxHeight,
                     child: LyricView(
                       controller: _lyricController,
-                      style: style,
+                      preset: preset,
+                      onLineTap: (details) => _onTapLine(details.seekPosition),
                     ),
                   );
                 },

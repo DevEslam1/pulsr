@@ -3,6 +3,8 @@ import 'dart:ui' show DisplayFeature, DisplayFeatureType;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+
 import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
@@ -21,7 +23,6 @@ import 'widgets/lyrics_view.dart';
 import 'widgets/now_playing_queue_view.dart';
 import 'widgets/player_controls.dart';
 import 'widgets/player_seek_bar.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Responsive layout coordinator for the Now Playing screen.
 ///
@@ -137,91 +138,14 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
       final topHeight = hinge.bounds.top;
       final bottomHeight = mediaQuery.size.height - hinge.bounds.bottom;
 
-      return Column(
-        children: [
-          // Upper half: Album Art + Lyrics Focus
-          SizedBox(
-            height: topHeight,
-            width: double.infinity,
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: ClipRRect(
-                borderRadius: AppRadii.r20All,
-                child: widget.themeWidget,
-              ),
-            ),
-          ),
-          // Hinge spacer
-          SizedBox(height: hinge.bounds.height),
-          // Lower half: Tactile Control Deck
-          SizedBox(
-            height: bottomHeight,
-            width: double.infinity,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.xs,
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer,
-                  borderRadius: AppRadii.r24All,
-                  border: Border.all(
-                    color: p.hairline,
-                    width: 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black
-                          .withValues(alpha: p.isDark ? 0.35 : 0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    PlayerSeekBar(
-                      duration: widget.state.duration,
-                      activeColor: widget.activeColor,
-                      showUpNext: false,
-                      onSeek: (pos) => widget.cubit.seek(pos),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    PlayerControls(
-                      isPlaying: widget.state.isPlaying,
-                      isBuffering: widget.state.isBuffering,
-                      isShuffle: widget.state.isShuffle,
-                      repeatMode: widget.state.repeatMode,
-                      primaryColor: widget.activeColor,
-                      onPlayPause: () => widget.cubit.togglePlayPause(),
-                      onNext: () => widget.cubit.next(),
-                      onPrevious: () => widget.cubit.previous(),
-                      onToggleShuffle: () => widget.cubit.toggleShuffle(),
-                      onToggleRepeat: () => widget.cubit.toggleRepeat(),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      widget.state.currentSong?.title ?? '',
-                      style: TextStyle(
-                        color: widget.activeColor,
-                        fontSize: AppFontSize.body,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+      return _FoldableTabletopLayout(
+        topHeight: topHeight,
+        hingeHeight: hinge.bounds.height,
+        bottomHeight: bottomHeight,
+        state: widget.state,
+        cubit: widget.cubit,
+        themeWidget: widget.themeWidget,
+        activeColor: widget.activeColor,
       );
     }
 
@@ -239,7 +163,6 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
             isLandscapeOrientation;
     if (isTabletLandscape) {
       _wasSplitView = true;
-      final p = context.palette;
       return Stack(
         children: [
           // 1. Unified Dynamic Ambient Backdrop (Isolated in RepaintBoundary)
@@ -254,68 +177,71 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Color.lerp(widget.bgColor, Colors.black,
-                                    p.isDark ? 0.45 : 0.05) ??
+                            Color.lerp(
+                                  widget.bgColor,
+                                  Colors.black,
+                                  p.isDark ? 0.42 : 0.04,
+                                ) ??
                                 widget.bgColor,
                             p.bg,
                             p.deepShade,
                           ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: const [0.0, 0.50, 1.0],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          stops: const [0.0, 0.52, 1.0],
                         ),
                       ),
                     ),
                   ),
 
-                  // Expansive unified ambient glow spanning the full screen width
+                  // Primary stage spotlight behind Left Player Deck
                   PositionedDirectional(
-                    top: -60,
-                    start: -40,
-                    end: -40,
-                    height: mediaQuery.size.height * 0.90,
+                    top: -80,
+                    start: -60,
+                    end: width * 0.25,
+                    height: mediaQuery.size.height * 0.95,
                     child: IgnorePointer(
                       child: AnimatedContainer(
                         duration: context.motionMs(500),
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: const Alignment(-0.25, -0.30),
+                            center: const Alignment(-0.30, -0.25),
                             radius: 1.15,
                             colors: [
                               widget.activeColor
-                                  .withValues(alpha: p.isDark ? 0.28 : 0.16),
+                                  .withValues(alpha: p.isDark ? 0.30 : 0.18),
                               widget.activeColor
-                                  .withValues(alpha: p.isDark ? 0.10 : 0.06),
+                                  .withValues(alpha: p.isDark ? 0.11 : 0.06),
                               widget.activeColor.withValues(alpha: 0.02),
                               Colors.transparent,
                             ],
-                            stops: const [0.0, 0.40, 0.75, 1.0],
+                            stops: const [0.0, 0.42, 0.76, 1.0],
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  // Harmonizing atmospheric glow across the stage
+                  // Secondary ambient wash behind Right Studio Console
                   PositionedDirectional(
-                    top: 0,
-                    start: 0,
-                    end: 0,
-                    bottom: 0,
+                    top: 20,
+                    start: width * 0.35,
+                    end: -40,
+                    bottom: -40,
                     child: IgnorePointer(
                       child: AnimatedContainer(
                         duration: context.motionMs(500),
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: const Alignment(0.40, -0.15),
-                            radius: 1.0,
+                            center: const Alignment(0.45, 0.15),
+                            radius: 1.05,
                             colors: [
                               widget.activeColor
-                                  .withValues(alpha: p.isDark ? 0.12 : 0.07),
+                                  .withValues(alpha: p.isDark ? 0.14 : 0.08),
                               widget.activeColor.withValues(alpha: 0.03),
                               Colors.transparent,
                             ],
-                            stops: const [0.0, 0.50, 1.0],
+                            stops: const [0.0, 0.55, 1.0],
                           ),
                         ),
                       ),
@@ -326,13 +252,13 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
             ),
           ),
 
-          // 2. Foreground 2-Pane Split (Apple Music Element Ordering)
+          // 2. Foreground 2-Pane Studio Console Split
           SafeArea(
             top: true,
             bottom: true,
             child: Row(
               children: [
-                // Left Pane: Persistent Full-Fidelity Player Theme (Artwork + Controls Column)
+                // Left Pane: Persistent Full-Fidelity Player Theme
                 Expanded(
                   flex: 5,
                   child: PlayerSplitViewScope(
@@ -341,119 +267,261 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                   ),
                 ),
 
+                // Subtle vertical studio console divider
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: Container(
+                    width: 1,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          p.hairline,
+                          widget.activeColor.withValues(alpha: 0.28),
+                          p.hairline,
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.2, 0.5, 0.8, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+
                 const SizedBox(width: AppSpacing.sm),
 
-                // Right Pane: Tabbed View (Lyrics by default, Queue, Quick DSP)
+                // Right Pane: Framed Interactive Console (Lyrics, Queue, Quick DSP)
                 Expanded(
                   flex: 6,
-                  child: Column(
-                    children: [
-                      // Sleek Floating Capsule TabBar at Top Right
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                          top: AppSpacing.sm,
-                          bottom: AppSpacing.xs,
-                        ),
-                        child: Align(
-                          alignment: AlignmentDirectional.center,
-                          child: RepaintBoundary(
-                            child: Container(
-                              height:
-                                  PulsrLayoutMetrics.fieldHeight(context) + 6,
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                color: p.surfaceContainer,
-                                borderRadius: AppRadii.r20All,
-                                border: Border.all(
-                                  color: p.hairline,
-                                  width: 1.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(
-                                        alpha: p.isDark ? 0.30 : 0.06),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 3),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      top: AppSpacing.xs,
+                      end: AppSpacing.md,
+                      bottom: AppSpacing.sm,
+                    ),
+                    child: Column(
+                      children: [
+                        // Top Console Dock: Segmented Tab Capsule + Quick EQ Trigger
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(
+                            bottom: AppSpacing.sm,
+                            start: AppSpacing.sm,
+                            end: AppSpacing.sm,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: RepaintBoundary(
+                                  child: Container(
+                                    constraints:
+                                        const BoxConstraints(maxWidth: 360),
+                                    height:
+                                        PulsrLayoutMetrics.fieldHeight(context) +
+                                            6,
+                                    padding: const EdgeInsets.all(3.5),
+                                    decoration: BoxDecoration(
+                                      color: p.surfaceContainer.withValues(
+                                        alpha: p.isDark ? 0.78 : 0.92,
+                                      ),
+                                      borderRadius: AppRadii.r20All,
+                                      border: Border.all(
+                                        color: p.hairline,
+                                        width: 1.0,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: p.isDark ? 0.32 : 0.06,
+                                          ),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: TabBar(
+                                      controller: _tabController,
+                                      isScrollable: false,
+                                      dividerColor: Colors.transparent,
+                                      indicatorSize: TabBarIndicatorSize.tab,
+                                      splashBorderRadius: AppRadii.r16All,
+                                      onTap: (_) =>
+                                          HapticFeedback.selectionClick(),
+                                      indicator: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            widget.activeColor
+                                                .withValues(alpha: 0.36),
+                                            widget.activeColor
+                                                .withValues(alpha: 0.18),
+                                          ],
+                                        ),
+                                        borderRadius: AppRadii.r16All,
+                                        border: Border.all(
+                                          color: widget.activeColor
+                                              .withValues(alpha: 0.60),
+                                          width: 1,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: widget.activeColor
+                                                .withValues(alpha: 0.24),
+                                            blurRadius: 12,
+                                            spreadRadius: -2,
+                                          ),
+                                        ],
+                                      ),
+                                      labelColor: p.textPrimary,
+                                      unselectedLabelColor: p.textSecondary,
+                                      labelStyle: const TextStyle(
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.2,
+                                      ),
+                                      unselectedLabelStyle: const TextStyle(
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.1,
+                                      ),
+                                      tabs: [
+                                        Tab(
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.lyrics_rounded,
+                                                size: 15,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  context.l10n.lyrics,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Tab(
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.queue_music_rounded,
+                                                size: 15,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  context.l10n.queueTab,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Tab(
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.tune_rounded,
+                                                size: 15,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  context.l10n.dspLabel,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ],
+                                ),
                               ),
-                              child: TabBar(
+                            ],
+                          ),
+                        ),
+
+                        // Framed Studio Glass Surface for Tab Contents
+                        Expanded(
+                          child: Container(
+                            margin: const EdgeInsetsDirectional.only(
+                              start: AppSpacing.xs,
+                              end: AppSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.surfaceContainer.withValues(
+                                alpha: p.isDark ? 0.42 : 0.65,
+                              ),
+                              borderRadius: AppRadii.r24All,
+                              border: Border.all(
+                                color: p.hairline,
+                                width: 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                    alpha: p.isDark ? 0.24 : 0.04,
+                                  ),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: AppRadii.r24All,
+                              child: TabBarView(
                                 controller: _tabController,
-                                isScrollable: true,
-                                tabAlignment: TabAlignment.center,
-                                dividerColor: Colors.transparent,
-                                indicatorSize: TabBarIndicatorSize.tab,
-                                splashBorderRadius: AppRadii.r16All,
-                                indicator: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      widget.activeColor
-                                          .withValues(alpha: 0.34),
-                                      widget.activeColor
-                                          .withValues(alpha: 0.18),
-                                    ],
-                                  ),
-                                  borderRadius: AppRadii.r16All,
-                                  border: Border.all(
-                                    color: widget.activeColor
-                                        .withValues(alpha: 0.55),
-                                    width: 1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: widget.activeColor
-                                          .withValues(alpha: 0.22),
-                                      blurRadius: 12,
-                                      spreadRadius: -2,
+                                children: [
+                                  // 1. Lyrics View (Tab 0)
+                                  Padding(
+                                    padding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                      AppSpacing.md,
+                                      AppSpacing.xs,
+                                      AppSpacing.md,
+                                      AppSpacing.md,
                                     ),
-                                  ],
-                                ),
-                                labelColor: p.textPrimary,
-                                unselectedLabelColor: p.textSecondary,
-                                labelStyle: const TextStyle(
-                                  fontSize: AppFontSize.label,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.2,
-                                ),
-                                unselectedLabelStyle: const TextStyle(
-                                  fontSize: AppFontSize.label,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.1,
-                                ),
-                                tabs: [
-                                  Tab(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.lyrics_rounded,
-                                            size: 15),
-                                        const SizedBox(width: 6),
-                                        Text(context.l10n.lyrics),
-                                      ],
+                                    child: LyricsView(
+                                      key: ValueKey(
+                                        'tablet_lyrics_${widget.state.currentSong?.id}_${widget.state.currentSong?.remoteId}',
+                                      ),
+                                      lyrics: widget.state.lyrics,
+                                      isLoading: widget.state.isLoadingLyrics,
+                                      activeColor: widget.activeColor,
+                                      source: widget.state.lyricsSource,
                                     ),
                                   ),
-                                  Tab(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.queue_music_rounded,
-                                            size: 15),
-                                        const SizedBox(width: 6),
-                                        Text(context.l10n.queueTab),
-                                      ],
+                                  // 2. Queue View (Tab 1)
+                                  const Padding(
+                                    padding: EdgeInsetsDirectional.fromSTEB(
+                                      AppSpacing.md,
+                                      AppSpacing.xs,
+                                      AppSpacing.md,
+                                      AppSpacing.md,
                                     ),
+                                    child: NowPlayingQueueView(),
                                   ),
-                                  Tab(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.tune_rounded,
-                                            size: 15),
-                                        const SizedBox(width: 6),
-                                        Text(context.l10n.dspLabel),
-                                      ],
+                                  // 3. Quick DSP Controls (Tab 2)
+                                  Padding(
+                                    padding: const EdgeInsets.all(
+                                      AppSpacing.lg,
+                                    ),
+                                    child: _QuickDspControls(
+                                      cubit: widget.cubit,
+                                      state: widget.state,
+                                      activeColor: widget.activeColor,
                                     ),
                                   ),
                                 ],
@@ -461,54 +529,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                             ),
                           ),
                         ),
-                      ),
-
-                      // Right Content Views
-                      Expanded(
-                        child: TabBarView(
-                          controller: _tabController,
-                          children: [
-                            // 1. Lyrics View (Tab 0 - default, matching Apple Music iPad)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.fromSTEB(
-                                AppSpacing.sm,
-                                0,
-                                AppSpacing.lg,
-                                AppSpacing.md,
-                              ),
-                              child: LyricsView(
-                                key: ValueKey(
-                                  'tablet_lyrics_${widget.state.currentSong?.id}_${widget.state.currentSong?.remoteId}',
-                                ),
-                                lyrics: widget.state.lyrics,
-                                isLoading: widget.state.isLoadingLyrics,
-                                activeColor: widget.activeColor,
-                                source: widget.state.lyricsSource,
-                              ),
-                            ),
-                            // 2. Queue View (Tab 1)
-                            const Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                AppSpacing.sm,
-                                0,
-                                AppSpacing.lg,
-                                AppSpacing.md,
-                              ),
-                              child: NowPlayingQueueView(),
-                            ),
-                            // 3. Quick DSP Controls (Tab 2)
-                            Padding(
-                              padding: const EdgeInsets.all(AppSpacing.lg),
-                              child: _QuickDspControls(
-                                cubit: widget.cubit,
-                                state: widget.state,
-                                activeColor: widget.activeColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -521,6 +543,285 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     // 3. Single-Pane Layout (Phone / Standard)
     _clearStaleOverlaysWhenLeavingSplit();
     return widget.themeWidget;
+  }
+}
+
+/// Foldable Tabletop Mode (Horizontal Hinge Detected):
+/// Upper screen renders the showcase player theme; lower half acts as a
+/// tactile studio control deck.
+class _FoldableTabletopLayout extends StatelessWidget {
+  final double topHeight;
+  final double hingeHeight;
+  final double bottomHeight;
+  final PlayerState state;
+  final PlayerCubit cubit;
+  final Widget themeWidget;
+  final Color activeColor;
+
+  const _FoldableTabletopLayout({
+    required this.topHeight,
+    required this.hingeHeight,
+    required this.bottomHeight,
+    required this.state,
+    required this.cubit,
+    required this.themeWidget,
+    required this.activeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final song = state.currentSong;
+
+    return Column(
+      children: [
+        // Upper Half: Framed Visual Stage
+        SizedBox(
+          height: topHeight,
+          width: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.xs,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: AppRadii.r24All,
+                border: Border.all(
+                  color: p.hairline,
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: p.isDark ? 0.14 : 0.08),
+                    blurRadius: 24,
+                    spreadRadius: -4,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: AppRadii.r24All,
+                child: themeWidget,
+              ),
+            ),
+          ),
+        ),
+
+        // Physical Hinge Spacer
+        SizedBox(height: hingeHeight),
+
+        // Lower Half: Tactile Studio Control Deck
+        SizedBox(
+          height: bottomHeight,
+          width: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xs,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    p.surfaceContainer,
+                    Color.lerp(
+                          p.surfaceContainer,
+                          activeColor,
+                          p.isDark ? 0.06 : 0.03,
+                        ) ??
+                        p.surfaceContainer,
+                  ],
+                ),
+                borderRadius: AppRadii.r24All,
+                border: Border.all(
+                  color: p.hairline,
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black
+                        .withValues(alpha: p.isDark ? 0.38 : 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompactDeck = constraints.maxHeight < 175;
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Top Deck Header: Track Metadata + Quick Console Actions
+                      Row(
+                        children: [
+                          AnimatedContainer(
+                            duration: context.motionMs(240),
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: state.isPlaying
+                                  ? activeColor
+                                  : p.textSecondary.withValues(alpha: 0.4),
+                              boxShadow: state.isPlaying
+                                  ? [
+                                      BoxShadow(
+                                        color:
+                                            activeColor.withValues(alpha: 0.6),
+                                        blurRadius: 8,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  song?.title ?? '',
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.body,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (!isCompactDeck &&
+                                    (song?.artist.isNotEmpty ?? false))
+                                  Text(
+                                    song!.artist,
+                                    style: TextStyle(
+                                      color: activeColor,
+                                      fontSize: AppFontSize.bodySmall,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          _DeckQuickActionButton(
+                            icon: Icons.lyrics_rounded,
+                            isActive: state.isLyricsVisible,
+                            activeColor: activeColor,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              cubit.toggleLyricsVisibility();
+                            },
+                          ),
+                          const SizedBox(width: 6),
+                          _DeckQuickActionButton(
+                            icon: Icons.queue_music_rounded,
+                            isActive: state.isQueueVisible,
+                            activeColor: activeColor,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              cubit.toggleQueueVisibility();
+                            },
+                          ),
+                          const SizedBox(width: 6),
+                          _DeckQuickActionButton(
+                            icon: Icons.tune_rounded,
+                            isActive: state.isEqEnabled,
+                            activeColor: activeColor,
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              EqualizerSheet.show(context);
+                            },
+                          ),
+                        ],
+                      ),
+
+                      // Center Seek Bar
+                      PlayerSeekBar(
+                        duration: state.duration,
+                        activeColor: activeColor,
+                        showUpNext: false,
+                        onSeek: (pos) => cubit.seek(pos),
+                      ),
+
+                      // Primary Transport Controls
+                      PlayerControls(
+                        isPlaying: state.isPlaying,
+                        isBuffering: state.isBuffering,
+                        isShuffle: state.isShuffle,
+                        repeatMode: state.repeatMode,
+                        primaryColor: activeColor,
+                        onPlayPause: () => cubit.togglePlayPause(),
+                        onNext: () => cubit.next(),
+                        onPrevious: () => cubit.previous(),
+                        onToggleShuffle: () => cubit.toggleShuffle(),
+                        onToggleRepeat: () => cubit.toggleRepeat(),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DeckQuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final bool isActive;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  const _DeckQuickActionButton({
+    required this.icon,
+    required this.isActive,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return PulsrPressable(
+      pressedScale: 0.92,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: context.motionMs(200),
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          borderRadius: AppRadii.r14All,
+          color: isActive
+              ? activeColor.withValues(alpha: 0.22)
+              : AppColors.specularAt(0.06),
+          border: Border.all(
+            color: isActive
+                ? activeColor.withValues(alpha: 0.55)
+                : p.hairline,
+            width: 1.0,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 17,
+          color: isActive ? activeColor : p.textSecondary,
+        ),
+      ),
+    );
   }
 }
 
@@ -543,6 +844,7 @@ class _QuickDspControls extends StatelessWidget {
     return ListView(
       physics: const BouncingScrollPhysics(),
       children: [
+        // Top Header + Full Equalizer Sheet Trigger
         Row(
           children: [
             Expanded(
@@ -564,23 +866,30 @@ class _QuickDspControls extends StatelessWidget {
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.xs,
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs + 2,
                 ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      activeColor.withValues(alpha: 0.24),
-                      activeColor.withValues(alpha: 0.12),
+                      activeColor.withValues(alpha: 0.28),
+                      activeColor.withValues(alpha: 0.14),
                     ],
                   ),
                   borderRadius: AppRadii.r14All,
                   border: Border.all(
-                    color: activeColor.withValues(alpha: 0.45),
+                    color: activeColor.withValues(alpha: 0.50),
                     width: 1.0,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.16),
+                      blurRadius: 12,
+                      spreadRadius: -2,
+                    ),
+                  ],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -605,14 +914,29 @@ class _QuickDspControls extends StatelessWidget {
             ),
           ],
         ),
+
         const SizedBox(height: AppSpacing.md),
+
+        // Interactive Signal Chain Visualizer Strip
+        _SignalChainVisualizerStrip(
+          isEqEnabled: state.isEqEnabled,
+          isDdcEnabled: state.isViperDdcEnabled,
+          isLimiterEnabled: state.isLimiterEnabled,
+          activeColor: activeColor,
+        ),
+
+        const SizedBox(height: AppSpacing.md),
+
         _DspModuleBentoCard(
           icon: Icons.graphic_eq_rounded,
           title: l10n.eqEngineTitle,
           subtitle: l10n.eqEngineSubtitle,
           value: state.isEqEnabled,
           activeColor: activeColor,
-          onChanged: (v) => cubit.setEqualizerEnabled(v),
+          onChanged: (v) {
+            HapticFeedback.selectionClick();
+            cubit.setEqualizerEnabled(v);
+          },
         ),
         const SizedBox(height: AppSpacing.s10),
         _DspModuleBentoCard(
@@ -621,7 +945,10 @@ class _QuickDspControls extends StatelessWidget {
           subtitle: l10n.truePeakLimiterSubtitle,
           value: state.isLimiterEnabled,
           activeColor: activeColor,
-          onChanged: (v) => cubit.setLookaheadLimiter(v),
+          onChanged: (v) {
+            HapticFeedback.selectionClick();
+            cubit.setLookaheadLimiter(v);
+          },
         ),
         const SizedBox(height: AppSpacing.s10),
         _DspModuleBentoCard(
@@ -632,9 +959,174 @@ class _QuickDspControls extends StatelessWidget {
               : l10n.dspNoProfileLoaded,
           value: state.isViperDdcEnabled,
           activeColor: activeColor,
-          onChanged: (v) => cubit.setViperDdcEnabled(v),
+          onChanged: (v) {
+            HapticFeedback.selectionClick();
+            cubit.setViperDdcEnabled(v);
+          },
         ),
       ],
+    );
+  }
+}
+
+/// Visual representation of the real-time C++ DSP chain nodes (`EQ -> DDC -> LIM`).
+class _SignalChainVisualizerStrip extends StatelessWidget {
+  final bool isEqEnabled;
+  final bool isDdcEnabled;
+  final bool isLimiterEnabled;
+  final Color activeColor;
+
+  const _SignalChainVisualizerStrip({
+    required this.isEqEnabled,
+    required this.isDdcEnabled,
+    required this.isLimiterEnabled,
+    required this.activeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final anyActive = isEqEnabled || isDdcEnabled || isLimiterEnabled;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 2,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.specularAt(p.isDark ? 0.04 : 0.03),
+        borderRadius: AppRadii.r16All,
+        border: Border.all(
+          color: anyActive
+              ? activeColor.withValues(alpha: 0.28)
+              : p.hairline,
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _SignalStageChip(
+            label: 'PCM IN',
+            icon: Icons.waves_rounded,
+            isActive: true,
+            activeColor: activeColor,
+          ),
+          _SignalConnectorLine(
+            isActive: isEqEnabled,
+            activeColor: activeColor,
+          ),
+          _SignalStageChip(
+            label: 'PEQ',
+            icon: Icons.graphic_eq_rounded,
+            isActive: isEqEnabled,
+            activeColor: activeColor,
+          ),
+          _SignalConnectorLine(
+            isActive: isDdcEnabled,
+            activeColor: activeColor,
+          ),
+          _SignalStageChip(
+            label: 'DDC',
+            icon: Icons.headphones_rounded,
+            isActive: isDdcEnabled,
+            activeColor: activeColor,
+          ),
+          _SignalConnectorLine(
+            isActive: isLimiterEnabled,
+            activeColor: activeColor,
+          ),
+          _SignalStageChip(
+            label: 'LIM',
+            icon: Icons.shield_outlined,
+            isActive: isLimiterEnabled,
+            activeColor: activeColor,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SignalStageChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isActive;
+  final Color activeColor;
+
+  const _SignalStageChip({
+    required this.label,
+    required this.icon,
+    required this.isActive,
+    required this.activeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return AnimatedContainer(
+      duration: context.motionMs(220),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: isActive
+            ? activeColor.withValues(alpha: 0.18)
+            : AppColors.specularAt(0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isActive
+              ? activeColor.withValues(alpha: 0.50)
+              : AppColors.specularAt(0.10),
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 13,
+            color: isActive ? activeColor : p.textSecondary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+              color: isActive ? p.textPrimary : p.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SignalConnectorLine extends StatelessWidget {
+  final bool isActive;
+  final Color activeColor;
+
+  const _SignalConnectorLine({
+    required this.isActive,
+    required this.activeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Expanded(
+      child: AnimatedContainer(
+        duration: context.motionMs(220),
+        height: 1.5,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(2),
+          color: isActive
+              ? activeColor.withValues(alpha: 0.65)
+              : p.hairline,
+        ),
+      ),
     );
   }
 }
@@ -676,7 +1168,7 @@ class _DspModuleBentoCard extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: value
                 ? [
-                    activeColor.withValues(alpha: 0.16),
+                    activeColor.withValues(alpha: 0.18),
                     activeColor.withValues(alpha: 0.06),
                   ]
                 : [
@@ -687,15 +1179,15 @@ class _DspModuleBentoCard extends StatelessWidget {
           borderRadius: AppRadii.r20All,
           border: Border.all(
             color: value
-                ? activeColor.withValues(alpha: 0.45)
+                ? activeColor.withValues(alpha: 0.48)
                 : AppColors.specularAt(0.12),
             width: value ? 1.2 : 1.0,
           ),
           boxShadow: value
               ? [
                   BoxShadow(
-                    color: activeColor.withValues(alpha: 0.14),
-                    blurRadius: 16,
+                    color: activeColor.withValues(alpha: 0.15),
+                    blurRadius: 18,
                     spreadRadius: -2,
                     offset: const Offset(0, 4),
                   ),
@@ -706,8 +1198,8 @@ class _DspModuleBentoCard extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: context.motionMs(220),
-              width: 42,
-              height: 42,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: value
@@ -715,10 +1207,19 @@ class _DspModuleBentoCard extends StatelessWidget {
                     : AppColors.specularAt(0.08),
                 border: Border.all(
                   color: value
-                      ? activeColor.withValues(alpha: 0.50)
+                      ? activeColor.withValues(alpha: 0.55)
                       : AppColors.specularAt(0.12),
                   width: 1.0,
                 ),
+                boxShadow: value
+                    ? [
+                        BoxShadow(
+                          color: activeColor.withValues(alpha: 0.25),
+                          blurRadius: 10,
+                          spreadRadius: -2,
+                        ),
+                      ]
+                    : null,
               ),
               child: Icon(
                 icon,
@@ -732,15 +1233,35 @@ class _DspModuleBentoCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: AppFontSize.body,
-                      fontWeight: FontWeight.w800,
-                      color: p.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppFontSize.body,
+                            fontWeight: FontWeight.w800,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      AnimatedContainer(
+                        duration: context.motionMs(200),
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: value
+                              ? activeColor
+                              : p.textSecondary.withValues(alpha: 0.28),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     subtitle,
                     maxLines: 1,
@@ -749,7 +1270,7 @@ class _DspModuleBentoCard extends StatelessWidget {
                       fontSize: AppFontSize.bodySmall,
                       fontWeight: FontWeight.w500,
                       color: value
-                          ? activeColor.withValues(alpha: 0.90)
+                          ? activeColor.withValues(alpha: 0.92)
                           : p.textSecondary,
                     ),
                   ),

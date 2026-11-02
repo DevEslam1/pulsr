@@ -399,12 +399,12 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
 
         const SizedBox(height: AppSpacing.s8),
 
-        // Indicator strip: Smooth expanding dot indicator + Quick Radio link
+        // Indicator strip: Smooth expanding dot indicator + Quick Radio chip
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+          padding: const EdgeInsets.symmetric(horizontal: 6.0),
           child: Row(
             children: [
-              // Dots
+              // Pagination Dots
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: List.generate(total, (i) {
@@ -419,18 +419,27 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                       );
                     },
                     child: Container(
-                      margin: const EdgeInsetsDirectional.only(end: 4.0),
+                      margin: const EdgeInsetsDirectional.only(end: 4.5),
                       padding: const EdgeInsets.symmetric(vertical: 4.0),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 240),
                         curve: Curves.easeOutCubic,
-                        width: isActive ? 18.0 : 5.0,
-                        height: 5.0,
+                        width: isActive ? 20.0 : 5.5,
+                        height: 5.5,
                         decoration: BoxDecoration(
                           color: isActive
                               ? p.accent
-                              : p.textTertiary.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(2.5),
+                              : p.textTertiary.withValues(alpha: 0.32),
+                          borderRadius: BorderRadius.circular(3.0),
+                          boxShadow: isActive
+                              ? [
+                                  BoxShadow(
+                                    color: p.accent.withValues(alpha: 0.40),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
+                              : null,
                         ),
                       ),
                     ),
@@ -440,7 +449,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
 
               const Spacer(),
 
-              // Quick "All Stations" action
+              // Quick "All Stations" tonal action chip
               Semantics(
                 button: true,
                 label: 'View all radio stations',
@@ -453,17 +462,27 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                           HapticFeedback.selectionClick();
                           context.push('/radio');
                         },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6.0,
-                        vertical: 2.0,
+                    child: Container(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        8.0,
+                        3.0,
+                        5.0,
+                        3.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.10),
+                        borderRadius: AppRadii.circular(999),
+                        border: Border.all(
+                          color: p.accent.withValues(alpha: 0.24),
+                          width: 0.8,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.radio_rounded,
-                            size: 13,
+                            size: 12.5,
                             color: p.accent,
                           ),
                           const SizedBox(width: 4),
@@ -473,10 +492,10 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                               color: p.accent,
                               fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
+                              letterSpacing: 0.25,
                             ),
                           ),
-                          const SizedBox(width: 2),
+                          const SizedBox(width: 1),
                           Icon(
                             Icons.chevron_right_rounded,
                             size: 14,
@@ -542,6 +561,13 @@ class _QuranHeroCard extends StatelessWidget {
         final defaultBadge =
             isArabic ? 'إذاعة القرآن الكريم' : 'Holy Quran Radio';
 
+        final baseSurface = p.surfaceContainer;
+        final elevatedSurface = Color.alphaBlend(
+          (isPlaying ? AppColors.mint : p.accent)
+              .withValues(alpha: p.isDark ? 0.10 : 0.06),
+          p.surfaceContainerHigh,
+        );
+
         return Semantics(
           button: true,
           label:
@@ -555,20 +581,28 @@ class _QuranHeroCard extends StatelessWidget {
               child: Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: p.surfaceContainer,
+                  gradient: LinearGradient(
+                    begin: AlignmentDirectional.topStart,
+                    end: AlignmentDirectional.bottomEnd,
+                    colors: [
+                      elevatedSurface,
+                      baseSurface,
+                    ],
+                  ),
                   borderRadius: AppRadii.r24All,
                   border: Border.all(
                     color: isPlaying
-                        ? p.accent.withValues(alpha: 0.65)
-                        : p.accent.withValues(alpha: 0.22),
+                        ? p.accent.withValues(alpha: 0.70)
+                        : p.accent.withValues(alpha: 0.24),
                     width: isPlaying ? 1.5 : 1.0,
                   ),
                   boxShadow: isPlaying
                       ? [
                           BoxShadow(
-                            color: p.accent.withValues(alpha: 0.2),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
+                            color: p.accent.withValues(alpha: 0.22),
+                            blurRadius: 22,
+                            spreadRadius: -2,
+                            offset: const Offset(0, 6),
                           ),
                           ...PulsrElevation.level2(context),
                         ]
@@ -577,12 +611,33 @@ class _QuranHeroCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
+                    // Ambient radial glow behind the reciter portrait stage
+                    PositionedDirectional(
+                      end: -20,
+                      top: -20,
+                      bottom: -20,
+                      width: 170,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              colors: [
+                                p.accent.withValues(
+                                    alpha: isPlaying ? 0.22 : 0.12),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
                     // Reciter Ambient Artwork (Trailing alignment - unobstructed stage)
                     PositionedDirectional(
                       end: 0,
                       top: 0,
                       bottom: 0,
-                      width: 145,
+                      width: 148,
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           final isNetwork =
@@ -596,7 +651,7 @@ class _QuranHeroCard extends StatelessWidget {
                                 CachedArtwork(
                                   id: 0,
                                   remoteUrl: item.artworkAsset,
-                                  size: 145,
+                                  size: 148,
                                   fallbackIcon: Icons.radio_rounded,
                                 )
                               else
@@ -614,31 +669,31 @@ class _QuranHeroCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                              // Smooth fade from surfaceContainer into the photo
+                              // Smooth multi-stop fade from card surface into the portrait
                               DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: AlignmentDirectional.centerStart,
                                     end: AlignmentDirectional.centerEnd,
                                     colors: [
-                                      p.surfaceContainer,
-                                      p.surfaceContainer.withValues(alpha: 0.8),
-                                      p.surfaceContainer.withValues(alpha: 0.15),
+                                      baseSurface,
+                                      baseSurface.withValues(alpha: 0.86),
+                                      baseSurface.withValues(alpha: 0.28),
                                       Colors.transparent,
                                     ],
-                                    stops: const [0.0, 0.35, 0.75, 1.0],
+                                    stops: const [0.0, 0.32, 0.68, 1.0],
                                   ),
                                 ),
                               ),
-                              // Subtle vignette darkening for high contrast in light & dark modes
+                              // Subtle vertical vignette for contrast in light & dark modes
                               DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
                                     colors: [
-                                      Colors.black.withValues(alpha: 0.1),
-                                      Colors.black.withValues(alpha: 0.35),
+                                      Colors.black.withValues(alpha: 0.08),
+                                      Colors.black.withValues(alpha: 0.38),
                                     ],
                                   ),
                                 ),
@@ -646,6 +701,28 @@ class _QuranHeroCard extends StatelessWidget {
                             ],
                           );
                         },
+                      ),
+                    ),
+
+                    // Top inner specular highlight hairline
+                    Positioned(
+                      top: 0,
+                      left: 24,
+                      right: 24,
+                      child: IgnorePointer(
+                        child: Container(
+                          height: 1,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withValues(alpha: 0.0),
+                                (p.isDark ? Colors.white : Colors.black)
+                                    .withValues(alpha: p.isDark ? 0.14 : 0.05),
+                                Colors.white.withValues(alpha: 0.0),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
 
@@ -657,12 +734,13 @@ class _QuranHeroCard extends StatelessWidget {
                         child: Icon(
                           Icons.graphic_eq_rounded,
                           size: 100,
-                          color: p.accent.withValues(alpha: 0.05),
+                          color: p.accent
+                              .withValues(alpha: isPlaying ? 0.08 : 0.045),
                         ),
                       ),
                     ),
 
-                    // Foreground Content Layer (Leaves right side open for portrait)
+                    // Foreground Content Layer (Leaves trailing side open for portrait)
                     Padding(
                       padding: const EdgeInsetsDirectional.fromSTEB(
                         AppSpacing.md,
@@ -674,69 +752,100 @@ class _QuranHeroCard extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Top Overline: Status / Reciter Pill Badge
+                          // Top Overline: Status / Reciter Pill Badge + Counter Chip
                           Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isPlaying
-                                      ? AppColors.mint.withValues(alpha: 0.18)
-                                      : p.accent.withValues(alpha: 0.14),
-                                  borderRadius: AppRadii.circular(999),
-                                  border: Border.all(
-                                    color: isPlaying
-                                        ? AppColors.mint.withValues(alpha: 0.4)
-                                        : p.accent.withValues(alpha: 0.28),
-                                    width: 0.8,
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
                                   ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (isPlaying) ...[
-                                      const _PulsingLiveDot(),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        isArabic ? 'بث مباشر' : 'LIVE ON AIR',
-                                        style: TextStyle(
-                                          color: AppColors.mint,
-                                          fontSize: AppFontSize.tiny,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.5,
+                                  decoration: BoxDecoration(
+                                    color: isPlaying
+                                        ? AppColors.mint.withValues(alpha: 0.18)
+                                        : p.accent.withValues(alpha: 0.14),
+                                    borderRadius: AppRadii.circular(999),
+                                    border: Border.all(
+                                      color: isPlaying
+                                          ? AppColors.mint
+                                              .withValues(alpha: 0.45)
+                                          : p.accent.withValues(alpha: 0.30),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (isPlaying) ...[
+                                        const _PulsingLiveDot(),
+                                        const SizedBox(width: 4.5),
+                                        Flexible(
+                                          child: Text(
+                                            isArabic
+                                                ? 'بث مباشر'
+                                                : 'LIVE ON AIR',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: AppColors.mint,
+                                              fontSize: AppFontSize.tiny,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ] else ...[
-                                      Icon(
-                                        Icons.radio_rounded,
-                                        size: 11,
-                                        color: p.accent,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        badgeText ?? defaultBadge,
-                                        style: TextStyle(
+                                      ] else ...[
+                                        Icon(
+                                          Icons.radio_rounded,
+                                          size: 11,
                                           color: p.accent,
-                                          fontSize: AppFontSize.tiny,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.5,
                                         ),
-                                      ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            badgeText ?? defaultBadge,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: p.accent,
+                                              fontSize: AppFontSize.tiny,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.4,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              // Station count badge
-                              Text(
-                                '${index + 1}/$total',
-                                style: TextStyle(
-                                  color: p.textTertiary,
-                                  fontSize: AppFontSize.tiny,
-                                  fontWeight: FontWeight.w700,
+                              // Station count micro-pill
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5.5,
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: p.surfaceContainerHighest
+                                      .withValues(alpha: 0.65),
+                                  borderRadius: AppRadii.r6All,
+                                  border: Border.all(
+                                    color: p.hairline.withValues(alpha: 0.6),
+                                    width: 0.6,
+                                  ),
+                                ),
+                                child: Text(
+                                  '${index + 1}/$total',
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.tiny,
+                                    fontWeight: FontWeight.w700,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -783,9 +892,8 @@ class _QuranHeroCard extends StatelessWidget {
                                   velocity: 24.0,
                                   blankSpace: 32.0,
                                   style: TextStyle(
-                                    color: isPlaying
-                                        ? p.accent
-                                        : p.textSecondary,
+                                    color:
+                                        isPlaying ? p.accent : p.textSecondary,
                                     fontSize: 11.5,
                                     fontWeight: isPlaying
                                         ? FontWeight.w700
@@ -798,7 +906,7 @@ class _QuranHeroCard extends StatelessWidget {
 
                           const SizedBox(height: 8),
 
-                          // Bottom Action Row: Play/Pause Button + Equalizer / Hint
+                          // Bottom Action Row: Tactile Play/Pause Button + Status Capsule
                           Row(
                             children: [
                               ExcludeSemantics(
@@ -811,24 +919,43 @@ class _QuranHeroCard extends StatelessWidget {
                                       width: 38,
                                       height: 38,
                                       decoration: BoxDecoration(
-                                        color: p.accent,
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Color.alphaBlend(
+                                              Colors.white
+                                                  .withValues(alpha: 0.16),
+                                              p.accent,
+                                            ),
+                                            p.accent,
+                                          ],
+                                        ),
                                         shape: BoxShape.circle,
-                                        boxShadow:
-                                            PulsrElevation.level2(context),
-                                        border: isPlaying
-                                            ? Border.all(
-                                                color: p.onAccent
-                                                    .withValues(alpha: 0.35),
-                                                width: 1.5,
-                                              )
-                                            : null,
+                                        boxShadow: [
+                                          ...PulsrElevation.level2(context),
+                                          BoxShadow(
+                                            color: p.accent.withValues(
+                                              alpha: isPlaying ? 0.34 : 0.18,
+                                            ),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                        border: Border.all(
+                                          color: p.onAccent.withValues(
+                                            alpha: isPlaying ? 0.38 : 0.18,
+                                          ),
+                                          width: isPlaying ? 1.5 : 1.0,
+                                        ),
                                       ),
                                       child: Center(
                                         child: isBuffering
                                             ? SizedBox(
                                                 width: 16,
                                                 height: 16,
-                                                child: CircularProgressIndicator(
+                                                child:
+                                                    CircularProgressIndicator(
                                                   strokeWidth: 2.0,
                                                   color: p.onAccent,
                                                 ),
@@ -846,36 +973,61 @@ class _QuranHeroCard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              if (isPlaying) ...[
-                                _MiniEqualizerBars(
-                                  isPlaying: true,
-                                  color: AppColors.mint,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8.5,
+                                  vertical: 4.5,
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  isArabic ? 'بث حي' : 'LIVE',
-                                  style: TextStyle(
-                                    color: AppColors.mint,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                                decoration: BoxDecoration(
+                                  color: isPlaying
+                                      ? AppColors.mint.withValues(alpha: 0.12)
+                                      : p.surfaceContainerHighest
+                                          .withValues(alpha: 0.55),
+                                  borderRadius: AppRadii.circular(999),
+                                  border: Border.all(
+                                    color: isPlaying
+                                        ? AppColors.mint.withValues(alpha: 0.30)
+                                        : p.hairline.withValues(alpha: 0.65),
+                                    width: 0.75,
                                   ),
                                 ),
-                              ] else ...[
-                                Icon(
-                                  Icons.volume_up_rounded,
-                                  size: 13,
-                                  color: p.textTertiary,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isPlaying) ...[
+                                      _MiniEqualizerBars(
+                                        isPlaying: true,
+                                        color: AppColors.mint,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        isArabic ? 'بث حي' : 'LIVE',
+                                        style: TextStyle(
+                                          color: AppColors.mint,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      Icon(
+                                        Icons.volume_up_rounded,
+                                        size: 13,
+                                        color: p.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        isArabic ? 'استمع الآن' : 'Listen Now',
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isArabic ? 'استمع الآن' : 'Listen Now',
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ],
                           ),
                         ],

@@ -6130,6 +6130,22 @@
   "@quranRepeatOff": {
     "description": "Repeat mode off"
   },
+  "ambientSounds": "Ambient Sounds",
+  "@ambientSounds": {
+    "description": "Section title for relaxing ambient sound effects in Quran Mode"
+  },
+  "ambientSoundsDesc": "Relaxing background sound while listening",
+  "@ambientSoundsDesc": {
+    "description": "Subtitle for ambient sounds section"
+  },
+  "ambientSoundVolume": "Volume",
+  "@ambientSoundVolume": {
+    "description": "Volume label for ambient sound slider"
+  },
+  "ambientSoundError": "Could not load ambient sound. Check your connection.",
+  "@ambientSoundError": {
+    "description": "Error shown when ambient sound fails to load"
+  },
   "batchCappedTracks": "{count, plural, =1{1 track skipped (batch limit)} other{{count} tracks skipped (batch limit)}}",
   "@batchCappedTracks": {
     "description": "Batch download toast suffix for tracks not queued because of the per-batch cap",

@@ -1,9 +1,12 @@
+// lib/core/widgets/pulsr_section_header.dart
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
+import 'pulsr_pressable.dart';
 import 'pulsr_text.dart';
 
 /// {@category DesignSystem}
@@ -35,6 +38,7 @@ class PulsrSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final gutter = Adaptive.pagePadding(context);
+    final isLargeHeader = overline != null;
 
     return Padding(
       padding: padding ??
@@ -48,19 +52,38 @@ class PulsrSectionHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (icon != null) ...[
-            Icon(
-              icon,
-              size: 20.0,
-              color: p.accent,
-            ),
-            const SizedBox(width: AppSpacing.xs),
+            if (isLargeHeader)
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: p.accent.withValues(alpha: p.isDark ? 0.16 : 0.10),
+                  border: Border.all(
+                    color: p.accent.withValues(alpha: 0.35),
+                    width: 1.0,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  size: 17.0,
+                  color: p.accent,
+                ),
+              )
+            else
+              Icon(
+                icon,
+                size: 18.0,
+                color: p.accent,
+              ),
+            const SizedBox(width: AppSpacing.xs + 2),
           ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (overline != null) ...[
+                if (isLargeHeader) ...[
                   Text(
                     overline!.toUpperCase(),
                     style: PulsrText.overline(context: context),
@@ -72,20 +95,21 @@ class PulsrSectionHeader extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        overline != null ? title : title.toUpperCase(),
+                        isLargeHeader ? title : title.toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: overline != null
+                        style: isLargeHeader
                             ? TextStyle(
                                 fontFamily: 'Manrope',
                                 fontSize: AppFontSize.bodyLarge,
                                 fontWeight: FontWeight.w800,
                                 color: p.textPrimary,
+                                letterSpacing: AppTracking.title,
                               )
                             : Theme.of(context).textTheme.labelSmall?.copyWith(
                                   color: p.textTertiary,
                                   letterSpacing: AppTracking.wide,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w800,
                                 ),
                       ),
                     ),
@@ -93,19 +117,27 @@ class PulsrSectionHeader extends StatelessWidget {
                       const SizedBox(width: AppSpacing.xs),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s6,
-                          vertical: AppSpacing.s2,
+                          horizontal: 7.0,
+                          vertical: 2.0,
                         ),
                         decoration: BoxDecoration(
-                          color: p.surfaceContainerHigh,
+                          color: p.isDark
+                              ? AppColors.specularAt(0.08)
+                              : p.surfaceContainerHigh,
                           borderRadius: AppRadii.full,
+                          border: Border.all(
+                            color: p.isDark
+                                ? AppColors.specularAt(0.14)
+                                : p.hairline,
+                            width: 0.8,
+                          ),
                         ),
                         child: Text(
                           '$count',
                           style: TextStyle(
                             fontFamily: 'Manrope',
                             fontSize: AppFontSize.tiny,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                             color: p.textSecondary,
                           ),
                         ),
@@ -120,25 +152,57 @@ class PulsrSectionHeader extends StatelessWidget {
             trailing!
           else if (actionLabel != null && onAction != null)
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 160),
-              child: TextButton(
-                onPressed: onAction,
-                style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
-                  minimumSize: const Size(44, 44),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  actionLabel!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Manrope',
-                    color: p.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: AppFontSize.label,
-                    letterSpacing: AppTracking.label,
+              constraints: const BoxConstraints(
+                maxWidth: 168,
+                minHeight: 40,
+              ),
+              child: PulsrPressable(
+                pressedScale: 0.95,
+                focusBorderRadius: AppRadii.full,
+                onTap: onAction,
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  widthFactor: 1.0,
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.only(
+                      start: AppSpacing.s10,
+                      end: AppSpacing.xs,
+                      top: 6,
+                      bottom: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: p.isDark ? 0.14 : 0.09),
+                      borderRadius: AppRadii.full,
+                      border: Border.all(
+                        color: p.accent.withValues(alpha: 0.30),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            actionLabel!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Manrope',
+                              color: p.accent,
+                              fontWeight: FontWeight.w800,
+                              fontSize: AppFontSize.label,
+                              letterSpacing: AppTracking.label,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: p.accent,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

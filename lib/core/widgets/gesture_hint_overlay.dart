@@ -1,7 +1,9 @@
 // lib/core/widgets/gesture_hint_overlay.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
@@ -73,8 +75,12 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
     } catch (_) {}
   }
 
-  Future<void> _dismiss() async {
+  Future<void> _dismiss({bool fromUserTap = false}) async {
     if (!mounted || _dismissed) return;
+    if (fromUserTap) {
+      HapticFeedback.selectionClick();
+    }
+    _autoHideTimer?.cancel();
     setState(() => _visible = false);
     await Future.delayed(const Duration(milliseconds: 250));
     if (mounted) setState(() => _dismissed = true);
@@ -89,6 +95,8 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
     if (_dismissed) return const SizedBox.shrink();
 
     final p = context.palette;
+    final motionDuration = context.motionMs(260);
+    final motionCurve = context.motionCurve(Curves.easeOutCubic);
 
     return Align(
       alignment: widget.alignment,
@@ -96,85 +104,126 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
         padding: widget.padding,
         child: IgnorePointer(
           ignoring: !_visible,
-          child: AnimatedOpacity(
-            opacity: _visible ? 1.0 : 0.0,
-            duration: context.motionMs(260),
-            curve: context.motionCurve(Curves.easeOutCubic),
-            child: Material(
-              color: Colors.transparent,
-              child: GestureDetector(
-                onTap: _dismiss,
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s14,
-                    vertical: AppSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (p.isDark ? p.surfaceContainerHigh : p.surface)
-                        .withValues(alpha: 0.94),
-                    borderRadius: AppRadii.r20All,
-                    border: Border.all(
-                      color: p.accent.withValues(alpha: 0.35),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black
-                            .withValues(alpha: p.isDark ? 0.45 : 0.15),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
+          child: AnimatedSlide(
+            offset: _visible ? Offset.zero : const Offset(0, 0.18),
+            duration: motionDuration,
+            curve: motionCurve,
+            child: AnimatedScale(
+              scale: _visible ? 1.0 : 0.94,
+              duration: motionDuration,
+              curve: motionCurve,
+              child: AnimatedOpacity(
+                opacity: _visible ? 1.0 : 0.0,
+                duration: motionDuration,
+                curve: motionCurve,
+                child: Material(
+                  color: Colors.transparent,
+                  child: GestureDetector(
+                    onTap: () => _dismiss(fromUserTap: true),
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      padding: const EdgeInsetsDirectional.only(
+                        start: AppSpacing.s10,
+                        end: AppSpacing.xs,
+                        top: 6,
+                        bottom: 6,
                       ),
-                      BoxShadow(
-                        color: p.accent.withValues(alpha: 0.15),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.xxs),
-                        decoration: BoxDecoration(
-                          color: p.accent.withValues(alpha: 0.18),
-                          shape: BoxShape.circle,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color.lerp(
+                              p.isDark ? p.surfaceContainerHigh : p.surface,
+                              p.accent,
+                              p.isDark ? 0.10 : 0.05,
+                            )!
+                                .withValues(alpha: 0.96),
+                            (p.isDark ? p.surfaceContainerHigh : p.surface)
+                                .withValues(alpha: 0.94),
+                          ],
                         ),
-                        child: Icon(
-                          widget.icon,
-                          color: p.accent,
-                          size: 16,
+                        borderRadius: AppRadii.full,
+                        border: Border.all(
+                          color: p.accent.withValues(alpha: 0.42),
+                          width: 1.2,
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Flexible(
-                        child: Text(
-                          widget.message,
-                          style: TextStyle(
-                            fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w700,
-                            color: p.textPrimary,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black
+                                .withValues(alpha: p.isDark ? 0.45 : 0.14),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          BoxShadow(
+                            color: p.accent.withValues(alpha: 0.18),
+                            blurRadius: 14,
+                            spreadRadius: -2,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: AppSpacing.s6),
-                      IconButton(
-                        tooltip: context.l10n.close,
-                        onPressed: _dismiss,
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget,
-                        ),
-                        icon: Icon(
-                          Icons.close_rounded,
-                          size: 16,
-                          color: p.textTertiary,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.18),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: p.accent.withValues(alpha: 0.40),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Icon(
+                              widget.icon,
+                              color: p.accent,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Flexible(
+                            child: Text(
+                              widget.message,
+                              style: TextStyle(
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w700,
+                                color: p.textPrimary,
+                                height: 1.25,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xxs),
+                          IconButton(
+                            tooltip: context.l10n.close,
+                            onPressed: () => _dismiss(fromUserTap: true),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget,
+                            ),
+                            icon: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: p.isDark
+                                    ? AppColors.specularAt(0.08)
+                                    : p.surfaceContainer,
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 14,
+                                color: p.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

@@ -1,6 +1,8 @@
 // lib/core/widgets/pulsr_search_field.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
@@ -163,6 +165,7 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
   }
 
   void _handleClear() {
+    HapticFeedback.selectionClick();
     _debounceTimer?.cancel();
     _controller.clear();
     widget.onClear?.call();
@@ -182,37 +185,65 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
     final fieldHeight =
         widget.height ?? PulsrLayoutMetrics.fieldHeight(context);
 
+    final Color borderColor = _isFocused
+        ? p.accent
+        : (hasText
+            ? p.accent.withValues(alpha: 0.45)
+            : (p.isDark ? AppColors.specularAt(0.12) : p.hairline));
+
     Widget field = AnimatedContainer(
-      duration: context.motionMs(180),
-      curve: Curves.easeOutCubic,
+      duration: context.motionMs(200),
+      curve: context.motionCurve(Curves.easeOutCubic),
       height: fieldHeight,
       decoration: BoxDecoration(
-        color: _isFocused ? p.surfaceContainerHigh : p.surfaceContainer,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: _isFocused
+              ? [
+                  Color.lerp(
+                        p.surfaceContainerHigh,
+                        p.accent,
+                        p.isDark ? 0.06 : 0.03,
+                      ) ??
+                      p.surfaceContainerHigh,
+                  p.surfaceContainerHigh,
+                ]
+              : [
+                  p.surfaceContainer,
+                  p.surfaceContainer,
+                ],
+        ),
         borderRadius: AppRadii.cardRadius,
         border: widget.showBorder
             ? Border.all(
-                color: _isFocused
-                    ? p.accent
-                    : (hasText ? p.accent.withValues(alpha: 0.45) : p.hairline),
-                width: _isFocused ? 1.5 : 1.0,
+                color: borderColor,
+                width: _isFocused ? 1.4 : 1.0,
               )
             : null,
         boxShadow: _isFocused
             ? [
                 BoxShadow(
-                  color: p.accent.withValues(alpha: p.isDark ? 0.16 : 0.10),
-                  blurRadius: 12,
+                  color: p.accent.withValues(alpha: p.isDark ? 0.18 : 0.10),
+                  blurRadius: 16,
                   spreadRadius: -2,
-                  offset: const Offset(0, 2),
+                  offset: const Offset(0, 3),
                 ),
               ]
-            : null,
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: p.isDark ? 0.16 : 0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Center(
         child: TextField(
           controller: _controller,
           focusNode: _focusNode,
           autofocus: widget.autofocus,
+          textInputAction: TextInputAction.search,
           textAlignVertical: TextAlignVertical.center,
           onChanged: _handleChanged,
           onSubmitted: (value) {
@@ -221,6 +252,8 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
             widget.onSubmitted?.call(value);
           },
           cursorColor: p.accent,
+          cursorWidth: 1.8,
+          cursorRadius: const Radius.circular(2),
           style: TextStyle(
             color: p.textPrimary,
             fontSize: AppFontSize.body,
@@ -234,13 +267,22 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
               fontSize: AppFontSize.bodySmall,
               fontWeight: FontWeight.w500,
             ),
-            prefixIcon: Icon(
-              Icons.search_rounded,
-              color: active ? p.accent : p.textTertiary,
-              size: 20,
+            prefixIcon: AnimatedScale(
+              scale: _isFocused ? 1.08 : 1.0,
+              duration: context.motionMs(180),
+              curve: context.motionCurve(Curves.easeOutCubic),
+              child: Icon(
+                Icons.search_rounded,
+                color: active ? p.accent : p.textTertiary,
+                size: 20,
+              ),
             ),
             suffixIcon: AnimatedSwitcher(
-              duration: context.motionMs(150),
+              duration: context.motionMs(160),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: ScaleTransition(scale: anim, child: child),
+              ),
               child: hasText
                   ? IconButton(
                       key: const ValueKey('clear_btn'),
@@ -249,15 +291,24 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
                         minHeight: AppSpacing.minTouchTarget,
                       ),
                       icon: Container(
-                        padding: const EdgeInsets.all(3),
+                        width: 22,
+                        height: 22,
                         decoration: BoxDecoration(
-                          color: p.surfaceContainerHigh,
+                          color: p.isDark
+                              ? AppColors.specularAt(0.10)
+                              : p.surfaceContainerHigh,
                           shape: BoxShape.circle,
+                          border: Border.all(
+                            color: p.isDark
+                                ? AppColors.specularAt(0.14)
+                                : p.hairline,
+                            width: 0.8,
+                          ),
                         ),
                         child: Icon(
                           Icons.close_rounded,
                           color: p.textSecondary,
-                          size: 14,
+                          size: 13.5,
                         ),
                       ),
                       tooltip: context.l10n.clear,

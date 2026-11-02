@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../performance/gpu_budget.dart';
 import '../services/settings_cache.dart';
@@ -125,9 +126,8 @@ class GlassContainer extends StatelessWidget {
     final effectiveRadius =
         borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
 
-    // The user's Liquid Glass Tint (0 = ultra clear, 1 = tinted) and the
-    // preset opacity were previously accepted but never applied, so every
-    // "glass" surface rendered opaque and the slider did nothing.
+    // Apply the user's Liquid Glass Tint (0 = ultra clear, 1 = tinted) and
+    // preset opacity so glass surfaces respond dynamically to user settings.
     final tint = (tintFactor ??
             SettingsCache()
                 .getDouble('setting_liquid_glass_tint', defaultValue: 0.8))
@@ -137,22 +137,44 @@ class GlassContainer extends StatelessWidget {
     final baseColor =
         color == null ? base.withValues(alpha: base.a * tintAlpha) : base;
 
+    final showLiquidSheen = isLiquid || specularHighlight;
+
     final effectiveBorder = border ??
         Border.all(
-          color: p.hairline,
+          color: showLiquidSheen && p.isDark
+              ? AppColors.specularAt(0.16)
+              : p.hairline,
           width: 1.0,
         );
 
     final effectiveShadow = boxShadow;
 
+    final Gradient? liquidGradient = showLiquidSheen
+        ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color.lerp(
+                    baseColor,
+                    Colors.white,
+                    p.isDark ? 0.055 : 0.12,
+                  ) ??
+                  baseColor,
+              baseColor,
+            ],
+          )
+        : null;
+
     final decoration = shape != null
         ? ShapeDecoration(
-            color: baseColor,
+            color: liquidGradient == null ? baseColor : null,
+            gradient: liquidGradient,
             shape: shape!,
             shadows: effectiveShadow,
           )
         : BoxDecoration(
-            color: baseColor,
+            color: liquidGradient == null ? baseColor : null,
+            gradient: liquidGradient,
             borderRadius: effectiveRadius,
             border: effectiveBorder,
             boxShadow: effectiveShadow,

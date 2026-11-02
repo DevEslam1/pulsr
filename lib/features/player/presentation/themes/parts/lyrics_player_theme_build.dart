@@ -18,92 +18,13 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
         ));
     final isTablet = context.isTablet;
     final p = context.palette;
+    final isInSplitView = PlayerSplitViewScope.of(context);
 
-    return Stack(
-      children: [
-        // 1 & 2. Dynamic Fluid Ambient Backdrop & Dual Glow Auras (Isolated in RepaintBoundary)
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: AnimatedContainer(
-                    duration: context.motionMs(500),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color.lerp(bgColor, Colors.black,
-                                  p.isDark ? 0.42 : 0.04) ??
-                              bgColor,
-                          bgColor,
-                          p.isDark ? const Color(0xFF080910) : p.bg,
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0.0, 0.48, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-                PositionedDirectional(
-                  top: -70,
-                  start: -30,
-                  end: -30,
-                  height: isTablet ? 520 : 400,
-                  child: IgnorePointer(
-                    child: AnimatedContainer(
-                      duration: context.motionMs(500),
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.center,
-                          radius: 0.85,
-                          colors: [
-                            activeColor.withValues(
-                              alpha: state.isPlaying ? 0.32 : 0.18,
-                            ),
-                            activeColor.withValues(alpha: 0.07),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.54, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                PositionedDirectional(
-                  bottom: -60,
-                  start: 0,
-                  end: 0,
-                  height: isTablet ? 380 : 280,
-                  child: IgnorePointer(
-                    child: AnimatedContainer(
-                      duration: context.motionMs(500),
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.center,
-                          radius: 0.85,
-                          colors: [
-                            activeColor.withValues(alpha: 0.16),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // 3. Foreground Content
-        SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isInSplitView = PlayerSplitViewScope.of(context);
-              final metrics =
-                  PlayerThemeMetrics.calculate(context, constraints);
-              final isLandscape = metrics.isLandscape;
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics =
+            PlayerThemeMetrics.calculate(context, constraints);
+        final isLandscape = metrics.isLandscape;
 
               final viewSwitcher = PlayerViewSwitcher(
                 state: state,
@@ -434,8 +355,91 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                 ],
               );
             },
+          );
+
+    if (isInSplitView) {
+      return content;
+    }
+
+    return Stack(
+      children: [
+        // 1 & 2. Dynamic Fluid Ambient Backdrop & Dual Glow Auras (Isolated in RepaintBoundary)
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedContainer(
+                    duration: context.motionMs(500),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color.lerp(bgColor, Colors.black,
+                                  p.isDark ? 0.42 : 0.04) ??
+                              bgColor,
+                          bgColor,
+                          p.isDark ? const Color(0xFF080910) : p.bg,
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.48, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                PositionedDirectional(
+                  top: -70,
+                  start: -30,
+                  end: -30,
+                  height: isTablet ? 520 : 400,
+                  child: IgnorePointer(
+                    child: AnimatedContainer(
+                      duration: context.motionMs(500),
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 0.85,
+                          colors: [
+                            activeColor.withValues(
+                              alpha: state.isPlaying ? 0.32 : 0.18,
+                            ),
+                            activeColor.withValues(alpha: 0.07),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.54, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                PositionedDirectional(
+                  bottom: -60,
+                  start: 0,
+                  end: 0,
+                  height: isTablet ? 380 : 280,
+                  child: IgnorePointer(
+                    child: AnimatedContainer(
+                      duration: context.motionMs(500),
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 0.85,
+                          colors: [
+                            activeColor.withValues(alpha: 0.16),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+
+        // 3. Foreground Content
+        SafeArea(child: content),
       ],
     );
   }

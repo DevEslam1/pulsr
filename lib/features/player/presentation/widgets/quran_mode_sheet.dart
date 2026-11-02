@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/services/ambient_sound_service.dart';
 import '../../../../core/services/earbud_optimization_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/di/injection.dart';
@@ -407,6 +408,11 @@ class _QuranModePanelState extends State<QuranModePanel> {
               ),
               applyOnRelease: true,
             ),
+
+            // Ambient sounds
+            const SizedBox(height: AppSpacing.sm),
+            _AmbientSoundPanel(enabled: enabled),
+            const SizedBox(height: AppSpacing.sm),
 
             // Learning speed
             Padding(
@@ -1044,5 +1050,262 @@ class _QuranSliderTileState extends State<_QuranSliderTile> {
         ],
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ambient Sound Panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Ambient relaxing sound effects (Rain, Fire) section in Quran Mode.
+class _AmbientSoundPanel extends StatefulWidget {
+  final bool enabled;
+
+  const _AmbientSoundPanel({this.enabled = true});
+
+  @override
+  State<_AmbientSoundPanel> createState() => _AmbientSoundPanelState();
+}
+
+class _AmbientSoundPanelState extends State<_AmbientSoundPanel> {
+  final AmbientSoundService _service = AmbientSoundService();
+
+  @override
+  void initState() {
+    super.initState();
+    _service.addListener(_onServiceChanged);
+    unawaited(_service.init());
+  }
+
+  void _onServiceChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant _AmbientSoundPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled && _service.isEnabled) {
+      unawaited(_service.setEnabled(false));
+    }
+  }
+
+  @override
+  void dispose() {
+    _service.removeListener(_onServiceChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final isControlActive = widget.enabled && (_service.isEnabled || _service.isLoading);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: AppRadii.r14All,
+          border: Border.all(
+            color: (widget.enabled && _service.isEnabled)
+                ? p.accent.withValues(alpha: 0.35)
+                : p.hairline,
+          ),
+        ),
+        padding: const EdgeInsets.all(AppSpacing.s14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row – title + on/off switch
+            Row(
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: Icon(
+                    _service.isEnabled
+                        ? _iconForEffect(_service.effect)
+                        : Icons.nature_outlined,
+                    key: ValueKey(_service.isEnabled ? _service.effect : 'off'),
+                    color: (widget.enabled && _service.isEnabled)
+                        ? p.accent
+                        : p.textSecondary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.l10n.ambientSounds,
+                        style: TextStyle(
+                          color: widget.enabled ? p.textPrimary : p.textSecondary,
+                          fontSize: AppFontSize.body,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        context.l10n.ambientSoundsDesc,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.label,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_service.isLoading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Semantics(
+                    label: context.l10n.ambientSounds,
+                    value: (widget.enabled && _service.isEnabled) ? 'On' : 'Off',
+                    child: PulsrSwitch(
+                      value: widget.enabled && _service.isEnabled,
+                      onChanged: !widget.enabled
+                          ? null
+                          : (v) {
+                              HapticFeedback.selectionClick();
+                              unawaited(_service.setEnabled(v));
+                            },
+                    ),
+                  ),
+              ],
+            ),
+
+            // Error message
+            if (_service.errorMessage != null && widget.enabled) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                _service.errorMessage!,
+                style: TextStyle(color: p.error, fontSize: AppFontSize.label),
+              ),
+            ],
+
+            // Effect selector + volume – only visible when active
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 250),
+              crossFadeState: isControlActive
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              firstChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: AppSpacing.s10),
+                  Divider(height: 1, color: p.hairline),
+                  const SizedBox(height: AppSpacing.s10),
+
+                  // Effect chips
+                  Text(
+                    'EFFECT',
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.overline,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: AmbientSoundEffect.values.map((effect) {
+                      final selected = effect == _service.effect;
+                      return Semantics(
+                        label: effect.displayName,
+                        selected: selected,
+                        child: ChoiceChip(
+                          selected: selected,
+                          onSelected: !widget.enabled
+                              ? null
+                              : (_) {
+                                  HapticFeedback.selectionClick();
+                                  unawaited(_service.setEffect(effect));
+                                },
+                          avatar: Text(
+                            effect.emoji,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          label: Text(effect.label),
+                          labelStyle: TextStyle(
+                            color: selected ? p.onAccent : p.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppFontSize.label,
+                          ),
+                          backgroundColor: p.surfaceContainer,
+                          selectedColor: p.accent,
+                          side: BorderSide(color: p.hairline),
+                          showCheckmark: false,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: AppSpacing.s10),
+
+                  // Volume slider
+                  Row(
+                    children: [
+                      Icon(Icons.volume_down_rounded,
+                          color: p.textSecondary, size: 18),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 7),
+                            overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 16),
+                          ),
+                          child: Slider(
+                            value: _service.volume,
+                            onChanged: !widget.enabled
+                                ? null
+                                : (v) => _service.setVolume(v),
+                            activeColor: p.accent,
+                            inactiveColor: p.hairline,
+                            label: '%',
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.volume_up_rounded,
+                          color: p.textSecondary, size: 18),
+                      const SizedBox(width: AppSpacing.xs),
+                      SizedBox(
+                        width: 36,
+                        child: Text(
+                          '%',
+                          style: TextStyle(
+                            color: p.accent,
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.end,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              secondChild: const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _iconForEffect(AmbientSoundEffect effect) {
+    switch (effect) {
+      case AmbientSoundEffect.rain:
+        return Icons.water_drop_rounded;
+      case AmbientSoundEffect.fire:
+        return Icons.local_fire_department_rounded;
+    }
   }
 }

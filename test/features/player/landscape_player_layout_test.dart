@@ -105,6 +105,15 @@ void main() {
         expect(find.text('Queue'), findsOneWidget);
         expect(find.text('Lyrics'), findsOneWidget);
         expect(find.text('DSP'), findsOneWidget);
+
+        // TabBar container must be constrained as a compact floating capsule
+        final constrainedBoxes = tester.widgetList<ConstrainedBox>(
+          find.byType(ConstrainedBox),
+        );
+        final tabPillConstraint = constrainedBoxes.any(
+          (box) => box.constraints.maxWidth == 320,
+        );
+        expect(tabPillConstraint, isTrue);
       },
     );
 
