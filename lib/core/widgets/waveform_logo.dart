@@ -1,9 +1,10 @@
 // lib/core/widgets/waveform_logo.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../motion/pulsr_motion.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
 
 /// {@category DesignSystem}
+/// Five-bar audio waveform glyph rendered via zero-allocation [CustomPaint].
 class WaveformLogo extends StatefulWidget {
   final double size;
   final Color? color;
@@ -83,7 +84,6 @@ class _WaveformLogoState extends State<WaveformLogo>
   @override
   Widget build(BuildContext context) {
     final themeColor = widget.color ?? Colors.white;
-    final barHeights = [0.35, 0.65, 1.0, 0.75, 0.45];
 
     return ExcludeSemantics(
       child: LayoutBuilder(
@@ -95,57 +95,94 @@ class _WaveformLogoState extends State<WaveformLogo>
                   ? constraints.biggest.shortestSide
                   : 48.0);
 
-          return SizedBox(
-            width: effectiveSize,
-            height: effectiveSize,
-            child: _controller != null
-                ? AnimatedBuilder(
-                    animation: _controller!,
-                    builder: (context, _) {
-                      final t = _controller!.value;
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: List.generate(5, (index) {
-                          final pulse =
-                              0.85 + (t * 0.3) * ((index % 3) + 1) / 3;
-                          final barHeightRatio = barHeights[index] * pulse;
-                          return _buildBar(
-                              effectiveSize, barHeightRatio, themeColor);
-                        }),
-                      );
-                    },
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return _buildBar(
-                          effectiveSize, barHeights[index], themeColor);
-                    }),
-                  ),
+          return RepaintBoundary(
+            child: SizedBox(
+              width: effectiveSize,
+              height: effectiveSize,
+              child: CustomPaint(
+                size: Size.square(effectiveSize),
+                painter: _WaveformLogoPainter(
+                  animation: _controller,
+                  color: themeColor,
+                  isAnimating: _controller != null,
+                ),
+              ),
+            ),
           );
         },
       ),
     );
   }
+}
 
-  Widget _buildBar(
-      double effectiveSize, double barHeightRatio, Color themeColor) {
-    return Container(
-      width: effectiveSize * 0.12,
-      height: effectiveSize * barHeightRatio,
-      decoration: BoxDecoration(
-        color: themeColor,
-        borderRadius: AppRadii.circular(effectiveSize * 0.06),
-        boxShadow: [
-          BoxShadow(
-            color: themeColor.withValues(alpha: 0.3),
-            blurRadius: 4,
-            spreadRadius: 0.5,
-          ),
+class _WaveformLogoPainter extends CustomPainter {
+  static const List<double> _baseHeights = [0.35, 0.65, 1.0, 0.75, 0.45];
+  static const List<double> _phaseOffsets = [0.0, 0.9, 1.8, 2.7, 3.6];
+
+  final Animation<double>? animation;
+  final Color color;
+  final bool isAnimating;
+
+  _WaveformLogoPainter({
+    required this.animation,
+    required this.color,
+    required this.isAnimating,
+  }) : super(repaint: animation);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    if (w <= 0 || h <= 0) return;
+
+    final barWidth = w * 0.125;
+    final radius = Radius.circular(barWidth / 2);
+    final totalSpacing = w - (barWidth * 5);
+    final gap = totalSpacing / 6.0;
+    final centerY = h / 2.0;
+    final t = animation?.value ?? 0.0;
+
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: isAnimating ? 0.30 : 0.18)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5);
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color.lerp(color, Colors.white, 0.18) ?? color,
+          color,
         ],
-      ),
-    );
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+
+    for (var i = 0; i < 5; i++) {
+      final double ratio;
+      if (isAnimating) {
+        final wave = math.sin(t * math.pi + _phaseOffsets[i]).abs();
+        final pulse = 0.78 + (wave * 0.34);
+        ratio = (_baseHeights[i] * pulse).clamp(0.22, 1.0);
+      } else {
+        ratio = _baseHeights[i];
+      }
+
+      final barHeight = h * ratio;
+      final x = gap + i * (barWidth + gap);
+      final top = centerY - (barHeight / 2.0);
+      final rrect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, top, barWidth, barHeight),
+        radius,
+      );
+
+      canvas.drawRRect(rrect, glowPaint);
+      canvas.drawRRect(rrect, fillPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveformLogoPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.isAnimating != isAnimating ||
+        oldDelegate.animation != animation;
   }
 }

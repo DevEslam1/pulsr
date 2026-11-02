@@ -118,6 +118,46 @@ void main() {
     );
 
     testWidgets(
+      'Tablet landscape dynamic backdrop gradient covers full page with bgColor',
+      (tester) async {
+        const testBgColor = Color(0xFF4A2810);
+        const testActiveColor = Color(0xFFFFB300);
+
+        await tester.pumpWidget(
+          buildSubject(
+            size: const Size(1024, 768),
+            child: ResponsivePlayerLayout(
+              state: const PlayerState(),
+              cubit: mockPlayerCubit,
+              themeWidget: const SizedBox(
+                key: ValueKey('test_theme_widget'),
+                child: Text('Theme in Left Pane'),
+              ),
+              activeColor: testActiveColor,
+              bgColor: testBgColor,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final animatedContainers = tester.widgetList<AnimatedContainer>(
+          find.byType(AnimatedContainer),
+        );
+        final backdrop = animatedContainers.firstWhere(
+          (c) =>
+              c.decoration is BoxDecoration &&
+              (c.decoration as BoxDecoration).gradient is LinearGradient,
+        );
+        final gradient =
+            (backdrop.decoration as BoxDecoration).gradient! as LinearGradient;
+
+        // Gradient must ground the center and all stops in testBgColor, covering the entire page
+        expect(gradient.colors.length, 3);
+        expect(gradient.colors[1], testBgColor);
+      },
+    );
+
+    testWidgets(
       'PulsrLayoutMetrics.isPlayerSplitMode enforces 620dp width floor',
       (tester) async {
         bool? splitNarrow;

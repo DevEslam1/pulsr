@@ -1,5 +1,6 @@
 // lib/core/widgets/pulsr_text_field.dart
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
@@ -106,20 +107,29 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final hasError = widget.error != null && widget.error!.isNotEmpty;
+    final activeTone = hasError ? p.error : p.accent;
 
     final border = OutlineInputBorder(
-      borderRadius: AppRadii.r12All,
-      borderSide: BorderSide(color: p.borderSubtle, width: 1.0),
+      borderRadius: AppRadii.r14All,
+      borderSide: BorderSide(
+        color: p.isDark ? AppColors.specularAt(0.12) : p.borderSubtle,
+        width: 1.0,
+      ),
     );
 
     final focusedBorder = OutlineInputBorder(
-      borderRadius: AppRadii.r12All,
+      borderRadius: AppRadii.r14All,
       borderSide: BorderSide(color: p.accent, width: 1.5),
     );
 
     final errorBorder = OutlineInputBorder(
-      borderRadius: AppRadii.r12All,
+      borderRadius: AppRadii.r14All,
       borderSide: BorderSide(color: p.error, width: 1.4),
+    );
+
+    final focusedErrorBorder = OutlineInputBorder(
+      borderRadius: AppRadii.r14All,
+      borderSide: BorderSide(color: p.error, width: 1.6),
     );
 
     return Column(
@@ -132,36 +142,63 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
               start: AppSpacing.s4,
               bottom: AppSpacing.s6,
             ),
-            child: AnimatedDefaultTextStyle(
-              duration: context.motionMs(160),
-              style: TextStyle(
-                fontFamily: 'Manrope',
-                fontSize: AppFontSize.label,
-                fontWeight: FontWeight.w700,
-                letterSpacing: AppTracking.label,
-                color: hasError
-                    ? p.error
-                    : (_isFocused ? p.accent : p.textSecondary),
-              ),
-              child: Text(widget.label!),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: AnimatedDefaultTextStyle(
+                    duration: context.motionMs(160),
+                    style: TextStyle(
+                      fontFamily: 'Manrope',
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.label,
+                      color: hasError
+                          ? p.error
+                          : (_isFocused ? p.accent : p.textSecondary),
+                    ),
+                    child: Text(widget.label!),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                AnimatedContainer(
+                  duration: context.motionMs(180),
+                  width: _isFocused || hasError ? 5.0 : 0.0,
+                  height: _isFocused || hasError ? 5.0 : 0.0,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: activeTone,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
         AnimatedContainer(
           duration: context.motionMs(180),
+          curve: Curves.easeOutCubic,
           decoration: BoxDecoration(
-            borderRadius: AppRadii.r12All,
+            borderRadius: AppRadii.r14All,
             boxShadow: _isFocused
                 ? [
                     BoxShadow(
-                      color: (hasError ? p.error : p.accent)
-                          .withValues(alpha: p.isDark ? 0.16 : 0.10),
-                      blurRadius: 12,
+                      color: activeTone.withValues(
+                        alpha: p.isDark ? 0.18 : 0.10,
+                      ),
+                      blurRadius: 14,
                       spreadRadius: -2,
-                      offset: const Offset(0, 2),
+                      offset: const Offset(0, 3),
                     ),
                   ]
-                : null,
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: p.isDark ? 0.14 : 0.03,
+                      ),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: TextField(
             controller: widget.controller,
@@ -180,22 +217,29 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
               fontWeight: FontWeight.w600,
               color: p.textPrimary,
             ),
-            cursorColor: p.accent,
+            cursorColor: activeTone,
+            cursorWidth: 1.8,
+            cursorRadius: const Radius.circular(2),
             decoration: InputDecoration(
               hintText: widget.hint,
               hintStyle: TextStyle(
                 fontFamily: 'Manrope',
                 fontSize: AppFontSize.body,
-                fontWeight: FontWeight.w400,
+                fontWeight: FontWeight.w500,
                 color: p.textTertiary,
               ),
               prefixIcon: widget.prefixIcon != null
-                  ? Icon(
-                      widget.prefixIcon,
-                      size: 20.0,
-                      color: hasError
-                          ? p.error
-                          : (_isFocused ? p.accent : p.textSecondary),
+                  ? AnimatedScale(
+                      scale: _isFocused ? 1.08 : 1.0,
+                      duration: context.motionMs(180),
+                      curve: Curves.easeOutCubic,
+                      child: Icon(
+                        widget.prefixIcon,
+                        size: 20.0,
+                        color: hasError
+                            ? p.error
+                            : (_isFocused ? p.accent : p.textSecondary),
+                      ),
                     )
                   : null,
               suffixIcon: widget.suffix,
@@ -204,17 +248,17 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
                   _isFocused ? p.surfaceContainerHigh : p.surfaceContainer,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
+                vertical: AppSpacing.sm + 2,
               ),
               enabledBorder: border,
               focusedBorder: focusedBorder,
               errorBorder: errorBorder,
-              focusedErrorBorder: errorBorder,
+              focusedErrorBorder: focusedErrorBorder,
               errorText: widget.error,
               errorStyle: TextStyle(
                 fontFamily: 'Manrope',
                 fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 color: p.error,
               ),
             ),

@@ -109,6 +109,29 @@ void main() {
       await cubit.close();
     });
 
+    test('starts TTL countdown when the fetch completes rather than when it begins', () async {
+      when(() => mockYtm.searchWithFallback(any(), limit: any(named: 'limit')))
+          .thenAnswer((_) async {
+        clock.advance(1000);
+        return testTracks;
+      });
+
+      final cubit = createCubit();
+      const category = 'TTL Clock Category';
+
+      await cubit.categoryFuture(category);
+
+      clock.advance(HomeCubit.categoryTtl.inMilliseconds - 500);
+      await cubit.categoryFuture(category);
+      verify(() => mockYtm.searchWithFallback(any(), limit: any(named: 'limit'))).called(1);
+
+      clock.advance(600);
+      await cubit.categoryFuture(category);
+      verify(() => mockYtm.searchWithFallback(any(), limit: any(named: 'limit'))).called(1);
+
+      await cubit.close();
+    });
+
     test('does not cache empty results so retrying can succeed', () async {
       var calls = 0;
       when(() => mockYtm.searchWithFallback(any(), limit: any(named: 'limit')))

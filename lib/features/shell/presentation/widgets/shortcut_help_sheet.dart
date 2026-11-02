@@ -123,29 +123,42 @@ class ShortcutHelpSheet extends StatelessWidget {
               vertical: AppSpacing.s10,
             ),
             decoration: BoxDecoration(
-              color: p.surfaceContainer.withValues(alpha: 0.6),
+              color: p.surfaceContainer.withValues(alpha: 0.65),
               borderRadius: AppRadii.r14All,
-              border: Border.all(color: p.hairline),
+              border: Border.all(
+                color: p.hairline.withValues(alpha: 0.8),
+              ),
             ),
             child: Row(
               children: [
+                // 3D Mechanical Keycap Badge
                 Container(
-                  constraints: const BoxConstraints(minWidth: 38),
+                  constraints:
+                      const BoxConstraints(minWidth: 42, minHeight: 30),
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s8,
                     vertical: AppSpacing.xxs,
                   ),
                   decoration: BoxDecoration(
-                    color: p.surfaceContainerHigh,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        p.surfaceContainerHighest,
+                        p.surfaceContainerHigh,
+                      ],
+                    ),
                     borderRadius: AppRadii.r8All,
                     border: Border.all(
-                      color: p.hairline.withValues(alpha: 0.8),
+                      color: p.accent.withValues(alpha: 0.28),
+                      width: 1.0,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 2,
-                        offset: const Offset(0, 1),
+                        color: Colors.black
+                            .withValues(alpha: p.isDark ? 0.35 : 0.12),
+                        blurRadius: 0,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -179,14 +192,30 @@ class ShortcutHelpSheet extends StatelessWidget {
                         style: TextStyle(
                           fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w500,
-                          color: p.textTertiary,
+                          color: p.textSecondary,
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                Icon(item.icon, size: 20, color: p.textTertiary),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainerHigh.withValues(alpha: 0.65),
+                    borderRadius: AppRadii.r10All,
+                    border: Border.all(
+                      color: p.hairline.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    item.icon,
+                    size: 18,
+                    color: p.textSecondary,
+                  ),
+                ),
               ],
             ),
           );

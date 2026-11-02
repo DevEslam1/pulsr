@@ -20,7 +20,7 @@ class PlayerTransportController {
   final void Function()? _debouncedPersistQueueSlots;
   final void Function({bool force})? _updateWidgetThrottled;
   final Future<void> Function(SongsTableData song,
-      {List<SongsTableData>? queue, Duration? initialPosition})? _onPlaySong;
+      {List<SongsTableData>? queue, Duration? initialPosition, int? queueIndex})? _onPlaySong;
 
   // Monotonic stopwatch for seek throttling. H-05: instance-scoped so separate
   // controller instances (e.g. test + prod) never share throttle state.
@@ -42,7 +42,7 @@ class PlayerTransportController {
     void Function()? debouncedPersistQueueSlots,
     void Function({bool force})? updateWidgetThrottled,
     Future<void> Function(SongsTableData song,
-            {List<SongsTableData>? queue, Duration? initialPosition})?
+            {List<SongsTableData>? queue, Duration? initialPosition, int? queueIndex})?
         onPlaySong,
   })  : _audioHandler = audioHandler,
         _getState = getState,
@@ -287,18 +287,10 @@ class PlayerTransportController {
   }
 
   Future<void> toggleFavoriteSong(SongsTableData song) =>
-      _executeToggleFavorite(song);
+      toggleFavoriteById(song.id);
 
-  Future<void> toggleFavoriteById(int songId) async {
-    final state = _getState();
-    final song = (state.currentSong?.id == songId)
-        ? state.currentSong
-        : (state.queue.where((s) => s.id == songId).firstOrNull ??
-            _slotLookupCache?[songId]);
-    if (song != null) {
-      await _executeToggleFavorite(song);
-    }
-  }
+  Future<void> toggleFavoriteById(int songId) =>
+      _executeToggleFavorite(songId);
 
   Future<void> toggleFavorite([Object? target]) async {
     if (target is SongsTableData) {
@@ -311,11 +303,10 @@ class PlayerTransportController {
     }
   }
 
-  Future<void> _executeToggleFavorite(SongsTableData song) async {
+  Future<void> _executeToggleFavorite(int songId) async {
     if (_toggleFavoriteUseCase == null) return;
     try {
-      final songId = song.id;
-      final result = await _toggleFavoriteUseCase!(song.id);
+      final result = await _toggleFavoriteUseCase!(songId);
       if (_isClosed()) return;
       result.fold(
         (failure) {

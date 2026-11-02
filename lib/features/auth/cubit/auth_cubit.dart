@@ -44,8 +44,10 @@ class AuthCubit extends PulsrCubit<AuthState> {
         syncNow();
       } else {
         _syncingUserId = null;
+        _syncing = false;
         safeEmit(state.copyWith(
           status: AuthStatus.unauthenticated,
+          syncStatus: SyncStatus.idle,
           user: null,
           errorMessage: null,
         ));
@@ -279,8 +281,10 @@ class AuthCubit extends PulsrCubit<AuthState> {
       }
       return;
     }
-    // FIX-C11: Monotonic clock prevents system wall-clock jumps from disrupting sync deduplication
-    if (_syncStopwatch.isRunning &&
+    // FIX-C11: Monotonic clock prevents system wall-clock jumps from disrupting sync deduplication.
+    // Allow immediate retries if the previous sync resulted in a failure.
+    if (state.syncStatus != SyncStatus.failure &&
+        _syncStopwatch.isRunning &&
         _syncStopwatch.elapsed < _syncDedupeWindow) {
       return;
     }
@@ -301,12 +305,18 @@ class AuthCubit extends PulsrCubit<AuthState> {
           syncError: null,
         ));
       } else {
+        _syncStopwatch
+          ..stop()
+          ..reset();
         safeEmit(state.copyWith(
           syncStatus: SyncStatus.failure,
           syncError: 'Failed to sync with cloud. Check internet connection.',
         ));
       }
     } catch (_) {
+      _syncStopwatch
+        ..stop()
+        ..reset();
       if (isClosed || state.user == null) return;
       safeEmit(state.copyWith(
         syncStatus: SyncStatus.failure,

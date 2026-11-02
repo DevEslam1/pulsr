@@ -152,7 +152,7 @@ class _DockStyleOption extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: '$name. $description. $bestFor',
+      label: '$name. $description.$bestFor',
       child: Material(
         color: Colors.transparent,
         child: MouseRegion(
@@ -169,18 +169,54 @@ class _DockStyleOption extends StatelessWidget {
                 vertical: AppSpacing.s10,
               ),
               decoration: BoxDecoration(
+                gradient: selected
+                    ? LinearGradient(
+                        begin: AlignmentDirectional.centerStart,
+                        end: AlignmentDirectional.centerEnd,
+                        colors: [
+                          Color.alphaBlend(
+                            p.accent.withValues(alpha: p.isDark ? 0.16 : 0.10),
+                            p.surfaceContainerHigh,
+                          ),
+                          p.surfaceContainer,
+                        ],
+                      )
+                    : null,
                 color: selected
-                    ? p.accentContainer
-                    : p.surfaceContainer.withValues(alpha: 0.6),
+                    ? null
+                    : p.surfaceContainer.withValues(alpha: 0.62),
                 borderRadius: AppRadii.r16All,
                 border: Border.all(
-                  color: selected ? p.accent : p.hairline,
-                  width: selected ? 1.5 : 1,
+                  color: selected
+                      ? p.accent.withValues(alpha: 0.65)
+                      : p.hairline.withValues(alpha: 0.8),
+                  width: selected ? 1.5 : 1.0,
                 ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: p.accent.withValues(alpha: 0.14),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
               ),
               child: Row(
                 children: [
-                  _DockMicroMockup(mode: mode, selected: selected),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainerHighest.withValues(alpha: 0.45),
+                      borderRadius: AppRadii.r12All,
+                      border: Border.all(
+                        color: selected
+                            ? p.accent.withValues(alpha: 0.30)
+                            : p.hairline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: _DockMicroMockup(mode: mode, selected: selected),
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
@@ -190,8 +226,9 @@ class _DockStyleOption extends StatelessWidget {
                           name,
                           style: TextStyle(
                             fontSize: AppFontSize.body,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                             color: selected ? p.accent : p.textPrimary,
+                            letterSpacing: -0.15,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -200,18 +237,18 @@ class _DockStyleOption extends StatelessWidget {
                           style: TextStyle(
                             fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w500,
-                            color: p.textTertiary,
+                            color: p.textSecondary,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 4),
                         Text(
                           bestFor,
                           style: TextStyle(
                             fontSize: AppFontSize.tiny,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                             color: selected
-                                ? p.accent.withValues(alpha: 0.9)
-                                : p.textSecondary.withValues(alpha: 0.75),
+                                ? p.accent.withValues(alpha: 0.92)
+                                : p.textTertiary,
                           ),
                         ),
                       ],
@@ -230,7 +267,7 @@ class _DockStyleOption extends StatelessWidget {
                         : Icon(
                             Icons.circle_outlined,
                             key: const ValueKey('unselected'),
-                            color: p.textTertiary,
+                            color: p.textTertiary.withValues(alpha: 0.65),
                             size: 22,
                           ),
                   ),
@@ -278,24 +315,49 @@ class _LiveDockPreviewBanner extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: p.surfaceContainerHigh.withValues(alpha: 0.45),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.alphaBlend(
+              p.accent.withValues(alpha: p.isDark ? 0.08 : 0.05),
+              p.surfaceContainerHigh,
+            ),
+            p.surfaceContainer,
+          ],
+        ),
         borderRadius: AppRadii.cardRadius,
-        border: Border.all(color: p.hairline.withValues(alpha: 0.6)),
+        border: Border.all(color: p.accent.withValues(alpha: 0.24)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.layers_outlined, size: 14, color: p.accent),
-              const SizedBox(width: AppSpacing.xxs),
-              Text(
-                context.l10n.dockStylePreviewBadge,
-                style: TextStyle(
-                  fontSize: AppFontSize.tiny,
-                  fontWeight: FontWeight.w800,
-                  color: p.accent,
-                  letterSpacing: 0.5,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.14),
+                  borderRadius: AppRadii.r6All,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.layers_outlined, size: 13, color: p.accent),
+                    const SizedBox(width: AppSpacing.xxs),
+                    Text(
+                      context.l10n.dockStylePreviewBadge,
+                      style: TextStyle(
+                        fontSize: AppFontSize.tiny,
+                        fontWeight: FontWeight.w800,
+                        color: p.accent,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const Spacer(),
@@ -304,7 +366,7 @@ class _LiveDockPreviewBanner extends StatelessWidget {
                 style: TextStyle(
                   fontSize: AppFontSize.tiny,
                   fontWeight: FontWeight.w700,
-                  color: p.textTertiary,
+                  color: p.textSecondary,
                 ),
               ),
             ],
@@ -312,7 +374,7 @@ class _LiveDockPreviewBanner extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Center(
             child: SizedBox(
-              height: 52,
+              height: 54,
               child: AnimatedSwitcher(
                 duration: context.motionMs(260),
                 switchInCurve: Curves.easeOutCubic,
@@ -348,15 +410,16 @@ class _HeroDockStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    Widget nowPlayingCard(
-            {double opacity = 1.0,
-            double scale = 1.0,
-            bool elevated = false}) =>
+    Widget nowPlayingCard({
+      double opacity = 1.0,
+      double scale = 1.0,
+      bool elevated = false,
+    }) =>
         Transform.scale(
           scale: scale,
           child: Container(
-            width: 170,
-            height: 22,
+            width: 176,
+            height: 23,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s6),
             decoration: BoxDecoration(
               color: elevated
@@ -371,10 +434,10 @@ class _HeroDockStage extends StatelessWidget {
               boxShadow: elevated
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
+                        color: Colors.black.withValues(alpha: 0.28),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
-                      )
+                      ),
                     ]
                   : null,
             ),
@@ -400,15 +463,16 @@ class _HeroDockStage extends StatelessWidget {
           ),
         );
 
-    Widget navBarCard(
-            {double opacity = 1.0,
-            double scale = 1.0,
-            bool elevated = false}) =>
+    Widget navBarCard({
+      double opacity = 1.0,
+      double scale = 1.0,
+      bool elevated = false,
+    }) =>
         Transform.scale(
           scale: scale,
           child: Container(
-            width: 170,
-            height: 22,
+            width: 176,
+            height: 23,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             decoration: BoxDecoration(
               color: elevated
@@ -423,10 +487,10 @@ class _HeroDockStage extends StatelessWidget {
               boxShadow: elevated
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
+                        color: Colors.black.withValues(alpha: 0.28),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
-                      )
+                      ),
                     ]
                   : null,
             ),
@@ -435,8 +499,11 @@ class _HeroDockStage extends StatelessWidget {
               children: [
                 Icon(Icons.home_rounded, size: 12, color: p.accent),
                 Icon(Icons.search_rounded, size: 12, color: p.textTertiary),
-                Icon(Icons.library_music_rounded,
-                    size: 12, color: p.textTertiary),
+                Icon(
+                  Icons.library_music_rounded,
+                  size: 12,
+                  color: p.textTertiary,
+                ),
               ],
             ),
           ),
@@ -463,7 +530,7 @@ class _HeroDockStage extends StatelessWidget {
         );
       case DockStackMode.miniPlayerOnTop:
         return SizedBox(
-          width: 170,
+          width: 176,
           height: 48,
           child: Stack(
             alignment: Alignment.bottomCenter,
@@ -476,7 +543,7 @@ class _HeroDockStage extends StatelessWidget {
         );
       case DockStackMode.navBarOnTop:
         return SizedBox(
-          width: 170,
+          width: 176,
           height: 48,
           child: Stack(
             alignment: Alignment.bottomCenter,

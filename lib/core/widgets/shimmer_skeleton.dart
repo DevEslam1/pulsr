@@ -1,19 +1,21 @@
 // lib/core/widgets/shimmer_skeleton.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
 import 'pulsr_static_grid.dart';
 
 /// {@category DesignSystem}
 /// Coordinates the shimmer sweep for every [SkeletonBox] beneath it.
 ///
-/// A single [AnimationController] drives one full-screen highlight band through
-/// a [ShaderMask], so a screen with dozens of placeholder blocks stays perfectly
-/// in sync and only burns one ticker. When reduce-motion is on the mask is
-/// skipped entirely and the blocks render static.
+/// A single [AnimationController] drives one shared highlight phase across all
+/// descendant boxes so a screen with dozens of placeholder blocks stays perfectly
+/// in sync and only burns one ticker. When reduce-motion is on, the sweep is
+/// skipped and the blocks render static.
 class SkeletonShimmer extends StatefulWidget {
   final Widget child;
 
@@ -76,9 +78,8 @@ class _SkeletonShimmerScope extends InheritedWidget {
 
 /// A placeholder block used by list/grid loading states.
 ///
-/// When it lives under a [SkeletonShimmer] it renders a static surface and lets
-/// the ancestor sweep the highlight (one ticker for the whole screen). Standalone
-/// it falls back to its own shimmer. Honours the reduce-motion switch either way.
+/// When it lives under a [SkeletonShimmer] it shares the ancestor's single ticker.
+/// Standalone it falls back to its own shimmer. Honours the reduce-motion switch either way.
 class SkeletonBox extends StatefulWidget {
   final double? width;
   final double height;
@@ -135,6 +136,16 @@ class _SkeletonBoxState extends State<SkeletonBox>
   Widget build(BuildContext context) {
     final p = context.palette;
     final base = p.surfaceContainerHigh;
+    final peak = Color.lerp(
+          p.surfaceContainer,
+          Colors.white,
+          p.isDark ? 0.05 : 0.35,
+        ) ??
+        p.surfaceContainer;
+    final rimColor = p.isDark
+        ? AppColors.specularAt(0.06)
+        : Colors.black.withValues(alpha: 0.03);
+    final borderRadius = AppRadii.circular(widget.radius);
 
     // Shared shimmer: paint the moving highlight inside this box (no layer).
     final shimmer = _SkeletonShimmerScope.of(context);
@@ -148,12 +159,13 @@ class _SkeletonBoxState extends State<SkeletonBox>
             final t = shimmer.value;
             return DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: AppRadii.circular(widget.radius),
+                borderRadius: borderRadius,
+                border: Border.all(color: rimColor, width: 0.8),
                 gradient: LinearGradient(
-                  begin: Alignment(-1.8 + 3.6 * t, 0),
-                  end: Alignment(-0.8 + 3.6 * t, 0),
-                  colors: [base, p.surfaceContainer, base],
-                  stops: const [0.20, 0.50, 0.80],
+                  begin: Alignment(-1.9 + 3.8 * t, -0.25),
+                  end: Alignment(-0.7 + 3.8 * t, 0.25),
+                  colors: [base, peak, base],
+                  stops: const [0.18, 0.50, 0.82],
                 ),
               ),
             );
@@ -163,7 +175,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
     }
 
     return ClipRRect(
-      borderRadius: AppRadii.circular(widget.radius),
+      borderRadius: borderRadius,
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
@@ -173,11 +185,13 @@ class _SkeletonBoxState extends State<SkeletonBox>
             height: widget.height,
             child: DecoratedBox(
               decoration: BoxDecoration(
+                borderRadius: borderRadius,
+                border: Border.all(color: rimColor, width: 0.8),
                 gradient: LinearGradient(
-                  begin: Alignment(-2.0 + 4.0 * t, -0.4),
-                  end: Alignment(-1.0 + 4.0 * t, 0.4),
-                  colors: [base, p.surfaceContainer, base],
-                  stops: const [0.30, 0.50, 0.70],
+                  begin: Alignment(-2.0 + 4.0 * t, -0.35),
+                  end: Alignment(-0.8 + 4.0 * t, 0.35),
+                  colors: [base, peak, base],
+                  stops: const [0.22, 0.50, 0.78],
                 ),
               ),
             ),
@@ -206,8 +220,8 @@ class SkeletonLine extends StatelessWidget {
       SkeletonBox(width: width, height: height, radius: radius);
 }
 
-/// A horizontal row skeleton: artwork + two stacked lines, matching the
-/// geometry of `SongTile` so lists don't jump when real data arrives.
+/// A horizontal row skeleton: artwork + two stacked lines + trailing duration pill,
+/// matching the geometry of `SongTile` so lists don't jump when real data arrives.
 class SkeletonSongRow extends StatelessWidget {
   final double artworkSize;
   final double radius;
@@ -222,7 +236,9 @@ class SkeletonSongRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
       child: Row(
         children: [
           SkeletonBox(
@@ -236,30 +252,40 @@ class SkeletonSongRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                SkeletonLine(width: 180, height: 13),
+                SkeletonLine(width: 176, height: 13),
                 SizedBox(height: AppSpacing.xs),
-                SkeletonLine(width: 110, height: 11),
+                SkeletonLine(width: 108, height: 11),
               ],
             ),
           ),
+          const SizedBox(width: AppSpacing.sm),
+          const SkeletonLine(width: 32, height: 10, radius: 5),
         ],
       ),
     );
   }
 }
 
-/// Entrance cascade for a list of placeholder rows: each item fades + rises
-/// with a small stagger. Collapses to instant under reduce-motion.
+/// Entrance cascade for a list of placeholder rows: each item fades, scales,
+/// and rises with a small stagger. Collapses to instant under reduce-motion.
 Widget _cascade(int index, Widget child, bool enabled) {
   if (!enabled) return child;
+  final delay = (index * 45).ms;
   return child
       .animate()
-      .fadeIn(duration: 300.ms, delay: (index * 45).ms, curve: Curves.easeOut)
+      .fadeIn(duration: 300.ms, delay: delay, curve: Curves.easeOut)
+      .scaleXY(
+        begin: 0.985,
+        end: 1.0,
+        duration: 300.ms,
+        delay: delay,
+        curve: Curves.easeOutCubic,
+      )
       .slideY(
         begin: 0.08,
         end: 0,
         duration: 300.ms,
-        delay: (index * 45).ms,
+        delay: delay,
         curve: Curves.easeOutCubic,
       );
 }
@@ -329,9 +355,9 @@ class SkeletonGrid extends StatelessWidget {
       itemBuilder: (context, i) {
         return _cascade(
           i,
-          Column(
+          const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               Expanded(
                 child: SkeletonBox(
                   width: double.infinity,

@@ -5,7 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../motion/pulsr_motion.dart';
 
 /// {@category DesignSystem}
-/// Reveals [child] with a short fade + rise, staggered by [index].
+/// Reveals [child] with a short fade, subtle scale, and rise, staggered by [index].
 ///
 /// Include the current sort/group signature in [groupKey]: because the key
 /// changes whenever the ordering changes, every row re-mounts and replays the
@@ -35,24 +35,36 @@ class StaggeredReveal extends StatelessWidget {
     // in long libraries, so later rows are mounted fully visible.
     if (!context.motionEnabled || index >= 16) return child;
     final delay = index < 8 ? (index * 30).ms : 0.ms;
+    final duration = context.motionMs(250);
+    final curve = context.motionCurve(Curves.easeOutCubic);
+
     final anim = child
         .animate(
-            key: ValueKey('${groupKey ?? ''}#${horizontal ? 'h' : 'v'}$index'))
-        .fadeIn(duration: 250.ms, delay: delay, curve: Curves.easeOutCubic);
+          key: ValueKey('${groupKey ?? ''}#${horizontal ? 'h' : 'v'}$index'),
+        )
+        .fadeIn(duration: duration, delay: delay, curve: curve)
+        .scaleXY(
+          begin: 0.985,
+          end: 1.0,
+          duration: duration,
+          delay: delay,
+          curve: curve,
+        );
+
     final animated = horizontal
         ? anim.slideX(
             begin: beginOffset,
             end: 0,
-            duration: 250.ms,
+            duration: duration,
             delay: delay,
-            curve: Curves.easeOutCubic,
+            curve: curve,
           )
         : anim.slideY(
             begin: beginOffset,
             end: 0,
-            duration: 250.ms,
+            duration: duration,
             delay: delay,
-            curve: Curves.easeOutCubic,
+            curve: curve,
           );
     return RepaintBoundary(child: animated);
   }

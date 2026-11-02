@@ -1,4 +1,4 @@
-// PlaylistsScreen widget suite.
+﻿// PlaylistsScreen widget suite.
 //
 // Covers the loading skeleton, error and empty states, the populated local
 // grid, the create-playlist dialog flow and the local/online tab switch.
@@ -145,5 +145,37 @@ void main() {
 
     verify(() => cubit.autoFetchOnlineLibrary())
         .called(greaterThanOrEqualTo(1));
+  });
+
+  testWidgets('renders smart playlists in a horizontal scrollable row',
+      (tester) async {
+    final smartPl = PlaylistsTableData(
+      id: 2,
+      name: 'High Energy',
+      createdAt: DateTime(2024),
+      updatedAt: DateTime(2024),
+      isSmart: true,
+      smartCriteria: '{"rules":[],"matchAll":true}',
+    );
+
+    await pumpScreen(tester);
+    await emit(
+      tester,
+      PlaylistState(
+        isLoading: false,
+        playlists: [smartPl, userPlaylist],
+        smartPlaylistCounts: const {2: 5},
+      ),
+    );
+
+    expect(find.text('High Energy'), findsOneWidget);
+    expect(find.text('Road Trip'), findsOneWidget);
+
+    final horizontalList = find.byWidgetPredicate(
+      (widget) =>
+          widget is ListView &&
+          widget.scrollDirection == Axis.horizontal,
+    );
+    expect(horizontalList, findsOneWidget);
   });
 }

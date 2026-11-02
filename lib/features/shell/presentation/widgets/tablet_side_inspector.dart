@@ -1,17 +1,19 @@
 // lib/features/shell/presentation/widgets/tablet_side_inspector.dart
 import 'package:flutter/material.dart';
-import '../../../../core/motion/pulsr_motion.dart';
-import '../../../../core/utils/l10n_extensions.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/widgets/lyrics_view.dart';
 import '../../../player/presentation/widgets/now_playing_queue_view.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
 
 @immutable
 class _TabletLyricsData {
@@ -109,6 +111,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                 fontSize: AppFontSize.label,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 color: isSelected ? p.onAccent : p.textSecondary,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             );
           },
@@ -180,202 +183,266 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
     return Container(
       width: inspectorWidth,
       decoration: BoxDecoration(
-        color: p.surfaceContainer,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            p.surfaceContainerHigh.withValues(alpha: 0.55),
+            p.surfaceContainer,
+          ],
+          stops: const [0.0, 0.25],
+        ),
         border: BorderDirectional(
           start: BorderSide(
-            color: _isDragging ? p.accent.withValues(alpha: 0.6) : p.hairline,
+            color: _isDragging ? p.accent.withValues(alpha: 0.70) : p.hairline,
             width: _isDragging ? 1.5 : 1.0,
           ),
         ),
       ),
       child: ClipRect(
-        child: Builder(
-          builder: (context) {
-            final inspectorContent = Stack(
+        child: Stack(
+          children: [
+            Column(
               children: [
-                Column(
-                  children: [
-                    // Header with Tabs & Close Button
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s14,
-                        vertical: AppSpacing.s10,
-                      ),
-                      child: Row(
-                        children: [
-                          // Data-driven Segmented Selector
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                color: p.surfaceContainer,
-                                borderRadius: AppRadii.r12All,
-                                border: Border.all(color: p.hairline),
-                              ),
-                              child: Row(
-                                children: [
-                                  for (int i = 0; i < tabs.length; i++) ...[
-                                    if (i > 0)
-                                      const SizedBox(width: AppSpacing.xxs),
-                                    Expanded(
-                                      child: Semantics(
-                                        button: true,
-                                        selected: safeTabIndex == i,
-                                        label: tabs[i].label(context),
-                                        child: GestureDetector(
-                                          onTap: () => setState(
-                                              () => _selectedTabIndex = i),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: AppSpacing.s6,
-                                            ),
-                                            decoration: BoxDecoration(
+                // Header with Recessed Segmented Tabs & Close Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s14,
+                    vertical: AppSpacing.s10,
+                  ),
+                  child: Row(
+                    children: [
+                      // Data-driven Segmented Selector
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(3.5),
+                          decoration: BoxDecoration(
+                            color: p.surfaceContainerHighest
+                                .withValues(alpha: 0.55),
+                            borderRadius: AppRadii.r12All,
+                            border: Border.all(
+                              color: p.hairline.withValues(alpha: 0.8),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              for (int i = 0; i < tabs.length; i++) ...[
+                                if (i > 0)
+                                  const SizedBox(width: AppSpacing.xxs),
+                                Expanded(
+                                  child: Semantics(
+                                    button: true,
+                                    selected: safeTabIndex == i,
+                                    label: tabs[i].label(context),
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () {
+                                        if (_selectedTabIndex != i) {
+                                          HapticFeedback.selectionClick();
+                                          setState(() => _selectedTabIndex = i);
+                                        }
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: context.motionMs(200),
+                                        curve: context
+                                            .motionCurve(Curves.easeOutCubic),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: AppSpacing.s6,
+                                          horizontal: AppSpacing.xxs,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: safeTabIndex == i
+                                              ? LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    Color.alphaBlend(
+                                                      Colors.white.withValues(
+                                                          alpha: 0.14),
+                                                      p.accent,
+                                                    ),
+                                                    p.accent,
+                                                  ],
+                                                )
+                                              : null,
+                                          borderRadius: AppRadii.r8All,
+                                          boxShadow: safeTabIndex == i
+                                              ? [
+                                                  BoxShadow(
+                                                    color: p.accent.withValues(
+                                                        alpha: 0.28),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              tabs[i].icon,
+                                              size: 15,
                                               color: safeTabIndex == i
-                                                  ? p.accent
-                                                  : Colors.transparent,
-                                              borderRadius: AppRadii.r8All,
+                                                  ? p.onAccent
+                                                  : p.textSecondary,
                                             ),
-                                            alignment: Alignment.center,
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  tabs[i].icon,
-                                                  size: 15,
-                                                  color: safeTabIndex == i
-                                                      ? p.onAccent
-                                                      : p.textSecondary,
-                                                ),
-                                                const SizedBox(
-                                                    width: AppSpacing.s6),
-                                                Flexible(
-                                                  child: tabs[i].headerWidget !=
-                                                          null
-                                                      ? tabs[i].headerWidget!(
-                                                          context,
-                                                          safeTabIndex == i,
-                                                        )
-                                                      : Text(
-                                                          tabs[i]
-                                                              .label(context),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style: TextStyle(
-                                                            fontSize:
-                                                                AppFontSize
-                                                                    .label,
-                                                            fontWeight:
-                                                                safeTabIndex ==
-                                                                        i
-                                                                    ? FontWeight
-                                                                        .w800
-                                                                    : FontWeight
-                                                                        .w600,
-                                                            color: safeTabIndex ==
-                                                                    i
-                                                                ? p.onAccent
-                                                                : p.textSecondary,
-                                                          ),
-                                                        ),
-                                                ),
-                                              ],
+                                            const SizedBox(
+                                                width: AppSpacing.s6),
+                                            Flexible(
+                                              child: tabs[i].headerWidget !=
+                                                      null
+                                                  ? tabs[i].headerWidget!(
+                                                      context,
+                                                      safeTabIndex == i,
+                                                    )
+                                                  : Text(
+                                                      tabs[i].label(context),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            AppFontSize.label,
+                                                        fontWeight:
+                                                            safeTabIndex == i
+                                                                ? FontWeight
+                                                                    .w800
+                                                                : FontWeight
+                                                                    .w600,
+                                                        color: safeTabIndex == i
+                                                            ? p.onAccent
+                                                            : p.textSecondary,
+                                                      ),
+                                                    ),
                                             ),
-                                          ),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 20),
-                            tooltip: context.l10n.close,
-                            onPressed: widget.onClose,
-                            constraints: const BoxConstraints(
-                              minWidth: AppSpacing.minTouchTarget,
-                              minHeight: AppSpacing.minTouchTarget,
-                            ),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Divider(height: 1, thickness: 1, color: p.hairline),
-
-                    // Content Area built dynamically from active tab descriptor
-                    Expanded(
-                      child: tabs[safeTabIndex].builder(context),
-                    ),
-                  ],
-                ),
-                // Left edge drag-to-resize handle
-                PositionedDirectional(
-                  start: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: 14,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.resizeLeftRight,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onHorizontalDragStart: (_) {
-                        _dragDeltaAccumulator = 0.0;
-                        setState(() => _isDragging = true);
-                      },
-                      onHorizontalDragUpdate: (details) {
-                        final isRtl =
-                            Directionality.of(context) == TextDirection.rtl;
-                        final delta =
-                            isRtl ? details.delta.dx : -details.delta.dx;
-                        _dragDeltaAccumulator += delta;
-                        if (_dragDeltaAccumulator.abs() >= 1.0) {
-                          final current = _customWidth ?? defaultWidth;
-                          final newWidth =
-                              (current + _dragDeltaAccumulator).clamp(
-                            TabletSideInspector.minWidth,
-                            TabletSideInspector.maxWidth,
-                          );
-                          _dragDeltaAccumulator = 0.0;
-                          if (newWidth != _customWidth) {
-                            setState(() {
-                              _customWidth = newWidth;
-                            });
-                          }
-                        }
-                      },
-                      onHorizontalDragEnd: (_) {
-                        _dragDeltaAccumulator = 0.0;
-                        setState(() => _isDragging = false);
-                      },
-                      onHorizontalDragCancel: () {
-                        _dragDeltaAccumulator = 0.0;
-                        setState(() => _isDragging = false);
-                      },
-                      child: Center(
-                        child: AnimatedContainer(
-                          duration: context.motionMs(150),
-                          width: _isDragging ? 4 : 3,
-                          height: _isDragging ? 48 : 32,
-                          decoration: BoxDecoration(
-                            color: _isDragging
-                                ? p.accent
-                                : p.textTertiary.withValues(alpha: 0.3),
-                            borderRadius: AppRadii.r4All,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: p.surfaceContainerHigh.withValues(alpha: 0.65),
+                          border: Border.all(
+                            color: p.hairline.withValues(alpha: 0.65),
+                          ),
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: p.textSecondary,
+                          ),
+                          tooltip: context.l10n.close,
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            widget.onClose();
+                          },
+                          constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, thickness: 1, color: p.hairline),
+
+                // Content Area built dynamically from active tab descriptor
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: context.motionMs(180),
+                    child: KeyedSubtree(
+                      key: ValueKey('inspector_tab_${tabs[safeTabIndex].id}'),
+                      child: tabs[safeTabIndex].builder(context),
                     ),
                   ),
                 ),
               ],
-            );
+            ),
 
-            return inspectorContent;
-          },
+            // Left edge drag-to-resize handle
+            PositionedDirectional(
+              start: 0,
+              top: 0,
+              bottom: 0,
+              width: 14,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeLeftRight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragStart: (_) {
+                    HapticFeedback.selectionClick();
+                    _dragDeltaAccumulator = 0.0;
+                    setState(() => _isDragging = true);
+                  },
+                  onHorizontalDragUpdate: (details) {
+                    final isRtl =
+                        Directionality.of(context) == TextDirection.rtl;
+                    final delta = isRtl ? details.delta.dx : -details.delta.dx;
+                    _dragDeltaAccumulator += delta;
+                    if (_dragDeltaAccumulator.abs() >= 1.0) {
+                      final current = _customWidth ?? defaultWidth;
+                      final newWidth = (current + _dragDeltaAccumulator).clamp(
+                        TabletSideInspector.minWidth,
+                        TabletSideInspector.maxWidth,
+                      );
+                      _dragDeltaAccumulator = 0.0;
+                      if (newWidth != _customWidth) {
+                        setState(() {
+                          _customWidth = newWidth;
+                        });
+                      }
+                    }
+                  },
+                  onHorizontalDragEnd: (_) {
+                    _dragDeltaAccumulator = 0.0;
+                    setState(() => _isDragging = false);
+                  },
+                  onHorizontalDragCancel: () {
+                    _dragDeltaAccumulator = 0.0;
+                    setState(() => _isDragging = false);
+                  },
+                  child: Center(
+                    child: AnimatedContainer(
+                      duration: context.motionMs(150),
+                      width: _isDragging ? 4.5 : 3.0,
+                      height: _isDragging ? 52.0 : 32.0,
+                      decoration: BoxDecoration(
+                        color: _isDragging
+                            ? p.accent
+                            : p.textTertiary.withValues(alpha: 0.32),
+                        borderRadius: AppRadii.r4All,
+                        boxShadow: _isDragging
+                            ? [
+                                BoxShadow(
+                                  color: p.accent.withValues(alpha: 0.45),
+                                  blurRadius: 8,
+                                ),
+                              ]
+                            : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -179,16 +179,21 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                           colors: [
                             Color.lerp(
                                   widget.bgColor,
-                                  Colors.black,
-                                  p.isDark ? 0.42 : 0.04,
+                                  widget.activeColor,
+                                  0.10,
                                 ) ??
                                 widget.bgColor,
-                            p.bg,
-                            p.deepShade,
+                            widget.bgColor,
+                            Color.lerp(
+                                  widget.bgColor,
+                                  p.isDark ? Colors.black : Colors.white,
+                                  p.isDark ? 0.22 : 0.06,
+                                ) ??
+                                widget.bgColor,
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          stops: const [0.0, 0.52, 1.0],
+                          stops: const [0.0, 0.45, 1.0],
                         ),
                       ),
                     ),
@@ -196,22 +201,22 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
 
                   // Primary stage spotlight behind Left Player Deck
                   PositionedDirectional(
-                    top: -80,
+                    top: -60,
                     start: -60,
-                    end: width * 0.25,
-                    height: mediaQuery.size.height * 0.95,
+                    width: width * 0.60,
+                    height: mediaQuery.size.height * 1.1,
                     child: IgnorePointer(
                       child: AnimatedContainer(
                         duration: context.motionMs(500),
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: const Alignment(-0.30, -0.25),
+                            center: const Alignment(-0.25, -0.20),
                             radius: 1.15,
                             colors: [
                               widget.activeColor
-                                  .withValues(alpha: p.isDark ? 0.30 : 0.18),
+                                  .withValues(alpha: p.isDark ? 0.32 : 0.20),
                               widget.activeColor
-                                  .withValues(alpha: p.isDark ? 0.11 : 0.06),
+                                  .withValues(alpha: p.isDark ? 0.12 : 0.07),
                               widget.activeColor.withValues(alpha: 0.02),
                               Colors.transparent,
                             ],
@@ -224,21 +229,49 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
 
                   // Secondary ambient wash behind Right Studio Console
                   PositionedDirectional(
-                    top: 20,
-                    start: width * 0.35,
+                    top: -40,
                     end: -40,
-                    bottom: -40,
+                    width: width * 0.60,
+                    height: mediaQuery.size.height * 1.1,
                     child: IgnorePointer(
                       child: AnimatedContainer(
                         duration: context.motionMs(500),
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: const Alignment(0.45, 0.15),
-                            radius: 1.05,
+                            center: const Alignment(0.30, -0.15),
+                            radius: 1.15,
                             colors: [
                               widget.activeColor
-                                  .withValues(alpha: p.isDark ? 0.14 : 0.08),
-                              widget.activeColor.withValues(alpha: 0.03),
+                                  .withValues(alpha: p.isDark ? 0.24 : 0.14),
+                              widget.activeColor
+                                  .withValues(alpha: p.isDark ? 0.09 : 0.05),
+                              widget.activeColor.withValues(alpha: 0.01),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.45, 0.80, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Center bottom atmospheric reflection glow
+                  Positioned(
+                    bottom: -60,
+                    left: width * 0.10,
+                    right: width * 0.10,
+                    height: mediaQuery.size.height * 0.50,
+                    child: IgnorePointer(
+                      child: AnimatedContainer(
+                        duration: context.motionMs(500),
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: Alignment.bottomCenter,
+                            radius: 0.95,
+                            colors: [
+                              widget.activeColor
+                                  .withValues(alpha: p.isDark ? 0.18 : 0.10),
+                              widget.activeColor.withValues(alpha: 0.04),
                               Colors.transparent,
                             ],
                             stops: const [0.0, 0.55, 1.0],
@@ -316,18 +349,27 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                                 child: RepaintBoundary(
                                   child: Container(
                                     constraints:
-                                        const BoxConstraints(maxWidth: 360),
+                                        const BoxConstraints(maxWidth: 320),
                                     height:
                                         PulsrLayoutMetrics.fieldHeight(context) +
                                             6,
                                     padding: const EdgeInsets.all(3.5),
                                     decoration: BoxDecoration(
-                                      color: p.surfaceContainer.withValues(
-                                        alpha: p.isDark ? 0.78 : 0.92,
+                                      color: Color.alphaBlend(
+                                        widget.bgColor.withValues(
+                                          alpha: p.isDark ? 0.32 : 0.18,
+                                        ),
+                                        p.surfaceContainer.withValues(
+                                          alpha: p.isDark ? 0.72 : 0.88,
+                                        ),
                                       ),
                                       borderRadius: AppRadii.r20All,
                                       border: Border.all(
-                                        color: p.hairline,
+                                        color: Color.alphaBlend(
+                                          widget.activeColor
+                                              .withValues(alpha: 0.20),
+                                          p.hairline,
+                                        ),
                                         width: 1.0,
                                       ),
                                       boxShadow: [
@@ -461,12 +503,20 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                               end: AppSpacing.xs,
                             ),
                             decoration: BoxDecoration(
-                              color: p.surfaceContainer.withValues(
-                                alpha: p.isDark ? 0.42 : 0.65,
+                              color: Color.alphaBlend(
+                                widget.bgColor.withValues(
+                                  alpha: p.isDark ? 0.25 : 0.14,
+                                ),
+                                p.surfaceContainer.withValues(
+                                  alpha: p.isDark ? 0.38 : 0.55,
+                                ),
                               ),
                               borderRadius: AppRadii.r24All,
                               border: Border.all(
-                                color: p.hairline,
+                                color: Color.alphaBlend(
+                                  widget.activeColor.withValues(alpha: 0.15),
+                                  p.hairline,
+                                ),
                                 width: 1.0,
                               ),
                               boxShadow: [

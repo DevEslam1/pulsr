@@ -1,4 +1,7 @@
+// lib/core/widgets/pulsr_chip.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
@@ -43,20 +46,25 @@ class PulsrChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final effectiveAccent = activeColor ?? p.accent;
+    final isActionSelected = selected && variant == PulsrChipVariant.action;
 
-    final bgColor = selected
-        ? (variant == PulsrChipVariant.action ? effectiveAccent : p.accentSoft)
+    final Color bgColor = selected
+        ? (isActionSelected ? effectiveAccent : p.accentSoft)
         : p.surfaceContainer;
 
-    final borderColor = selected ? effectiveAccent : p.borderSubtle;
+    final Color borderColor = selected
+        ? (isActionSelected
+            ? effectiveAccent
+            : effectiveAccent.withValues(alpha: 0.55))
+        : (p.isDark ? AppColors.specularAt(0.12) : p.borderSubtle);
 
-    final textColor = selected
-        ? (variant == PulsrChipVariant.action
-            ? p.textOnAccent
-            : effectiveAccent)
+    final Color textColor = selected
+        ? (isActionSelected ? p.textOnAccent : effectiveAccent)
         : p.textSecondary;
 
-    final iconColor = textColor;
+    final Color iconColor = textColor;
+    final bool showLeadingIcon =
+        icon != null || (selected && variant == PulsrChipVariant.filter);
 
     return Semantics(
       button: true,
@@ -64,6 +72,7 @@ class PulsrChip extends StatelessWidget {
       label: label,
       child: PulsrPressable(
         onTap: onTap,
+        hapticStyle: PulsrHapticStyle.selection,
         focusBorderRadius: AppRadii.full,
         child: ConstrainedBox(
           constraints: const BoxConstraints(
@@ -75,38 +84,76 @@ class PulsrChip extends StatelessWidget {
               duration: context.motion(PulsrDurations.tap),
               curve: Curves.easeOutCubic,
               constraints: const BoxConstraints(minWidth: 44, minHeight: 36),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: AppSpacing.xs,
+              padding: EdgeInsetsDirectional.only(
+                start: AppSpacing.sm,
+                end: onDeleted != null ? AppSpacing.xs : AppSpacing.sm,
+                top: AppSpacing.xs,
+                bottom: AppSpacing.xs,
               ),
               decoration: BoxDecoration(
-                color: bgColor,
+                color: selected ? null : bgColor,
+                gradient: selected
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isActionSelected
+                            ? [
+                                Color.lerp(
+                                      effectiveAccent,
+                                      Colors.white,
+                                      0.12,
+                                    ) ??
+                                    effectiveAccent,
+                                effectiveAccent,
+                              ]
+                            : [
+                                effectiveAccent.withValues(
+                                  alpha: p.isDark ? 0.24 : 0.16,
+                                ),
+                                effectiveAccent.withValues(
+                                  alpha: p.isDark ? 0.12 : 0.08,
+                                ),
+                              ],
+                      )
+                    : null,
                 borderRadius: AppRadii.full,
                 border: Border.all(
                   color: borderColor,
-                  width: selected ? 1.4 : 1.0,
+                  width: selected ? 1.3 : 1.0,
                 ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: effectiveAccent.withValues(
+                            alpha: isActionSelected ? 0.28 : 0.16,
+                          ),
+                          blurRadius: 12,
+                          spreadRadius: -2,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  if (icon != null) ...[
-                    Icon(
-                      icon,
-                      size: 16.0,
-                      color: iconColor,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                  ] else if (selected &&
-                      variant == PulsrChipVariant.filter) ...[
-                    Icon(
-                      Icons.check_rounded,
-                      size: 15.0,
-                      color: iconColor,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                  ],
+                  AnimatedSize(
+                    duration: context.motionMs(180),
+                    curve: Curves.easeOutCubic,
+                    child: showLeadingIcon
+                        ? Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                              end: AppSpacing.xs,
+                            ),
+                            child: Icon(
+                              icon ?? Icons.check_rounded,
+                              size: icon != null ? 16.0 : 15.0,
+                              color: iconColor,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                   Flexible(
                     child: Text(
                       label,
@@ -116,7 +163,7 @@ class PulsrChip extends StatelessWidget {
                         fontFamily: 'Manrope',
                         fontSize: AppFontSize.label,
                         fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w600,
+                            selected ? FontWeight.w800 : FontWeight.w600,
                         letterSpacing: AppTracking.label,
                         color: textColor,
                         height: 1.1,
@@ -131,14 +178,21 @@ class PulsrChip extends StatelessWidget {
                           MaterialLocalizations.of(context).deleteButtonTooltip,
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: onDeleted,
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          onDeleted!();
+                        },
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: textColor.withValues(alpha: 0.12),
+                          ),
                           child: Icon(
                             Icons.close_rounded,
-                            size: 16.0,
-                            color: textColor.withValues(alpha: 0.7),
+                            size: 13.5,
+                            color: textColor.withValues(alpha: 0.85),
                           ),
                         ),
                       ),

@@ -16,6 +16,9 @@ import '../../../party/presentation/party_sheet.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../cubit/player_cubit.dart';
+import '../../../../core/services/ambient_sound_service.dart';
+import 'ambient_sound_panel.dart' show iconForEffect;
+import 'ambient_sound_sheet.dart';
 import 'quran_mode_sheet.dart';
 
 /// Secondary player actions kept out of the primary transport dock.
@@ -115,6 +118,34 @@ class PlayerMoreSheet extends StatelessWidget {
                 PulsrHaptics.selection();
                 Navigator.of(context).pop();
                 QuranModeSheet.show(context);
+              },
+            ),
+            AnimatedBuilder(
+              animation: AmbientSoundService(),
+              builder: (context, _) {
+                final ambient = AmbientSoundService();
+                final isAmbientActive = ambient.isEnabled;
+                final activeEffects = ambient.activeEffects;
+                // Build subtitle: list active effect emojis + paused state
+                final subtitle = isAmbientActive
+                    ? '${activeEffects.map((e) => e.emoji).join(' ')} • ${activeEffects.length} effect${activeEffects.length == 1 ? '' : 's'}${ambient.isAudioPlaying ? '' : ' (Paused)'}'
+                    : l10n.ambientSoundsDesc;
+                // Icon: use icon of first active effect, or generic waves
+                final icon = isAmbientActive
+                    ? iconForEffect(activeEffects.first)
+                    : Icons.waves_rounded;
+                return _MoreActionTile(
+                  icon: icon,
+                  iconColor: activeColor,
+                  title: l10n.ambientSounds,
+                  subtitle: subtitle,
+                  isActive: isAmbientActive,
+                  onTap: () {
+                    PulsrHaptics.selection();
+                    Navigator.of(context).pop();
+                    AmbientSoundSheet.show(context);
+                  },
+                );
               },
             ),
             Padding(

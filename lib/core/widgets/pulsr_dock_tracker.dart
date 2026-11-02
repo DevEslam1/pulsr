@@ -18,8 +18,11 @@ class PulsrDockScope extends InheritedWidget {
 class PulsrDockAware extends StatelessWidget {
   final Widget child;
   final bool heightIncludesSafeArea;
-  const PulsrDockAware(
-      {super.key, required this.child, this.heightIncludesSafeArea = false});
+  const PulsrDockAware({
+    super.key,
+    required this.child,
+    this.heightIncludesSafeArea = false,
+  });
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<double>(
@@ -59,10 +62,11 @@ class PulsrDockTracker {
   static final ValueNotifier<int> changeNotifier = ValueNotifier<int>(0);
 
   static void updateDock({required double height, required bool miniPlayer}) {
-    final changed = (dockHeight.value - height).abs() > 0.5 ||
+    final sanitizedHeight = height.isFinite && height > 0 ? height : 0.0;
+    final changed = (dockHeight.value - sanitizedHeight).abs() > 0.5 ||
         hasMiniPlayer.value != miniPlayer;
     if (changed) {
-      dockHeight.value = height;
+      dockHeight.value = sanitizedHeight;
       hasMiniPlayer.value = miniPlayer;
       changeNotifier.value++;
     }
@@ -73,5 +77,24 @@ class PulsrDockTracker {
       isNowPlayingOpen.value = open;
       changeNotifier.value++;
     }
+  }
+
+  /// Computes total bottom clearance for floating overlays, combining
+  /// safe-area inset and active dock height when Now Playing is closed.
+  static double bottomClearanceOf(
+    BuildContext context, {
+    double extra = 0.0,
+  }) {
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final activeDock = isNowPlayingOpen.value ? 0.0 : dockHeight.value;
+    return safeBottom + activeDock + extra;
+  }
+
+  @visibleForTesting
+  static void reset() {
+    dockHeight.value = 0.0;
+    hasMiniPlayer.value = false;
+    isNowPlayingOpen.value = false;
+    changeNotifier.value = 0;
   }
 }

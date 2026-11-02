@@ -2,15 +2,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
 import '../constants/app_radii.dart';
+import '../motion/pulsr_motion.dart';
+import '../responsive/responsive_values.dart';
 import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
 import 'glass_container.dart';
 import 'pulsr_modal_tracker.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import '../responsive/responsive_values.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 /// {@category DesignSystem}
 /// Uniform dialog entry-points used across the entire app.
@@ -56,12 +58,14 @@ class PulsrDialogHelper {
     final trackManually = !useRootNavigator;
     if (trackManually) PulsrModalTracker.push();
     final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
-    final future = navigator.push<T>(DialogRoute<T>(
-      context: context,
-      barrierDismissible: barrierDismissible,
-      barrierColor: AppColors.scrimAt(0.55),
-      builder: builder,
-    ));
+    final future = navigator.push<T>(
+      DialogRoute<T>(
+        context: context,
+        barrierDismissible: barrierDismissible,
+        barrierColor: AppColors.scrimAt(0.58),
+        builder: builder,
+      ),
+    );
     return trackManually ? future.whenComplete(PulsrModalTracker.pop) : future;
   }
 
@@ -77,26 +81,30 @@ class PulsrDialogHelper {
   }) {
     final confirm = confirmLabel ?? context.l10n.confirm;
     final cancel = cancelLabel ?? context.l10n.cancel;
+    final p = context.palette;
+    final activeTone =
+        isDestructive ? Theme.of(context).colorScheme.error : p.accent;
+
     return showPulsrDialog<bool>(
       context,
       icon: icon != null
           ? Icon(
               icon,
-              size: 28,
-              color: isDestructive
-                  ? Theme.of(context).colorScheme.error
-                  : context.palette.accent,
+              size: 26,
+              color: activeTone,
             )
           : null,
       title: Text(
         title,
         style: const TextStyle(
-            fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
+          fontWeight: FontWeight.w800,
+          fontSize: AppFontSize.title,
+        ),
       ),
       content: Text(
         message,
         style: TextStyle(
-          color: context.palette.textSecondary,
+          color: p.textSecondary,
           fontSize: AppFontSize.body,
           height: 1.45,
         ),
@@ -106,12 +114,19 @@ class PulsrDialogHelper {
           onPressed: () =>
               Navigator.of(context, rootNavigator: true).pop(false),
           style: TextButton.styleFrom(
-            foregroundColor: context.palette.textSecondary,
+            foregroundColor: p.textSecondary,
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadii.r12All,
+            ),
           ),
-          child:
-              Text(cancel, style: const TextStyle(fontWeight: FontWeight.w600)),
+          child: Text(
+            cancel,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
         FilledButton(
           onPressed: () {
@@ -128,18 +143,19 @@ class PulsrDialogHelper {
             Navigator.of(context, rootNavigator: true).pop(true);
           },
           style: FilledButton.styleFrom(
-            backgroundColor:
-                isDestructive ? context.palette.error : context.palette.accent,
-            foregroundColor: context.palette.onAccent,
+            backgroundColor: isDestructive ? p.error : p.accent,
+            foregroundColor: isDestructive ? Colors.white : p.onAccent,
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+              horizontal: AppSpacing.s20,
+              vertical: AppSpacing.sm,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: AppRadii.r12All,
             ),
           ),
           child: Text(
             confirm,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
       ],
@@ -201,15 +217,24 @@ class _PulsrInputDialog extends StatefulWidget {
 
 class _PulsrInputDialogState extends State<_PulsrInputDialog> {
   late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _isFocused = true;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialText);
+    _focusNode = FocusNode()
+      ..addListener(() {
+        if (mounted && _isFocused != _focusNode.hasFocus) {
+          setState(() => _isFocused = _focusNode.hasFocus);
+        }
+      });
   }
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -227,12 +252,14 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
     final p = context.palette;
     return PulsrDialog(
       icon: widget.icon != null
-          ? Icon(widget.icon, size: 28, color: p.accent)
+          ? Icon(widget.icon, size: 26, color: p.accent)
           : null,
       title: Text(
         widget.title,
         style: const TextStyle(
-            fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
+          fontWeight: FontWeight.w800,
+          fontSize: AppFontSize.title,
+        ),
       ),
       content: SingleChildScrollView(
         child: Column(
@@ -243,20 +270,41 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
               Text(
                 widget.message!,
                 style: TextStyle(
-                    color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                  color: p.textSecondary,
+                  fontSize: AppFontSize.bodySmall,
+                ),
               ),
               const SizedBox(height: AppSpacing.s14),
             ],
-            Container(
+            AnimatedContainer(
+              duration: context.motionMs(180),
               decoration: BoxDecoration(
-                color: p.surfaceContainerHigh.withValues(alpha: 0.6),
-                borderRadius: AppRadii.r12All,
-                border: Border.all(color: p.hairline),
+                color: p.surfaceContainer.withValues(
+                  alpha: p.isDark ? 0.72 : 0.90,
+                ),
+                borderRadius: AppRadii.r14All,
+                border: Border.all(
+                  color: _isFocused
+                      ? p.accent
+                      : (p.isDark ? AppColors.specularAt(0.14) : p.hairline),
+                  width: _isFocused ? 1.4 : 1.0,
+                ),
+                boxShadow: _isFocused
+                    ? [
+                        BoxShadow(
+                          color: p.accent.withValues(alpha: 0.16),
+                          blurRadius: 12,
+                          spreadRadius: -2,
+                        ),
+                      ]
+                    : null,
               ),
               child: TextField(
                 controller: _controller,
+                focusNode: _focusNode,
                 autofocus: true,
                 keyboardType: widget.keyboardType,
+                cursorColor: p.accent,
                 style: TextStyle(
                   color: p.textPrimary,
                   fontSize: AppFontSize.callout,
@@ -265,11 +313,13 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
                 decoration: InputDecoration(
                   hintText: widget.hintText,
                   hintStyle: TextStyle(
-                      color: p.textTertiary, fontSize: AppFontSize.body),
+                    color: p.textTertiary,
+                    fontSize: AppFontSize.body,
+                  ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s14,
-                    vertical: AppSpacing.sm,
+                    vertical: AppSpacing.sm + 2,
                   ),
                 ),
                 onSubmitted: (_) => _submit(),
@@ -283,9 +333,18 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
           style: TextButton.styleFrom(
             foregroundColor: p.textSecondary,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadii.r12All,
+            ),
           ),
-          child: Text(widget.cancelLabel,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          child: Text(
+            widget.cancelLabel,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
         FilledButton(
           onPressed: _submit,
@@ -293,14 +352,16 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+              horizontal: AppSpacing.s20,
+              vertical: AppSpacing.sm,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: AppRadii.r12All,
             ),
           ),
           child: Text(
             widget.confirmLabel,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
       ],
@@ -310,7 +371,7 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
 
 /// A premium, consistent frosted-glass dialog container for the whole app.
 ///
-/// Features rounded corners (24px), subtle hairline border, soft glow shadow,
+/// Features rounded corners (24px), subtle specular border, soft glow shadow,
 /// and frosted translucent backdrop.
 class PulsrDialog extends StatelessWidget {
   final dynamic icon;
@@ -331,7 +392,12 @@ class PulsrDialog extends StatelessWidget {
     final p = context.palette;
 
     Widget? iconWidget;
-    if (icon is Widget) {
+    Color badgeColor = p.accent;
+    if (icon is Icon) {
+      final ic = icon as Icon;
+      iconWidget = ic;
+      if (ic.color != null) badgeColor = ic.color!;
+    } else if (icon is Widget) {
       iconWidget = icon as Widget;
     } else if (icon is IconData) {
       iconWidget = Icon(icon as IconData, size: 26, color: p.accent);
@@ -346,9 +412,12 @@ class PulsrDialog extends StatelessWidget {
 
     return Dialog(
       backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       insetPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.lg,
+      ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: context.responsive.value(
@@ -357,36 +426,61 @@ class PulsrDialog extends StatelessWidget {
             expanded: 540.0,
           ),
         ),
-        child: GlassContainer.solid(
+        child: GlassContainer.fromPreset(
+          preset: GlassPreset.dialog,
+          specularHighlight: true,
           borderRadius: AppRadii.dialogRadius,
           color: p.surfaceContainerHigh,
+          border: Border.all(
+            color: p.isDark ? AppColors.specularAt(0.16) : p.hairline,
+            width: 1.0,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.10),
-              blurRadius: 16,
+              color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.12),
+              blurRadius: 28,
               spreadRadius: 0,
-              offset: const Offset(0, 4),
+              offset: const Offset(0, 10),
+            ),
+            BoxShadow(
+              color: badgeColor.withValues(alpha: p.isDark ? 0.12 : 0.06),
+              blurRadius: 20,
+              spreadRadius: -4,
             ),
           ],
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Optional top icon badge
+              // Optional top icon badge with studio halo
               if (iconWidget != null) ...[
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.lg),
                   child: Center(
                     child: Container(
-                      width: 52,
-                      height: 52,
+                      width: 54,
+                      height: 54,
                       decoration: BoxDecoration(
-                        color: p.accentContainer.withValues(alpha: 0.35),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            badgeColor.withValues(alpha: 0.22),
+                            badgeColor.withValues(alpha: 0.08),
+                          ],
+                        ),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: p.accent.withValues(alpha: 0.25),
-                          width: 1.5,
+                          color: badgeColor.withValues(alpha: 0.38),
+                          width: 1.2,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: badgeColor.withValues(alpha: 0.20),
+                            blurRadius: 14,
+                            spreadRadius: -2,
+                          ),
+                        ],
                       ),
                       alignment: Alignment.center,
                       child: iconWidget,
@@ -423,11 +517,14 @@ class PulsrDialog extends StatelessWidget {
                   child: SingleChildScrollView(
                     padding: EdgeInsetsDirectional.fromSTEB(
                       AppSpacing.lg,
-                      title != null ? 14 : 24,
+                      title != null ? 12 : 24,
                       AppSpacing.lg,
                       AppSpacing.md,
                     ),
                     child: DefaultTextStyle.merge(
+                      textAlign: iconWidget != null && titleWidget != null
+                          ? TextAlign.center
+                          : TextAlign.start,
                       style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.body,
@@ -441,8 +538,12 @@ class PulsrDialog extends StatelessWidget {
               // Action Buttons
               if (actions != null && actions!.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20,
-                      AppSpacing.xs, AppSpacing.s20, AppSpacing.s18),
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s20,
+                    AppSpacing.xs,
+                    AppSpacing.s20,
+                    AppSpacing.s18,
+                  ),
                   child: Align(
                     alignment: AlignmentDirectional.centerEnd,
                     child: Wrap(

@@ -122,7 +122,13 @@ void main() {
     await pumpScreen(tester);
 
     expect(find.byType(QuranRadioHeroCarousel), findsOneWidget);
-    expect(find.text('الشيخ محمد صديق المنشاوي'), findsWidgets);
+    expect(
+      find.byWidgetPredicate((w) =>
+          w is Text &&
+          (w.data == 'Sheikh Mohamed Siddiq El-Minshawi' ||
+              w.data == 'الشيخ محمد صديق المنشاوي')),
+      findsWidgets,
+    );
     expect(find.text('Focus Flow'), findsOneWidget);
     expect(find.text('Favorites'), findsWidgets);
   });

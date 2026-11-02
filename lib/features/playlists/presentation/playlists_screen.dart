@@ -1,4 +1,4 @@
-import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
+// lib/features/playlists/presentation/playlists_screen.dart
 import 'dart:async';
 import 'dart:io';
 
@@ -8,7 +8,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../../../core/di/injection.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/services/playlist_share_service.dart';
@@ -20,37 +26,36 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/safe_file_path.dart';
-import '../../../core/widgets/pulsr_empty_state.dart';
-import '../../../core/widgets/pulsr_dialog.dart';
-import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
-import '../../../core/widgets/pulsr_toast.dart';
+import '../../../core/widgets/pulsr_button.dart';
+import '../../../core/widgets/pulsr_card.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
+import '../../../core/widgets/pulsr_progress.dart';
+import '../../../core/widgets/pulsr_refresh_indicator.dart';
+import '../../../core/widgets/pulsr_section_header.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_static_grid.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
+import '../../../core/widgets/staggered_reveal.dart';
+import '../../../data/db/app_database.dart';
+import '../../../data/usecases/playlist_io_usecases.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
-import '../../../data/usecases/playlist_io_usecases.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
-import '../../../data/db/app_database.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../../playlist_detail/presentation/playlist_detail_screen.dart';
 import '../../playlist_detail/presentation/online_playlist_detail_screen.dart';
+import '../../playlist_detail/presentation/playlist_detail_screen.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
-import 'widgets/spotify_import_dialog.dart';
 import 'widgets/playlist_suggestion_card.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
-import '../../../core/widgets/pulsr_section_header.dart';
-import '../../../core/widgets/pulsr_card.dart';
-import '../../../core/widgets/pulsr_button.dart';
-import '../../../core/widgets/staggered_reveal.dart';
+import 'widgets/smart_playlist_card.dart';
+import 'widgets/spotify_import_dialog.dart';
 
 enum _PlaylistTabMode { local, online }
 
@@ -89,19 +94,20 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       if (!mounted) return;
       setState(() => _suggestions = suggestions);
     } catch (e, st) {
-      // Suggestions are a best-effort convenience and stay hidden on failure,
-      // but the reason must still reach crash reporting.
-      ErrorLogger.log('Failed to load playlist suggestions',
-          error: e, stackTrace: st, category: 'PlaylistsScreen');
+      ErrorLogger.log(
+        'Failed to load playlist suggestions',
+        error: e,
+        stackTrace: st,
+        category: 'PlaylistsScreen',
+      );
     }
   }
 
   Future<void> _createPlaylistFromSuggestion(
-      PlaylistSuggestion suggestion) async {
-    // The card is only removed after several awaits; without this latch a
-    // double-tap creates two playlists from the same suggestion.
+    PlaylistSuggestion suggestion,
+  ) async {
     if (!_creatingSuggestions.add(suggestion.title)) return;
-    // Capture localized strings before async gaps (no context-across-gap).
+    HapticFeedback.selectionClick();
     final createFailedText = context.l10n.suggestCreateFailed;
     final loc = context.l10n;
     final useCases = getIt<PlaylistUseCases>();
@@ -114,7 +120,6 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         }
         return;
       }
-      // Suggestions already carry resolved songs; persist them by id.
       final songIds = suggestion.songs.map((s) => s.id).toList();
       if (songIds.isNotEmpty) {
         await useCases.addSongsToPlaylist(playlistId, songIds);
@@ -144,6 +149,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   void _onSelectPlaylist(PlaylistsTableData pl) {
+    HapticFeedback.selectionClick();
     if (context.isTwoPanePlaylist) {
       setState(() => _selectedPlaylist = pl);
     } else {
@@ -174,7 +180,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   void _showRenameDialog(
-      BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) async {
+    BuildContext context,
+    PlaylistCubit cubit,
+    PlaylistsTableData pl,
+  ) async {
     final name = await PulsrDialogHelper.showInputDialog(
       context,
       title: context.l10n.browseRenamePlaylist,
@@ -188,8 +197,6 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     }
   }
 
-  /// Exports (or shares) a playlist from the list cards. Smart playlists
-  /// resolve through their live criteria query. Defaults to M3U export.
   Future<void> _exportPlaylistSongs(
     BuildContext context,
     PlaylistsTableData pl, {
@@ -205,7 +212,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       if (pl.isSmart && pl.smartCriteria != null) {
         songs = await useCases
             .watchSmartPlaylistSongs(
-                SmartCriteria.fromJsonString(pl.smartCriteria!))
+              SmartCriteria.fromJsonString(pl.smartCriteria!),
+            )
             .first;
       } else {
         final res = await useCases.watchPlaylistSongs(pl.id).first;
@@ -257,34 +265,47 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     }
   }
 
-  /// Presents a small format picker, then exports the playlist in the chosen
-  /// M3U / PLS / WPL format.
   Future<void> _showExportFormatSheet(
-      BuildContext context, PlaylistsTableData pl) async {
+    BuildContext context,
+    PlaylistsTableData pl,
+  ) async {
+    final p = context.palette;
     final format = await PulsrSheetHelper.showPulsrSheet<PlaylistFormat>(
       context: context,
-      builder: (ctx) => SafeArea(
+      builder: (ctx) => PulsrBottomSheet(
+        title: Text(context.l10n.export),
+        subtitle: Text(pl.name, maxLines: 1, overflow: TextOverflow.ellipsis),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.playlist_play_rounded),
-              title: const Text('M3U'),
+              leading: Icon(Icons.playlist_play_rounded, color: p.accent),
+              title: const Text(
+                'M3U',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               subtitle: Text(context.l10n.mostCompatible),
               onTap: () => Navigator.pop(ctx, PlaylistFormat.m3u),
             ),
             ListTile(
-              leading: const Icon(Icons.list_alt_rounded),
-              title: const Text('PLS'),
+              leading: Icon(Icons.list_alt_rounded, color: p.accent),
+              title: const Text(
+                'PLS',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               subtitle: Text(context.l10n.exportFormatWinampLabel),
               onTap: () => Navigator.pop(ctx, PlaylistFormat.pls),
             ),
             ListTile(
-              leading: const Icon(Icons.queue_music_rounded),
-              title: const Text('WPL'),
+              leading: Icon(Icons.queue_music_rounded, color: p.accent),
+              title: const Text(
+                'WPL',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               subtitle: Text(context.l10n.exportFormatWmpLabel),
               onTap: () => Navigator.pop(ctx, PlaylistFormat.wpl),
             ),
+            const SizedBox(height: AppSpacing.xs),
           ],
         ),
       ),
@@ -293,11 +314,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     await _exportPlaylistSongs(context, pl, format: format);
   }
 
-  /// Routes sharing through [PlaylistShareService] so the portable JSON bundle
-  /// is the primary format. Returns false (caller falls back to the existing
-  /// M3U share) when the service cannot produce or validate a bundle.
   Future<bool> _sharePlaylistBundle(
-      String name, List<SongsTableData> songs) async {
+    String name,
+    List<SongsTableData> songs,
+  ) async {
     final sharePrefix = context.l10n.browsePlaylistSharePrefix;
     try {
       final shareService = getIt<PlaylistShareService>();
@@ -329,7 +349,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   void _confirmDelete(
-      BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) async {
+    BuildContext context,
+    PlaylistCubit cubit,
+    PlaylistsTableData pl,
+  ) async {
     final undoLabel = context.l10n.undo;
     final deleteTitle = '${context.l10n.delete} "${pl.name}"?';
     final deleteMessage = context.l10n.browseCannotBeUndone;
@@ -346,9 +369,6 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       final plName = pl.name;
       final isSmart = pl.isSmart;
       final smartCriteria = pl.smartCriteria;
-      // P0-4: capture membership before the playlist (and its join rows) is
-      // deleted so Undo can restore the exact contents. Smart playlists derive
-      // their songs from criteria, so only local playlists carry song ids.
       List<int> songIds = const [];
       if (!isSmart) {
         try {
@@ -359,8 +379,12 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             (songs) => [for (final s in songs) s.id],
           );
         } catch (e, st) {
-          ErrorLogger.log('Failed to capture playlist songs for undo',
-              error: e, stackTrace: st, category: 'PlaylistsScreen');
+          ErrorLogger.log(
+            'Failed to capture playlist songs for undo',
+            error: e,
+            stackTrace: st,
+            category: 'PlaylistsScreen',
+          );
         }
       }
       final deleted = await cubit.deletePlaylist(pl.id);
@@ -393,8 +417,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       allowedExtensions: ['m3u', 'm3u8', 'pls', 'wpl'],
     );
     if (result == null) return;
-    final file = SafeFilePath.validate(result.path,
-        allowedExtensions: ['m3u', 'm3u8', 'pls', 'wpl']);
+    final file = SafeFilePath.validate(
+      result.path,
+      allowedExtensions: ['m3u', 'm3u8', 'pls', 'wpl'],
+    );
     if (file == null) return;
 
     final filePath = file.path;
@@ -414,20 +440,28 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content:
-                  Text(context.l10n.importPlaylistFailed(failure.message))),
+            content: Text(context.l10n.importPlaylistFailed(failure.message)),
+          ),
         );
       },
       (importResult) {
         PulsrDialogHelper.showPulsrDialog(
           context,
-          icon: Icon(Icons.check_circle_rounded,
-              color: context.palette.success, size: 28),
-          title: Text(context.l10n.playlistImported,
-              style: const TextStyle(fontWeight: FontWeight.w800)),
-          content: Text(context.l10n.importMatched(
+          icon: Icon(
+            Icons.check_circle_rounded,
+            color: context.palette.success,
+            size: 28,
+          ),
+          title: Text(
+            context.l10n.playlistImported,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            context.l10n.importMatched(
               importResult.matchedTrackCount,
-              importResult.totalExtractedPaths)),
+              importResult.totalExtractedPaths,
+            ),
+          ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
@@ -440,7 +474,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   void _showAddOnlinePlaylistDialog(
-      BuildContext context, PlaylistCubit cubit) async {
+    BuildContext context,
+    PlaylistCubit cubit,
+  ) async {
     final url = await PulsrDialogHelper.showInputDialog(
       context,
       title: context.l10n.addYouTubePlaylist,
@@ -482,8 +518,6 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         final columns = Adaptive.gridColumns(context, minItemWidth: 170);
         final isTwoPane = context.isTwoPanePlaylist;
 
-        // Resolve the two-pane selection without mutating state during build;
-        // the field is updated in a post-frame callback when it differs.
         final PlaylistsTableData? resolvedSelection;
         if (isTwoPane) {
           final current = _selectedPlaylist;
@@ -518,22 +552,39 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         );
 
         return Scaffold(
+          backgroundColor: p.bg,
           appBar: AppBar(
-            title: Text(context.l10n.playlists),
+            backgroundColor: p.bg,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            title: Text(
+              context.l10n.playlists,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: AppFontSize.titleLarge,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
+            ),
             actions: [
               if (_selectedTab == _PlaylistTabMode.online) ...[
                 IconButton(
                   constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: context.l10n.syncOnlineLibrary,
-                  onPressed: () => cubit.refreshOnlineLibrary(),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    cubit.refreshOnlineLibrary();
+                  },
                 ),
                 IconButton(
                   constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   icon: const Icon(Icons.add_link_rounded),
                   tooltip: context.l10n.addPlaylistUrl,
                   onPressed: () => _showAddOnlinePlaylistDialog(context, cubit),
@@ -541,37 +592,41 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               ] else ...[
                 IconButton(
                   constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   icon: const Icon(Icons.playlist_play_rounded),
                   tooltip: context.l10n.playlistImportSpotify,
                   onPressed: () => _showImportSpotifyDialog(context, cubit),
                 ),
                 IconButton(
                   constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   icon: const Icon(Icons.file_upload_rounded),
                   tooltip: context.l10n.importM3u,
                   onPressed: () => _importPlaylist(context),
                 ),
                 IconButton(
                   constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   icon: _isCreatingPlaylist
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                      ? PulsrProgressBar.circular(
+                          size: 18,
+                          strokeWidth: 2,
+                          color: p.accent,
                         )
-                      : const Icon(Icons.add_rounded),
+                      : Icon(Icons.add_rounded, color: p.accent),
                   tooltip: context.l10n.createPlaylist,
                   onPressed: _isCreatingPlaylist
                       ? null
                       : () => _showCreateDialog(context, cubit),
                 ),
               ],
+              const SizedBox(width: AppSpacing.xxs),
             ],
           ),
           body: isTwoPane
@@ -585,7 +640,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       SizedBox(width: context.hinge!.bounds.width)
                     else
                       VerticalDivider(
-                          width: 1, thickness: 1, color: p.hairline),
+                        width: 1,
+                        thickness: 1,
+                        color: p.hairline,
+                      ),
                     Expanded(
                       child: resolvedSelection != null
                           ? PlaylistDetailScreen(
@@ -597,8 +655,11 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.queue_music_rounded,
-                                      size: 64, color: p.textTertiary),
+                                  Icon(
+                                    Icons.queue_music_rounded,
+                                    size: 64,
+                                    color: p.textTertiary,
+                                  ),
                                   const SizedBox(height: AppSpacing.md),
                                   Text(
                                     context.l10n.selectPlaylistHint,
@@ -637,9 +698,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     required int columns,
     required bool isTabletLandscape,
   }) {
-    return RefreshIndicator(
-      color: p.accent,
-      backgroundColor: p.surfaceContainer,
+    return PulsrRefreshIndicator(
       onRefresh: () async {
         if (_selectedTab == _PlaylistTabMode.online) {
           await cubit.autoFetchOnlineLibrary(force: true);
@@ -654,137 +713,117 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         }
       },
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         padding: EdgeInsets.only(
-            bottom: PulsrLayoutMetrics.scrollBottom(context),
-            top: AppSpacing.sm),
+          bottom: PulsrLayoutMetrics.scrollBottom(context),
+          top: AppSpacing.sm,
+        ),
         children: [
-          // Liked songs hero card (Local favorites)
           Padding(
-            padding:
-                EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+            padding: EdgeInsets.symmetric(
+              horizontal: Adaptive.pagePadding(context),
+            ),
             child: _PlaylistHeroCard(
               title: context.l10n.favorites,
               subtitle: context.l10n.likedTracks,
               icon: Icons.favorite_rounded,
               colors: [p.favorite, AppColors.roseDeep],
-              onTap: () => context.push('/favorites'),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                context.push('/favorites');
+              },
             ),
           ),
-
-          // Suggested for you (optional; hidden until real library data yields
-          // at least one suggestion).
-          if (_suggestions.isNotEmpty) ...[
+          if (_suggestions.isNotEmpty || smartPlaylists.isNotEmpty) ...[
             PulsrSectionHeader(
-              title: context.l10n.suggestedForYou,
+              title: _suggestions.isNotEmpty
+                  ? context.l10n.suggestedForYou
+                  : context.l10n.smartPlaylists,
               padding: EdgeInsetsDirectional.only(
                 start: Adaptive.pagePadding(context),
                 end: Adaptive.pagePadding(context),
                 top: AppSpacing.sectionGap,
                 bottom: AppSpacing.s10,
               ),
+              actionLabel: context.l10n.createSmartPlaylist,
+              onAction: () async {
+                HapticFeedback.selectionClick();
+                await context.push('/smart-playlist-builder');
+              },
             ),
             SizedBox(
-              height: 140,
+              height: 152,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.symmetric(
-                    horizontal: Adaptive.pagePadding(context)),
-                itemCount: _suggestions.length,
+                  horizontal: Adaptive.pagePadding(context),
+                ),
+                itemCount: _suggestions.length + smartPlaylists.length,
                 separatorBuilder: (_, __) =>
                     const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, index) {
-                  final suggestion = _suggestions[index];
-                  return PlaylistSuggestionCard(
-                    suggestion: suggestion,
-                    onTap: () => _createPlaylistFromSuggestion(suggestion),
+                  if (index < _suggestions.length) {
+                    final suggestion = _suggestions[index];
+                    return PlaylistSuggestionCard(
+                      suggestion: suggestion,
+                      onTap: () => _createPlaylistFromSuggestion(suggestion),
+                    );
+                  }
+                  final smartIndex = index - _suggestions.length;
+                  final pl = smartPlaylists[smartIndex];
+                  final count = state.smartPlaylistCounts[pl.id] ?? 0;
+                  return StaggeredReveal(
+                    index: index,
+                    horizontal: true,
+                    groupKey: 'smart_playlists',
+                    child: SmartPlaylistCard(
+                      playlist: pl,
+                      songCount: count,
+                      isSelected:
+                          isTabletLandscape && _selectedPlaylist?.id == pl.id,
+                      onTap: () => _onSelectPlaylist(pl),
+                      onLongPress: () => _onSelectPlaylist(pl),
+                      menuItems: (_) => [
+                        PopupMenuItem(
+                          value: 'edit-smart',
+                          child: Text(context.l10n.editSmartRules),
+                        ),
+                        PopupMenuItem(
+                          value: 'share',
+                          child: Text(context.l10n.share),
+                        ),
+                        PopupMenuItem(
+                          value: 'rename',
+                          child: Text(context.l10n.rename),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text(
+                            context.l10n.delete,
+                            style: TextStyle(color: p.error),
+                          ),
+                        ),
+                      ],
+                      onMenuSelected: (v) {
+                        if (v == 'edit-smart') {
+                          context.push('/smart-playlist-builder', extra: pl);
+                        } else if (v == 'share') {
+                          _exportPlaylistSongs(context, pl, share: true);
+                        } else if (v == 'rename') {
+                          _showRenameDialog(context, cubit, pl);
+                        } else if (v == 'delete') {
+                          _confirmDelete(context, cubit, pl);
+                        }
+                      },
+                    ),
                   );
                 },
               ),
             ),
           ],
-
-          // SMART PLAYLISTS Header
-          PulsrSectionHeader(
-            title: context.l10n.smartPlaylists,
-            padding: EdgeInsetsDirectional.only(
-              start: Adaptive.pagePadding(context),
-              end: Adaptive.pagePadding(context),
-              top: AppSpacing.sectionGap,
-              bottom: AppSpacing.s10,
-            ),
-            actionLabel: smartPlaylists.isEmpty
-                ? context.l10n.createSmartPlaylist
-                : null,
-            onAction: smartPlaylists.isEmpty
-                ? () async {
-                    await context.push('/smart-playlist-builder');
-                  }
-                : null,
-          ),
-
-          if (smartPlaylists.isNotEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: Adaptive.pagePadding(context)),
-              child: PulsrStaticGrid(
-                crossAxisCount: isTabletLandscape ? 2 : columns,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 14,
-                childAspectRatio: 1.0,
-                itemCount: smartPlaylists.length,
-                itemBuilder: (context, index) {
-                  final pl = smartPlaylists[index];
-                  final count = state.smartPlaylistCounts[pl.id] ?? 0;
-                  return StaggeredReveal(
-                      index: index,
-                      // BUG-24: a stable group key prevents every row from
-                      // re-animating when the list length changes on add/remove.
-                      groupKey: 'smart_playlists',
-                      child: _PlaylistCard(
-                        name: pl.name,
-                        subtitle:
-                            '${context.l10n.tracksCount(count)} • ${context.l10n.browseSmart}',
-                        icon: Icons.auto_awesome_rounded,
-                        isSmart: true,
-                        gradient: [
-                          p.accent,
-                          AppColors.ldacViolet,
-                        ],
-                        isSelected:
-                            isTabletLandscape && _selectedPlaylist?.id == pl.id,
-                        onTap: () => _onSelectPlaylist(pl),
-                        onLongPress: () => _onSelectPlaylist(pl),
-                        menuItems: (_) => [
-                          PopupMenuItem(
-                              value: 'edit-smart',
-                              child: Text(context.l10n.editSmartRules)),
-                          PopupMenuItem(
-                              value: 'share', child: Text(context.l10n.share)),
-                          PopupMenuItem(
-                              value: 'rename',
-                              child: Text(context.l10n.rename)),
-                          PopupMenuItem(
-                              value: 'delete',
-                              child: Text(context.l10n.delete)),
-                        ],
-                        onMenuSelected: (v) {
-                          if (v == 'edit-smart') {
-                            context.push('/smart-playlist-builder', extra: pl);
-                          } else if (v == 'share') {
-                            _exportPlaylistSongs(context, pl, share: true);
-                          } else if (v == 'rename') {
-                            _showRenameDialog(context, cubit, pl);
-                          } else if (v == 'delete') {
-                            _confirmDelete(context, cubit, pl);
-                          }
-                        },
-                      ));
-                },
-              ),
-            ),
-
-          // ── YOUR PLAYLISTS SECTION ──────────────────────────────
           PulsrSectionHeader(
             title: context.l10n.playlists,
             padding: EdgeInsetsDirectional.fromSTEB(
@@ -794,14 +833,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               12,
             ),
           ),
-
-          // ── TABS UNDER YOUR PLAYLISTS (Local vs Online) ─────────
           Padding(
-            padding:
-                EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+            padding: EdgeInsets.symmetric(
+              horizontal: Adaptive.pagePadding(context),
+            ),
             child: PulsrSegmentedControl(
               selectedIndex: _selectedTab == _PlaylistTabMode.local ? 0 : 1,
               onChanged: (i) {
+                HapticFeedback.selectionClick();
                 final mode =
                     i == 0 ? _PlaylistTabMode.local : _PlaylistTabMode.online;
                 setState(() => _selectedTab = mode);
@@ -821,16 +860,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: AppSpacing.md),
-
-          // ── TAB CONTENT ─────────────────────────────────────────
           if (_selectedTab == _PlaylistTabMode.local) ...[
-            // LOCAL PLAYLISTS VIEW
             if (state.playlists.isEmpty && state.isLoading)
               Padding(
                 padding: EdgeInsets.symmetric(
-                    horizontal: Adaptive.pagePadding(context)),
+                  horizontal: Adaptive.pagePadding(context),
+                ),
                 child: SkeletonGrid(
                   columns: isTabletLandscape ? 2 : columns,
                   itemCount: (isTabletLandscape ? 2 : columns) * 2,
@@ -860,7 +896,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             else
               Padding(
                 padding: EdgeInsets.symmetric(
-                    horizontal: Adaptive.pagePadding(context)),
+                  horizontal: Adaptive.pagePadding(context),
+                ),
                 child: PulsrStaticGrid(
                   crossAxisCount: isTabletLandscape ? 2 : columns,
                   crossAxisSpacing: 14,
@@ -870,52 +907,59 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   itemBuilder: (context, index) {
                     final pl = userPlaylists[index];
                     return StaggeredReveal(
-                        index: index,
-                        groupKey: 'user_playlists',
-                        child: _PlaylistCard(
-                          name: pl.name,
-                          subtitle: context.l10n.browseOfflinePlaylist,
-                          icon: Icons.queue_music_rounded,
-                          gradient: [
-                            p.surfaceContainerHigh,
-                            p.surfaceContainer
-                          ],
-                          muted: true,
-                          isSelected: isTabletLandscape &&
-                              _selectedPlaylist?.id == pl.id,
-                          onTap: () => _onSelectPlaylist(pl),
-                          onLongPress: () => _onSelectPlaylist(pl),
-                          menuItems: (_) => [
-                            PopupMenuItem(
-                                value: 'export',
-                                child: Text(context.l10n.export)),
-                            PopupMenuItem(
-                                value: 'share',
-                                child: Text(context.l10n.share)),
-                            PopupMenuItem(
-                                value: 'rename',
-                                child: Text(context.l10n.rename)),
-                            PopupMenuItem(
-                                value: 'delete',
-                                child: Text(context.l10n.delete)),
-                          ],
-                          onMenuSelected: (v) {
-                            if (v == 'export') {
-                              _showExportFormatSheet(context, pl);
-                            } else if (v == 'share') {
-                              _exportPlaylistSongs(context, pl, share: true);
-                            } else if (v == 'rename') {
-                              _showRenameDialog(context, cubit, pl);
-                            } else if (v == 'delete') {
-                              _confirmDelete(context, cubit, pl);
-                            }
-                          },
-                        ));
+                      index: index,
+                      groupKey: 'user_playlists',
+                      child: _PlaylistCard(
+                        name: pl.name,
+                        subtitle: context.l10n.browseOfflinePlaylist,
+                        icon: Icons.queue_music_rounded,
+                        gradient: [
+                          p.surfaceContainerHigh,
+                          p.surfaceContainer,
+                        ],
+                        muted: true,
+                        isSelected:
+                            isTabletLandscape && _selectedPlaylist?.id == pl.id,
+                        onTap: () => _onSelectPlaylist(pl),
+                        onLongPress: () => _onSelectPlaylist(pl),
+                        menuItems: (_) => [
+                          PopupMenuItem(
+                            value: 'export',
+                            child: Text(context.l10n.export),
+                          ),
+                          PopupMenuItem(
+                            value: 'share',
+                            child: Text(context.l10n.share),
+                          ),
+                          PopupMenuItem(
+                            value: 'rename',
+                            child: Text(context.l10n.rename),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(
+                              context.l10n.delete,
+                              style: TextStyle(color: p.error),
+                            ),
+                          ),
+                        ],
+                        onMenuSelected: (v) {
+                          if (v == 'export') {
+                            _showExportFormatSheet(context, pl);
+                          } else if (v == 'share') {
+                            _exportPlaylistSongs(context, pl, share: true);
+                          } else if (v == 'rename') {
+                            _showRenameDialog(context, cubit, pl);
+                          } else if (v == 'delete') {
+                            _confirmDelete(context, cubit, pl);
+                          }
+                        },
+                      ),
+                    );
                   },
                 ),
               ),
           ] else ...[
-            // ONLINE PLAYLISTS VIEW (Auto-fetches YouTube Music library)
             _OnlinePlaylistsContent(
               cubit: cubit,
               playerCubit: playerCubit,
@@ -947,7 +991,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     BuildContext context,
     YtmAccountPlaylist playlist,
   ) async {
-    // Capture localized strings before async gaps (avoid context-across-gap).
+    HapticFeedback.selectionClick();
     final l10n = context.l10n;
     final loadFailedText = l10n.playlistLoadFailed;
     if (context.mounted) {
@@ -1015,15 +1059,13 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       PulsrToast.show(context, message: context.l10n.emptyPlaylist);
       return;
     }
+    HapticFeedback.selectionClick();
     final l10n = context.l10n;
     PulsrToast.show(
       context,
       message:
           '${l10n.browseFetching} "${entry.title}" ${l10n.browseForDownload}…',
     );
-    // The cached entry keeps only a preview window of tracks (SharedPreferences
-    // is not a database), so re-fetch the playlist before queueing to make
-    // "download" cover every track.
     var tracks = entry.tracks;
     try {
       final fullTracks = await getIt<YtmService>()
@@ -1066,6 +1108,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       PulsrToast.show(context, message: context.l10n.noLikedToDownload);
       return;
     }
+    HapticFeedback.selectionClick();
     final songs = likedTracks.map((t) => t.toSongData()).toList();
     final downloadCubit = context.read<YtmDownloadCubit?>() ??
         (getIt.isRegistered<YtmDownloadCubit>()
@@ -1091,8 +1134,6 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     );
   }
 
-  /// P0-4: a saved online playlist is removed only after an explicit
-  /// confirmation, and Undo restores the exact cached entry (no re-fetch).
   Future<void> _confirmRemoveCustomPlaylist(
     BuildContext context,
     OnlinePlaylistEntry entry,
@@ -1158,8 +1199,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                               color: p.accentSoft,
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(Icons.cloud_sync_rounded,
-                                size: 28, color: p.accent),
+                            child: Icon(
+                              Icons.cloud_sync_rounded,
+                              size: 28,
+                              color: p.accent,
+                            ),
                           ),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
@@ -1200,27 +1244,31 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       ),
                     ),
                   ),
-
                 if (isLoggedIn && online.isCachingLibrary)
                   Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(
                       Adaptive.pagePadding(context),
                       AppSpacing.xs,
                       Adaptive.pagePadding(context),
-                      0,
+                      AppSpacing.sm,
                     ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
+                        horizontal: AppSpacing.s14,
+                        vertical: AppSpacing.s10,
+                      ),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
-                        borderRadius: AppRadii.r12All,
+                        borderRadius: AppRadii.r14All,
                         border: Border.all(color: p.hairline),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.cloud_download_rounded,
-                              color: p.accent, size: 20),
+                          Icon(
+                            Icons.cloud_download_rounded,
+                            color: p.accent,
+                            size: 20,
+                          ),
                           const SizedBox(width: AppSpacing.s10),
                           Expanded(
                             child: Column(
@@ -1238,17 +1286,14 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: AppSpacing.s6),
-                                ClipRRect(
-                                  borderRadius: AppRadii.r6All,
-                                  child: LinearProgressIndicator(
-                                    value: online.cacheTotal == 0
-                                        ? null
-                                        : online.cacheCompleted /
-                                            online.cacheTotal,
-                                    minHeight: 4,
-                                    backgroundColor: p.surfaceContainerHigh,
-                                    color: p.accent,
-                                  ),
+                                PulsrProgressBar(
+                                  value: online.cacheTotal == 0
+                                      ? null
+                                      : online.cacheCompleted /
+                                          online.cacheTotal,
+                                  height: 4,
+                                  color: p.accent,
+                                  backgroundColor: p.surfaceContainerHigh,
                                 ),
                               ],
                             ),
@@ -1257,12 +1302,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       ),
                     ),
                   ),
-
                 if (isLoggedIn) ...[
-                  // Liked Music Online Hero Card
                   Padding(
                     padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
+                      horizontal: Adaptive.pagePadding(context),
+                    ),
                     child: _LikedMusicOnlineCard(
                       status: online.likedStatus,
                       trackCount: online.likedTracks.length,
@@ -1282,8 +1326,6 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       ),
                     ),
                   ),
-
-                  // ── ACCOUNT PLAYLISTS SECTION ─────────────────────────
                   PulsrSectionHeader(
                     title: context.l10n.accountPlaylists,
                     padding: EdgeInsetsDirectional.fromSTEB(
@@ -1293,37 +1335,42 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       10,
                     ),
                     trailing: online.accountStatus == YtmFetchStatus.loading
-                        ? SizedBox(
-                            width: AppSpacing.s14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: p.accent),
+                        ? PulsrProgressBar.circular(
+                            size: AppSpacing.s14,
+                            strokeWidth: 2,
+                            color: p.accent,
                           )
                         : (online.accountPlaylists.isNotEmpty
                             ? Text(
                                 context.l10n.accountPlaylistCount(
-                                    online.accountPlaylists.length),
+                                  online.accountPlaylists.length,
+                                ),
                                 style: TextStyle(
-                                    color: p.textTertiary,
-                                    fontSize: AppFontSize.caption,
-                                    fontWeight: FontWeight.w600),
+                                  color: p.textTertiary,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
                               )
                             : null),
                   ),
-
                   if (online.accountStatus == YtmFetchStatus.loading &&
                       online.accountPlaylists.isEmpty)
                     Padding(
                       padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
+                        horizontal: Adaptive.pagePadding(context),
+                      ),
                       child: const SkeletonList(itemCount: 4),
                     )
                   else if (online.accountStatus == YtmFetchStatus.error &&
                       online.accountPlaylists.isEmpty)
                     Padding(
                       padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context),
-                          vertical: 10),
+                        horizontal: Adaptive.pagePadding(context),
+                        vertical: 10,
+                      ),
                       child: Container(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
@@ -1333,8 +1380,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline_rounded,
-                                color: p.error, size: 22),
+                            Icon(
+                              Icons.error_outline_rounded,
+                              color: p.error,
+                              size: 22,
+                            ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
@@ -1342,8 +1392,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                     context.l10n
                                         .browseFailedToLoadAccountPlaylists,
                                 style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label),
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.label,
+                                ),
                               ),
                             ),
                             TextButton(
@@ -1357,7 +1408,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                   else if (online.accountPlaylists.isEmpty)
                     Padding(
                       padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
+                        horizontal: Adaptive.pagePadding(context),
+                      ),
                       child: Container(
                         padding: const EdgeInsets.all(AppSpacing.s18),
                         decoration: BoxDecoration(
@@ -1367,15 +1419,19 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.playlist_remove_rounded,
-                                color: p.textTertiary, size: 26),
+                            Icon(
+                              Icons.playlist_remove_rounded,
+                              color: p.textTertiary,
+                              size: 26,
+                            ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 context.l10n.noAccountPlaylists,
                                 style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.bodySmall),
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.bodySmall,
+                                ),
                               ),
                             ),
                           ],
@@ -1385,7 +1441,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                   else
                     Padding(
                       padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
+                        horizontal: Adaptive.pagePadding(context),
+                      ),
                       child: PulsrStaticGrid(
                         crossAxisCount: columns,
                         crossAxisSpacing: 14,
@@ -1397,8 +1454,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           return _AccountPlaylistCard(
                             playlist: pl,
                             onTap: () => context.push(
-                                '/online-playlist?id=${Uri.encodeComponent(pl.playlistId)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.account}',
-                                extra: pl),
+                              '/online-playlist?id=${Uri.encodeComponent(pl.playlistId)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.account}',
+                              extra: pl,
+                            ),
                             onDownload: () =>
                                 _downloadAccountPlaylist(context, pl),
                           );
@@ -1406,33 +1464,25 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       ),
                     ),
                 ],
-
-                // ── ADDED PLAYLISTS SECTION ─────────────────────────────
                 if (online.customPlaylists.isNotEmpty ||
                     online.customStatus == YtmFetchStatus.error ||
                     online.customStatus == YtmFetchStatus.loading) ...[
-                  Padding(
+                  PulsrSectionHeader(
+                    title: context.l10n.addedPlaylists,
                     padding: EdgeInsetsDirectional.fromSTEB(
-                        Adaptive.pagePadding(context),
-                        24,
-                        Adaptive.pagePadding(context),
-                        10),
-                    child: Text(
-                      context.l10n.addedPlaylists,
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: p.textTertiary),
+                      Adaptive.pagePadding(context),
+                      24,
+                      Adaptive.pagePadding(context),
+                      10,
                     ),
                   ),
-                  // BUG-08: surface custom-playlist fetch failures (previously
-                  // the error state was never rendered).
                   if (online.customStatus == YtmFetchStatus.error &&
                       online.customPlaylists.isEmpty)
                     Padding(
                       padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context),
-                          vertical: 10),
+                        horizontal: Adaptive.pagePadding(context),
+                        vertical: 10,
+                      ),
                       child: Container(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
@@ -1442,16 +1492,20 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline_rounded,
-                                color: p.error, size: 22),
+                            Icon(
+                              Icons.error_outline_rounded,
+                              color: p.error,
+                              size: 22,
+                            ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 online.customError ??
                                     context.l10n.browseFailedToFetch,
                                 style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label),
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.label,
+                                ),
                               ),
                             ),
                           ],
@@ -1462,13 +1516,15 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       online.customPlaylists.isEmpty)
                     Padding(
                       padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
+                        horizontal: Adaptive.pagePadding(context),
+                      ),
                       child: const SkeletonList(itemCount: 2),
                     )
                   else if (online.customPlaylists.isNotEmpty)
                     Padding(
                       padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
+                        horizontal: Adaptive.pagePadding(context),
+                      ),
                       child: PulsrStaticGrid(
                         crossAxisCount: columns,
                         crossAxisSpacing: 14,
@@ -1480,8 +1536,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           return _OnlinePlaylistCard(
                             entry: pl,
                             onTap: () => context.push(
-                                '/online-playlist?id=${Uri.encodeComponent(pl.id)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.custom}',
-                                extra: pl),
+                              '/online-playlist?id=${Uri.encodeComponent(pl.id)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.custom}',
+                              extra: pl,
+                            ),
                             onDownload: () =>
                                 _downloadCustomPlaylist(context, pl),
                             onRemove: () =>
@@ -1491,28 +1548,33 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       ),
                     ),
                 ],
-
-                // Add YouTube Playlist Button
                 Padding(
                   padding: EdgeInsetsDirectional.fromSTEB(
-                      Adaptive.pagePadding(context),
-                      16,
-                      Adaptive.pagePadding(context),
-                      0),
+                    Adaptive.pagePadding(context),
+                    16,
+                    Adaptive.pagePadding(context),
+                    0,
+                  ),
                   child: InkWell(
-                    onTap: onAddPlaylist,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onAddPlaylist();
+                    },
                     borderRadius: AppRadii.r18All,
                     child: DashedBorderCard(
                       color: AppColors.ytRed,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.add_rounded,
-                              color: AppColors.ytRed, size: 20),
+                          const Icon(
+                            Icons.add_rounded,
+                            color: AppColors.ytRed,
+                            size: 20,
+                          ),
                           const SizedBox(width: AppSpacing.xs),
                           Text(
                             context.l10n.addYtmUrl,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: AppColors.ytRed,
                               fontWeight: FontWeight.w800,
                               fontSize: AppFontSize.body,
@@ -1556,7 +1618,10 @@ class _AccountPlaylistCard extends StatelessWidget {
       button: true,
       label: playlist.title,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         borderRadius: AppRadii.r20All,
         child: Container(
           decoration: BoxDecoration(
@@ -1564,6 +1629,7 @@ class _AccountPlaylistCard extends StatelessWidget {
             borderRadius: AppRadii.r20All,
             border: Border.all(color: p.hairline),
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1571,68 +1637,25 @@ class _AccountPlaylistCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(AppRadii.r20)),
-                      child: playlist.artworkUrl != null
-                          ? Image.network(
-                              playlist.artworkUrl!,
-                              fit: BoxFit.cover,
-                              cacheWidth: 360,
-                              cacheHeight: 360,
-                              loadingBuilder: (context, child, progress) =>
-                                  progress == null
-                                      ? child
-                                      : Container(
-                                          decoration: const BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: gradientColors,
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ),
-                                          ),
-                                          child: const Center(
-                                            child: SizedBox(
-                                              width: 24,
-                                              height: 24,
-                                              child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white),
-                                            ),
-                                          ),
-                                        ),
-                              errorBuilder: (_, __, ___) => Container(
-                                decoration: const BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: gradientColors,
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                ),
-                                child: const Center(
-                                  child: Icon(Icons.queue_music_rounded,
-                                      color: Colors.white, size: 36),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: gradientColors,
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                              ),
-                              child: const Center(
-                                child: Icon(Icons.queue_music_rounded,
-                                    color: Colors.white, size: 36),
-                              ),
-                            ),
-                    ),
+                    if (playlist.artworkUrl != null)
+                      Image.network(
+                        playlist.artworkUrl!,
+                        fit: BoxFit.cover,
+                        cacheWidth: 360,
+                        cacheHeight: 360,
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
+                                ? child
+                                : _buildFallbackCover(gradientColors),
+                        errorBuilder: (_, __, ___) =>
+                            _buildFallbackCover(gradientColors),
+                      )
+                    else
+                      _buildFallbackCover(gradientColors),
                     if (onDownload != null)
                       PositionedDirectional(
-                        top: 8,
-                        end: 8,
+                        top: 6,
+                        end: 6,
                         child: Semantics(
                           button: true,
                           label: context.l10n.downloadAction,
@@ -1640,17 +1663,20 @@ class _AccountPlaylistCard extends StatelessWidget {
                             behavior: HitTestBehavior.opaque,
                             onTap: onDownload,
                             child: SizedBox(
-                              width: 44,
-                              height: 44,
+                              width: 40,
+                              height: 40,
                               child: Center(
                                 child: Container(
                                   padding: const EdgeInsets.all(AppSpacing.s6),
                                   decoration: BoxDecoration(
-                                    color: AppColors.scrimAt(0.55),
+                                    color: AppColors.scrimAt(0.60),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.download_rounded,
-                                      color: Colors.white, size: 16),
+                                  child: const Icon(
+                                    Icons.download_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1661,8 +1687,12 @@ class _AccountPlaylistCard extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14,
-                    AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s14,
+                  AppSpacing.s10,
+                  AppSpacing.s14,
+                  AppSpacing.sm,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1682,13 +1712,34 @@ class _AccountPlaylistCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: p.textSecondary, fontSize: AppFontSize.label),
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackCover(List<Color> colors) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.queue_music_rounded,
+          color: Colors.white,
+          size: 36,
         ),
       ),
     );
@@ -1774,8 +1825,11 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                 color: AppColors.specularAt(0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.thumb_up_alt_rounded,
-                  color: Colors.white, size: 26),
+              child: const Icon(
+                Icons.thumb_up_alt_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -1784,7 +1838,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                 children: [
                   Text(
                     context.l10n.likedMusic,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
                       fontSize: AppFontSize.title,
@@ -1796,7 +1850,8 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                     subtitle,
                     style: TextStyle(
                       color: AppColors.specularAt(
-                          status == YtmFetchStatus.error ? 0.7 : 0.85),
+                        status == YtmFetchStatus.error ? 0.7 : 0.85,
+                      ),
                       fontSize: AppFontSize.label,
                     ),
                   ),
@@ -1833,8 +1888,11 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                                 color: AppColors.specularAt(0.2),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.download_rounded,
-                                  color: Colors.white, size: 22),
+                              child: const Icon(
+                                Icons.download_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),
@@ -1846,9 +1904,14 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: const BoxDecoration(
-                        color: Colors.white, shape: BoxShape.circle),
-                    child: Icon(Icons.play_arrow_rounded,
-                        color: gradientColors.first, size: 26),
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.play_arrow_rounded,
+                      color: gradientColors.first,
+                      size: 26,
+                    ),
                   ),
                 ],
               )
@@ -1857,7 +1920,9 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: const BoxDecoration(
-                    color: Colors.white, shape: BoxShape.circle),
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
                 child: Icon(
                   status == YtmFetchStatus.error
                       ? Icons.refresh_rounded
@@ -1893,11 +1958,17 @@ class _OnlinePlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final previewArt =
+        entry.tracks.isNotEmpty ? entry.tracks.first.artworkUrl : null;
+
     return Semantics(
       button: true,
       label: entry.title,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         onLongPress: onRemove,
         borderRadius: AppRadii.r20All,
         child: Container(
@@ -1906,68 +1977,77 @@ class _OnlinePlaylistCard extends StatelessWidget {
             borderRadius: AppRadii.r20All,
             border: Border.all(color: p.hairline),
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.ytRed.withValues(alpha: 0.8),
-                        AppColors.ytRed.withValues(alpha: 0.35)
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(AppRadii.r20)),
-                  ),
-                  child: Stack(
-                    children: [
-                      const Center(
-                          child: Icon(Icons.queue_music_rounded,
-                              color: Colors.white, size: 40)),
-                      if (onDownload != null)
-                        PositionedDirectional(
-                          top: 8,
-                          start: 8,
-                          child: GestureDetector(
-                            onTap: onDownload,
-                            child: Container(
-                              padding: const EdgeInsets.all(AppSpacing.xxs),
-                              decoration: BoxDecoration(
-                                color: AppColors.scrimAt(0.35),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.download_rounded,
-                                  color: Colors.white, size: 14),
-                            ),
-                          ),
-                        ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (previewArt != null && previewArt.isNotEmpty)
+                      Image.network(
+                        previewArt,
+                        fit: BoxFit.cover,
+                        cacheWidth: 360,
+                        cacheHeight: 360,
+                        errorBuilder: (_, __, ___) => _buildGradientCover(),
+                      )
+                    else
+                      _buildGradientCover(),
+                    if (onDownload != null)
                       PositionedDirectional(
-                        top: 8,
-                        end: 8,
+                        top: 6,
+                        start: 6,
                         child: GestureDetector(
-                          onTap: onRemove,
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onDownload,
                           child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.xxs),
+                            width: 34,
+                            height: 34,
                             decoration: BoxDecoration(
-                              color: AppColors.scrimAt(0.35),
+                              color: AppColors.scrimAt(0.55),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.close_rounded,
-                                color: Colors.white, size: 14),
+                            child: const Icon(
+                              Icons.download_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    PositionedDirectional(
+                      top: 6,
+                      end: 6,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onRemove,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: AppColors.scrimAt(0.55),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14,
-                    AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s14,
+                  AppSpacing.s10,
+                  AppSpacing.s14,
+                  AppSpacing.sm,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1976,20 +2056,46 @@ class _OnlinePlaylistCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: AppFontSize.bodySmall),
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: AppFontSize.bodySmall,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.s2),
-                    Text(context.l10n.entryAdded(entry.tracks.length),
-                        style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.label)),
+                    Text(
+                      context.l10n.entryAdded(entry.tracks.length),
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGradientCover() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.ytRed.withValues(alpha: 0.85),
+            AppColors.ytRedDeep,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.queue_music_rounded,
+          color: Colors.white,
+          size: 40,
         ),
       ),
     );
@@ -2024,9 +2130,10 @@ class _PlaylistHeroCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.s20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-              colors: colors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight),
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: AppRadii.r22All,
           boxShadow: [
             BoxShadow(
@@ -2042,7 +2149,9 @@ class _PlaylistHeroCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
-                  color: AppColors.specularAt(0.2), shape: BoxShape.circle),
+                color: AppColors.specularAt(0.2),
+                shape: BoxShape.circle,
+              ),
               child: Icon(icon, color: Colors.white, size: 26),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -2053,16 +2162,20 @@ class _PlaylistHeroCard extends StatelessWidget {
                   Text(
                     title,
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: AppFontSize.title,
-                        letterSpacing: AppTracking.title),
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: AppFontSize.title,
+                      letterSpacing: AppTracking.title,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.s2),
-                  Text(subtitle,
-                      style: TextStyle(
-                          color: AppColors.specularAt(0.8),
-                          fontSize: AppFontSize.label)),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: AppColors.specularAt(0.8),
+                      fontSize: AppFontSize.label,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -2070,9 +2183,14 @@ class _PlaylistHeroCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: const BoxDecoration(
-                  color: Colors.white, shape: BoxShape.circle),
-              child:
-                  Icon(Icons.play_arrow_rounded, color: colors.first, size: 26),
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.play_arrow_rounded,
+                color: colors.first,
+                size: 26,
+              ),
             ),
           ],
         ),
@@ -2082,14 +2200,12 @@ class _PlaylistHeroCard extends StatelessWidget {
 }
 
 class _PlaylistCard extends StatelessWidget {
-  static const _smartBadgeText = 'SMART';
   final String name;
   final String subtitle;
   final IconData icon;
   final List<Color> gradient;
   final bool muted;
   final bool isSelected;
-  final bool isSmart;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final List<PopupMenuEntry<String>> Function(BuildContext)? menuItems;
@@ -2103,7 +2219,6 @@ class _PlaylistCard extends StatelessWidget {
     required this.onTap,
     this.muted = false,
     this.isSelected = false,
-    this.isSmart = false,
     this.onLongPress,
     this.menuItems,
     this.onMenuSelected,
@@ -2133,28 +2248,31 @@ class _PlaylistCard extends StatelessWidget {
     final p = context.palette;
     final card = Semantics(
       button: true,
+      selected: isSelected,
       label: name,
       child: InkWell(
         onTap: onTap,
         borderRadius: AppRadii.r20All,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
             borderRadius: AppRadii.r20All,
             border: Border.all(
               color: isSelected ? p.accent : p.hairline,
-              width: isSelected ? 2.2 : 1.0,
+              width: isSelected ? 2.0 : 1.0,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: p.glow.withValues(alpha: 0.35),
+                      color: p.glow.withValues(alpha: 0.32),
                       blurRadius: 12,
                       spreadRadius: 1,
                     ),
                   ]
                 : null,
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2162,67 +2280,44 @@ class _PlaylistCard extends StatelessWidget {
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                        colors: gradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight),
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(AppRadii.r20)),
+                      colors: gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                   ),
                   child: Stack(
                     children: [
                       Center(
-                        child: Icon(icon,
-                            color: muted ? p.textSecondary : Colors.white,
-                            size: 40),
-                      ),
-                      if (isSmart)
-                        PositionedDirectional(
-                          top: AppSpacing.xs,
-                          end: AppSpacing.xs,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s6,
-                              vertical: AppSpacing.s2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.scrimLight,
-                              borderRadius: AppRadii.r6All,
-                              border: Border.all(
-                                color: AppColors.specularAt(0.35),
-                                width: 0.8,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.auto_awesome_rounded,
-                                  size: 10,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: AppSpacing.xxs),
-                                Text(
-                                  _smartBadgeText,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: AppFontSize.micro,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: AppTracking.wide,
-                                  ),
-                                ),
-                              ],
-                            ),
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: muted
+                                ? p.accent.withValues(alpha: 0.12)
+                                : Colors.white.withValues(alpha: 0.16),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            icon,
+                            color: muted ? p.accent : Colors.white,
+                            size: 30,
                           ),
                         ),
+                      ),
+
                     ],
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14,
-                    AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s14,
+                  AppSpacing.s10,
+                  AppSpacing.xs,
+                  AppSpacing.sm,
+                ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       child: Column(
@@ -2233,22 +2328,32 @@ class _PlaylistCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                                color: p.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                fontSize: AppFontSize.body),
+                              color: isSelected ? p.accent : p.textPrimary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: AppFontSize.body,
+                            ),
                           ),
                           const SizedBox(height: AppSpacing.s2),
-                          Text(subtitle,
-                              style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.label)),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.label,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     if (menuItems != null)
                       PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert_rounded,
-                            size: 18, color: p.textTertiary),
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          Icons.more_vert_rounded,
+                          size: 18,
+                          color: p.textTertiary,
+                        ),
                         onSelected: onMenuSelected,
                         itemBuilder: menuItems!,
                       ),
@@ -2286,12 +2391,12 @@ class DashedBorderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
+      height: 58,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: AppRadii.r18All,
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.4),
-        color: color.withValues(alpha: 0.05),
+        border: Border.all(color: color.withValues(alpha: 0.45), width: 1.4),
+        color: color.withValues(alpha: 0.06),
       ),
       child: child,
     );

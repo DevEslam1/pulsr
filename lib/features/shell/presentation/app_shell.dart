@@ -4,27 +4,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/motion/pulsr_motion.dart';
-import '../../../core/router/app_router.dart';
-import '../../../core/router/safe_navigation.dart';
 import '../../../core/responsive/layout_delegate.dart';
 import '../../../core/responsive/pulsr_hinge_gap.dart';
+import '../../../core/router/app_router.dart';
+import '../../../core/router/safe_navigation.dart';
+import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
-import '../../../core/widgets/pulsr_modal_tracker.dart';
-import '../../../core/widgets/pulsr_dock_tracker.dart';
-import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/gesture_hint_overlay.dart';
+import '../../../core/widgets/pulsr_dock_tracker.dart';
+import '../../../core/widgets/pulsr_modal_tracker.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
+import 'widgets/dock_style_controller.dart';
 import 'widgets/landscape_sidebar.dart';
 import 'widgets/player_shortcut_scope.dart';
 import 'widgets/stacked_bottom_dock.dart';
-import 'widgets/dock_style_controller.dart';
 import 'widgets/tablet_side_inspector.dart';
 
 class AppShell extends StatefulWidget {
@@ -142,6 +144,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ..stop()
       ..reset();
 
+    HapticFeedback.selectionClick();
     final isSameTab = index == widget.navigationShell.currentIndex;
 
     if (!isSameTab && (_tabHistory.isEmpty || _tabHistory.last != index)) {
@@ -292,9 +295,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final extendedRail = _isSidebarExtended ?? layoutDelegate.railExpanded;
 
     return BlocListener<PlayerCubit, PlayerState>(
-      // Playback errors (bot/verification blocks, "multiple tracks failed",
-      // stream resolution failures) were only stored in state.errorMessage and
-      // never displayed, so playback appeared to stop or skip for no reason.
       listenWhen: (prev, curr) =>
           curr.errorMessage != null && curr.errorMessage != prev.errorMessage,
       listener: (context, state) {
@@ -350,6 +350,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     required bool inspectorOpen,
     required bool extendedRail,
   }) {
+    final p = context.palette;
+
     // Phone / Compact Layout (bottom dock)
     if (!useRail) {
       return Scaffold(
@@ -357,7 +359,31 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         body: Stack(
           children: [
             Positioned.fill(
-                child: PulsrDockAware(child: widget.navigationShell)),
+              child: PulsrDockAware(child: widget.navigationShell),
+            ),
+            // Soft bottom ambient vignette so scrolling content fades into the floating dock
+            PositionedDirectional(
+              start: 0,
+              end: 0,
+              bottom: 0,
+              height: 112,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        p.surface.withValues(alpha: 0.0),
+                        p.surface.withValues(alpha: p.isDark ? 0.55 : 0.38),
+                        p.surface.withValues(alpha: p.isDark ? 0.88 : 0.72),
+                      ],
+                      stops: const [0.0, 0.55, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
             PositionedDirectional(
               start: 0,
               end: 0,
@@ -374,7 +400,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            // One-time education for the (previously invisible) dock styles.
+            // One-time education for the dock styles.
             PositionedDirectional(
               start: 0,
               end: 0,
@@ -436,15 +462,35 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     child: Row(
                       children: [
                         Expanded(
-                            child: PulsrDockAware(
-                                heightIncludesSafeArea: true,
-                                child: widget.navigationShell)),
-                        if (inspectorOpen) ...[
-                          TabletSideInspector(
-                            onClose: () =>
-                                setState(() => _isSideInspectorOpen = false),
+                          child: PulsrDockAware(
+                            heightIncludesSafeArea: true,
+                            child: widget.navigationShell,
                           ),
-                        ],
+                        ),
+                        AnimatedSwitcher(
+                          duration: context.motionMs(240),
+                          switchInCurve:
+                              context.motionCurve(Curves.easeOutCubic),
+                          switchOutCurve:
+                              context.motionCurve(Curves.easeInCubic),
+                          child: inspectorOpen
+                              ? Row(
+                                  key: const ValueKey('tablet_side_inspector'),
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    VerticalDivider(
+                                      width: 1,
+                                      thickness: 1,
+                                      color: p.hairline,
+                                    ),
+                                    TabletSideInspector(
+                                      onClose: () => setState(
+                                          () => _isSideInspectorOpen = false),
+                                    ),
+                                  ],
+                                )
+                              : const SizedBox.shrink(),
+                        ),
                       ],
                     ),
                   ),

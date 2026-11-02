@@ -3,18 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/responsive/breakpoints.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_logo.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
-import '../../../../core/responsive/breakpoints.dart';
 import '../nav_destinations.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
 
 /// The 4 navigation rail display modes based on screen width/posture.
 enum SidebarRailMode {
@@ -195,7 +196,15 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
             width: totalWidth,
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
-              color: p.surfaceContainer,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  p.surfaceContainerHigh.withValues(alpha: 0.55),
+                  p.surfaceContainer,
+                ],
+                stops: const [0.0, 0.35],
+              ),
               border: BorderDirectional(
                 end: BorderSide(
                   color: p.hairline,
@@ -204,157 +213,146 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
               ),
             ),
             child: ClipRect(
-              child: Builder(
-                builder: (context) {
-                  final sidebarBody = Padding(
-                    padding: EdgeInsetsDirectional.only(start: leftInset),
-                    child: SafeArea(
-                      top: true,
-                      bottom: true,
-                      left: false,
-                      right: false,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          return SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const NeverScrollableScrollPhysics(),
-                            child: SizedBox(
-                              width: targetContentWidth,
-                              height: constraints.maxHeight,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  // ── Brand Header ──────────────────────────────────────────
-                                  _SidebarBrandHeader(
-                                    isExtended: isExtended,
-                                    onToggle: widget.onToggleExtended,
-                                    p: p,
-                                  ),
-
-                                  const SizedBox(height: AppSpacing.s6),
-
-                                  // ── Main Scrollable Nav List ──────────────────────────────
-                                  Expanded(
-                                    child: ListView(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: horizontalPadding,
-                                        vertical: AppSpacing.xxs,
-                                      ),
-                                      children: [
-                                        for (final item in primaryItems) ...[
-                                          _SidebarNavItem(
-                                            icon: item.icon,
-                                            activeIcon: item.activeIcon,
-                                            label: item.label,
-                                            isSelected: widget.currentIndex ==
-                                                item.index,
-                                            isExtended: isExtended,
-                                            iconSize: iconSize,
-                                            showCompactLabel: showCompactLabel,
-                                            badgeCount:
-                                                widget.badgeCounts?[item.index],
-                                            p: p,
-                                            onTap: () {
-                                              if (widget.currentIndex !=
-                                                  item.index) {
-                                                widget.onDestinationSelected(
-                                                    item.index);
-                                              }
-                                            },
-                                          ),
-                                          const SizedBox(
-                                              height: AppSpacing.xxs),
-                                        ],
-
-                                        // Single subtle divider between primary items and secondary items
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: AppSpacing.s14,
-                                              vertical: AppSpacing.s6),
-                                          child: Divider(
-                                            height: 1,
-                                            thickness: 1,
-                                            color: p.hairline
-                                                .withValues(alpha: 0.35),
-                                          ),
-                                        ),
-
-                                        for (final item in secondaryItems) ...[
-                                          _SidebarNavItem(
-                                            icon: item.icon,
-                                            activeIcon: item.activeIcon,
-                                            label: item.label,
-                                            isSelected: widget.currentIndex ==
-                                                item.index,
-                                            isExtended: isExtended,
-                                            iconSize: iconSize,
-                                            showCompactLabel: showCompactLabel,
-                                            badgeCount:
-                                                widget.badgeCounts?[item.index],
-                                            p: p,
-                                            onTap: () {
-                                              if (widget.currentIndex !=
-                                                  item.index) {
-                                                widget.onDestinationSelected(
-                                                    item.index);
-                                              }
-                                            },
-                                          ),
-                                          const SizedBox(
-                                              height: AppSpacing.xxs),
-                                        ],
-
-                                        // Optional Side Inspector (Queue/Lyrics) Shortcut
-                                        if (widget.onToggleSideInspector !=
-                                            null) ...[
-                                          const SizedBox(
-                                              height: AppSpacing.xxs),
-                                          _SidebarNavItem(
-                                            icon: Icons.vertical_split_outlined,
-                                            activeIcon:
-                                                Icons.vertical_split_rounded,
-                                            label:
-                                                context.l10n.sidebarSidePanel,
-                                            isSelected:
-                                                widget.isSideInspectorOpen,
-                                            isExtended: isExtended,
-                                            iconSize: iconSize,
-                                            showCompactLabel: showCompactLabel,
-                                            p: p,
-                                            trailingBadge: isExtended &&
-                                                    widget.isSideInspectorOpen
-                                                ? context.l10n.badgeOn
-                                                : null,
-                                            onTap: () {
-                                              HapticFeedback.selectionClick();
-                                              widget.onToggleSideInspector!();
-                                            },
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-
-                                  // ── Bottom Section: Active Song Badge & Collapse Toggle ────
-                                  _SidebarBottomSection(
-                                    isExtended: isExtended,
-                                    p: p,
-                                    onOpenNowPlaying: widget.onOpenNowPlaying,
-                                    onToggleExtended: widget.onToggleExtended,
-                                    showNowPlayingTile:
-                                        widget.showNowPlayingTile,
-                                  ),
-                                ],
+              child: Padding(
+                padding: EdgeInsetsDirectional.only(start: leftInset),
+                child: SafeArea(
+                  top: true,
+                  bottom: true,
+                  left: false,
+                  right: false,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: SizedBox(
+                          width: targetContentWidth,
+                          height: constraints.maxHeight,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // ── Brand Header ──────────────────────────────────────────
+                              _SidebarBrandHeader(
+                                isExtended: isExtended,
+                                onToggle: widget.onToggleExtended,
+                                p: p,
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  );
 
-                  return sidebarBody;
-                },
+                              const SizedBox(height: AppSpacing.s6),
+
+                              // ── Main Scrollable Nav List ──────────────────────────────
+                              Expanded(
+                                child: ListView(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: horizontalPadding,
+                                    vertical: AppSpacing.xxs,
+                                  ),
+                                  children: [
+                                    for (final item in primaryItems) ...[
+                                      _SidebarNavItem(
+                                        icon: item.icon,
+                                        activeIcon: item.activeIcon,
+                                        label: item.label,
+                                        isSelected:
+                                            widget.currentIndex == item.index,
+                                        isExtended: isExtended,
+                                        iconSize: iconSize,
+                                        showCompactLabel: showCompactLabel,
+                                        badgeCount:
+                                            widget.badgeCounts?[item.index],
+                                        p: p,
+                                        onTap: () {
+                                          if (widget.currentIndex !=
+                                              item.index) {
+                                            widget.onDestinationSelected(
+                                                item.index);
+                                          }
+                                        },
+                                      ),
+                                      const SizedBox(height: AppSpacing.xxs),
+                                    ],
+
+                                    // Single subtle divider between primary items and secondary items
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.s14,
+                                        vertical: AppSpacing.s6,
+                                      ),
+                                      child: Divider(
+                                        height: 1,
+                                        thickness: 1,
+                                        color:
+                                            p.hairline.withValues(alpha: 0.45),
+                                      ),
+                                    ),
+
+                                    for (final item in secondaryItems) ...[
+                                      _SidebarNavItem(
+                                        icon: item.icon,
+                                        activeIcon: item.activeIcon,
+                                        label: item.label,
+                                        isSelected:
+                                            widget.currentIndex == item.index,
+                                        isExtended: isExtended,
+                                        iconSize: iconSize,
+                                        showCompactLabel: showCompactLabel,
+                                        badgeCount:
+                                            widget.badgeCounts?[item.index],
+                                        p: p,
+                                        onTap: () {
+                                          if (widget.currentIndex !=
+                                              item.index) {
+                                            widget.onDestinationSelected(
+                                                item.index);
+                                          }
+                                        },
+                                      ),
+                                      const SizedBox(height: AppSpacing.xxs),
+                                    ],
+
+                                    // Optional Side Inspector (Queue/Lyrics) Shortcut
+                                    if (widget.onToggleSideInspector !=
+                                        null) ...[
+                                      const SizedBox(height: AppSpacing.xxs),
+                                      _SidebarNavItem(
+                                        icon: Icons.vertical_split_outlined,
+                                        activeIcon:
+                                            Icons.vertical_split_rounded,
+                                        label: context.l10n.sidebarSidePanel,
+                                        isSelected: widget.isSideInspectorOpen,
+                                        isExtended: isExtended,
+                                        iconSize: iconSize,
+                                        showCompactLabel: showCompactLabel,
+                                        p: p,
+                                        trailingBadge: isExtended &&
+                                                widget.isSideInspectorOpen
+                                            ? context.l10n.badgeOn
+                                            : null,
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          widget.onToggleSideInspector!();
+                                        },
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+
+                              // ── Bottom Section: Active Song Badge & Collapse Toggle ────
+                              _SidebarBottomSection(
+                                isExtended: isExtended,
+                                p: p,
+                                onOpenNowPlaying: widget.onOpenNowPlaying,
+                                onToggleExtended: widget.onToggleExtended,
+                                showNowPlayingTile: widget.showNowPlayingTile,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
@@ -380,6 +378,38 @@ class _SidebarBrandHeader extends StatelessWidget {
     final isShort = MediaQuery.sizeOf(context).height < 500;
     final topPad = isShort ? AppSpacing.xs : AppSpacing.md;
 
+    Widget buildLogoBadge({double boxSize = 38, double logoSize = 22}) {
+      return Container(
+        width: boxSize,
+        height: boxSize,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              p.accentContainer,
+              Color.alphaBlend(
+                p.accent.withValues(alpha: 0.12),
+                p.surfaceContainerHighest,
+              ),
+            ],
+          ),
+          borderRadius: AppRadii.r12All,
+          border: Border.all(
+            color: p.accent.withValues(alpha: 0.28),
+            width: 1.0,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: PulsrLogo(
+          size: logoSize,
+          color: p.accent,
+          glowColor: p.glow,
+          animate: false,
+        ),
+      );
+    }
+
     if (!isExtended) {
       return Padding(
         padding: EdgeInsetsDirectional.fromSTEB(0, topPad, 0, AppSpacing.xs),
@@ -388,12 +418,7 @@ class _SidebarBrandHeader extends StatelessWidget {
             onTap: onToggle,
             child: Tooltip(
               message: context.l10n.sidebarExpand,
-              child: PulsrLogo(
-                size: 32,
-                color: p.accent,
-                glowColor: p.glow,
-                animate: false,
-              ),
+              child: buildLogoBadge(boxSize: 40, logoSize: 24),
             ),
           ),
         ),
@@ -409,12 +434,7 @@ class _SidebarBrandHeader extends StatelessWidget {
           child: ClipRect(
             child: Row(
               children: [
-                PulsrLogo(
-                  size: 32,
-                  color: p.accent,
-                  glowColor: p.glow,
-                  animate: false,
-                ),
+                buildLogoBadge(boxSize: 38, logoSize: 22),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
@@ -516,16 +536,25 @@ class _SidebarNavItem extends StatelessWidget {
                   height: showCompactLabel ? 52 : 46,
                   width: showCompactLabel ? 52 : 46,
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? activeColor.withValues(alpha: p.isDark ? 0.18 : 0.12)
-                        : Colors.transparent,
-                    borderRadius: AppRadii.r14All,
-                    border: isSelected
-                        ? Border.all(
-                            color: activeColor.withValues(alpha: 0.35),
-                            width: 1.2,
+                    gradient: isSelected
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              activeColor.withValues(
+                                  alpha: p.isDark ? 0.22 : 0.16),
+                              activeColor.withValues(
+                                  alpha: p.isDark ? 0.08 : 0.05),
+                            ],
                           )
-                        : Border.all(color: Colors.transparent, width: 1.2),
+                        : null,
+                    borderRadius: AppRadii.r14All,
+                    border: Border.all(
+                      color: isSelected
+                          ? activeColor.withValues(alpha: 0.38)
+                          : Colors.transparent,
+                      width: 1.2,
+                    ),
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
@@ -619,18 +648,18 @@ class _SidebarNavItem extends StatelessWidget {
               gradient: isSelected
                   ? LinearGradient(
                       colors: [
-                        activeColor.withValues(alpha: p.isDark ? 0.18 : 0.12),
-                        activeColor.withValues(alpha: p.isDark ? 0.08 : 0.05),
+                        activeColor.withValues(alpha: p.isDark ? 0.20 : 0.14),
+                        activeColor.withValues(alpha: p.isDark ? 0.06 : 0.04),
                       ],
                     )
                   : null,
               borderRadius: AppRadii.r12All,
-              border: isSelected
-                  ? Border.all(
-                      color: activeColor.withValues(alpha: 0.32),
-                      width: 1.0,
-                    )
-                  : Border.all(color: Colors.transparent, width: 1.0),
+              border: Border.all(
+                color: isSelected
+                    ? activeColor.withValues(alpha: 0.34)
+                    : Colors.transparent,
+                width: 1.0,
+              ),
             ),
             child: ClipRect(
               child: Row(
@@ -688,7 +717,9 @@ class _SidebarNavItem extends StatelessWidget {
                       (badgeCount != null && badgeCount! > 0))
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                        horizontal: AppSpacing.s6,
+                        vertical: AppSpacing.s2,
+                      ),
                       decoration: BoxDecoration(
                         color: activeColor.withValues(alpha: 0.2),
                         borderRadius: AppRadii.r6All,
@@ -744,8 +775,9 @@ class _SidebarBottomSection extends StatelessWidget {
         ),
         child: IconButton(
           constraints: const BoxConstraints(
-              minWidth: AppSpacing.minTouchTarget,
-              minHeight: AppSpacing.minTouchTarget),
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
           tooltip: context.l10n.sidebarExpand,
           iconSize: 20,
           icon: Icon(
@@ -789,7 +821,7 @@ class _SidebarBottomSection extends StatelessWidget {
                           borderRadius: AppRadii.r12All,
                           border: Border.all(
                             color: state.isPlaying
-                                ? p.accent.withValues(alpha: 0.6)
+                                ? p.accent.withValues(alpha: 0.65)
                                 : p.hairline,
                             width: 1.2,
                           ),
@@ -821,12 +853,25 @@ class _SidebarBottomSection extends StatelessWidget {
                     child: Container(
                       margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs, vertical: AppSpacing.s6),
+                        horizontal: AppSpacing.xs,
+                        vertical: AppSpacing.s6,
+                      ),
                       decoration: BoxDecoration(
-                        color: p.surfaceContainer.withValues(alpha: 0.45),
-                        borderRadius: AppRadii.r10All,
+                        gradient: LinearGradient(
+                          colors: [
+                            Color.alphaBlend(
+                              p.accent.withValues(
+                                  alpha: state.isPlaying ? 0.10 : 0.04),
+                              p.surfaceContainerHigh,
+                            ),
+                            p.surfaceContainer,
+                          ],
+                        ),
+                        borderRadius: AppRadii.r12All,
                         border: Border.all(
-                          color: p.hairline.withValues(alpha: 0.4),
+                          color: state.isPlaying
+                              ? p.accent.withValues(alpha: 0.32)
+                              : p.hairline.withValues(alpha: 0.6),
                           width: 1,
                         ),
                       ),
@@ -838,8 +883,8 @@ class _SidebarBottomSection extends StatelessWidget {
                               remoteUrl:
                                   song.remoteArtworkUrl ?? song.artworkUri,
                               type: ArtworkType.AUDIO,
-                              size: 28,
-                              borderRadius: 6,
+                              size: 30,
+                              borderRadius: 7,
                             ),
                             const SizedBox(width: AppSpacing.xs),
                             Expanded(
@@ -886,8 +931,9 @@ class _SidebarBottomSection extends StatelessWidget {
               if (!isExtended)
                 IconButton(
                   constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   tooltip: context.l10n.sidebarExpand,
                   iconSize: 20,
                   icon: Icon(

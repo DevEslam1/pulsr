@@ -1,10 +1,11 @@
+// lib/core/widgets/staggered_list_item.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../motion/pulsr_motion.dart';
 
 /// {@category DesignSystem}
-/// Wraps a list item with a staggered cascading entrance animation (smooth fade
-/// and subtle vertical rise) inspired by Meloplay's staggered list transitions.
+/// Wraps a list item with a staggered cascading entrance animation (smooth fade,
+/// subtle scale, and vertical rise) inspired by Meloplay's staggered list transitions.
 class StaggeredListItem extends StatefulWidget {
   final int index;
   final Widget child;
@@ -30,6 +31,7 @@ class _StaggeredListItemState extends State<StaggeredListItem>
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
+  late final Animation<double> _scaleAnimation;
   Timer? _delayTimer;
 
   @override
@@ -40,6 +42,8 @@ class _StaggeredListItemState extends State<StaggeredListItem>
       duration: widget.animDuration,
     );
 
+    final easeOutCubic = CurveTween(curve: Curves.easeOutCubic);
+
     _fadeAnimation = _controller.drive(
       CurveTween(curve: Curves.easeOut),
     );
@@ -48,7 +52,11 @@ class _StaggeredListItemState extends State<StaggeredListItem>
       Tween<Offset>(
         begin: Offset(0.0, widget.slideOffset / 100),
         end: Offset.zero,
-      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+      ).chain(easeOutCubic),
+    );
+
+    _scaleAnimation = _controller.drive(
+      Tween<double>(begin: 0.985, end: 1.0).chain(easeOutCubic),
     );
 
     // Stagger animation capped to the first 15 items for high scroll performance
@@ -69,6 +77,12 @@ class _StaggeredListItemState extends State<StaggeredListItem>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.duration = context.motion(widget.animDuration);
+  }
+
+  @override
   void dispose() {
     _delayTimer?.cancel();
     _controller.dispose();
@@ -85,7 +99,10 @@ class _StaggeredListItemState extends State<StaggeredListItem>
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: widget.child,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: widget.child,
+          ),
         ),
       ),
     );

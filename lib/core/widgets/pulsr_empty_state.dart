@@ -28,7 +28,7 @@ class PulsrEmptyState extends StatelessWidget {
     this.illustration,
     this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle = '',
     this.primaryActionLabel,
     this.primaryActionIcon,
     this.onPrimaryAction,

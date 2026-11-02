@@ -1,5 +1,8 @@
+// lib/features/ytm_search/presentation/widgets/ytm_download_button.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
@@ -9,9 +12,8 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../data/models/download_settings.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
-import '../../cubit/ytm_download_cubit.dart';
 import '../../../downloads/presentation/widgets/download_quality_picker_sheet.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
+import '../../cubit/ytm_download_cubit.dart';
 
 /// Routes a picker-confirmed [quality] into the queued task, where the
 /// repository persists it and hands it to the transfer service. Extracted to
@@ -55,6 +57,28 @@ class YtmDownloadButton extends StatelessWidget {
     this.iconSize = 20,
   });
 
+  Future<void> _openQualityPicker(
+    BuildContext context,
+    YtmDownloadCubit cubit,
+  ) async {
+    HapticFeedback.mediumImpact();
+    String? defaultQuality;
+    try {
+      defaultQuality = (await DownloadSettings.load()).quality;
+    } catch (_) {
+      defaultQuality = null;
+    }
+    if (!context.mounted) return;
+    DownloadQualityPickerSheet.show(
+      context,
+      song: song,
+      initialQuality: downloadQualityFromSetting(defaultQuality),
+      onConfirm: (quality) {
+        routeDownloadQuality(cubit, song, quality);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!AppConfig.ytmEnabled) return const SizedBox.shrink();
@@ -88,90 +112,138 @@ class YtmDownloadButton extends StatelessWidget {
         final item = state.itemFor(videoId);
         final isAlreadyLocal = song.source == SongSource.local &&
             (song.remoteId != null && song.remoteId!.isNotEmpty);
+
+        final Widget child;
         if (isAlreadyLocal || item.status == YtDownloadStatus.done) {
-          return SizedBox(
+          child = SizedBox(
+            key: const ValueKey('ytm_dl_done'),
             width: AppSpacing.s40,
             height: 40,
-            child: Icon(Icons.download_done_rounded,
-                size: iconSize, color: tintColor),
+            child: Center(
+              child: Container(
+                width: iconSize + 10,
+                height: iconSize + 10,
+                decoration: BoxDecoration(
+                  color: tintColor.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.download_done_rounded,
+                  size: iconSize,
+                  color: tintColor,
+                ),
+              ),
+            ),
           );
-        }
-
-        switch (item.status) {
-          case YtDownloadStatus.queued:
-          case YtDownloadStatus.running:
-            final progressValue =
-                item.status == YtDownloadStatus.queued ? null : item.progress;
-            return SizedBox(
-              width: AppSpacing.s40,
-              height: 40,
-              child: Center(
-                child: Semantics(
-                  label: context.l10n.browseDownloadOffline,
-                  value: progressValue == null
-                      ? null
-                      : '${(progressValue * 100).toStringAsFixed(0)}%',
-                  child: SizedBox(
-                    width: iconSize,
-                    height: iconSize,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.4,
-                      value: progressValue,
-                      color: tintColor,
+        } else {
+          switch (item.status) {
+            case YtDownloadStatus.queued:
+            case YtDownloadStatus.running:
+              final progressValue = item.status == YtDownloadStatus.queued
+                  ? null
+                  : item.progress?.clamp(0.0, 1.0);
+              final pctLabel = progressValue == null
+                  ? null
+                  : '${(progressValue * 100).toStringAsFixed(0)}%';
+              child = SizedBox(
+                key: const ValueKey('ytm_dl_progress'),
+                width: AppSpacing.s40,
+                height: 40,
+                child: Center(
+                  child: Semantics(
+                    label: context.l10n.browseDownloadOffline,
+                    value: pctLabel,
+                    child: Tooltip(
+                      message: pctLabel ?? context.l10n.browseDownloadOffline,
+                      child: SizedBox(
+                        width: iconSize + 4,
+                        height: iconSize + 4,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              value: progressValue,
+                              color: tintColor,
+                              backgroundColor:
+                                  tintColor.withValues(alpha: 0.18),
+                            ),
+                            Icon(
+                              Icons.arrow_downward_rounded,
+                              size: iconSize * 0.58,
+                              color: tintColor,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          case YtDownloadStatus.done:
-            return SizedBox(
-              width: AppSpacing.s40,
-              height: 40,
-              child: Icon(Icons.download_done_rounded,
-                  size: iconSize, color: tintColor),
-            );
-          case YtDownloadStatus.failed:
-            return IconButton(
-              tooltip: item.error == null
-                  ? null
-                  : resolveUiErrorMessage(context, item.error!),
-              icon: Icon(Icons.error_outline_rounded,
-                  size: iconSize, color: p.error),
-              onPressed: () => cubit.retryDownload(song),
-              visualDensity: VisualDensity.compact,
-            );
-          case YtDownloadStatus.paused:
-          case YtDownloadStatus.canceled:
-          case YtDownloadStatus.idle:
-            return GestureDetector(
-              onLongPress: () async {
-                // Open on the persisted default instead of always "high", so
-                // the sheet reflects the choice the user already made.
-                String? defaultQuality;
-                try {
-                  defaultQuality = (await DownloadSettings.load()).quality;
-                } catch (_) {
-                  defaultQuality = null;
-                }
-                if (!context.mounted) return;
-                DownloadQualityPickerSheet.show(
-                  context,
-                  song: song,
-                  initialQuality: downloadQualityFromSetting(defaultQuality),
-                  onConfirm: (quality) {
-                    routeDownloadQuality(cubit, song, quality);
+              );
+              break;
+            case YtDownloadStatus.done:
+              child = SizedBox(
+                key: const ValueKey('ytm_dl_done'),
+                width: AppSpacing.s40,
+                height: 40,
+                child: Icon(
+                  Icons.download_done_rounded,
+                  size: iconSize,
+                  color: tintColor,
+                ),
+              );
+              break;
+            case YtDownloadStatus.failed:
+              child = GestureDetector(
+                key: const ValueKey('ytm_dl_failed'),
+                onLongPress: () => _openQualityPicker(context, cubit),
+                child: IconButton(
+                  tooltip: item.error == null
+                      ? null
+                      : resolveUiErrorMessage(context, item.error!),
+                  icon: Icon(
+                    Icons.error_outline_rounded,
+                    size: iconSize,
+                    color: p.error,
+                  ),
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    cubit.retryDownload(song);
                   },
-                );
-              },
-              child: IconButton(
-                tooltip: context.l10n.browseDownloadOffline,
-                icon: Icon(Icons.download_rounded,
-                    size: iconSize, color: baseColor),
-                onPressed: () => cubit.download(song),
-                visualDensity: VisualDensity.compact,
-              ),
-            );
+                  visualDensity: VisualDensity.compact,
+                ),
+              );
+              break;
+            case YtDownloadStatus.paused:
+            case YtDownloadStatus.canceled:
+            case YtDownloadStatus.idle:
+              child = GestureDetector(
+                key: const ValueKey('ytm_dl_idle'),
+                onLongPress: () => _openQualityPicker(context, cubit),
+                child: IconButton(
+                  tooltip: context.l10n.browseDownloadOffline,
+                  icon: Icon(
+                    Icons.download_rounded,
+                    size: iconSize,
+                    color: baseColor,
+                  ),
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    cubit.download(song);
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+              );
+              break;
+          }
         }
+
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: child,
+        );
       },
     );
   }

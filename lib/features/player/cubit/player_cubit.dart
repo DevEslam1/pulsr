@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/services/ambient_sound_service.dart';
 import '../../../core/services/sponsorblock_service.dart';
 import '../../../core/utils/async_guard.dart';
 import '../../../core/utils/error_logger.dart';
@@ -86,8 +87,6 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   // Monotonic counter bumped whenever the queue is mutated; used to invalidate
   // the home-widget "up next" title cache on reorder.
   int _queueVersion = 0;
-  int? _lastScrobbledSongId;
-  int _lastScrobbledPlayGen = -1;
   final AsyncGuard _mediaItemGuard = AsyncGuard();
   final AsyncGuard _queueSyncGuard = AsyncGuard();
 
@@ -225,11 +224,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       // AUDIT-FIX: the only caller is the queue-history jump in previous();
       // preserve the play/pause state so "previous" while paused does not
       // start playback.
-      onPlaySong: (song, {queue, initialPosition}) => playSong(
+      onPlaySong: (song, {queue, initialPosition, queueIndex}) => playSong(
         song,
         queue: queue,
         initialPosition: initialPosition,
         preservePlaybackState: true,
+        queueIndex: queueIndex,
       ),
     );
     widgetBridge.listenToClicks(
@@ -245,6 +245,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     unawaited(playbackOptionsController.restoreQuranMode());
     _listenToSettings();
     _listenToAudioService();
+    AmbientSoundService().onPlayerPlaybackStateChanged(state.isPlaying);
     _syncAudioEffects(force: true);
     unawaited(_audioHandler.effectsReady.then((_) async {
       if (isClosed) return;
@@ -479,13 +480,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   }
 
   void _maybeScrobble(SongsTableData song, Duration position, bool isPlaying) {
-    final currentGen = _audioHandler.playbackState.valueOrNull?.queueIndex ?? 0;
-    if (_lastScrobbledSongId != song.id ||
-        _lastScrobbledPlayGen != currentGen) {
-      _lastScrobbledSongId = song.id;
-      _lastScrobbledPlayGen = currentGen;
-      widgetBridge.scrobble(song, position, isPlaying);
-    }
+    widgetBridge.debouncedScrobble(song, position, isPlaying);
   }
 
   /// The engine's authoritative current queue index when known and in range for
@@ -846,6 +841,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             if (state.isPlaying) {
               safeEmit(state.copyWith(
                   playback: state.playback.copyWith(isPlaying: false)));
+              AmbientSoundService().onPlayerPlaybackStateChanged(false);
             }
           });
         }
@@ -878,6 +874,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         return;
       }
 
+      if (state.isPlaying != resolvedPlaying) {
+        AmbientSoundService().onPlayerPlaybackStateChanged(resolvedPlaying);
+      }
+
       safeEmit(state.copyWith(
         playback: state.playback.copyWith(
           isPlaying: resolvedPlaying,
@@ -894,6 +894,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         ),
       ));
       widgetBridge.updateWidgetProgressThrottled(state);
+      final current = state.currentSong;
+      if (current != null) {
+        widgetBridge.debouncedScrobble(current, state.position, resolvedPlaying);
+      }
     });
 
     Stream<Duration> positionUpdates;
@@ -912,7 +916,6 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           state.duration > Duration.zero &&
           state.position > state.duration * 0.5 &&
           pos < const Duration(seconds: 3);
-      if (wrapped) _lastScrobbledSongId = null;
       safeEmit(
           state.copyWith(playback: state.playback.copyWith(position: pos)));
       if (wrapped) {
@@ -921,6 +924,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       }
       if (state.isPlaying) {
         widgetBridge.updateWidgetProgressThrottled(state);
+        final current = state.currentSong;
+        if (current != null) {
+          widgetBridge.debouncedScrobble(current, pos, true);
+        }
         // SponsorBlock auto-skip: jump past a skippable segment when one covers
         // the current position. Guarded so overlapping ticks never double-seek.
         // BUG-2 FIX: use a generation counter instead of a boolean so the guard
@@ -1068,6 +1075,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   @override
   Future<void> close() async {
+    AmbientSoundService().onPlayerPlaybackStateChanged(false);
     final cleanups = <({String name, FutureOr<void> Function() run})>[
       (name: 'transportController', run: transportController.dispose),
       (name: 'dspController', run: dspController.dispose),

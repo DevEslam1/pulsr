@@ -2,7 +2,6 @@ part of '../classic_player_theme.dart';
 
 extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
   Widget _buildBody(BuildContext context) {
-    final p = context.palette;
     final state = props.state;
     final cubit = props.cubit;
     final activeColor = props.activeColor;
@@ -457,7 +456,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
       children: [
         Positioned.fill(
           child: Container(
-            color: p.bg,
+            color: props.bgColor,
           ),
         ),
         SafeArea(child: mainLayout),

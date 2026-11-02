@@ -426,7 +426,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                 ],
                               ),
                               onTap: () {
-                                cubit.playSong(song, queue: queue);
+                                cubit.playSong(song, queue: queue, queueIndex: index);
                               },
                               onLongPress: () =>
                                   _showRowActions(context, cubit, song),

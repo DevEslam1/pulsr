@@ -405,7 +405,6 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     _emit(current.copyWith(
       dsp: current.dsp.copyWith(isQuranModeEnabled: false),
     ));
-    unawaited(AmbientSoundService().onQuranModeDisabled());
 
     final persisted = await _quranManager.setEnabled(false);
     if (!persisted && !isClosed && gen == _quranToggleGen) {

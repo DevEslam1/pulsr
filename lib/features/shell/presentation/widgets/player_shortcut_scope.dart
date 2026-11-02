@@ -69,6 +69,7 @@ class PlayerShortcutScope extends StatelessWidget {
   }) {
     return () {
       if (isTextInputFocused()) return;
+      HapticFeedback.selectionClick();
       action();
       PulsrToast.show(
         context,
@@ -82,6 +83,7 @@ class PlayerShortcutScope extends StatelessWidget {
   VoidCallback _guardHelp(BuildContext context) {
     return () {
       if (isTextInputFocused()) return;
+      HapticFeedback.selectionClick();
       ShortcutHelpSheet.show(context);
     };
   }

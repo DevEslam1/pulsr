@@ -1,3 +1,4 @@
+// lib/core/widgets/spinning_vinyl_disc.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -8,8 +9,8 @@ import '../widgets/cached_artwork.dart';
 
 /// {@category DesignSystem}
 /// An animated vinyl record disc that smoothly rotates when [isPlaying] is true
-/// and halts when false. Concentric micro-grooves and light reflection provide a
-/// tactile analog aesthetic matching Pulsr's glass & dark/AMOLED UI.
+/// and halts when false. Concentric micro-grooves and anisotropic light reflection
+/// provide a tactile analog aesthetic matching Pulsr's glass & dark/AMOLED UI.
 class SpinningVinylDisc extends StatefulWidget {
   final int id;
   final String? remoteArtworkUrl;
@@ -79,14 +80,29 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
   Widget build(BuildContext context) {
     final discSize = widget.size;
     final labelSize = discSize * 0.44;
-    final spindleSize = discSize * 0.08;
+    final spindleSize = discSize * 0.085;
 
     final content = RepaintBoundary(
       child: GestureDetector(
         onTap: widget.onTap,
-        child: SizedBox(
+        child: Container(
           width: discSize,
           height: discSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.vinylDiscBase,
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.scrimLight,
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+            border: Border.all(
+              color: AppColors.vinylDiscRim,
+              width: 1.2,
+            ),
+          ),
           child: AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
@@ -98,32 +114,22 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Outer vinyl record with dark grooves
+                // Concentric micro-grooves + anisotropic vinyl luster
+                CustomPaint(
+                  size: Size(discSize, discSize),
+                  painter: const _VinylGroovePainter(),
+                ),
+
+                // Center album art label with recessed collar
                 Container(
-                  width: discSize,
-                  height: discSize,
+                  width: labelSize + 3.0,
+                  height: labelSize + 3.0,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.vinylDiscBase,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.scrimLight,
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: AppColors.vinylDiscRim,
-                      width: 1.2,
-                    ),
-                  ),
-                  child: CustomPaint(
-                    size: Size(discSize, discSize),
-                    painter: _VinylGroovePainter(),
+                    color: Colors.black.withValues(alpha: 0.55),
                   ),
                 ),
 
-                // Center album art label
                 ClipOval(
                   child: SizedBox(
                     width: labelSize,
@@ -144,12 +150,20 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: AppColors.specularAt(0.25),
+                              color: AppColors.specularAt(0.28),
                               width: 1.0,
                             ),
                           ),
                         ),
-                        // Center Spindle Hole
+                        // Metallic Center Spindle Ring & Hole
+                        Container(
+                          width: spindleSize * 1.45,
+                          height: spindleSize * 1.45,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.specularAt(0.22),
+                          ),
+                        ),
                         Container(
                           width: spindleSize,
                           height: spindleSize,
@@ -157,8 +171,8 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
                             shape: BoxShape.circle,
                             color: AppColors.vinylSpindle,
                             border: Border.all(
-                              color: AppColors.specularAt(0.4),
-                              width: 0.6,
+                              color: AppColors.specularAt(0.45),
+                              width: 0.7,
                             ),
                           ),
                         ),
@@ -185,21 +199,52 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
 }
 
 class _VinylGroovePainter extends CustomPainter {
+  const _VinylGroovePainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = size.width / 2;
-    final minRadius = maxRadius * 0.48;
+    final maxRadius = (size.width / 2) - 1.2;
+    final minRadius = maxRadius * 0.47;
+    if (maxRadius <= minRadius) return;
 
+    // 1. Subtle dual-cone anisotropic reflection across the vinyl surface
+    final rect = Rect.fromCircle(center: center, radius: maxRadius);
+    final sheenPaint = Paint()
+      ..shader = SweepGradient(
+        colors: [
+          Colors.transparent,
+          Colors.white.withValues(alpha: 0.06),
+          Colors.transparent,
+          Colors.transparent,
+          Colors.white.withValues(alpha: 0.06),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.14, 0.30, 0.50, 0.64, 0.80],
+      ).createShader(rect);
+    canvas.drawCircle(center, maxRadius, sheenPaint);
+
+    // 2. Concentric micro-grooves
     final groovePaint = Paint()
       ..color = AppColors.highlightSoft
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.6;
 
-    final ringSteps = math.max(3, (maxRadius - minRadius) ~/ 3.5);
+    final accentGroovePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.09)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+
+    final ringSteps = math.max(3, (maxRadius - minRadius) ~/ 3.2);
     for (int i = 1; i <= ringSteps; i++) {
       final r = minRadius + (maxRadius - minRadius) * (i / ringSteps);
-      canvas.drawCircle(center, r, groovePaint);
+      canvas.drawCircle(
+        center,
+        r,
+        (i == 1 || i == ringSteps || i == ringSteps ~/ 2)
+            ? accentGroovePaint
+            : groovePaint,
+      );
     }
   }
 

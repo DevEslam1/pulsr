@@ -1,5 +1,8 @@
 // lib/features/playlists/presentation/widgets/spotify_import_dialog.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -8,6 +11,7 @@ import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
 import '../../../../data/services/spotify_importer_service.dart';
 
 /// Modal dialog for importing a Spotify playlist into Pulsr.
@@ -47,9 +51,22 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
     super.dispose();
   }
 
+  Future<void> _pasteFromClipboard() async {
+    HapticFeedback.selectionClick();
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim();
+    if (text != null && text.isNotEmpty && mounted) {
+      _urlController.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
+  }
+
   Future<void> _startImport() async {
     final input = _urlController.text.trim();
     if (input.isEmpty) return;
+    HapticFeedback.selectionClick();
 
     final id = SpotifyImporterService.extractPlaylistId(input);
     if (id == null) {
@@ -96,7 +113,9 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
       setState(() {
         _stage = _ImportStage.error;
         _errorMessage = resolveUiErrorMessage(
-            context, e.toString().replaceFirst('Exception: ', ''));
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
+        );
       });
     }
   }
@@ -106,10 +125,22 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
     final p = context.palette;
 
     return PulsrDialog(
-      icon: Icon(
-        Icons.playlist_play_rounded,
-        size: 30,
-        color: p.accent,
+      icon: Container(
+        padding: const EdgeInsets.all(AppSpacing.s10),
+        decoration: BoxDecoration(
+          color: AppColors.spotifyGreen.withValues(alpha: 0.14),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          _stage == _ImportStage.result
+              ? Icons.check_circle_rounded
+              : (_stage == _ImportStage.error
+                  ? Icons.error_outline_rounded
+                  : Icons.playlist_play_rounded),
+          size: 28,
+          color:
+              _stage == _ImportStage.error ? p.error : AppColors.spotifyGreen,
+        ),
       ),
       title: Text(
         _stage == _ImportStage.result
@@ -141,37 +172,69 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _urlController,
-              autofocus: true,
-              style:
-                  TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
-              decoration: InputDecoration(
-                hintText: 'https://open.spotify.com/playlist/...',
-                hintStyle: TextStyle(
-                  color: p.textSecondary.withValues(alpha: 0.6),
-                  fontSize: AppFontSize.bodySmall,
-                ),
-                filled: true,
-                fillColor: p.surfaceContainer,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.accent, width: 1.5),
-                ),
-              ),
-              onSubmitted: (_) => _startImport(),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _urlController,
+              builder: (context, value, _) {
+                final hasText = value.text.isNotEmpty;
+                return TextField(
+                  controller: _urlController,
+                  autofocus: true,
+                  autocorrect: false,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: AppFontSize.body,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'https://open.spotify.com/playlist/...',
+                    hintStyle: TextStyle(
+                      color: p.textSecondary.withValues(alpha: 0.6),
+                      fontSize: AppFontSize.bodySmall,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.link_rounded,
+                      size: 20,
+                      color: hasText ? AppColors.spotifyGreen : p.textTertiary,
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        hasText
+                            ? Icons.close_rounded
+                            : Icons.content_paste_rounded,
+                        size: 18,
+                        color: p.textSecondary,
+                      ),
+                      tooltip: hasText ? context.l10n.clear : 'Paste',
+                      onPressed: () {
+                        if (hasText) {
+                          _urlController.clear();
+                        } else {
+                          _pasteFromClipboard();
+                        }
+                      },
+                    ),
+                    filled: true,
+                    fillColor: p.surfaceContainer,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadii.r12All,
+                      borderSide: BorderSide(color: p.hairline),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: AppRadii.r12All,
+                      borderSide: BorderSide(color: p.hairline),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: AppRadii.r12All,
+                      borderSide: BorderSide(color: p.accent, width: 1.5),
+                    ),
+                  ),
+                  onSubmitted: (_) => _startImport(),
+                );
+              },
             ),
           ],
         );
@@ -180,32 +243,29 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
             if (_progressFraction != null) ...[
-              LinearProgressIndicator(
-                value: _progressFraction,
-                backgroundColor: p.surfaceContainer,
+              PulsrProgressBar.determinate(
+                value: _progressFraction!,
+                height: 6,
                 color: p.accent,
-                minHeight: 6,
-                borderRadius: AppRadii.circular(3),
+                backgroundColor: p.surfaceContainer,
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 '${((_progressFraction ?? 0) * 100).toInt()}%',
                 style: TextStyle(
                   color: p.accent,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   fontSize: AppFontSize.bodySmall,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ] else ...[
-              SizedBox(
-                width: 32,
-                height: 32,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: p.accent,
-                ),
+              PulsrProgressBar.circular(
+                size: 30,
+                strokeWidth: 3,
+                color: p.accent,
               ),
             ],
             const SizedBox(height: AppSpacing.md),
@@ -215,9 +275,10 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               style: TextStyle(
                 color: p.textSecondary,
                 fontSize: AppFontSize.body,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
           ],
         );
 
@@ -227,12 +288,21 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Successfully created playlist "${res.playlistTitle}" with ${res.matchedCount} of ${res.totalTracks} tracks resolved.',
-              style: TextStyle(
-                color: p.textSecondary,
-                fontSize: AppFontSize.body,
-                height: 1.45,
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: p.surfaceContainer,
+                borderRadius: AppRadii.r12All,
+                border: Border.all(color: p.hairline),
+              ),
+              child: Text(
+                'Successfully created playlist "${res.playlistTitle}" with ${res.matchedCount} of ${res.totalTracks} tracks resolved.',
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: AppFontSize.bodySmall,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
               ),
             ),
             if (res.unmatchedTracks.isNotEmpty) ...[
@@ -287,19 +357,22 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         );
 
       case _ImportStage.error:
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _errorMessage ?? 'An error occurred during import.',
-              style: TextStyle(
-                color: p.error,
-                fontSize: AppFontSize.body,
-                height: 1.45,
-              ),
+        return Container(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: p.error.withValues(alpha: 0.10),
+            borderRadius: AppRadii.r12All,
+            border: Border.all(color: p.error.withValues(alpha: 0.32)),
+          ),
+          child: Text(
+            _errorMessage ?? 'An error occurred during import.',
+            style: TextStyle(
+              color: p.error,
+              fontSize: AppFontSize.bodySmall,
+              fontWeight: FontWeight.w600,
+              height: 1.45,
             ),
-          ],
+          ),
         );
     }
   }
@@ -310,8 +383,10 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         return [
           TextButton(
             onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: Text(context.l10n.cancel,
-                style: TextStyle(color: p.textSecondary)),
+            child: Text(
+              context.l10n.cancel,
+              style: TextStyle(color: p.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: _startImport,
@@ -320,8 +395,10 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               foregroundColor: p.onAccent,
               shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
-            child: Text(context.l10n.importAction,
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(
+              context.l10n.importAction,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ];
 
@@ -337,8 +414,10 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               foregroundColor: p.onAccent,
               shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
-            child: Text(context.l10n.done,
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(
+              context.l10n.done,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ];
 
@@ -346,8 +425,10 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         return [
           TextButton(
             onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: Text(context.l10n.cancel,
-                style: TextStyle(color: p.textSecondary)),
+            child: Text(
+              context.l10n.cancel,
+              style: TextStyle(color: p.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () {
@@ -360,8 +441,10 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
               foregroundColor: p.onAccent,
               shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
-            child: Text(context.l10n.retry,
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(
+              context.l10n.retry,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ];
     }

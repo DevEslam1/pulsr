@@ -17,6 +17,11 @@ class DockStyleController {
   static final ValueNotifier<DockStackMode> mode =
       ValueNotifier<DockStackMode>(DockStackMode.defaultLayout);
 
+  /// Whether the active dock mode overlaps the mini player and navigation bar.
+  static bool get isStacked =>
+      mode.value == DockStackMode.miniPlayerOnTop ||
+      mode.value == DockStackMode.navBarOnTop;
+
   /// Restores the persisted dock style (call once at startup).
   static Future<void> load() async {
     try {

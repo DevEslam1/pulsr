@@ -183,6 +183,20 @@ class FakeAudioPlayer extends Mock implements AudioPlayer {
   }
 
   @override
+  Future<Duration?> setAudioSources(
+    List<AudioSource> audioSources, {
+    bool preload = true,
+    int? initialIndex,
+    Duration? initialPosition,
+    ShuffleOrder? shuffleOrder,
+  }) async {
+    _processingState = ProcessingState.ready;
+    _processingStateController.add(_processingState);
+    _playerStateController.add(playerState);
+    return _duration;
+  }
+
+  @override
   Future<bool> dspClearGainCurve() async => false;
 
   @override

@@ -39,6 +39,7 @@ mixin _$PlaybackSlice {
   int get currentSongRating;
   String? get currentSongEqOverride;
   double get currentSongVolumeOverrideDb;
+  bool get isMuted;
 
   /// Create a copy of PlaybackSlice
   /// with the given fields replaced by the non-null parameter values.
@@ -107,7 +108,9 @@ mixin _$PlaybackSlice {
             (identical(other.currentSongVolumeOverrideDb,
                     _this.currentSongVolumeOverrideDb) ||
                 other.currentSongVolumeOverrideDb ==
-                    _this.currentSongVolumeOverrideDb));
+                    _this.currentSongVolumeOverrideDb) &&
+            (identical(other.isMuted, _this.isMuted) ||
+                other.isMuted == _this.isMuted));
   }
 
   @override
@@ -138,14 +141,15 @@ mixin _$PlaybackSlice {
       _this.silenceSkipSensitivity,
       _this.currentSongRating,
       _this.currentSongEqOverride,
-      _this.currentSongVolumeOverrideDb
+      _this.currentSongVolumeOverrideDb,
+      _this.isMuted
     ]);
   }
 
   @override
   String toString() {
     final _this = this as PlaybackSlice;
-    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, isBuffering: ${_this.isBuffering}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, sleepTimerRemainingTracks: ${_this.sleepTimerRemainingTracks}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb})';
+    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, isBuffering: ${_this.isBuffering}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, sleepTimerRemainingTracks: ${_this.sleepTimerRemainingTracks}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, isMuted: ${_this.isMuted})';
   }
 }
 
@@ -179,7 +183,8 @@ abstract mixin class $PlaybackSliceCopyWith<$Res> {
       int silenceSkipSensitivity,
       int currentSongRating,
       String? currentSongEqOverride,
-      double currentSongVolumeOverrideDb});
+      double currentSongVolumeOverrideDb,
+      bool isMuted});
 }
 
 /// @nodoc
@@ -219,6 +224,7 @@ class _$PlaybackSliceCopyWithImpl<$Res>
     Object? currentSongRating = null,
     Object? currentSongEqOverride = freezed,
     Object? currentSongVolumeOverrideDb = null,
+    Object? isMuted = null,
   }) {
     return _then(PlaybackSlice(
       currentSong: freezed == currentSong
@@ -317,6 +323,10 @@ class _$PlaybackSliceCopyWithImpl<$Res>
           ? _self.currentSongVolumeOverrideDb
           : currentSongVolumeOverrideDb // ignore: cast_nullable_to_non_nullable
               as double,
+      isMuted: null == isMuted
+          ? _self.isMuted
+          : isMuted // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -438,7 +448,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             int silenceSkipSensitivity,
             int currentSongRating,
             String? currentSongEqOverride,
-            double currentSongVolumeOverrideDb)?
+            double currentSongVolumeOverrideDb,
+            bool isMuted)?
         $default, {
     required TResult orElse(),
   }) {
@@ -469,7 +480,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.silenceSkipSensitivity,
             _that.currentSongRating,
             _that.currentSongEqOverride,
-            _that.currentSongVolumeOverrideDb);
+            _that.currentSongVolumeOverrideDb,
+            _that.isMuted);
       case _:
         return orElse();
     }
@@ -514,7 +526,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             int silenceSkipSensitivity,
             int currentSongRating,
             String? currentSongEqOverride,
-            double currentSongVolumeOverrideDb)
+            double currentSongVolumeOverrideDb,
+            bool isMuted)
         $default,
   ) {
     final _that = this;
@@ -544,7 +557,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.silenceSkipSensitivity,
             _that.currentSongRating,
             _that.currentSongEqOverride,
-            _that.currentSongVolumeOverrideDb);
+            _that.currentSongVolumeOverrideDb,
+            _that.isMuted);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -588,7 +602,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             int silenceSkipSensitivity,
             int currentSongRating,
             String? currentSongEqOverride,
-            double currentSongVolumeOverrideDb)?
+            double currentSongVolumeOverrideDb,
+            bool isMuted)?
         $default,
   ) {
     final _that = this;
@@ -618,7 +633,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.silenceSkipSensitivity,
             _that.currentSongRating,
             _that.currentSongEqOverride,
-            _that.currentSongVolumeOverrideDb);
+            _that.currentSongVolumeOverrideDb,
+            _that.isMuted);
       case _:
         return null;
     }
@@ -652,7 +668,8 @@ class _PlaybackSlice extends PlaybackSlice {
       this.silenceSkipSensitivity = 0,
       this.currentSongRating = 0,
       this.currentSongEqOverride,
-      this.currentSongVolumeOverrideDb = 0.0})
+      this.currentSongVolumeOverrideDb = 0.0,
+      this.isMuted = false})
       : super._();
 
   @override
@@ -717,6 +734,9 @@ class _PlaybackSlice extends PlaybackSlice {
   @override
   @JsonKey()
   final double currentSongVolumeOverrideDb;
+  @override
+  @JsonKey()
+  final bool isMuted;
 
   /// Create a copy of PlaybackSlice
   /// with the given fields replaced by the non-null parameter values.
@@ -781,7 +801,9 @@ class _PlaybackSlice extends PlaybackSlice {
             (identical(other.currentSongVolumeOverrideDb,
                     currentSongVolumeOverrideDb) ||
                 other.currentSongVolumeOverrideDb ==
-                    currentSongVolumeOverrideDb));
+                    currentSongVolumeOverrideDb) &&
+            (identical(other.isMuted, isMuted) ||
+                other.isMuted == isMuted));
   }
 
   @override
@@ -811,13 +833,14 @@ class _PlaybackSlice extends PlaybackSlice {
       silenceSkipSensitivity,
       currentSongRating,
       currentSongEqOverride,
-      currentSongVolumeOverrideDb
+      currentSongVolumeOverrideDb,
+      isMuted
     ]);
   }
 
   @override
   String toString() {
-    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, isBuffering: $isBuffering, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, sleepTimerRemainingTracks: $sleepTimerRemainingTracks, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb)';
+    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, isBuffering: $isBuffering, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, sleepTimerRemainingTracks: $sleepTimerRemainingTracks, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, isMuted: $isMuted)';
   }
 }
 
@@ -853,7 +876,8 @@ abstract mixin class _$PlaybackSliceCopyWith<$Res>
       int silenceSkipSensitivity,
       int currentSongRating,
       String? currentSongEqOverride,
-      double currentSongVolumeOverrideDb});
+      double currentSongVolumeOverrideDb,
+      bool isMuted});
 }
 
 /// @nodoc
@@ -893,6 +917,7 @@ class __$PlaybackSliceCopyWithImpl<$Res>
     Object? currentSongRating = null,
     Object? currentSongEqOverride = freezed,
     Object? currentSongVolumeOverrideDb = null,
+    Object? isMuted = null,
   }) {
     return _then(_PlaybackSlice(
       currentSong: freezed == currentSong
@@ -991,6 +1016,10 @@ class __$PlaybackSliceCopyWithImpl<$Res>
           ? _self.currentSongVolumeOverrideDb
           : currentSongVolumeOverrideDb // ignore: cast_nullable_to_non_nullable
               as double,
+      isMuted: null == isMuted
+          ? _self.isMuted
+          : isMuted // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }

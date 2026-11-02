@@ -15,7 +15,6 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'audio_quality_badge.dart';
 import 'audio_quality_sheet.dart';
-import 'quran_mode_badge.dart';
 import 'equalizer_sheet.dart';
 import '../../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../../core/widgets/pulsr_dock_tracker.dart';
@@ -387,15 +386,6 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                     showDevice:
                                                                         false,
                                                                   ),
-                                                                  if (state
-                                                                      .isQuranModeEnabled) ...[
-                                                                    const SizedBox(
-                                                                        width: AppSpacing
-                                                                            .xs),
-                                                                    const QuranModeBadge(
-                                                                        compact:
-                                                                            true),
-                                                                  ],
                                                                 ],
                                                               ),
                                                             ),

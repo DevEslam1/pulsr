@@ -5,9 +5,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:injectable/injectable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/services/artwork_cache_manager.dart';
 import '../../core/utils/error_logger.dart';
@@ -21,8 +21,53 @@ class WidgetService {
   static const String iOSWidgetName = 'PulsrWidget';
   static const String appGroupId = 'group.com.pulsr.music';
 
+  static const int _maxCacheSize = 50;
+  static const int _maxPendingArtworkQueue = 3;
+  static const Duration _networkTimeout = Duration(seconds: 8);
+  static const String _contentVersionKey = 'widget_content_version';
+
+  static const Set<String> _knownWidgetActions = {
+    'play_pause',
+    'prev',
+    'next',
+    'favorite',
+    'shuffle',
+    'repeat',
+    'queue',
+    'open',
+    'main',
+  };
+
   bool _appGroupConfigured = false;
   bool _androidInitialized = false;
+  bool _versionInitialized = false;
+  static bool _hasPrunedArtworkThisSession = false;
+
+  final OnAudioQuery _audioQuery = OnAudioQuery();
+
+  // L-09: LinkedHashMap with manual access-order refresh on hit, so eviction
+  // (`keys.first`) drops the least-recently-used entry.
+  final LinkedHashMap<int, String> _artworkCache = LinkedHashMap();
+  final LinkedHashMap<int, Uint8List> _roundedArtworkCache = LinkedHashMap();
+
+  int? _lastSavedArtworkSongId;
+
+  /// Cached progress snapshot to suppress redundant 1Hz IPC updates when
+  /// playback is paused or position has not meaningfully advanced.
+  bool? _lastProgressIsPlaying;
+  int? _lastProgressPositionMs;
+  int? _lastProgressDurationMs;
+
+  /// Monotonic counter bumped whenever non-progress content changes (track,
+  /// favourite/shuffle/repeat state, queue preview, artwork). Persisted as
+  /// `contentVersion` in SharedPreferences and HomeWidget so it survives app restarts.
+  int _contentVersion = 0;
+
+  /// Whether an artwork resolve is currently in-flight (to avoid stacking).
+  bool _artworkResolveInFlight = false;
+  int _artworkGeneration = 0;
+  final Queue<SongsTableData> _pendingArtworkQueue = Queue<SongsTableData>();
+
   Future<void> _ensureAppGroup() async {
     if (Platform.isIOS) {
       if (_appGroupConfigured) return;
@@ -32,33 +77,17 @@ class WidgetService {
         // failure is retried on the next update.
         _appGroupConfigured = true;
       } catch (e) {
-        ErrorLogger.log('Failed to set iOS app group ID',
-            error: e, category: 'WidgetService');
+        ErrorLogger.log(
+          'Failed to set iOS app group ID',
+          error: e,
+          category: 'WidgetService',
+        );
       }
     } else if (Platform.isAndroid) {
       if (_androidInitialized) return;
       _androidInitialized = true;
     }
   }
-
-  final OnAudioQuery _audioQuery = OnAudioQuery();
-  // L-09: LinkedHashMap with manual access-order refresh on hit, so eviction
-  // (`keys.first`) drops the least-recently-*used* entry, not merely the
-  // least-recently-inserted one.
-  final LinkedHashMap<int, String> _artworkCache = LinkedHashMap();
-  final LinkedHashMap<int, Uint8List> _roundedArtworkCache = LinkedHashMap();
-  static const int _maxCacheSize = 50;
-
-  int? _lastSavedArtworkSongId;
-
-  static const String _contentVersionKey = 'widget_content_version';
-  bool _versionInitialized = false;
-  static bool _hasPrunedArtworkThisSession = false;
-
-  /// Monotonic counter bumped whenever non-progress content changes (track,
-  /// favourite/shuffle/repeat state, queue preview, artwork). Persisted as
-  /// `contentVersion` in SharedPreferences and HomeWidget so it survives app restarts.
-  int _contentVersion = 0;
 
   Future<void> _ensureContentVersionLoaded() async {
     if (_versionInitialized) return;
@@ -67,8 +96,12 @@ class WidgetService {
       _contentVersion = prefs.getInt(_contentVersionKey) ?? 0;
       _versionInitialized = true;
     } catch (e, st) {
-      ErrorLogger.log('Failed to load widget content version',
-          error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log(
+        'Failed to load widget content version',
+        error: e,
+        stackTrace: st,
+        category: 'WidgetService',
+      );
       _versionInitialized = true;
     }
   }
@@ -80,21 +113,83 @@ class WidgetService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_contentVersionKey, _contentVersion);
     } catch (e, st) {
-      ErrorLogger.log('Failed to persist widget content version to prefs',
-          error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log(
+        'Failed to persist widget content version to prefs',
+        error: e,
+        stackTrace: st,
+        category: 'WidgetService',
+      );
     }
     try {
       await HomeWidget.saveWidgetData<int>('contentVersion', _contentVersion);
     } catch (e, st) {
-      ErrorLogger.log('Failed to persist widget content version to HomeWidget',
-          error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log(
+        'Failed to persist widget content version to HomeWidget',
+        error: e,
+        stackTrace: st,
+        category: 'WidgetService',
+      );
     }
   }
 
-  /// Whether an artwork resolve is currently in-flight (to avoid stacking).
-  bool _artworkResolveInFlight = false;
-  int _artworkGeneration = 0;
-  final Queue<SongsTableData> _pendingArtworkQueue = Queue<SongsTableData>();
+  Future<void> _triggerWidgetReload() {
+    return HomeWidget.updateWidget(
+      name: androidWidgetName,
+      androidName: androidWidgetName,
+      qualifiedAndroidName: qualifiedAndroidName,
+      iOSName: iOSWidgetName,
+    );
+  }
+
+  static int _computePermille(int positionMs, int durationMs) {
+    if (durationMs <= 0 || positionMs <= 0) return 0;
+    return ((positionMs * 1000) ~/ durationMs).clamp(0, 1000);
+  }
+
+  static String _formatTimestamp(Duration d) {
+    if (d <= Duration.zero) return '0:00';
+    final totalSeconds = d.inSeconds;
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    if (hours > 0) {
+      final paddedMin = minutes.toString().padLeft(2, '0');
+      return '$hours:$paddedMin:$seconds';
+    }
+    return '$minutes:$seconds';
+  }
+
+  void _touchArtworkPathLru(int songId, String path) {
+    _artworkCache.remove(songId);
+    _artworkCache[songId] = path;
+  }
+
+  void _touchArtworkBytesLru(int songId, Uint8List bytes) {
+    _roundedArtworkCache.remove(songId);
+    _roundedArtworkCache[songId] = bytes;
+  }
+
+  Future<void> _evictOverflowCachesIfNeeded() async {
+    while (_artworkCache.length > _maxCacheSize) {
+      final oldestKey = _artworkCache.keys.first;
+      final evictedPath = _artworkCache.remove(oldestKey);
+      if (evictedPath != null) {
+        unawaited(_deleteFileSilently(File(evictedPath)));
+      }
+    }
+    while (_roundedArtworkCache.length > _maxCacheSize) {
+      final oldestKey = _roundedArtworkCache.keys.first;
+      _roundedArtworkCache.remove(oldestKey);
+    }
+  }
+
+  Future<void> _deleteFileSilently(File file) async {
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
 
   void _drainPendingArtwork() {
     if (_artworkResolveInFlight) return;
@@ -130,50 +225,74 @@ class WidgetService {
       await _ensureAppGroup();
       final hasSong = song != null;
 
-      await HomeWidget.saveWidgetData<String>(
-        'title',
-        hasSong && song.title.trim().isNotEmpty ? song.title : 'Pulsr Music',
-      );
-      await HomeWidget.saveWidgetData<String>(
-        'artist',
-        hasSong && song.artist.trim().isNotEmpty
-            ? song.artist
-            : 'Nothing playing',
-      );
-      await HomeWidget.saveWidgetData<String>(
-        'album',
-        hasSong && song.album.trim().isNotEmpty && song.album != 'Unknown Album'
-            ? song.album
-            : '',
-      );
-      await HomeWidget.saveWidgetData<bool>('isPlaying', isPlaying);
-      await HomeWidget.saveWidgetData<bool>('isFavorite', isFavorite);
-      await HomeWidget.saveWidgetData<bool>('isShuffle', isShuffle);
-      await HomeWidget.saveWidgetData<String>('repeatMode', repeatMode);
+      final posMs = hasSong ? position.inMilliseconds : 0;
+      final durMs = hasSong ? duration.inMilliseconds : 0;
+      final permille = _computePermille(posMs, durMs);
+
+      _lastProgressIsPlaying = isPlaying;
+      _lastProgressPositionMs = posMs;
+      _lastProgressDurationMs = durMs;
+
+      final resolvedTitle =
+          hasSong && song.title.trim().isNotEmpty ? song.title : 'Pulsr Music';
+      final resolvedArtist = hasSong && song.artist.trim().isNotEmpty
+          ? song.artist
+          : 'Nothing playing';
+      final resolvedAlbum = hasSong &&
+              song.album.trim().isNotEmpty &&
+              song.album != 'Unknown Album'
+          ? song.album
+          : '';
+
+      final saves = <Future<bool?>>[
+        HomeWidget.saveWidgetData<String>('title', resolvedTitle),
+        HomeWidget.saveWidgetData<String>('artist', resolvedArtist),
+        HomeWidget.saveWidgetData<String>('album', resolvedAlbum),
+        HomeWidget.saveWidgetData<bool>('isPlaying', isPlaying),
+        HomeWidget.saveWidgetData<bool>('isFavorite', isFavorite),
+        HomeWidget.saveWidgetData<bool>('isShuffle', isShuffle),
+        HomeWidget.saveWidgetData<String>('repeatMode', repeatMode),
+        HomeWidget.saveWidgetData<int>('positionMs', posMs),
+        HomeWidget.saveWidgetData<int>('durationMs', durMs),
+        HomeWidget.saveWidgetData<int>('progressPermille', permille),
+        HomeWidget.saveWidgetData<String>(
+          'formattedPosition',
+          _formatTimestamp(hasSong ? position : Duration.zero),
+        ),
+        HomeWidget.saveWidgetData<String>(
+          'formattedDuration',
+          _formatTimestamp(hasSong ? duration : Duration.zero),
+        ),
+      ];
+
       if (hasSong) {
-        await HomeWidget.saveWidgetData<int>(
-            'positionMs', position.inMilliseconds);
-        await HomeWidget.saveWidgetData<int>(
-            'durationMs', duration.inMilliseconds);
         for (int i = 0; i < 3; i++) {
-          final title = (nextQueueTitles != null && i < nextQueueTitles.length)
-              ? nextQueueTitles[i]
-              : '';
-          await HomeWidget.saveWidgetData<String>('nextTrack$i', title);
+          final nextTitle =
+              (nextQueueTitles != null && i < nextQueueTitles.length)
+                  ? nextQueueTitles[i]
+                  : '';
+          saves
+              .add(HomeWidget.saveWidgetData<String>('nextTrack$i', nextTitle));
         }
         final upNext = (nextQueueTitles != null && nextQueueTitles.isNotEmpty)
             ? nextQueueTitles.first
             : '';
-        await HomeWidget.saveWidgetData<String>('upNext', upNext);
-        await HomeWidget.saveWidgetData<String>('queueCover', queueCover ?? '');
+        saves.add(HomeWidget.saveWidgetData<String>('upNext', upNext));
+        saves.add(
+          HomeWidget.saveWidgetData<String>('queueCover', queueCover ?? ''),
+        );
 
-        // If artwork is already cached for this song, set it immediately.
-        // Otherwise always re-queue resolution — a missing/stale cache must not
-        // be skipped just because this song id was saved before.
+        await Future.wait(saves);
+
+        // Check if artwork is already cached and valid on disk without blocking the UI thread.
         final cachedArt = _artworkCache[song.id];
-        if (cachedArt != null && File(cachedArt).existsSync()) {
+        final isCachedValid =
+            cachedArt != null && await File(cachedArt).exists();
+        if (isCachedValid) {
+          _touchArtworkPathLru(song.id, cachedArt);
           _lastSavedArtworkSongId = song.id;
           await HomeWidget.saveWidgetData<String>('artwork', cachedArt);
+          await HomeWidget.saveWidgetData<bool>('artworkFailed', false);
         } else {
           if (cachedArt != null) {
             _artworkCache.remove(song.id);
@@ -181,37 +300,38 @@ class WidgetService {
           }
           _pendingArtworkQueue.removeWhere((s) => s.id == song.id);
           // C-04: Cap queue at 3 entries, drop oldest on rapid track changes
-          while (_pendingArtworkQueue.length >= 3) {
+          while (_pendingArtworkQueue.length >= _maxPendingArtworkQueue) {
             _pendingArtworkQueue.removeFirst();
           }
           _pendingArtworkQueue.add(song);
           _drainPendingArtwork();
         }
       } else {
-        await HomeWidget.saveWidgetData<int>('positionMs', 0);
-        await HomeWidget.saveWidgetData<int>('durationMs', 0);
         for (int i = 0; i < 3; i++) {
-          await HomeWidget.saveWidgetData<String>('nextTrack$i', '');
+          saves.add(HomeWidget.saveWidgetData<String>('nextTrack$i', ''));
         }
-        await HomeWidget.saveWidgetData<String>('upNext', '');
-        await HomeWidget.saveWidgetData<String>('queueCover', '');
-        await HomeWidget.saveWidgetData<String>('artwork', '');
-        await HomeWidget.saveWidgetData<bool>('artworkFailed', false);
+        saves.addAll([
+          HomeWidget.saveWidgetData<String>('upNext', ''),
+          HomeWidget.saveWidgetData<String>('queueCover', ''),
+          HomeWidget.saveWidgetData<String>('artwork', ''),
+          HomeWidget.saveWidgetData<bool>('artworkFailed', false),
+        ]);
+        await Future.wait(saves);
+
         _artworkGeneration++;
         _pendingArtworkQueue.clear();
         _lastSavedArtworkSongId = null;
       }
 
       await _bumpContentVersion();
-      await HomeWidget.updateWidget(
-        name: androidWidgetName,
-        androidName: androidWidgetName,
-        qualifiedAndroidName: qualifiedAndroidName,
-        iOSName: iOSWidgetName,
-      );
+      await _triggerWidgetReload();
     } catch (e, st) {
-      ErrorLogger.log('Failed to update home screen widget state',
-          error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log(
+        'Failed to update home screen widget state',
+        error: e,
+        stackTrace: st,
+        category: 'WidgetService',
+      );
     }
   }
 
@@ -220,92 +340,107 @@ class WidgetService {
   Future<void> _resolveArtworkAsync(SongsTableData song, int generation) async {
     try {
       final artPath = await _resolveArtworkPath(song).timeout(
-        const Duration(seconds: 8),
+        _networkTimeout,
         onTimeout: () {
-          ErrorLogger.log('Widget artwork resolve timed out after 8s',
-              category: 'WidgetService');
+          ErrorLogger.log(
+            'Widget artwork resolve timed out after 8s',
+            category: 'WidgetService',
+          );
           return null;
         },
       );
       if (generation != _artworkGeneration) return;
-      if (artPath != null && artPath.isNotEmpty) {
-        // Generation check: skip updating UI if newer songs are queued.
-        if (_pendingArtworkQueue.isNotEmpty &&
-            _pendingArtworkQueue.any((s) => s.id != song.id)) {
-          return;
-        }
-        _lastSavedArtworkSongId = song.id;
-        await HomeWidget.saveWidgetData<String>('artwork', artPath);
-        await HomeWidget.saveWidgetData<bool>('artworkFailed', false);
-        await _bumpContentVersion();
-        await HomeWidget.updateWidget(
-          name: androidWidgetName,
-          androidName: androidWidgetName,
-          qualifiedAndroidName: qualifiedAndroidName,
-          iOSName: iOSWidgetName,
-        );
-      } else {
-        // FIX-G03 / I12: Push empty string and flag error on failure
-        if (_pendingArtworkQueue.isNotEmpty &&
-            _pendingArtworkQueue.any((s) => s.id != song.id)) {
-          return;
-        }
-        _lastSavedArtworkSongId = song.id;
-        await HomeWidget.saveWidgetData<String>('artwork', '');
-        await HomeWidget.saveWidgetData<bool>('artworkFailed', true);
-        await _bumpContentVersion();
-        await HomeWidget.updateWidget(
-          name: androidWidgetName,
-          androidName: androidWidgetName,
-          qualifiedAndroidName: qualifiedAndroidName,
-          iOSName: iOSWidgetName,
-        );
+
+      // Generation check: skip updating UI if newer songs are queued.
+      if (_pendingArtworkQueue.isNotEmpty &&
+          _pendingArtworkQueue.any((s) => s.id != song.id)) {
+        return;
       }
+
+      _lastSavedArtworkSongId = song.id;
+      final hasArt = artPath != null && artPath.isNotEmpty;
+      await Future.wait([
+        HomeWidget.saveWidgetData<String>('artwork', hasArt ? artPath : ''),
+        HomeWidget.saveWidgetData<bool>('artworkFailed', !hasArt),
+      ]);
+      await _bumpContentVersion();
+      await _triggerWidgetReload();
     } catch (e, st) {
-      ErrorLogger.log('Widget artwork async resolve failed',
-          error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log(
+        'Widget artwork async resolve failed',
+        error: e,
+        stackTrace: st,
+        category: 'WidgetService',
+      );
       // FIX-G03 / I12: Reset artwork and flag error on error
       try {
-        await HomeWidget.saveWidgetData<String>('artwork', '');
-        await HomeWidget.saveWidgetData<bool>('artworkFailed', true);
+        await Future.wait([
+          HomeWidget.saveWidgetData<String>('artwork', ''),
+          HomeWidget.saveWidgetData<bool>('artworkFailed', true),
+        ]);
         await _bumpContentVersion();
-        await HomeWidget.updateWidget(
-          name: androidWidgetName,
-          androidName: androidWidgetName,
-          qualifiedAndroidName: qualifiedAndroidName,
-          iOSName: iOSWidgetName,
-        );
+        await _triggerWidgetReload();
       } catch (e, st) {
-        ErrorLogger.log('Reset artwork on error failed',
-            error: e, stackTrace: st, category: 'WidgetService');
+        ErrorLogger.log(
+          'Reset artwork on error failed',
+          error: e,
+          stackTrace: st,
+          category: 'WidgetService',
+        );
       }
     }
   }
 
-  /// Lightweight progress-only update (throttled 1/sec): updates only position, duration & play state
+  /// Lightweight progress-only update (throttled): updates position, duration & play state
   /// without re-resolving artwork or touching bitmap cache.
   Future<void> updateProgress({
     required bool isPlaying,
     Duration position = Duration.zero,
     Duration duration = Duration.zero,
   }) async {
+    final posMs = position.inMilliseconds;
+    final durMs = duration.inMilliseconds;
+
+    // Suppress redundant platform channel traffic if play state & duration are
+    // identical and position has moved by less than 500ms.
+    if (_lastProgressIsPlaying == isPlaying &&
+        _lastProgressDurationMs == durMs &&
+        _lastProgressPositionMs != null &&
+        (posMs - _lastProgressPositionMs!).abs() < 500) {
+      return;
+    }
+
+    _lastProgressIsPlaying = isPlaying;
+    _lastProgressPositionMs = posMs;
+    _lastProgressDurationMs = durMs;
+
     try {
       await _ensureAppGroup();
-      await HomeWidget.saveWidgetData<bool>('isPlaying', isPlaying);
-      await HomeWidget.saveWidgetData<int>(
-          'positionMs', position.inMilliseconds);
-      await HomeWidget.saveWidgetData<int>(
-          'durationMs', duration.inMilliseconds);
+      final permille = _computePermille(posMs, durMs);
 
-      await HomeWidget.updateWidget(
-        name: androidWidgetName,
-        androidName: androidWidgetName,
-        qualifiedAndroidName: qualifiedAndroidName,
-        iOSName: iOSWidgetName,
-      );
+      await Future.wait([
+        HomeWidget.saveWidgetData<bool>('isPlaying', isPlaying),
+        HomeWidget.saveWidgetData<int>('positionMs', posMs),
+        HomeWidget.saveWidgetData<int>('durationMs', durMs),
+        HomeWidget.saveWidgetData<int>('progressPermille', permille),
+        HomeWidget.saveWidgetData<String>(
+          'formattedPosition',
+          _formatTimestamp(position),
+        ),
+        HomeWidget.saveWidgetData<String>(
+          'formattedDuration',
+          _formatTimestamp(duration),
+        ),
+      ]);
+
+      await _triggerWidgetReload();
     } catch (e, st) {
-      ErrorLogger.log('updateProgress failed',
-          error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log(
+        'updateProgress failed',
+        error: e,
+        stackTrace: st,
+        category: 'WidgetService',
+      );
     }
   }
 
@@ -317,8 +452,7 @@ class WidgetService {
       final f = File(cachedPath);
       if (await f.exists() && await f.length() > 0) {
         // L-09 / M-03: refresh LRU position on hit and update mtime to align with disk pruner
-        _artworkCache.remove(songId);
-        _artworkCache[songId] = cachedPath;
+        _touchArtworkPathLru(songId, cachedPath);
         try {
           await f.setLastModified(DateTime.now());
         } catch (_) {}
@@ -337,130 +471,29 @@ class WidgetService {
       final cleanId = songId < 0 ? 'neg_${songId.abs()}' : '$songId';
       final cachedFile = File('${artDir.path}/pulsr_widget_art_$cleanId.png');
       if (await cachedFile.exists() && await cachedFile.length() > 0) {
-        _artworkCache[songId] = cachedFile.path;
+        _touchArtworkPathLru(songId, cachedFile.path);
         return cachedFile.path;
       }
 
       Uint8List? rawBytes = _roundedArtworkCache[songId];
       if (rawBytes != null) {
         // L-09: refresh LRU position on hit.
-        _roundedArtworkCache.remove(songId);
-        _roundedArtworkCache[songId] = rawBytes;
-      }
-      if (rawBytes == null) {
-        final remoteUrl = song.remoteArtworkUrl ??
-            (song.artworkUri?.startsWith('http') == true
-                ? song.artworkUri
-                : null);
-
-        // 1. Fast path: Check in-memory ArtworkLruCache
-        if (remoteUrl != null && remoteUrl.isNotEmpty) {
-          rawBytes = ArtworkLruCache().get('${remoteUrl}_hq') ??
-              ArtworkLruCache().get(remoteUrl);
-        } else {
-          rawBytes = ArtworkLruCache().get('AUDIO_${songId}_hq') ??
-              ArtworkLruCache().get('AUDIO_$songId');
-        }
-
-        // 2. Check persistent ArtworkCacheManager disk cache
-        if (rawBytes == null && remoteUrl != null && remoteUrl.isNotEmpty) {
-          final targetUrl = CachedArtwork.upgradeToHighResArtwork(remoteUrl);
-          rawBytes = await ArtworkCacheManager().get(targetUrl) ??
-              await ArtworkCacheManager().get(remoteUrl);
-
-          if (rawBytes == null || rawBytes.isEmpty) {
-            // Fetch remote artwork via HTTP
-            HttpClient? client;
-            try {
-              final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
-              if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty) {
-                client = HttpClient()
-                  ..connectionTimeout = const Duration(seconds: 8)
-                  ..idleTimeout = const Duration(seconds: 5);
-                final req = await client
-                    .getUrl(uri)
-                    .timeout(const Duration(seconds: 8));
-                final res =
-                    await req.close().timeout(const Duration(seconds: 8));
-                if (res.statusCode == 200) {
-                  final fetched = await consolidateHttpClientResponseBytes(res)
-                      .timeout(const Duration(seconds: 8));
-                  if (fetched.isNotEmpty) {
-                    rawBytes = fetched;
-                    unawaited(ArtworkCacheManager().put(targetUrl, fetched));
-                  }
-                }
-              }
-            } catch (e, st) {
-              ErrorLogger.log('_resolveArtworkPath HTTP fetch failed',
-                  error: e, stackTrace: st, category: 'WidgetService');
-            } finally {
-              try {
-                client?.close(force: true);
-              } catch (e, st) {
-                ErrorLogger.log('Failed to close widget HTTP client',
-                    error: e, stackTrace: st, category: 'WidgetService');
-              }
-            }
-          }
-        }
-
-        // 3. Check local file URI (e.g. file:///...)
-        if ((rawBytes == null || rawBytes.isEmpty) &&
-            song.artworkUri != null &&
-            song.artworkUri!.isNotEmpty) {
-          final parsed = Uri.tryParse(song.artworkUri!);
-          if (parsed != null && parsed.scheme == 'file') {
-            final f = File(parsed.toFilePath());
-            if (await f.exists() && await f.length() > 0) {
-              rawBytes = await f.readAsBytes();
-            }
-          }
-        }
-
-        // 4. Fallback to OnAudioQuery for local MediaStore tracks (Audio ID, then Album ID)
-        if ((rawBytes == null || rawBytes.isEmpty) && songId > 0) {
-          rawBytes = await _audioQuery.queryArtwork(
-            songId,
-            ArtworkType.AUDIO,
-            format: ArtworkFormat.JPEG,
-            size: 256,
-            quality: 90,
-          );
-
-          if ((rawBytes == null || rawBytes.isEmpty) && song.albumId != null) {
-            rawBytes = await _audioQuery.queryArtwork(
-              song.albumId!,
-              ArtworkType.ALBUM,
-              format: ArtworkFormat.JPEG,
-              size: 256,
-              quality: 90,
-            );
-          }
-        }
-
+        _touchArtworkBytesLru(songId, rawBytes);
+      } else {
+        rawBytes = await _fetchArtworkBytes(song);
         if (rawBytes == null || rawBytes.isEmpty) return null;
-
-        _roundedArtworkCache[songId] = rawBytes;
+        _touchArtworkBytesLru(songId, rawBytes);
       }
 
-      await cachedFile.writeAsBytes(rawBytes, flush: true);
-      _artworkCache[songId] = cachedFile.path;
-      // Enforce LRU bounds
-      if (_artworkCache.length > _maxCacheSize) {
-        final oldestKey = _artworkCache.keys.first;
-        final evictedPath = _artworkCache.remove(oldestKey);
-        if (evictedPath != null) {
-          try {
-            final f = File(evictedPath);
-            if (f.existsSync()) f.deleteSync();
-          } catch (_) {}
-        }
-      }
-      if (_roundedArtworkCache.length > _maxCacheSize) {
-        final oldestKey = _roundedArtworkCache.keys.first;
-        _roundedArtworkCache.remove(oldestKey);
-      }
+      // Atomic write via staging file so native widget host never reads a partial file.
+      final tempFile =
+          File('${artDir.path}/pulsr_widget_art_${cleanId}_tmp.png');
+      await tempFile.writeAsBytes(rawBytes, flush: true);
+      await tempFile.rename(cachedFile.path);
+
+      _touchArtworkPathLru(songId, cachedFile.path);
+      await _evictOverflowCachesIfNeeded();
+
       // Opportunistically prune old widget temp files at most once per session (L-6)
       if (!_hasPrunedArtworkThisSession) {
         _hasPrunedArtworkThisSession = true;
@@ -468,25 +501,121 @@ class WidgetService {
       }
       return cachedFile.path;
     } catch (e, st) {
-      ErrorLogger.log('Failed to resolve artwork path for widget',
-          error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log(
+        'Failed to resolve artwork path for widget',
+        error: e,
+        stackTrace: st,
+        category: 'WidgetService',
+      );
       return null;
     }
   }
 
-  // FIX-G01: Deleted unused dead code _roundCorners (native rounding moved to RemoteViews)
+  /// Resolves raw artwork bytes across memory cache, disk cache, remote HTTPS,
+  /// local file URI, and MediaStore fallbacks.
+  Future<Uint8List?> _fetchArtworkBytes(SongsTableData song) async {
+    final songId = song.id;
+    final remoteUrl = song.remoteArtworkUrl ??
+        (song.artworkUri?.startsWith('http') == true ? song.artworkUri : null);
 
-  static const Set<String> _knownWidgetActions = {
-    'play_pause',
-    'prev',
-    'next',
-    'favorite',
-    'open',
-    'main',
-  };
+    // 1. Fast path: Check in-memory ArtworkLruCache
+    Uint8List? rawBytes;
+    if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      rawBytes = ArtworkLruCache().get('${remoteUrl}_hq') ??
+          ArtworkLruCache().get(remoteUrl);
+    } else {
+      rawBytes = ArtworkLruCache().get('AUDIO_${songId}_hq') ??
+          ArtworkLruCache().get('AUDIO_$songId');
+    }
+    if (rawBytes != null && rawBytes.isNotEmpty) return rawBytes;
+
+    // 2. Check persistent ArtworkCacheManager disk cache & remote HTTPS fallback
+    if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      final targetUrl = CachedArtwork.upgradeToHighResArtwork(remoteUrl);
+      rawBytes = await ArtworkCacheManager().get(targetUrl) ??
+          await ArtworkCacheManager().get(remoteUrl);
+
+      if (rawBytes == null || rawBytes.isEmpty) {
+        HttpClient? client;
+        try {
+          final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
+          if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty) {
+            client = HttpClient()
+              ..connectionTimeout = _networkTimeout
+              ..idleTimeout = const Duration(seconds: 5);
+            final req = await client.getUrl(uri).timeout(_networkTimeout);
+            final res = await req.close().timeout(_networkTimeout);
+            if (res.statusCode == 200) {
+              final fetched = await consolidateHttpClientResponseBytes(res)
+                  .timeout(_networkTimeout);
+              if (fetched.isNotEmpty) {
+                rawBytes = fetched;
+                unawaited(ArtworkCacheManager().put(targetUrl, fetched));
+              }
+            }
+          }
+        } catch (e, st) {
+          ErrorLogger.log(
+            '_resolveArtworkPath HTTP fetch failed',
+            error: e,
+            stackTrace: st,
+            category: 'WidgetService',
+          );
+        } finally {
+          try {
+            client?.close(force: true);
+          } catch (e, st) {
+            ErrorLogger.log(
+              'Failed to close widget HTTP client',
+              error: e,
+              stackTrace: st,
+              category: 'WidgetService',
+            );
+          }
+        }
+      }
+    }
+    if (rawBytes != null && rawBytes.isNotEmpty) return rawBytes;
+
+    // 3. Check local file URI (e.g. file:///...)
+    if (song.artworkUri != null && song.artworkUri!.isNotEmpty) {
+      final parsed = Uri.tryParse(song.artworkUri!);
+      if (parsed != null && parsed.scheme == 'file') {
+        final f = File(parsed.toFilePath());
+        if (await f.exists() && await f.length() > 0) {
+          rawBytes = await f.readAsBytes();
+        }
+      }
+    }
+    if (rawBytes != null && rawBytes.isNotEmpty) return rawBytes;
+
+    // 4. Fallback to OnAudioQuery for local MediaStore tracks (Audio ID, then Album ID)
+    if (songId > 0) {
+      rawBytes = await _audioQuery.queryArtwork(
+        songId,
+        ArtworkType.AUDIO,
+        format: ArtworkFormat.JPEG,
+        size: 256,
+        quality: 90,
+      );
+
+      if ((rawBytes == null || rawBytes.isEmpty) && song.albumId != null) {
+        rawBytes = await _audioQuery.queryArtwork(
+          song.albumId!,
+          ArtworkType.ALBUM,
+          format: ArtworkFormat.JPEG,
+          size: 256,
+          quality: 90,
+        );
+      }
+    }
+
+    return (rawBytes != null && rawBytes.isNotEmpty) ? rawBytes : null;
+  }
 
   StreamSubscription<Uri?> listenToWidgetClicks(
-      void Function(Uri? uri) onUriReceived) {
+    void Function(Uri? uri) onUriReceived,
+  ) {
     return HomeWidget.widgetClicked.listen((uri) {
       if (uri == null) return;
       if (uri.scheme.toLowerCase() != 'pulsrwidget') return;
@@ -527,8 +656,12 @@ class WidgetService {
               final stat = await f.stat();
               return (file: f, modified: stat.modified);
             } catch (e, st) {
-              ErrorLogger.log('Failed to stat widget artwork file',
-                  error: e, stackTrace: st, category: 'WidgetService');
+              ErrorLogger.log(
+                'Failed to stat widget artwork file',
+                error: e,
+                stackTrace: st,
+                category: 'WidgetService',
+              );
               return (file: f, modified: null);
             }
           }),
@@ -550,26 +683,36 @@ class WidgetService {
       // Enforce the total-count limit oldest-first.
       if (survivors.length > _maxCacheSize) {
         survivors.sort((a, b) => a.modified.compareTo(b.modified));
-        stale.addAll(survivors
-            .take(survivors.length - _maxCacheSize)
-            .map((s) => s.file));
+        stale.addAll(
+          survivors.take(survivors.length - _maxCacheSize).map((s) => s.file),
+        );
       }
 
       for (var i = 0; i < stale.length; i += batchSize) {
         final end =
             (i + batchSize < stale.length) ? i + batchSize : stale.length;
-        await Future.wait(stale.sublist(i, end).map((f) async {
-          try {
-            await f.delete();
-          } catch (e, st) {
-            ErrorLogger.log('_pruneOldWidgetArtwork failed',
-                error: e, stackTrace: st, category: 'WidgetService');
-          }
-        }));
+        await Future.wait(
+          stale.sublist(i, end).map((f) async {
+            try {
+              await f.delete();
+            } catch (e, st) {
+              ErrorLogger.log(
+                '_pruneOldWidgetArtwork failed',
+                error: e,
+                stackTrace: st,
+                category: 'WidgetService',
+              );
+            }
+          }),
+        );
       }
     } catch (e, st) {
-      ErrorLogger.log('_pruneOldWidgetArtwork failed',
-          error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log(
+        '_pruneOldWidgetArtwork failed',
+        error: e,
+        stackTrace: st,
+        category: 'WidgetService',
+      );
     }
   }
 }

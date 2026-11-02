@@ -7,7 +7,6 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
-import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../settings/cubit/settings_cubit.dart';

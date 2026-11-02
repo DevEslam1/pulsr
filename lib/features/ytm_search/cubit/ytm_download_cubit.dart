@@ -89,8 +89,6 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   final Map<String, int> _recentlyCompleted = {};
   static const int _recentlyCompletedTtlMs = 10000;
 
-  /// Upper bound on [_reconciledVideoIds]; oldest entries are evicted first.
-  static const int _maxReconciledIds = 500;
 
   YtmDownloadCubit(
     this._service,
@@ -156,10 +154,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
         _reconcileLocks[task.videoId] = true;
         _reconciledVideoIds.add(task.videoId);
         _recentlyCompleted[task.videoId] = now;
-        // FIX-H04 / B-06: Cap reconciled IDs at 500, evicting oldest (insertion order)
-        while (_reconciledVideoIds.length > _maxReconciledIds) {
-          _reconciledVideoIds.remove(_reconciledVideoIds.first);
-        }
+// Completed IDs remain in _reconciledVideoIds while task is in downloads.tasks to prevent re-reconciling.
         unawaited(_onDownloadComplete(task).whenComplete(() {
           _reconcileLocks.remove(task.videoId);
         }));

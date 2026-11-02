@@ -2,20 +2,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/responsive/layout_delegate.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/widgets/pulsr_dock_tracker.dart';
+import '../../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/mini_player.dart';
-import '../../../../core/widgets/pulsr_modal_tracker.dart';
-import '../../../../core/widgets/pulsr_dock_tracker.dart';
-import '../../../../core/responsive/layout_delegate.dart';
-import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../bottom_nav_bar.dart';
 import 'dock_style_picker_sheet.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 enum DockStackMode {
   /// Default: MiniPlayer is placed above BottomNavBar in vertical order.
@@ -277,18 +278,10 @@ class StackedBottomDockState extends State<StackedBottomDock> {
     widget.onModeChanged(nextMode);
   }
 
-  /// A downward flick on the dock no longer *silently* restacks it.
-  ///
-  /// It used to cycle default -> system -> mini-in-front -> nav-in-front, so a
-  /// user who flicked down while reaching for the mini player could land in a
-  /// layout they never asked for and had no obvious way back from. The gesture
-  /// now opens the explicit picker; the mode only changes on a deliberate tap.
   void _handleSwipeDown() {
     _showDockStylePicker();
   }
 
-  /// One meaning per direction: up always *un-stacks*, and from the resting
-  /// layout it opens Now Playing. It never cycles through styles.
   void _handleSwipeUp() {
     if (widget.mode != DockStackMode.defaultLayout) {
       _setMode(DockStackMode.defaultLayout);
@@ -297,8 +290,6 @@ class StackedBottomDockState extends State<StackedBottomDock> {
     }
   }
 
-  /// Discoverable alternative to the swipe-only dock-mode cycling: a long-press
-  /// on the mini player opens an explicit chooser.
   bool _pickerOpen = false;
 
   void _showDockStylePicker() {
@@ -352,7 +343,14 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                       child: Container(
                         height: 56,
                         decoration: BoxDecoration(
-                          color: p.surfaceContainer,
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              p.surfaceContainerHigh,
+                              p.surfaceContainer,
+                            ],
+                          ),
                           borderRadius: AppRadii.r24All,
                           border: Border.all(
                             color: p.hairline,
@@ -361,9 +359,10 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black
-                                  .withValues(alpha: p.isDark ? 0.20 : 0.05),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                                  .withValues(alpha: p.isDark ? 0.35 : 0.08),
+                              blurRadius: 16,
+                              spreadRadius: -2,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
@@ -380,8 +379,18 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                                 ),
                                 Container(
                                   width: 1,
-                                  height: 28,
-                                  color: p.hairline.withValues(alpha: 0.35),
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        p.hairline.withValues(alpha: 0.0),
+                                        p.hairline.withValues(alpha: 0.65),
+                                        p.hairline.withValues(alpha: 0.0),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                                 Expanded(
                                   flex: 5,
@@ -425,10 +434,6 @@ class StackedBottomDockState extends State<StackedBottomDock> {
             final isStacked = mode != DockStackMode.defaultLayout;
             final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
 
-            // Size the stack to whichever card sits highest. In navBarOnTop the
-            // mini player peeks above the nav bar, so its top is
-            // _peekOffset + _miniPlayerHeight (not navBarTotalHeight + _peekOffset,
-            // which clipped it).
             final double dockHeight = computeDockHeight(
               hasSong: true,
               mode: mode,
@@ -468,12 +473,12 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                 navBarBottom =
                     _miniPlayerHeight - navBarTotalHeight + _peekOffset;
                 navBarScale = 0.95;
-                navBarOpacity = 0.70;
+                navBarOpacity = 0.72;
                 break;
               case DockStackMode.navBarOnTop:
                 miniPlayerBottom = _peekOffset;
                 miniPlayerScale = 0.95;
-                miniPlayerOpacity = 0.70;
+                miniPlayerOpacity = 0.72;
                 navBarBottom = 0.0;
                 navBarScale = 1.0;
                 navBarOpacity = 1.0;
@@ -482,16 +487,16 @@ class StackedBottomDockState extends State<StackedBottomDock> {
 
             final List<BoxShadow> stackedElevationShadow = [
               BoxShadow(
-                color: AppColors.scrimAt(p.isDark ? 0.45 : 0.20),
-                blurRadius: 18,
-                spreadRadius: 0,
+                color: AppColors.scrimAt(p.isDark ? 0.48 : 0.20),
+                blurRadius: 20,
+                spreadRadius: -1,
                 offset: const Offset(0, -4),
               ),
               BoxShadow(
-                color: AppColors.scrimAt(p.isDark ? 0.30 : 0.12),
-                blurRadius: 12,
-                spreadRadius: -1,
-                offset: const Offset(0, 4),
+                color: p.accent.withValues(alpha: p.isDark ? 0.08 : 0.04),
+                blurRadius: 14,
+                spreadRadius: -2,
+                offset: const Offset(0, 2),
               ),
             ];
 
@@ -505,7 +510,6 @@ class StackedBottomDockState extends State<StackedBottomDock> {
             );
 
             if (isStacked && !isMiniBehind) {
-              // Add drop shadow when mini player is the top stacked card
               miniPlayerWidget = DecoratedBox(
                 decoration: BoxDecoration(
                   boxShadow: stackedElevationShadow,
@@ -514,8 +518,11 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               );
             }
 
-            Widget wrapBehindCard(Widget child, DockStackMode targetMode,
-                {required bool isMini}) {
+            Widget wrapBehindCard(
+              Widget child,
+              DockStackMode targetMode, {
+              required bool isMini,
+            }) {
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _setMode(targetMode),
@@ -598,7 +605,6 @@ class StackedBottomDockState extends State<StackedBottomDock> {
             );
 
             if (isStacked && isNavBarOnTop) {
-              // Add drop shadow when nav bar is the top stacked card
               navBarWidget = DecoratedBox(
                 decoration: BoxDecoration(
                   boxShadow: stackedElevationShadow,

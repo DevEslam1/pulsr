@@ -27,7 +27,10 @@ class PlaybackVolumeMute {
   Future<void> setVolume(double volume) async {
     try {
       await _audioHandler.setVolume(volume);
-      if (volume > 0.0) _muted = false;
+      _muted = volume <= 0.001;
+      final s = _getState();
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(isMuted: _muted)));
     } catch (e, st) {
       ErrorLogger.log('Set volume failed',
           error: e,
@@ -44,7 +47,10 @@ class PlaybackVolumeMute {
       final current = _audioHandler.volume;
       final target = (current + delta).clamp(0.0, 1.0);
       await _audioHandler.setVolume(target);
-      if (target > 0.0) _muted = false;
+      _muted = target <= 0.001;
+      final s = _getState();
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(isMuted: _muted)));
     } catch (e, st) {
       ErrorLogger.log('Adjust volume failed',
           error: e,
@@ -74,6 +80,9 @@ class PlaybackVolumeMute {
         await _audioHandler.setVolume(0.0);
         _muted = true;
       }
+      final s = _getState();
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(isMuted: _muted)));
     } catch (e, st) {
       ErrorLogger.log('Toggle mute failed',
           error: e,

@@ -1,17 +1,29 @@
+// lib/features/ytm_search/presentation/ytm_search_screen.dart
 import 'dart:async';
 
-import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
+
 import '../../../core/di/injection.dart';
+import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
-import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_progress.dart';
+import '../../../core/widgets/pulsr_refresh_indicator.dart';
+import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -21,9 +33,6 @@ import '../cubit/ytm_download_cubit.dart';
 import '../cubit/ytm_search_cubit.dart';
 import '../cubit/ytm_search_state.dart';
 import 'widgets/ytm_download_button.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
 
 class YtmSearchScreen extends StatelessWidget {
   const YtmSearchScreen({super.key});
@@ -49,6 +58,7 @@ class _YtmSearchView extends StatefulWidget {
 
 class _YtmSearchViewState extends State<_YtmSearchView> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
   List<String> _history = const [];
   bool _historyLoaded = false;
   bool _historyLoading = false;
@@ -80,8 +90,12 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         });
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to refresh YTM search history',
-          error: e, stackTrace: st, category: 'YtmSearch');
+      ErrorLogger.log(
+        'Failed to refresh YTM search history',
+        error: e,
+        stackTrace: st,
+        category: 'YtmSearch',
+      );
       if (mounted) {
         setState(() {
           _history = _history.isNotEmpty ? _history : const [];
@@ -101,8 +115,24 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     }
   }
 
+  void _applyHistoryQuery(String query, {bool keepFocus = false}) {
+    HapticFeedback.selectionClick();
+    final text = keepFocus ? '$query ' : query;
+    _searchController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    if (keepFocus) {
+      _searchFocus.requestFocus();
+    } else {
+      _searchFocus.unfocus();
+    }
+    context.read<YtmSearchCubit>().onQueryChanged(text);
+  }
+
   @override
   void dispose() {
+    _searchFocus.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -115,9 +145,21 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
 
     return PulsrPagePopScope(
       child: Scaffold(
+        backgroundColor: p.bg,
         appBar: AppBar(
+          backgroundColor: p.bg,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(context.l10n.browseYouTubeMusic),
+          title: Text(
+            context.l10n.browseYouTubeMusic,
+            style: TextStyle(
+              color: p.textPrimary,
+              fontSize: AppFontSize.titleLarge,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
         ),
         body: SafeArea(
           top: false,
@@ -131,44 +173,52 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                 listener: (_, __) => _refreshHistory(),
                 child: BlocBuilder<YtmSearchCubit, YtmSearchState>(
                   builder: (context, state) {
+                    final showProgress =
+                        (state.isLoading || cubit.isDebouncing) &&
+                            state.query.trim().isNotEmpty;
+
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
-                              Adaptive.pagePadding(context),
-                              12,
-                              Adaptive.pagePadding(context),
-                              6),
-                          child: TextField(
-                            controller: _searchController,
-                            autofocus: true,
-                            textInputAction: TextInputAction.search,
-                            onChanged: cubit.onQueryChanged,
-                            decoration: InputDecoration(
-                              hintText: context.l10n.browseSongsOnYtm,
-                              prefixIcon: Icon(Icons.search_rounded,
-                                  color: p.textTertiary),
-                              suffixIcon: state.query.isNotEmpty
-                                  ? IconButton(
-                                      constraints: const BoxConstraints(
-                                          minWidth: AppSpacing.minTouchTarget,
-                                          minHeight: AppSpacing.minTouchTarget),
-                                      icon: Icon(Icons.clear_rounded,
-                                          color: p.textTertiary),
-                                      tooltip: context.l10n.clear,
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        cubit.clearQuery();
-                                      },
-                                    )
-                                  : null,
-                            ),
+                        PulsrSearchField(
+                          controller: _searchController,
+                          focusNode: _searchFocus,
+                          autofocus: true,
+                          debounceDuration: Duration.zero,
+                          hintText: context.l10n.browseSongsOnYtm,
+                          margin: EdgeInsetsDirectional.fromSTEB(
+                            Adaptive.pagePadding(context),
+                            AppSpacing.xs,
+                            Adaptive.pagePadding(context),
+                            AppSpacing.xxs,
                           ),
+                          onChanged: (value) {
+                            if (value.isEmpty) {
+                              cubit.clearQuery();
+                            } else {
+                              cubit.onQueryChanged(value);
+                            }
+                          },
+                          onClear: cubit.clearQuery,
+                        ),
+                        SizedBox(
+                          height: 2,
+                          child: showProgress
+                              ? PulsrProgressBar.indeterminate(
+                                  height: 2,
+                                  color: p.accent,
+                                  backgroundColor: Colors.transparent,
+                                )
+                              : null,
                         ),
                         Expanded(
-                          child:
-                              _buildBody(context, state, cubit, playerCubit, p),
+                          child: _buildBody(
+                            context,
+                            state,
+                            cubit,
+                            playerCubit,
+                            p,
+                          ),
                         ),
                       ],
                     );
@@ -201,51 +251,146 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         onPrimaryAction: _historyLoadFailed ? _refreshHistory : null,
       );
     }
+
     return ListView(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-          AppSpacing.md, AppSpacing.xxs, AppSpacing.md, 160),
+      physics: const BouncingScrollPhysics(),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsetsDirectional.fromSTEB(
+        Adaptive.pagePadding(context),
+        AppSpacing.xs,
+        Adaptive.pagePadding(context),
+        PulsrLayoutMetrics.scrollBottom(context),
+      ),
       children: [
         Row(
           children: [
+            Icon(Icons.history_rounded, size: 15, color: p.textTertiary),
+            const SizedBox(width: AppSpacing.s6),
             Expanded(
               child: Text(
-                context.l10n.history,
+                context.l10n.history.toUpperCase(),
                 style: TextStyle(
-                  color: p.textSecondary,
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w700,
+                  color: p.textTertiary,
+                  fontSize: AppFontSize.tiny,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: AppTracking.wide,
                 ),
               ),
             ),
             TextButton(
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: () async {
+                HapticFeedback.lightImpact();
                 await cubit.clearHistory();
                 if (mounted) _refreshHistory();
               },
-              child: Text(context.l10n.browseClearHistory),
+              child: Text(
+                context.l10n.browseClearHistory,
+                style: TextStyle(
+                  color: p.accent,
+                  fontSize: AppFontSize.caption,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ],
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final h in _history)
-              ActionChip(
-                label: Text(h, maxLines: 1, overflow: TextOverflow.ellipsis),
-                avatar: Icon(Icons.history_rounded,
-                    size: 16, color: p.textTertiary),
-                onPressed: () {
-                  _searchController.text = h;
-                  cubit.onQueryChanged(h);
-                },
-              ),
-          ],
+        const SizedBox(height: AppSpacing.xxs),
+        Container(
+          decoration: BoxDecoration(
+            color: p.surfaceContainer.withValues(alpha: 0.5),
+            borderRadius: AppRadii.r16All,
+            border: Border.all(color: p.hairline),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (var i = 0; i < _history.length; i++) ...[
+                if (i > 0) Divider(color: p.hairline, height: 1, indent: 42),
+                Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: () => _applyHistoryQuery(_history[i]),
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        start: AppSpacing.sm,
+                        end: AppSpacing.xxs,
+                        top: 2,
+                        bottom: 2,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.history_rounded,
+                            size: 18,
+                            color: p.textTertiary,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              _history[i],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontSize: AppFontSize.body,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              Icons.north_west_rounded,
+                              size: 16,
+                              color: p.textTertiary,
+                            ),
+                            onPressed: () => _applyHistoryQuery(
+                              _history[i],
+                              keepFocus: true,
+                            ),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            tooltip: context.l10n.remove,
+                            icon: Icon(
+                              Icons.close_rounded,
+                              size: 18,
+                              color: p.textTertiary,
+                            ),
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              cubit.removeHistoryQuery(_history[i]);
+                              _refreshHistory();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Text(
-          context.l10n.browseYtmSearchScreenDesc,
-          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
+        Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 15, color: p.textTertiary),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                context.l10n.browseYtmSearchScreenDesc,
+                style: TextStyle(
+                  color: p.textTertiary,
+                  fontSize: AppFontSize.label,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -266,7 +411,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
       return PulsrEmptyState(
         icon: Icons.cloud_off_rounded,
         title: context.l10n.browseSearchFailed,
-        subtitle: state.errorMessage!,
+        subtitle: resolveUiErrorMessage(context, state.errorMessage!),
         primaryActionLabel: context.l10n.tryAgain,
         primaryActionIcon: Icons.refresh_rounded,
         onPrimaryAction: cubit.retryAfterCooldown,
@@ -294,19 +439,36 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
             if (status == null) return const SizedBox.shrink();
             return Container(
               width: double.infinity,
-              margin: const EdgeInsetsDirectional.fromSTEB(
-                  AppSpacing.sm, AppSpacing.xxs, AppSpacing.sm, AppSpacing.xxs),
+              margin: EdgeInsetsDirectional.fromSTEB(
+                Adaptive.pagePadding(context),
+                AppSpacing.xxs,
+                Adaptive.pagePadding(context),
+                AppSpacing.xxs,
+              ),
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
+              ),
               decoration: BoxDecoration(
                 color: p.accent.withValues(alpha: 0.12),
-                borderRadius: AppRadii.r10All,
+                borderRadius: AppRadii.r12All,
                 border: Border.all(color: p.accent.withValues(alpha: 0.35)),
               ),
-              child: Text(
-                status,
-                style: TextStyle(
-                    fontSize: AppFontSize.label, color: p.textSecondary),
+              child: Row(
+                children: [
+                  Icon(Icons.shield_outlined, size: 16, color: p.accent),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: AppFontSize.label,
+                        color: p.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
           },
@@ -314,32 +476,40 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         if (cubit.showingCachedResults)
           Container(
             width: double.infinity,
-            margin: const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.sm, AppSpacing.xxs, AppSpacing.sm, AppSpacing.xxs),
+            margin: EdgeInsetsDirectional.fromSTEB(
+              Adaptive.pagePadding(context),
+              AppSpacing.xxs,
+              Adaptive.pagePadding(context),
+              AppSpacing.xxs,
+            ),
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
             decoration: BoxDecoration(
-              color: p.textSecondary.withValues(alpha: 0.08),
-              borderRadius: AppRadii.r10All,
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.r12All,
+              border: Border.all(color: p.hairline),
             ),
             child: Row(
               children: [
-                Icon(Icons.history_rounded, size: 16, color: p.textSecondary),
+                Icon(Icons.history_rounded, size: 16, color: p.accent),
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
                     context.l10n.ytmCachedResults,
                     style: TextStyle(
-                        fontSize: AppFontSize.label, color: p.textSecondary),
+                      fontSize: AppFontSize.label,
+                      color: p.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         Expanded(
-          child: RefreshIndicator(
-            color: p.accent,
-            backgroundColor: p.surfaceContainer,
+          child: PulsrRefreshIndicator(
             onRefresh: () async {
               cubit.retry();
               await Future.delayed(const Duration(milliseconds: 300));
@@ -355,12 +525,17 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                 return false;
               },
               child: ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
                 padding: EdgeInsets.only(
-                    bottom: PulsrLayoutMetrics.scrollBottom(context),
-                    top: AppSpacing.xxs),
+                  bottom: PulsrLayoutMetrics.scrollBottom(context),
+                  top: AppSpacing.xxs,
+                ),
                 itemCount: songs.length +
                     (state.isLoading || state.loadMoreFailed ? 1 : 0),
                 itemBuilder: (context, index) {
@@ -378,13 +553,14 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                         ),
                       );
                     }
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    return Padding(
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                       child: Center(
-                        child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        child: PulsrProgressBar.circular(
+                          size: 22,
+                          strokeWidth: 2.4,
+                          color: p.accent,
                         ),
                       ),
                     );
@@ -396,6 +572,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                     subtitleOverride: state.results[index].artist,
                     onTap: () => playerCubit.playSong(song, queue: songs),
                     onLongPress: () => _showTrackActions(context, song, p),
+                    onMorePressed: () => _showTrackActions(context, song, p),
                     trailing: YtmDownloadButton(song: song),
                   );
                 },
@@ -408,33 +585,72 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
   }
 
   Future<void> _showTrackActions(
-      BuildContext context, SongsTableData song, PulsrPalette p) {
+    BuildContext context,
+    SongsTableData song,
+    PulsrPalette p,
+  ) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      builder: (sheetContext) => Material(
-        type: MaterialType.transparency,
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Icons.download_rounded, color: p.accent),
-                title: Text(context.l10n.browseDownloadOffline),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  context.read<YtmDownloadCubit>().download(song);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.playlist_add_rounded, color: p.accent),
-                title: Text(context.l10n.addToPlaylist),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  AddToPlaylistSheet.show(context, song: song);
-                },
-              ),
-            ],
+      builder: (sheetContext) => PulsrBottomSheet(
+        leading: SizedBox(
+          width: 44,
+          height: 44,
+          child: CachedArtwork(
+            id: song.id,
+            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+            albumId: song.albumId,
+            type: ArtworkType.AUDIO,
+            size: 44,
+            borderRadius: 10,
           ),
+        ),
+        title: Text(
+          song.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          song.artist,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.playlist_play_rounded, color: p.accent),
+              title: Text(context.l10n.playNext),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                context.read<PlayerCubit>().playNext(song);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.queue_music_rounded, color: p.accent),
+              title: Text(context.l10n.addToQueue),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                context.read<PlayerCubit>().addAllToQueue([song]);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.download_rounded, color: p.accent),
+              title: Text(context.l10n.browseDownloadOffline),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                context.read<YtmDownloadCubit>().download(song);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.playlist_add_rounded, color: p.accent),
+              title: Text(context.l10n.addToPlaylist),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                AddToPlaylistSheet.show(context, song: song);
+              },
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
         ),
       ),
     );

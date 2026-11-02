@@ -1,11 +1,14 @@
 // lib/core/widgets/pulsr_dismissible.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
 import '../motion/pulsr_motion.dart';
 import '../utils/l10n_extensions.dart';
-import 'package:flutter/services.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
 
 /// {@category DesignSystem}
 /// Two-swipe confirmation wrapper for list tiles and cards.
@@ -82,57 +85,85 @@ class PulsrDismissible extends StatefulWidget {
     final effectiveIcon =
         isConfirming ? Icons.check_circle_outline_rounded : icon;
 
-    return Container(
+    final Widget iconBadge = AnimatedContainer(
+      duration: context.motionMs(200),
+      width: isConfirming ? 34 : 30,
+      height: isConfirming ? 34 : 30,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: isConfirming ? 0.22 : 0.14),
+        border: Border.all(
+          color: color.withValues(alpha: isConfirming ? 0.55 : 0.28),
+          width: 1.0,
+        ),
+      ),
+      child: Icon(
+        effectiveIcon,
+        size: isConfirming ? 19 : 17,
+        color: color,
+      ),
+    );
+
+    final Widget labelWidget = Flexible(
+      child: Text(
+        effectiveLabel,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: AppFontSize.bodySmall,
+          fontWeight: isConfirming ? FontWeight.w900 : FontWeight.w700,
+          letterSpacing: isConfirming ? 0.25 : 0.1,
+        ),
+      ),
+    );
+
+    return AnimatedContainer(
+      duration: context.motionMs(200),
       margin: margin ??
           const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.s2,
+          ),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        gradient: LinearGradient(
+          begin: isEnd ? Alignment.centerRight : Alignment.centerLeft,
+          end: isEnd ? Alignment.centerLeft : Alignment.centerRight,
+          colors: [
+            Color.lerp(
+                  backgroundColor,
+                  color,
+                  isConfirming ? 0.18 : 0.06,
+                ) ??
+                backgroundColor,
+            backgroundColor,
+          ],
+        ),
         borderRadius: borderRadius ?? AppRadii.r16All,
+        border: Border.all(
+          color: color.withValues(alpha: isConfirming ? 0.45 : 0.20),
+          width: isConfirming ? 1.2 : 1.0,
+        ),
       ),
       alignment: isEnd
           ? AlignmentDirectional.centerEnd
           : AlignmentDirectional.centerStart,
       padding: EdgeInsetsDirectional.only(
-        start: isEnd ? 0 : 20,
-        end: isEnd ? 20 : 0,
+        start: isEnd ? 12 : 16,
+        end: isEnd ? 16 : 12,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: isEnd
             ? [
-                Flexible(
-                  child: Text(
-                    effectiveLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: color,
-                      fontWeight:
-                          isConfirming ? FontWeight.w900 : FontWeight.w700,
-                      letterSpacing: isConfirming ? 0.2 : null,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Icon(effectiveIcon, color: color),
+                labelWidget,
+                const SizedBox(width: AppSpacing.xs + 2),
+                iconBadge,
               ]
             : [
-                Icon(effectiveIcon, color: color),
-                const SizedBox(width: AppSpacing.xs),
-                Flexible(
-                  child: Text(
-                    effectiveLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: color,
-                      fontWeight:
-                          isConfirming ? FontWeight.w900 : FontWeight.w700,
-                      letterSpacing: isConfirming ? 0.2 : null,
-                    ),
-                  ),
-                ),
+                iconBadge,
+                const SizedBox(width: AppSpacing.xs + 2),
+                labelWidget,
               ],
       ),
     );
@@ -537,23 +568,44 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
                   },
                 ),
               ),
-              // Sliding child layer
+              // Sliding child layer with dynamic elevation shadow when displaced
               AnimatedBuilder(
                 animation: _offsetController,
-                builder: (context, _) {
+                child: ClipRRect(
+                  borderRadius: AppRadii.r16All,
+                  child: widget.child,
+                ),
+                builder: (context, clippedChild) {
                   final offset = _offsetController.value;
                   final isRevealed = _pendingDirection != null;
+                  final displacement = offset.abs().clamp(0.0, 1.0);
 
                   return Transform.translate(
                     offset: Offset(offset * _itemWidth, 0),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: isRevealed ? _close : null,
-                      child: IgnorePointer(
-                        ignoring: isRevealed,
-                        child: ClipRRect(
-                          borderRadius: AppRadii.r16All,
-                          child: widget.child,
+                    child: DecoratedBox(
+                      decoration: displacement > 0.01
+                          ? BoxDecoration(
+                              borderRadius: AppRadii.r16All,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.scrimAt(
+                                    0.28 * displacement,
+                                  ),
+                                  blurRadius: 14 * displacement,
+                                  offset: Offset(
+                                    offset > 0 ? -4 : 4,
+                                    2,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : const BoxDecoration(),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: isRevealed ? _close : null,
+                        child: IgnorePointer(
+                          ignoring: isRevealed,
+                          child: clippedChild,
                         ),
                       ),
                     ),

@@ -88,23 +88,18 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     await _pruneDeletedTombstones();
     safeEmit(state.copyWith(isLoading: true));
     try {
-      // FIX-I02: Reconcile on boot from cubit init rather than repository constructor
-      await (_downloadRepository?.reconcileOnBoot() ??
-          _observeDownloadsUseCase.reconcileOnBoot());
-      // Subscribe BEFORE hydrating: getAll() reads the repository's live task
-      // map (which is updated before every stream event is emitted), so the
-      // snapshot includes everything emitted up to call time, and events
-      // emitted after the subscription flow through the listener. The old
-      // order (snapshot first, subscribe after) permanently lost any task
-      // event emitted inside the gap.
+      // Subscribe and start timer before reconcile so a reconcile failure
+      // cannot leave the cubit permanently unsubscribed.
       _subscribeToDownloadUpdates();
-      await loadInitialTasks();
-      await refreshStorageStats();
-      // B-11 / FIX-C4: Periodic prune of deleted tombstones older than ignore window
       autoTimer(Timer.periodic(const Duration(seconds: 30), (_) {
         if (isClosed) return;
         _pruneDeletedTombstones();
       }));
+      // FIX-I02: Reconcile on boot from cubit init rather than repository constructor
+      await (_downloadRepository?.reconcileOnBoot() ??
+          _observeDownloadsUseCase.reconcileOnBoot());
+      await loadInitialTasks();
+      await refreshStorageStats();
     } catch (e, st) {
       // _init runs from the constructor: an unexpected throw (a use case
       // throwing instead of returning Left) would otherwise escape as an
@@ -183,6 +178,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       _resubscribeTimer = null;
       if (!isClosed) {
         _subscribeToDownloadUpdates();
+        unawaited(loadInitialTasks());
       }
     }));
   }
@@ -192,15 +188,15 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     // Events are flowing again: reset the resubscribe backoff.
     _resubscribeAttempts = 0;
 
-    final shouldDrop = await _deleteMutex.protect(() async {
+    await _deleteMutex.protect(() async {
       final now = _nowMs;
       _deletedAtMsByVideoId.removeWhere(
           (_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
-      if (_deletedAtMsByVideoId.containsKey(task.videoId)) return true;
+      if (_deletedAtMsByVideoId.containsKey(task.videoId)) return;
 
       final currentTasks = state.tasks;
       final existingTask = currentTasks[task.videoId];
-      if (existingTask != null && existingTask == task) return true;
+      if (existingTask != null && existingTask == task) return;
 
       final lastEmit = _lastEmitTimeByVideoId[task.videoId] ?? 0;
       final isProgressOnly = existingTask != null &&
@@ -209,36 +205,31 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           task.progress < 1.0;
 
       if (isProgressOnly && (now - lastEmit < 100)) {
-        return true;
+        return;
       }
 
       _lastEmitTimeByVideoId[task.videoId] = now;
-      return false;
-    });
-    if (shouldDrop || isClosed) {
-      return;
-    }
 
-    final previousTask = state.tasks[task.videoId];
-    if (previousTask != null && previousTask.status != task.status) {
-      if (task.status == DownloadStatus.complete) {
-        SoundFeedbackService.playSuccess(mirrorHaptics: true);
-      } else if (task.status == DownloadStatus.failed) {
-        SoundFeedbackService.playError(mirrorHaptics: true);
+      if (isClosed) return;
+
+      final previousTask = state.tasks[task.videoId];
+      if (previousTask != null && previousTask.status != task.status) {
+        if (task.status == DownloadStatus.complete) {
+          SoundFeedbackService.playSuccess(mirrorHaptics: true);
+        } else if (task.status == DownloadStatus.failed) {
+          SoundFeedbackService.playError(mirrorHaptics: true);
+        }
       }
-    }
 
-    final updatedTasks = Map<String, DownloadTask>.unmodifiable({
-      ...state.tasks,
-      task.videoId: task,
-    });
+      final updatedTasks = Map<String, DownloadTask>.unmodifiable({
+        ...state.tasks,
+        task.videoId: task,
+      });
 
-    safeEmit(state.copyWith(
-      tasks: updatedTasks,
-      cachedTaskList: _replaceTaskInOrderedList(state.taskList, task),
-    ));
-
-    await _deleteMutex.protect(() async {
+      safeEmit(state.copyWith(
+        tasks: updatedTasks,
+        cachedTaskList: _replaceTaskInOrderedList(state.taskList, task),
+      ));
       // Prune throttle bookkeeping: tasks that never reach a terminal state
       // would otherwise leak an entry forever.
       if (_lastEmitTimeByVideoId.length > _maxThrottleEntries) {

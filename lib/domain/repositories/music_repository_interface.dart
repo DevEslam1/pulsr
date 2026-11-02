@@ -205,7 +205,8 @@ abstract class IMusicRepository {
       String playlistId, List<String> orderedVideoIds);
   Future<Result<void>> renameOnlinePlaylist(String playlistId, String newTitle);
   Future<Result<void>> removeOnlinePlaylist(String playlistId);
-  Future<Result<void>> clearOnlineLibraryCache();
+  Future<Result<void>> clearOnlineLibraryCache({bool onlyAccount = false});
+  Future<Result<int>> getTotalSongCount({List<String>? excludedFolders});
 
   // --- EXCLUDED FOLDERS ---
   Stream<Result<List<ExcludedFoldersTableData>>> watchExcludedFolders();

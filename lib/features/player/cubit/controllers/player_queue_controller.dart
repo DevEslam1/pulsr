@@ -31,6 +31,39 @@ part 'player_queue_radio.dart';
 class PlayerQueueController {
   static const int maxQueueSize = 500;
 
+  /// Normalized title for deduplication comparison (matching BitChord's QueueBuilder.normalizeTitle).
+  static String normalizeTitle(String title) {
+    return title
+        .toLowerCase()
+        .replaceAll(
+            RegExp(r'[\(\[\{].*?[\)\]\}]'), '') // remove parenthesized content
+        .replaceAll(RegExp(r'[\p{P}\p{S}\s]+', unicode: true), '') // strip punctuation, symbols & whitespace
+        .trim();
+  }
+
+  /// Tests if two tracks represent the same recording using normalized title and artists.
+  static bool isSameRecording(
+      String titleA, String artistA, String titleB, String artistB) {
+    final normA = normalizeTitle(titleA);
+    final normB = normalizeTitle(titleB);
+    if (normA.isNotEmpty && normA == normB) {
+      final artSetA = artistA
+          .toLowerCase()
+          .split(RegExp(r'[,&/\\]'))
+          .map((e) => e.trim())
+          .toSet();
+      final artSetB = artistB
+          .toLowerCase()
+          .split(RegExp(r'[,&/\\]'))
+          .map((e) => e.trim())
+          .toSet();
+      if (artSetA.intersection(artSetB).isNotEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   final PulsrAudioHandler _audioHandler;
   final IMusicRepository _repository;
   final PlayerState Function() _getState;

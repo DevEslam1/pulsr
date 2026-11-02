@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -563,8 +562,7 @@ class _QuranHeroCard extends StatelessWidget {
 
         final baseSurface = p.surfaceContainer;
         final elevatedSurface = Color.alphaBlend(
-          (isPlaying ? AppColors.mint : p.accent)
-              .withValues(alpha: p.isDark ? 0.10 : 0.06),
+          p.accent.withValues(alpha: p.isDark ? 0.05 : 0.03),
           p.surfaceContainerHigh,
         );
 
@@ -613,17 +611,17 @@ class _QuranHeroCard extends StatelessWidget {
                   children: [
                     // Ambient radial glow behind the reciter portrait stage
                     PositionedDirectional(
-                      end: -20,
-                      top: -20,
-                      bottom: -20,
-                      width: 170,
+                      end: -10,
+                      top: -10,
+                      bottom: -10,
+                      width: 210,
                       child: IgnorePointer(
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: RadialGradient(
                               colors: [
                                 p.accent.withValues(
-                                    alpha: isPlaying ? 0.22 : 0.12),
+                                    alpha: isPlaying ? 0.20 : 0.10),
                                 Colors.transparent,
                               ],
                             ),
@@ -632,12 +630,12 @@ class _QuranHeroCard extends StatelessWidget {
                       ),
                     ),
 
-                    // Reciter Ambient Artwork (Trailing alignment - unobstructed stage)
+                    // Reciter Ambient Artwork (Wide cinematic alignment with smooth theme-aware fade)
                     PositionedDirectional(
                       end: 0,
                       top: 0,
                       bottom: 0,
-                      width: 148,
+                      width: 195,
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           final isNetwork =
@@ -651,14 +649,14 @@ class _QuranHeroCard extends StatelessWidget {
                                 CachedArtwork(
                                   id: 0,
                                   remoteUrl: item.artworkAsset,
-                                  size: 148,
+                                  size: 195,
                                   fallbackIcon: Icons.radio_rounded,
                                 )
                               else
                                 Image.asset(
                                   item.artworkAsset,
                                   fit: BoxFit.cover,
-                                  alignment: Alignment.topCenter,
+                                  alignment: Alignment.centerRight,
                                   errorBuilder: (_, __, ___) => Container(
                                     color: p.accentContainer
                                         .withValues(alpha: 0.2),
@@ -669,7 +667,7 @@ class _QuranHeroCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                              // Smooth multi-stop fade from card surface into the portrait
+                              // Smooth multi-stop fade from card surface into the portrait (dark/light theme-aware, no green)
                               DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
@@ -677,24 +675,26 @@ class _QuranHeroCard extends StatelessWidget {
                                     end: AlignmentDirectional.centerEnd,
                                     colors: [
                                       baseSurface,
-                                      baseSurface.withValues(alpha: 0.86),
-                                      baseSurface.withValues(alpha: 0.28),
+                                      baseSurface.withValues(alpha: 0.96),
+                                      baseSurface.withValues(alpha: 0.72),
+                                      baseSurface.withValues(alpha: 0.25),
                                       Colors.transparent,
                                     ],
-                                    stops: const [0.0, 0.32, 0.68, 1.0],
+                                    stops: const [0.0, 0.20, 0.45, 0.75, 1.0],
                                   ),
                                 ),
                               ),
-                              // Subtle vertical vignette for contrast in light & dark modes
+                              // Subtle vertical soft blend for contrast without murkiness
                               DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
                                     colors: [
-                                      Colors.black.withValues(alpha: 0.08),
-                                      Colors.black.withValues(alpha: 0.38),
+                                      Colors.transparent,
+                                      baseSurface.withValues(alpha: p.isDark ? 0.25 : 0.12),
                                     ],
+                                    stops: const [0.70, 1.0],
                                   ),
                                 ),
                               ),
@@ -707,18 +707,21 @@ class _QuranHeroCard extends StatelessWidget {
                     // Top inner specular highlight hairline
                     Positioned(
                       top: 0,
-                      left: 24,
-                      right: 24,
+                      left: 16,
+                      right: 16,
                       child: IgnorePointer(
                         child: Container(
-                          height: 1,
+                          height: 1.2,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                Colors.white.withValues(alpha: 0.0),
+                                Colors.transparent,
                                 (p.isDark ? Colors.white : Colors.black)
-                                    .withValues(alpha: p.isDark ? 0.14 : 0.05),
-                                Colors.white.withValues(alpha: 0.0),
+                                    .withValues(alpha: p.isDark ? 0.20 : 0.08),
+                                p.accent.withValues(alpha: isPlaying ? 0.40 : 0.15),
+                                (p.isDark ? Colors.white : Colors.black)
+                                    .withValues(alpha: p.isDark ? 0.20 : 0.08),
+                                Colors.transparent,
                               ],
                             ),
                           ),
@@ -745,7 +748,7 @@ class _QuranHeroCard extends StatelessWidget {
                       padding: const EdgeInsetsDirectional.fromSTEB(
                         AppSpacing.md,
                         10,
-                        125,
+                        130,
                         10,
                       ),
                       child: Column(
@@ -763,13 +766,12 @@ class _QuranHeroCard extends StatelessWidget {
                                   ),
                                   decoration: BoxDecoration(
                                     color: isPlaying
-                                        ? AppColors.mint.withValues(alpha: 0.18)
+                                        ? p.accent.withValues(alpha: 0.16)
                                         : p.accent.withValues(alpha: 0.14),
                                     borderRadius: AppRadii.circular(999),
                                     border: Border.all(
                                       color: isPlaying
-                                          ? AppColors.mint
-                                              .withValues(alpha: 0.45)
+                                          ? p.accent.withValues(alpha: 0.40)
                                           : p.accent.withValues(alpha: 0.30),
                                       width: 0.8,
                                     ),
@@ -788,7 +790,7 @@ class _QuranHeroCard extends StatelessWidget {
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              color: AppColors.mint,
+                                              color: p.accent,
                                               fontSize: AppFontSize.tiny,
                                               fontWeight: FontWeight.w800,
                                               letterSpacing: 0.5,
@@ -980,13 +982,13 @@ class _QuranHeroCard extends StatelessWidget {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isPlaying
-                                      ? AppColors.mint.withValues(alpha: 0.12)
+                                      ? p.accent.withValues(alpha: 0.14)
                                       : p.surfaceContainerHighest
                                           .withValues(alpha: 0.55),
                                   borderRadius: AppRadii.circular(999),
                                   border: Border.all(
                                     color: isPlaying
-                                        ? AppColors.mint.withValues(alpha: 0.30)
+                                        ? p.accent.withValues(alpha: 0.38)
                                         : p.hairline.withValues(alpha: 0.65),
                                     width: 0.75,
                                   ),
@@ -997,13 +999,13 @@ class _QuranHeroCard extends StatelessWidget {
                                     if (isPlaying) ...[
                                       _MiniEqualizerBars(
                                         isPlaying: true,
-                                        color: AppColors.mint,
+                                        color: p.accent,
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
                                         isArabic ? 'بث حي' : 'LIVE',
                                         style: TextStyle(
-                                          color: AppColors.mint,
+                                          color: p.accent,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w800,
                                           letterSpacing: 0.3,
@@ -1033,6 +1035,24 @@ class _QuranHeroCard extends StatelessWidget {
                         ],
                       ),
                     ),
+
+                    // Top-level crisp border overlay guaranteeing right corners and edges
+                    // are never obscured or clipped by child artwork or gradients
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadii.r24All,
+                            border: Border.all(
+                              color: isPlaying
+                                  ? p.accent.withValues(alpha: 0.85)
+                                  : p.accent.withValues(alpha: 0.28),
+                              width: isPlaying ? 1.5 : 1.0,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1044,7 +1064,7 @@ class _QuranHeroCard extends StatelessWidget {
   }
 }
 
-/// Pulsing green dot indicating live broadcast.
+/// Pulsing dot indicating live broadcast in theme accent color.
 class _PulsingLiveDot extends StatefulWidget {
   const _PulsingLiveDot();
 
@@ -1073,6 +1093,7 @@ class _PulsingLiveDotState extends State<_PulsingLiveDot>
 
   @override
   Widget build(BuildContext context) {
+    final dotColor = context.palette.accent;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -1081,11 +1102,11 @@ class _PulsingLiveDotState extends State<_PulsingLiveDot>
           width: 7,
           height: 7,
           decoration: BoxDecoration(
-            color: AppColors.mint.withValues(alpha: alpha),
+            color: dotColor.withValues(alpha: alpha),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: AppColors.mint
+                color: dotColor
                     .withValues(alpha: _controller.value * 0.7),
                 blurRadius: 4,
                 spreadRadius: 1,

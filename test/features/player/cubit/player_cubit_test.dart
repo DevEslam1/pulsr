@@ -1059,6 +1059,12 @@ void main() {
         expect(cubit.state.currentSong?.id, equals(202));
         // Position is reset to zero for new track
         expect(cubit.state.position, equals(Duration.zero));
+        expect(cubit.state.queueHistory.map((s) => s.id), contains(201));
+
+        // Play second occurrence of duplicate song with queueIndex
+        await cubit.playSong(song1, queue: [song1, song2, song1], queueIndex: 2);
+        expect(cubit.state.currentIndex, equals(2));
+        expect(cubit.state.queueHistory.map((s) => s.id), contains(202));
 
         await cubit.close();
       },
@@ -1072,6 +1078,22 @@ void main() {
           repository: mockRepository,
           toggleFavoriteUseCase: mockToggleFavorite,
         );
+
+        // Volume and mute toggle
+        expect(cubit.state.isMuted, isFalse);
+        expect(cubit.isMuted, isFalse);
+        await cubit.toggleMute();
+        expect(cubit.state.isMuted, isTrue);
+        expect(cubit.isMuted, isTrue);
+        await cubit.toggleMute();
+        expect(cubit.state.isMuted, isFalse);
+        expect(cubit.isMuted, isFalse);
+        await cubit.setVolume(0.0);
+        expect(cubit.state.isMuted, isTrue);
+        expect(cubit.isMuted, isTrue);
+        await cubit.setVolume(0.8);
+        expect(cubit.state.isMuted, isFalse);
+        expect(cubit.isMuted, isFalse);
 
         // EQ & Presets
         await cubit.setEqualizerEnabled(true);

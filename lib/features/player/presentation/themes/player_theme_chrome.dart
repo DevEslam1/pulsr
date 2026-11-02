@@ -37,7 +37,9 @@ import '../../../sheets/sleep_timer_sheet.dart';
 import '../../../sheets/song_options_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../../cubit/player_cubit.dart';
+import '../../../../core/services/ambient_sound_service.dart';
 import '../../cubit/player_state.dart';
+import '../widgets/ambient_sound_sheet.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_quality_sheet.dart';
 import '../widgets/equalizer_sheet.dart';
@@ -45,7 +47,7 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_more_sheet.dart';
 import '../widgets/player_seek_bar.dart';
 import '../widgets/player_volume_bar.dart';
-import '../widgets/quran_mode_badge.dart';
+import '../widgets/quran_mode_sheet.dart';
 import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';
 import 'player_theme_scaffold.dart' show PlayerThemeMetrics;
@@ -778,11 +780,19 @@ class PlayerBottomActionDock extends StatelessWidget {
                     ? Icons.speaker_rounded
                     : Icons.headphones_rounded)));
 
+    final double effectiveBarWidth = math.max(
+      barWidth,
+      math.min(
+        MediaQuery.sizeOf(context).width - (isTablet ? 64.0 : 20.0),
+        isTablet ? 480.0 : 364.0,
+      ),
+    );
+
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: barWidth,
-          minWidth: barWidth,
+          maxWidth: effectiveBarWidth,
+          minWidth: effectiveBarWidth,
           maxHeight: barHeight,
           minHeight: barHeight,
         ),
@@ -887,7 +897,48 @@ class PlayerBottomActionDock extends StatelessWidget {
                     ),
                   ),
 
-                  // 4. Sleep Timer
+                  // 4. Quran Mode
+                  Expanded(
+                    child: PlayerDockIconButton(
+                      icon: Icons.auto_stories_rounded,
+                      tooltip: l10n.quranMode,
+                      isActive: props.state.isQuranModeEnabled,
+                      activeColor: AppColors.quranEmerald,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      style: dockIconStyle,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        QuranModeSheet.show(context);
+                      },
+                    ),
+                  ),
+
+                  // 5. Ambient Sounds (Rain logo)
+                  Expanded(
+                    child: AnimatedBuilder(
+                      animation: AmbientSoundService(),
+                      builder: (context, _) {
+                        final ambient = AmbientSoundService();
+                        final isAmbientActive = ambient.isEnabled;
+                        return PlayerDockIconButton(
+                          icon: Icons.water_drop_rounded,
+                          tooltip: l10n.ambientSounds,
+                          isActive: isAmbientActive,
+                          activeColor: props.activeColor,
+                          inactiveColor: p.textSecondary,
+                          isTablet: isTablet,
+                          style: dockIconStyle,
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            AmbientSoundSheet.show(context);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 6. Sleep Timer
                   Expanded(
                     child: PlayerDockIconButton(
                       icon: Icons.timer_outlined,
@@ -920,7 +971,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                     ),
                   ),
 
-                  // 5. Secondary actions (party / Quran / canvas / playlist)
+                  // 7. Secondary actions (party / canvas / playlist)
                   Expanded(
                     child: _MoreDockButton(
                       song: song,
@@ -1497,10 +1548,6 @@ class PlayerTrackHeader extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     qualityBadge,
-                    if (props.state.isQuranModeEnabled) ...[
-                      const SizedBox(width: AppSpacing.xs),
-                      const QuranModeBadge(compact: true),
-                    ],
                     if (extraBadge != null) ...[
                       const SizedBox(width: AppSpacing.xs),
                       extraBadge!,

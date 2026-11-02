@@ -11,6 +11,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     Duration? initialPosition,
     bool openPlayerIfPlaying = true,
     bool preservePlaybackState = false,
+    int? queueIndex,
   }) =>
       _queueMutex.protect(() => _playSongLocked(
             song,
@@ -18,6 +19,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
             initialPosition: initialPosition,
             openPlayerIfPlaying: openPlayerIfPlaying,
             preservePlaybackState: preservePlaybackState,
+            queueIndex: queueIndex,
           ));
 
   /// [preservePlaybackState] — when true (queue shuffle / history jump) the
@@ -28,12 +30,14 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     Duration? initialPosition,
     bool openPlayerIfPlaying = true,
     bool preservePlaybackState = false,
+    int? queueIndex,
   }) async {
     _cancelPendingSeek();
     final state = _getState();
     if (openPlayerIfPlaying &&
         initialPosition == null &&
-        _isSameTrack(state.currentSong, song)) {
+        _isSameTrack(state.currentSong, song) &&
+        (queueIndex == null || queueIndex == state.currentIndex)) {
       // A supplied queue is a request to replace/reorder the current queue (e.g.
       // the Queue screen "Shuffle" action passes the current song with a freshly
       // shuffled queue). Only take the plain resume shortcut when the queue is
@@ -97,7 +101,15 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     _mediaItemGuard.next();
 
     final rawQueue = queue != null ? List<SongsTableData>.from(queue) : [song];
-    var targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, song));
+    var targetIndex = -1;
+    if (queueIndex != null &&
+        queueIndex >= 0 &&
+        queueIndex < rawQueue.length &&
+        _isSameTrack(rawQueue[queueIndex], song)) {
+      targetIndex = queueIndex;
+    } else {
+      targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, song));
+    }
     if (targetIndex == -1) {
       targetIndex = 0;
       rawQueue.insert(0, song);
@@ -147,6 +159,17 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     final prevDuration = state.duration;
     final prevLyrics = state.lyrics;
     final prevLyricsSource = state.lyricsSource;
+    final prevQueueHistory = state.queueHistory;
+
+    final updatedHistory = List<SongsTableData>.from(state.queueHistory);
+    final previousSong = state.currentSong;
+    if (!isSameSong && previousSong != null) {
+      updatedHistory.removeWhere((s) => s.id == previousSong.id);
+      updatedHistory.insert(0, previousSong);
+      if (updatedHistory.length > 25) {
+        updatedHistory.removeRange(25, updatedHistory.length);
+      }
+    }
 
     final Map<int, QueueTier> nextTrackTiers;
     if (isSameSong && preservePlaybackState && queue != null) {
@@ -184,6 +207,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         queue: List<SongsTableData>.unmodifiable(effectiveQueue),
         currentIndex: effectiveIndex,
         trackTiers: nextTrackTiers,
+        queueHistory: updatedHistory,
       ),
       playback: state.playback.copyWith(
         currentSong: song,
@@ -256,6 +280,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
               queue: List<SongsTableData>.unmodifiable(prevQueue),
               currentIndex: prevIndex,
               trackTiers: prevTrackTiers,
+              queueHistory: prevQueueHistory,
             ),
             playback: current.playback.copyWith(
               currentSong: prevSong,

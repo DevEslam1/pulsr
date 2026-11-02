@@ -1,14 +1,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
 import '../../../core/utils/adaptive.dart';
 import 'nav_destinations.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
 
 class PulsrBottomNavBar extends StatefulWidget {
   final int currentIndex;
@@ -64,9 +65,9 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
       bottom: widget.includeSafeArea,
       child: Padding(
         padding: EdgeInsetsDirectional.fromSTEB(
-          isTablet ? 24 : 14,
+          isTablet ? 24 : 12,
           3,
-          isTablet ? 24 : 14,
+          isTablet ? 24 : 12,
           isTablet ? 12 : 8,
         ),
         child: Align(
@@ -107,95 +108,149 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
               child: ValueListenableBuilder<double>(
                 valueListenable: _visualDyNotifier,
                 builder: (context, visualDy, child) {
+                  final isDraggingDock = visualDy.abs() > 0.5;
                   return AnimatedContainer(
                     duration: context.motionMs(120),
                     curve: context.motionCurve(Curves.easeOutCubic),
                     transform: Matrix4.translationValues(0, visualDy, 0),
                     height: barHeight,
-                    child: child,
-                  );
-                },
-                child: Container(
-                  height: barHeight,
-                  decoration: BoxDecoration(
-                    borderRadius: navRadius,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black
-                            .withValues(alpha: p.isDark ? 0.25 : 0.06),
-                        blurRadius: 8,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: navRadius,
-                    child: Builder(
-                      builder: (context) {
-                        final navContainer = Container(
-                          decoration: BoxDecoration(
-                            borderRadius: navRadius,
-                            color: p.surfaceContainer,
-                            border: Border.all(
-                              color: p.hairline,
-                              width: 1.0,
-                            ),
+                    decoration: BoxDecoration(
+                      borderRadius: navRadius,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black
+                              .withValues(alpha: p.isDark ? 0.38 : 0.09),
+                          blurRadius: 18,
+                          spreadRadius: -2,
+                          offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: p.accent.withValues(
+                            alpha: isDraggingDock
+                                ? (p.isDark ? 0.14 : 0.08)
+                                : (p.isDark ? 0.05 : 0.02),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.xs,
-                              vertical: AppSpacing.xxs),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Align(
-                                alignment: Alignment.topCenter,
-                                child: Container(
-                                  margin: const EdgeInsets.only(top: 2),
-                                  width: 24,
-                                  height: 2.5,
-                                  decoration: BoxDecoration(
-                                    color:
-                                        p.textTertiary.withValues(alpha: 0.25),
-                                    borderRadius: AppRadii.r2All,
+                          blurRadius: 14,
+                          spreadRadius: -4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: navRadius,
+                      child: Builder(
+                        builder: (context) {
+                          final navContainer = DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: navRadius,
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  p.surfaceContainerHigh.withValues(
+                                    alpha: widget.enableBlur ? 0.88 : 1.0,
                                   ),
-                                ),
-                              ),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  for (int i = 0; i < items.length; i++)
-                                    Expanded(
-                                      child: _NavTabItem(
-                                        item: items[i],
-                                        index: i,
-                                        isSelected: widget.currentIndex == i,
-                                        p: p,
-                                        isTablet: isTablet,
-                                        iconOnly: widget.iconOnly,
-                                        // Forward same-tab taps too: AppShell
-                                        // resets the branch (scroll to top).
-                                        onTap: () => widget.onTap(i),
-                                      ),
-                                    ),
+                                  p.surfaceContainer.withValues(
+                                    alpha: widget.enableBlur ? 0.84 : 1.0,
+                                  ),
                                 ],
                               ),
-                            ],
-                          ),
-                        );
+                              border: Border.all(
+                                color: isDraggingDock
+                                    ? p.accent.withValues(alpha: 0.35)
+                                    : p.hairline,
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Subtle top inner specular highlight hairline
+                                Positioned(
+                                  top: 0,
+                                  left: 24,
+                                  right: 24,
+                                  child: IgnorePointer(
+                                    child: Container(
+                                      height: 1,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.white.withValues(alpha: 0.0),
+                                            (p.isDark
+                                                    ? Colors.white
+                                                    : Colors.black)
+                                                .withValues(
+                                                    alpha:
+                                                        p.isDark ? 0.12 : 0.04),
+                                            Colors.white.withValues(alpha: 0.0),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Top gesture grab handle pill
+                                Align(
+                                  alignment: Alignment.topCenter,
+                                  child: IgnorePointer(
+                                    child: AnimatedContainer(
+                                      duration: context.motionMs(160),
+                                      margin: const EdgeInsets.only(top: 3.5),
+                                      width: isDraggingDock ? 32 : 24,
+                                      height: 2.5,
+                                      decoration: BoxDecoration(
+                                        color: isDraggingDock
+                                            ? p.accent.withValues(alpha: 0.65)
+                                            : p.textTertiary
+                                                .withValues(alpha: 0.24),
+                                        borderRadius: AppRadii.r2All,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.xs,
+                                    vertical: AppSpacing.xxs,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      for (int i = 0; i < items.length; i++)
+                                        Expanded(
+                                          child: _NavTabItem(
+                                            item: items[i],
+                                            index: i,
+                                            isSelected:
+                                                widget.currentIndex == i,
+                                            p: p,
+                                            isTablet: isTablet,
+                                            iconOnly: widget.iconOnly,
+                                            onTap: () => widget.onTap(i),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
 
-                        if (!widget.enableBlur || GpuBudget.isGpuSaverActive) {
-                          return navContainer;
-                        }
-                        return BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                          child: navContainer,
-                        );
-                      },
+                          if (!widget.enableBlur ||
+                              GpuBudget.isGpuSaverActive) {
+                            return navContainer;
+                          }
+                          return BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                            child: navContainer,
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -228,6 +283,7 @@ class _NavTabItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final double iconSize = isTablet ? 24.0 : 22.0;
     final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final itemRadius = isTablet ? AppRadii.r22All : AppRadii.r18All;
 
     return Semantics(
       selected: isSelected,
@@ -241,12 +297,13 @@ class _NavTabItem extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: isTablet ? AppRadii.r22All : AppRadii.r18All,
+            borderRadius: itemRadius,
             splashColor: p.accent.withValues(alpha: 0.12),
             highlightColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: context.motionMs(250),
+              duration: context.motionMs(240),
               curve: context.motionCurve(Curves.easeOutCubic),
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
               padding: EdgeInsets.symmetric(
                 horizontal: isTablet ? 10 : 6,
                 vertical: AppSpacing.xxs,
@@ -257,40 +314,64 @@ class _NavTabItem extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          p.accent.withValues(alpha: 0.22),
-                          p.accent.withValues(alpha: 0.08),
+                          p.accent.withValues(alpha: p.isDark ? 0.24 : 0.18),
+                          p.accent.withValues(alpha: p.isDark ? 0.08 : 0.05),
                         ],
                       )
                     : null,
-                borderRadius: isTablet ? AppRadii.r22All : AppRadii.r18All,
-                border: isSelected
-                    ? Border.all(
-                        color: p.accent.withValues(alpha: 0.38),
-                        width: 1.2,
-                      )
-                    : Border.all(color: Colors.transparent, width: 1.2),
+                borderRadius: itemRadius,
+                border: Border.all(
+                  color: isSelected
+                      ? p.accent.withValues(alpha: 0.38)
+                      : Colors.transparent,
+                  width: 1.1,
+                ),
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: p.accent.withValues(alpha: 0.22),
+                          color: p.accent.withValues(alpha: 0.20),
                           blurRadius: 10,
+                          spreadRadius: -2,
                           offset: const Offset(0, 2),
                         ),
                       ]
                     : null,
               ),
               child: iconOnly
-                  ? Center(
-                      child: AnimatedScale(
-                        scale: isSelected ? 1.08 : 1.0,
-                        duration: context.motionMs(220),
-                        curve: context.motionCurve(Curves.easeOutBack),
-                        child: Icon(
-                          isSelected ? item.activeIcon : item.icon,
-                          size: iconSize,
-                          color: isSelected ? p.accent : p.textTertiary,
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedContainer(
+                          duration: context.motionMs(220),
+                          curve: context.motionCurve(Curves.easeOutCubic),
+                          height: 2,
+                          width: isSelected ? 14 : 0,
+                          margin: const EdgeInsets.only(bottom: 2),
+                          decoration: BoxDecoration(
+                            color: p.accent,
+                            borderRadius: AppRadii.r2All,
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: p.accent.withValues(alpha: 0.55),
+                                      blurRadius: 5,
+                                    ),
+                                  ]
+                                : null,
+                          ),
                         ),
-                      ),
+                        AnimatedScale(
+                          scale: isSelected ? 1.08 : 1.0,
+                          duration: context.motionMs(220),
+                          curve: context.motionCurve(Curves.easeOutBack),
+                          child: Icon(
+                            isSelected ? item.activeIcon : item.icon,
+                            size: iconSize,
+                            color: isSelected ? p.accent : p.textTertiary,
+                          ),
+                        ),
+                      ],
                     )
                   : MediaQuery.withClampedTextScaling(
                       minScaleFactor: 0.8,
@@ -299,18 +380,18 @@ class _NavTabItem extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Selection indicator capsule: grows and lights up when active.
+                          // Selection LED capsule: grows and lights up when active.
                           AnimatedContainer(
                             duration: context.motionMs(220),
                             curve: context.motionCurve(Curves.easeOutCubic),
-                            height: 2,
-                            width: isSelected ? 18 : 6,
+                            height: 2.2,
+                            width: isSelected ? 18 : 5,
                             margin:
                                 const EdgeInsets.only(bottom: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? p.accent
-                                  : p.textTertiary.withValues(alpha: 0.25),
+                                  : p.textTertiary.withValues(alpha: 0.22),
                               borderRadius: AppRadii.r2All,
                               boxShadow: isSelected
                                   ? [
@@ -332,7 +413,7 @@ class _NavTabItem extends StatelessWidget {
                               color: isSelected ? p.accent : p.textTertiary,
                             ),
                           ),
-                          const SizedBox(height: 1),
+                          const SizedBox(height: 1.5),
                           AnimatedDefaultTextStyle(
                             duration: context.motionMs(200),
                             style: TextStyle(

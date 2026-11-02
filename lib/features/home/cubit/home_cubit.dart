@@ -206,6 +206,9 @@ class HomeCubit extends PulsrCubit<HomeState> {
         if (result.isEmpty && identical(_categoryFutures[category], future)) {
           _categoryFutures.remove(category);
           _categoryFetchTimestamps.remove(category);
+        } else if (identical(_categoryFutures[category], future)) {
+          _categoryFetchTimestamps[category] =
+              _monotonicClock.elapsedMilliseconds;
         }
         return result;
       } catch (e, st) {

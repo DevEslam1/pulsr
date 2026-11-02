@@ -1,8 +1,10 @@
+// lib/core/widgets/pulsr_toast.dart
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../features/player/cubit/player_cubit.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_typography.dart';
 import '../di/injection.dart';
@@ -212,6 +214,7 @@ class _ToastWidgetState extends State<_ToastWidget>
   late final AnimationController _animController;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
+  late final Animation<double> _scaleAnimation;
   Timer? _autoDismissTimer;
   bool _isDismissing = false;
 
@@ -225,24 +228,29 @@ class _ToastWidgetState extends State<_ToastWidget>
       duration: Duration.zero,
     );
 
-    _fadeAnimation = CurvedAnimation(
+    final curved = CurvedAnimation(
       parent: _animController,
       curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
     );
 
+    _fadeAnimation = curved;
+
     final initialOffset = widget.position == PulsrToastPosition.top
-        ? const Offset(0.0, -0.40)
+        ? const Offset(0.0, -0.35)
         : (widget.position == PulsrToastPosition.center
-            ? const Offset(0.0, 0.15)
-            : const Offset(0.0, 0.40));
+            ? const Offset(0.0, 0.14)
+            : const Offset(0.0, 0.35));
 
     _slideAnimation = Tween<Offset>(
       begin: initialOffset,
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOutCubic,
-    ));
+    ).animate(curved);
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.96,
+      end: 1.0,
+    ).animate(curved);
 
     _animController.forward();
     _startAutoDismissTimer();
@@ -391,6 +399,10 @@ class _ToastWidgetState extends State<_ToastWidget>
         ? AppRadii.r24All
         : (isCompactLandscape ? AppRadii.r16All : AppRadii.r20All);
 
+    final Color borderColor = (widget.isError || widget.isSuccess)
+        ? statusColor.withValues(alpha: 0.48)
+        : (p.isDark ? AppColors.specularAt(0.15) : p.hairline);
+
     return AnimatedBuilder(
       animation: Listenable.merge([
         PulsrDockTracker.changeNotifier,
@@ -439,218 +451,275 @@ class _ToastWidgetState extends State<_ToastWidget>
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onVerticalDragEnd: (details) {
-                        if ((details.primaryVelocity ?? 0) > 80) {
-                          HapticFeedback.lightImpact();
-                          dismiss();
-                        }
-                      },
-                      onHorizontalDragEnd: (details) {
-                        if ((details.primaryVelocity ?? 0).abs() > 80) {
-                          HapticFeedback.lightImpact();
-                          dismiss();
-                        }
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: snackbarRadius,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: p.isDark ? 0.30 : 0.08),
-                              blurRadius: 10,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: snackbarRadius,
-                          child: Semantics(
-                            liveRegion: true,
-                            container: true,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: snackbarRadius,
-                                color: p.surfaceContainerHigh,
-                                border: Border.all(
-                                  color: widget.isError
-                                      ? p.error
-                                      : (widget.isSuccess
-                                          ? p.success
-                                          : p.hairline),
-                                  width: 1.0,
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onVerticalDragEnd: (details) {
+                          if ((details.primaryVelocity ?? 0) > 80) {
+                            HapticFeedback.lightImpact();
+                            dismiss();
+                          }
+                        },
+                        onHorizontalDragEnd: (details) {
+                          if ((details.primaryVelocity ?? 0).abs() > 80) {
+                            HapticFeedback.lightImpact();
+                            dismiss();
+                          }
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: snackbarRadius,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(
+                                  alpha: p.isDark ? 0.38 : 0.10,
                                 ),
+                                blurRadius: 18,
+                                spreadRadius: 0,
+                                offset: const Offset(0, 6),
                               ),
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                isCompactLandscape ? 10 : 12,
-                                isCompactLandscape ? 7 : 9,
-                                isCompactLandscape ? 8 : 10,
-                                isCompactLandscape ? 7 : 9,
+                              BoxShadow(
+                                color: statusColor.withValues(
+                                  alpha: p.isDark ? 0.14 : 0.06,
+                                ),
+                                blurRadius: 14,
+                                spreadRadius: -2,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Leading Status Badge
-                                  Container(
-                                    width: isCompactLandscape ? 30 : 32,
-                                    height: isCompactLandscape ? 30 : 32,
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withValues(
-                                          alpha: p.isDark ? 0.18 : 0.12),
-                                      borderRadius: BorderRadius.circular(
-                                          isCompactLandscape ? 9 : 10),
-                                      border: Border.all(
-                                        color:
-                                            statusColor.withValues(alpha: 0.24),
-                                        width: 1.0,
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        effectiveIcon,
-                                        color: statusColor,
-                                        size: isCompactLandscape ? 16 : 18,
-                                      ),
-                                    ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: snackbarRadius,
+                            child: Semantics(
+                              liveRegion: true,
+                              container: true,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: snackbarRadius,
+                                  gradient: LinearGradient(
+                                    begin: AlignmentDirectional.centerStart,
+                                    end: AlignmentDirectional.centerEnd,
+                                    colors: [
+                                      Color.lerp(
+                                            p.surfaceContainerHigh,
+                                            statusColor,
+                                            p.isDark ? 0.10 : 0.05,
+                                          ) ??
+                                          p.surfaceContainerHigh,
+                                      p.surfaceContainerHigh,
+                                    ],
                                   ),
-                                  const SizedBox(width: 10),
+                                  border: Border.all(
+                                    color: borderColor,
+                                    width: 1.0,
+                                  ),
+                                ),
+                                padding: EdgeInsetsDirectional.fromSTEB(
+                                  isCompactLandscape ? 10 : 12,
+                                  isCompactLandscape ? 6 : 8,
+                                  isCompactLandscape ? 6 : 8,
+                                  isCompactLandscape ? 6 : 8,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Leading Status Badge
+                                    Container(
+                                      width: isCompactLandscape ? 30 : 34,
+                                      height: isCompactLandscape ? 30 : 34,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            statusColor.withValues(
+                                              alpha: p.isDark ? 0.24 : 0.16,
+                                            ),
+                                            statusColor.withValues(
+                                              alpha: p.isDark ? 0.10 : 0.06,
+                                            ),
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          isCompactLandscape ? 9 : 11,
+                                        ),
+                                        border: Border.all(
+                                          color: statusColor.withValues(
+                                            alpha: 0.36,
+                                          ),
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          effectiveIcon,
+                                          color: statusColor,
+                                          size: isCompactLandscape ? 16 : 18,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
 
-                                  // Text Content
-                                  Flexible(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (widget.title != null) ...[
+                                    // Text Content
+                                    Flexible(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (widget.title != null) ...[
+                                            Text(
+                                              widget.title!,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: p.textPrimary,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: isCompactLandscape
+                                                    ? 12.0
+                                                    : AppFontSize.bodySmall,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 1.5),
+                                          ],
                                           Text(
-                                            widget.title!,
-                                            maxLines: 1,
+                                            widget.message,
+                                            maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              color: p.textPrimary,
-                                              fontWeight: FontWeight.w700,
+                                              color: widget.title != null
+                                                  ? p.textSecondary
+                                                  : p.textPrimary,
+                                              fontWeight: FontWeight.w600,
                                               fontSize: isCompactLandscape
                                                   ? 12.0
                                                   : AppFontSize.bodySmall,
+                                              height: 1.24,
                                             ),
                                           ),
-                                          const SizedBox(height: 1),
                                         ],
-                                        Text(
-                                          widget.message,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: widget.title != null
-                                                ? p.textSecondary
-                                                : p.textPrimary,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: isCompactLandscape
-                                                ? 12.0
-                                                : AppFontSize.bodySmall,
-                                            height: 1.22,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
 
-                                  // Optional Action Button
-                                  if (widget.action != null) ...[
-                                    const SizedBox(width: 8),
-                                    Semantics(
-                                      button: true,
-                                      label: widget.action!.label,
-                                      child: ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                            minWidth: 48, minHeight: 48),
-                                        child: GestureDetector(
-                                          behavior: HitTestBehavior.opaque,
-                                          onTap: () {
-                                            HapticFeedback.lightImpact();
-                                            widget.action!.onPressed();
-                                            dismiss();
-                                          },
-                                          child: Container(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal:
-                                                  isCompactLandscape ? 9 : 11,
-                                              vertical:
-                                                  isCompactLandscape ? 4 : 5,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: statusColor.withValues(
-                                                  alpha:
-                                                      p.isDark ? 0.20 : 0.14),
-                                              borderRadius: AppRadii.r10All,
-                                              border: Border.all(
-                                                color: statusColor.withValues(
-                                                    alpha: 0.32),
-                                                width: 1.0,
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                if (widget.action!.icon !=
-                                                    null) ...[
-                                                  Icon(
-                                                    widget.action!.icon,
-                                                    size: isCompactLandscape
-                                                        ? 12
-                                                        : 14,
-                                                    color: statusColor,
+                                    // Optional Action Button
+                                    if (widget.action != null) ...[
+                                      const SizedBox(width: 8),
+                                      Semantics(
+                                        button: true,
+                                        label: widget.action!.label,
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            minWidth: 48,
+                                            minHeight: 48,
+                                          ),
+                                          child: GestureDetector(
+                                            behavior: HitTestBehavior.opaque,
+                                            onTap: () {
+                                              HapticFeedback.lightImpact();
+                                              widget.action!.onPressed();
+                                              dismiss();
+                                            },
+                                            child: Center(
+                                              child: Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: isCompactLandscape
+                                                      ? 9
+                                                      : 11,
+                                                  vertical: isCompactLandscape
+                                                      ? 5
+                                                      : 6,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: statusColor.withValues(
+                                                    alpha:
+                                                        p.isDark ? 0.22 : 0.14,
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                ],
-                                                Text(
-                                                  widget.action!.label,
-                                                  style: TextStyle(
-                                                    color: statusColor,
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: isCompactLandscape
-                                                        ? 11.5
-                                                        : AppFontSize.bodySmall,
+                                                  borderRadius: AppRadii.r10All,
+                                                  border: Border.all(
+                                                    color:
+                                                        statusColor.withValues(
+                                                            alpha: 0.38),
+                                                    width: 1.0,
                                                   ),
                                                 ),
-                                              ],
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    if (widget.action!.icon !=
+                                                        null) ...[
+                                                      Icon(
+                                                        widget.action!.icon,
+                                                        size: isCompactLandscape
+                                                            ? 12
+                                                            : 14,
+                                                        color: statusColor,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                    ],
+                                                    Text(
+                                                      widget.action!.label,
+                                                      style: TextStyle(
+                                                        color: statusColor,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        fontSize:
+                                                            isCompactLandscape
+                                                                ? 11.5
+                                                                : AppFontSize
+                                                                    .bodySmall,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+
+                                    // Close Button (48x48dp accessible target with visual micro-pill)
+                                    const SizedBox(width: 2),
+                                    Semantics(
+                                      button: true,
+                                      label: MaterialLocalizations.of(context)
+                                          .closeButtonTooltip,
+                                      child: GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: () {
+                                          HapticFeedback.lightImpact();
+                                          dismiss();
+                                        },
+                                        child: SizedBox(
+                                          width: 48,
+                                          height: 48,
+                                          child: Center(
+                                            child: Container(
+                                              width: 24,
+                                              height: 24,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: p.isDark
+                                                    ? AppColors.specularAt(0.07)
+                                                    : p.surfaceContainer,
+                                              ),
+                                              child: Icon(
+                                                Icons.close_rounded,
+                                                size: isCompactLandscape
+                                                    ? 14
+                                                    : 15,
+                                                color: p.textSecondary,
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ],
-
-                                  // Close Button
-                                  const SizedBox(width: 4),
-                                  Semantics(
-                                    button: true,
-                                    label: MaterialLocalizations.of(context)
-                                        .closeButtonTooltip,
-                                    child: GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: () {
-                                        HapticFeedback.lightImpact();
-                                        dismiss();
-                                      },
-                                      child: SizedBox(
-                                        width: 48,
-                                        height: 48,
-                                        child: Icon(
-                                          Icons.close_rounded,
-                                          size: isCompactLandscape ? 16 : 18,
-                                          color: p.textTertiary,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                           ),

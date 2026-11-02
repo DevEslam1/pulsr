@@ -145,10 +145,21 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           final slotData = _queueSlots[restoredSlot];
           if (slotData != null) {
             final targetSongs = slotData.songsFrom(_slotLookupCache);
+            final targetOriginalSong = (slotData.currentIndex >= 0 &&
+                    slotData.currentIndex < targetSongs.length)
+                ? targetSongs[slotData.currentIndex]
+                : null;
             final validSongs = targetSongs.where((s) => !s.isMissing).toList();
             if (validSongs.isNotEmpty) {
-              final safeIdx =
-                  slotData.currentIndex.clamp(0, validSongs.length - 1);
+              int safeIdx = -1;
+              if (targetOriginalSong != null) {
+                safeIdx = validSongs
+                    .indexWhere((s) => _isSameTrack(s, targetOriginalSong));
+              }
+              if (safeIdx == -1) {
+                safeIdx =
+                    slotData.currentIndex.clamp(0, validSongs.length - 1);
+              }
               final song = validSongs[safeIdx];
               final s = _getState();
               _emit(s.copyWith(
@@ -288,24 +299,32 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
   Future<void> _reorderQueueLocked(int oldIndex, int newIndex) async {
     final state = _getState();
+    var adjustedNewIndex = newIndex;
+    // In Flutter ReorderableListView, dragging to the end passes newIndex == queue.length.
+    if (adjustedNewIndex == state.queue.length) {
+      adjustedNewIndex = state.queue.length - 1;
+    }
     if (oldIndex < 0 ||
         oldIndex >= state.queue.length ||
-        newIndex < 0 ||
-        newIndex >= state.queue.length) {
+        adjustedNewIndex < 0 ||
+        adjustedNewIndex >= state.queue.length) {
       return;
     }
+    final targetIndex = adjustedNewIndex;
+    if (oldIndex == targetIndex) return;
+
     final updatedQueue = List<SongsTableData>.from(state.queue);
     final song = updatedQueue.removeAt(oldIndex);
-    updatedQueue.insert(newIndex, song);
+    updatedQueue.insert(targetIndex, song);
 
     int newCurrentIndex = state.currentIndex;
     if (state.currentIndex == oldIndex) {
-      newCurrentIndex = newIndex;
+      newCurrentIndex = targetIndex;
     } else if (oldIndex < state.currentIndex &&
-        newIndex >= state.currentIndex) {
+        targetIndex >= state.currentIndex) {
       newCurrentIndex = state.currentIndex - 1;
     } else if (oldIndex > state.currentIndex &&
-        newIndex <= state.currentIndex) {
+        targetIndex <= state.currentIndex) {
       newCurrentIndex = state.currentIndex + 1;
     }
 
@@ -327,7 +346,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _invalidateQueueSyncResolution();
 
     try {
-      await _audioHandler.reorderQueue(oldIndex, newIndex);
+      await _audioHandler.reorderQueue(oldIndex, targetIndex);
     } catch (e, st) {
       // H-08: Roll back queue and slot state if audio handler reorder throws
       ErrorLogger.log('Failed to reorder queue in audio handler',
@@ -547,9 +566,16 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
             error: e, stackTrace: st, category: 'PlayerQueueController');
         if (!_isClosed()) {
           _bumpQueueVersion();
-          _emit(state.copyWith(
-            playback: state.playback
-                .copyWith(errorMessage: 'Failed to switch queue slot'),
+          final s = _getState();
+          _emit(s.copyWith(
+            queueSlice: state.queueSlice,
+            playback: s.playback.copyWith(
+              currentSong: state.currentSong,
+              duration: state.duration,
+              position: state.position,
+              playbackSpeed: state.playbackSpeed,
+              errorMessage: 'Failed to switch queue slot',
+            ),
           ));
           _invalidateQueueSyncResolution();
           try {
@@ -578,12 +604,15 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final safeNewSong = newSong;
     if (safeNewSong == null || oldId == safeNewSong.id) return;
 
-    final state = _getState();
-    if (state.queue.any((s) => s.id == safeNewSong.id)) return;
-
-    _slotLookupCache[safeNewSong.id] = safeNewSong;
-    _slotLookupCache.remove(oldId);
+    var shouldProceed = true;
     await _queueMutex.protect(() async {
+      final state = _getState();
+      if (state.queue.any((s) => s.id == safeNewSong.id)) {
+        shouldProceed = false;
+        return;
+      }
+      _slotLookupCache[safeNewSong.id] = safeNewSong;
+      _slotLookupCache.remove(oldId);
       _queueSlots.updateAll((slot, data) {
         if (!data.songIds.contains(oldId)) return data;
         return QueueSlotData(
@@ -595,34 +624,34 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           speed: data.speed,
         );
       });
+      if (state.queue.any((s) => s.id == oldId)) {
+        final oldSong = state.queue.firstWhere((s) => s.id == oldId);
+        final oldTier = state.trackTiers[oldId];
+        if (oldSong.isAutoplay || oldTier == QueueTier.autoplay) {
+          safeNewSong.isAutoplay = true;
+        }
+        final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
+        if (oldTier != null) {
+          updatedTiers.remove(oldId);
+          updatedTiers[safeNewSong.id] = oldTier;
+        }
+        _bumpQueueVersion();
+        _emit(state.copyWith(
+          queueSlice: state.queueSlice.copyWith(
+            queue:
+                state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
+            trackTiers: updatedTiers,
+          ),
+          playback: state.playback.copyWith(
+            currentSong:
+                state.currentSong?.id == oldId ? safeNewSong : state.currentSong,
+          ),
+        ));
+        _updateWidgetThrottled(force: true);
+      }
     });
+    if (!shouldProceed) return;
     debouncedPersistQueueSlots();
-
-    if (state.queue.any((s) => s.id == oldId)) {
-      final oldSong = state.queue.firstWhere((s) => s.id == oldId);
-      final oldTier = state.trackTiers[oldId];
-      if (oldSong.isAutoplay || oldTier == QueueTier.autoplay) {
-        safeNewSong.isAutoplay = true;
-      }
-      final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
-      if (oldTier != null) {
-        updatedTiers.remove(oldId);
-        updatedTiers[safeNewSong.id] = oldTier;
-      }
-      _bumpQueueVersion();
-      _emit(state.copyWith(
-        queueSlice: state.queueSlice.copyWith(
-          queue:
-              state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
-          trackTiers: updatedTiers,
-        ),
-        playback: state.playback.copyWith(
-          currentSong:
-              state.currentSong?.id == oldId ? safeNewSong : state.currentSong,
-        ),
-      ));
-      _updateWidgetThrottled(force: true);
-    }
 
     try {
       _audioHandler.swapReconciledSong(oldId, safeNewSong);
@@ -644,10 +673,23 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       // exactly-full.
       if (existingIdx == state.currentIndex ||
           existingIdx == state.queue.length - 1) {
+        final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
+        if (updatedTiers[song.id] != QueueTier.userQueue) {
+          updatedTiers[song.id] = QueueTier.userQueue;
+          _emit(state.copyWith(
+            queueSlice: state.queueSlice.copyWith(trackTiers: updatedTiers),
+          ));
+        }
         return;
       }
       // Reorder existing song to end instead of enqueuing duplicate into audio handler
       await _reorderQueueLocked(existingIdx, state.queue.length - 1);
+      final s = _getState();
+      final updatedTiers = Map<int, QueueTier>.from(s.trackTiers);
+      updatedTiers[song.id] = QueueTier.userQueue;
+      _emit(s.copyWith(
+        queueSlice: s.queueSlice.copyWith(trackTiers: updatedTiers),
+      ));
       return;
     }
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {
@@ -715,11 +757,24 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       // before the capacity check — which would otherwise wrongly block it at
       // exactly-full.
       if (existingIdx == state.currentIndex || existingIdx == targetSlot) {
+        final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
+        if (updatedTiers[song.id] != QueueTier.userQueue) {
+          updatedTiers[song.id] = QueueTier.userQueue;
+          _emit(state.copyWith(
+            queueSlice: state.queueSlice.copyWith(trackTiers: updatedTiers),
+          ));
+        }
         return;
       }
       final adjustedTarget =
           targetSlot > existingIdx ? targetSlot - 1 : targetSlot;
       await _reorderQueueLocked(existingIdx, adjustedTarget);
+      final s = _getState();
+      final updatedTiers = Map<int, QueueTier>.from(s.trackTiers);
+      updatedTiers[song.id] = QueueTier.userQueue;
+      _emit(s.copyWith(
+        queueSlice: s.queueSlice.copyWith(trackTiers: updatedTiers),
+      ));
       return;
     }
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {

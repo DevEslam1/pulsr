@@ -46,6 +46,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   StreamSubscription? _favoritesSub;
   StreamSubscription? _downloadedSub;
   int _songsToken = 0;
+  int _genresToken = 0;
+  int _yearsToken = 0;
+  int _downloadedToken = 0;
   bool _snapshotConsumed = false;
 
   /// DB-level pagination window for the songs watch. The full 10k-row list
@@ -245,12 +248,35 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                 errorMessage: null,
                 isLoading: false,
                 isLoadingMore: false));
-            LibraryCacheManager().saveSnapshot(
-              songs: songs,
-              totalSongCount: songs.length,
-              albumCount: state.albums.length,
-              artistCount: state.artists.length,
-            );
+            if (!_hasMoreSongs) {
+              LibraryCacheManager().saveSnapshot(
+                songs: songs,
+                totalSongCount: songs.length,
+                albumCount: state.albums.length,
+                artistCount: state.artists.length,
+              );
+            } else {
+              final repo = _musicRepository ??
+                  (getIt.isRegistered<IMusicRepository>()
+                      ? getIt<IMusicRepository>()
+                      : null);
+              repo?.getTotalSongCount(excludedFolders: excluded).then((res) {
+                final total = res.fold((_) => songs.length, (r) => r);
+                LibraryCacheManager().saveSnapshot(
+                  songs: songs,
+                  totalSongCount: total,
+                  albumCount: state.albums.length,
+                  artistCount: state.artists.length,
+                );
+              }).catchError((_) {
+                LibraryCacheManager().saveSnapshot(
+                  songs: songs,
+                  totalSongCount: songs.length,
+                  albumCount: state.albums.length,
+                  artistCount: state.artists.length,
+                );
+              });
+            }
           },
         );
       },
@@ -323,12 +349,14 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   Future<void> _subscribeGenres() async {
+    final t = ++_genresToken;
     _genresSub?.cancel();
     removeFromComposite(_genresSub);
     final excluded = await _currentExcludedFolders();
-    if (isClosed) return;
+    if (isClosed || t != _genresToken) return;
     _genresSub = autoSub(
         _getGenresUseCase.watchGenres(excludedFolders: excluded), (result) {
+      if (isClosed || t != _genresToken) return;
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (genres) => safeEmit(state.copyWith(
@@ -338,12 +366,14 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   Future<void> _subscribeYears() async {
+    final t = ++_yearsToken;
     _yearsSub?.cancel();
     removeFromComposite(_yearsSub);
     final excluded = await _currentExcludedFolders();
-    if (isClosed) return;
+    if (isClosed || t != _yearsToken) return;
     _yearsSub = autoSub(_getYearsUseCase.watchYears(excludedFolders: excluded),
         (result) {
+      if (isClosed || t != _yearsToken) return;
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (years) => safeEmit(state.copyWith(
@@ -359,15 +389,17 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   void _subscribeDownloaded() {
+    final t = ++_downloadedToken;
     _downloadedSub?.cancel();
     removeFromComposite(_downloadedSub);
     final repo = _musicRepository;
     if (repo == null) return;
     () async {
       final excluded = await _currentExcludedFolders();
-      if (isClosed) return;
+      if (isClosed || t != _downloadedToken) return;
       _downloadedSub = autoSub(
           repo.watchDownloadedSongs(excludedFolders: excluded), (result) {
+        if (isClosed || t != _downloadedToken) return;
         result.fold(
           (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
           (songs) => safeEmit(state.copyWith(

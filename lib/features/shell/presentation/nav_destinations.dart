@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/utils/l10n_extensions.dart';
 
+@immutable
 class PulsrDestination {
   final int index;
   final IconData icon;
@@ -19,6 +20,37 @@ class PulsrDestination {
     required this.activeIcon,
     required this.label,
   });
+
+  /// Returns the appropriate icon for the current selection state.
+  IconData iconForState({required bool isSelected}) =>
+      isSelected ? activeIcon : icon;
+
+  PulsrDestination copyWith({
+    int? index,
+    IconData? icon,
+    IconData? activeIcon,
+    String? label,
+  }) {
+    return PulsrDestination(
+      index: index ?? this.index,
+      icon: icon ?? this.icon,
+      activeIcon: activeIcon ?? this.activeIcon,
+      label: label ?? this.label,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PulsrDestination &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          icon == other.icon &&
+          activeIcon == other.activeIcon &&
+          label == other.label;
+
+  @override
+  int get hashCode => Object.hash(index, icon, activeIcon, label);
 }
 
 /// The primary destinations, in dock order.

@@ -324,12 +324,12 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             .map((p) => OnlinePlaylistEntry.fromJson(p as Map<String, dynamic>))
             .toList();
         // B-19: Validate loaded custom playlists count <= 10 and tracks per playlist <= 50
-        if (rawCustomList.length > 10) {
+        if (rawCustomList.length > 50) {
           ErrorLogger.log(
-            'Loaded custom playlists exceeded cap of 10 (${rawCustomList.length}), truncating',
+            'Loaded custom playlists exceeded cap of 50 (${rawCustomList.length}), truncating',
             category: 'PlaylistCubit',
           );
-          rawCustomList = rawCustomList.take(10).toList();
+          rawCustomList = rawCustomList.take(50).toList();
         }
         final customPlaylists = rawCustomList.map((entry) {
           if (entry.tracks.length > 50) {
@@ -461,7 +461,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       final liked = onlineValue.likedTracks;
       final customs = onlineValue.customPlaylists;
       final cappedCustoms =
-          customs.length > 10 ? customs.sublist(customs.length - 10) : customs;
+          customs.length > 50 ? customs.sublist(customs.length - 50) : customs;
       final data = {
         'likedTracks': liked.take(200).map((t) => t.toJson()).toList(),
         'accountPlaylists':
@@ -908,9 +908,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         if (job.kind == OnlineLibraryKind.liked) {
           tracks =
               await account.fetchLikedSongs(maxTracks: kYtmMaxPlaylistTracks);
-          if (tracks.isNotEmpty) {
-            _setOnlineState((s) => s.copyWith(likedTracks: tracks));
-          }
+          _setOnlineState((s) => s.copyWith(likedTracks: tracks));
         } else {
           final details = await account.fetchPlaylistDetails(
             job.playlistId,
@@ -932,18 +930,16 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
         if (_disposed || isClosed || !account.isLoggedIn) break;
 
-        if (tracks.isNotEmpty) {
-          artworkUrl ??= tracks.firstOrNull?.artworkUrl;
-          await repo.cacheOnlinePlaylist(
-            playlistId: job.playlistId,
-            kind: job.kind,
-            title: title,
-            author: author,
-            artworkUrl: artworkUrl,
-            sortOrder: job.sortOrder,
-            tracks: tracks,
-          );
-        }
+        artworkUrl ??= tracks.firstOrNull?.artworkUrl;
+        await repo.cacheOnlinePlaylist(
+          playlistId: job.playlistId,
+          kind: job.kind,
+          title: title,
+          author: author,
+          artworkUrl: artworkUrl,
+          sortOrder: job.sortOrder,
+          tracks: tracks,
+        );
       } on YtmException catch (e, st) {
         ErrorLogger.log(
           'Online library cache failed for ${job.playlistId}: ${e.code}',
@@ -1026,12 +1022,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           ));
       if (tracks.isNotEmpty) {
         await _saveOnlineCache();
-        try {
-          final repo = getIt.isRegistered<IMusicRepository>()
-              ? getIt<IMusicRepository>()
-              : null;
-          await repo?.importOnlineTracksAsFavorites(tracks);
-        } catch (_) {}
+
       }
     } on YtmException catch (e) {
       if (_disposed || isClosed) return;
@@ -1110,8 +1101,14 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final input = urlOrId.trim();
     if (input.isEmpty) return Future.value();
 
+    final canonicalId = canonicalYtmPlaylistId(input);
+    final targetId = canonicalId.isNotEmpty ? canonicalId : input;
+
     // Prevent duplicate fetches (already saved).
-    if (onlineState.customPlaylists.any((p) => p.id == input)) {
+    if (onlineState.customPlaylists.any((p) =>
+        p.id == input ||
+        p.id == targetId ||
+        (canonicalId.isNotEmpty && canonicalYtmPlaylistId(p.id) == canonicalId))) {
       return Future.value();
     }
     // Two rapid submits both pass the check above before the first await, so
@@ -1240,10 +1237,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     }
   }
 
-  Future<void> _clearCachedOnlineLibrary() async {
+  Future<void> _clearCachedOnlineLibrary({bool onlyAccount = false}) async {
     if (!getIt.isRegistered<IMusicRepository>()) return;
     try {
-      await getIt<IMusicRepository>().clearOnlineLibraryCache();
+      await getIt<IMusicRepository>().clearOnlineLibraryCache(onlyAccount: onlyAccount);
     } catch (e, st) {
       ErrorLogger.log('Failed to clear cached online library',
           error: e, stackTrace: st, category: 'PlaylistCubit');
@@ -1272,6 +1269,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           accountError: null,
         ));
     unawaited(_saveOnlineCache());
+    unawaited(_clearCachedOnlineLibrary(onlyAccount: true));
   }
 
   /// Resets all online playlist state (liked + fetched list) and drops the

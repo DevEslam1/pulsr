@@ -1964,15 +1964,50 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<void>> clearOnlineLibraryCache() async {
+  Future<Result<void>> clearOnlineLibraryCache(
+      {bool onlyAccount = false}) async {
     try {
       await _db.transaction(() async {
-        await _db.delete(_db.onlinePlaylistEntriesTable).go();
-        await _db.delete(_db.onlinePlaylistsTable).go();
+        if (onlyAccount) {
+          final accountPlaylists = await (_db.select(_db.onlinePlaylistsTable)
+                ..where((t) => t.kind.isIn(
+                    [OnlineLibraryKind.account, OnlineLibraryKind.liked])))
+              .get();
+          final ids = accountPlaylists.map((p) => p.playlistId).toList();
+          if (ids.isNotEmpty) {
+            await (_db.delete(_db.onlinePlaylistEntriesTable)
+                  ..where((t) => t.playlistId.isIn(ids)))
+                .go();
+            await (_db.delete(_db.onlinePlaylistsTable)
+                  ..where((t) => t.playlistId.isIn(ids)))
+                .go();
+          }
+        } else {
+          await _db.delete(_db.onlinePlaylistEntriesTable).go();
+          await _db.delete(_db.onlinePlaylistsTable).go();
+        }
       });
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to clear online library cache', e));
+    }
+  }
+
+  @override
+  Future<Result<int>> getTotalSongCount({List<String>? excludedFolders}) async {
+    try {
+      final countExp = _db.songsTable.id.count();
+      final query = _db.selectOnly(_db.songsTable)
+        ..addColumns([countExp])
+        ..where(_db.songsTable.isMissing.equals(false) &
+            (_db.songsTable.cueFile.isNull() |
+                _db.songsTable.cueStartMs.isNotNull()) &
+            _notInExcludedFolders(excludedFolders ?? const []));
+
+      final row = await query.getSingle();
+      return Right(row.read(countExp) ?? 0);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to get song count', e));
     }
   }
 
