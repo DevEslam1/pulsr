@@ -7,7 +7,9 @@
 
 #if defined(__linux__) || defined(__ANDROID__)
 #include <linux/usbdevice_fs.h>
+#include <poll.h>
 #include <sys/ioctl.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #else
 // Non-Linux mock definitions for host compilation and tests
@@ -503,19 +505,44 @@ void UsbAudioSink::releaseResources() {
 }
 
 void UsbAudioSink::workerLoop() {
+#if defined(__linux__) || defined(__ANDROID__)
+    // Java's Process.THREAD_PRIORITY_URGENT_AUDIO is nice -19. usbfs URB
+    // completion latency is directly in the playback path; best effort because
+    // some kernels refuse the negative nice for app threads.
+    setpriority(PRIO_PROCESS, 0, -19);
+#endif
     const int frameBytes = channels_ * bytesPerSample_;
+    int repeatedReadyPolls = 0;
     while (running_.load(std::memory_order_acquire)) {
         struct usbdevfs_urb* urb = nullptr;
         int r = ioctl(fd_, USBDEVFS_REAPURBNDELAY, &urb);
         if (r < 0) {
             if (errno == EAGAIN || errno == EINPROGRESS) {
+#if defined(__linux__) || defined(__ANDROID__)
+                // Block until a URB completes (or 5 ms, keeping running_
+                // responsive) instead of spinning on a 1 ms sleep.
+                struct pollfd pfd{};
+                pfd.fd = fd_;
+                pfd.events = POLLOUT;
+                const int polled = poll(&pfd, 1, 5);
+                if (polled > 0 && (pfd.revents & POLLOUT) != 0) {
+                    // Some kernels report usbfs fds as always writable. Bail
+                    // out to a short sleep if that produces no completions.
+                    if (++repeatedReadyPolls < 8) continue;
+                }
+                repeatedReadyPolls = 0;
+                if (polled < 0 && errno == EINTR) continue;
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
+#else
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+#endif
                 continue;
             }
             // ESHUTDOWN / ENOENT / device gone: stop cleanly.
             lastError_.store(errno, std::memory_order_release);
             break;
         }
+        repeatedReadyPolls = 0;
         if (urb == nullptr) continue;
 
         // FIX 2: a reaped IN URB (endpoint bit 7 set) is an async feedback

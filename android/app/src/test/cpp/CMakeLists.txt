@@ -85,6 +85,9 @@ endfunction()
 pulsr_add_test(test_native_all ${DSP_SRCS})
 pulsr_add_test(test_dsp_stress ${DSP_SRCS})
 pulsr_add_test(test_bypass_transparency ${DSP_SRCS})
+pulsr_add_test(test_safety_bypass ${DSP_SRCS})
+pulsr_add_test(test_aaudio_sink_support)
+pulsr_add_test(test_ir_bounds)
 
 # ConvolutionReverb resamples its wet path above 48 kHz, so it never links alone.
 set(REVERB_SRCS
@@ -98,6 +101,8 @@ pulsr_add_test(test_reverb_fft ${REVERB_SRCS})
 
 pulsr_add_test(test_dsd_dc_soak ${MAIN_CPP}/DsdDecoder.cpp)
 pulsr_add_test(test_dsd_decoder_correctness ${MAIN_CPP}/DsdDecoder.cpp)
+pulsr_add_test(test_dsd_dynamic_cic ${MAIN_CPP}/DsdDecoder.cpp)
+pulsr_add_test(test_engine_registry ${DSP_SRCS})
 
 pulsr_add_test(test_limiter_true_peak ${MAIN_CPP}/LookaheadLimiter.cpp)
 

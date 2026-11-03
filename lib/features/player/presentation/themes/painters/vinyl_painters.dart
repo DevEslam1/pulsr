@@ -81,6 +81,9 @@ class _VinylGroovesPainter extends CustomPainter {
 /// to the vinyl annulus so the centre label stays untouched.
 class _VinylSheenPainter extends CustomPainter {
   final double labelRatio;
+  Path? _cachedClipPath;
+  Paint? _cachedSheenPaint;
+  Size? _lastSize;
 
   _VinylSheenPainter({this.labelRatio = 0.44});
 
@@ -88,29 +91,34 @@ class _VinylSheenPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final outer = Path()
-      ..addOval(Rect.fromCircle(center: center, radius: radius - 4));
-    final inner = Path()
-      ..addOval(Rect.fromCircle(center: center, radius: radius * labelRatio));
+
+    if (_cachedClipPath == null || _lastSize != size) {
+      _lastSize = size;
+      final outer = Path()
+        ..addOval(Rect.fromCircle(center: center, radius: radius - 4));
+      final inner = Path()
+        ..addOval(Rect.fromCircle(center: center, radius: radius * labelRatio));
+      _cachedClipPath = Path.combine(PathOperation.difference, outer, inner);
+
+      _cachedSheenPaint = Paint()
+        ..shader = SweepGradient(
+          center: Alignment.center,
+          colors: [
+            AppColors.specularAt(0.0),
+            AppColors.specularAt(0.09),
+            AppColors.specularAt(0.0),
+            AppColors.specularAt(0.0),
+            AppColors.specularAt(0.09),
+            AppColors.specularAt(0.0),
+          ],
+          stops: const [0.0, 0.22, 0.44, 0.50, 0.72, 0.94],
+        ).createShader(Rect.fromCircle(center: center, radius: radius))
+        ..blendMode = BlendMode.screen;
+    }
 
     canvas.save();
-    canvas.clipPath(Path.combine(PathOperation.difference, outer, inner));
-
-    final sheenPaint = Paint()
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        colors: [
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.08),
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.08),
-          AppColors.specularAt(0.0),
-        ],
-        stops: const [0.0, 0.22, 0.44, 0.50, 0.72, 0.94],
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..blendMode = BlendMode.screen;
-    canvas.drawCircle(center, radius - 4, sheenPaint);
+    canvas.clipPath(_cachedClipPath!);
+    canvas.drawCircle(center, radius - 4, _cachedSheenPaint!);
     canvas.restore();
   }
 

@@ -1,30 +1,52 @@
 package com.pulsr.music
 
-import android.util.Log
-import org.json.JSONObject
+import android.content.Context
+import android.net.ConnectivityManager
 import java.net.HttpURLConnection
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.URL
-import java.util.concurrent.ConcurrentHashMap
+import java.net.URLEncoder
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
+import org.json.JSONObject
 
 /**
- * Layer 4: Native DNS-over-HTTPS (DoH) Resolver.
+ * Layer 4: Native DNS-over-HTTPS (DoH) resolver.
  *
  * Fallback resolver using Cloudflare (1.1.1.1) and Google (8.8.8.8) DoH APIs
- * when system DNS returns NXDOMAIN or poisoned records.
- * Strictly generic in src/main.
+ * when system DNS returns NXDOMAIN or poisoned records. Strictly generic.
  */
 object DnsOverHttpsResolver {
-    private const val TAG = "DnsOverHttpsResolver"
-    private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
+    private const val CACHE_TTL_MS = 5 * 60 * 1000L
+    private const val NEGATIVE_TTL_MS = 30_000L
     private const val MAX_CACHE_SIZE = 256
+    private const val HARD_DEADLINE_MS = 3000L
+    private const val QUERY_TIMEOUT_MS = 1500
+
+    private data class CacheEntry(val addresses: List<InetAddress>, val expiresAt: Long)
 
     private val cacheLock = Any()
-    private val dnsCache = object : LinkedHashMap<String, Pair<InetAddress, Long>>(MAX_CACHE_SIZE, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<InetAddress, Long>>?): Boolean {
+    private val dnsCache = object : LinkedHashMap<String, CacheEntry>(MAX_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CacheEntry>?): Boolean {
             return size > MAX_CACHE_SIZE
         }
     }
+
+    private val executor = Executors.newFixedThreadPool(4)
+
+    @Volatile
+    private var appContext: Context? = null
+
+    /** Called once at engine attach; only used for IPv4/IPv6 ordering. */
+    fun initialize(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    private fun now(): Long = System.currentTimeMillis()
 
     private fun isNumericIp(ip: String): Boolean {
         val parts = ip.split('.')
@@ -40,96 +62,162 @@ object DnsOverHttpsResolver {
         return false
     }
 
-    private fun putInCache(hostname: String, address: InetAddress, ttlSeconds: Long, now: Long) {
-        val ttlMs = (ttlSeconds * 1000L).coerceIn(30_000L, CACHE_TTL_MS)
-        synchronized(cacheLock) {
-            dnsCache[hostname] = address to (now + ttlMs)
+    private fun cached(hostname: String): CacheEntry? {
+        val at = now()
+        return synchronized(cacheLock) {
+            val entry = dnsCache[hostname]
+            if (entry != null && at < entry.expiresAt) {
+                entry
+            } else {
+                if (entry != null) dnsCache.remove(hostname)
+                null
+            }
         }
     }
 
-    fun resolve(hostname: String): InetAddress? {
-        val now = System.currentTimeMillis()
-        val cached = synchronized(cacheLock) {
-            dnsCache[hostname]?.let { entry ->
-                if (now < entry.second) {
-                    entry.first
-                } else {
-                    dnsCache.remove(hostname)
-                    null
+    private fun putInCache(hostname: String, addresses: List<InetAddress>, ttlMillis: Long) {
+        val ttl = ttlMillis.coerceIn(NEGATIVE_TTL_MS, CACHE_TTL_MS)
+        synchronized(cacheLock) {
+            dnsCache[hostname] = CacheEntry(addresses, now() + ttl)
+        }
+    }
+
+    fun resolve(hostname: String): InetAddress? = resolveAll(hostname).firstOrNull()
+
+    /**
+     * Resolves every address for [hostname] (A + AAAA in parallel). Positive
+     * and negative answers are cached; the whole lookup is bounded by a ~3 s
+     * deadline so a dead DoH endpoint cannot stall playback.
+     */
+    fun resolveAll(hostname: String): List<InetAddress> {
+        cached(hostname)?.let { return orderAddresses(it.addresses) }
+
+        val deadline = now() + HARD_DEADLINE_MS
+        val answers = java.util.concurrent.ConcurrentLinkedQueue<Pair<InetAddress, Long>>()
+        val minTtl = AtomicLong(Long.MAX_VALUE)
+
+        fun collect(results: List<Pair<InetAddress, Long>>) {
+            for (answer in results) {
+                answers.add(answer)
+                minTtl.accumulateAndGet(answer.second) { a, b -> minOf(a, b) }
+            }
+        }
+
+        collect(queryBoth("https://1.1.1.1/dns-query", hostname, deadline))
+        if (answers.isEmpty() && now() < deadline) {
+            collect(queryBoth("https://dns.google/resolve", hostname, deadline))
+        }
+
+        val addresses = answers.map { it.first }
+            .distinctBy { it.hostAddress }
+        if (addresses.isEmpty()) {
+            putInCache(hostname, emptyList(), NEGATIVE_TTL_MS)
+            return emptyList()
+        }
+
+        val ttl = if (minTtl.get() == Long.MAX_VALUE) NEGATIVE_TTL_MS
+        else (minTtl.get() * 1000L).coerceIn(NEGATIVE_TTL_MS, CACHE_TTL_MS)
+        putInCache(hostname, addresses, ttl)
+        return orderAddresses(addresses)
+    }
+
+    /** Runs A and AAAA queries concurrently; waits until both finish or the deadline passes. */
+    private fun queryBoth(
+        baseUrl: String,
+        hostname: String,
+        deadline: Long,
+    ): List<Pair<InetAddress, Long>> {
+        val results = ConcurrentLinkedQueue<Pair<InetAddress, Long>>()
+        val latch = CountDownLatch(2)
+        for (recordType in listOf("A", "AAAA")) {
+            executor.execute {
+                try {
+                    val remaining = deadline - now()
+                    if (remaining > 0) {
+                        val timeout = minOf(QUERY_TIMEOUT_MS.toLong(), remaining).toInt()
+                        results.addAll(queryDoH(baseUrl, hostname, recordType, timeout))
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    latch.countDown()
                 }
             }
         }
-        if (cached != null) {
-            return cached
+        try {
+            latch.await((deadline - now()).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
         }
-
-        // Try Cloudflare DoH first (A, then AAAA)
-        val cfResolved = resolveViaCloudflare(hostname)
-        if (cfResolved != null) {
-            putInCache(hostname, cfResolved.first, cfResolved.second, now)
-            return cfResolved.first
-        }
-
-        // Fallback to Google DoH (A, then AAAA)
-        val googleResolved = resolveViaGoogle(hostname)
-        if (googleResolved != null) {
-            putInCache(hostname, googleResolved.first, googleResolved.second, now)
-            return googleResolved.first
-        }
-
-        return null
+        return results.toList()
     }
 
-    private fun queryDoH(baseUrl: String, hostname: String, recordType: String): Pair<InetAddress, Long>? {
-        return runCatching {
-            val url = URL("$baseUrl?name=$hostname&type=$recordType")
-            // Bypass proxy — DoH must reach the resolver even when a custom
+    private fun queryDoH(
+        baseUrl: String,
+        hostname: String,
+        recordType: String,
+        timeoutMs: Int,
+    ): List<Pair<InetAddress, Long>> {
+        if (timeoutMs <= 0) return emptyList()
+        var conn: HttpURLConnection? = null
+        return try {
+            val encodedName = URLEncoder.encode(hostname, "UTF-8")
+            val url = URL("$baseUrl?name=$encodedName&type=$recordType")
+            // Bypass proxy: DoH must reach the resolver even when a custom
             // proxy is dead, otherwise a bad proxy loops into DoH failure.
-            val conn = url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
-            try {
-                conn.setRequestProperty("Accept", "application/dns-json")
-                conn.connectTimeout = 1500
-                conn.readTimeout = 1500
-                conn.requestMethod = "GET"
+            conn = url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
+            conn.setRequestProperty("Accept", "application/dns-json")
+            conn.connectTimeout = timeoutMs
+            conn.readTimeout = timeoutMs
+            conn.requestMethod = "GET"
 
-                if (conn.responseCode == 200) {
-                    val json = conn.inputStream.bufferedReader().use { it.readText() }
-                    val root = JSONObject(json)
-                    val status = root.optInt("Status", -1)
-                    if (status != 0) {
-                        return@runCatching null
-                    }
-                    val answers = root.optJSONArray("Answer")
-                    if (answers != null && answers.length() > 0) {
-                        for (i in 0 until answers.length()) {
-                            val ans = answers.getJSONObject(i)
-                            val type = ans.optInt("type")
-                            val ttl = ans.optLong("TTL", 0L)
-                            if (ttl <= 0L) continue
-                            // Type 1 = A, Type 28 = AAAA
-                            if (type == 1 || type == 28) {
-                                val ip = ans.optString("data")
-                                if (ip.isNotEmpty() && isNumericIp(ip)) {
-                                    return@runCatching (InetAddress.getByName(ip) to ttl)
-                                }
+            val out = mutableListOf<Pair<InetAddress, Long>>()
+            if (conn.responseCode == 200) {
+                val json = conn.inputStream.bufferedReader().use { it.readText() }
+                val root = JSONObject(json)
+                if (root.optInt("Status", -1) == 0) {
+                    val answers = root.optJSONArray("Answer") ?: return emptyList()
+                    for (i in 0 until answers.length()) {
+                        val ans = answers.getJSONObject(i)
+                        val type = ans.optInt("type")
+                        val ttl = ans.optLong("TTL", 0L)
+                        if (ttl <= 0L) continue
+                        if (type == 1 || type == 28) {
+                            val ip = ans.optString("data")
+                            if (ip.isNotEmpty() && isNumericIp(ip)) {
+                                out.add(InetAddress.getByName(ip) to ttl)
                             }
                         }
                     }
                 }
-                null
-            } finally {
-                conn.disconnect()
             }
-        }.getOrNull()
+            out
+        } catch (_: Exception) {
+            emptyList()
+        } finally {
+            conn?.disconnect()
+        }
     }
 
-    private fun resolveViaCloudflare(hostname: String): Pair<InetAddress, Long>? {
-        return queryDoH("https://1.1.1.1/dns-query", hostname, "A")
-            ?: queryDoH("https://1.1.1.1/dns-query", hostname, "AAAA")
+    /**
+     * IPv4 first on a dual-stack network; IPv6 first only when the active
+     * network has no IPv4 address at all.
+     */
+    private fun orderAddresses(addresses: List<InetAddress>): List<InetAddress> {
+        if (addresses.size < 2) return addresses
+        val v4 = addresses.filter { it is Inet4Address }
+        val v6 = addresses.filter { it !is Inet4Address }
+        if (v4.isEmpty() || v6.isEmpty()) return addresses
+        return if (activeNetworkHasIpv4()) v4 + v6 else v6 + v4
     }
 
-    private fun resolveViaGoogle(hostname: String): Pair<InetAddress, Long>? {
-        return queryDoH("https://dns.google/resolve", hostname, "A")
-            ?: queryDoH("https://dns.google/resolve", hostname, "AAAA")
+    private fun activeNetworkHasIpv4(): Boolean {
+        val ctx = appContext ?: return true
+        return runCatching {
+            val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return@runCatching true
+            val network = cm.activeNetwork ?: return@runCatching true
+            val link = cm.getLinkProperties(network) ?: return@runCatching true
+            link.linkAddresses.any { it.address is Inet4Address }
+        }.getOrDefault(true)
     }
 }

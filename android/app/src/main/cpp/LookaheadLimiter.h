@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <cassert>
 #include <atomic>
+#include <cstring>
+#include <iterator>
 
 class LookaheadLimiter {
 public:
@@ -22,14 +24,17 @@ public:
     static constexpr int INTERP_TAPS = 48;
     static constexpr int INTERP_PHASES = 4;
     static constexpr int TAPS_PER_PHASE = INTERP_TAPS / INTERP_PHASES; // 12
-    // Group delay of the 12-tap BS.1770 true-peak FIR: peak interpolation is centered at history[5..6]
-    static constexpr int FILTER_DELAY = (TAPS_PER_PHASE / 2) - 1; // 5 samples
+    // The true-peak interpolation is centered between history[5] and history[6]
+    // (i.e. 5..6 samples behind the write head). The output delay is
+    // lookaheadSamples_ + FILTER_DELAY; the gain deque window (lookahead + 2)
+    // keeps the min-gain entry alive until the detected peak leaves readIdx.
+    static constexpr int FILTER_DELAY = 6;
 
     LookaheadLimiter();
     void setSampleRate(double sampleRate);
     void configure(double lookaheadMs, double thresholdDb, double releaseMs, bool truePeakMode = true);
     void setEnabled(bool enabled);
-    bool isEnabled() const { return enabled_; }
+    bool isEnabled() const { return enabled_.load(std::memory_order_relaxed); }
     void applyParams(const LimiterParamSet& params);
     void reset();
 
@@ -39,14 +44,31 @@ public:
     // lookahead latency abruptly (a 5 ms time jump at the output).
     void setProcessingActive(bool active);
     bool isDraining() const {
-        return bypassPending_ || (bypassTarget_ == 0.0f && bypassMix_ > 0.0f);
+        return bypassPending_ ||
+               (bypassTarget_.load(std::memory_order_relaxed) == 0.0f &&
+                bypassMix_.load(std::memory_order_relaxed) > 0.0f);
     }
 
     // Read from the control thread (getPipelineLatencyFrames) while the audio
-    // thread writes lookaheadSamples_ in configure(); mirror it to an atomic so
-    // the query never races the audio thread.
-    int getLatencyFrames() const { return latencyFramesAtomic_.load(std::memory_order_relaxed); }
+    // thread writes lookaheadSamples_ in configure(); the mirror is atomic so
+    // the query never races the render thread. A fully bypassed/dormant stage
+    // reports zero latency.
+    int getLatencyFrames() const {
+        if (!enabled_.load(std::memory_order_relaxed) ||
+            (bypassTarget_.load(std::memory_order_relaxed) == 0.0f &&
+             bypassMix_.load(std::memory_order_relaxed) <= 0.0f)) {
+            return 0;
+        }
+        return latencyFramesAtomic_.load(std::memory_order_relaxed);
+    }
     float getCurrentGainReductionDb() const { return gainReductionDb_.load(std::memory_order_relaxed); }
+
+    /** Sample index of the min-gain entry at the deque head. */
+    int64_t getMinGainSampleIndex() const {
+        constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
+        return (dequeTail_ > dequeHead_) ? deque_[dequeHead_ & kMask].idx
+                                         : sampleCount_ - 1;
+    }
 
     void process(float* L, float* R, int frames);
     void processMono(float* inOut, int frames);
@@ -61,7 +83,7 @@ private:
     double thresholdDb_ = -0.2;
     double releaseMs_ = 50.0;
     bool truePeakMode_ = true;
-    bool enabled_ = false;
+    std::atomic<bool> enabled_{false};
 
     std::atomic<bool> paramsChanged_{false};
     LimiterParamSet pendingParams_;
@@ -75,6 +97,11 @@ private:
     float avgEnergy_ = 0.0f;
     float transientWeight_ = 0.0f;
     float envelope_ = 1.0f;
+    // Earliest output index of a peak the current attack ramp must cover. When
+    // a newer, lower target arrives while already attacking, the deadline is
+    // kept so the earlier peak cannot slip over the ceiling.
+    int64_t attackDeadlineIdx_ = 0;
+    bool attackActive_ = false;
     std::atomic<float> gainReductionDb_{0.0f};
 
     static constexpr int MAX_CHANNELS = 8;
@@ -98,8 +125,8 @@ private:
     // inserted after being dormant the mix ramps up so stale delay-line
     // contents never leak into the output; when it is removed the mix ramps
     // down over one lookahead window so the latency change is inaudible.
-    float bypassMix_ = 1.0f;
-    float bypassTarget_ = 1.0f;
+    std::atomic<float> bypassMix_{1.0f};
+    std::atomic<float> bypassTarget_{1.0f};
     int bypassHoldRemaining_ = 0;
     bool enableFading_ = false;
     bool bypassPending_ = false;
@@ -112,6 +139,8 @@ private:
         sampleCount_ = 0;
         envelope_ = 1.0f;
         minGain_ = 1.0f;
+        attackDeadlineIdx_ = 0;
+        attackActive_ = false;
         avgEnergy_ = 0.0f;
         transientWeight_ = 0.0f;
         gainReductionDb_.store(0.0f, std::memory_order_relaxed);
@@ -119,14 +148,18 @@ private:
 
     void beginEnableTransition() {
         resetTransientState();
-        // The first lookahead window of the delay line still holds samples
-        // from before the bypass. Keep outputting the current input, scaled by
-        // the limiter's instantaneous gain, until those slots are overwritten,
-        // then crossfade to the fresh delayed stream. Muting would click and
-        // replaying the stale delay line would leak old audio.
+        // Discard every sample/state from the previous session: a stale delay
+        // line would convolve old audio with the new stream, and stale gainBuf_
+        // entries could keep the envelope pinned low after re-enable.
+        std::memset(delayBuf_, 0, sizeof(delayBuf_));
+        std::fill(std::begin(gainBuf_), std::end(gainBuf_), 1.0f);
+        std::memset(deque_, 0, sizeof(deque_));
+        // Keep outputting the current input, scaled by the limiter's
+        // instantaneous gain, until the window is fresh, then crossfade to the
+        // delayed stream.
         bypassHoldRemaining_ = lookaheadSamples_ + FILTER_DELAY;
-        bypassMix_ = 0.0f;
-        bypassTarget_ = 1.0f;
+        bypassMix_.store(0.0f, std::memory_order_relaxed);
+        bypassTarget_.store(1.0f, std::memory_order_relaxed);
         enableFading_ = true;
         bypassPending_ = false;
         disabledSinceProcess_ = false;
@@ -137,17 +170,24 @@ private:
     inline float advanceBypassMix() {
         const int window = std::max(1, lookaheadSamples_ + FILTER_DELAY);
         const float step = 1.0f / static_cast<float>(window);
-        if (bypassMix_ < bypassTarget_) {
-            bypassMix_ = std::min(bypassTarget_, bypassMix_ + step);
-        } else if (bypassMix_ > bypassTarget_) {
-            bypassMix_ = std::max(bypassTarget_, bypassMix_ - step);
+        const float target = bypassTarget_.load(std::memory_order_relaxed);
+        float mix = bypassMix_.load(std::memory_order_relaxed);
+        if (mix < target) {
+            mix = std::min(target, mix + step);
+        } else if (mix > target) {
+            mix = std::max(target, mix - step);
         }
-        return bypassMix_;
+        bypassMix_.store(mix, std::memory_order_relaxed);
+        return mix;
     }
 
     inline void pushGainDeque(float gain, int64_t idx, int windowSize) {
         constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
-        while (dequeTail_ > dequeHead_ && deque_[(dequeTail_ - 1) & kMask].gain >= gain) {
+        // Strict '>': keep the OLDEST entry among equal gains. Popping equals
+        // would move the head to the newest sample each block and reset the
+        // attack ramp's remaining time, turning the intended linear ramp into
+        // an exponential approach that never reaches target before the peak.
+        while (dequeTail_ > dequeHead_ && deque_[(dequeTail_ - 1) & kMask].gain > gain) {
             dequeTail_--;
         }
         deque_[dequeTail_ & kMask] = { gain, idx };

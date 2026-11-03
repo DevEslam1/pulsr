@@ -47,6 +47,9 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        // registerWith() already bound this plugin for the cached audio_service
+        // engine; a second registration would duplicate the channel handler.
+        if (::channel.isInitialized) return
         context = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
@@ -86,9 +89,9 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         mainHandler.post {
             if (context == null) return@post
             if (!::channel.isInitialized) return@post
-            try {
+            safeCall("YtDownloadPlugin", method) {
                 channel.invokeMethod(method, arguments)
-            } catch (_: Exception) {}
+            }
         }
     }
 
@@ -160,24 +163,28 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 // thread (jank, and an ANR when the file is slow to write), so
                 // it moves to a worker and the outcome is delivered back on the
                 // platform thread — which is where `result` must be invoked.
-                saveExecutor.execute {
-                    try {
-                        val saved = saveToMediaStore(currentContext, source, displayName, title, mimeType)
-                        mainHandler.post {
-                            if (saved != null) {
-                                result.success(mapOf(
-                                    "path" to saved.path,
-                                    "contentUri" to saved.contentUri,
-                                ))
-                            } else {
-                                result.error("SAVE_FAILED", "MediaStore did not return a path", null)
+                try {
+                    saveExecutor.execute {
+                        try {
+                            val saved = saveToMediaStore(currentContext, source, displayName, title, mimeType)
+                            mainHandler.post {
+                                if (saved != null) {
+                                    result.success(mapOf(
+                                        "path" to saved.path,
+                                        "contentUri" to saved.contentUri,
+                                    ))
+                                } else {
+                                    result.error("SAVE_FAILED", "MediaStore did not return a path", null)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            mainHandler.post {
+                                result.error("SAVE_FAILED", e.localizedMessage ?: "Unknown error", e.stackTraceToString())
                             }
                         }
-                    } catch (e: Exception) {
-                        mainHandler.post {
-                            result.error("SAVE_FAILED", e.localizedMessage ?: "Unknown error", e.stackTraceToString())
-                        }
                     }
+                } catch (_: java.util.concurrent.RejectedExecutionException) {
+                    result.error("PLUGIN_DISPOSED", "Download plugin is shutting down", null)
                 }
             }
             "deleteFromMusic" -> {
@@ -187,15 +194,19 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     result.error("INVALID_ARGUMENT", "path or contentUri is required", null)
                     return
                 }
-                saveExecutor.execute {
-                    try {
-                        val deleted = deleteFromMusic(currentContext, path, contentUri)
-                        mainHandler.post { result.success(deleted) }
-                    } catch (e: Exception) {
-                        mainHandler.post {
-                            result.error("DELETE_FAILED", e.localizedMessage ?: "Unknown error", null)
+                try {
+                    saveExecutor.execute {
+                        try {
+                            val deleted = deleteFromMusic(currentContext, path, contentUri)
+                            mainHandler.post { result.success(deleted) }
+                        } catch (e: Exception) {
+                            mainHandler.post {
+                                result.error("DELETE_FAILED", e.localizedMessage ?: "Unknown error", null)
+                            }
                         }
                     }
+                } catch (_: java.util.concurrent.RejectedExecutionException) {
+                    result.error("PLUGIN_DISPOSED", "Download plugin is shutting down", null)
                 }
             }
             "getFreeDiskSpace" -> {
@@ -355,6 +366,24 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         return deleted
     }
 
+    internal fun sanitizeDisplayName(raw: String): String {
+        var name = raw.trim()
+            .replace('/', '_')
+            .replace('\\', '_')
+        while (name.contains("..")) {
+            name = name.replace("..", "_")
+        }
+        name = name.filterNot { it.isISOControl() }.trim().trim('.')
+        if (name.isEmpty()) return "audio"
+        if (name.length > 120) {
+            val dot = name.lastIndexOf('.')
+            val extension = if (dot > 0 && name.length - dot <= 10) name.substring(dot) else ""
+            val base = if (dot > 0) name.substring(0, dot) else name
+            name = base.take((120 - extension.length).coerceAtLeast(1)) + extension
+        }
+        return name
+    }
+
     private fun saveToMediaStore(
         context: Context,
         source: File,
@@ -363,9 +392,12 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         mimeType: String,
     ): SavedAudio? {
         val resolver = context.contentResolver
+        // MediaStore treats DISPLAY_NAME as a filename. A separator or ".."
+        // from the caller could escape Music/ or create hidden/odd entries.
+        val safeDisplayName = sanitizeDisplayName(displayName)
 
         val lowerMime = mimeType.trim().lowercase()
-        val lowerName = displayName.trim().lowercase()
+        val lowerName = safeDisplayName.trim().lowercase()
 
         val cleanDisplayName: String
         val resolvedMimeType: String
@@ -374,7 +406,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             lowerMime.contains("webm") || lowerName.endsWith(".webm") || lowerName.endsWith(".webm.oga") -> {
                 // If it is an Opus stream in WebM container, save with clean .opus extension
                 // and audio/opus on Q+ (or .ogg and audio/ogg on pre-Q) so Android MediaProvider does not append .oga
-                val base = displayName.replace(Regex("""\.(webm|oga)+$""", RegexOption.IGNORE_CASE), "")
+                val base = safeDisplayName.replace(Regex("""\.(webm|oga)+$""", RegexOption.IGNORE_CASE), "")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     cleanDisplayName = "$base.opus"
                     resolvedMimeType = "audio/opus"
@@ -384,16 +416,16 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 }
             }
             lowerMime.contains("ogg") || lowerName.endsWith(".ogg") || lowerName.endsWith(".oga") -> {
-                val base = displayName.replace(Regex("""\.(ogg|oga)+$""", RegexOption.IGNORE_CASE), "")
+                val base = safeDisplayName.replace(Regex("""\.(ogg|oga)+$""", RegexOption.IGNORE_CASE), "")
                 cleanDisplayName = "$base.ogg"
                 resolvedMimeType = "audio/ogg"
             }
             lowerMime.contains("mp4") || lowerMime.contains("m4a") || lowerName.endsWith(".m4a") -> {
-                cleanDisplayName = displayName
+                cleanDisplayName = safeDisplayName
                 resolvedMimeType = "audio/mp4"
             }
             else -> {
-                cleanDisplayName = displayName
+                cleanDisplayName = safeDisplayName
                 resolvedMimeType = mimeType
             }
         }
@@ -417,12 +449,23 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 if (!copied) {
                     return null
                 }
-                success = true
 
-                // Best-effort clear IS_PENDING
-                runCatching {
-                    resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
+                // Publish the row. If IS_PENDING cannot be cleared the file is
+                // invisible to other apps, so drop the row instead of leaving a
+                // permanently pending, undeletable ghost.
+                val pendingCleared = runCatching {
+                    resolver.update(
+                        uri,
+                        ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) },
+                        null,
+                        null
+                    ) > 0
+                }.getOrDefault(false)
+                if (!pendingCleared) {
+                    runCatching { resolver.delete(uri, null, null) }
+                    return null
                 }
+                success = true
 
                 var path: String? = null
                 resolver.query(uri, arrayOf(MediaStore.Audio.Media.DATA), null, null, null)?.use { c ->

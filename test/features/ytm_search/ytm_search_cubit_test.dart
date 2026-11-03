@@ -65,20 +65,23 @@ void main() {
   });
 
   group('SearchPhase getter', () {
-    test('reports error, fetching, displaying and debouncing', () {
+    test('reports error, fetching, displaying, noResults and debouncing', () {
       const withError = YtmSearchState(query: 'x', errorMessage: 'boom');
       expect(withError.phase, SearchPhase.error);
       expect(const YtmSearchState(query: 'x', isLoading: true).phase,
           SearchPhase.fetching);
       expect(YtmSearchState(query: 'x', results: [_track('aaaaaaaaaaa')]).phase,
           SearchPhase.displaying);
+      expect(const YtmSearchState(query: 'x', hasSearched: true).phase,
+          SearchPhase.noResults);
       expect(const YtmSearchState(query: 'x').phase, SearchPhase.debouncing);
       expect(const YtmSearchState().phase, SearchPhase.idle);
       expect(const YtmSearchState(errorMessage: '').phase, SearchPhase.idle);
     });
 
-    test('isTerminal only for displaying and error', () {
+    test('isTerminal for displaying, noResults and error', () {
       expect(SearchPhase.displaying.isTerminal, isTrue);
+      expect(SearchPhase.noResults.isTerminal, isTrue);
       expect(SearchPhase.error.isTerminal, isTrue);
       expect(SearchPhase.idle.isTerminal, isFalse);
       expect(SearchPhase.debouncing.isTerminal, isFalse);
@@ -177,8 +180,8 @@ void main() {
   });
 
   group('search success & history', () {
-    test('saves a successful query to history and pref list', () async {
-      when(() => service.searchWithFallback(any()))
+    test('does not save typing fragments during debounced search', () async {
+      when(() => service.searchWithFallback(any(), limit: any(named: 'limit')))
           .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
 
       final cubit = build();
@@ -187,35 +190,23 @@ void main() {
       await pumpEventQueue();
 
       final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList('ytm_search_history'), isNull);
+    });
+
+    test('saves on explicit commitQuery', () async {
+      final cubit = build();
+      await cubit.commitQuery('Rick Astley');
+
+      final prefs = await SharedPreferences.getInstance();
       expect(
           prefs.getStringList('ytm_search_history'), contains('Rick Astley'));
       expect(cubit.historyNotifier.value, contains('Rick Astley'));
     });
 
-    test('does not save when the search returns no results', () async {
-      when(() => service.searchWithFallback(any()))
-          .thenAnswer((_) async => const []);
-
-      final cubit = build();
-      cubit.onQueryChanged('empty query');
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      await pumpEventQueue();
-
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getStringList('ytm_search_history'), isNull);
-    });
-
     test('de-dupes case-insensitively, keeping the newest casing', () async {
-      when(() => service.searchWithFallback(any()))
-          .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
-
       final cubit = build();
-      cubit.onQueryChanged('beatles');
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      await pumpEventQueue();
-      cubit.onQueryChanged('Beatles');
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      await pumpEventQueue();
+      await cubit.commitQuery('beatles');
+      await cubit.commitQuery('Beatles');
 
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList('ytm_search_history')!;
@@ -223,14 +214,9 @@ void main() {
     });
 
     test('caps history at 20 entries', () async {
-      when(() => service.searchWithFallback(any()))
-          .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
-
       final cubit = build();
       for (var i = 0; i < 25; i++) {
-        cubit.onQueryChanged('query number $i');
-        await Future<void>.delayed(const Duration(milliseconds: 350));
-        await pumpEventQueue();
+        await cubit.commitQuery('query number $i');
       }
 
       final prefs = await SharedPreferences.getInstance();
@@ -242,13 +228,8 @@ void main() {
     });
 
     test('ignores queries shorter than two characters', () async {
-      when(() => service.searchWithFallback(any()))
-          .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
-
       final cubit = build();
-      cubit.onQueryChanged('a');
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      await pumpEventQueue();
+      await cubit.commitQuery('a');
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getStringList('ytm_search_history'), isNull);

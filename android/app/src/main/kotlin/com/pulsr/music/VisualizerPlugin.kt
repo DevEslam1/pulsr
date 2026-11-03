@@ -1,5 +1,7 @@
 package com.pulsr.music
 
+import android.content.Context
+import android.content.pm.PackageManager
 import android.media.audiofx.Visualizer
 import android.os.Handler
 import android.os.Looper
@@ -16,7 +18,8 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     private lateinit var methodChannel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var visualizer: Visualizer? = null
-    private var eventSink: EventChannel.EventSink? = null
+    @Volatile private var eventSink: EventChannel.EventSink? = null
+    private var appContext: Context? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val fftExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
         Thread(r, "PulsrVisualizerFFT")
@@ -26,8 +29,9 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
         const val EVENT_CHANNEL = "com.pulsr.music/visualizer_stream"
 
-        fun registerWith(flutterEngine: FlutterEngine): VisualizerPlugin {
+        fun registerWith(flutterEngine: FlutterEngine, context: Context? = null): VisualizerPlugin {
             val plugin = VisualizerPlugin()
+            plugin.appContext = context?.applicationContext
             plugin.methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             plugin.methodChannel.setMethodCallHandler(plugin)
 
@@ -38,6 +42,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        appContext = binding.applicationContext
         methodChannel = MethodChannel(binding.binaryMessenger, METHOD_CHANNEL)
         methodChannel.setMethodCallHandler(this)
 
@@ -85,6 +90,15 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     private var currentSessionId: Int = 0
 
     private fun startVisualizer(audioSessionId: Int): Boolean {
+        // Session 0 is the global mixer pseudo-session: attaching a Visualizer
+        // to it either throws or captures unrelated audio.
+        if (audioSessionId <= 0) return false
+        val ctx = appContext
+        if (ctx != null && ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
         stopVisualizer()
         currentSessionId = audioSessionId
         return try {
@@ -113,18 +127,22 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                 ) {
                     if (fft == null || fft.size < 4 || eventSink == null) return
                     val fftCopy = fft.copyOf()
-                    fftExecutor.execute {
-                        try {
-                            val bandValues = processFftData(fftCopy)
-                            val normalizedList = bandValues.toList()
-                            mainHandler.post {
-                                try {
-                                    eventSink?.success(normalizedList)
-                                } catch (_: Throwable) {}
+                    try {
+                        fftExecutor.execute {
+                            try {
+                                val bandValues = processFftData(fftCopy)
+                                val normalizedList = bandValues.toList()
+                                mainHandler.post {
+                                    try {
+                                        eventSink?.success(normalizedList)
+                                    } catch (_: Throwable) {}
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.w("VisualizerPlugin", "FFT processing failed: ${e.message}")
                             }
-                        } catch (e: Exception) {
-                            android.util.Log.w("VisualizerPlugin", "FFT processing failed: ${e.message}")
                         }
+                    } catch (_: java.util.concurrent.RejectedExecutionException) {
+                        // Plugin is shutting down; drop this frame.
                     }
                 }
             }, Visualizer.getMaxCaptureRate() / 2, false, true)
@@ -195,7 +213,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         eventSink = events
-        if (visualizer == null) {
+        if (visualizer == null && currentSessionId > 0) {
             startVisualizer(currentSessionId)
         }
     }

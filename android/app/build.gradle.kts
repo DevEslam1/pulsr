@@ -128,6 +128,10 @@ android {
         unitTests.isIncludeAndroidResources = true
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     lint {
         checkReleaseBuilds = false
         abortOnError = false

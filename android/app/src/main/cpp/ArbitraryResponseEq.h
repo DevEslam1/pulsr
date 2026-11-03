@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 #include <utility>
+#include <atomic>
 
 class ArbitraryResponseEq {
 public:
@@ -30,14 +31,23 @@ public:
     // underestimates it. Minimum-phase mode (the AutoEQ import default) front-
     // loads its energy at n=0 and is effectively zero-latency, so it reports 0.
     int getLatencyFrames() const {
+        // A fully disabled stage contributes zero latency even if an old
+        // kernel is still parked mid-crossfade.
+        if ((!enabled_ && smoothedEnabledMix_ < 1e-4f) || !hasResponse_) return 0;
         if (filterCrossfadeProgress_ < 1.0f) {
             return (linearPhase_ || oldLinearPhase_) ? (FIR_TAPS / 2) : 0;
         }
-        if ((!enabled_ && smoothedEnabledMix_ < 1e-4f) || !hasResponse_) return 0;
         return linearPhase_ ? (FIR_TAPS / 2) : 0;
     }
     void applyParams(const ArbitraryEqParamSet& params);
     void reset();
+
+    /**
+     * Control-thread resolver for kernels that could not be synthesized on the
+     * audio thread (sample-rate mismatch). Returns true when work was done.
+     */
+    bool resynthesizeIfNeeded();
+    bool needsResynthesis() const { return needsResynthesis_.load(std::memory_order_acquire); }
 
     bool loadGraphicEqString(const std::string& eqString, bool linearPhase = false);
 
@@ -95,6 +105,14 @@ private:
     float phaseDelayL_[PHASE_DELAY_TAPS] = {};
     float phaseDelayR_[PHASE_DELAY_TAPS] = {};
     int phaseDelayIdx_ = 0;
+
+    // Linear-phase dry alignment for channels 2..7 (stereo paths are delayed
+    // inside processFrame via historyL_/R_).
+    static constexpr int MAX_SURROUND_CHANNELS = 6;
+    static constexpr int SURROUND_DRY_DELAY = (FIR_TAPS - 1) / 2;
+    float surroundDelay_[MAX_SURROUND_CHANNELS][SURROUND_DRY_DELAY] = {};
+    int surroundDelayIdx_ = 0;
+    std::atomic<bool> needsResynthesis_{false};
 
     std::shared_ptr<const std::vector<std::pair<double, double>>> preparedNodesRef_;
     std::shared_ptr<const PreparedArbitraryEqFilter> preparedFilterRef_;

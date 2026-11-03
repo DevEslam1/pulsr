@@ -302,6 +302,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             final seekVal =
                                 (ratio * maxDuration).clamp(0.0, maxDuration);
                             if (_lastHapticCheckMs != null) {
+                              if ((seekVal == 0.0 && _lastHapticCheckMs! > 0.0) ||
+                                  (seekVal == maxDuration && _lastHapticCheckMs! < maxDuration)) {
+                                HapticFeedback.selectionClick();
+                              }
                               _checkHapticBoundaries(
                                   _lastHapticCheckMs!, seekVal, context);
                             }
@@ -358,7 +362,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           duration: context.motionMs(200),
                           curve: Curves.easeOutCubic,
                           height: _dragValue != null
-                              ? widget.height + 12.0
+                              ? widget.height * 1.35
                               : widget.height,
                           width: double.infinity,
                           child: Stack(
@@ -388,7 +392,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                         visibleCount: window.visibleCount,
                                         style: widget.style,
                                         amplitudeScale:
-                                            _dragValue != null ? 1.25 : 1.0,
+                                            _dragValue != null ? 1.35 : 1.0,
                                       ),
                                     ),
                                   ),
@@ -412,7 +416,14 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                             (trackWidth - 96)
                                                 .clamp(0.0, trackWidth)),
                                     child: IgnorePointer(
-                                      child: Container(
+                                      child: AnimatedOpacity(
+                                        opacity: _dragValue != null ? 1.0 : 0.0,
+                                        duration: context.motionMs(150),
+                                        child: AnimatedScale(
+                                          scale: _dragValue != null ? 1.0 : 0.85,
+                                          duration: context.motionMs(150),
+                                          curve: Curves.easeOutBack,
+                                          child: Container(
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: AppSpacing.s8,
                                             vertical: AppSpacing.s4),
@@ -446,6 +457,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                             ],
                                           ),
                                         ),
+                                        ),
+                                      ),
                                       ),
                                     ),
                                   );

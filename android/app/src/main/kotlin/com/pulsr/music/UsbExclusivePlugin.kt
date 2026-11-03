@@ -302,9 +302,21 @@ class UsbExclusivePlugin(
             }
             try { context.unregisterReceiver(deviceReceiver) } catch (_: Exception) {}
         } catch (_: Exception) {}
-        closeLocked()
-        methodChannel.setMethodCallHandler(null)
-        eventChannel.setStreamHandler(null)
+        try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
+        try { eventChannel.setStreamHandler(null) } catch (_: Exception) {}
+        // closeLocked() closes the native sink and the usbfs connection, which
+        // can block; keep it off the main thread. quitSafely() runs queued work
+        // before the looper exits.
+        val posted = try {
+            workerHandler.post {
+                try { closeLocked() } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {
+            false
+        }
+        if (!posted) {
+            try { closeLocked() } catch (_: Exception) {}
+        }
         try { workerThread.quitSafely() } catch (_: Exception) {}
     }
 
@@ -526,7 +538,9 @@ class UsbExclusivePlugin(
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 if (intent?.action != ACTION_USB_PERMISSION) return
-                val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                // The boolean extra is spoofable/ambiguous on some OEM builds;
+                // the permission grant state is the authoritative answer.
+                val granted = usbManager?.hasPermission(device) == true
                 finishPermission(granted)
             }
         }
@@ -543,8 +557,10 @@ class UsbExclusivePlugin(
             finishPermission(false)
             return
         }
+        // The intent is already explicit (setPackage below). Android 12+ needs
+        // MUTABLE for UsbManager to attach the permission result to it.
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_IMMUTABLE else 0)
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
         val pi = PendingIntent.getBroadcast(
             context,
             0,
@@ -852,8 +868,9 @@ class UsbExclusivePlugin(
             return failure("claim_failed")
         }
 
-        val mainHandler = Handler(Looper.getMainLooper())
         val watchdog = Runnable {
+            // Same monitor as the native start below: the watchdog must not
+            // release the interface while start is still in flight.
             synchronized(this) {
                 if (!streaming) {
                     try { conn.releaseInterface(iface) } catch (_: Exception) {}
@@ -879,14 +896,23 @@ class UsbExclusivePlugin(
                 lastStreamResultCode = 5
                 return failure("no_fd")
             }
-            val resultCode = try {
-                nativeUsbStreamStartWithFormat(
-                    fd, epAddress, epInterface, epAlt,
-                    sampleRate, channels, streamBytes,
-                )
-            } catch (e: Throwable) {
-                Log.w(TAG, "nativeUsbStreamStartWithFormat failed: ${e.message}")
-                -1
+            val resultCode: Int
+            synchronized(this) {
+                resultCode = try {
+                    nativeUsbStreamStartWithFormat(
+                        fd, epAddress, epInterface, epAlt,
+                        sampleRate, channels, streamBytes,
+                    )
+                } catch (e: Throwable) {
+                    Log.w(TAG, "nativeUsbStreamStartWithFormat failed: ${e.message}")
+                    -1
+                }
+                if (resultCode == 0) {
+                    streaming = true
+                    directStreamingActive = true
+                    currentStreamingRate = sampleRate
+                    claimedStreamingInterface = iface
+                }
             }
             lastStreamResultCode = resultCode
             if (resultCode != 0) {
@@ -903,10 +929,6 @@ class UsbExclusivePlugin(
                 return failure(errStr) + mapOf("resultCode" to resultCode)
             }
             mainHandler.removeCallbacks(watchdog)
-            streaming = true
-            directStreamingActive = true
-            currentStreamingRate = sampleRate
-            claimedStreamingInterface = iface
             emitState()
             return buildStatus() + mapOf("success" to true, "resultCode" to 0)
         } catch (e: Exception) {

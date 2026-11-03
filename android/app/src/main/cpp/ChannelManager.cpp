@@ -35,6 +35,7 @@ void ChannelManager::resetChannelState(int channel) {
     rampRemaining_[channel] = 0;
     std::fill(delayLines_[channel].begin(), delayLines_[channel].end(), 0.0f);
     writeIndex_[channel] = 0;
+    smoothedDelaySamples_[channel] = static_cast<float>(delaySamples_[channel]);
 }
 
 void ChannelManager::reset() {
@@ -45,6 +46,7 @@ void ChannelManager::reset() {
         gainStep_[ch] = 0.0f;
         rampRemaining_[ch] = 0;
         delaySamples_[ch] = 0;
+        smoothedDelaySamples_[ch] = 0.0f;
         std::fill(delayLines_[ch].begin(), delayLines_[ch].end(), 0.0f);
         writeIndex_[ch] = 0;
     }
@@ -114,15 +116,23 @@ void ChannelManager::applyParams(const ChannelManagerParamSet& params) {
         delaySamples_[ch] = std::clamp(
             static_cast<int>(delayMs * 0.001 * sampleRate_), 0,
             maxDelaySamples_);
+        if (justEnabled) {
+            // Start at the requested delay instead of sweeping from zero, which
+            // would pitch-shift the first 20 ms of a freshly enabled stage.
+            smoothedDelaySamples_[ch] = static_cast<float>(delaySamples_[ch]);
+        }
     }
 }
 
 void ChannelManager::processInterleaved(float* buffer, int frames, int channels) {
     if (buffer == nullptr || frames <= 0 || channels <= 0) return;
-    if (!params_.enabled && !rampingDown_) return;
+    if (!rampingDown_ && (!stageEnabled_ || !params_.enabled)) return;
 
     const int activeChannels = std::min(channels, MAX_CHANNELS);
     const int declaredChannels = std::min(params_.channelCount, activeChannels);
+    // 20 ms one-pole smoothing for live distance/delay edits.
+    const float delaySmoothCoeff =
+        1.0f - std::exp(-1.0f / static_cast<float>(sampleRate_ * 0.020));
     for (int f = 0; f < frames; ++f) {
         const int base = f * channels;
         for (int ch = 0; ch < activeChannels; ++ch) {
@@ -130,18 +140,25 @@ void ChannelManager::processInterleaved(float* buffer, int frames, int channels)
             if (!std::isfinite(x)) x = 0.0f;
 
             if (ch < declaredChannels) {
-                const int d = delaySamples_[ch];
+                const float targetDelay = static_cast<float>(delaySamples_[ch]);
+                float& smoothDelay = smoothedDelaySamples_[ch];
+                smoothDelay += delaySmoothCoeff * (targetDelay - smoothDelay);
+                if (std::abs(smoothDelay - targetDelay) < 1e-4f) {
+                    smoothDelay = targetDelay;
+                }
+                const float d = smoothDelay;
                 auto& line = delayLines_[ch];
                 if (!line.empty()) {
                     const int size = static_cast<int>(line.size());
-                    if (d > 0) {
-                        int read = writeIndex_[ch] - d;
-                        if (read < 0) read += size;
-                        const float delayed = line[static_cast<size_t>(read)];
-                        line[static_cast<size_t>(writeIndex_[ch])] = x;
-                        x = delayed;
-                    } else {
-                        line[static_cast<size_t>(writeIndex_[ch])] = x;
+                    line[static_cast<size_t>(writeIndex_[ch])] = x;
+                    if (d > 0.0001f) {
+                        float read = static_cast<float>(writeIndex_[ch]) - d;
+                        while (read < 0.0f) read += static_cast<float>(size);
+                        const int i0 = static_cast<int>(read) % size;
+                        const int i1 = (i0 + 1) % size;
+                        const float frac = read - static_cast<float>(static_cast<int>(read));
+                        x = line[static_cast<size_t>(i0)] * (1.0f - frac) +
+                            line[static_cast<size_t>(i1)] * frac;
                     }
                     writeIndex_[ch] = (writeIndex_[ch] + 1) % size;
                 }

@@ -45,6 +45,8 @@ struct Token {
     TokenType type = TokenType::End;
     double numVal = 0.0;
     std::string strVal;
+    size_t start = 0;
+    size_t end = 0;
 };
 
 class Lexer {
@@ -60,15 +62,29 @@ public:
 
     Token next() {
         skipWhitespace();
+        const size_t start = pos_;
+        Token token = nextImpl();
+        token.start = start;
+        token.end = pos_;
+        return token;
+    }
+
+private:
+    Token nextImpl() {
+        skipWhitespace();
         if (unclosedComment_) return {TokenType::Invalid, 0.0, "unclosed block comment"};
         if (pos_ >= src_.size()) return {TokenType::End, 0.0, ""};
 
         char c = src_[pos_];
 
         if (c == '@') {
-            size_t start = pos_;
+            // Always consume the '@' before scanning; otherwise a bare '@'
+            // (no alphabetic tag) leaves pos_ unchanged and spins forever now
+            // that the whole script (not just a pre-split body) is lexed.
+            ++pos_;
+            const size_t start = pos_;
             while (pos_ < src_.size() && std::isalpha(src_[pos_])) ++pos_;
-            std::string tag = src_.substr(start, pos_ - start);
+            std::string tag = "@" + src_.substr(start, pos_ - start);
             if (tag == "@init") return {TokenType::AtInit, 0.0, tag};
             if (tag == "@sample") return {TokenType::AtSample, 0.0, tag};
             return {TokenType::Ident, 0.0, tag};
@@ -480,24 +496,48 @@ bool LiveProg::loadCode(const std::string& scriptCode) {
 }
 
 bool LiveProg::compileScript(const std::string& code) {
-    // Split into @init and @sample text
+    // Split into @init and @sample sections using lexed tokens, so a tag in a
+    // // or /* */ comment is never treated as a section marker.
     std::string initText;
     std::string sampleText;
 
-    auto pInit = code.find("@init");
-    auto pSample = code.find("@sample");
+    size_t initTagStart = std::string::npos;
+    size_t initContentStart = std::string::npos;
+    size_t sampleTagStart = std::string::npos;
+    size_t sampleContentStart = std::string::npos;
+    {
+        Lexer sectionLexer(code);
+        for (Token t = sectionLexer.next(); t.type != TokenType::End;
+             t = sectionLexer.next()) {
+            if (t.type == TokenType::AtInit && initTagStart == std::string::npos) {
+                initTagStart = t.start;
+                initContentStart = t.end;
+            } else if (t.type == TokenType::AtSample &&
+                       sampleTagStart == std::string::npos) {
+                sampleTagStart = t.start;
+                sampleContentStart = t.end;
+            }
+        }
+    }
 
-    if (pInit == std::string::npos && pSample == std::string::npos) {
+    if (initTagStart == std::string::npos &&
+        sampleTagStart == std::string::npos) {
         sampleText = code;
+    } else if (initTagStart != std::string::npos &&
+               sampleTagStart != std::string::npos) {
+        if (initTagStart < sampleTagStart) {
+            initText = code.substr(initContentStart,
+                                   sampleTagStart - initContentStart);
+            sampleText = code.substr(sampleContentStart);
+        } else {
+            sampleText = code.substr(sampleContentStart,
+                                     initTagStart - sampleContentStart);
+            initText = code.substr(initContentStart);
+        }
+    } else if (initTagStart != std::string::npos) {
+        initText = code.substr(initContentStart);
     } else {
-        if (pInit != std::string::npos) {
-            size_t end = (pSample != std::string::npos && pSample > pInit) ? pSample : code.size();
-            initText = code.substr(pInit + 5, end - (pInit + 5));
-        }
-        if (pSample != std::string::npos) {
-            size_t end = (pInit != std::string::npos && pInit > pSample) ? pInit : code.size();
-            sampleText = code.substr(pSample + 7, end - (pSample + 7));
-        }
+        sampleText = code.substr(sampleContentStart);
     }
 
     // Keep varMap_ and register variables into a temporary copy if needed

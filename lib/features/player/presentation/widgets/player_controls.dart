@@ -93,7 +93,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   void _triggerPrevNudge() {
     _prevNudgeTimer?.cancel();
     setState(() => _prevNudgeX = -4.0);
-    _prevNudgeTimer = Timer(const Duration(milliseconds: 140), () {
+    _prevNudgeTimer = Timer(const Duration(milliseconds: 160), () {
       if (mounted) {
         setState(() => _prevNudgeX = 0.0);
       }
@@ -103,7 +103,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   void _triggerNextNudge() {
     _nextNudgeTimer?.cancel();
     setState(() => _nextNudgeX = 4.0);
-    _nextNudgeTimer = Timer(const Duration(milliseconds: 140), () {
+    _nextNudgeTimer = Timer(const Duration(milliseconds: 160), () {
       if (mounted) {
         setState(() => _nextNudgeX = 0.0);
       }
@@ -621,21 +621,27 @@ class _ControlButton extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                AnimatedContainer(
+                AnimatedOpacity(
+                  opacity: isActive ? 1.0 : 0.0,
                   duration: context.motionMs(200),
-                  width: isActive ? 10 : 0,
-                  height: isActive ? 3 : 0,
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadii.r2All,
-                    color: activeColor,
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: activeColor.withValues(alpha: 0.55),
-                              blurRadius: 4,
-                            ),
-                          ]
-                        : null,
+                  child: AnimatedScale(
+                    scale: isActive ? 1.0 : 0.0,
+                    duration: context.motionMs(200),
+                    curve: Curves.easeOutBack,
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: activeColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: activeColor.withValues(alpha: 0.65),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],

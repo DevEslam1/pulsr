@@ -173,6 +173,12 @@ internal object YtmHttpClient {
                     val urlStr = uri?.toString()
                     val customProxy = ProxyManager.getProxy(urlStr)
                     if (customProxy != null) return listOf(customProxy)
+                    if (ProxyManager.isBlocked()) {
+                        // failClosed: every configured path is dead. Throwing
+                        // here makes OkHttp fail the route instead of silently
+                        // going DIRECT past the circuit breaker.
+                        throw IllegalArgumentException("Proxy paths are blocked")
+                    }
                     // Delegate to system – covers VPN-as-proxy and enterprise PAC.
                     val systemProxies = runCatching { systemSelector?.select(uri) }.getOrNull()
                     if (systemProxies != null && systemProxies.isNotEmpty() && systemProxies.any { it != Proxy.NO_PROXY }) {

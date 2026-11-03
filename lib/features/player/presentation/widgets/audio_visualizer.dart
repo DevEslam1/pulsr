@@ -831,6 +831,15 @@ class _WaveVisualizerPainter extends CustomPainter {
 
 // --- PAINTER 3: CIRCULAR VISUALIZER ---
 class _CircularVisualizerPainter extends CustomPainter {
+  static final Paint _paint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3.5
+    ..strokeCap = StrokeCap.round;
+
+  static final Paint _ringPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
+
   final List<double> data;
   final Color color;
 
@@ -848,18 +857,8 @@ class _CircularVisualizerPainter extends CustomPainter {
     final count = data.length;
     final angleStep = (2 * math.pi) / count;
 
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
-      ..strokeCap = StrokeCap.round
-      ..color = color;
-
-    // Draw base ring with glow
-    final ringPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..color = color.withValues(alpha: 0.4);
-    canvas.drawCircle(center, baseRadius, ringPaint);
+    _ringPaint.color = color.withValues(alpha: 0.4);
+    canvas.drawCircle(center, baseRadius, _ringPaint);
 
     for (int i = 0; i < count; i++) {
       final angle = i * angleStep - (math.pi / 2);
@@ -871,9 +870,9 @@ class _CircularVisualizerPainter extends CustomPainter {
       final endX = center.dx + (baseRadius + barLength) * math.cos(angle);
       final endY = center.dy + (baseRadius + barLength) * math.sin(angle);
 
-      paint.color =
+      _paint.color =
           color.withValues(alpha: (0.4 + magnitude * 0.6).clamp(0.0, 1.0));
-      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), paint);
+      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), _paint);
     }
   }
 
@@ -883,6 +882,8 @@ class _CircularVisualizerPainter extends CustomPainter {
 
 // --- PAINTER 4: PARTICLES VISUALIZER ---
 class _ParticlesVisualizerPainter extends CustomPainter {
+  static final Paint _paint = Paint()..style = PaintingStyle.fill;
+
   final List<double> data;
   final Color color;
 
@@ -893,7 +894,6 @@ class _ParticlesVisualizerPainter extends CustomPainter {
     if (data.isEmpty) return;
 
     final center = Offset(size.width / 2, size.height / 2);
-    final paint = Paint()..style = PaintingStyle.fill;
 
     for (int i = 0; i < data.length; i++) {
       final angle = (i / data.length) * 2 * math.pi;
@@ -902,8 +902,8 @@ class _ParticlesVisualizerPainter extends CustomPainter {
       final x = center.dx + dist * math.cos(angle);
       final y = center.dy + dist * math.sin(angle);
 
-      paint.color = color.withValues(alpha: mag * 0.8);
-      canvas.drawCircle(Offset(x, y), 3.0 + mag * 4.0, paint);
+      _paint.color = color.withValues(alpha: mag * 0.8);
+      canvas.drawCircle(Offset(x, y), 3.0 + mag * 4.0, _paint);
     }
   }
 
@@ -913,6 +913,10 @@ class _ParticlesVisualizerPainter extends CustomPainter {
 
 // --- PAINTER 5: 3D TERRAIN VISUALIZER ---
 class _Terrain3DVisualizerPainter extends CustomPainter {
+  static final Paint _paint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5;
+
   final List<double> data;
   final Color color;
 
@@ -922,10 +926,7 @@ class _Terrain3DVisualizerPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (data.isEmpty) return;
 
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.6)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+    _paint.color = color.withValues(alpha: 0.6);
 
     final rows = 5;
     for (int r = 0; r < rows; r++) {
@@ -943,7 +944,7 @@ class _Terrain3DVisualizerPainter extends CustomPainter {
           path.lineTo(x, y);
         }
       }
-      canvas.drawPath(path, paint);
+      canvas.drawPath(path, _paint);
     }
   }
 
@@ -953,6 +954,9 @@ class _Terrain3DVisualizerPainter extends CustomPainter {
 
 // --- PAINTER 6: ALBUM ART REACTIVE ---
 class _AlbumArtReactivePainter extends CustomPainter {
+  static final Paint _glowPaint = Paint()
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
+
   final List<double> data;
   final Color color;
 
@@ -966,12 +970,10 @@ class _AlbumArtReactivePainter extends CustomPainter {
     final bassMag =
         (data.take(4).fold<double>(0, (s, e) => s + e) / 4.0).clamp(0.0, 1.0);
 
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: (bassMag * 0.4).clamp(0.0, 0.6))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
+    _glowPaint.color = color.withValues(alpha: (bassMag * 0.4).clamp(0.0, 0.6));
 
     canvas.drawCircle(
-        center, (size.width / 4) * (1.0 + bassMag * 0.2), glowPaint);
+        center, (size.width / 4) * (1.0 + bassMag * 0.2), _glowPaint);
   }
 
   @override

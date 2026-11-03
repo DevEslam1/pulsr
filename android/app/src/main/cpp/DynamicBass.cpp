@@ -56,7 +56,15 @@ void DynamicBass::getPresetValues(int preset, int& xLow, int& xHigh,
 void DynamicBass::setParams(bool enabled, double strength, int xLow, int xHigh,
                             int yLow, int yHigh, double sideGainLow, double sideGainHigh,
                             int devicePreset) {
-    enabled_ = enabled;
+    const bool changed =
+        enabled != pendingEnabled_ ||
+        strength != pendingStrength_ ||
+        xLow != pendingXLow_ || xHigh != pendingXHigh_ ||
+        yLow != pendingYLow_ || yHigh != pendingYHigh_ ||
+        sideGainLow != pendingSideGainLow_ ||
+        sideGainHigh != pendingSideGainHigh_ ||
+        devicePreset != pendingDevicePreset_;
+    if (!changed) return;
     pendingEnabled_ = enabled;
     pendingStrength_ = strength;
     pendingXLow_ = xLow;
@@ -93,6 +101,10 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
             yHigh_ = std::clamp(pendingYHigh_, 30, 300);
             sideGainLow_ = std::clamp(pendingSideGainLow_, 0.0, 2.0);
             sideGainHigh_ = std::clamp(pendingSideGainHigh_, 0.0, 2.0);
+            // The UI can send a crossed crossover pair; a zero/negative band
+            // would make the filters invalid and the envelope undefined.
+            if (xHigh_ <= xLow_) xHigh_ = std::min(xLow_ + 100, 12000);
+            if (yHigh_ <= yLow_) yHigh_ = std::min(yLow_ + 10, 300);
         }
 
         strength_ = std::clamp(pendingStrength_, 0.0, 8.0);

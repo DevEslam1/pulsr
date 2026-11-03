@@ -282,6 +282,12 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
     final newGain = _VerticalEqSlider.min +
         fraction * (_VerticalEqSlider.max - _VerticalEqSlider.min);
     final roundedGain = double.parse(newGain.toStringAsFixed(1));
+    final oldGain = _dragGain ?? widget.value;
+    if ((oldGain < -0.1 && roundedGain >= 0.0) ||
+        (oldGain > 0.1 && roundedGain <= 0.0) ||
+        (oldGain != 0.0 && roundedGain == 0.0)) {
+      HapticFeedback.selectionClick();
+    }
     setState(() {
       _dragGain = roundedGain;
     });
@@ -311,19 +317,33 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
         // Value Pill
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Container(
+          child: AnimatedContainer(
+            duration: context.motionMs(150),
+            curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
             decoration: BoxDecoration(
-              color: (gain.abs() > 0.1 ? widget.accentColor : widget.trackColor)
-                  .withValues(alpha: 0.15),
+              color: _isDragging
+                  ? widget.accentColor
+                  : (gain.abs() > 0.1 ? widget.accentColor : widget.trackColor)
+                      .withValues(alpha: 0.15),
               borderRadius: AppRadii.r6All,
+              border: Border.all(
+                color: _isDragging
+                    ? widget.accentColor
+                    : (gain.abs() > 0.1
+                        ? widget.accentColor.withValues(alpha: 0.4)
+                        : Colors.transparent),
+                width: 1.0,
+              ),
             ),
             child: Text(
               '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)}',
               style: TextStyle(
                 fontSize: AppFontSize.tiny,
-                color: gain.abs() > 0.1 ? widget.accentColor : widget.textColor,
+                color: _isDragging
+                    ? Colors.white
+                    : (gain.abs() > 0.1 ? widget.accentColor : widget.textColor),
                 fontWeight: FontWeight.w700,
               ),
             ),

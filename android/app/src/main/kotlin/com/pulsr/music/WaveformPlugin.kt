@@ -6,6 +6,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
@@ -14,7 +15,13 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.io.File
+import java.net.URI
 import java.nio.ByteOrder
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.sqrt
 
 /// Decodes a local audio file to PCM and returns [count] peak-normalized RMS
@@ -23,13 +30,23 @@ import kotlin.math.sqrt
 class WaveformPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var context: Context? = null
-    private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
-    private val activeDecodes = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicBoolean>()
+
+    @Volatile
+    private var backgroundExecutor: ExecutorService = newExecutor()
+
+    private val activeDecodes = java.util.concurrent.ConcurrentHashMap<String, AtomicBoolean>()
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/waveform"
         private const val TAG = "WaveformPlugin"
         private const val DEQUEUE_TIMEOUT_US = 10_000L
+        private const val SPARSE_MIN_DURATION_US = 600_000_000L // 10 minutes
+        private const val SPARSE_WINDOW_US = 100_000L          // ~100 ms per bucket
+
+        private fun newExecutor(): ExecutorService =
+            Executors.newFixedThreadPool(2) { runnable ->
+                Thread(runnable, "PulsrWaveform").apply { isDaemon = true }
+            }
 
         fun registerWith(flutterEngine: FlutterEngine, context: Context): WaveformPlugin {
             val plugin = WaveformPlugin()
@@ -40,10 +57,22 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
+    private fun ensureExecutor(): ExecutorService {
+        val current = backgroundExecutor
+        if (!current.isShutdown) return current
+        synchronized(this) {
+            if (backgroundExecutor.isShutdown) {
+                backgroundExecutor = newExecutor()
+            }
+            return backgroundExecutor
+        }
+    }
+
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
+        ensureExecutor()
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -52,10 +81,11 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
 
     fun cleanup() {
         if (::channel.isInitialized) channel.setMethodCallHandler(null)
-        backgroundExecutor.shutdown()
-        try {
-            backgroundExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)
-        } catch (_: Exception) {}
+        // Cancel every in-flight decode first: shutdownNow interrupts the
+        // workers, and the codec loops check these flags between buffers.
+        for (flag in activeDecodes.values) flag.set(true)
+        backgroundExecutor.shutdownNow()
+        activeDecodes.clear()
         context = null
     }
 
@@ -72,21 +102,34 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
 
-                val cancellationFlag = java.util.concurrent.atomic.AtomicBoolean(false)
-                activeDecodes[decodeId] = cancellationFlag
+                val cancellationFlag = AtomicBoolean(false)
+                // A duplicate decodeId cancels the previous task. Its finally
+                // block uses the 2-arg remove, so it cannot evict this new flag.
+                activeDecodes.put(decodeId, cancellationFlag)?.set(true)
 
-                backgroundExecutor.execute {
-                    try {
-                        val buckets = decodeToBuckets(path, count, timeoutMs, cancellationFlag)
-                        postSuccess(result, buckets.toList())
-                    } catch (e: java.util.concurrent.CancellationException) {
-                        postError(result, "CANCELLED", "Waveform decode cancelled for $path")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Waveform decode failed for $path: ${e.message}")
-                        postError(result, "DECODE_ERROR", e.message)
-                    } finally {
-                        activeDecodes.remove(decodeId)
+                val executor = ensureExecutor()
+                try {
+                    executor.execute {
+                        if (cancellationFlag.get()) {
+                            activeDecodes.remove(decodeId, cancellationFlag)
+                            postError(result, "CANCELLED", "Waveform decode cancelled for $path")
+                            return@execute
+                        }
+                        try {
+                            val buckets = decodeToBuckets(path, count, timeoutMs, cancellationFlag)
+                            postSuccess(result, buckets.toList())
+                        } catch (e: java.util.concurrent.CancellationException) {
+                            postError(result, "CANCELLED", "Waveform decode cancelled for $path")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Waveform decode failed for $path: ${e.message}")
+                            postError(result, "DECODE_ERROR", e.message)
+                        } finally {
+                            activeDecodes.remove(decodeId, cancellationFlag)
+                        }
                     }
+                } catch (_: RejectedExecutionException) {
+                    activeDecodes.remove(decodeId, cancellationFlag)
+                    postError(result, "PLUGIN_DISPOSED", "Waveform plugin is shutting down")
                 }
             }
             "cancelDecode" -> {
@@ -104,7 +147,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
         path: String,
         count: Int,
         timeoutMs: Long = 30_000L,
-        cancellationFlag: java.util.concurrent.atomic.AtomicBoolean? = null
+        cancellationFlag: AtomicBoolean? = null
     ): DoubleArray {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
@@ -126,15 +169,23 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("No audio MIME type found")
             extractor.selectTrack(trackIndex)
 
-            val formatDurationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else 0L
-            val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(1) else 44100
+            var formatDurationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else 0L
+            var sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(1) else 44100
             var channelCount = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
                 format.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
             } else 2
 
             codec = MediaCodec.createDecoderByType(mime)
+            // Prefer float output on API 24+; the output-format callback below
+            // remains authoritative if the codec ignores the request.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                runCatching {
+                    format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_FLOAT)
+                }
+            }
             codec.configure(format, null, null, 0)
             codec.start()
+            val activeCodec = codec
 
             val sumSq = DoubleArray(count)
             val cnt = LongArray(count)
@@ -143,18 +194,23 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             // time, so we collect per-buffer RMS and resample it to [count].
             val fallbackRms = ArrayList<Double>()
             var pcmEncoding = AudioFormat.ENCODING_PCM_16BIT
-
             val bufferInfo = MediaCodec.BufferInfo()
+
             var sawInputEOS = false
             var sawOutputEOS = false
-            val maxIterations = 5_000_000
-            var iterations = 0
-            val deadline = SystemClock.elapsedRealtime() + timeoutMs
-
             var channelIndex = 0
             var channelAcc = 0.0
+            var lastOutputPtsUs = -1L
+            var iterations = 0
+            val maxIterations = 5_000_000
+            val deadline = SystemClock.elapsedRealtime() + timeoutMs
 
-            while (!sawOutputEOS) {
+            // Per-output-buffer state.
+            var framesInBuffer = 0L
+            var bufferSumSq = 0.0
+            var bufferFrames = 0L
+
+            fun checkAbort(iterationBudget: Int) {
                 if (cancellationFlag?.get() == true) {
                     throw java.util.concurrent.CancellationException("Decode was cancelled")
                 }
@@ -162,94 +218,232 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                     Log.w(TAG, "Waveform decode exceeded ${timeoutMs}ms timeout for $path; aborting")
                     throw java.util.concurrent.TimeoutException("Waveform decode exceeded ${timeoutMs}ms timeout")
                 }
-                if (++iterations > maxIterations) {
-                    Log.w(TAG, "Exceeded maximum decode iterations ($maxIterations) for $path; terminating loop")
-                    break
+                if (++iterations > iterationBudget) {
+                    throw IllegalStateException("Exceeded maximum decode iterations ($iterationBudget)")
                 }
-                if (!sawInputEOS) {
-                    val inIndex = codec.dequeueInputBuffer(DEQUEUE_TIMEOUT_US)
-                    if (inIndex >= 0) {
-                        val inBuf = codec.getInputBuffer(inIndex)
-                        val sampleSize = if (inBuf != null) extractor.readSampleData(inBuf, 0) else -1
-                        if (sampleSize < 0) {
-                            codec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            sawInputEOS = true
-                        } else {
-                            codec.queueInputBuffer(inIndex, 0, sampleSize, extractor.sampleTime, 0)
-                            extractor.advance()
-                        }
+            }
+
+            fun resetStreamState() {
+                sawInputEOS = false
+                sawOutputEOS = false
+                channelIndex = 0
+                channelAcc = 0.0
+                lastOutputPtsUs = -1L
+            }
+
+            fun updateOutputFormat() {
+                val of = activeCodec.outputFormat
+                if (of.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
+                    pcmEncoding = of.getInteger(MediaFormat.KEY_PCM_ENCODING)
+                }
+                if (of.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                    channelCount = of.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
+                }
+                if (of.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                    sampleRate = of.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(1)
+                }
+                channelAcc = 0.0
+                channelIndex = 0
+            }
+
+            fun feedInput() {
+                if (sawInputEOS) return
+                val inIndex = activeCodec.dequeueInputBuffer(DEQUEUE_TIMEOUT_US)
+                if (inIndex >= 0) {
+                    val inBuf = activeCodec.getInputBuffer(inIndex)
+                    val sampleSize = if (inBuf != null) extractor.readSampleData(inBuf, 0) else -1
+                    if (sampleSize < 0) {
+                        activeCodec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        sawInputEOS = true
+                    } else {
+                        activeCodec.queueInputBuffer(inIndex, 0, sampleSize, extractor.sampleTime, 0)
+                        extractor.advance()
                     }
                 }
+            }
 
-                val outIndex = codec.dequeueOutputBuffer(bufferInfo, DEQUEUE_TIMEOUT_US)
-                when {
-                    outIndex >= 0 -> {
-                        try {
-                            if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) sawOutputEOS = true
-                            if (bufferInfo.size > 0 && bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
-                                val outBuf = codec.getOutputBuffer(outIndex)
-                                if (outBuf != null) {
-                                    outBuf.position(bufferInfo.offset)
-                                    outBuf.limit(bufferInfo.offset + bufferInfo.size)
-                                    outBuf.order(ByteOrder.nativeOrder())
+            fun accumulateFrame(frameValue: Double, frameIndex: Long) {
+                totalFramesDecoded++
+                if (formatDurationUs > 0) {
+                    val bufferPts = bufferInfo.presentationTimeUs.coerceAtLeast(0L)
+                    val frameTimeUs = bufferPts + (frameIndex * 1_000_000L) / sampleRate
+                    val bucket = ((frameTimeUs.toDouble() / formatDurationUs) * count)
+                        .toInt().coerceIn(0, count - 1)
+                    sumSq[bucket] += frameValue * frameValue
+                    cnt[bucket]++
+                } else {
+                    bufferSumSq += frameValue * frameValue
+                    bufferFrames++
+                }
+            }
 
-                                    var frameSumSq = 0.0
-                                    var frames = 0
-                                    if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
-                                        val fb = outBuf.asFloatBuffer()
-                                        val n = fb.remaining()
-                                        for (i in 0 until n) {
-                                            channelAcc += fb.get(i)
-                                            channelIndex++
-                                            if (channelIndex == channelCount) {
-                                                val v = channelAcc / channelCount
-                                                frameSumSq += v * v
-                                                frames++
-                                                channelAcc = 0.0
-                                                channelIndex = 0
-                                            }
-                                        }
-                                    } else {
-                                        val sb = outBuf.asShortBuffer()
-                                        val n = sb.remaining()
-                                        for (i in 0 until n) {
-                                            channelAcc += sb.get(i) / 32768.0
-                                            channelIndex++
-                                            if (channelIndex == channelCount) {
-                                                val v = channelAcc / channelCount
-                                                frameSumSq += v * v
-                                                frames++
-                                                channelAcc = 0.0
-                                                channelIndex = 0
-                                            }
-                                        }
-                                    }
+            fun pushSample(raw: Double) {
+                val v = if (raw.isFinite()) raw else 0.0
+                channelAcc += v
+                channelIndex++
+                if (channelIndex == channelCount) {
+                    accumulateFrame(channelAcc / channelCount, framesInBuffer)
+                    framesInBuffer++
+                    channelAcc = 0.0
+                    channelIndex = 0
+                }
+            }
 
-                                    if (frames > 0) {
-                                        totalFramesDecoded += frames
-                                        if (formatDurationUs > 0) {
-                                            val bucket = ((bufferInfo.presentationTimeUs.toDouble() / formatDurationUs) * count)
-                                                .toInt().coerceIn(0, count - 1)
-                                            sumSq[bucket] += frameSumSq
-                                            cnt[bucket] += frames
-                                        } else {
-                                            fallbackRms.add(sqrt(frameSumSq / frames))
-                                        }
-                                    }
-                                }
+            fun handleOutputBuffer(outIndex: Int) {
+                try {
+                    if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                        sawOutputEOS = true
+                    }
+                    if (bufferInfo.size <= 0 ||
+                        bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                    ) {
+                        return
+                    }
+                    val outBuf = activeCodec.getOutputBuffer(outIndex) ?: return
+                    outBuf.position(bufferInfo.offset)
+                    outBuf.limit(bufferInfo.offset + bufferInfo.size)
+                    outBuf.order(ByteOrder.nativeOrder())
+                    if (bufferInfo.presentationTimeUs >= 0) {
+                        lastOutputPtsUs = bufferInfo.presentationTimeUs
+                    }
+
+                    framesInBuffer = 0L
+                    bufferSumSq = 0.0
+                    bufferFrames = 0L
+
+                    when (pcmEncoding) {
+                        AudioFormat.ENCODING_PCM_FLOAT -> {
+                            val fb = outBuf.asFloatBuffer()
+                            val n = fb.remaining()
+                            for (i in 0 until n) pushSample(fb.get(i).toDouble())
+                        }
+                        AudioFormat.ENCODING_PCM_24BIT_PACKED -> {
+                            val base = outBuf.position()
+                            val n = outBuf.remaining() / 3
+                            for (i in 0 until n) {
+                                val o = base + i * 3
+                                val b0 = outBuf.get(o).toInt() and 0xFF
+                                val b1 = outBuf.get(o + 1).toInt() and 0xFF
+                                val b2 = outBuf.get(o + 2).toInt() // signed: sign-extends << 16
+                                val raw = b0 or (b1 shl 8) or (b2 shl 16)
+                                pushSample(raw / 8388608.0)
                             }
-                        } finally {
-                            codec.releaseOutputBuffer(outIndex, false)
+                        }
+                        AudioFormat.ENCODING_PCM_32BIT -> {
+                            val ib = outBuf.asIntBuffer()
+                            val n = ib.remaining()
+                            for (i in 0 until n) pushSample(ib.get(i) / 2147483648.0)
+                        }
+                        AudioFormat.ENCODING_PCM_8BIT -> {
+                            val base = outBuf.position()
+                            val n = outBuf.remaining()
+                            for (i in 0 until n) {
+                                val b = outBuf.get(base + i).toInt() and 0xFF
+                                pushSample((b - 128) / 128.0)
+                            }
+                        }
+                        else -> {
+                            // ENCODING_PCM_16BIT is the universal fallback.
+                            val sb = outBuf.asShortBuffer()
+                            val n = sb.remaining()
+                            for (i in 0 until n) pushSample(sb.get(i) / 32768.0)
                         }
                     }
-                    outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                        val of = codec.outputFormat
-                        if (of.containsKey(MediaFormat.KEY_PCM_ENCODING)) pcmEncoding = of.getInteger(MediaFormat.KEY_PCM_ENCODING)
-                        if (of.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) channelCount = of.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
-                        channelAcc = 0.0
-                        channelIndex = 0
+
+                    if (formatDurationUs <= 0 && bufferFrames > 0) {
+                        fallbackRms.add(sqrt(bufferSumSq / bufferFrames))
                     }
+                } finally {
+                    activeCodec.releaseOutputBuffer(outIndex, false)
                 }
+            }
+
+            fun drainOutput() {
+                val outIndex = activeCodec.dequeueOutputBuffer(bufferInfo, DEQUEUE_TIMEOUT_US)
+                when {
+                    outIndex >= 0 -> handleOutputBuffer(outIndex)
+                    outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> updateOutputFormat()
+                    else -> Unit
+                }
+            }
+
+            fun decodeLinear() {
+                while (!sawOutputEOS) {
+                    checkAbort(maxIterations)
+                    feedInput()
+                    drainOutput()
+                }
+            }
+
+            /**
+             * Samples [count] evenly spaced ~100 ms windows. Returns false when
+             * the extractor cannot seek; the caller then restarts linearly.
+             */
+            fun decodeSparse(): Boolean {
+                var lastSeekUs = Long.MIN_VALUE
+                var lastSampleTime = Long.MIN_VALUE
+                var anyFrames = false
+                for (b in 0 until count) {
+                    checkAbort(maxIterations)
+                    var targetUs = (b.toLong() * formatDurationUs) / count
+                    if (lastSeekUs != Long.MIN_VALUE && targetUs <= lastSeekUs) {
+                        targetUs = lastSeekUs + 1
+                    }
+                    val seeked = runCatching {
+                        extractor.seekTo(targetUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                    }.isSuccess
+                    if (!seeked) return false
+                    val actualUs = extractor.sampleTime
+                    if (actualUs < 0) return false
+                    // A seek that does not move forward (or jumps far behind the
+                    // target) means this source cannot do random access.
+                    if (b > 0 && actualUs <= lastSampleTime) return false
+                    if (b > 0 && actualUs < targetUs - 2_000_000L) return false
+                    lastSeekUs = targetUs
+                    lastSampleTime = actualUs
+
+                    val flushed = runCatching { activeCodec.flush() }.isSuccess
+                    if (!flushed) return false
+                    resetStreamState()
+
+                    val windowEndUs = actualUs + SPARSE_WINDOW_US
+                    val framesBefore = totalFramesDecoded
+                    while (true) {
+                        checkAbort(maxIterations)
+                        feedInput()
+                        drainOutput()
+                        if (lastOutputPtsUs >= windowEndUs) break
+                        if (sawOutputEOS) break
+                    }
+                    if (totalFramesDecoded > framesBefore) anyFrames = true
+                    if (sawOutputEOS) break
+                }
+                return anyFrames
+            }
+
+            if (formatDurationUs >= SPARSE_MIN_DURATION_US && formatDurationUs > 0) {
+                val sparseOk = try {
+                    decodeSparse()
+                } catch (e: java.util.concurrent.CancellationException) {
+                    throw e
+                } catch (e: java.util.concurrent.TimeoutException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "Sparse waveform seek failed for $path; falling back to linear: ${e.message}")
+                    false
+                }
+                if (!sparseOk) {
+                    java.util.Arrays.fill(sumSq, 0.0)
+                    java.util.Arrays.fill(cnt, 0L)
+                    fallbackRms.clear()
+                    totalFramesDecoded = 0
+                    runCatching { activeCodec.flush() }
+                    runCatching { extractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC) }
+                    resetStreamState()
+                    decodeLinear()
+                }
+            } else {
+                decodeLinear()
             }
 
             if (channelIndex > 0) {
@@ -317,7 +511,11 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                     throw IllegalStateException("No context for content URI")
                 }
             }
-            path.startsWith("file://") -> extractor.setDataSource(Uri.parse(path).path ?: path)
+            path.startsWith("file://") -> {
+                val filePath = runCatching { File(URI(path)).absolutePath }
+                    .getOrElse { Uri.parse(path).path ?: path }
+                extractor.setDataSource(filePath)
+            }
             else -> extractor.setDataSource(path)
         }
     }

@@ -480,13 +480,13 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                         child: AnimatedContainer(
                           duration: context.motionMs(200),
                           curve: Curves.easeOutCubic,
-                          height: isDragging ? 38.0 : 32.0,
+                          height: isDragging ? 43.2 : 32.0,
                           child: RepaintBoundary(
                             child: PulsrSlider(
                               value: effectiveValue,
                               min: 0.0,
                               max: maxDuration > 0 ? maxDuration : 1.0,
-                              height: isDragging ? 38.0 : 32.0,
+                              height: isDragging ? 43.2 : 32.0,
                               semanticLabel: semanticLabel,
                               semanticFormatterCallback: (val) =>
                                   labelFor(Duration(milliseconds: val.round())),
@@ -499,6 +499,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                               animateWave: isPlaying && enabled,
                               onChangeStart: enabled
                                   ? (val) {
+                                      HapticFeedback.selectionClick();
                                       _tapSeekPending = true;
                                       _tapSeekRatio = val.clamp(
                                           0.0, maxDuration.toDouble());
@@ -518,6 +519,10 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                                         _tapSeekPending = false;
                                       }
                                       if (_lastHapticCheckMs != null) {
+                                        if ((clampedVal == 0.0 && _lastHapticCheckMs! > 0.0) ||
+                                            (clampedVal == maxDuration && _lastHapticCheckMs! < maxDuration)) {
+                                          HapticFeedback.selectionClick();
+                                        }
                                         _checkHapticBoundaries(
                                             _lastHapticCheckMs!,
                                             clampedVal,
@@ -568,7 +573,14 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           start: (ratio * trackWidth - 54).clamp(
                               0.0, (trackWidth - 108).clamp(0.0, trackWidth)),
                           child: IgnorePointer(
-                            child: Container(
+                            child: AnimatedOpacity(
+                              opacity: isDragging ? 1.0 : 0.0,
+                              duration: context.motionMs(150),
+                              child: AnimatedScale(
+                                scale: isDragging ? 1.0 : 0.85,
+                                duration: context.motionMs(150),
+                                curve: Curves.easeOutBack,
+                                child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.s8,
                                 vertical: AppSpacing.s4,
@@ -603,6 +615,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                             ),
                           ),
                         ),
+                      ),
+                    ),
                     ],
                   );
                 },

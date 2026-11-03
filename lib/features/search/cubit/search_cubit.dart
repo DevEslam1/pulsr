@@ -1,3 +1,4 @@
+import 'package:mutex/mutex.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -18,6 +19,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
   final FolderUseCases _folderUseCases;
   StreamSubscription? _searchSub;
   Timer? _debounceTimer;
+  final Mutex _historyMutex = Mutex();
 
   SearchCubit({
     required SearchMusicUseCase searchUseCase,
@@ -261,6 +263,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
   /// Pull-to-refresh: re-runs the query and completes when it has settled, so
   /// the RefreshIndicator spinner reflects real work.
   Future<void> refresh() async {
+    invalidateExcludedFoldersCache();
     if (state.query.trim().isEmpty) return;
     unawaited(_executeSearch(state.query));
     try {
@@ -437,23 +440,26 @@ class SearchCubit extends PulsrCubit<SearchState> {
         raw.length > maxQueryLength ? raw.substring(0, maxQueryLength) : raw;
     await historyReady;
     if (isClosed) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
+    await _historyMutex.protect(() async {
       if (isClosed) return;
-      final existing =
-          prefs.getStringList(_historyKey) ?? List<String>.from(state.history);
-      final updated = [
-        q,
-        ...existing.where((h) => h.toLowerCase() != q.toLowerCase())
-      ].take(historyMax).toList();
-      await prefs.setStringList(_historyKey, updated);
-      if (!isClosed) {
-        safeEmit(state.copyWith(history: List<String>.unmodifiable(updated)));
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (isClosed) return;
+        final existing =
+            prefs.getStringList(_historyKey) ?? List<String>.from(state.history);
+        final updated = [
+          q,
+          ...existing.where((h) => h.toLowerCase() != q.toLowerCase())
+        ].take(historyMax).toList();
+        await prefs.setStringList(_historyKey, updated);
+        if (!isClosed) {
+          safeEmit(state.copyWith(history: List<String>.unmodifiable(updated)));
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed to persist search history',
+            error: e, stackTrace: st, category: 'SearchCubit');
       }
-    } catch (e, st) {
-      ErrorLogger.log('Failed to persist search history',
-          error: e, stackTrace: st, category: 'SearchCubit');
-    }
+    });
   }
 
   Future<void> clearHistory() async {
@@ -490,10 +496,16 @@ class SearchCubit extends PulsrCubit<SearchState> {
   /// Excluded folders, cached for 5 s while typing. BUG FIX: a failed lookup
   /// used to be cached as "no exclusions" for 5 s, briefly showing hidden
   /// songs. Failures now fall back to the last known list and aren't cached.
-  Future<List<String>> _excludedFolders() async {
+  void invalidateExcludedFoldersCache() {
+    _cachedExcludedFolders = null;
+    _lastExcludedFetch = null;
+  }
+
+  Future<List<String>> _excludedFolders({bool forceRefresh = false}) async {
     final cached = _cachedExcludedFolders;
     final fetched = _lastExcludedFetch;
-    if (cached != null &&
+    if (!forceRefresh &&
+        cached != null &&
         fetched != null &&
         DateTime.now().difference(fetched).inSeconds <= 5) {
       return cached;
@@ -546,7 +558,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
               var pool = allResults;
               var filtered = _filterWithFuzzy(pool, q, filter);
 
-              if (filtered.isEmpty && boundedQuery.length >= 2) {
+              if (pool.isEmpty && boundedQuery.length >= 2) {
                 try {
                   final prefixRes = await _searchUseCase
                       .searchSongs(boundedQuery.substring(0, 2),
@@ -618,7 +630,11 @@ class SearchCubit extends PulsrCubit<SearchState> {
     final generation = _generation;
     final raised = _resultLimit + SearchAlgorithmUtils.maxResultCount;
     _resultLimit = raised > _searchLimit ? _searchLimit : raised;
-    final q = normalize(state.query.trim());
+    final trimmed = state.query.trim();
+    final bounded = trimmed.length > maxQueryLength
+        ? trimmed.substring(0, maxQueryLength)
+        : trimmed;
+    final q = normalize(bounded);
     final filtered =
         _filterWithFuzzy(pool, q, _lastPoolFilter ?? state.selectedFilter);
     if (isClosed || generation != _generation) return;

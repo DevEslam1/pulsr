@@ -36,7 +36,7 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
 
     s.crossfeed.delayUs = clampFinite(s.crossfeed.delayUs, 0.0, 2000.0, 0.0);
     s.crossfeed.feedDb = clampFinite(s.crossfeed.feedDb, -30.0, 0.0, 0.0);
-    s.crossfeed.fcut = clampFinite(s.crossfeed.fcut, 20.0, 20000.0, 650.0);
+    s.crossfeed.fcut = clampFinite(s.crossfeed.fcut, 100.0, 5000.0, 650.0);
     {
         const int m = static_cast<int>(s.crossfeed.mode);
         if (m < 0 || m > 3) s.crossfeed.mode = CrossfeedMode::Bs2bDefault;
@@ -219,6 +219,12 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
 }
 
 void AudioDspEngine::applySampleRateLocked(double sampleRate) {
+    // Resolve any kernel the audio thread deferred while the old rate was
+    // active. This is a control-thread synthesis; the render path only swaps
+    // the ready kernel through the published snapshot.
+    if (arbitraryEq_.needsResynthesis()) {
+        arbitraryEq_.setSampleRate(sampleRate, /*resynthesize=*/true);
+    }
     auto current = currentParams_.load();
     // Unchanged-rate resync: do nothing. This is the common case for a seek or a
     // gapless same-format transition, where regenerating the synthetic reverb IR
@@ -354,9 +360,22 @@ DspEngineRegistry& DspEngineRegistry::instance() {
     return sRegistry;
 }
 
-void DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
-    if (!engine) return;
+bool DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
+    if (!engine) return false;
     std::lock_guard<std::mutex> lock(mutex_);
+    int slot = -1;
+    for (int i = 0; i < kMaxEngines; ++i) {
+        if (slots_[i].engine.load(std::memory_order_acquire) == nullptr &&
+            !slots_[i].tearingDown.load(std::memory_order_acquire)) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) return false;
+    slots_[slot].inFlight.store(0, std::memory_order_relaxed);
+    slots_[slot].tearingDown.store(false, std::memory_order_relaxed);
+    slots_[slot].engine.store(engine, std::memory_order_release);
+
     engines_.push_back(engine);
     auto& tmpl = AudioDspEngine::instance();
     auto current = tmpl.getParams();
@@ -371,6 +390,75 @@ void DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
     if (deg != 0) {
         engine->triggerStageAutoDegrade(deg);
     }
+    return true;
+}
+
+DspEngineRegistry::RenderLease DspEngineRegistry::acquireForRender(int64_t handle) {
+    RenderLease lease{};
+    if (handle == 0) return lease;
+    for (int i = 0; i < kMaxEngines; ++i) {
+        Slot& slot = slots_[i];
+        // Read teardown first (acquire): once it is observed true the slot is
+        // not a valid render target.
+        if (slot.tearingDown.load(std::memory_order_acquire)) continue;
+        AudioDspEngine* engine = slot.engine.load(std::memory_order_acquire);
+        if (engine == nullptr ||
+            reinterpret_cast<int64_t>(engine) != handle) {
+            continue;
+        }
+        slot.inFlight.fetch_add(1, std::memory_order_seq_cst);
+        // Revalidate after publishing the arrival. destroy() sets tearingDown
+        // (seq_cst) before loading inFlight, so either it sees our count and
+        // waits, or we see teardown here and back out without touching engine.
+        if (slot.tearingDown.load(std::memory_order_seq_cst) ||
+            slot.engine.load(std::memory_order_seq_cst) != engine) {
+            slot.inFlight.fetch_sub(1, std::memory_order_seq_cst);
+            continue;
+        }
+        lease.engine = engine;
+        lease.slot = i;
+        return lease;
+    }
+    return lease;
+}
+
+void DspEngineRegistry::releaseForRender(int slot) {
+    if (slot < 0 || slot >= kMaxEngines) return;
+    slots_[slot].inFlight.fetch_sub(1, std::memory_order_seq_cst);
+}
+
+int DspEngineRegistry::beginTeardown(int64_t handle) {
+    if (handle == 0) return -1;
+    for (int i = 0; i < kMaxEngines; ++i) {
+        Slot& slot = slots_[i];
+        AudioDspEngine* engine = slot.engine.load(std::memory_order_seq_cst);
+        if (engine == nullptr ||
+            reinterpret_cast<int64_t>(engine) != handle) {
+            continue;
+        }
+        bool expected = false;
+        if (!slot.tearingDown.compare_exchange_strong(
+                expected, true, std::memory_order_seq_cst,
+                std::memory_order_seq_cst)) {
+            return -1;  // concurrent/double teardown
+        }
+        return i;
+    }
+    return -1;
+}
+
+void DspEngineRegistry::waitForRenderers(int slot) {
+    if (slot < 0 || slot >= kMaxEngines) return;
+    while (slots_[slot].inFlight.load(std::memory_order_seq_cst) != 0) {
+        std::this_thread::yield();
+    }
+}
+
+void DspEngineRegistry::finishTeardown(int slot) {
+    if (slot < 0 || slot >= kMaxEngines) return;
+    slots_[slot].engine.store(nullptr, std::memory_order_relaxed);
+    slots_[slot].inFlight.store(0, std::memory_order_relaxed);
+    slots_[slot].tearingDown.store(false, std::memory_order_release);
 }
 
 AudioDspEngine* DspEngineRegistry::selectActiveEngineLocked() const {
@@ -389,6 +477,14 @@ void DspEngineRegistry::unregisterEngine(AudioDspEngine* engine) {
     if (!engine) return;
     std::lock_guard<std::mutex> lock(mutex_);
     engines_.erase(std::remove(engines_.begin(), engines_.end(), engine), engines_.end());
+    for (int i = 0; i < kMaxEngines; ++i) {
+        if (slots_[i].engine.load(std::memory_order_seq_cst) == engine) {
+            // The engine is already out of the broadcast list; no new render
+            // may observe it. Keep tearingDown set until finishTeardown().
+            slots_[i].engine.store(nullptr, std::memory_order_release);
+            break;
+        }
+    }
 }
 
 void DspEngineRegistry::broadcastParams(const std::shared_ptr<const DspParamSnapshot>& snapshot) {
@@ -772,6 +868,112 @@ void AudioDspEngine::reset() {
     });
 }
 
+void AudioDspEngine::processSafetyStage(float* buffer, int frames, int channels,
+                                        double currentSr,
+                                        const DspParamSnapshot& snapshot,
+                                        int& blockLatency) {
+    if (!snapshot.headphoneSafety.enabled || frames <= 0 || channels <= 0 ||
+        currentSr <= 0.0) {
+        smoothedSafetyGain_ = 1.0;
+        safetyAttenuationActive_.store(false, std::memory_order_relaxed);
+        return;
+    }
+
+    double sumSq = 0.0;
+    const int totalSamples = frames * channels;
+    for (int i = 0; i < totalSamples; ++i) {
+        const float s = buffer[i];
+        if (std::isfinite(s)) {
+            sumSq += static_cast<double>(s * s);
+        }
+    }
+    const double meanSq = sumSq / static_cast<double>(totalSamples);
+    // The buffer here is the signal BEFORE the safety attenuation below, so
+    // weight the measured energy by the attenuation the safety stage is
+    // currently applying (previous block's smoothed gain). Without this the
+    // dose over-reads by ~6 dB while attenuating.
+    const double doseGain = smoothedSafetyGain_;
+    const double meanSqDelivered = meanSq * doseGain * doseGain;
+    // 100% weekly dose = 40 hours continuous at -14 dBFS (mean square power ~ 0.0398107)
+    // deltaDose = (meanSq / 0.0398107) * (frames / (40.0 * 3600.0 * currentSr))
+    // 0.0398107 * 144000.0 = 5732.74
+    const double deltaDose = (meanSqDelivered * static_cast<double>(frames)) / (5732.74 * currentSr);
+
+    // Rolling 7-day exponential decay per block (tau = 7 days = 604,800 s)
+    const double decayFactor = std::max(0.0, 1.0 - (static_cast<double>(frames) / (604800.0 * currentSr)));
+    double curDose = weeklyDose_.load(std::memory_order_relaxed);
+    double newDose = 0.0;
+    do {
+        newDose = (curDose * decayFactor) + deltaDose;
+    } while (!weeklyDose_.compare_exchange_weak(curDose, newDose,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed));
+
+    // Hysteresis: engage at the threshold, release only once the (now
+    // attenuation-weighted) dose has decayed to 95% of it. Without this the
+    // gain could toggle every block at the boundary.
+    const bool wasAttenuating = safetyAttenuationActive_.load(std::memory_order_relaxed);
+    const double engageThreshold = snapshot.headphoneSafety.doseThreshold;
+    const double releaseThreshold = engageThreshold * 0.95;
+    const bool thresholdExceeded = wasAttenuating ? (newDose >= releaseThreshold)
+                                                  : (newDose >= engageThreshold);
+    safetyAttenuationActive_.store(thresholdExceeded, std::memory_order_relaxed);
+
+    // Smooth broadband attenuation when weekly dose threshold is exceeded (-6 dB gain)
+    const double targetGain = thresholdExceeded ? 0.5 : 1.0;
+    const double startGain = smoothedSafetyGain_;
+    if (std::abs(targetGain - smoothedSafetyGain_) > 1e-5) {
+        const double safetyTau = 0.020;
+        const double safetySmooth =
+            1.0 - std::exp(-static_cast<double>(frames) / (currentSr * safetyTau));
+        smoothedSafetyGain_ += safetySmooth * (targetGain - smoothedSafetyGain_);
+    } else {
+        smoothedSafetyGain_ = targetGain;
+    }
+    if (std::abs(smoothedSafetyGain_ - 1.0) > 1e-4 || std::abs(startGain - 1.0) > 1e-4) {
+        // Ramp per frame, not per interleaved sample, so every channel of a
+        // frame shares the same gain (per-sample ramps skew L/R slightly).
+        double currentGain = startGain;
+        const double gainIncrement = (smoothedSafetyGain_ - startGain) / static_cast<double>(frames);
+        for (int f = 0; f < frames; ++f) {
+            const float g = static_cast<float>(currentGain);
+            for (int ch = 0; ch < channels; ++ch) {
+                buffer[f * channels + ch] *= g;
+            }
+            currentGain += gainIncrement;
+        }
+    }
+
+    // Continuous true-peak ceiling guard
+    safetyLimiter_.processInterleaved(buffer, frames, channels);
+    blockLatency += safetyLimiter_.getLatencyFrames();
+}
+
+void AudioDspEngine::meterDoseReadOnly(const float* buffer, int frames, int channels,
+                                       double currentSr,
+                                       const HeadphoneSafetyParamSet& safety) {
+    if (!safety.enabled || frames <= 0 || channels <= 0 || currentSr <= 0.0) return;
+
+    double sumSq = 0.0;
+    const int totalSamples = frames * channels;
+    for (int i = 0; i < totalSamples; ++i) {
+        const float s = buffer[i];
+        if (std::isfinite(s)) {
+            sumSq += static_cast<double>(s * s);
+        }
+    }
+    const double meanSq = sumSq / static_cast<double>(totalSamples);
+    const double deltaDose = (meanSq * static_cast<double>(frames)) / (5732.74 * currentSr);
+    const double decayFactor = std::max(0.0, 1.0 - (static_cast<double>(frames) / (604800.0 * currentSr)));
+    double curDose = weeklyDose_.load(std::memory_order_relaxed);
+    double newDose = 0.0;
+    do {
+        newDose = (curDose * decayFactor) + deltaDose;
+    } while (!weeklyDose_.compare_exchange_weak(curDose, newDose,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed));
+}
+
 int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) {
     if (!buffer || frames <= 0 || channels <= 0) return frames;
 
@@ -879,10 +1081,21 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         viperDdc_.applyParams(snapshot->viperDdc);
         arbitraryEq_.applyParams(snapshot->arbitraryEq);
         liveProg_.applyParams(snapshot->liveProg);
-        safetyLimiter_.configure(5.0, snapshot->headphoneSafety.safetyCeilingDb, 50.0, true);
+        // configure() rebuilds the lookahead window; only do it when the ceiling
+        // actually changes, not on every unrelated snapshot generation.
+        if (!safetyConfigured_ ||
+            snapshot->headphoneSafety.safetyCeilingDb != lastSafetyCeilingDb_) {
+            safetyLimiter_.configure(
+                5.0, snapshot->headphoneSafety.safetyCeilingDb, 50.0, true);
+            lastSafetyCeilingDb_ = snapshot->headphoneSafety.safetyCeilingDb;
+            safetyConfigured_ = true;
+        }
         // The safety stage is a hard guard: enabling/disabling it is immediate.
         // The user-facing limiter fades in/out via setProcessingActive().
-        safetyLimiter_.setEnabled(snapshot->headphoneSafety.enabled);
+        if (snapshot->headphoneSafety.enabled != lastSafetyEnabled_) {
+            safetyLimiter_.setEnabled(snapshot->headphoneSafety.enabled);
+            lastSafetyEnabled_ = snapshot->headphoneSafety.enabled;
+        }
 
         lastAppliedGeneration_.store(snapshot->generation);
     }
@@ -896,6 +1109,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         safetyAttenuationActive_.store(false, std::memory_order_relaxed);
         limiter_.setProcessingActive(false);
+        // Bit-perfect output must remain sample-identical, but the listener's
+        // weekly sound dose still has to be metered. Read-only: no gain is
+        // applied and the safety limiter never runs on this path.
+        const double bpSr = sampleRate_.load(std::memory_order_acquire);
+        if (snapshot->headphoneSafety.enabled && frames > 0 && bpSr > 0.0) {
+            meterDoseReadOnly(buffer, frames, channels, bpSr,
+                              snapshot->headphoneSafety);
+        }
         return frames;
     }
 
@@ -903,7 +1124,6 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     if (snapshot->bypassCompare.enabled) {
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
-        safetyAttenuationActive_.store(false, std::memory_order_relaxed);
         limiter_.setProcessingActive(false);
         if (std::abs(snapshot->bypassCompare.gainCompensationLinear - 1.0) > 1e-4) {
             const int totalSamples = frames * channels;
@@ -912,6 +1132,18 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                 buffer[i] *= gain;
             }
         }
+        // Level matching must not turn into a safety bypass: dose metering is
+        // mandatory, and the safety limiter still guards the compensated
+        // signal when headphone safety is enabled.
+        const double abSr = sampleRate_.load(std::memory_order_acquire);
+        if (snapshot->headphoneSafety.enabled && frames > 0 && abSr > 0.0) {
+            processSafetyStage(buffer, frames, channels, abSr, *snapshot, blockLatency);
+        } else {
+            safetyAttenuationActive_.store(false, std::memory_order_relaxed);
+        }
+        // The A/B path usually reports zero latency, but the safety limiter is
+        // still in the signal path when enabled and contributes its lookahead.
+        effectiveLatencyFrames_.store(blockLatency, std::memory_order_release);
         return frames;
     }
 
@@ -959,6 +1191,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     viperDdc_.setEnabled((stages & STAGE_VIPER_DDC) && snapshot->viperDdc.enabled);
     multibandCompressor_.setEnabled((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled);
     liveProg_.setEnabled((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled);
+    channelManager_.setEnabled((stages & STAGE_CHANNEL_MANAGER) && snapshot->channelManager.enabled);
     bool hasNetPositiveGain = smoothedReplayGain_ > 1.001 || smoothedDirectVolume_ > 1.001;
     if (snapshot->directVolume.enabled && snapshot->directVolume.gainLinear > 1.001) {
         hasNetPositiveGain = true;
@@ -1019,20 +1252,31 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     const bool runLimiter = limiterRequested || limiter_.isDraining();
     const bool dvcActive = snapshot->directVolume.enabled &&
         (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(snapshot->directVolume.gainLinear - 1.0) > 1e-4);
-    const bool nonUnityGain = ((stages & ~static_cast<uint32_t>(STAGE_DITHER)) != 0) ||
+    // A raw activeStages bit is not evidence that a stage is doing work: the
+    // UI commonly publishes 0xFFFFFFFF with every stage flag off. Include a
+    // stage only when its own enabled flag (or an active ramp) says so.
+    const bool anyStageEnabled =
+        (((stages & STAGE_EQ) != 0) && snapshot->eq.enabled) || eq_.isRamping() ||
+        (((stages & STAGE_DYNEQ) != 0) && snapshot->dynamicEq.enabled) || dynamicEq_.isRamping() ||
+        (((stages & STAGE_CROSSFEED) != 0) && snapshot->crossfeed.enabled) || crossfeed_.isRamping() ||
+        ((stages & STAGE_PANNER) != 0) || panner_.isRamping() ||
+        (((stages & STAGE_WIDTH) != 0) && snapshot->stereoWidth.enabled) || stereoWidth_.isRamping() ||
+        (((stages & STAGE_CROSSOVER) != 0) && snapshot->subCrossover.enabled) || subCrossover_.isRamping() ||
+        (((stages & STAGE_DYNAMIC_BASS) != 0) && snapshot->dynamicBass.enabled) || dynamicBass_.isRamping() ||
+        (((stages & STAGE_LOUDNESS) != 0) && snapshot->loudness.enabled) || loudnessContour_.isRamping() ||
+        (((stages & STAGE_REVERB) != 0) && snapshot->reverb.enabled) || reverb_.isRamping() ||
+        (((stages & STAGE_SATURATION) != 0) && snapshot->saturation.enabled) || saturation_.isRamping() ||
+        (((stages & STAGE_ARBITRARY_EQ) != 0) && snapshot->arbitraryEq.enabled) || arbitraryEq_.isRamping() ||
+        (((stages & STAGE_VIPER_DDC) != 0) && snapshot->viperDdc.enabled) || viperDdc_.isRamping() ||
+        (((stages & STAGE_MULTIBAND_COMPRESSOR) != 0) && snapshot->multibandCompressor.enabled) || multibandCompressor_.isRamping() ||
+        (((stages & STAGE_LIVE_PROG) != 0) && snapshot->liveProg.enabled) || liveProg_.isRamping() ||
+        (((stages & STAGE_RESAMPLER) != 0) && snapshot->resampler.enabled && !resampler_.isEffectivelyBypassed()) ||
+        (((stages & STAGE_CHANNEL_MANAGER) != 0) && snapshot->channelManager.enabled) || channelManager_.isRamping();
+    const bool nonUnityGain = anyStageEnabled ||
                               (std::abs(smoothedReplayGain_ - 1.0) > 1e-4) ||
                               (std::abs(startReplayGain - 1.0) > 1e-4) ||
                               dvcActive ||
                               (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4) ||
-                              eq_.isRamping() ||
-                              crossfeed_.isRamping() || stereoWidth_.isRamping() ||
-                              reverb_.isRamping() ||
-                              loudnessContour_.isRamping() || dynamicEq_.isRamping() ||
-                              subCrossover_.isRamping() ||
-                              saturation_.isRamping() || arbitraryEq_.isRamping() ||
-                              viperDdc_.isRamping() || liveProg_.isRamping() ||
-                              dynamicBass_.isRamping() || multibandCompressor_.isRamping() ||
-                              panner_.isRamping() ||
                               runLimiter;
 
     if (nonUnityGain) {
@@ -1067,8 +1311,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         // 1b. Arbitrary Response EQ (EqualizerAPO GraphicEq)
         if ((stages & STAGE_ARBITRARY_EQ) || arbitraryEq_.isRamping()) {
             arbitraryEq_.processInterleaved(buffer, frames, channels);
-            // FIR latency applies to every channel count, not only stereo.
-            blockLatency += arbitraryEq_.getLatencyFrames();
+            // FIR latency applies to every channel count, not only stereo, but
+            // only while the stage is actually enabled or fading out.
+            if (((stages & STAGE_ARBITRARY_EQ) != 0 && snapshot->arbitraryEq.enabled) ||
+                arbitraryEq_.isRamping()) {
+                blockLatency += arbitraryEq_.getLatencyFrames();
+            }
         }
 
         // 1c. ViPER-DDC (Digital Dynamic Correction)
@@ -1102,7 +1350,10 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         //    the reverb tail is not re-saturated (which muddies the wet signal).
         if ((stages & STAGE_SATURATION) || saturation_.isRamping()) {
             saturation_.processInterleaved(buffer, frames, channels);
-            blockLatency += saturation_.getLatencyFrames();
+            if (((stages & STAGE_SATURATION) != 0 && snapshot->saturation.enabled) ||
+                saturation_.isRamping()) {
+                blockLatency += saturation_.getLatencyFrames();
+            }
         }
 
         // 6. Convolution Reverb Stage
@@ -1192,79 +1443,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // 11. Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870)
     // Mask-immune: safety enforcement cannot be bypassed by activeStages bitmask dropping.
     // Placed after DVC and main limiter, before dither.
-    if (snapshot->headphoneSafety.enabled && frames > 0 && currentSr > 0.0) {
-        double sumSq = 0.0;
-        const int totalSamples = frames * channels;
-        for (int i = 0; i < totalSamples; ++i) {
-            const float s = buffer[i];
-            if (std::isfinite(s)) {
-                sumSq += static_cast<double>(s * s);
-            }
-        }
-        const double meanSq = sumSq / static_cast<double>(totalSamples);
-        // The buffer here is the signal BEFORE the safety attenuation below, so
-        // weight the measured energy by the attenuation the safety stage is
-        // currently applying (previous block's smoothed gain). Without this the
-        // dose over-reads by ~6 dB while attenuating.
-        const double doseGain = smoothedSafetyGain_;
-        const double meanSqDelivered = meanSq * doseGain * doseGain;
-        // 100% weekly dose = 40 hours continuous at -14 dBFS (mean square power ~ 0.0398107)
-        // deltaDose = (meanSq / 0.0398107) * (frames / (40.0 * 3600.0 * currentSr))
-        // 0.0398107 * 144000.0 = 5732.74
-        const double deltaDose = (meanSqDelivered * static_cast<double>(frames)) / (5732.74 * currentSr);
-
-        // Rolling 7-day exponential decay per block (tau = 7 days = 604,800 s)
-        const double decayFactor = std::max(0.0, 1.0 - (static_cast<double>(frames) / (604800.0 * currentSr)));
-        double curDose = weeklyDose_.load(std::memory_order_relaxed);
-        double newDose = 0.0;
-        do {
-            newDose = (curDose * decayFactor) + deltaDose;
-        } while (!weeklyDose_.compare_exchange_weak(curDose, newDose,
-                                                    std::memory_order_relaxed,
-                                                    std::memory_order_relaxed));
-
-        // Hysteresis: engage at the threshold, release only once the (now
-        // attenuation-weighted) dose has decayed to 95% of it. Without this the
-        // gain could toggle every block at the boundary.
-        const bool wasAttenuating = safetyAttenuationActive_.load(std::memory_order_relaxed);
-        const double engageThreshold = snapshot->headphoneSafety.doseThreshold;
-        const double releaseThreshold = engageThreshold * 0.95;
-        const bool thresholdExceeded = wasAttenuating ? (newDose >= releaseThreshold)
-                                                      : (newDose >= engageThreshold);
-        safetyAttenuationActive_.store(thresholdExceeded, std::memory_order_relaxed);
-
-        // Smooth broadband attenuation when weekly dose threshold is exceeded (-6 dB gain)
-        const double targetGain = thresholdExceeded ? 0.5 : 1.0;
-        const double startGain = smoothedSafetyGain_;
-        if (std::abs(targetGain - smoothedSafetyGain_) > 1e-5) {
-            const double safetyTau = 0.020;
-            const double safetySmooth =
-                1.0 - std::exp(-static_cast<double>(frames) / (currentSr * safetyTau));
-            smoothedSafetyGain_ += safetySmooth * (targetGain - smoothedSafetyGain_);
-        } else {
-            smoothedSafetyGain_ = targetGain;
-        }
-        if (std::abs(smoothedSafetyGain_ - 1.0) > 1e-4 || std::abs(startGain - 1.0) > 1e-4) {
-            // Ramp per frame, not per interleaved sample, so every channel of a
-            // frame shares the same gain (per-sample ramps skew L/R slightly).
-            double currentGain = startGain;
-            const double gainIncrement = (smoothedSafetyGain_ - startGain) / static_cast<double>(frames);
-            for (int f = 0; f < frames; ++f) {
-                const float g = static_cast<float>(currentGain);
-                for (int ch = 0; ch < channels; ++ch) {
-                    buffer[f * channels + ch] *= g;
-                }
-                currentGain += gainIncrement;
-            }
-        }
-
-        // Continuous true-peak ceiling guard
-        safetyLimiter_.processInterleaved(buffer, frames, channels);
-        blockLatency += safetyLimiter_.getLatencyFrames();
-    } else {
-        smoothedSafetyGain_ = 1.0;
-        safetyAttenuationActive_.store(false, std::memory_order_relaxed);
-    }
+    processSafetyStage(buffer, frames, channels, currentSr, *snapshot, blockLatency);
 
     // TPDF Dither — its own stage bit, so a lone dither toggle acts standalone
     // (previously it was nested inside the non-unity-gain block and dead when no
@@ -1510,9 +1689,17 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             buffer[i] = std::clamp(s, -1.0f, 1.0f);
         }
         if (nonFiniteFound) {
+            // resetInternal() clears the gain targets too. Capture them first so
+            // an active attenuation (ReplayGain < 1 or DVC < 1) does not jump
+            // back to 0 dB and blast the listener.
+            const double replayGainTarget = targetReplayGain_;
+            const double dvcTarget = snapshot->directVolume.enabled
+                ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
+                : 1.0;
             resetInternal();
-            smoothedReplayGain_ = 1.0;
-            smoothedDirectVolume_ = 1.0;
+            targetReplayGain_ = replayGainTarget;
+            smoothedReplayGain_ = replayGainTarget;
+            smoothedDirectVolume_ = dvcTarget;
         }
     }
 

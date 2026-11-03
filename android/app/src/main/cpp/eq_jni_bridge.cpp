@@ -3,12 +3,13 @@
 #include <android/log.h>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <mutex>
-#include <shared_mutex>
 #include <thread>
 #include <vector>
 #include "AudioDspEngine.h"
+#include "IrBounds.h"
 #include "UsbAudioSink.h"
 
 #define LOG_TAG "PulsrDSP"
@@ -16,24 +17,24 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 namespace {
-// Serialises engine teardown against in-flight calls that use the raw jlong
-// handle (which bypasses the registry). Shared for the non-RT control paths
-// (nativeResetEngine / nativeResyncForTrack), unique for destroy.
-std::shared_mutex gEngineLifecycleMutex;
+// Engine lifetime is owned by DspEngineRegistry's fixed slot table. Render,
+// reset, resync and destroy all go through acquireForRender()/beginTeardown()
+// so teardown only waits for the slot actually being destroyed, and a stale
+// or double destroy is a safe no-op. No process-wide mutex is taken on the
+// render path.
 
-// M-6 lock-free render/teardown handshake. The per-block render path
-// (nativeProcessDirectFloatBuffer) must NOT take gEngineLifecycleMutex: a
-// shared_mutex read-lock can still block and invert priority against the writer
-// in nativeDestroyEngine on the RT render thread. Instead the render path bumps
-// gRenderInFlight (a lock-free atomic RMW) around its engine use and checks
-// gTeardownEngineHandle; nativeDestroyEngine sets gTeardownEngineHandle then waits for
-// gRenderInFlight to drain to zero before `delete engine`. All four ops are
-// seq_cst so the arrive-then-check / set-then-wait pair forms a Dekker-style
-// StoreLoad handshake: destroy can never both observe zero in-flight renders AND
-// let a render proceed to touch the engine. Scoped to the specific engine handle
-// being destroyed so concurrent renders on other engines continue unimpeded.
-std::atomic<int> gRenderInFlight{0};
-std::atomic<jlong> gTeardownEngineHandle{0};
+/** RAII admission lease; releases the slot even when a JNI call throws. */
+struct EngineLease {
+    DspEngineRegistry::RenderLease lease;
+    explicit EngineLease(int64_t handle)
+        : lease(DspEngineRegistry::instance().acquireForRender(handle)) {}
+    ~EngineLease() {
+        if (lease.slot >= 0) {
+            DspEngineRegistry::instance().releaseForRender(lease.slot);
+        }
+    }
+    AudioDspEngine* get() const { return lease.engine; }
+};
 
 static inline double getEffectiveSampleRate() {
     double sr = DspEngineRegistry::instance().getAppliedSampleRate();
@@ -386,7 +387,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
         JNIEnv* env, jobject /* thiz */, jfloatArray irSamples, jint channels) {
     if (!irSamples) return JNI_FALSE;
     jsize len = env->GetArrayLength(irSamples);
-    if (channels < 1 || channels > 8 || len < channels) return JNI_FALSE;
+    if (!pulsr::ValidateIrShape(len, channels)) return JNI_FALSE;
     jfloat* data = env->GetFloatArrayElements(irSamples, nullptr);
     if (!data) return JNI_FALSE;
 
@@ -408,6 +409,17 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     int frames = (channels > 0) ? (len / channels) : len;
 
     try {
+        const double effectiveSr = getEffectiveSampleRate();
+        // Cap pathological IRs (a 24-bit/192 kHz impulse file can be minutes
+        // long). 10 s at the effective rate is far beyond any room tail.
+        const int maxFrames = std::max(
+            1, static_cast<int>(std::floor(effectiveSr * pulsr::kMaxIrSeconds)));
+        if (frames > maxFrames) {
+            const int fadeFrames =
+                std::max(1, static_cast<int>(effectiveSr * 0.01));  // 10 ms
+            frames = pulsr::TruncateIrWithFade(ir, channels, maxFrames, fadeFrames);
+        }
+
         // Normalize the loaded IR to unit peak. A full-scale impulse response would
         // otherwise drive the wet path far above the dry signal (createCustom does
         // not normalize), forcing constant limiting/clipping. Normalizing here keeps
@@ -424,7 +436,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
             }
         }
 
-        const double effectiveSr = getEffectiveSampleRate();
         const double targetCoreRate = std::min(effectiveSr, 48000.0);
         auto customIr = PreparedIr::createCustom(effectiveSr, ir.data(), frames, channels, targetCoreRate);
 
@@ -485,11 +496,17 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerQuality(
 }
 
 namespace {
+// Thread-local DSD decoder caches mean reset() must be broadcast through a
+// generation counter; resetting only the calling thread left every other
+// render thread with stale CIC/FIR/DC-blocker state.
+std::atomic<uint64_t> gDsdResetGeneration{1};
+
 struct CachedDsdDecoder {
     DsdDecoder decoder;
     jint dsdRate = -1;
     jint targetRate = -1;
     jint bitOrder = -1;
+    uint64_t lastResetGen = 0;
 };
 thread_local CachedDsdDecoder sDecoderCache;
 } // namespace
@@ -522,6 +539,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
     try {
         // bitOrder contract: 0 = LSB first (DSF), 1 = MSB first (DFF)
         auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
+        const uint64_t resetGen = gDsdResetGeneration.load(std::memory_order_acquire);
         if (sDecoderCache.dsdRate != dsdRate ||
             sDecoderCache.targetRate != targetPcmSampleRate ||
             sDecoderCache.bitOrder != bitOrder) {
@@ -530,8 +548,10 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
             sDecoderCache.dsdRate = dsdRate;
             sDecoderCache.targetRate = targetPcmSampleRate;
             sDecoderCache.bitOrder = bitOrder;
-        } else if (resetState) {
+            sDecoderCache.lastResetGen = resetGen;
+        } else if (resetState || sDecoderCache.lastResetGen != resetGen) {
             sDecoderCache.decoder.reset();
+            sDecoderCache.lastResetGen = resetGen;
         }
 
         int maxOutFrames = sDecoderCache.decoder.getExpectedPcmFrames(byteCount);
@@ -571,7 +591,8 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeResetDsdDecoder(
         JNIEnv* /* env */, jobject /* thiz */) {
-    sDecoderCache.decoder.reset();
+    // Bump the generation so every thread-local cache resets on its next chunk.
+    gDsdResetGeneration.fetch_add(1, std::memory_order_release);
 }
 
 JNIEXPORT void JNICALL
@@ -1039,7 +1060,12 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeCreateEngine(
     AudioDspEngine* engine = nullptr;
     try {
         engine = new AudioDspEngine();
-        DspEngineRegistry::instance().registerEngine(engine);
+        if (!DspEngineRegistry::instance().registerEngine(engine)) {
+            // Slot table full: refuse rather than hand out an unregistered
+            // pointer that destroy() could never validate.
+            delete engine;
+            return 0;
+        }
         return reinterpret_cast<jlong>(engine);
     } catch (...) {
         // Do not leak the engine if registration throws.
@@ -1233,45 +1259,37 @@ JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeDestroyEngine(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
     if (engineHandle == 0) return;
-    try {
-        // Control-side teardown with two independent exclusions, because the
-        // render path no longer shares this mutex (see
-        // nativeProcessDirectFloatBuffer):
-        //   1) unique_lock still excludes the NON-RT shared-lock holders
-        //      (nativeResetEngine / nativeResyncForTrack), so they cannot run
-        //      against `delete engine`.
-        //   2) The gEngineTeardown + gRenderInFlight handshake excludes in-flight
-        //      renders. We publish teardown (seq_cst) THEN wait for the in-flight
-        //      render count to reach zero. A render bumps its +1 (seq_cst) BEFORE
-        //      reading gEngineTeardown, so this StoreLoad pair guarantees we
-        //      cannot both see zero renders here AND let a render proceed to
-        //      touch the engine there: a render that slipped past the flag is
-        //      already counted and we wait for it; a render arriving later sees
-        //      the flag and bails. Hence `delete engine` never races a render.
-        std::unique_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
-        gTeardownEngineHandle.store(engineHandle, std::memory_order_seq_cst);
-        while (gRenderInFlight.load(std::memory_order_seq_cst) != 0) {
-            std::this_thread::yield();
-        }
-        auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
-        DspEngineRegistry::instance().unregisterEngine(engine);
-        delete engine;
-        gTeardownEngineHandle.store(0, std::memory_order_seq_cst);
-    } catch (...) {
-        // Re-open the render gate even if teardown threw, so a failed destroy
-        // cannot wedge subsequent renders into the reject path forever.
-        gTeardownEngineHandle.store(0, std::memory_order_seq_cst);
+    auto& registry = DspEngineRegistry::instance();
+    const int slot = registry.beginTeardown(static_cast<int64_t>(engineHandle));
+    if (slot < 0) {
+        // Unknown, stale or already-destroyed handle: never reinterpret it.
+        return;
     }
+    auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
+    try {
+        registry.waitForRenderers(slot);
+        registry.unregisterEngine(engine);
+        delete engine;
+    } catch (...) {
+        // finishTeardown() still clears the slot below, so a failed delete
+        // cannot wedge the table.
+    }
+    registry.finishTeardown(slot);
 }
 
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResetEngine(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
-    std::shared_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
-    auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
-    if (!engine) engine = &AudioDspEngine::instance();
+    if (engineHandle == 0) {
+        try {
+            AudioDspEngine::instance().reset();
+        } catch (...) {}
+        return;
+    }
+    EngineLease lease(static_cast<int64_t>(engineHandle));
+    if (!lease.get()) return;
     try {
-        engine->reset();
+        lease.get()->reset();
     } catch (...) {}
 }
 
@@ -1296,27 +1314,11 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
         static_cast<jlong>(frameCount) * channels * static_cast<jlong>(sizeof(float));
     if (capacity < 0 || requiredBytes > capacity) return 0;
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
-    // M-6: lock-free render/teardown handshake, replacing the per-block
-    // std::shared_lock<std::shared_mutex> that was taken here on the RT render
-    // thread. A shared_mutex read-lock can still block (and invert priority
-    // against nativeDestroyEngine's writer), so it was never RT-safe. Instead we
-    // publish our arrival in gRenderInFlight (a lock-free atomic RMW: no mutex,
-    // no priority inversion, no allocation) and then read gEngineTeardown. Both
-    // ops are seq_cst to form a StoreLoad (Dekker) handshake with destroy, which
-    // stores gEngineTeardown then loads gRenderInFlight: destroy can never both
-    // observe zero in-flight renders AND allow this render to touch the engine.
-    // Either we observe teardown and bail before using the engine, or destroy
-    // observes our count and waits for this block to finish before deleting.
-    gRenderInFlight.fetch_add(1, std::memory_order_seq_cst);
-    struct RenderGate {
-        ~RenderGate() { gRenderInFlight.fetch_sub(1, std::memory_order_seq_cst); }
-    } renderGate;
-    // If this specific engine is being destroyed, do not touch it.
-    if (gTeardownEngineHandle.load(std::memory_order_seq_cst) == engineHandle) {
-        return 0;
-    }
-    auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
-    if (!engine) return 0;  // FIX M-2: never render through the control singleton
+    // Lock-free admission: one atomic increment in the engine's slot, then a
+    // revalidation against teardown. No locks, no shared_ptr traffic.
+    EngineLease lease(static_cast<int64_t>(engineHandle));
+    auto* engine = lease.get();
+    if (!engine) return 0;
     try {
         jint processed = static_cast<jint>(engine->processInterleaved(floatBuffer, frameCount, channels));
         // USB exclusive streaming: tee the processed PCM to the isochronous USB
@@ -1340,11 +1342,16 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle, jdouble sampleRate, jint channels) {
-    std::shared_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
-    auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
-    if (!engine) engine = &AudioDspEngine::instance();
+    if (engineHandle == 0) {
+        try {
+            AudioDspEngine::instance().resyncForTrack(sampleRate, channels);
+        } catch (...) {}
+        return;
+    }
+    EngineLease lease(static_cast<int64_t>(engineHandle));
+    if (!lease.get()) return;
     try {
-        engine->resyncForTrack(sampleRate, channels);
+        lease.get()->resyncForTrack(sampleRate, channels);
     } catch (...) {}
 }
 

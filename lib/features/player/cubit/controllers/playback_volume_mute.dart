@@ -24,10 +24,16 @@ class PlaybackVolumeMute {
 
   bool get isMuted => _muted;
 
+  void _remember(double v) {
+    if (v > 0.001) _volumeBeforeMute = v;
+  }
+
   Future<void> setVolume(double volume) async {
+    final clamped = volume.clamp(0.0, 1.0);
+    _remember(clamped);
     try {
-      await _audioHandler.setVolume(volume);
-      _muted = volume <= 0.001;
+      await _audioHandler.setVolume(clamped);
+      _muted = clamped <= 0.001;
       final s = _getState();
       _emit(s.copyWith(
           playback: s.playback.copyWith(isMuted: _muted)));
@@ -46,6 +52,7 @@ class PlaybackVolumeMute {
     try {
       final current = _audioHandler.volume;
       final target = (current + delta).clamp(0.0, 1.0);
+      _remember(target);
       await _audioHandler.setVolume(target);
       _muted = target <= 0.001;
       final s = _getState();
@@ -74,9 +81,7 @@ class PlaybackVolumeMute {
         _muted = false;
       } else {
         final currentVol = _audioHandler.volume;
-        if (currentVol > 0.0) {
-          _volumeBeforeMute = currentVol;
-        }
+        _remember(currentVol);
         await _audioHandler.setVolume(0.0);
         _muted = true;
       }

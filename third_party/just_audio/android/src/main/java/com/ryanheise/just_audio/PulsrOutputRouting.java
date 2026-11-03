@@ -22,8 +22,10 @@ public final class PulsrOutputRouting {
     private static AudioDeviceInfo preferred;
     private static Field audioTrackField;
     private static Field audioOutputField;
+    private static Field audioOutputTrackField;
     private static Method getAudioTrackMethod;
     private static boolean reflectionLookupDone = false;
+    private static boolean audioOutputReflectionDone = false;
     private static boolean reflectionWarningLogged = false;
 
     private static synchronized void ensureReflectionInitialized() {
@@ -74,12 +76,20 @@ public final class PulsrOutputRouting {
                         Object obj = getAudioTrackMethod.invoke(audioOutput);
                         if (obj instanceof AudioTrack) return (AudioTrack) obj;
                     }
-                    try {
-                        Field f = audioOutput.getClass().getDeclaredField("audioTrack");
-                        f.setAccessible(true);
-                        Object obj = f.get(audioOutput);
-                        if (obj instanceof AudioTrack) return (AudioTrack) obj;
-                    } catch (Exception ignored) {}
+                    if (!audioOutputReflectionDone) {
+                        audioOutputReflectionDone = true;
+                        try {
+                            audioOutputTrackField =
+                                    audioOutput.getClass().getDeclaredField("audioTrack");
+                            audioOutputTrackField.setAccessible(true);
+                        } catch (Exception ignored) {}
+                    }
+                    if (audioOutputTrackField != null) {
+                        try {
+                            Object obj = audioOutputTrackField.get(audioOutput);
+                            if (obj instanceof AudioTrack) return (AudioTrack) obj;
+                        } catch (Exception ignored) {}
+                    }
                 }
             } catch (Exception ignored) {}
         }

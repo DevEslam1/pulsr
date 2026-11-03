@@ -117,6 +117,18 @@ class AudioPlayer {
       StreamController<DspOutputModeEffect>.broadcast();
   MethodChannel? _platformControlChannel;
 
+  /// Control channel for the active platform player. Reuses the channel
+  /// created during platform initialisation instead of constructing a new
+  /// MethodChannel for every DSP call (which also loses the native handler
+  /// identity and allocates on each fade).
+  MethodChannel? get _activeControlChannel {
+    final existing = _platformControlChannel;
+    if (existing != null) return existing;
+    final platform = _platformValue;
+    if (platform == null) return null;
+    return MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
+  }
+
   /// Emits whenever the platform applies or rejects an output-mode change.
   Stream<DspOutputModeEffect> get outputModeEffectStream =>
       _outputModeEffectController.stream;
@@ -1283,10 +1295,8 @@ class AudioPlayer {
     if (_disposed || gains.isEmpty) return false;
     try {
       if (!_active) return false;
-      final platform = _platformValue;
-      if (platform == null) return false;
-      final channel =
-          MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
+      final channel = _activeControlChannel;
+      if (channel == null) return false;
       return await channel.invokeMethod<bool>('dspSetGainCurve', {
             'gains': gains,
             'segmentMs': segmentMs,
@@ -1305,10 +1315,8 @@ class AudioPlayer {
     if (_disposed) return false;
     try {
       if (!_active) return false;
-      final platform = _platformValue;
-      if (platform == null) return false;
-      final channel =
-          MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
+      final channel = _activeControlChannel;
+      if (channel == null) return false;
       return await channel.invokeMethod<bool>('dspClearGainCurve') ?? false;
     } catch (_) {
       return false;
@@ -1317,11 +1325,12 @@ class AudioPlayer {
 
   /// Fades profile changes separately from sleep and crossfade envelopes.
   Future<bool> dspSetTransitionMuted(bool muted) async {
-    if (_disposed || !_active || _platformValue == null) return false;
+    if (_disposed || !_active) return false;
+    final channel = _activeControlChannel;
+    if (channel == null) return false;
     try {
-      return await MethodChannel(
-            'com.ryanheise.just_audio.methods.${_platformValue!.id}',
-          ).invokeMethod<bool>('dspSetTransitionMuted', {'muted': muted}) ??
+      return await channel
+              .invokeMethod<bool>('dspSetTransitionMuted', {'muted': muted}) ??
           false;
     } catch (_) {
       // Not the Pulsr Android fork — let the caller apply without a fade.
@@ -1331,11 +1340,11 @@ class AudioPlayer {
 
   /// Actual render-thread gain; a requested mute alone is not an acknowledgement.
   Future<double?> dspGetTransitionGain() async {
-    if (_disposed || !_active || _platformValue == null) return null;
+    if (_disposed || !_active) return null;
+    final channel = _activeControlChannel;
+    if (channel == null) return null;
     try {
-      return await MethodChannel(
-        'com.ryanheise.just_audio.methods.${_platformValue!.id}',
-      ).invokeMethod<double>('dspGetTransitionGain');
+      return await channel.invokeMethod<double>('dspGetTransitionGain');
     } catch (_) {
       // Not the Pulsr Android fork — signal "cannot report" to the caller.
       return null;
@@ -1355,14 +1364,12 @@ class AudioPlayer {
   Future<bool> dspSetFloatOutput(bool enabled) async {
     if (_disposed) return false;
     try {
-      final platform = _platformValue;
-      if (!_active || platform == null) {
+      final channel = _activeControlChannel;
+      if (!_active || channel == null) {
         _floatOutputEnabled = enabled;
         _floatOutputActive = false;
         return true; // remembered; flushed on platform activation
       }
-      final channel =
-          MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
       final accepted = await channel
               .invokeMethod<bool>('dspSetFloatOutput', {'enabled': enabled}) ??
           false;
@@ -1394,16 +1401,14 @@ class AudioPlayer {
   }) async {
     if (_disposed) return false;
     try {
-      final platform = _platformValue;
-      if (!_active || platform == null) {
+      final channel = _activeControlChannel;
+      if (!_active || channel == null) {
         _aaudioOutputEnabled = enabled;
         _aaudioPreferExclusive = preferExclusive;
         _aaudioTargetBufferMs = targetBufferMs;
         _aaudioOutputActive = false;
         return true; // remembered; flushed on platform activation
       }
-      final channel =
-          MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
       final accepted = await channel.invokeMethod<bool>('dspSetAaudioOutput', {
             'enabled': enabled,
             'preferExclusive': preferExclusive,
@@ -2829,10 +2834,16 @@ class _ProxyHttpServer {
     _running = true;
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server.listen((request) async {
-      if (request.method == 'GET') {
-        final uriPath = _requestKey(request.uri);
-        final handler = _handlerMap[uriPath]!;
+      final uriPath = _requestKey(request.uri);
+      final handler = _handlerMap[uriPath];
+      if ((request.method == 'GET' || request.method == 'HEAD') &&
+          handler != null) {
         handler(this, request);
+      } else {
+        request.response.statusCode = handler == null
+            ? HttpStatus.notFound
+            : HttpStatus.methodNotAllowed;
+        await request.response.close();
       }
     }, onDone: () {
       _running = false;
@@ -3788,6 +3799,7 @@ class LockCachingAudioSource extends StreamAudioSource {
   /// entire file continues in parallel.
   Future<HttpClientResponse> _fetch() async {
     _downloading = true;
+    try {
     final cacheFile = await this.cacheFile;
     final partialCacheFile = await _partialCacheFile;
 
@@ -4015,6 +4027,16 @@ class LockCachingAudioSource extends StreamAudioSource {
       _downloading = false;
     }, cancelOnError: true);
     return response;
+    } catch (e) {
+      // A failed connection/status/openWrite must not leave _downloading set,
+      // otherwise clearCache() refuses to run forever.
+      _downloading = false;
+      try { _httpClient?.close(force: true); } catch (_) {}
+      _httpClient = null;
+      try { await _sink?.close(); } catch (_) {}
+      _sink = null;
+      rethrow;
+    }
   }
 
   @override
@@ -4041,6 +4063,7 @@ class LockCachingAudioSource extends StreamAudioSource {
       for (final req in _requests) {
         req.fail(error, stackTrace);
       }
+      _requests.clear();
       return Future<HttpClientResponse>.error(error as Object, stackTrace);
     });
     return byteRangeRequest.future.then((response) {
@@ -4220,9 +4243,11 @@ _ProxyHandler _proxyHandlerForUri(
   Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
     final client = _createHttpClient(userAgent: userAgent);
-    // Try to make normal request
-    String? host;
+    var socketDetached = false;
     try {
+      // Try to make normal request
+      String? host;
+      try {
       final requestHeaders = <String, String>{};
       request.headers
           .forEach((name, value) => requestHeaders[name] = value.join(', '));
@@ -4296,6 +4321,9 @@ _ProxyHandler _proxyHandlerForUri(
         final socket = await Socket.connect(uri.host, uri.port);
         final clientSocket =
             await request.response.detachSocket(writeHeaders: false);
+        // The response socket is now owned by clientSocket; closing the
+        // HttpClient here would tear down a connection already handed off.
+        socketDetached = true;
         final done = Completer<dynamic>();
         socket.listen(
           clientSocket.add,
@@ -4327,6 +4355,9 @@ _ProxyHandler _proxyHandlerForUri(
         await socket.flush();
         await done.future;
       }
+      }
+    } finally {
+      if (!socketDetached) client.close();
     }
   }
 

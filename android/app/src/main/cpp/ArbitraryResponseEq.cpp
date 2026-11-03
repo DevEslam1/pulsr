@@ -69,6 +69,7 @@ void ArbitraryResponseEq::setSampleRate(double sampleRate, bool resynthesize) {
     // otherwise the constructor's passthrough impulse must be preserved.
     if (resynthesize && hasResponse_) {
         synthesizeFir();
+        needsResynthesis_.store(false, std::memory_order_release);
     }
     reset();
 }
@@ -80,6 +81,8 @@ void ArbitraryResponseEq::reset() {
     std::memset(phaseDelayL_, 0, sizeof(phaseDelayL_));
     std::memset(phaseDelayR_, 0, sizeof(phaseDelayR_));
     phaseDelayIdx_ = 0;
+    std::memset(surroundDelay_, 0, sizeof(surroundDelay_));
+    surroundDelayIdx_ = 0;
     smoothedEnabledMix_ = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
     filterCrossfadeProgress_ = 1.0f;
     oldLinearPhase_ = linearPhase_;
@@ -307,6 +310,27 @@ std::vector<float> ArbitraryResponseEq::synthesizeFirKernel(
     return filter;
 }
 
+bool ArbitraryResponseEq::resynthesizeIfNeeded() {
+    if (!needsResynthesis_.exchange(false, std::memory_order_acq_rel)) {
+        return false;
+    }
+    if (loadedString_ != "" && nodes_.empty()) {
+        std::vector<std::pair<double, double>> parsed;
+        if (parseGraphicEq(loadedString_, parsed)) {
+            nodes_.assign(parsed.begin(), parsed.end());
+            hasResponse_ = true;
+        }
+    }
+    if (!hasResponse_ || nodes_.empty()) {
+        std::fill(firFilter_.begin(), firFilter_.end(), 0.0f);
+        firFilter_[0] = 1.0f;
+        firSynthesizedRate_ = sampleRate_;
+        return true;
+    }
+    synthesizeFir();
+    return true;
+}
+
 void ArbitraryResponseEq::synthesizeFir() {
     // Use the scratch-buffer synthesizers, not synthesizeFirKernel(): the
     // latter allocates two vectors (filter + spectrum) and is only safe for
@@ -473,11 +497,27 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
             }
             return;
         }
-        // Sample rate mismatch: fall through to re-synthesize kernel at active sampleRate_
+        // Sample rate mismatch: FFT synthesis must never run on the audio
+        // thread. Keep the current kernel (or passthrough) and ask the control
+        // thread to rebuild it via resynthesizeIfNeeded().
         if (params.preparedFilter->nodes) {
-            applyPreparedNodes(params.preparedFilter->nodes, params.preparedFilter->linearPhase);
-            return;
+            const bool hadResponse = hasResponse_;
+            preparedNodesRef_ = params.preparedFilter->nodes;
+            linearPhase_ = params.preparedFilter->linearPhase;
+            nodes_.assign(params.preparedFilter->nodes->begin(),
+                          params.preparedFilter->nodes->end());  // reserved capacity
+            hasResponse_ = !nodes_.empty();
+            if (hadResponse && smoothedEnabledMix_ > 1e-4f &&
+                linearPhase_ != oldLinearPhase_) {
+                // A phase-mode change across the rate boundary would otherwise
+                // swap the dry alignment under the listener; let the resynth
+                // resolve it at the new rate.
+                filterCrossfadeProgress_ = 1.0f;
+                oldLinearPhase_ = linearPhase_;
+            }
         }
+        needsResynthesis_.store(true, std::memory_order_release);
+        return;
     }
 
     if (!params.preparedFilter && preparedFilterRef_) {
@@ -499,18 +539,26 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
         firSynthesizedRate_ = sampleRate_;
     }
 
-    // Fallback path (e.g. tests or legacy calls where preparedFilter was omitted)
+    // Legacy paths: no FFT may run here (audio thread). Remember the requested
+    // response and let a control-thread resynthesizeIfNeeded() build the kernel.
     if (params.parsedNodes) {
         if (params.parsedNodes != preparedNodesRef_ ||
             params.linearPhase != linearPhase_ ||
             std::abs(firSynthesizedRate_ - sampleRate_) >= 0.5) {
-            applyPreparedNodes(params.parsedNodes, params.linearPhase);
+            preparedNodesRef_ = params.parsedNodes;
+            linearPhase_ = params.linearPhase;
+            nodes_.assign(params.parsedNodes->begin(), params.parsedNodes->end());
+            hasResponse_ = !nodes_.empty();
+            needsResynthesis_.store(true, std::memory_order_release);
         }
         return;
     }
-    if (!params.graphicEqString.empty() &&
-        (params.graphicEqString != loadedString_ || params.linearPhase != linearPhase_)) {
-        loadGraphicEqString(params.graphicEqString, params.linearPhase);
+    if (!params.graphicEqString.empty()) {
+        if (params.graphicEqString != loadedString_ || params.linearPhase != linearPhase_) {
+            loadedString_ = params.graphicEqString;
+            linearPhase_ = params.linearPhase;
+            needsResynthesis_.store(true, std::memory_order_release);
+        }
     } else if (params.graphicEqString.empty() && (hasResponse_ || preparedNodesRef_ != nullptr)) {
         loadGraphicEqString("", params.linearPhase);
     }
@@ -703,6 +751,18 @@ void ArbitraryResponseEq::process(float* L, float* R, int frames) {
     const float targetEnabledMix = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
     if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
     if (!L || !R || frames <= 0) return;
+    if (smoothedEnabledMix_ < 1e-4f && targetEnabledMix > 0.0f) {
+        // Cold enable: clear stale convolution/phase-delay history so the first
+        // processed block does not comb against the previous session.
+        std::memset(historyL_, 0, sizeof(historyL_));
+        std::memset(historyR_, 0, sizeof(historyR_));
+        std::memset(phaseDelayL_, 0, sizeof(phaseDelayL_));
+        std::memset(phaseDelayR_, 0, sizeof(phaseDelayR_));
+        std::memset(surroundDelay_, 0, sizeof(surroundDelay_));
+        historyIdx_ = 0;
+        phaseDelayIdx_ = 0;
+        surroundDelayIdx_ = 0;
+    }
 
     // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
     const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
@@ -727,6 +787,16 @@ void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int chan
     const float targetEnabledMix = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
     if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
     if (!buffer || frames <= 0 || channels < 1) return;
+    if (smoothedEnabledMix_ < 1e-4f && targetEnabledMix > 0.0f) {
+        std::memset(historyL_, 0, sizeof(historyL_));
+        std::memset(historyR_, 0, sizeof(historyR_));
+        std::memset(phaseDelayL_, 0, sizeof(phaseDelayL_));
+        std::memset(phaseDelayR_, 0, sizeof(phaseDelayR_));
+        std::memset(surroundDelay_, 0, sizeof(surroundDelay_));
+        historyIdx_ = 0;
+        phaseDelayIdx_ = 0;
+        surroundDelayIdx_ = 0;
+    }
 
     // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
     const double kTau = (targetEnabledMix > smoothedEnabledMix_) ? 0.025 : 0.015;
@@ -753,6 +823,20 @@ void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int chan
             processFrame(buffer[i * channels], buffer[i * channels + 1],
                          buffer[i * channels], buffer[i * channels + 1],
                          currentEnabledMix, crossfadeStep);
+            // Linear-phase L/R are delayed via historyL_/R_ inside processFrame;
+            // dry surround channels need the same delay to stay time-aligned
+            // with the stereo pair.
+            if (linearPhase_ && channels > 2) {
+                const int surroundChannels = std::min(channels, 8);
+                for (int ch = 2; ch < surroundChannels; ++ch) {
+                    const int slot = ch - 2;
+                    const float delayed = surroundDelay_[slot][surroundDelayIdx_];
+                    surroundDelay_[slot][surroundDelayIdx_] =
+                        buffer[i * channels + ch];
+                    buffer[i * channels + ch] = delayed;
+                }
+                surroundDelayIdx_ = (surroundDelayIdx_ + 1) % SURROUND_DRY_DELAY;
+            }
             currentEnabledMix += mixStep;
         }
     }

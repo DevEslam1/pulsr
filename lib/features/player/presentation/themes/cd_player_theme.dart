@@ -43,6 +43,7 @@ class CdPlayerTheme extends StatefulWidget {
 class _CdPlayerThemeState extends State<CdPlayerTheme>
     with TickerProviderStateMixin {
   late final AnimationController _rotationController;
+  late final AnimationController _velocityController;
   late final AnimationController _tonearmController;
   late final CurvedAnimation _tonearmAnimation;
 
@@ -54,6 +55,12 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
       duration: const Duration(seconds: 12),
     );
 
+    _velocityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+      value: widget.props.state.isPlaying ? 1.0 : 0.0,
+    );
+
     _tonearmController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 850),
@@ -62,14 +69,15 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
 
     _tonearmAnimation = CurvedAnimation(
       parent: _tonearmController,
-      curve: Curves.easeInOutCubic,
+      curve: Curves.easeInOutBack,
     );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _tonearmController.duration = context.motionMs(850);
+    _tonearmController.duration = context.motionMs(480);
+    _velocityController.duration = context.motionMs(650);
     _syncRotation();
   }
 
@@ -79,9 +87,29 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
       if (!_rotationController.isAnimating) {
         _rotationController.repeat();
       }
+      _velocityController.animateTo(
+        1.0,
+        duration: context.motionMs(650),
+        curve: Curves.easeOutCubic,
+      );
     } else {
-      if (_rotationController.isAnimating) {
-        _rotationController.stop();
+      if (!context.motionEnabled) {
+        _velocityController.value = 0.0;
+        if (_rotationController.isAnimating) {
+          _rotationController.stop();
+        }
+      } else if (_rotationController.isAnimating) {
+        _velocityController
+            .animateTo(
+              0.0,
+              duration: context.motionMs(650),
+              curve: Curves.decelerate,
+            )
+            .whenComplete(() {
+              if (mounted && !widget.props.state.isPlaying && _velocityController.value == 0.0) {
+                _rotationController.stop();
+              }
+            });
       }
     }
   }
@@ -102,6 +130,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
   @override
   void dispose() {
     _tonearmAnimation.dispose();
+    _velocityController.dispose();
     _rotationController.dispose();
     _tonearmController.dispose();
     super.dispose();

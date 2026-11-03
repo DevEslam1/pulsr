@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
@@ -125,6 +127,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         borderRadius: AppRadii.r12All,
       ),
       onSelected: (_) {
+        HapticFeedback.selectionClick();
         setState(() {
           _filter = filter;
           // Prune selections that are not part of the newly filtered list, so
@@ -529,26 +532,57 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                               },
                               child: Row(
                                 children: [
-                                  if (_isSelectionMode) ...[
-                                    Checkbox(
-                                      value: isSelected,
-                                      activeColor: p.accent,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: AppRadii.r4All,
+                                  AnimatedSize(
+                                    duration: context.motionMs(180),
+                                    curve: Curves.easeOutCubic,
+                                    child: AnimatedSwitcher(
+                                      duration: context.motionMs(180),
+                                      transitionBuilder: (child, animation) =>
+                                          FadeTransition(
+                                        opacity: animation,
+                                        child: SizeTransition(
+                                          sizeFactor: animation,
+                                          axis: Axis.horizontal,
+                                          child: child,
+                                        ),
                                       ),
-                                      onChanged: (val) {
-                                        setState(() {
-                                          if (val == true) {
-                                            _selectedVideoIds.add(task.videoId);
-                                          } else {
-                                            _selectedVideoIds
-                                                .remove(task.videoId);
-                                          }
-                                        });
-                                      },
+                                      child: _isSelectionMode
+                                          ? Row(
+                                              key: const ValueKey(
+                                                  'selection_checkbox_row'),
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Checkbox(
+                                                  value: isSelected,
+                                                  activeColor: p.accent,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        AppRadii.r4All,
+                                                  ),
+                                                  onChanged: (val) {
+                                                    HapticFeedback
+                                                        .selectionClick();
+                                                    setState(() {
+                                                      if (val == true) {
+                                                        _selectedVideoIds
+                                                            .add(task.videoId);
+                                                      } else {
+                                                        _selectedVideoIds
+                                                            .remove(
+                                                                task.videoId);
+                                                      }
+                                                    });
+                                                  },
+                                                ),
+                                                const SizedBox(
+                                                    width: AppSpacing.xxs),
+                                              ],
+                                            )
+                                          : const SizedBox.shrink(
+                                              key: ValueKey(
+                                                  'no_selection_checkbox')),
                                     ),
-                                    const SizedBox(width: AppSpacing.xxs),
-                                  ],
+                                  ),
                                   Expanded(
                                     child: BlocSelector<DownloadsCubit,
                                         DownloadsState, DownloadTask>(
@@ -631,7 +665,15 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             (t) => t.status == DownloadStatus.complete && t.localSongId != null)
         .toList();
 
-    return SafeArea(
+    return AnimatedSlide(
+      offset: Offset.zero,
+      duration: context.motion(PulsrDurations.layout),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: 1.0,
+        duration: context.motion(PulsrMotion.state),
+        child: SafeArea(
+          key: const ValueKey('downloads_bulk_actions_bar'),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
@@ -677,7 +719,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Future<void> _confirmDeleteSelected(

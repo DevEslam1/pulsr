@@ -48,6 +48,34 @@ void Crossfeed::initBs2b(double fcut, double feedDb) {
 
 void Crossfeed::setMode(CrossfeedMode mode) {
     const CrossfeedMode previousMode = mode_;
+    const bool liveWet = enabled_ && smoothedEnabledMix_ > 1e-4f;
+    bool crossfadeStarted = false;
+    if (liveWet && mode != previousMode) {
+        crossfadeStarted = true;
+        prevCustomDelaySamples_ = smoothedDelaySamples_;
+        prevCustomFeedLevel_ = smoothedFeedLevel_;
+        prevCustomLpCoeff_ = smoothedLpCoeff_;
+        // Snapshot the old BS2B coefficients/states so the old and new modes
+        // can run concurrently for the 15 ms output crossfade below.
+        prevMode_ = previousMode;
+        prevBs2bA0Lo_ = bs2b_a0_lo_;
+        prevBs2bB1Lo_ = bs2b_b1_lo_;
+        prevBs2bA0Hi_ = bs2b_a0_hi_;
+        prevBs2bA1Hi_ = bs2b_a1_hi_;
+        prevBs2bB1Hi_ = bs2b_b1_hi_;
+        prevBs2bGain_ = bs2b_gain_;
+        prevBs2bLo_[0] = bs2b_lo_[0];
+        prevBs2bLo_[1] = bs2b_lo_[1];
+        prevBs2bHi_[0] = bs2b_hi_[0];
+        prevBs2bHi_[1] = bs2b_hi_[1];
+        prevBs2bAsis_[0] = bs2b_asis_[0];
+        prevBs2bAsis_[1] = bs2b_asis_[1];
+        modeCrossfadeTotal_ = std::max(1, static_cast<int>(sampleRate_ * 0.015));
+        modeCrossfadeSamples_ = 0;
+    } else if (mode == previousMode || !liveWet) {
+        modeCrossfadeTotal_ = 0;
+        modeCrossfadeSamples_ = 0;
+    }
     mode_ = mode;
     switch (mode_) {
         case CrossfeedMode::Bs2bDefault:
@@ -78,11 +106,20 @@ void Crossfeed::setMode(CrossfeedMode mode) {
     }
     initBs2b(fcut_, feedDb_);
     configure(delayUs_, feedDb_, fcut_);
+    if (mode_ != CrossfeedMode::Custom && previousMode == CrossfeedMode::Custom) {
+        // Entering BS2B from Custom: the BS2B registers are stale from an
+        // earlier session (they were not ticked during Custom). Start clean.
+        bs2b_lo_[0] = bs2b_lo_[1] = 0.0;
+        bs2b_hi_[0] = bs2b_hi_[1] = 0.0;
+        bs2b_asis_[0] = bs2b_asis_[1] = 0.0;
+    }
 
     // The Custom delay line is only written while in Custom mode, so switching
     // into Custom would otherwise read stale samples from a previous Custom run
     // (or zeros/garbage) until the line refills. Clear it on any mode change.
-    if (mode_ != previousMode) {
+    // When leaving Custom mid-crossfade the old custom path is still running,
+    // so keep its state until the fade completes.
+    if (mode_ != previousMode && (mode_ == CrossfeedMode::Custom || !crossfadeStarted)) {
         clearCustomState();
     }
 }
@@ -142,33 +179,45 @@ void Crossfeed::reset() {
     smoothedDelaySamples_ = targetDelaySamples_;
     smoothedLpCoeff_ = targetLpCoeff_;
     smoothedEnabledMix_ = enabled_ ? 1.0f : 0.0f;
+    modeCrossfadeSamples_ = 0;
+    modeCrossfadeTotal_ = 0;
 
     bs2b_lo_[0] = 0.0; bs2b_lo_[1] = 0.0;
     bs2b_hi_[0] = 0.0; bs2b_hi_[1] = 0.0;
     bs2b_asis_[0] = 0.0; bs2b_asis_[1] = 0.0;
 }
 
-inline void Crossfeed::processBs2bFrame(float inL, float inR, float& outL, float& outR) {
+inline void Crossfeed::processBs2bFrameWith(
+        float inL, float inR, float& outL, float& outR,
+        double a0Lo, double b1Lo, double a0Hi, double a1Hi, double b1Hi,
+        double gain, double lo[2], double hi[2], double asis[2]) {
     double dInL = inL;
     double dInR = inR;
     if (!std::isfinite(dInL)) dInL = 0.0;
     if (!std::isfinite(dInR)) dInR = 0.0;
 
-    bs2b_lo_[0] = bs2b_a0_lo_ * dInL + bs2b_b1_lo_ * bs2b_lo_[0];
-    bs2b_lo_[1] = bs2b_a0_lo_ * dInR + bs2b_b1_lo_ * bs2b_lo_[1];
+    lo[0] = a0Lo * dInL + b1Lo * lo[0];
+    lo[1] = a0Lo * dInR + b1Lo * lo[1];
 
-    bs2b_hi_[0] = bs2b_a0_hi_ * dInL + bs2b_a1_hi_ * bs2b_asis_[0] + bs2b_b1_hi_ * bs2b_hi_[0];
-    bs2b_hi_[1] = bs2b_a0_hi_ * dInR + bs2b_a1_hi_ * bs2b_asis_[1] + bs2b_b1_hi_ * bs2b_hi_[1];
-    bs2b_asis_[0] = dInL;
-    bs2b_asis_[1] = dInR;
+    hi[0] = a0Hi * dInL + a1Hi * asis[0] + b1Hi * hi[0];
+    hi[1] = a0Hi * dInR + a1Hi * asis[1] + b1Hi * hi[1];
+    asis[0] = dInL;
+    asis[1] = dInR;
 
-    if (std::abs(bs2b_lo_[0]) < 1e-30) bs2b_lo_[0] = 0.0;
-    if (std::abs(bs2b_lo_[1]) < 1e-30) bs2b_lo_[1] = 0.0;
-    if (std::abs(bs2b_hi_[0]) < 1e-30) bs2b_hi_[0] = 0.0;
-    if (std::abs(bs2b_hi_[1]) < 1e-30) bs2b_hi_[1] = 0.0;
+    if (std::abs(lo[0]) < 1e-30) lo[0] = 0.0;
+    if (std::abs(lo[1]) < 1e-30) lo[1] = 0.0;
+    if (std::abs(hi[0]) < 1e-30) hi[0] = 0.0;
+    if (std::abs(hi[1]) < 1e-30) hi[1] = 0.0;
 
-    outL = static_cast<float>((bs2b_hi_[0] + bs2b_lo_[1]) * bs2b_gain_);
-    outR = static_cast<float>((bs2b_hi_[1] + bs2b_lo_[0]) * bs2b_gain_);
+    outL = static_cast<float>((hi[0] + lo[1]) * gain);
+    outR = static_cast<float>((hi[1] + lo[0]) * gain);
+}
+
+inline void Crossfeed::processBs2bFrame(float inL, float inR, float& outL, float& outR) {
+    processBs2bFrameWith(inL, inR, outL, outR,
+                         bs2b_a0_lo_, bs2b_b1_lo_,
+                         bs2b_a0_hi_, bs2b_a1_hi_, bs2b_b1_hi_,
+                         bs2b_gain_, bs2b_lo_, bs2b_hi_, bs2b_asis_);
 }
 
 inline void Crossfeed::processCustomFrame(float l, float r, float& outL, float& outR,
@@ -201,9 +250,63 @@ inline void Crossfeed::processCustomFrame(float l, float r, float& outL, float& 
     outR = (r + delayedL * feedLevel) * makeup;
 }
 
+inline void Crossfeed::processMixedFrame(float inL, float inR, float& outL,
+                                         float& outR, float currentMix,
+                                         float currentDelay) {
+    float wetL = 0.0f;
+    float wetR = 0.0f;
+    if (modeCrossfadeTotal_ > 0 && modeCrossfadeSamples_ < modeCrossfadeTotal_) {
+        float newL = 0.0f, newR = 0.0f;
+        float oldL = 0.0f, oldR = 0.0f;
+        if (mode_ == CrossfeedMode::Custom) {
+            const float feed = smoothedFeedLevel_;
+            processCustomFrame(inL, inR, newL, newR, currentDelay, feed,
+                               smoothedLpCoeff_, 1.0f / (1.0f + feed));
+        } else {
+            processBs2bFrame(inL, inR, newL, newR);
+        }
+        if (prevMode_ == CrossfeedMode::Custom) {
+            const float feed = prevCustomFeedLevel_;
+            processCustomFrame(inL, inR, oldL, oldR, prevCustomDelaySamples_,
+                               feed, prevCustomLpCoeff_, 1.0f / (1.0f + feed));
+        } else {
+            processBs2bFrameWith(inL, inR, oldL, oldR,
+                                 prevBs2bA0Lo_, prevBs2bB1Lo_,
+                                 prevBs2bA0Hi_, prevBs2bA1Hi_, prevBs2bB1Hi_,
+                                 prevBs2bGain_, prevBs2bLo_, prevBs2bHi_,
+                                 prevBs2bAsis_);
+        }
+        const float progress = static_cast<float>(modeCrossfadeSamples_) /
+                               static_cast<float>(modeCrossfadeTotal_);
+        const float oldW =
+            0.5f * (1.0f + std::cos(static_cast<float>(M_PI) * progress));
+        wetL = oldW * oldL + (1.0f - oldW) * newL;
+        wetR = oldW * oldR + (1.0f - oldW) * newR;
+        ++modeCrossfadeSamples_;
+        if (modeCrossfadeSamples_ >= modeCrossfadeTotal_) {
+            modeCrossfadeTotal_ = 0;
+            if (mode_ != CrossfeedMode::Custom) {
+                clearCustomState();
+            }
+        }
+    } else if (mode_ == CrossfeedMode::Custom) {
+        const float feed = smoothedFeedLevel_;
+        processCustomFrame(inL, inR, wetL, wetR, currentDelay, feed,
+                           smoothedLpCoeff_, 1.0f / (1.0f + feed));
+    } else {
+        processBs2bFrame(inL, inR, wetL, wetR);
+    }
+    outL = (1.0f - currentMix) * inL + currentMix * wetL;
+    outR = (1.0f - currentMix) * inR + currentMix * wetR;
+}
+
 void Crossfeed::process(float* L, float* R, int frames) {
     const float targetMix = enabled_ ? 1.0f : 0.0f;
-    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) {
+        modeCrossfadeTotal_ = 0;
+        modeCrossfadeSamples_ = 0;
+        return;
+    }
     if (!L || !R || frames <= 0) return;
 
     constexpr double kTau = 0.015;
@@ -216,20 +319,8 @@ void Crossfeed::process(float* L, float* R, int frames) {
     const float mixStep = (smoothedEnabledMix_ - startMix) / static_cast<float>(frames);
     float currentMix = startMix;
 
-    if (mode_ != CrossfeedMode::Custom) {
-        for (int i = 0; i < frames; ++i) {
-            float inL = L[i];
-            float inR = R[i];
-            float outL = 0.0f, outR = 0.0f;
-            processBs2bFrame(inL, inR, outL, outR);
-            L[i] = (1.0f - currentMix) * inL + currentMix * outL;
-            R[i] = (1.0f - currentMix) * inR + currentMix * outR;
-            currentMix += mixStep;
-        }
-        return;
-    }
-
-    // Custom Delay-Line Crossfeed mode
+    // Custom parameters are smoothed unconditionally so a mode switch into
+    // Custom never begins with a parameter step.
     smoothedFeedLevel_ += static_cast<float>(smoothFactor) * (targetFeedLevel_ - smoothedFeedLevel_);
     if (std::abs(smoothedFeedLevel_ - targetFeedLevel_) < 1e-5f) {
         smoothedFeedLevel_ = targetFeedLevel_;
@@ -247,25 +338,23 @@ void Crossfeed::process(float* L, float* R, int frames) {
     const float delayStep = (smoothedDelaySamples_ - startDelay) / static_cast<float>(frames);
     float currentDelay = startDelay;
 
-    const float feedLevel = smoothedFeedLevel_;
-    const float lpCoeff = smoothedLpCoeff_;
-    const float makeup = 1.0f / (1.0f + feedLevel);
-
     for (int i = 0; i < frames; ++i) {
-        float inL = L[i];
-        float inR = R[i];
         float outL = 0.0f, outR = 0.0f;
         currentDelay += delayStep;
-        processCustomFrame(inL, inR, outL, outR, currentDelay, feedLevel, lpCoeff, makeup);
-        L[i] = (1.0f - currentMix) * inL + currentMix * outL;
-        R[i] = (1.0f - currentMix) * inR + currentMix * outR;
+        processMixedFrame(L[i], R[i], outL, outR, currentMix, currentDelay);
+        L[i] = outL;
+        R[i] = outR;
         currentMix += mixStep;
     }
 }
 
 void Crossfeed::processInterleaved(float* buffer, int frames, int channels) {
     const float targetMix = enabled_ ? 1.0f : 0.0f;
-    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) {
+        modeCrossfadeTotal_ = 0;
+        modeCrossfadeSamples_ = 0;
+        return;
+    }
     if (!buffer || frames <= 0 || channels < 2) return;
 
     constexpr double kTau = 0.015;
@@ -278,21 +367,6 @@ void Crossfeed::processInterleaved(float* buffer, int frames, int channels) {
     const float mixStep = (smoothedEnabledMix_ - startMix) / static_cast<float>(frames);
     float currentMix = startMix;
 
-    if (mode_ != CrossfeedMode::Custom) {
-        for (int i = 0; i < frames; ++i) {
-            const int idx = i * channels;
-            float inL = buffer[idx];
-            float inR = buffer[idx + 1];
-            float outL = 0.0f, outR = 0.0f;
-            processBs2bFrame(inL, inR, outL, outR);
-            buffer[idx] = (1.0f - currentMix) * inL + currentMix * outL;
-            buffer[idx + 1] = (1.0f - currentMix) * inR + currentMix * outR;
-            currentMix += mixStep;
-        }
-        return;
-    }
-
-    // Custom Delay-Line Crossfeed mode
     smoothedFeedLevel_ += static_cast<float>(smoothFactor) * (targetFeedLevel_ - smoothedFeedLevel_);
     if (std::abs(smoothedFeedLevel_ - targetFeedLevel_) < 1e-5f) {
         smoothedFeedLevel_ = targetFeedLevel_;
@@ -310,19 +384,14 @@ void Crossfeed::processInterleaved(float* buffer, int frames, int channels) {
     const float delayStep = (smoothedDelaySamples_ - startDelay) / static_cast<float>(frames);
     float currentDelay = startDelay;
 
-    const float feedLevel = smoothedFeedLevel_;
-    const float lpCoeff = smoothedLpCoeff_;
-    const float makeup = 1.0f / (1.0f + feedLevel);
-
     for (int i = 0; i < frames; ++i) {
         const int idx = i * channels;
-        float inL = buffer[idx];
-        float inR = buffer[idx + 1];
         float outL = 0.0f, outR = 0.0f;
         currentDelay += delayStep;
-        processCustomFrame(inL, inR, outL, outR, currentDelay, feedLevel, lpCoeff, makeup);
-        buffer[idx] = (1.0f - currentMix) * inL + currentMix * outL;
-        buffer[idx + 1] = (1.0f - currentMix) * inR + currentMix * outR;
+        processMixedFrame(buffer[idx], buffer[idx + 1], outL, outR,
+                          currentMix, currentDelay);
+        buffer[idx] = outL;
+        buffer[idx + 1] = outR;
         currentMix += mixStep;
     }
 }

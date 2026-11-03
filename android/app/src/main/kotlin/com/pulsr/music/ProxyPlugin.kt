@@ -26,12 +26,15 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         fun registerWith(flutterEngine: FlutterEngine, context: Context): ProxyPlugin {
             val plugin = ProxyPlugin()
             plugin.context = context
+            DnsOverHttpsResolver.initialize(context)
             val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel = channel
             channel.setMethodCallHandler(plugin)
             ProxyPool.setOnPathChangeListener { label ->
                 plugin.mainHandler.post {
-                    plugin.channel?.invokeMethod("onPathChanged", mapOf("path" to label))
+                    safeCall("ProxyPlugin", "onPathChanged") {
+                        plugin.channel?.invokeMethod("onPathChanged", mapOf("path" to label))
+                    }
                 }
             }
             return plugin
@@ -40,6 +43,7 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
+        binding.applicationContext?.let { DnsOverHttpsResolver.initialize(it) }
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel?.setMethodCallHandler(this)
         ProxyPool.setOnPathChangeListener { label ->
@@ -74,6 +78,7 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 val username = call.argument<String>("username")
                 val password = call.argument<String>("password")
                 val bypassHosts = call.argument<String>("bypassHosts")
+                val failClosed = call.argument<Boolean>("failClosed") ?: false
 
                 ProxyManager.setProxy(
                     enabled = enabled,
@@ -83,6 +88,7 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     username = username,
                     password = password,
                     bypassHosts = bypassHosts,
+                    failClosed = failClosed,
                 )
                 result.success(true)
             }
@@ -111,18 +117,28 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     )
                 }
                 ProxyPool.setAutoRotate(autoRotate)
-                ProxyPool.setProxies(nodes)
+                // An empty list clears the pool but must not mark it as an
+                // explicit (user-supplied) pool; otherwise ProxyManager stops
+                // honoring the single-proxy configuration.
+                ProxyPool.setProxies(nodes, isExplicit = nodes.isNotEmpty())
                 result.success(true)
             }
             "testProxy" -> {
                 val testUrl = call.argument<String>("testUrl") ?: "https://www.google.com/generate_204"
                 val timeoutMs = call.argument<Int>("timeoutMs") ?: 10000
 
-                executor.execute {
-                    val res = ProxyManager.testConnection(testUrl, timeoutMs)
-                    mainHandler.post {
-                        result.success(res)
+                try {
+                    executor.execute {
+                        val res = ProxyManager.testConnection(testUrl, timeoutMs)
+                        mainHandler.post {
+                            try {
+                                result.success(res)
+                            } catch (_: Exception) {
+                            }
+                        }
                     }
+                } catch (e: java.util.concurrent.RejectedExecutionException) {
+                    result.error("PLUGIN_DISPOSED", "Proxy plugin is shutting down", null)
                 }
             }
             "testAllProxies" -> {

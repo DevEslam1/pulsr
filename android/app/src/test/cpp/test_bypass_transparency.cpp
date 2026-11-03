@@ -106,6 +106,44 @@ int main() {
     }
 
     {
+        // The UI can publish every stage bit while every stage flag is off.
+        // That must remain a zero-latency, bit-exact bypass.
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->activeStages = 0xFFFFFFFFu;
+        // Every stage defaults to disabled; explicitly clear the ones with a
+        // flag so the intent is unambiguous.
+        snap->eq.enabled = false;
+        snap->crossfeed.enabled = false;
+        snap->reverb.enabled = false;
+        snap->limiter.enabled = false;
+        snap->resampler.enabled = false;
+        snap->saturation.enabled = false;
+        snap->stereoWidth.enabled = false;
+        snap->loudness.enabled = false;
+        snap->subCrossover.enabled = false;
+        snap->dynamicEq.enabled = false;
+        snap->multibandCompressor.enabled = false;
+        snap->dynamicBass.enabled = false;
+        snap->viperDdc.enabled = false;
+        snap->arbitraryEq.enabled = false;
+        snap->liveProg.enabled = false;
+        snap->directVolume.enabled = false;
+        snap->replayGain.enabled = false;
+        snap->headphoneSafety.enabled = false;
+        snap->channelManager.enabled = false;
+        engine->setSampleRate(snap->sampleRate);
+        engine->publishParams(snap);
+        const auto input = makeSignal(frames, channels);
+        auto work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(bitIdentical(work, input),
+              "0xFFFFFFFF activeStages with all flags off must be bit-exact");
+        check(engine->getPipelineLatencyFrames() == 0,
+              "disabled stages must report zero pipeline latency");
+    }
+
+    {
         // Bit-perfect wins over everything upstream of it, including ReplayGain.
         auto engine = makeEngine();
         auto snap = baseSnapshot();

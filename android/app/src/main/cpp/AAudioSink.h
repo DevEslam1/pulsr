@@ -18,6 +18,8 @@
 
 #include <aaudio/AAudio.h>
 
+#include "AAudioSinkSupport.h"
+
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -45,8 +47,11 @@ public:
         int32_t targetBufferMs = 150;  // 0 => device default capacity
     };
 
+    AAudioSink();
+
     // Requires EXCLUSIVE for bit-perfect/DoP; otherwise uses the shared ladder.
-    // Returns false and fills `error` on failure.
+    // Returns false and fills `error` on failure. Closes any previous stream
+    // before applying the new configuration.
     bool Open(const Config& config, std::string* error);
 
     // Blocks until the stream is released. Safe from any thread.
@@ -86,6 +91,7 @@ private:
     static void ErrorCallback(AAudioStream* stream, void* userData, aaudio_result_t error);
     bool RecoverDisconnected();
     void CheckAndAdaptBuffer(AAudioStream* st);
+    void ShrinkBufferIfStable(AAudioStream* st);
 
     Config config_{};
     std::atomic<AAudioStream*> stream_{nullptr};
@@ -93,7 +99,7 @@ private:
     mutable std::atomic<int32_t> activeReaders_{0};
     mutable std::atomic<int32_t> activeWriters_{0};
     std::atomic<bool> releasing_{false};
-    std::atomic<bool> disconnected_{false};
+    AAudioRecoveryState recovery_;
     std::atomic<bool> exclusive_{false};
     bool bitPerfect_ = false;           // exclusive/DoP: unity gain, no fallback
     int32_t bytesPerFrame_ = 0;
@@ -102,9 +108,14 @@ private:
     std::atomic<int64_t> readBase_{0}; // device read counter at last flush
     std::atomic<int64_t> readOffset_{0}; // timeline carried across disconnect recovery
     mutable std::atomic<int32_t> lastXRunCount_{0};
+    std::atomic<int32_t> initialBufferFrames_{0};
+    mutable std::atomic<int64_t> lastXRunTimestampMs_{0};
+    mutable std::atomic<int64_t> lastShrinkTimestampMs_{0};
     std::atomic<float> volume_{1.0f};
     std::atomic<aaudio_result_t> lastWriteResult_{AAUDIO_OK};
     std::string lastError_;
+    // Preallocated once in the constructor (64 KB). TryOpen never resizes it
+    // while a writer may be active.
     std::vector<uint8_t> volumeScratch_;
     std::chrono::steady_clock::time_point lastRecoveryAttempt_{};
     int recoveryAttempts_ = 0;

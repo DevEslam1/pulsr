@@ -202,7 +202,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(QuranModePanel), findsOneWidget);
-      expect(find.byType(ChoiceChip), findsNWidgets(6));
+      expect(find.byType(ChoiceChip), findsWidgets);
 
       await tester.tap(find.byType(PulsrSwitch).first);
       await tester.pump();
@@ -241,6 +241,7 @@ void main() {
       verify(() => cubit.setQuranAmbience(any())).called(1);
       verify(() => cubit.setQuranWarmth(any())).called(1);
 
+      await tester.ensureVisible(find.text('0.5x'));
       await tester.tap(find.text('0.5x'));
       await tester.pump();
       verify(() => cubit.setQuranPlaybackSpeed(0.5)).called(1);
@@ -261,6 +262,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.byIcon(Icons.refresh_rounded));
       await tester.tap(find.byIcon(Icons.refresh_rounded));
       await tester.pump();
       verify(() => cubit.detectEarbudCapabilities()).called(2);

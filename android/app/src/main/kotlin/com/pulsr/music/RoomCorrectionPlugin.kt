@@ -85,32 +85,49 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
                 return
             }
             val bufSize = maxOf(minBuf * 4, 16384)
-            val record = try {
-                val source = if (Build.VERSION.SDK_INT >= 24) {
-                    MediaRecorder.AudioSource.UNPROCESSED
-                } else {
-                    MediaRecorder.AudioSource.MIC
-                }
-                AudioRecord(source, sampleRate, AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT, bufSize)
+            val supportsUnprocessed = Build.VERSION.SDK_INT >= 24 && runCatching {
+                val am = appContext.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                am?.getProperty(android.media.AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED) == "true"
+            }.getOrDefault(false)
+
+            fun createRecord(source: Int): AudioRecord? = try {
+                AudioRecord(
+                    source, sampleRate, AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT, bufSize
+                )
             } catch (_: Throwable) {
-                try {
-                    AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate,
-                        AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
-                } catch (e2: Throwable) {
-                    result.error("CAPTURE_UNAVAILABLE", e2.message, null)
-                    return
-                }
+                null
             }
-            if (record.state != AudioRecord.STATE_INITIALIZED) {
+
+            var record: AudioRecord? = if (supportsUnprocessed) {
+                createRecord(MediaRecorder.AudioSource.UNPROCESSED)
+            } else {
+                null
+            }
+            // A source can be advertised and still fail to initialize on some
+            // HALs; only keep UNPROCESSED when it actually reached INITIALIZED.
+            if (record != null && record.state != AudioRecord.STATE_INITIALIZED) {
                 record.release()
+                record = null
+            }
+            if (record == null) {
+                record = createRecord(MediaRecorder.AudioSource.MIC)
+            }
+            if (record == null || record.state != AudioRecord.STATE_INITIALIZED) {
+                record?.release()
                 result.error("CAPTURE_UNAVAILABLE", "AudioRecord not initialized (permission?)", null)
+                return
+            }
+            try {
+                record.startRecording()
+            } catch (e: Throwable) {
+                runCatching { record.release() }
+                result.error("CAPTURE_FAILED", e.message, null)
                 return
             }
             audioRecord = record
             capturing.set(true)
             currentSampleRate = sampleRate
-            record.startRecording()
             captureThread = Thread {
                 val buf = ByteArray(8192)
                 var overrunCount = 0
@@ -122,7 +139,25 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
                             break
                         }
                         if (n < 0) {
-                            overrunCount++
+                            when (n) {
+                                AudioRecord.ERROR_DEAD_OBJECT,
+                                AudioRecord.ERROR_INVALID_OPERATION,
+                                AudioRecord.ERROR_BAD_VALUE -> {
+                                    val code = n
+                                    mainHandler.post {
+                                        try {
+                                            eventSink?.error(
+                                                "CAPTURE_ERROR",
+                                                "AudioRecord read failed ($code)",
+                                                null
+                                            )
+                                        } catch (_: Exception) {
+                                        }
+                                    }
+                                    break
+                                }
+                                else -> overrunCount++
+                            }
                         } else if (n > 0 && capturing.get()) {
                             val payload = mapOf(
                                 "pcm" to buf.copyOf(n),
@@ -149,6 +184,10 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             result.success(true)
         } catch (e: Throwable) {
             Log.w(TAG, "startCapture failed: ${e.message}")
+            capturing.set(false)
+            val record = audioRecord
+            audioRecord = null
+            runCatching { record?.release() }
             result.error("CAPTURE_FAILED", e.message, null)
         }
     }

@@ -12,6 +12,7 @@ extension _EqAbCompareBar on _EqualizerSheetState {
         opacity: dspBlocked != null ? 0.45 : 1.0,
         child: GestureDetector(
           onTapDown: (_) {
+            HapticFeedback.selectionClick();
             _abCompareTimer?.cancel();
             _setStateSafe(() => _isAbComparing = true);
             cubit.startAbComparison();
@@ -23,6 +24,7 @@ extension _EqAbCompareBar on _EqualizerSheetState {
             });
           },
           onTapUp: (_) {
+            HapticFeedback.selectionClick();
             _abCompareTimer?.cancel();
             _abCompareTimer = null;
             _setStateSafe(() => _isAbComparing = false);
@@ -34,7 +36,9 @@ extension _EqAbCompareBar on _EqualizerSheetState {
             _setStateSafe(() => _isAbComparing = false);
             cubit.endAbComparison();
           },
-          child: Container(
+          child: AnimatedContainer(
+            duration: context.motionMs(150),
+            curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s8, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
@@ -71,7 +75,10 @@ extension _EqAbCompareBar on _EqualizerSheetState {
         children: [
           for (final slot in ComparisonSlot.values) ...[
             InkWell(
-              onTap: () => cubit.switchComparisonSlot(slot),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                cubit.switchComparisonSlot(slot);
+              },
               borderRadius: AppRadii.r8All,
               child: Container(
                 padding: const EdgeInsets.symmetric(

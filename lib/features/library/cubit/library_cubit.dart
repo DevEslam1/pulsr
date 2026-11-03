@@ -260,22 +260,31 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                   (getIt.isRegistered<IMusicRepository>()
                       ? getIt<IMusicRepository>()
                       : null);
-              repo?.getTotalSongCount(excludedFolders: excluded).then((res) {
-                final total = res.fold((_) => songs.length, (r) => r);
-                LibraryCacheManager().saveSnapshot(
-                  songs: songs,
-                  totalSongCount: total,
-                  albumCount: state.albums.length,
-                  artistCount: state.artists.length,
-                );
-              }).catchError((_) {
+              try {
+                repo?.getTotalSongCount(excludedFolders: excluded).then((res) {
+                  final total = res.fold((_) => songs.length, (r) => r);
+                  LibraryCacheManager().saveSnapshot(
+                    songs: songs,
+                    totalSongCount: total,
+                    albumCount: state.albums.length,
+                    artistCount: state.artists.length,
+                  );
+                }).catchError((_) {
+                  LibraryCacheManager().saveSnapshot(
+                    songs: songs,
+                    totalSongCount: songs.length,
+                    albumCount: state.albums.length,
+                    artistCount: state.artists.length,
+                  );
+                });
+              } catch (_) {
                 LibraryCacheManager().saveSnapshot(
                   songs: songs,
                   totalSongCount: songs.length,
                   albumCount: state.albums.length,
                   artistCount: state.artists.length,
                 );
-              });
+              }
             }
           },
         );
@@ -331,7 +340,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (albums) => safeEmit(state.copyWith(
-            albums: List.unmodifiable(albums), errorMessage: null)),
+            albums: List.unmodifiable(albums))),
       );
     });
   }
@@ -343,7 +352,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (artists) => safeEmit(state.copyWith(
-            artists: List.unmodifiable(artists), errorMessage: null)),
+            artists: List.unmodifiable(artists))),
       );
     });
   }
@@ -360,7 +369,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (genres) => safeEmit(state.copyWith(
-            genres: List.unmodifiable(genres), errorMessage: null)),
+            genres: List.unmodifiable(genres))),
       );
     });
   }
@@ -377,7 +386,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (years) => safeEmit(state.copyWith(
-            years: List.unmodifiable(years), errorMessage: null)),
+            years: List.unmodifiable(years))),
       );
     });
   }
@@ -406,7 +415,6 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             downloadedSongs: List<SongsTableData>.unmodifiable(
               songs.where(isDownloadedOnlineTrack),
             ),
-            errorMessage: null,
           )),
         );
       });
@@ -422,8 +430,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         (favs) {
           if (_pendingFavoriteTargets.isEmpty) {
             safeEmit(state.copyWith(
-                favorites: List<SongsTableData>.unmodifiable(favs),
-                errorMessage: null));
+                favorites: List<SongsTableData>.unmodifiable(favs)));
             return;
           }
           // A favorite toggle is in flight: the DB still holds the pre-toggle
@@ -458,8 +465,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           final seen = <int>{};
           merged = merged.where((s) => seen.add(s.id)).toList();
           safeEmit(state.copyWith(
-              favorites: List<SongsTableData>.unmodifiable(merged),
-              errorMessage: null));
+              favorites: List<SongsTableData>.unmodifiable(merged)));
         },
       );
     });
@@ -471,7 +477,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     result.fold(
       (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (folders) => safeEmit(state.copyWith(
-          folders: List.unmodifiable(folders), errorMessage: null)),
+          folders: List.unmodifiable(folders))),
     );
   }
 
@@ -722,7 +728,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         (songs) => safeEmit(state.copyWith(
             selectedSongIds: songs.map((s) => s.id).toSet(),
             isMultiSelectMode: true,
-            errorMessage: songs.length >= selectAllCap
+            infoMessage: songs.length >= selectAllCap
                 ? 'Selected first $selectAllCap tracks (library exceeds cap)'
                 : null)),
       );

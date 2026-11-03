@@ -7,11 +7,50 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
 import android.util.Log
+import androidx.annotation.WorkerThread
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+
+/**
+ * Delegating connection used when the caller supplied no lifecycle reference:
+ * the network callback is released exactly when the connection is disconnected
+ * instead of on a timer that can fire while the stream is still being read.
+ */
+private class UnregisterOnDisconnectConnection(
+    private val delegate: HttpURLConnection,
+    private val onDisconnect: () -> Unit,
+) : HttpURLConnection(delegate.url) {
+    private val disconnected = AtomicBoolean(false)
+
+    override fun connect() = delegate.connect()
+
+    override fun disconnect() {
+        if (disconnected.compareAndSet(false, true)) {
+            runCatching { onDisconnect() }
+        }
+        delegate.disconnect()
+    }
+
+    override fun usingProxy(): Boolean = delegate.usingProxy()
+    override fun getInputStream(): InputStream = delegate.inputStream
+    override fun getErrorStream(): InputStream? = delegate.errorStream
+    override fun getOutputStream(): OutputStream = delegate.outputStream
+    override fun getResponseCode(): Int = delegate.responseCode
+    override fun getResponseMessage(): String? = delegate.responseMessage
+    override fun getHeaderField(position: Int): String? = delegate.getHeaderField(position)
+    override fun getHeaderField(name: String?): String? = delegate.getHeaderField(name)
+    override fun getRequestMethod(): String = delegate.requestMethod
+    override fun setRequestMethod(method: String) = delegate.setRequestMethod(method)
+    override fun getContentLength(): Int = delegate.contentLength
+    override fun getContentLengthLong(): Long = delegate.contentLengthLong
+    override fun getContentType(): String? = delegate.contentType
+}
 
 /**
  * Layer 4: Cellular Network Failover Helper.
@@ -54,6 +93,7 @@ object CellularFailoverHelper {
      * Optionally accepts an [onCloseRef] to receive a callback that unregisters
      * the network callback once the caller finishes streaming data.
      */
+    @WorkerThread
     fun openCellularConnection(
         context: Context,
         targetUrl: String,
@@ -83,13 +123,18 @@ object CellularFailoverHelper {
         var unregisterNeeded = true
         return try {
             cm.requestNetwork(request, callback, timeoutMs)
-            latch.await(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            try {
+                latch.await(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return null
+            }
             val net = selectedNetwork.get()
             if (net != null) {
                 val url = URL(targetUrl)
                 val conn = net.openConnection(url) as? HttpURLConnection
                 if (conn != null) {
-                    val isUnregistered = java.util.concurrent.atomic.AtomicBoolean(false)
+                    val isUnregistered = AtomicBoolean(false)
                     val unregisterAction: () -> Unit = {
                         if (isUnregistered.compareAndSet(false, true)) {
                             runCatching { cm.unregisterNetworkCallback(callback) }
@@ -98,13 +143,13 @@ object CellularFailoverHelper {
                     unregisterNeeded = false
                     if (onCloseRef != null) {
                         onCloseRef.set(unregisterAction)
+                        conn
                     } else {
-                        // Fallback: auto-unregister after 10s if caller did not supply a lifecycle ref
-                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                            unregisterAction()
-                        }, 10000L)
+                        // No lifecycle ref: tie the callback release to the
+                        // connection itself. A 10 s timer could unregister
+                        // while a slow response body is still being read.
+                        UnregisterOnDisconnectConnection(conn, unregisterAction)
                     }
-                    conn
                 } else {
                     null
                 }
@@ -124,6 +169,7 @@ object CellularFailoverHelper {
     /**
      * Executes a block within an active cellular connection scope and unregisters when done.
      */
+    @WorkerThread
     fun <T> withCellularConnection(
         context: Context,
         targetUrl: String,
@@ -152,7 +198,12 @@ object CellularFailoverHelper {
 
         return try {
             cm.requestNetwork(request, callback, timeoutMs)
-            latch.await(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            try {
+                latch.await(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return null
+            }
             val net = selectedNetwork.get() ?: return null
             val url = URL(targetUrl)
             val conn = net.openConnection(url) as? HttpURLConnection ?: return null

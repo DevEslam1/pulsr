@@ -198,6 +198,9 @@ void main() {
     when(() => repo.watchDownloadedSongs(
             excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => repo.getTotalSongCount(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => const Right(500));
     when(() => repo.watchAllSongs(
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
@@ -256,6 +259,9 @@ void main() {
     when(() => repo.watchDownloadedSongs(
             excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => repo.getTotalSongCount(
+            excludedFolders: any(named: 'excludedFolders')))
+        .thenAnswer((_) async => const Right(500));
     when(() => repo.importOnlineTracksAsFavorites(any()))
         .thenAnswer((_) async => const Left(DatabaseFailure('import failed')));
     getIt.registerSingleton<YtmAccountService>(account);

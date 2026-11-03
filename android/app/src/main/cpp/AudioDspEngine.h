@@ -24,6 +24,7 @@
 #include <vector>
 #include <memory>
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <functional>
 #include <array>
@@ -322,6 +323,18 @@ private:
     // Direct Volume Control output gain, smoothed across a 20ms window.
     double smoothedDirectVolume_ = 1.0;
 
+    // Dose metering + attenuation, shared by the normal chain and the
+    // bypass-compare path. Strictly RT-safe: no allocation, no locks.
+    void processSafetyStage(float* buffer, int frames, int channels,
+                            double currentSr, const DspParamSnapshot& snapshot,
+                            int& blockLatency);
+
+    // Accumulates the weekly dose without touching the audio buffer (used by
+    // the bit-perfect path, which must stay sample-identical).
+    void meterDoseReadOnly(const float* buffer, int frames, int channels,
+                           double currentSr,
+                           const HeadphoneSafetyParamSet& safety);
+
     inline float generateTpdf() {
         ditherPrngState1_ ^= ditherPrngState1_ << 13;
         ditherPrngState1_ ^= ditherPrngState1_ >> 17;
@@ -369,6 +382,9 @@ private:
 
     // Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870)
     LookaheadLimiter safetyLimiter_;
+    double lastSafetyCeilingDb_ = 1e9;
+    bool lastSafetyEnabled_ = true;  // constructor configures and enables it
+    bool safetyConfigured_ = false;
     std::atomic<double> weeklyDose_{0.0};
     std::atomic<bool> safetyAttenuationActive_{false};
     double smoothedSafetyGain_{1.0};
@@ -376,11 +392,39 @@ private:
 
 class DspEngineRegistry {
 public:
+    static constexpr int kMaxEngines = 16;
+
+    struct RenderLease {
+        AudioDspEngine* engine = nullptr;
+        int slot = -1;
+    };
+
     static DspEngineRegistry& instance();
 
-    void registerEngine(AudioDspEngine* engine);
+    bool registerEngine(AudioDspEngine* engine);
     void unregisterEngine(AudioDspEngine* engine);
     void broadcastParams(const std::shared_ptr<const DspParamSnapshot>& snapshot);
+
+    /**
+     * Lock-free render/control admission. The render thread calls
+     * acquireForRender() and must pair it with releaseForRender(slot). A
+     * handle that is unknown, already torn down, or currently tearing down
+     * yields a null lease. The engine pointer is only returned after the slot
+     * is revalidated with the in-flight count published, so destroy() cannot
+     * free it underneath the caller.
+     */
+    RenderLease acquireForRender(int64_t handle);
+    void releaseForRender(int slot);
+
+    /**
+     * Marks the matching slot as tearing down. Returns the slot index, or -1
+     * when the handle is not registered (stale/double destroy: safe no-op).
+     * destroy() then calls waitForRenderers(slot) before deleting the engine,
+     * and finishTeardown(slot) afterwards.
+     */
+    int beginTeardown(int64_t handle);
+    void waitForRenderers(int slot);
+    void finishTeardown(int slot);
 
     /// Maximum pipeline latency across all registered (processing) engines.
     /// The singleton control engine never runs processInterleaved, so its stage
@@ -410,8 +454,15 @@ public:
     void drainRetireQueues();
 
 private:
+    struct Slot {
+        std::atomic<AudioDspEngine*> engine{nullptr};
+        std::atomic<int> inFlight{0};
+        std::atomic<bool> tearingDown{false};
+    };
+
     AudioDspEngine* selectActiveEngineLocked() const;
     std::mutex mutex_;
     std::vector<AudioDspEngine*> engines_;
+    Slot slots_[kMaxEngines];
 };
 

@@ -31,11 +31,14 @@ public:
 
     void setSampleRate(double sampleRate);
     void applyParams(const ChannelManagerParamSet& params);
+    // Stage-bit gate from AudioDspEngine. RampingDown_ still runs even when the
+    // bit is cleared so a disable can finish its click-free fade.
+    void setEnabled(bool enabled) { stageEnabled_ = enabled; }
     void reset();
 
     void processInterleaved(float* buffer, int frames, int channels);
 
-    bool isEnabled() const { return params_.enabled || rampingDown_; }
+    bool isEnabled() const { return stageEnabled_ && (params_.enabled || rampingDown_); }
     bool isRamping() const { return rampingDown_; }
     int getChannelCount() const { return params_.channelCount; }
 
@@ -43,8 +46,10 @@ private:
     double sampleRate_ = 0.0;
     ChannelManagerParamSet params_{};
     bool rampingDown_ = false;
+    bool stageEnabled_ = true;
 
     int delaySamples_[MAX_CHANNELS] = {};
+    float smoothedDelaySamples_[MAX_CHANNELS] = {};
     int maxDelaySamples_ = 1;
     std::array<std::vector<float>, MAX_CHANNELS> delayLines_;
     std::array<int, MAX_CHANNELS> writeIndex_{};

@@ -18,6 +18,7 @@ mixin _$YtmSearchState {
   String get query;
   List<YtmTrack> get results;
   bool get isLoading;
+  bool get hasSearched;
   bool get loadMoreFailed;
   String? get errorMessage;
 
@@ -41,6 +42,8 @@ mixin _$YtmSearchState {
                 .equals(other.results, _this.results) &&
             (identical(other.isLoading, _this.isLoading) ||
                 other.isLoading == _this.isLoading) &&
+            (identical(other.hasSearched, _this.hasSearched) ||
+                other.hasSearched == _this.hasSearched) &&
             (identical(other.loadMoreFailed, _this.loadMoreFailed) ||
                 other.loadMoreFailed == _this.loadMoreFailed) &&
             (identical(other.errorMessage, _this.errorMessage) ||
@@ -55,6 +58,7 @@ mixin _$YtmSearchState {
         _this.query,
         const DeepCollectionEquality().hash(_this.results),
         _this.isLoading,
+        _this.hasSearched,
         _this.loadMoreFailed,
         _this.errorMessage);
   }
@@ -62,7 +66,7 @@ mixin _$YtmSearchState {
   @override
   String toString() {
     final _this = this as YtmSearchState;
-    return 'YtmSearchState(query: ${_this.query}, results: ${_this.results}, isLoading: ${_this.isLoading}, loadMoreFailed: ${_this.loadMoreFailed}, errorMessage: ${_this.errorMessage})';
+    return 'YtmSearchState(query: ${_this.query}, results: ${_this.results}, isLoading: ${_this.isLoading}, hasSearched: ${_this.hasSearched}, loadMoreFailed: ${_this.loadMoreFailed}, errorMessage: ${_this.errorMessage})';
   }
 }
 
@@ -76,6 +80,7 @@ abstract mixin class $YtmSearchStateCopyWith<$Res> {
       {String query,
       List<YtmTrack> results,
       bool isLoading,
+      bool hasSearched,
       bool loadMoreFailed,
       String? errorMessage});
 }
@@ -96,6 +101,7 @@ class _$YtmSearchStateCopyWithImpl<$Res>
     Object? query = null,
     Object? results = null,
     Object? isLoading = null,
+    Object? hasSearched = null,
     Object? loadMoreFailed = null,
     Object? errorMessage = freezed,
   }) {
@@ -111,6 +117,10 @@ class _$YtmSearchStateCopyWithImpl<$Res>
       isLoading: null == isLoading
           ? _self.isLoading
           : isLoading // ignore: cast_nullable_to_non_nullable
+              as bool,
+      hasSearched: null == hasSearched
+          ? _self.hasSearched
+          : hasSearched // ignore: cast_nullable_to_non_nullable
               as bool,
       loadMoreFailed: null == loadMoreFailed
           ? _self.loadMoreFailed
@@ -218,7 +228,7 @@ extension YtmSearchStatePatterns on YtmSearchState {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(String query, List<YtmTrack> results, bool isLoading,
-            bool loadMoreFailed, String? errorMessage)?
+            bool hasSearched, bool loadMoreFailed, String? errorMessage)?
         $default, {
     required TResult orElse(),
   }) {
@@ -226,7 +236,7 @@ extension YtmSearchStatePatterns on YtmSearchState {
     switch (_that) {
       case _YtmSearchState() when $default != null:
         return $default(_that.query, _that.results, _that.isLoading,
-            _that.loadMoreFailed, _that.errorMessage);
+            _that.hasSearched, _that.loadMoreFailed, _that.errorMessage);
       case _:
         return orElse();
     }
@@ -248,14 +258,14 @@ extension YtmSearchStatePatterns on YtmSearchState {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(String query, List<YtmTrack> results, bool isLoading,
-            bool loadMoreFailed, String? errorMessage)
+            bool hasSearched, bool loadMoreFailed, String? errorMessage)
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _YtmSearchState():
         return $default(_that.query, _that.results, _that.isLoading,
-            _that.loadMoreFailed, _that.errorMessage);
+            _that.hasSearched, _that.loadMoreFailed, _that.errorMessage);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -276,14 +286,14 @@ extension YtmSearchStatePatterns on YtmSearchState {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(String query, List<YtmTrack> results, bool isLoading,
-            bool loadMoreFailed, String? errorMessage)?
+            bool hasSearched, bool loadMoreFailed, String? errorMessage)?
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _YtmSearchState() when $default != null:
         return $default(_that.query, _that.results, _that.isLoading,
-            _that.loadMoreFailed, _that.errorMessage);
+            _that.hasSearched, _that.loadMoreFailed, _that.errorMessage);
       case _:
         return null;
     }
@@ -297,6 +307,7 @@ class _YtmSearchState extends YtmSearchState {
       {this.query = '',
       List<YtmTrack> results = const [],
       this.isLoading = false,
+      this.hasSearched = false,
       this.loadMoreFailed = false,
       this.errorMessage})
       : _results = results,
@@ -317,6 +328,9 @@ class _YtmSearchState extends YtmSearchState {
   @override
   @JsonKey()
   final bool isLoading;
+  @override
+  @JsonKey()
+  final bool hasSearched;
   @override
   @JsonKey()
   final bool loadMoreFailed;
@@ -340,6 +354,8 @@ class _YtmSearchState extends YtmSearchState {
             const DeepCollectionEquality().equals(other.results, _results) &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading) &&
+            (identical(other.hasSearched, hasSearched) ||
+                other.hasSearched == hasSearched) &&
             (identical(other.loadMoreFailed, loadMoreFailed) ||
                 other.loadMoreFailed == loadMoreFailed) &&
             (identical(other.errorMessage, errorMessage) ||
@@ -353,13 +369,14 @@ class _YtmSearchState extends YtmSearchState {
         query,
         const DeepCollectionEquality().hash(_results),
         isLoading,
+        hasSearched,
         loadMoreFailed,
         errorMessage);
   }
 
   @override
   String toString() {
-    return 'YtmSearchState(query: $query, results: $results, isLoading: $isLoading, loadMoreFailed: $loadMoreFailed, errorMessage: $errorMessage)';
+    return 'YtmSearchState(query: $query, results: $results, isLoading: $isLoading, hasSearched: $hasSearched, loadMoreFailed: $loadMoreFailed, errorMessage: $errorMessage)';
   }
 }
 
@@ -375,6 +392,7 @@ abstract mixin class _$YtmSearchStateCopyWith<$Res>
       {String query,
       List<YtmTrack> results,
       bool isLoading,
+      bool hasSearched,
       bool loadMoreFailed,
       String? errorMessage});
 }
@@ -395,6 +413,7 @@ class __$YtmSearchStateCopyWithImpl<$Res>
     Object? query = null,
     Object? results = null,
     Object? isLoading = null,
+    Object? hasSearched = null,
     Object? loadMoreFailed = null,
     Object? errorMessage = freezed,
   }) {
@@ -410,6 +429,10 @@ class __$YtmSearchStateCopyWithImpl<$Res>
       isLoading: null == isLoading
           ? _self.isLoading
           : isLoading // ignore: cast_nullable_to_non_nullable
+              as bool,
+      hasSearched: null == hasSearched
+          ? _self.hasSearched
+          : hasSearched // ignore: cast_nullable_to_non_nullable
               as bool,
       loadMoreFailed: null == loadMoreFailed
           ? _self.loadMoreFailed

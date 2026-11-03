@@ -58,10 +58,13 @@ class PlayerScrobbleCoordinator {
     final posMs = position.inMilliseconds;
     // Differentiate true track restart (returning near zero from >10s into playback)
     // from a standard backward scrub within the track.
+    final restartThresholdMs = song.durationMs > 0 && song.durationMs < 10000
+        ? (song.durationMs * 0.7).round()
+        : 10000;
     final isTrueRestart = _lastSongId == song.id &&
         _lastPosMs != null &&
         posMs < 3000 &&
-        _lastPosMs! > 10000;
+        _lastPosMs! > restartThresholdMs;
     final isSongRestart = isTrueRestart;
     final isSongChange = _lastSongId != song.id || isSongRestart;
     final isPlayStateChange = _lastIsPlaying != isPlaying;
@@ -84,7 +87,7 @@ class PlayerScrobbleCoordinator {
     // backgrounded) yields a large raw delta but a matching expected delta, so
     // it is not misclassified as a seek.
     var expectedDeltaMs = 0;
-    if (isPlaying && _lastIsPlaying == true && _lastMonotonicMs != null) {
+    if (isPlaying && _lastMonotonicMs != null) {
       final speed = _playbackSpeed?.call() ?? 1.0;
       final elapsed = (nowMonotonicMs - _lastMonotonicMs!) - pauseDurationMs;
       if (elapsed > 0 && speed.isFinite) {

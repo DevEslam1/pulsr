@@ -128,8 +128,17 @@ class DownloadTile extends StatelessWidget {
                                 color: p.surface,
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(Icons.check_circle_rounded,
-                                  color: p.success, size: 14),
+                              child: AnimatedSwitcher(
+                                duration: context.motionMs(220),
+                                switchInCurve: Curves.easeOutBack,
+                                switchOutCurve: Curves.easeIn,
+                                child: Icon(
+                                  Icons.check_circle_rounded,
+                                  key: ValueKey(task.status),
+                                  color: p.success,
+                                  size: 14,
+                                ),
+                              ),
                             ),
                           ),
                       ],
@@ -144,7 +153,17 @@ class DownloadTile extends StatelessWidget {
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: AppRadii.r12All,
                   ),
-                  child: Icon(statusIcon, color: statusColor, size: 22),
+                  child: AnimatedSwitcher(
+                    duration: context.motionMs(220),
+                    switchInCurve: Curves.easeOutBack,
+                    switchOutCurve: Curves.easeIn,
+                    child: Icon(
+                      statusIcon,
+                      key: ValueKey(task.status),
+                      color: statusColor,
+                      size: 22,
+                    ),
+                  ),
                 ),
               const SizedBox(width: AppSpacing.s10),
               Expanded(
@@ -178,15 +197,19 @@ class DownloadTile extends StatelessWidget {
                           ),
                         if (task.status != DownloadStatus.complete) ...[
                           const SizedBox(width: AppSpacing.xxs),
-                          PulsrBadge(
-                            label: statusLabel,
-                            color: switch (task.status) {
-                              DownloadStatus.complete =>
-                                PulsrBadgeColor.success,
-                              DownloadStatus.failed => PulsrBadgeColor.error,
-                              DownloadStatus.paused => PulsrBadgeColor.neutral,
-                              _ => PulsrBadgeColor.accent,
-                            },
+                          AnimatedSwitcher(
+                            duration: context.motionMs(180),
+                            child: PulsrBadge(
+                              key: ValueKey(task.status),
+                              label: statusLabel,
+                              color: switch (task.status) {
+                                DownloadStatus.complete =>
+                                  PulsrBadgeColor.success,
+                                DownloadStatus.failed => PulsrBadgeColor.error,
+                                DownloadStatus.paused => PulsrBadgeColor.neutral,
+                                _ => PulsrBadgeColor.accent,
+                              },
+                            ),
                           ),
                         ],
                       ],
@@ -322,80 +345,102 @@ class DownloadTile extends StatelessWidget {
               ),
             ],
           ),
-          if (task.status == DownloadStatus.downloading ||
-              task.status == DownloadStatus.tagging ||
-              task.status == DownloadStatus.paused) ...[
-            const SizedBox(height: AppSpacing.sm),
-            TweenAnimationBuilder<double>(
-              duration: context.motion(PulsrDurations.layout),
-              curve: Curves.easeOut,
-              tween: Tween<double>(
-                begin: 0.0,
-                end: task.progress.clamp(0.0, 1.0),
-              ),
-              builder: (context, animatedProgress, _) {
-                final progressValue = task.status == DownloadStatus.tagging
-                    ? null
-                    : (task.status == DownloadStatus.paused ||
-                            animatedProgress > 0
-                        ? animatedProgress
-                        : null);
-                return Semantics(
-                  label: statusLabel,
-                  value: progressValue == null
-                      ? null
-                      : '${(progressValue * 100).toStringAsFixed(0)}%',
-                  child: progressValue != null
-                      ? PulsrProgressBar.determinate(
-                          value: progressValue,
-                          height: 6,
-                          color: p.accent,
-                          backgroundColor: p.surfaceContainerHigh,
-                          borderRadius: AppRadii.r4All,
-                        )
-                      : PulsrProgressBar.indeterminate(
-                          height: 6,
-                          color: p.accent,
-                          backgroundColor: p.surfaceContainerHigh,
-                          borderRadius: AppRadii.r4All,
+          AnimatedSize(
+            duration: context.motionMs(200),
+            curve: Curves.easeOutCubic,
+            child: (task.status == DownloadStatus.downloading ||
+                    task.status == DownloadStatus.tagging ||
+                    task.status == DownloadStatus.paused)
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: AppSpacing.sm),
+                      TweenAnimationBuilder<double>(
+                        duration: context.motion(PulsrDurations.layout),
+                        curve: Curves.easeOut,
+                        tween: Tween<double>(
+                          begin: 0.0,
+                          end: task.progress.clamp(0.0, 1.0),
                         ),
-                );
-              },
-            ),
-            if (task.status == DownloadStatus.downloading ||
-                task.status == DownloadStatus.paused) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${(task.progress * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (task.status == DownloadStatus.downloading &&
-                      task.speedKbps != null &&
-                      task.speedKbps! > 0)
-                    Text(
-                      '${task.speedKbps!.toStringAsFixed(0)} KB/s',
-                      style: TextStyle(
-                          color: p.textTertiary, fontSize: AppFontSize.label),
-                    ),
-                  if (task.status == DownloadStatus.downloading &&
-                      task.etaSeconds != null &&
-                      task.etaSeconds! > 0)
-                    Text(
-                      '${l10n.browseEta} ${Formatters.formatDuration(Duration(seconds: task.etaSeconds!))}',
-                      style: TextStyle(
-                          color: p.textTertiary, fontSize: AppFontSize.label),
-                    ),
-                ],
-              ),
-            ],
-          ],
+                        builder: (context, animatedProgress, _) {
+                          final progressValue = task.status == DownloadStatus.tagging
+                              ? null
+                              : (task.status == DownloadStatus.paused ||
+                                      animatedProgress > 0
+                                  ? animatedProgress
+                                  : null);
+                          return Semantics(
+                            label: statusLabel,
+                            value: progressValue == null
+                                ? null
+                                : '${(progressValue * 100).toStringAsFixed(0)}%',
+                            child: progressValue != null
+                                ? Stack(
+                                    children: [
+                                      SizedBox(
+                                        height: 6,
+                                        child: LinearProgressIndicator(
+                                          value: progressValue,
+                                          backgroundColor: p.surfaceContainerHigh,
+                                          valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                                        ),
+                                      ),
+                                      PulsrProgressBar.determinate(
+                                        value: progressValue,
+                                        height: 6,
+                                        color: p.accent,
+                                        backgroundColor: p.surfaceContainerHigh,
+                                        borderRadius: AppRadii.r4All,
+                                      ),
+                                    ],
+                                  )
+                                : PulsrProgressBar.indeterminate(
+                                    height: 6,
+                                    color: p.accent,
+                                    backgroundColor: p.surfaceContainerHigh,
+                                    borderRadius: AppRadii.r4All,
+                                  ),
+                          );
+                        },
+                      ),
+                      if (task.status == DownloadStatus.downloading ||
+                          task.status == DownloadStatus.paused) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${(task.progress * 100).toStringAsFixed(0)}%',
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (task.status == DownloadStatus.downloading &&
+                                task.speedKbps != null &&
+                                task.speedKbps! > 0)
+                              Text(
+                                '${task.speedKbps!.toStringAsFixed(0)} KB/s',
+                                style: TextStyle(
+                                    color: p.textTertiary, fontSize: AppFontSize.label),
+                              ),
+                            if (task.status == DownloadStatus.downloading &&
+                                task.etaSeconds != null &&
+                                task.etaSeconds! > 0)
+                              Text(
+                                '${l10n.browseEta} ${Formatters.formatDuration(Duration(seconds: task.etaSeconds!))}',
+                                style: TextStyle(
+                                    color: p.textTertiary, fontSize: AppFontSize.label),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
           if (task.error != null && task.error!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
             Row(

@@ -86,10 +86,8 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     try {
                         val file = if (path.startsWith("content:")) {
                             val uri = android.net.Uri.parse(path)
-                            tempFile = java.io.File.createTempFile("tag_read_", ".tmp", context?.cacheDir)
-                            context?.contentResolver?.openInputStream(uri)?.use { input ->
-                                tempFile.outputStream().use { output -> input.copyTo(output) }
-                            }
+                            val ctx = context ?: throw java.io.IOException("Context unavailable")
+                            tempFile = AudioTempFiles.copyToTempFile(ctx, uri, "tag_read_")
                             tempFile
                         } else {
                             File(path)
@@ -220,10 +218,17 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     try {
                         val file = if (isContentUri) {
                             val uri = android.net.Uri.parse(path)
-                            tempFile = java.io.File.createTempFile("tag_write_", ".tmp", context?.cacheDir)
-                            context?.contentResolver?.openInputStream(uri)?.use { input ->
-                                tempFile.outputStream().use { output -> input.copyTo(output) }
-                            }
+                            val ctx = context ?: throw java.io.IOException("Context unavailable")
+                            tempFile = AudioTempFiles.copyToTempFile(ctx, uri, "tag_write_")
+                            // Preserve the original bytes before jaudiotagger
+                            // touches anything, so a failed write-back can be
+                            // rolled back without touching user storage again.
+                            backupFile = java.io.File.createTempFile(
+                                "tag_backup_",
+                                tempFile.name.substringAfterLast('.', "tmp").let { ".$it" },
+                                ctx.cacheDir
+                            )
+                            tempFile.copyTo(backupFile, overwrite = true)
                             tempFile
                         } else {
                             File(path)
@@ -384,13 +389,26 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         }
 
                         if (isContentUri) {
+                            if (file.length() <= 0L) {
+                                throw java.io.IOException("Tagged temp file is empty for $path")
+                            }
                             val uri = android.net.Uri.parse(path)
-                            val cr = context?.contentResolver
-                                ?: throw java.io.IOException("ContentResolver unavailable for $uri")
-                            val outStream = cr.openOutputStream(uri, "rwt")
-                                ?: throw java.io.IOException("Failed to open output stream for content URI: $uri")
-                            outStream.use { out ->
-                                file.inputStream().use { input -> input.copyTo(out) }
+                            val ctx = context ?: throw java.io.IOException("Context unavailable for $uri")
+                            val cr = ctx.contentResolver
+                            val pfd = cr.openFileDescriptor(uri, "rwt")
+                                ?: throw java.io.IOException("Failed to open file descriptor for $uri")
+                            pfd.use { descriptor ->
+                                java.io.FileOutputStream(descriptor.fileDescriptor).use { out ->
+                                    file.inputStream().use { input -> input.copyTo(out) }
+                                }
+                            }
+                            val writtenTemp = AudioTempFiles.copyToTempFile(ctx, uri, "tag_check_")
+                            try {
+                                if (writtenTemp.length() <= 0L) {
+                                    throw java.io.IOException("Write-back to $uri produced an empty file")
+                                }
+                            } finally {
+                                runCatching { writtenTemp.delete() }
                             }
                         }
 
@@ -403,12 +421,13 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         try {
                             val fileToVerify = if (isContentUri) {
                                 val uri = android.net.Uri.parse(path)
-                                val cr = context?.contentResolver
-                                val inStream = cr?.openInputStream(uri)
-                                    ?: throw java.io.IOException("Failed to open input stream for verification of $uri")
-                                val vTemp = File.createTempFile("pulsr_verify_", ".tmp", context?.cacheDir)
+                                val ctx = context
+                                    ?: throw java.io.IOException("Context unavailable for $uri")
+                                val vTemp = AudioTempFiles.copyToTempFile(ctx, uri, "pulsr_verify_")
                                 verifyTempFile = vTemp
-                                vTemp.outputStream().use { vOut -> inStream.use { vIn -> vIn.copyTo(vOut) } }
+                                if (vTemp.length() <= 0L) {
+                                    throw java.io.IOException("Verification copy of $uri is empty")
+                                }
                                 vTemp
                             } else {
                                 File(path)
@@ -471,9 +490,19 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         }
 
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            result.success(mapOf("ok" to true, "verified" to verified, "verifiedFields" to verifiedFields))
+                            result.success(
+                                mapOf(
+                                    "ok" to true,
+                                    "verified" to verified,
+                                    "verifiedFields" to verifiedFields,
+                                    "backupCreated" to (backupFile?.exists() == true),
+                                )
+                            )
                         }
                     } catch (e: Exception) {
+                        if (isContentUri) {
+                            restoreContentUri(android.net.Uri.parse(path), backupFile)
+                        }
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             result.error("WRITE_TAGS_ERROR", e.message, e.stackTraceToString())
                         }
@@ -496,6 +525,18 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
             }
 
             else -> result.notImplemented()
+        }
+    }
+
+    private fun restoreContentUri(uri: android.net.Uri, backup: File?) {
+        val ctx = context ?: return
+        if (backup == null || !backup.exists()) return
+        runCatching {
+            ctx.contentResolver.openOutputStream(uri, "rwt")?.use { out ->
+                backup.inputStream().use { input -> input.copyTo(out) }
+            }
+        }.onFailure {
+            android.util.Log.w("TagEditorPlugin", "Failed to restore $uri from backup: ${it.message}")
         }
     }
 

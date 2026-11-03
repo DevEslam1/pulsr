@@ -220,8 +220,10 @@ class _CassetteBody extends StatelessWidget {
     // Right spool starts empty hub (r=26) and fills to full (r=42)
     const double minR = 26.0;
     const double maxR = 43.0;
-    final leftTapeRadius = maxR - (progress * (maxR - minR));
-    final rightTapeRadius = minR + (progress * (maxR - minR));
+    final leftTapeRadius =
+        math.sqrt(maxR * maxR * (1.0 - progress) + minR * minR * progress);
+    final rightTapeRadius =
+        math.sqrt(minR * minR * (1.0 - progress) + maxR * maxR * progress);
 
     return Container(
       decoration: BoxDecoration(
@@ -782,23 +784,28 @@ class _CassetteScrew extends StatelessWidget {
 }
 
 class _AcrylicReflectionPainter extends CustomPainter {
+  Paint? _cachedPaint;
+  Size? _lastSize;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withValues(alpha: 0.10),
-          Colors.white.withValues(alpha: 0.02),
-          Colors.transparent,
-          Colors.white.withValues(alpha: 0.06),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.25, 0.45, 0.65, 1.0],
-      ).createShader(Offset.zero & size);
-
-    canvas.drawRect(Offset.zero & size, paint);
+    if (_cachedPaint == null || _lastSize != size) {
+      _lastSize = size;
+      _cachedPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.10),
+            Colors.white.withValues(alpha: 0.02),
+            Colors.transparent,
+            Colors.white.withValues(alpha: 0.06),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.25, 0.45, 0.65, 1.0],
+        ).createShader(Offset.zero & size);
+    }
+    canvas.drawRect(Offset.zero & size, _cachedPaint!);
   }
 
   @override
@@ -806,17 +813,18 @@ class _AcrylicReflectionPainter extends CustomPainter {
 }
 
 class _TapePackRingsPainter extends CustomPainter {
+  static final Paint _paint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.6
+    ..color = Colors.white.withValues(alpha: 0.07);
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.6
-      ..color = Colors.white.withValues(alpha: 0.07);
 
     for (double r = 26; r < radius - 2; r += 2.4) {
-      canvas.drawCircle(center, r, paint);
+      canvas.drawCircle(center, r, _paint);
     }
   }
 
@@ -825,12 +833,13 @@ class _TapePackRingsPainter extends CustomPainter {
 }
 
 class _SpoolTeethPainter extends CustomPainter {
+  static final Paint _paint = Paint()
+    ..color = Colors.white
+    ..strokeWidth = 2.0;
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2.0;
 
     for (int i = 0; i < 6; i++) {
       final angle = i * (math.pi / 3);
@@ -842,7 +851,7 @@ class _SpoolTeethPainter extends CustomPainter {
         center.dx + 10 * math.cos(angle),
         center.dy + 10 * math.sin(angle),
       );
-      canvas.drawLine(p1, p2, paint);
+      canvas.drawLine(p1, p2, _paint);
     }
   }
 

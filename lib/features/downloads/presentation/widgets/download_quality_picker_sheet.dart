@@ -1,5 +1,7 @@
 // lib/features/downloads/presentation/widgets/download_quality_picker_sheet.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -138,103 +140,120 @@ class _DownloadQualityPickerSheetState
 
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-              child: Material(
-                color: isSelected
-                    ? p.accent.withValues(alpha: 0.12)
-                    : p.surfaceContainer,
-                shape: RoundedRectangleBorder(
+              child: AnimatedContainer(
+                duration: context.motionMs(180),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? p.accent.withValues(alpha: 0.12)
+                      : p.surfaceContainer,
                   borderRadius: AppRadii.r16All,
-                  side: BorderSide(
+                  border: Border.all(
                     color: isSelected ? p.accent : p.hairline,
                     width: isSelected ? 1.8 : 1.0,
                   ),
                 ),
-                child: InkWell(
+                child: Material(
+                  color: Colors.transparent,
                   borderRadius: AppRadii.r16All,
-                  onTap: () {
-                    setState(() => _selectedQuality = opt.quality);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Row(
-                      children: [
-                        Icon(
-                          opt.icon,
-                          color: isSelected ? p.accent : p.textSecondary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: AppSpacing.xs,
-                                runSpacing: AppSpacing.xxs,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    opt.title,
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.body,
-                                      fontWeight: FontWeight.w700,
-                                      color:
-                                          isSelected ? p.accent : p.textPrimary,
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.xs,
-                                      vertical: AppSpacing.xxs,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? p.accent.withValues(alpha: 0.2)
-                                          : p.hairline,
-                                      borderRadius: AppRadii.r4All,
-                                    ),
-                                    child: Text(
-                                      opt.badge,
+                  child: InkWell(
+                    borderRadius: AppRadii.r16All,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _selectedQuality = opt.quality);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Row(
+                        children: [
+                          Icon(
+                            opt.icon,
+                            color: isSelected ? p.accent : p.textSecondary,
+                            size: 24,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Wrap(
+                                  spacing: AppSpacing.xs,
+                                  runSpacing: AppSpacing.xxs,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      opt.title,
                                       style: TextStyle(
-                                        fontSize: AppFontSize.tiny,
+                                        fontSize: AppFontSize.body,
                                         fontWeight: FontWeight.w700,
                                         color: isSelected
                                             ? p.accent
-                                            : p.textSecondary,
+                                            : p.textPrimary,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: AppSpacing.xxs),
-                              Text(
-                                opt.desc,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.caption,
-                                  color: p.textSecondary,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.xs,
+                                        vertical: AppSpacing.xxs,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? p.accent.withValues(alpha: 0.2)
+                                            : p.hairline,
+                                        borderRadius: AppRadii.r4All,
+                                      ),
+                                      child: Text(
+                                        opt.badge,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.tiny,
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected
+                                              ? p.accent
+                                              : p.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (estString != null)
-                          Text(
-                            '~$estString',
-                            style: TextStyle(
-                              fontSize: AppFontSize.caption,
-                              fontWeight: FontWeight.w600,
-                              color: isSelected ? p.accent : p.textSecondary,
+                                const SizedBox(height: AppSpacing.xxs),
+                                Text(
+                                  opt.desc,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.caption,
+                                    color: p.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Icon(
-                          isSelected
-                              ? Icons.check_circle_rounded
-                              : Icons.radio_button_unchecked_rounded,
-                          color: isSelected ? p.accent : p.textTertiary,
-                          size: 22,
-                        ),
-                      ],
+                          if (estString != null)
+                            Text(
+                              '~$estString',
+                              style: TextStyle(
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected ? p.accent : p.textSecondary,
+                              ),
+                            ),
+                          const SizedBox(width: AppSpacing.sm),
+                          AnimatedSwitcher(
+                            duration: context.motionMs(180),
+                            transitionBuilder: (child, animation) =>
+                                ScaleTransition(
+                              scale: animation,
+                              child: child,
+                            ),
+                            child: Icon(
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              key: ValueKey(isSelected),
+                              color: isSelected ? p.accent : p.textTertiary,
+                              size: 22,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -50,6 +50,7 @@ class DownloadService : Service() {
         const val EXTRA_PROGRESS = "progress"
         const val EXTRA_VIDEO_ID = "videoId"
         const val EXTRA_PAUSED = "paused"
+        const val EXTRA_CANCEL_ALL = "cancelAll"
 
         private const val REQUEST_CODE_OPEN = 1001
         private const val REQUEST_CODE_CANCEL = 1002
@@ -195,6 +196,10 @@ class DownloadService : Service() {
         createChannel()
         // Restore timeout-paused marks wiped with the previous instance.
         pausedDownloads.addAll(timeoutPausedIds)
+        try {
+            DownloadChunkStateStore.purgeExpired(this)
+        } catch (_: Exception) {
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -202,7 +207,13 @@ class DownloadService : Service() {
             ACTION_START -> {
                 degraded = false
                 cancelIdleStop()
-                val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
+                val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
+                if (vid == null) {
+                    // startForegroundService() requires startForeground() within
+                    // ~5 s, even when the intent turns out to be malformed.
+                    postPlaceholderAndStop()
+                    return START_NOT_STICKY
+                }
                 val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
                     ?: getString(R.string.download_notification_default_title)
                 activeDownloads[vid] = 0
@@ -225,6 +236,7 @@ class DownloadService : Service() {
                     downloadTitles.remove(vid)
                     pausedDownloads.remove(vid)
                     timeoutPausedIds.remove(vid)
+                    try { onDownloadCompletedListener?.invoke(vid) } catch (_: Exception) {}
                 }
                 if (activeDownloads.isEmpty()) {
                     scheduleIdleStop()
@@ -233,21 +245,37 @@ class DownloadService : Service() {
                 }
             }
             ACTION_CANCEL -> {
-                val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
-                if (vid != null) {
-                    // Completed jobs are removed from activeDownloads but the
-                    // notification can linger for a few seconds. Only forward a
-                    // cancel that actually targeted a live job; otherwise a
-                    // stale tap would delete the finished download and its row.
-                    val wasActive = activeDownloads.remove(vid) != null
-                    downloadTitles.remove(vid)
-                    pausedDownloads.remove(vid)
-                    timeoutPausedIds.remove(vid)
-                    if (wasActive) {
-                        try { onDownloadCancelledListener?.invoke(vid) } catch (_: Exception) {}
+                if (intent.getBooleanExtra(EXTRA_CANCEL_ALL, false)) {
+                    // Multi-job notification: one Cancel action cancels every
+                    // active transfer and notifies the Dart engine per id.
+                    val ids = activeDownloads.keys.toList()
+                    activeDownloads.clear()
+                    downloadTitles.clear()
+                    pausedDownloads.clear()
+                    timeoutPausedIds.removeAll(ids.toSet())
+                    for (id in ids) {
+                        try { DownloadChunkStateStore.clearChunksForVideo(this, id) } catch (_: Exception) {}
+                        try { onDownloadCancelledListener?.invoke(id) } catch (_: Exception) {}
                     }
+                    stopForegroundAndSelf()
+                } else {
+                    val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
+                    if (vid != null) {
+                        // Completed jobs are removed from activeDownloads but the
+                        // notification can linger for a few seconds. Only forward a
+                        // cancel that actually targeted a live job; otherwise a
+                        // stale tap would delete the finished download and its row.
+                        val wasActive = activeDownloads.remove(vid) != null
+                        downloadTitles.remove(vid)
+                        pausedDownloads.remove(vid)
+                        timeoutPausedIds.remove(vid)
+                        try { DownloadChunkStateStore.clearChunksForVideo(this, vid) } catch (_: Exception) {}
+                        if (wasActive) {
+                            try { onDownloadCancelledListener?.invoke(vid) } catch (_: Exception) {}
+                        }
+                    }
+                    renderCurrentNotification(activeDownloads.keys.firstOrNull())
                 }
-                renderCurrentNotification(activeDownloads.keys.firstOrNull())
             }
             ACTION_PAUSE -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
@@ -359,6 +387,30 @@ class DownloadService : Service() {
         }
     }
 
+    /** Satisfies the startForegroundService contract for a malformed start. */
+    private fun postPlaceholderAndStop() {
+        val n = notificationFor(
+            getString(R.string.download_notification_downloads),
+            0,
+            null,
+            paused = false,
+            showTransport = false
+        )
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIFICATION_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIFICATION_ID, n)
+            }
+        } catch (_: Exception) {
+        }
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (_: Exception) {
+        }
+        stopSelf()
+    }
+
     private fun stopForegroundAndSelf() {
         cancelIdleStop()
         try {
@@ -399,6 +451,7 @@ class DownloadService : Service() {
         val cancelIntent = Intent(this, DownloadService::class.java).apply {
             action = ACTION_CANCEL
             putExtra(EXTRA_VIDEO_ID, targetVideoId)
+            if (activeDownloads.size > 1) putExtra(EXTRA_CANCEL_ALL, true)
             `package` = packageName
         }
         val cancelPending = PendingIntent.getService(this, REQUEST_CODE_CANCEL, cancelIntent,

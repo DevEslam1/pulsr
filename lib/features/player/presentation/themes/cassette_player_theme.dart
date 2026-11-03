@@ -31,8 +31,9 @@ class CassettePlayerTheme extends StatefulWidget {
 }
 
 class _CassettePlayerThemeState extends State<CassettePlayerTheme>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _spoolController;
+  late final AnimationController _spoolVelocityController;
 
   @override
   void initState() {
@@ -41,12 +42,19 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
       vsync: this,
       duration: const Duration(seconds: 4),
     );
+
+    _spoolVelocityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+      value: widget.props.state.isPlaying ? 1.0 : 0.0,
+    );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _updateSpoolSpeed();
+    _spoolVelocityController.duration = context.motionMs(650);
     _syncSpool();
   }
 
@@ -62,9 +70,29 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
       if (!_spoolController.isAnimating) {
         _spoolController.repeat();
       }
+      _spoolVelocityController.animateTo(
+        1.0,
+        duration: context.motionMs(650),
+        curve: Curves.easeOutCubic,
+      );
     } else {
-      if (_spoolController.isAnimating) {
-        _spoolController.stop();
+      if (!context.motionEnabled) {
+        _spoolVelocityController.value = 0.0;
+        if (_spoolController.isAnimating) {
+          _spoolController.stop();
+        }
+      } else if (_spoolController.isAnimating) {
+        _spoolVelocityController
+            .animateTo(
+              0.0,
+              duration: context.motionMs(650),
+              curve: Curves.decelerate,
+            )
+            .whenComplete(() {
+              if (mounted && !widget.props.state.isPlaying && _spoolVelocityController.value == 0.0) {
+                _spoolController.stop();
+              }
+            });
       }
     }
   }
@@ -84,6 +112,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
   @override
   void dispose() {
+    _spoolVelocityController.dispose();
     _spoolController.dispose();
     super.dispose();
   }

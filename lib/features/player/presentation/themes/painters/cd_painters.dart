@@ -145,6 +145,9 @@ class _CdDiscPainter extends CustomPainter {
 /// label keeps its original appearance.
 class _CdFlarePainter extends CustomPainter {
   final double labelRatio;
+  Path? _cachedClipPath;
+  Paint? _cachedFlarePaint;
+  Size? _lastSize;
 
   _CdFlarePainter({this.labelRatio = 0.44});
 
@@ -152,33 +155,49 @@ class _CdFlarePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final outer = Path()
-      ..addOval(Rect.fromCircle(center: center, radius: radius - 3));
-    final inner = Path()
-      ..addOval(Rect.fromCircle(center: center, radius: radius * labelRatio));
+
+    if (_cachedClipPath == null || _lastSize != size) {
+      _lastSize = size;
+      final outer = Path()
+        ..addOval(Rect.fromCircle(center: center, radius: radius - 3));
+      final inner = Path()
+        ..addOval(Rect.fromCircle(center: center, radius: radius * labelRatio));
+      _cachedClipPath = Path.combine(PathOperation.difference, outer, inner);
+
+      _cachedFlarePaint = Paint()
+        ..shader = SweepGradient(
+          center: Alignment.center,
+          colors: [
+            AppColors.specularAt(0.0),
+            AppColors.specularAt(0.16),
+            AppColors.specularAt(0.35),
+            AppColors.specularAt(0.16),
+            AppColors.specularAt(0.0),
+            AppColors.specularAt(0.0),
+            AppColors.specularAt(0.16),
+            AppColors.specularAt(0.35),
+            AppColors.specularAt(0.16),
+            AppColors.specularAt(0.0),
+          ],
+          stops: const [
+            0.0,
+            0.12,
+            0.25,
+            0.38,
+            0.50,
+            0.50,
+            0.62,
+            0.75,
+            0.88,
+            1.0
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: radius))
+        ..blendMode = BlendMode.screen;
+    }
 
     canvas.save();
-    canvas.clipPath(Path.combine(PathOperation.difference, outer, inner));
-
-    final flarePaint = Paint()
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        colors: [
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.16),
-          AppColors.specularAt(0.35),
-          AppColors.specularAt(0.16),
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.0),
-          AppColors.specularAt(0.16),
-          AppColors.specularAt(0.35),
-          AppColors.specularAt(0.16),
-          AppColors.specularAt(0.0),
-        ],
-        stops: const [0.0, 0.12, 0.25, 0.38, 0.50, 0.50, 0.62, 0.75, 0.88, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..blendMode = BlendMode.screen;
-    canvas.drawCircle(center, radius - 3, flarePaint);
+    canvas.clipPath(_cachedClipPath!);
+    canvas.drawCircle(center, radius - 3, _cachedFlarePaint!);
     canvas.restore();
   }
 

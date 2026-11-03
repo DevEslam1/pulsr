@@ -93,6 +93,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var isDynamicsPresetNativeActive = false
     @Volatile private var currentAudioSessionId = 0
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var dosePersistRunnable: Runnable? = null
+    @Volatile private var lastPersistedDose = -1.0
+    @Volatile private var wasMusicActive = false
     private var volumeBoostRetryRunnable: Runnable? = null
     private var volumeBoostRetryCount = 0
     private val MAX_VOLUME_BOOST_RETRIES = 3
@@ -1152,14 +1155,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 val safetyPrefs = appContext.getSharedPreferences("pulsr_safety_prefs", Context.MODE_PRIVATE)
                 val savedDose = safetyPrefs.getFloat("weekly_dose", 0.0f).toDouble()
                 val savedTime = safetyPrefs.getLong("weekly_dose_timestamp", 0L)
-                val elapsed = System.currentTimeMillis() - savedTime
-                if (savedDose > 0.0 && elapsed in 0 until (7L * 24 * 3600 * 1000)) {
-                    nativeSetWeeklyDose(savedDose)
-                    Log.i(TAG, "Restored weekly sound dose ($savedDose) from previous session")
+                if (savedDose > 0.0) {
+                    // The dose decays continuously while the app is dead (7-day
+                    // time constant), so restart from the decayed value rather
+                    // than the raw snapshot.
+                    val elapsedMs = (System.currentTimeMillis() - savedTime).coerceAtLeast(0L)
+                    val decayedDose = savedDose * kotlin.math.exp(-elapsedMs / 604_800_000.0)
+                    nativeSetWeeklyDose(decayedDose)
+                    lastPersistedDose = decayedDose
+                    Log.i(TAG, "Restored weekly sound dose ($decayedDose after decay) from previous session")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to restore weekly dose: ${e.message}")
             }
+            startDosePersistence()
         }
 
         // B-27: If the app was terminated while DVC was active, restore the original system volume
@@ -1322,8 +1331,50 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         cleanup()
     }
 
+    private fun startDosePersistence() {
+        if (dosePersistRunnable != null) return
+        val task = object : Runnable {
+            override fun run() {
+                if (disposed.get()) return
+                try {
+                    val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                    val active = am?.isMusicActive == true
+                    if (active || wasMusicActive) persistWeeklyDose()
+                    wasMusicActive = active
+                } catch (_: Exception) {
+                }
+                mainHandler.postDelayed(this, 60_000L)
+            }
+        }
+        dosePersistRunnable = task
+        mainHandler.postDelayed(task, 60_000L)
+    }
+
+    private fun stopDosePersistence() {
+        dosePersistRunnable?.let { mainHandler.removeCallbacks(it) }
+        dosePersistRunnable = null
+    }
+
+    /** Persists the live weekly dose off the audio thread. */
+    fun persistWeeklyDose() {
+        if (!isNativeDspLoaded) return
+        try {
+            val dose = nativeGetWeeklyDose()
+            if (kotlin.math.abs(dose - lastPersistedDose) < 1e-9) return
+            context?.getSharedPreferences("pulsr_safety_prefs", Context.MODE_PRIVATE)
+                ?.edit()
+                ?.putFloat("weekly_dose", dose.toFloat())
+                ?.putLong("weekly_dose_timestamp", System.currentTimeMillis())
+                ?.apply()
+            lastPersistedDose = dose
+        } catch (_: Exception) {
+        }
+    }
+
     fun cleanup() {
         disposed.set(true)
+        stopDosePersistence()
+        persistWeeklyDose()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val callback = audioDeviceCallback as? AudioDeviceCallback
             val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -1400,37 +1451,28 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun releaseNativeDsp() {
         if (!isNativeDspLoaded) return
-        try {
-            val currentDose = nativeGetWeeklyDose()
-            context?.getSharedPreferences("pulsr_safety_prefs", Context.MODE_PRIVATE)
-                ?.edit()
-                ?.putFloat("weekly_dose", currentDose.toFloat())
-                ?.putLong("weekly_dose_timestamp", System.currentTimeMillis())
-                ?.apply()
-        } catch (_: Exception) {}
-        try {
-            nativeSetEqEnabled(false)
-            nativeSetCrossfeedEnabled(false)
-            nativeSetLimiterEnabled(false)
-            nativeSetReverbEnabled(false)
-            nativeSetSaturationEnabled(false)
-            nativeSetStereoWidthEnabled(false)
-            nativeSetLoudnessContourEnabled(false)
-            nativeSetSubCrossoverEnabled(false)
-            nativeSetDynamicEqEnabled(false)
-            nativeSetMultibandCompressorEnabled(false)
+        persistWeeklyDose()
+        safeCall(TAG, "nativeSetEqEnabled") { nativeSetEqEnabled(false) }
+        safeCall(TAG, "nativeSetCrossfeedEnabled") { nativeSetCrossfeedEnabled(false) }
+        safeCall(TAG, "nativeSetLimiterEnabled") { nativeSetLimiterEnabled(false) }
+        safeCall(TAG, "nativeSetReverbEnabled") { nativeSetReverbEnabled(false) }
+        safeCall(TAG, "nativeSetSaturationEnabled") { nativeSetSaturationEnabled(false) }
+        safeCall(TAG, "nativeSetStereoWidthEnabled") { nativeSetStereoWidthEnabled(false) }
+        safeCall(TAG, "nativeSetLoudnessContourEnabled") { nativeSetLoudnessContourEnabled(false) }
+        safeCall(TAG, "nativeSetSubCrossoverEnabled") { nativeSetSubCrossoverEnabled(false) }
+        safeCall(TAG, "nativeSetDynamicEqEnabled") { nativeSetDynamicEqEnabled(false) }
+        safeCall(TAG, "nativeSetMultibandCompressorEnabled") { nativeSetMultibandCompressorEnabled(false) }
+        safeCall(TAG, "nativeSetDynamicBassParams") {
             nativeSetDynamicBassParams(false, 1.0, 100, 5600, 40, 80, 0.10, 0.50, 0)
-            nativeSetSincResamplerEnabled(false)
-            nativeSetReplayGainEnabled(false)
-            nativeSetDirectVolumeParams(false, 1.0)
-            nativeSetViperDdcEnabled(false)
-            nativeSetArbitraryEqEnabled(false)
-            nativeSetLiveProgEnabled(false)
-            nativeSetActiveStages(0)
-            nativeReset()
-        } catch (e: Exception) {
-            Log.w(TAG, "releaseNativeDsp failed: ${e.message}")
         }
+        safeCall(TAG, "nativeSetSincResamplerEnabled") { nativeSetSincResamplerEnabled(false) }
+        safeCall(TAG, "nativeSetReplayGainEnabled") { nativeSetReplayGainEnabled(false) }
+        safeCall(TAG, "nativeSetDirectVolumeParams") { nativeSetDirectVolumeParams(false, 1.0) }
+        safeCall(TAG, "nativeSetViperDdcEnabled") { nativeSetViperDdcEnabled(false) }
+        safeCall(TAG, "nativeSetArbitraryEqEnabled") { nativeSetArbitraryEqEnabled(false) }
+        safeCall(TAG, "nativeSetLiveProgEnabled") { nativeSetLiveProgEnabled(false) }
+        safeCall(TAG, "nativeSetActiveStages") { nativeSetActiveStages(0) }
+        safeCall(TAG, "nativeReset") { nativeReset() }
     }
 
     private fun restoreNativeStateAfterBypass() {
@@ -1449,19 +1491,19 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeMultibandCompressorEnabled = null
         lastNativeDynamicBassParams = null
 
-        try { nativeSetSincResamplerEnabled(isSincResamplerEnabled) } catch (_: Exception) {}
-        try { nativeSetEqEnabled(isEqEnabled && currentEqOwner == EqOwner.NATIVE) } catch (_: Exception) {}
-        try { nativeSetCrossfeedEnabled(isCrossfeedEnabled) } catch (_: Exception) {}
-        try { nativeSetLimiterEnabled(isLimiterEnabled) } catch (_: Exception) {}
-        try { nativeSetReverbEnabled(isReverbEnabled) } catch (_: Exception) {}
-        try { nativeSetSaturationEnabled(isSaturationEnabled) } catch (_: Exception) {}
-        try { nativeSetStereoWidthEnabled(isStereoWidthEnabled) } catch (_: Exception) {}
-        try { nativeSetLoudnessContourEnabled(isLoudnessContourEnabled) } catch (_: Exception) {}
-        try { nativeSetSubCrossoverEnabled(isSubCrossoverEnabled) } catch (_: Exception) {}
-        try { nativeSetDynamicEqEnabled(isDynamicEqEnabled) } catch (_: Exception) {}
-        try { nativeSetViperDdcEnabled(isViperDdcEnabled) } catch (_: Exception) {}
-        try { nativeSetArbitraryEqEnabled(isArbitraryEqEnabled) } catch (_: Exception) {}
-        try { nativeSetLiveProgEnabled(isLiveProgEnabled) } catch (_: Exception) {}
+        safeCall(TAG, "restoreSincResampler") { nativeSetSincResamplerEnabled(isSincResamplerEnabled) }
+        safeCall(TAG, "restoreEq") { nativeSetEqEnabled(isEqEnabled && currentEqOwner == EqOwner.NATIVE) }
+        safeCall(TAG, "restoreCrossfeed") { nativeSetCrossfeedEnabled(isCrossfeedEnabled) }
+        safeCall(TAG, "restoreLimiter") { nativeSetLimiterEnabled(isLimiterEnabled) }
+        safeCall(TAG, "restoreReverb") { nativeSetReverbEnabled(isReverbEnabled) }
+        safeCall(TAG, "restoreSaturation") { nativeSetSaturationEnabled(isSaturationEnabled) }
+        safeCall(TAG, "restoreStereoWidth") { nativeSetStereoWidthEnabled(isStereoWidthEnabled) }
+        safeCall(TAG, "restoreLoudness") { nativeSetLoudnessContourEnabled(isLoudnessContourEnabled) }
+        safeCall(TAG, "restoreSubCrossover") { nativeSetSubCrossoverEnabled(isSubCrossoverEnabled) }
+        safeCall(TAG, "restoreDynamicEq") { nativeSetDynamicEqEnabled(isDynamicEqEnabled) }
+        safeCall(TAG, "restoreViperDdc") { nativeSetViperDdcEnabled(isViperDdcEnabled) }
+        safeCall(TAG, "restoreArbitraryEq") { nativeSetArbitraryEqEnabled(isArbitraryEqEnabled) }
+        safeCall(TAG, "restoreLiveProg") { nativeSetLiveProgEnabled(isLiveProgEnabled) }
         // FIX M-10: clear MBC dedup cache so all band params are re-pushed after bypass restore
         lastNativeMultibandCompressorBands.clear()
         lastNativeMultibandCompressorCrossovers = null

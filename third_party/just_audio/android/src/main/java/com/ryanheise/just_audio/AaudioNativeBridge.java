@@ -65,6 +65,9 @@ public final class AaudioNativeBridge {
 
     public static native int nativeGetXRunCount(long handle);
 
+    /** Real underruns since the previous call (feeds the buffer governor). */
+    public static native int nativeGetXRunDelta(long handle);
+
     public static native boolean nativeIsExclusive(long handle);
 
     public static native void nativeSetVolume(long handle, float volume);

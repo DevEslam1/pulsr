@@ -42,6 +42,12 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
     private var isScrobblerPresent = false
     private val scrobblerCheckTtlMs = 60_000L // Re-check every 60s if not present
 
+    private var lastTrackKey: String? = null
+    private var lastPlaying: Boolean? = null
+    private var lastPosition: Long = -1L
+    private var lastSentAtMs = 0L
+    private val positionThrottleMs = 5_000L
+
     private val knownScrobblerPackages = arrayOf(
         "com.adam.aslfms",
         "fm.last.android",
@@ -102,6 +108,21 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
         position: Long,
         isPlaying: Boolean
     ) {
+        // Track/state transitions are scrobbled immediately; position-only
+        // updates are throttled to one per 5 s (players publish position at a
+        // much higher rate, which woke every scrobbler receiver constantly).
+        val key = "$id|$artist|$track|$album"
+        val sameTrackAndState = key == lastTrackKey && isPlaying == lastPlaying
+        val now = System.currentTimeMillis()
+        if (sameTrackAndState) {
+            if (position == lastPosition) return
+            if (now - lastSentAtMs < positionThrottleMs) return
+        }
+        lastTrackKey = key
+        lastPlaying = isPlaying
+        lastPosition = position
+        lastSentAtMs = now
+
         if (!isScrobblerAvailable()) return
         try {
             val actions = arrayOf(
@@ -125,19 +146,60 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
                     putExtra("package", context.packageName)
                     putExtra("app-name", "Pulsr")
                 }
-                try { context.sendBroadcast(baseIntent) } catch (_: Throwable) {}
-
-                // Send explicit broadcasts to known scrobbler packages on Android 8+
-                for (pkg in knownScrobblerPackages) {
+                // Implicit broadcasts no longer reach manifest receivers on
+                // Android 8+, and the system treats them as a blind fan-out.
+                // Deliver only to receivers the package manager actually sees.
+                for (pkg in resolveReceivers(action)) {
                     try {
-                        val explicitIntent = Intent(baseIntent).setPackage(pkg)
-                        context.sendBroadcast(explicitIntent)
-                    } catch (_: Throwable) {}
+                        context.sendBroadcast(Intent(baseIntent).setPackage(pkg))
+                    } catch (_: Throwable) {
+                    }
                 }
             }
         } catch (_: Throwable) {
             // Ignore broadcast failures in restricted environments
         }
+    }
+
+    private fun resolveReceivers(action: String): Set<String> {
+        val packages = LinkedHashSet<String>()
+        val pm = context.packageManager
+        try {
+            val intent = Intent(action)
+            val receivers = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                pm.queryBroadcastReceivers(
+                    intent,
+                    android.content.pm.PackageManager.ResolveInfoFlags.of(
+                        android.content.pm.PackageManager.MATCH_ALL.toLong()
+                    )
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                pm.queryBroadcastReceivers(intent, android.content.pm.PackageManager.MATCH_ALL)
+            }
+            for (info in receivers) {
+                val pkg = info.activityInfo?.packageName
+                    ?: info.resolvePackageName
+                    ?: info.serviceInfo?.packageName
+                if (!pkg.isNullOrEmpty() && pkg != context.packageName) {
+                    packages.add(pkg)
+                }
+            }
+        } catch (_: Throwable) {
+        }
+        // Some scrobblers do not advertise their receiver in <queries>; add the
+        // curated list when the package is actually installed.
+        for (pkg in knownScrobblerPackages) {
+            if (isPackageInstalled(pkg)) packages.add(pkg)
+        }
+        return packages
+    }
+
+    private fun isPackageInstalled(pkg: String): Boolean = try {
+        context.packageManager.getPackageInfo(pkg, 0)
+        true
+    } catch (_: Throwable) {
+        false
     }
 
     fun cleanup() {

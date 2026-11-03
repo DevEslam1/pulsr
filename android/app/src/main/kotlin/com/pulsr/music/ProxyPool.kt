@@ -86,14 +86,15 @@ object ProxyPool {
             }
 
         fun toJavaProxy(): Proxy {
-            return Proxy(type, InetSocketAddress(host, port))
+            // createUnresolved: resolving here would run DNS under ProxyPool's
+            // lock (and potentially on the main thread) for SOCKS/HTTP hosts.
+            return Proxy(type, InetSocketAddress.createUnresolved(host, port))
         }
     }
 
     private val proxies = CopyOnWriteArrayList<ProxyNode>()
     private val failureCounts = ConcurrentHashMap<String, Int>()
     private val lock = Any()
-    private var activeProxyIndex = 0
     @Volatile
     private var activeProxyId: String? = null
     private var autoRotateEnabled = true
@@ -125,7 +126,6 @@ object ProxyPool {
         synchronized(lock) {
             proxies.clear()
             proxies.addAll(list)
-            activeProxyIndex = 0
             activeProxyId = null
             hasExplicitPool = isExplicit
             if (list.isEmpty()) {
@@ -138,7 +138,6 @@ object ProxyPool {
     fun clearPool() {
         synchronized(lock) {
             proxies.clear()
-            activeProxyIndex = 0
             activeProxyId = null
             hasExplicitPool = false
             currentPathLabel = "DIRECT"
@@ -147,30 +146,40 @@ object ProxyPool {
 
     fun clear() = clearPool()
 
+    fun isPoolConfigured(): Boolean = proxies.isNotEmpty()
+
+    fun hasAliveProxy(): Boolean = proxies.any { it.isAlive }
+
+    /** Stable rotation order: quality first, then node id (never EWMA/index). */
+    private fun stableOrderedAlive(): List<ProxyNode> =
+        proxies.filter { it.isAlive }
+            .sortedWith(compareBy<ProxyNode> { it.quality.ordinal }.thenBy { it.id })
+
     fun getActiveProxy(targetUrl: String? = null): Proxy? {
-        val selected: ProxyNode
+        var selected: ProxyNode? = null
+        var labelToNotify: String? = null
         synchronized(lock) {
-            if (proxies.isEmpty()) {
+            val alive = stableOrderedAlive()
+            if (alive.isEmpty()) {
                 activeProxyId = null
-                currentPathLabel = "DIRECT"
-                return null
+                if (currentPathLabel != "DIRECT") {
+                    currentPathLabel = "DIRECT"
+                    labelToNotify = "DIRECT"
+                }
+            } else {
+                // Stickiness: a node chosen by the Happy-Eyeballs race (or a
+                // previous call) stays active for as long as it is alive.
+                selected = alive.firstOrNull { it.id == activeProxyId } ?: alive.first()
+                activeProxyId = selected.id
+                val label = "${selected.type.name}:${selected.host}:${selected.port}"
+                if (label != currentPathLabel) {
+                    currentPathLabel = label
+                    labelToNotify = label
+                }
             }
-
-            val aliveList = proxies.filter { it.isAlive }
-            if (aliveList.isEmpty()) {
-                activeProxyId = null
-                currentPathLabel = "DIRECT"
-                return null
-            }
-
-            // 2026-09 gap 5: prefer residential > unknown > datacenter, broken ties by EWMA success rate
-            val ranked = aliveList.sortedWith(compareBy<ProxyNode> { it.quality.ordinal }.thenByDescending { it.ewmaSuccessRate })
-            selected = ranked[Math.floorMod(activeProxyIndex, ranked.size)]
-            activeProxyId = selected.id
-            currentPathLabel = "${selected.type.name}:${selected.host}:${selected.port}"
         }
-
-        return selected.toJavaProxy()
+        labelToNotify?.let { label -> onPathChangeListener?.invoke(label) }
+        return selected?.toJavaProxy()
     }
 
     fun getActiveNode(): ProxyNode? {
@@ -180,13 +189,33 @@ object ProxyPool {
         }
     }
 
+    /** Credentials for a proxy endpoint. Used by the JVM Authenticator. */
+    fun credentialsFor(host: String, port: Int): Pair<String, String>? {
+        synchronized(lock) {
+            val node = proxies.firstOrNull {
+                it.host.equals(host, ignoreCase = true) && it.port == port
+            } ?: return null
+            if (node.username.isEmpty()) return null
+            return node.username to node.password
+        }
+    }
+
+    /**
+     * Adds a Proxy-Authorization header for a plain-HTTP request sent through
+     * an HTTP proxy. HTTPS tunnels must authenticate via java.net.Authenticator
+     * instead: the header is added to the CONNECT handshake by the proxy and,
+     * with some handlers, forwarded to the origin server.
+     */
     fun applyAuthHeader(conn: HttpURLConnection, node: ProxyNode? = null) {
         val targetNode = node ?: getActiveNode()
-        if (targetNode != null && targetNode.username.isNotEmpty()) {
-            val userPass = "${targetNode.username}:${targetNode.password}"
-            val basicAuth = "Basic " + android.util.Base64.encodeToString(userPass.toByteArray(), android.util.Base64.NO_WRAP)
-            conn.setRequestProperty("Proxy-Authorization", basicAuth)
-        }
+        if (targetNode == null || targetNode.username.isEmpty()) return
+        if (targetNode.type != Proxy.Type.HTTP) return
+        val isPlainHttp = runCatching { conn.url.protocol.equals("http", ignoreCase = true) }
+            .getOrDefault(false)
+        if (!isPlainHttp) return
+        val userPass = "${targetNode.username}:${targetNode.password}"
+        val basicAuth = "Basic " + android.util.Base64.encodeToString(userPass.toByteArray(), android.util.Base64.NO_WRAP)
+        conn.setRequestProperty("Proxy-Authorization", basicAuth)
     }
 
     fun resetNetworkFailures() {
@@ -235,20 +264,29 @@ object ProxyPool {
             }
 
             if (autoRotateEnabled) {
-                val remainingAlive = proxies.filter { it.isAlive }
+                val remainingAlive = stableOrderedAlive()
                 if (remainingAlive.isNotEmpty()) {
-                    activeProxyIndex = (activeProxyIndex + 1) % remainingAlive.size
-                    val ranked = remainingAlive.sortedWith(compareBy<ProxyNode> { it.quality.ordinal }.thenByDescending { it.ewmaSuccessRate })
-                    val newActive = ranked[Math.floorMod(activeProxyIndex, ranked.size)]
+                    // Rotate to the next alive node in the stable (quality,
+                    // id) order, not an index into a re-sorted EWMA list.
+                    val currentPos = remainingAlive.indexOfFirst { it.id == activeProxyId }
+                    val newActive = if (currentPos >= 0) {
+                        remainingAlive[(currentPos + 1) % remainingAlive.size]
+                    } else {
+                        remainingAlive.first()
+                    }
                     activeProxyId = newActive.id
                     val newLabel = "${newActive.type.name}:${newActive.host}:${newActive.port}"
-                    currentPathLabel = newLabel
-                    newLabelToNotify = newLabel
+                    if (newLabel != currentPathLabel) {
+                        currentPathLabel = newLabel
+                        newLabelToNotify = newLabel
+                    }
                     logI(TAG, "Rotated proxy path to $newLabel")
                 } else {
                     activeProxyId = null
-                    currentPathLabel = "DIRECT"
-                    newLabelToNotify = "DIRECT"
+                    if (currentPathLabel != "DIRECT") {
+                        currentPathLabel = "DIRECT"
+                        newLabelToNotify = "DIRECT"
+                    }
                     logI(TAG, "All proxies dead, rotated path to DIRECT")
                 }
             }
@@ -264,9 +302,7 @@ object ProxyPool {
                 proxies.firstOrNull { it.id == successHostOrId || "${it.host}:${it.port}" == successHostOrId || it.host == successHostOrId }
             } else {
                 activeProxyId?.let { id -> proxies.firstOrNull { it.id == id } }
-                    ?: proxies.filter { it.isAlive }.let {
-                        if (it.isNotEmpty()) it[Math.floorMod(activeProxyIndex, it.size)] else null
-                    }
+                    ?: stableOrderedAlive().firstOrNull()
             }
             target?.let {
                 synchronized(it.nodeLock) {
@@ -354,11 +390,7 @@ object ProxyPool {
             conn.readTimeout = timeoutMs
             conn.instanceFollowRedirects = true
             conn.requestMethod = "GET"
-            if (node.username.isNotEmpty()) {
-                val userPass = "${node.username}:${node.password}"
-                val basicAuth = "Basic " + android.util.Base64.encodeToString(userPass.toByteArray(), android.util.Base64.NO_WRAP)
-                conn.setRequestProperty("Proxy-Authorization", basicAuth)
-            }
+            applyAuthHeader(conn, node)
             val code = conn.responseCode
             val latency = System.currentTimeMillis() - start
             val success = code in 200..399
@@ -412,11 +444,7 @@ object ProxyPool {
                         conn.readTimeout = timeoutMs
                         conn.instanceFollowRedirects = true
                         conn.requestMethod = "GET"
-                        if (node.username.isNotEmpty()) {
-                            val userPass = "${node.username}:${node.password}"
-                            val basicAuth = "Basic " + android.util.Base64.encodeToString(userPass.toByteArray(), android.util.Base64.NO_WRAP)
-                            conn.setRequestProperty("Proxy-Authorization", basicAuth)
-                        }
+                        applyAuthHeader(conn, node)
 
                         val code = conn.responseCode
                         val latency = System.currentTimeMillis() - start

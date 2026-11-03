@@ -589,31 +589,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         : (format != null && format.channelCount > 0 ? format.channelCount : 2);
                 effective = probeAaudioOutput(rate, channels,
                         aaudioTargetBufferMs, aaudioPreferExclusive);
-                if (effective && format == null && requestedRate == null) {
-                    int otherRate = (rate == 48000) ? 44100 : 48000;
-                    long probeOther = 0L;
-                    try {
-                        probeOther = AaudioNativeBridge.nativeOpen(otherRate, channels,
-                                AaudioNativeBridge.ENCODING_PCM_I16, aaudioPreferExclusive,
-                                aaudioTargetBufferMs);
-                        if (probeOther != 0L) {
-                            // Also verify exclusive mode for the second rate probe.
-                            boolean otherExclusive = !aaudioPreferExclusive
-                                    || AaudioNativeBridge.nativeIsExclusive(probeOther);
-                            if (!otherExclusive) {
-                                effective = false;
-                                Log.w(TAG, "AAudio secondary probe opened in shared mode; exclusive not available");
-                            }
-                        } else {
-                            effective = false;
-                        }
-                    } catch (LinkageError | RuntimeException refused) {
-                        effective = false;
-                        Log.w(TAG, "AAudio secondary probe refused", refused);
-                    } finally {
-                        if (probeOther != 0L) AaudioNativeBridge.nativeClose(probeOther);
-                    }
-                }
+                // A second hardware stream open at another rate used to run on
+                // this (main) thread after a successful probe. The first probe
+                // already proves the device can open the requested mode; the
+                // other-rate check only doubled the UI-thread stall.
             }
             final boolean modeChanged = aaudioOutputEnabled != effective;
             final boolean forceReconfigure = effective && changed && !modeChanged;
@@ -1181,16 +1160,23 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void audioEffectSetEnabled(String type, boolean enabled) {
-        audioEffectsMap.get(type).setEnabled(enabled);
+        AudioEffect effect = audioEffectsMap.get(type);
+        if (effect != null) effect.setEnabled(enabled);
     }
 
     private void loudnessEnhancerSetTargetGain(double targetGain) {
+        AudioEffect effect = audioEffectsMap.get("AndroidLoudnessEnhancer");
+        if (!(effect instanceof LoudnessEnhancer)) return;
         int targetGainMillibels = (int)Math.round(targetGain * 100.0); // target gain needs to be provided in milliBel, the user provides the value in deciBel
-        ((LoudnessEnhancer)audioEffectsMap.get("AndroidLoudnessEnhancer")).setTargetGain(targetGainMillibels);
+        ((LoudnessEnhancer) effect).setTargetGain(targetGainMillibels);
     }
 
     private Map<String, Object> equalizerAudioEffectGetParameters() {
-        Equalizer equalizer = (Equalizer)audioEffectsMap.get("AndroidEqualizer");
+        AudioEffect effect = audioEffectsMap.get("AndroidEqualizer");
+        if (!(effect instanceof Equalizer)) {
+            return new HashMap<String, Object>();
+        }
+        Equalizer equalizer = (Equalizer) effect;
         ArrayList<Object> rawBands = new ArrayList<>();
         for (short i = 0; i < equalizer.getNumberOfBands(); i++) {
             rawBands.add(mapOf(
@@ -1211,7 +1197,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void equalizerBandSetGain(int bandIndex, double gain) {
-        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 100.0))); // target gain needs to be provided in milliBel, the user provides the value in deciBel
+        AudioEffect effect = audioEffectsMap.get("AndroidEqualizer");
+        if (!(effect instanceof Equalizer)) return;
+        ((Equalizer) effect).setBandLevel((short)bandIndex, (short)(Math.round(gain * 100.0))); // target gain needs to be provided in milliBel, the user provides the value in deciBel
     }
 
     /// Creates an event based on the current state.
@@ -1436,6 +1424,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         sinkWrapper = null;
         if (sink != null) sink.release();
         dspAudioProcessor = null;
+        // bufferWatcher, ObserverRenderer and the fallback runnables all hold
+        // this AudioPlayer; leaving them queued leaks the disposed player and
+        // keeps polling a released ExoPlayer.
+        handler.removeCallbacksAndMessages(null);
         eventChannel.endOfStream();
         dataEventChannel.endOfStream();
     }

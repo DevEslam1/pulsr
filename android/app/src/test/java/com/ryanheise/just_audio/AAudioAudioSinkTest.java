@@ -123,6 +123,38 @@ public class AAudioAudioSinkTest {
 
         final ByteBuffer buffer = ByteBuffer.allocateDirect(1000);
         assertTrue(sink.handleBuffer(buffer, 1_000_000L, 0));
-        assertEquals(1_002_083L, sink.getCurrentPositionUs(false));
+        // The frames read before the new base must not be added to the new
+        // presentation timestamp.
+        assertEquals(1_000_000L, sink.getCurrentPositionUs(false));
+
+        // Advance both counters by 480 frames (10 ms at 48 kHz) past the base.
+        bridge.framesWritten = 250 + 480;
+        bridge.framesRead = 250 + 480;
+        assertEquals(1_010_000L, sink.getCurrentPositionUs(false));
+    }
+
+    @Test
+    public void discontinuityRebasesPositionWithoutCountingOldFrames()
+            throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 1000;
+        bridge.framesWritten = 500;
+        bridge.framesRead = 200;
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm16(), 0, null);
+        final ByteBuffer buffer = ByteBuffer.allocateDirect(1000);
+        assertTrue(sink.handleBuffer(buffer, 5_000_000L, 0));
+        assertEquals(5_000_000L, sink.getCurrentPositionUs(false));
+
+        bridge.framesWritten = 900;
+        bridge.framesRead = 700;
+        sink.handleDiscontinuity();
+        final ByteBuffer next = ByteBuffer.allocateDirect(1000);
+        assertTrue(sink.handleBuffer(next, 6_000_000L, 0));
+        assertEquals(6_000_000L, sink.getCurrentPositionUs(false));
+
+        bridge.framesWritten = 900 + 480;
+        bridge.framesRead = 900 + 480;
+        assertEquals(6_010_000L, sink.getCurrentPositionUs(false));
     }
 }

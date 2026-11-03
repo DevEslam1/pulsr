@@ -199,6 +199,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                               cubit.onQueryChanged(value);
                             }
                           },
+                          onSubmitted: (value) => cubit.commitQuery(value),
                           onClear: cubit.clearQuery,
                         ),
                         SizedBox(
@@ -570,7 +571,10 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                     song: song,
                     query: state.query,
                     subtitleOverride: state.results[index].artist,
-                    onTap: () => playerCubit.playSong(song, queue: songs),
+                    onTap: () {
+                      cubit.commitQuery();
+                      playerCubit.playSong(song, queue: songs);
+                    },
                     onLongPress: () => _showTrackActions(context, song, p),
                     onMorePressed: () => _showTrackActions(context, song, p),
                     trailing: YtmDownloadButton(song: song),

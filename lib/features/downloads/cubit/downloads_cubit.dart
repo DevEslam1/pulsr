@@ -117,10 +117,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   Future<void> loadInitialTasks() async {
     try {
       final tasks = await _observeDownloadsUseCase.getAll();
-      final taskMap = Map<String, DownloadTask>.unmodifiable({
+      final merged = <String, DownloadTask>{
         for (final t in tasks) t.videoId: t,
-      });
-      safeEmit(state.copyWith(tasks: taskMap));
+        ...state.tasks,
+      };
+      safeEmit(state.copyWith(tasks: Map<String, DownloadTask>.unmodifiable(merged)));
     } catch (e, st) {
       // Was `catch (_) {}`: a failed load was indistinguishable from an empty
       // library. Log it and surface it in state.

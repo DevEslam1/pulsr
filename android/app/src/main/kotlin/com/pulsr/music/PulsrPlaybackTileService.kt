@@ -1,6 +1,7 @@
 package com.pulsr.music
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
@@ -10,6 +11,10 @@ import androidx.annotation.RequiresApi
 
 /**
  * Quick Settings Tile allowing one-tap play/pause toggle from the notification shade.
+ *
+ * The tile never guesses the new state optimistically: it renders the last
+ * state written by the player. Call [PlaybackTileState.setPlaying] from the
+ * player (a native hook is still required) and the system re-binds the tile.
  */
 @RequiresApi(Build.VERSION_CODES.N)
 class PulsrPlaybackTileService : TileService() {
@@ -35,17 +40,48 @@ class PulsrPlaybackTileService : TileService() {
             }
             sendBroadcast(keyUp)
 
-            // Visually toggle tile
-            val tile = qsTile ?: return
-            tile.state = if (tile.state == Tile.STATE_ACTIVE) Tile.STATE_INACTIVE else Tile.STATE_ACTIVE
-            tile.updateTile()
+            // Ask the system to re-bind the tile once the player publishes the
+            // real state. No optimistic toggle here.
+            PlaybackTileState.requestRefresh(this)
         } catch (_: Exception) {}
     }
 
     private fun updateTileState() {
         val tile = qsTile ?: return
         tile.label = getString(R.string.tile_playback_label)
-        tile.state = Tile.STATE_INACTIVE
+        tile.state = if (PlaybackTileState.isPlaying(this)) {
+            Tile.STATE_ACTIVE
+        } else {
+            Tile.STATE_INACTIVE
+        }
         tile.updateTile()
+    }
+}
+
+/** Persisted tile state, written by the playback owner. */
+object PlaybackTileState {
+    private const val PREFS = "pulsr_playback_tile"
+    private const val KEY_PLAYING = "is_playing"
+
+    fun isPlaying(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_PLAYING, false)
+
+    fun setPlaying(context: Context, playing: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_PLAYING, playing)
+            .apply()
+        requestRefresh(context)
+    }
+
+    fun requestRefresh(context: Context) {
+        try {
+            TileService.requestListeningState(
+                context,
+                ComponentName(context, PulsrPlaybackTileService::class.java)
+            )
+        } catch (_: Exception) {
+        }
     }
 }

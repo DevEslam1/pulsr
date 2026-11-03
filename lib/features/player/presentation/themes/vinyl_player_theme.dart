@@ -40,6 +40,7 @@ class VinylPlayerTheme extends StatefulWidget {
 class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     with TickerProviderStateMixin {
   late final AnimationController _rotationController;
+  late final AnimationController _velocityController;
   late final AnimationController _tonearmController;
   late final CurvedAnimation _tonearmAnimation;
 
@@ -51,6 +52,12 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
       duration: const Duration(seconds: 12),
     );
 
+    _velocityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+      value: widget.props.state.isPlaying ? 1.0 : 0.0,
+    );
+
     _tonearmController = AnimationController(
       vsync: this,
       duration: Duration.zero,
@@ -59,16 +66,15 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
     _tonearmAnimation = CurvedAnimation(
       parent: _tonearmController,
-      curve: Curves.easeInOutCubic,
+      curve: Curves.easeInOutBack,
     );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Arm drop used to be an off-scale 850 ms; it now follows the ambient token
-    // and collapses to zero under Reduce Motion.
-    _tonearmController.duration = context.motion(PulsrDurations.ambient);
+    _tonearmController.duration = context.motionMs(480);
+    _velocityController.duration = context.motionMs(650);
     _syncRotation();
   }
 
@@ -78,9 +84,29 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
       if (!_rotationController.isAnimating) {
         _rotationController.repeat();
       }
+      _velocityController.animateTo(
+        1.0,
+        duration: context.motionMs(650),
+        curve: Curves.easeOutCubic,
+      );
     } else {
-      if (_rotationController.isAnimating) {
-        _rotationController.stop();
+      if (!context.motionEnabled) {
+        _velocityController.value = 0.0;
+        if (_rotationController.isAnimating) {
+          _rotationController.stop();
+        }
+      } else if (_rotationController.isAnimating) {
+        _velocityController
+            .animateTo(
+              0.0,
+              duration: context.motionMs(650),
+              curve: Curves.decelerate,
+            )
+            .whenComplete(() {
+              if (mounted && !widget.props.state.isPlaying && _velocityController.value == 0.0) {
+                _rotationController.stop();
+              }
+            });
       }
     }
   }
@@ -101,6 +127,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
   @override
   void dispose() {
     _tonearmAnimation.dispose();
+    _velocityController.dispose();
     _rotationController.dispose();
     _tonearmController.dispose();
     super.dispose();

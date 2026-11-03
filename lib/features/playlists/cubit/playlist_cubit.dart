@@ -324,12 +324,12 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             .map((p) => OnlinePlaylistEntry.fromJson(p as Map<String, dynamic>))
             .toList();
         // B-19: Validate loaded custom playlists count <= 10 and tracks per playlist <= 50
-        if (rawCustomList.length > 50) {
+        if (rawCustomList.length > 10) {
           ErrorLogger.log(
-            'Loaded custom playlists exceeded cap of 50 (${rawCustomList.length}), truncating',
+            'Loaded custom playlists exceeded cap of 10 (${rawCustomList.length}), truncating',
             category: 'PlaylistCubit',
           );
-          rawCustomList = rawCustomList.take(50).toList();
+          rawCustomList = rawCustomList.take(10).toList();
         }
         final customPlaylists = rawCustomList.map((entry) {
           if (entry.tracks.length > 50) {
@@ -461,7 +461,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       final liked = onlineValue.likedTracks;
       final customs = onlineValue.customPlaylists;
       final cappedCustoms =
-          customs.length > 50 ? customs.sublist(customs.length - 50) : customs;
+          customs.length > 10 ? customs.sublist(customs.length - 10) : customs;
       final data = {
         'likedTracks': liked.take(200).map((t) => t.toJson()).toList(),
         'accountPlaylists':
@@ -485,20 +485,26 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     }
   }
 
+  static bool _seedingInFlight = false;
+
   Future<void> _checkSeeding(List playlists) async {
+    if (_seedingInFlight) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final seeded = prefs.getBool('smart_playlists_seeded') ?? false;
-      if (!seeded) {
+      if (!seeded && !_seedingInFlight) {
+        _seedingInFlight = true;
+        await prefs.setBool('smart_playlists_seeded', true);
         final hasSmart = playlists.any((p) => p.isSmart);
         if (!hasSmart) {
           await _playlistUseCases.seedDefaultSmartPlaylists();
         }
-        await prefs.setBool('smart_playlists_seeded', true);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to check or seed default smart playlists',
           error: e, stackTrace: st, category: 'PlaylistCubit');
+    } finally {
+      _seedingInFlight = false;
     }
   }
 
@@ -546,6 +552,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   void loadPlaylistSongs(int playlistId) {
     _playlistSongsSub?.cancel();
     removeFromComposite(_playlistSongsSub);
+    safeEmit(state.copyWith(currentPlaylistSongs: const []));
     _playlistSongsSub =
         autoSub(_playlistUseCases.watchPlaylistSongs(playlistId), (result) {
       result.fold(
@@ -618,7 +625,6 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   }
 
   Future<bool> deletePlaylist(int playlistId) async {
-    SoundFeedbackService.playWarning(mirrorHaptics: true);
     final removedSub = _smartSubscriptions.remove(playlistId);
     removedSub?.cancel();
     removeFromComposite(removedSub);
@@ -636,6 +642,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         return false;
       },
       (_) {
+        SoundFeedbackService.playWarning(mirrorHaptics: true);
         safeEmit(state.copyWith(errorMessage: null));
         return true;
       },
@@ -1113,20 +1120,20 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     }
     // Two rapid submits both pass the check above before the first await, so
     // identical requests join the in-flight future instead of fetching twice.
-    final inFlight = _customFetchInFlight[input];
+    final inFlight = _customFetchInFlight[targetId];
     if (inFlight != null) return inFlight;
 
-    final future = _runFetchOnlinePlaylistByUrl(input);
-    _customFetchInFlight[input] = future;
+    final future = _runFetchOnlinePlaylistByUrl(input, targetId: targetId);
+    _customFetchInFlight[targetId] = future;
     future.whenComplete(() {
-      if (identical(_customFetchInFlight[input], future)) {
-        _customFetchInFlight.remove(input);
+      if (identical(_customFetchInFlight[targetId], future)) {
+        _customFetchInFlight.remove(targetId);
       }
     });
     return future;
   }
 
-  Future<void> _runFetchOnlinePlaylistByUrl(String input) async {
+  Future<void> _runFetchOnlinePlaylistByUrl(String input, {required String targetId}) async {
     _setOnlineState((s) => s.copyWith(
           customStatus: YtmFetchStatus.loading,
           clearCustomError: true,
@@ -1136,8 +1143,19 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       final accountService = getIt.isRegistered<YtmAccountService>()
           ? getIt<YtmAccountService>()
           : null;
-      final details =
-          await accountService?.fetchPlaylistDetails(input, maxTracks: 200);
+      YtmPlaylistDetails? details;
+      if (accountService != null) {
+        try {
+          details =
+              await accountService.fetchPlaylistDetails(input, maxTracks: 200);
+        } catch (e, st) {
+          ErrorLogger.log(
+              'fetchPlaylistDetails failed, falling back to public tracks',
+              error: e,
+              stackTrace: st,
+              category: 'PlaylistCubit');
+        }
+      }
       if (_disposed || isClosed) return;
 
       List<YtmTrack> tracks = details?.tracks ?? const [];
@@ -1171,7 +1189,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       }
 
       final entry = OnlinePlaylistEntry(
-        id: input,
+        id: targetId,
         title: title,
         uploader: details?.author.isNotEmpty == true
             ? details!.author
@@ -1180,9 +1198,14 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       );
 
       // Re-dedupe after the awaits: a concurrent path may have landed the same
-      // entry while this fetch was running.
+      // entry while this fetch was running. Compare canonical IDs.
       final updated = List<OnlinePlaylistEntry>.from(
-          onlineState.customPlaylists.where((p) => p.id != input))
+          onlineState.customPlaylists.where((p) {
+        final pTarget = canonicalYtmPlaylistId(p.id).isNotEmpty
+            ? canonicalYtmPlaylistId(p.id)
+            : p.id;
+        return pTarget != targetId;
+      }))
         ..add(entry);
       _setOnlineState((s) => s.copyWith(
             customStatus: YtmFetchStatus.done,
@@ -1263,10 +1286,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     _setOnlineState((current) => current.copyWith(
           likedTracks: const [],
           likedStatus: YtmFetchStatus.idle,
-          likedError: null,
+          clearLikedError: true,
           accountPlaylists: const [],
           accountStatus: YtmFetchStatus.idle,
-          accountError: null,
+          clearAccountError: true,
         ));
     unawaited(_saveOnlineCache());
     unawaited(_clearCachedOnlineLibrary(onlyAccount: true));

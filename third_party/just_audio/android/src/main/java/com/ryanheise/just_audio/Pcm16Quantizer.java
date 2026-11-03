@@ -1,6 +1,6 @@
 package com.ryanheise.just_audio;
 
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * PCM16 requantisation for the default (non-bit-perfect) output path.
@@ -15,6 +15,11 @@ import java.util.Random;
  * <p>This runs ONLY on the default path. The bit-perfect path copies the decoded
  * bytes verbatim and never calls this, so bit-perfect output stays undithered.
  *
+ * <p>The native C++ chain already noise-shapes AND dithers to 16-bit when its
+ * dither stage is active, so samples that arrive already sitting exactly on a
+ * 16-bit integer step are rounded without adding a second TPDF layer. This
+ * prevents doubled dither noise (and the extra ~3 dB noise floor it causes).
+ *
  * <p>Note on standard integer asymmetry: PCM 16-bit spans [-32768, +32767].
  * Multiplying by 32768 maps +1.0f -> +32768 which clamps to Short.MAX_VALUE
  * (32767, 1 LSB below mathematical unity), while -1.0f maps to Short.MIN_VALUE
@@ -23,26 +28,24 @@ import java.util.Random;
 final class Pcm16Quantizer {
     private Pcm16Quantizer() {}
 
-    // Per-thread RNG so the playback thread never contends on a shared Random.
-    // Anonymous subclass (not ThreadLocal.withInitial) so it links on every
-    // supported API level without relying on Java-8 default-method desugaring.
-    private static final ThreadLocal<Random> DITHER_RNG = new ThreadLocal<Random>() {
-        @Override
-        protected Random initialValue() {
-            return new Random();
-        }
-    };
-
     /**
      * Requantises a DSP float sample to dithered 16-bit PCM (default path only).
      */
     static short fromFloat(float value) {
-        final Random rng = DITHER_RNG.get();
-        // TPDF dither: the difference of two independent [0,1) uniforms is a
-        // triangular distribution over (-1, +1) peaking at 0, i.e. +/-1 LSB of
-        // triangular dither added in the integer-sample domain before rounding.
-        final double dither = rng.nextDouble() - rng.nextDouble();
-        final long sample = Math.round((double) value * 32768.0 + dither);
+        if (!Float.isFinite(value)) return 0;
+        final double scaled = (double) value * 32768.0;
+        final double dither;
+        if (Math.abs(scaled - Math.rint(scaled)) < 1e-4) {
+            // Already quantised by the native 16-bit noise-shaped dither stage;
+            // do not add a second layer of TPDF dither.
+            dither = 0.0;
+        } else {
+            // TPDF dither: the difference of two independent [0,1) uniforms is
+            // a triangular distribution over (-1, +1), i.e. +/-1 LSB.
+            final ThreadLocalRandom rng = ThreadLocalRandom.current();
+            dither = rng.nextDouble() - rng.nextDouble();
+        }
+        final long sample = Math.round(scaled + dither);
         if (sample > Short.MAX_VALUE) return Short.MAX_VALUE;
         if (sample < Short.MIN_VALUE) return Short.MIN_VALUE;
         return (short) sample;

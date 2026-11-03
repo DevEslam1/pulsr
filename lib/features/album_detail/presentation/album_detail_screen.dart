@@ -49,6 +49,9 @@ enum _AlbumSort { track, title, duration }
 
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   late GetAlbumsUseCase _useCase;
+  late final ScrollController _scrollController;
+  bool _showCollapsedTitle = false;
+  double _expandedHeight = 280.0;
   _AlbumSort _sort = _AlbumSort.track;
   final Set<int> _selectedIds = {};
 
@@ -60,12 +63,29 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   void initState() {
     super.initState();
     _useCase = widget.getAlbumsUseCase ?? getIt<GetAlbumsUseCase>();
+    _scrollController = ScrollController()..addListener(_onScroll);
     _updateStream();
     _loadSortPreference();
   }
 
   void _updateStream() {
     _songsStream = _useCase.watchAlbumSongs(widget.album.id).distinct();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final threshold = _expandedHeight - kToolbarHeight - 48;
+    final show = _scrollController.offset > threshold;
+    if (show != _showCollapsedTitle) {
+      setState(() => _showCollapsedTitle = show);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   String _sortPrefsKey(int albumId) => 'album_sort_$albumId';
@@ -155,6 +175,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final expandedHeight = isTablet
         ? (MediaQuery.sizeOf(context).height * 0.42).clamp(290.0, 390.0)
         : PulsrLayoutMetrics.heroHeight(context);
+    _expandedHeight = expandedHeight;
     final artworkSize = (expandedHeight * 0.52).clamp(120.0, 210.0);
 
     final shouldSplit = PulsrBreakpoint.isLandscape(context) ||
@@ -212,6 +233,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       if (mounted) setState(() {});
                     },
                     child: CustomScrollView(
+                      controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(
                         parent: BouncingScrollPhysics(),
                       ),

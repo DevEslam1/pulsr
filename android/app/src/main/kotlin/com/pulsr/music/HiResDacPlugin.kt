@@ -256,7 +256,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED)
+                context.registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             } else {
                 context.registerReceiver(usbReceiver, filter)
             }

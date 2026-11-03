@@ -1,5 +1,8 @@
 // lib/features/artist_detail/presentation/artist_detail_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
+import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -36,6 +39,7 @@ class ArtistDetailScreen extends StatefulWidget {
 
 class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   static const _bioUnavailableText = 'Bio unavailable';
+  bool _bioExpanded = false;
   late GetArtistsUseCase _useCase;
   late final ArtistBioService _bioService;
   // Resolved once per artist so widget rebuilds (scroll, theme, selection)
@@ -198,42 +202,72 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   return Container(
                     margin: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
-                    padding: const EdgeInsets.all(AppSpacing.s14),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer.withValues(alpha: 0.6),
                       borderRadius: AppRadii.r16All,
                       border: Border.all(color: p.hairline),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.info_outline_rounded,
-                                size: 16, color: p.accent),
-                            const SizedBox(width: AppSpacing.s6),
-                            Text(
-                              context.l10n.aboutArtist,
-                              style: TextStyle(
-                                fontSize: AppFontSize.label,
-                                fontWeight: FontWeight.w700,
-                                color: p.accent,
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: AppRadii.r16All,
+                      child: InkWell(
+                        borderRadius: AppRadii.r16All,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _bioExpanded = !_bioExpanded);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.s14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.info_outline_rounded,
+                                      size: 16, color: p.accent),
+                                  const SizedBox(width: AppSpacing.s6),
+                                  Text(
+                                    context.l10n.aboutArtist,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.label,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.accent,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  AnimatedRotation(
+                                    turns: _bioExpanded ? 0.5 : 0.0,
+                                    duration: context.motionMs(200),
+                                    child: Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 18,
+                                      color: p.accent,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.s6),
-                        Text(
-                          bio,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: AppFontSize.label,
-                            color: p.textSecondary,
-                            height: 1.4,
+                              const SizedBox(height: AppSpacing.s6),
+                              AnimatedSize(
+                                duration: context.motionMs(220),
+                                curve: Curves.easeOutCubic,
+                                alignment: Alignment.topCenter,
+                                child: Text(
+                                  bio,
+                                  maxLines: _bioExpanded ? null : 4,
+                                  overflow: _bioExpanded
+                                      ? TextOverflow.visible
+                                      : TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.label,
+                                    color: p.textSecondary,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   );
                 },
@@ -293,19 +327,24 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                               width: 120,
                               margin: const EdgeInsetsDirectional.only(
                                   end: AppSpacing.s14),
-                              child: InkWell(
-                                borderRadius: AppRadii.r16All,
+                              child: PulsrPressable(
+                                pressedScale: 0.96,
+                                hapticStyle: PulsrHapticStyle.selection,
+                                focusBorderRadius: AppRadii.r16All,
                                 onTap: () => context.push(
                                     '/album?id=${album.id}',
                                     extra: album),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    CachedArtwork(
-                                        id: album.id,
-                                        type: ArtworkType.ALBUM,
-                                        size: 120,
-                                        borderRadius: 16),
+                                    Hero(
+                                      tag: 'album_${album.id}',
+                                      child: CachedArtwork(
+                                          id: album.id,
+                                          type: ArtworkType.ALBUM,
+                                          size: 120,
+                                          borderRadius: 16),
+                                    ),
                                     const SizedBox(height: AppSpacing.xs),
                                     Text(album.title,
                                         maxLines: 1,

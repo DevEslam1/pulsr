@@ -56,6 +56,21 @@ class YtDownloadItem {
       etaSeconds: (json['etaSeconds'] as num?)?.toInt(),
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is YtDownloadItem &&
+          runtimeType == other.runtimeType &&
+          status == other.status &&
+          progress == other.progress &&
+          speedKbps == other.speedKbps &&
+          etaSeconds == other.etaSeconds &&
+          error == other.error;
+
+  @override
+  int get hashCode =>
+      Object.hash(status, progress, speedKbps, etaSeconds, error);
 }
 
 class YtmDownloadState {
@@ -63,6 +78,21 @@ class YtmDownloadState {
   const YtmDownloadState({this.items = const {}});
   YtDownloadItem itemFor(String videoId) =>
       items[videoId] ?? const YtDownloadItem();
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! YtmDownloadState) return false;
+    if (items.length != other.items.length) return false;
+    for (final entry in items.entries) {
+      if (other.items[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hashAll(items.entries.map((e) => Object.hash(e.key, e.value)));
 }
 
 /// Per-row download UI adapter over [DownloadsCubit].
@@ -84,6 +114,10 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   /// Video ids whose completed task has already been folded back into the
   /// queue/DB, so the completion side effects run exactly once.
   final LinkedHashSet<String> _reconciledVideoIds = LinkedHashSet<String>();
+
+  /// Video IDs explicitly canceled by the user, preserved across pause/delete
+  /// lifecycle transitions in DownloadsCubit until re-queued.
+  final Set<String> _canceledVideoIds = {};
   final Map<String, bool> _reconcileLocks = {};
   // FIX-C12: Shield recently completed tasks with a 10-second TTL
   final Map<String, int> _recentlyCompleted = {};
@@ -129,9 +163,14 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
 
     final mapped = <String, YtDownloadItem>{};
     for (final task in downloads.tasks.values) {
-      mapped[task.videoId] = _mapTask(task);
-      if (task.status == DownloadStatus.complete) {
-        _recentlyCompleted[task.videoId] = now;
+      if (_canceledVideoIds.contains(task.videoId)) {
+        mapped[task.videoId] =
+            const YtDownloadItem(status: YtDownloadStatus.canceled);
+      } else {
+        mapped[task.videoId] = _mapTask(task);
+        if (task.status == DownloadStatus.complete) {
+          _recentlyCompleted[task.videoId] = now;
+        }
       }
     }
     // Canceled lives only here: the repository deletes the task on cancel, so a
@@ -143,6 +182,10 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
           entry.value.status == YtDownloadStatus.failed) {
         mapped.putIfAbsent(entry.key, () => entry.value);
       }
+    }
+    for (final id in _canceledVideoIds) {
+      mapped.putIfAbsent(
+          id, () => const YtDownloadItem(status: YtDownloadStatus.canceled));
     }
 
     safeEmit(YtmDownloadState(items: mapped));
@@ -264,6 +307,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     }
 
     if (current.status == YtDownloadStatus.paused) {
+      _reconciledVideoIds.remove(videoId);
+      _canceledVideoIds.remove(videoId);
       final resumed = await _downloads.resumeDownload(videoId);
       if (isClosed) return (outcome: _AdmitOutcome.alreadyActive, error: null);
       if (resumed.isRight()) {
@@ -288,6 +333,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     }
 
     _reconciledVideoIds.remove(videoId);
+    _canceledVideoIds.remove(videoId);
     _set(videoId,
         const YtDownloadItem(status: YtDownloadStatus.queued, progress: 0));
 
@@ -348,6 +394,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       );
 
   void cancelDownload(String videoId) {
+    _canceledVideoIds.add(videoId);
     _downloads.cancelDownload(videoId);
     _set(videoId, const YtDownloadItem(status: YtDownloadStatus.canceled));
   }

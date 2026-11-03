@@ -83,8 +83,20 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     @Override
     public void configure(Format format, int bufferSize, int[] outputChannels)
             throws ConfigurationException {
-        pendingOutput = null;
-        pendingInput = null;
+        // Gapless same-format transition: the processor is still active with the
+        // same input format, so do NOT configure/flush it (that would reset the
+        // native state and regenerate the reverb IR). Compute this BEFORE
+        // clearing pending buffers so an unconsumed tail buffer is not dropped
+        // at the track boundary.
+        final int requestedEncoding = format.pcmEncoding;
+        final boolean sameFormat = processFloat
+                && format.sampleRate == lastSampleRate
+                && format.channelCount == lastChannelCount
+                && requestedEncoding == lastPcmEncoding;
+        if (!sameFormat) {
+            pendingOutput = null;
+            pendingInput = null;
+        }
         inputEncoding = format.pcmEncoding;
 
         // Hi-res truth probe (see field docs): record what the DECODER actually
@@ -111,19 +123,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 Log.w(TAG, "Unsupported PCM encoding " + encoding
                         + "; native DSP bypassed for this format");
             }
+            // The wrapper is bypassed for this format: any processor-tail
+            // buffer from the previous configuration is no longer valid.
+            pendingOutput = null;
+            pendingInput = null;
             processFloat = false;
             super.configure(format, bufferSize, outputChannels);
             return;
         }
 
-        // Gapless same-format transition: the processor is still active with the
-        // same input format, so do NOT configure/flush it (that would reset the
-        // native state and regenerate the reverb IR). Pending buffers are
-        // cleared above.
-        final boolean sameFormat = processFloat
-                && format.sampleRate == lastSampleRate
-                && format.channelCount == lastChannelCount
-                && encoding == lastPcmEncoding;
         if (sameFormat) {
             super.configure(format.buildUpon().setPcmEncoding(C.ENCODING_PCM_FLOAT).build(),
                     bufferSize, outputChannels);
@@ -265,7 +273,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         } else {
             final IntBuffer ints = pcm.asIntBuffer();
             for (int i = 0; i < samples; i++) {
-                out[i] = ints.get(i) / 2147483648f;
+                // Widen to double before scaling: int/float rounds through
+                // float first and loses mantissa precision on hi-res 32-bit.
+                out[i] = (float) (ints.get(i) * (1.0 / 2147483648.0));
             }
         }
         converted.clear();

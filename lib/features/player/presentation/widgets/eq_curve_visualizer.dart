@@ -1,11 +1,30 @@
 // lib/features/player/presentation/widgets/eq_curve_visualizer.dart
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+
+class _ListDoubleTween extends Tween<List<double>> {
+  _ListDoubleTween({super.begin, super.end});
+
+  @override
+  List<double> lerp(double t) {
+    final b = begin ?? [];
+    final e = end ?? [];
+    if (b.isEmpty) return e;
+    if (e.isEmpty) return b;
+    final len = math.max(b.length, e.length);
+    return List<double>.generate(len, (i) {
+      final startVal = i < b.length ? b[i] : 0.0;
+      final endVal = i < e.length ? e[i] : 0.0;
+      return ui.lerpDouble(startVal, endVal, t) ?? endVal;
+    });
+  }
+}
 
 /// Real-time interactive Equalizer Curve visualizer utilizing centripetal
 /// Catmull-Rom spline interpolation, dB reference grid lines, frequency
@@ -53,17 +72,25 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
       child: Semantics(
         label: context.l10n.equalizer,
         value: '${widget.gains.length} ${context.l10n.bandsLabel}',
-        child: CustomPaint(
-          size: Size(double.infinity, widget.height),
-          painter: _CatmullRomEqPainter(
-            gains: widget.gains,
-            color: widget.activeColor,
-            spectrumData: widget.spectrumData,
-            frequencies: widget.frequencies,
-            maxGain: widget.maxGain,
-            showGrid: widget.showGrid,
-            showLabels: widget.showLabels && widget.height >= 70,
-            selectedBandIndex: _activeDraggingBand ?? widget.selectedBandIndex,
+        child: TweenAnimationBuilder<List<double>>(
+          tween: _ListDoubleTween(begin: widget.gains, end: widget.gains),
+          duration: _activeDraggingBand != null
+              ? Duration.zero
+              : context.motionMs(240),
+          curve: Curves.easeOutCubic,
+          builder: (context, animatedGains, _) => CustomPaint(
+            size: Size(double.infinity, widget.height),
+            painter: _CatmullRomEqPainter(
+              gains: animatedGains,
+              color: widget.activeColor,
+              spectrumData: widget.spectrumData,
+              frequencies: widget.frequencies,
+              maxGain: widget.maxGain,
+              showGrid: widget.showGrid,
+              showLabels: widget.showLabels && widget.height >= 70,
+              selectedBandIndex:
+                  _activeDraggingBand ?? widget.selectedBandIndex,
+            ),
           ),
         ),
       ),
@@ -277,15 +304,24 @@ class _CatmullRomEqPainter extends CustomPainter {
     final fillPaint = Paint()
       ..shader = LinearGradient(
         colors: [
-          color.withValues(alpha: 0.25),
-          color.withValues(alpha: 0.02),
+          color.withValues(alpha: 0.28),
+          color.withValues(alpha: 0.0),
         ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawPath(fillPath, fillPaint);
 
-    // 6. Draw Curve Stroke
+    // 6. Draw Curve Glow & Stroke
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.45)
+      ..strokeWidth = 3.6
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+    canvas.drawPath(curvePath, glowPaint);
+
     final strokePaint = Paint()
       ..color = color
       ..strokeWidth = 2.4

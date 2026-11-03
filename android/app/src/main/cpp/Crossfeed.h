@@ -38,8 +38,14 @@ public:
 
 private:
     inline void processBs2bFrame(float inL, float inR, float& outL, float& outR);
+    inline void processBs2bFrameWith(
+        float inL, float inR, float& outL, float& outR,
+        double a0Lo, double b1Lo, double a0Hi, double a1Hi, double b1Hi,
+        double gain, double lo[2], double hi[2], double asis[2]);
     inline void processCustomFrame(float l, float r, float& outL, float& outR,
                                    float currentDelay, float feedLevel, float lpCoeff, float makeup);
+    inline void processMixedFrame(float inL, float inR, float& outL, float& outR,
+                                  float currentMix, float currentDelay);
 
     void initBs2b(double fcut, double feedDb);
     void clearCustomState();
@@ -59,6 +65,21 @@ private:
     float smoothedLpCoeff_ = 0.087f;
     bool enabled_ = false;
     float smoothedEnabledMix_ = 0.0f;
+
+    // 15 ms output crossfade across a live mode switch. The previous BS2B
+    // coefficients/states are snapshotted so both paths can run concurrently.
+    CrossfeedMode prevMode_ = CrossfeedMode::Bs2bDefault;
+    int modeCrossfadeSamples_ = 0;
+    int modeCrossfadeTotal_ = 0;
+    double prevBs2bA0Lo_ = 0.0, prevBs2bB1Lo_ = 0.0;
+    double prevBs2bA0Hi_ = 0.0, prevBs2bA1Hi_ = 0.0, prevBs2bB1Hi_ = 0.0;
+    double prevBs2bGain_ = 1.0;
+    double prevBs2bLo_[2] = {0.0, 0.0};
+    double prevBs2bHi_[2] = {0.0, 0.0};
+    double prevBs2bAsis_[2] = {0.0, 0.0};
+    float prevCustomDelaySamples_ = 16.8f;
+    float prevCustomFeedLevel_ = 0.3548f;
+    float prevCustomLpCoeff_ = 0.087f;
 
     // Delay-line states (for Custom delay-line mode)
     float delayBufferL_[MAX_DELAY_SAMPLES] = {};

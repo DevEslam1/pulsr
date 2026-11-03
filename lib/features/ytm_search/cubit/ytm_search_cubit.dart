@@ -109,6 +109,16 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     }
   }
 
+  /// Persists [query] (or [state.query]) to search history.
+  /// BUG FIX: history used to be written on every debounced keystroke,
+  /// polluting recent searches with typing fragments. Now saved explicitly
+  /// on submission or result selection.
+  Future<void> commitQuery([String? query]) async {
+    final q = (query ?? state.query).trim();
+    if (q.length < 2) return;
+    await _saveToHistory(q);
+  }
+
   Future<void> _saveToHistory(String query) async {
     final q = query.trim();
     if (q.isEmpty || q.length < 2) return;
@@ -323,6 +333,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           safeEmit(state.copyWith(
               results: List<YtmTrack>.unmodifiable([track]),
               isLoading: false,
+              
               errorMessage: null));
           return;
         } catch (e, st) {
@@ -335,7 +346,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
         }
       }
 
-      final results = await _service.searchWithFallback(query);
+      final results = await _service.searchWithFallback(query, limit: _searchPageSize);
       if (effectiveGeneration != _generation || isClosed) return;
       _showingCachedResults = false;
 
@@ -348,6 +359,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
         safeEmit(state.copyWith(
           results: const [],
           isLoading: false,
+          
           loadMoreFailed: false,
           errorMessage: null,
         ));
@@ -357,14 +369,14 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
       _nextLimit = _searchPageSize;
       _hasMore = results.length >= _searchPageSize &&
-          _searchPageSize < _maxSearchLimit;
+          _nextLimit < _maxSearchLimit;
       safeEmit(state.copyWith(
           results: List<YtmTrack>.unmodifiable(results),
           isLoading: false,
+          
           loadMoreFailed: false,
           errorMessage: null));
       if (results.isNotEmpty) {
-        unawaited(_saveToHistory(query));
         unawaited(_cache.write(query, results));
       }
       // Speculative warm: the first [_warmTopN] hits are the taps users make

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -180,6 +181,7 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
               replaceOriginalWithTranslation:
                   widget.replaceOriginalWithTranslation,
               onTap: () {
+                HapticFeedback.selectionClick();
                 widget.onLineTapped?.call(line.timestamp);
               },
               onLongPress: () {
@@ -308,7 +310,13 @@ class _LyricLineWidget extends StatelessWidget {
             horizontal: AppSpacing.sm,
           ),
           alignment: alignment,
-          child: content,
+          child: AnimatedScale(
+            scale: isActive ? 1.04 : 0.96,
+            duration: context.motionMs(260),
+            curve: Curves.easeOutCubic,
+            alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+            child: content,
+          ),
         ),
       ),
     );
@@ -322,15 +330,13 @@ class _LyricLineWidget extends StatelessWidget {
       fontStyle: isBackground ? FontStyle.italic : FontStyle.normal,
       height: 1.35,
       color: isActive
-          ? activeColor
-          : (isPast
-              ? palette.textSecondary.withValues(alpha: 0.5)
-              : palette.textSecondary.withValues(alpha: 0.75)),
+          ? palette.textPrimary
+          : palette.textSecondary.withValues(alpha: 0.45),
       shadows: isActive
           ? [
               Shadow(
-                color: activeColor.withValues(alpha: 0.45),
-                blurRadius: 16,
+                color: activeColor.withValues(alpha: 0.55),
+                blurRadius: 18,
               ),
             ]
           : null,

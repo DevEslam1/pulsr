@@ -42,6 +42,9 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
         var connection: HttpURLConnection? = null
         try {
             val proxy = ProxyManager.getProxy(request.url())
+            if (proxy == null && ProxyManager.isBlocked()) {
+                throw IOException("Proxy paths are blocked (fail-closed)")
+            }
             val url = URL(request.url())
             val rawConn = if (proxy != null) url.openConnection(proxy) else url.openConnection()
             connection = (rawConn as HttpURLConnection).apply {

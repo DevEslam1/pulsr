@@ -331,21 +331,22 @@ inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& 
     const float fullOutL = multiband_ ? (subTapL + midHighL) : midHighL;
     const float fullOutR = multiband_ ? (subTapR + midHighR) : midHighR;
 
-    float dryW, wetW;
     if (currentEnabledMix >= 0.9999f) {
-        dryW = 0.0f;
-        wetW = 1.0f;
+        outL = fullOutL;
+        outR = fullOutR;
     } else if (currentEnabledMix <= 0.0001f) {
-        dryW = 1.0f;
-        wetW = 0.0f;
+        // Fully bypassed: bit-transparent, no delay applied.
+        outL = inL;
+        outR = inR;
     } else {
+        // Ramp: use the delay-compensated dry tap, not the raw input, or the
+        // dry and shaped paths comb-filter during the enable/disable fade.
         const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
-        dryW = std::cos(angle);
-        wetW = std::sin(angle);
+        const float dryW = std::cos(angle);
+        const float wetW = std::sin(angle);
+        outL = dryW * dryTapL + wetW * fullOutL;
+        outR = dryW * dryTapR + wetW * fullOutR;
     }
-
-    outL = dryW * inL + wetW * fullOutL;
-    outR = dryW * inR + wetW * fullOutR;
 }
 
 void HarmonicSaturation::process(float* L, float* R, int frames) {

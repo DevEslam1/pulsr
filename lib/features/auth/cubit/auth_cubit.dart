@@ -16,6 +16,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
   final AuthService _authService;
   final CloudSyncService _cloudSyncService;
   bool _syncing = false;
+  int _syncToken = 0;
   // Set when a sync arrives while one is already in flight; the in-flight pass
   // re-runs once it finishes so an account switch mid-sync is never dropped.
   bool _syncQueued = false;
@@ -43,8 +44,9 @@ class AuthCubit extends PulsrCubit<AuthState> {
         // Auto-sync in background on login
         syncNow();
       } else {
+        _syncToken++;
+        _syncQueued = false;
         _syncingUserId = null;
-        _syncing = false;
         safeEmit(state.copyWith(
           status: AuthStatus.unauthenticated,
           syncStatus: SyncStatus.idle,
@@ -291,20 +293,32 @@ class AuthCubit extends PulsrCubit<AuthState> {
     _syncStopwatch
       ..reset()
       ..start();
+    final token = ++_syncToken;
     _syncing = true;
     _syncQueued = false;
     _syncingUserId = currentUid;
     safeEmit(state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
     try {
       final success = await _cloudSyncService.syncAll();
-      if (isClosed || state.user == null) return;
-      if (success) {
-        safeEmit(state.copyWith(
-          syncStatus: SyncStatus.success,
-          lastSyncedAt: _cloudSyncService.lastSyncTime,
-          syncError: null,
-        ));
-      } else {
+      if (token == _syncToken && !isClosed && state.user != null) {
+        if (success) {
+          safeEmit(state.copyWith(
+            syncStatus: SyncStatus.success,
+            lastSyncedAt: _cloudSyncService.lastSyncTime,
+            syncError: null,
+          ));
+        } else {
+          _syncStopwatch
+            ..stop()
+            ..reset();
+          safeEmit(state.copyWith(
+            syncStatus: SyncStatus.failure,
+            syncError: 'Failed to sync with cloud. Check internet connection.',
+          ));
+        }
+      }
+    } catch (_) {
+      if (token == _syncToken && !isClosed && state.user != null) {
         _syncStopwatch
           ..stop()
           ..reset();
@@ -313,15 +327,6 @@ class AuthCubit extends PulsrCubit<AuthState> {
           syncError: 'Failed to sync with cloud. Check internet connection.',
         ));
       }
-    } catch (_) {
-      _syncStopwatch
-        ..stop()
-        ..reset();
-      if (isClosed || state.user == null) return;
-      safeEmit(state.copyWith(
-        syncStatus: SyncStatus.failure,
-        syncError: 'Failed to sync with cloud. Check internet connection.',
-      ));
     } finally {
       _syncing = false;
       _syncingUserId = null;
@@ -338,6 +343,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
   }
 
   Future<void> signOut() async {
+    _syncToken++;
     _syncQueued = false;
     _syncingUserId = null;
     _syncStopwatch

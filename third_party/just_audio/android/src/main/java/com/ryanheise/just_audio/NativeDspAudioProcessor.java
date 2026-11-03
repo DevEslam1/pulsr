@@ -389,7 +389,9 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
 
         if (bitPerfect && !hasActiveGainCurve) {
-            clearGainCurve();
+            // No curve and unity static gain were already verified under
+            // rampLock above; re-taking the lock to clear a transparent curve
+            // is redundant on the per-block bit-perfect path.
             ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
             ByteBuffer original = inputBuffer.duplicate();
             original.limit(position + processed * inputAudioFormat.bytesPerFrame);

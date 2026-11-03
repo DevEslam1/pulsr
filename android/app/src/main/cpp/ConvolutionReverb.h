@@ -36,6 +36,7 @@ public:
     static constexpr int FFT_SIZE = PARTITION_SIZE * 2; // 1024
     static constexpr int MAX_PREDELAY_SAMPLES = 153600; // 153,600 samples max predelay capacity (R2)
     static constexpr int MAX_PREALLOC_PARTITIONS = 512;
+    static constexpr int MAX_HQ_DRY_DELAY = PARTITION_SIZE * 16 + 1024; // 9216
 
     ConvolutionReverb();
     ~ConvolutionReverb();
@@ -90,6 +91,19 @@ private:
 
     void updatePreparedIr();
     void setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir);
+    void retireIr(std::shared_ptr<const PreparedIr> ir);
+    bool isIrCrossfadeActive() const {
+        return crossfadeIr_ != nullptr && irCrossfadeTotal_ > 0 &&
+               irCrossfadeSamples_ < irCrossfadeTotal_;
+    }
+    void accumulatePartitionLeft(const PreparedIr* ir,
+                                 std::vector<FftUtil::Complex>& accum,
+                                 int numPartitions);
+    void accumulatePartitionRight(const PreparedIr* ir,
+                                  std::vector<FftUtil::Complex>& accum,
+                                  int numPartitions);
+    void pushWetFifo(float l, float r);
+    bool popWetFifo(float& l, float& r);
     void preparePartitions();
     void ensurePredelayCapacity();
     void ensureScratchCapacity(int frames);
@@ -121,9 +135,25 @@ private:
     std::vector<float> resampleWetR_;
     std::vector<float> resampleOutL_;
     std::vector<float> resampleOutR_;
+    // Absorbs the +/-1 sample rational-resampler jitter across blocks instead
+    // of repeating/dropping the last wet sample.
+    static constexpr int WET_FIFO_SAMPLES = 64;
+    float wetFifoL_[WET_FIFO_SAMPLES] = {};
+    float wetFifoR_[WET_FIFO_SAMPLES] = {};
+    int wetFifoWrite_ = 0;
+    int wetFifoRead_ = 0;
+    int wetFifoCount_ = 0;
+    // Linear-phase / partition latency alignment for surround channels.
+    static constexpr int MAX_SURROUND_CHANNELS = 6;
+    float surroundDelay_[MAX_SURROUND_CHANNELS][MAX_HQ_DRY_DELAY] = {};
+    int surroundDelayIdx_ = 0;
 
     // Prepared IR snapshot pointer
     std::shared_ptr<const PreparedIr> preparedIr_;
+    // Old live IR kept alive while the wet output crossfades to the new one.
+    std::shared_ptr<const PreparedIr> crossfadeIr_;
+    std::vector<FftUtil::Complex> accumFreqL2_;
+    std::vector<FftUtil::Complex> accumFreqR2_;
 
     // Latency of the currently prepared IR, mirrored to an atomic so the
     // control-thread latency query never races the audio-thread IR swap.
@@ -169,7 +199,6 @@ private:
     // mix<1. Capacity covers the worst case: 16x SR scaling of the 512-sample
     // partition plus resampler group delay. Pre-allocated; never grown on the
     // audio thread.
-    static constexpr int MAX_HQ_DRY_DELAY = PARTITION_SIZE * 16 + 1024; // 9216
     std::vector<float> hqDryL_;
     std::vector<float> hqDryR_;
     int hqDryPos_ = 0;

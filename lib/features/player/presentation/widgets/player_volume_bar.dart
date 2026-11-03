@@ -1,7 +1,9 @@
 // lib/features/player/presentation/widgets/player_volume_bar.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
@@ -24,6 +26,7 @@ class PlayerVolumeBar extends StatefulWidget {
 
 class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
   double? _dragVolume;
+  bool _isDragging = false;
 
   @override
   Widget build(BuildContext context) {
@@ -58,22 +61,41 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
             },
           ),
           Expanded(
-            child: PulsrSlider(
-              min: 0.0,
-              max: 1.0,
-              value: effectiveVolume,
-              semanticLabel: context.l10n.volume,
-              semanticFormatterCallback: (v) => '${(v * 100).round()}%',
-              activeColor: widget.activeColor,
-              onChangeStart: (v) => setState(() => _dragVolume = v),
-              onChanged: (v) {
-                setState(() => _dragVolume = v);
-                widget.cubit.setVolume(v);
-              },
-              onChangeEnd: (v) {
-                setState(() => _dragVolume = null);
-                widget.cubit.setVolume(v);
-              },
+            child: AnimatedContainer(
+              duration: context.motionMs(150),
+              curve: Curves.easeOutCubic,
+              height: _isDragging ? 36.0 : 30.0,
+              alignment: Alignment.center,
+              child: PulsrSlider(
+                min: 0.0,
+                max: 1.0,
+                value: effectiveVolume,
+                semanticLabel: context.l10n.volume,
+                semanticFormatterCallback: (v) => '${(v * 100).round()}%',
+                activeColor: widget.activeColor,
+                onChangeStart: (v) {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _isDragging = true;
+                    _dragVolume = v;
+                  });
+                },
+                onChanged: (v) {
+                  final prev = _dragVolume ?? currentVolume;
+                  if ((prev > 0.02 && v <= 0.02) || (prev < 0.98 && v >= 0.98)) {
+                    HapticFeedback.selectionClick();
+                  }
+                  setState(() => _dragVolume = v);
+                  widget.cubit.setVolume(v);
+                },
+                onChangeEnd: (v) {
+                  setState(() {
+                    _isDragging = false;
+                    _dragVolume = null;
+                  });
+                  widget.cubit.setVolume(v);
+                },
+              ),
             ),
           ),
           IconButton(

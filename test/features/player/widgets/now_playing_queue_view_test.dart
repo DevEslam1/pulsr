@@ -47,7 +47,9 @@ void main() {
     when(() => cubit.playSong(any(),
         queue: any(named: 'queue'),
         initialPosition: any(named: 'initialPosition'),
-        openPlayerIfPlaying: any(named: 'openPlayerIfPlaying'))).thenAnswer(
+        openPlayerIfPlaying: any(named: 'openPlayerIfPlaying'),
+        queueIndex: any(named: 'queueIndex'),
+        preservePlaybackState: any(named: 'preservePlaybackState'))).thenAnswer(
       (_) async {},
     );
   });
@@ -112,7 +114,9 @@ void main() {
     verify(() => cubit.playSong(any(),
         queue: any(named: 'queue'),
         initialPosition: any(named: 'initialPosition'),
-        openPlayerIfPlaying: any(named: 'openPlayerIfPlaying'))).called(1);
+        openPlayerIfPlaying: any(named: 'openPlayerIfPlaying'),
+        queueIndex: any(named: 'queueIndex'),
+        preservePlaybackState: any(named: 'preservePlaybackState'))).called(1);
   });
 
   testWidgets('switching a queue slot invokes the cubit', (tester) async {

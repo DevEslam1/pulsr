@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -296,13 +297,16 @@ class _NavTabItem extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: onTap,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
             borderRadius: itemRadius,
             splashColor: p.accent.withValues(alpha: 0.12),
             highlightColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: context.motionMs(240),
-              curve: context.motionCurve(Curves.easeOutCubic),
+              duration: context.motionMs(220),
+              curve: Curves.easeOutCubic,
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               padding: EdgeInsets.symmetric(
                 horizontal: isTablet ? 10 : 6,
@@ -362,9 +366,9 @@ class _NavTabItem extends StatelessWidget {
                           ),
                         ),
                         AnimatedScale(
-                          scale: isSelected ? 1.08 : 1.0,
-                          duration: context.motionMs(220),
-                          curve: context.motionCurve(Curves.easeOutBack),
+                          scale: isSelected ? 1.12 : 1.0,
+                          duration: context.motionMs(200),
+                          curve: Curves.easeOutBack,
                           child: Icon(
                             isSelected ? item.activeIcon : item.icon,
                             size: iconSize,

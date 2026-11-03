@@ -9,9 +9,11 @@ enum SearchPhase {
   debouncing,
   fetching,
   displaying,
+  noResults,
   error;
 
-  bool get isTerminal => this == displaying || this == error;
+  bool get isTerminal =>
+      this == displaying || this == noResults || this == error;
 }
 
 @freezed
@@ -22,11 +24,10 @@ abstract class YtmSearchState with _$YtmSearchState {
     @Default('') String query,
     @Default([]) List<YtmTrack> results,
     @Default(false) bool isLoading,
+    @Default(false) bool hasSearched,
     @Default(false) bool loadMoreFailed,
     String? errorMessage,
   }) = _YtmSearchState;
-
-  bool get hasSearched => query.trim().isNotEmpty;
 
   SearchPhase get phase {
     if (errorMessage != null && errorMessage!.isNotEmpty) {
@@ -34,6 +35,7 @@ abstract class YtmSearchState with _$YtmSearchState {
     }
     if (isLoading) return SearchPhase.fetching;
     if (results.isNotEmpty) return SearchPhase.displaying;
+    if (hasSearched) return SearchPhase.noResults;
     if (query.trim().isNotEmpty) return SearchPhase.debouncing;
     return SearchPhase.idle;
   }

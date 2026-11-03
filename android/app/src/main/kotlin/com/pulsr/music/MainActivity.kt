@@ -38,21 +38,9 @@ class MainActivity : AudioServiceActivity() {
     }
     private var fileOpenerChannel: MethodChannel? = null
     private var lyricsChannel: MethodChannel? = null
-    private var audioEffectsPlugin: AudioEffectsPlugin? = null
-    private var tagEditorPlugin: TagEditorPlugin? = null
-    private var visualizerPlugin: VisualizerPlugin? = null
-    private var ringtonePlugin: RingtonePlugin? = null
-    private var scrobblerPlugin: ScrobblerPlugin? = null
-    private var ytmExtractorPlugin: YtmExtractorPlugin? = null
-    private var ytDownloadPlugin: YtDownloadPlugin? = null
-    private var waveformPlugin: WaveformPlugin? = null
-    private var proxyPlugin: ProxyPlugin? = null
-    private var hiResDacPlugin: HiResDacPlugin? = null
-    private var usbExclusivePlugin: UsbExclusivePlugin? = null
-    private var castDiscoveryPlugin: CastDiscoveryPlugin? = null
-    private var castSessionPlugin: CastSessionPlugin? = null
-    private var roomCorrectionPlugin: RoomCorrectionPlugin? = null
     private var updaterChannel: MethodChannel? = null
+    private var playbackTileChannel: MethodChannel? = null
+    @Volatile private var activityChannelsBound = false
     private val lyricsExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
     private var mediaReceiver: android.content.BroadcastReceiver? = null
  
@@ -124,8 +112,9 @@ class MainActivity : AudioServiceActivity() {
             pendingAudioUris.clear()
         }
         try {
+            // Never block the main thread waiting for a tag read; the tag
+            // library can sit in disk I/O for seconds on a slow provider.
             lyricsExecutor.shutdownNow()
-            lyricsExecutor.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS)
         } catch (e: Exception) {
             Log.w("MainActivity", "Error shutting down lyrics executor: ${e.message}")
         }
@@ -179,7 +168,10 @@ class MainActivity : AudioServiceActivity() {
             }
             return
         }
-        if (intent?.action != Intent.ACTION_VIEW && intent?.action != Intent.ACTION_SEND) return
+        if (intent?.action != Intent.ACTION_VIEW &&
+            intent?.action != Intent.ACTION_SEND &&
+            intent?.action != Intent.ACTION_SEND_MULTIPLE
+        ) return
         // Multi-share (EXTRA_STREAM as list) previously dropped all but one.
         if (intent.action == Intent.ACTION_SEND_MULTIPLE || intent.hasExtra(Intent.EXTRA_STREAM)) {
             try {
@@ -191,9 +183,14 @@ class MainActivity : AudioServiceActivity() {
                 }
                 val list = rawList?.filter { isSafeUri(it) }
                 if (!list.isNullOrEmpty()) {
-                    for (u in list) addPendingAudioUri(u.toString())
-                    if (!fromColdStart && fileOpenerChannel != null) {
+                    if (fromColdStart || fileOpenerChannel == null) {
+                        for (u in list) addPendingAudioUri(u.toString())
+                    } else {
+                        // Warm start: emit the first URI once and park the rest
+                        // for getInitialAudioUri. Enqueueing the first too made
+                        // Dart open it a second time when it drained the queue.
                         fileOpenerChannel?.invokeMethod("onAudioFileOpened", list.first().toString())
+                        for (u in list.drop(1)) addPendingAudioUri(u.toString())
                     }
                     return
                 }
@@ -236,21 +233,17 @@ class MainActivity : AudioServiceActivity() {
  
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        tagEditorPlugin = TagEditorPlugin.registerWith(flutterEngine, applicationContext)
-        visualizerPlugin = VisualizerPlugin.registerWith(flutterEngine)
-        ringtonePlugin = RingtonePlugin.registerWith(flutterEngine, applicationContext)
-        audioEffectsPlugin = AudioEffectsPlugin.registerWith(flutterEngine, applicationContext)
-        scrobblerPlugin = ScrobblerPlugin.registerWith(flutterEngine, applicationContext)
-        ytmExtractorPlugin = YtmExtractorPlugin.registerWith(flutterEngine, applicationContext)
-        ytDownloadPlugin = YtDownloadPlugin.registerWith(flutterEngine, applicationContext)
-        waveformPlugin = WaveformPlugin.registerWith(flutterEngine, applicationContext)
-        proxyPlugin = ProxyPlugin.registerWith(flutterEngine, applicationContext)
-        hiResDacPlugin = HiResDacPlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
-        usbExclusivePlugin = UsbExclusivePlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
-        castDiscoveryPlugin = CastDiscoveryPlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
-        castSessionPlugin = CastSessionPlugin.registerWith(flutterEngine, applicationContext)
-        roomCorrectionPlugin = RoomCorrectionPlugin.registerWith(flutterEngine, applicationContext)
- 
+        // audio_service re-attaches the same cached engine to every Activity, so
+        // this method runs more than once per process. Engine-scoped plugins are
+        // created once per engine; only Activity-scoped channels are re-bound.
+        PulsrEnginePlugins.obtain(flutterEngine, applicationContext)
+        bindActivityChannels(flutterEngine)
+    }
+
+    private fun bindActivityChannels(flutterEngine: FlutterEngine) {
+        if (activityChannelsBound) return
+        activityChannelsBound = true
+
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
         fileChannel.setMethodCallHandler { call, result ->
@@ -276,28 +269,14 @@ class MainActivity : AudioServiceActivity() {
                 lyricsExecutor.execute {
                     var lyrics: String? = null
                     var tempFile: File? = null
+                    val isContentUri = filePath.startsWith("content:")
                     try {
-                        val file = if (filePath.startsWith("content:")) {
-                            val uri = Uri.parse(filePath)
-                            val inputStream = contentResolver.openInputStream(uri)
-                            if (inputStream != null) {
-                                tempFile = File.createTempFile("lyrics_", ".tmp", cacheDir)
-                                inputStream.use { input ->
-                                    tempFile.outputStream().use { output -> input.copyTo(output) }
-                                }
-                                tempFile
-                            } else {
-                                null
-                            }
-                        } else {
-                            File(filePath)
-                        }
-
-                        if (file != null && file.exists()) {
+                        fun readFrom(file: File): String? {
+                            var found: String? = null
                             // 1) jaudiotagger – LYRICS key (widely supported)
                             try {
                                 val audioFile = AudioFileIO.read(file)
-                                lyrics = audioFile.tag?.getFirst(FieldKey.LYRICS)
+                                found = audioFile.tag?.getFirst(FieldKey.LYRICS)
                                 // 1b) FLAC/OGG store lyrics in Vorbis comments, but
                                 // most taggers write UNSYNCEDLYRICS / SYNCEDLYRICS,
                                 // which jaudiotagger 3.x has no FieldKey mapping for
@@ -306,7 +285,7 @@ class MainActivity : AudioServiceActivity() {
                                 // SYNCED is preferred over UNSYNCED when both exist
                                 // (reader ids are uppercased on read, so these exact
                                 // names match any letter case the tagger used).
-                                if (lyrics.isNullOrBlank()) {
+                                if (found.isNullOrBlank()) {
                                     val vorbisTag: AbstractTag? = when (val tag = audioFile.tag) {
                                         is FlacTag -> tag.vorbisCommentTag
                                         is VorbisCommentTag -> tag
@@ -322,7 +301,7 @@ class MainActivity : AudioServiceActivity() {
                                         )) {
                                             val v = vorbisTag.getFirst(key)
                                             if (!v.isNullOrBlank()) {
-                                                lyrics = v
+                                                found = v
                                                 break
                                             }
                                         }
@@ -330,11 +309,11 @@ class MainActivity : AudioServiceActivity() {
                                 }
                             } catch (_: Exception) {}
                             // 2) MediaMetadataRetriever fallback – some OEMs write lyrics that jaudiotagger misses
-                            if (lyrics.isNullOrBlank()) {
+                            if (found.isNullOrBlank()) {
                                 var retriever: MediaMetadataRetriever? = null
                                 try {
                                     retriever = MediaMetadataRetriever()
-                                    if (filePath.startsWith("content:")) {
+                                    if (isContentUri) {
                                         retriever.setDataSource(applicationContext, Uri.parse(filePath))
                                     } else {
                                         retriever.setDataSource(file.absolutePath)
@@ -347,13 +326,37 @@ class MainActivity : AudioServiceActivity() {
                                     for (k in fallbackKeys) {
                                         val v = retriever.extractMetadata(k)
                                         if (!v.isNullOrBlank() && v.contains("\n")) {
-                                            lyrics = v; break
+                                            found = v; break
                                         }
                                     }
                                 } catch (_: Exception) {} finally {
                                     try { retriever?.release() } catch (_: Exception) {}
                                 }
                             }
+                            return found
+                        }
+
+                        if (isContentUri) {
+                            val uri = Uri.parse(filePath)
+                            val cap = 16L * 1024 * 1024
+                            // Lyrics tags live in the header or at the tail;
+                            // 16 MB is enough for almost every file. Only fall
+                            // back to a full copy when parsing the head failed.
+                            tempFile = AudioTempFiles.copyToTempFile(
+                                applicationContext, uri, "lyrics_", cap
+                            )
+                            val truncated = tempFile.length() >= cap
+                            lyrics = readFrom(tempFile)
+                            if (lyrics.isNullOrBlank() && truncated) {
+                                runCatching { tempFile.delete() }
+                                tempFile = AudioTempFiles.copyToTempFile(
+                                    applicationContext, uri, "lyrics_full_"
+                                )
+                                lyrics = readFrom(tempFile)
+                            }
+                        } else {
+                            val file = File(filePath)
+                            if (file.exists()) lyrics = readFrom(file)
                         }
                         runOnUiThread { runCatching { result.success(lyrics) } }
                     } catch (e: Exception) {
@@ -447,17 +450,55 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
+        // Playback-state hook for the Quick Settings tile. Dart calls
+        // setPlaying whenever the audio handler's playing state changes.
+        val tileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/playback_tile")
+        playbackTileChannel = tileChannel
+        tileChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setPlaying" -> {
+                    PlaybackTileState.setPlaying(
+                        applicationContext,
+                        call.argument<Boolean>("playing") ?: false
+                    )
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/updater")
         updaterChannel = channel
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "installApk" -> {
+                    // The Play Store (prod) flavor ships without
+                    // REQUEST_INSTALL_PACKAGES; self-update is dev/ytm only.
+                    if (BuildConfig.FLAVOR == "prod") {
+                        result.error("UNSUPPORTED", "In-app APK install is not available in this build", null)
+                        return@setMethodCallHandler
+                    }
                     val filePath = call.argument<String>("filePath")
                     if (filePath == null) {
                         result.error("INVALID_ARG", "File path cannot be null", null)
                         return@setMethodCallHandler
                     }
                     val file = File(filePath)
+                    val allowedRoots = listOfNotNull(cacheDir, filesDir, getExternalFilesDir(null))
+                    val canonical = try {
+                        file.canonicalFile
+                    } catch (e: Exception) {
+                        result.error("INVALID_PATH", "Cannot resolve APK path: ${e.message}", null)
+                        return@setMethodCallHandler
+                    }
+                    val insideAllowedRoot = allowedRoots.any { root ->
+                        val rootPath = try { root.canonicalPath } catch (_: Exception) { root.path }
+                        canonical.path.startsWith(rootPath + File.separator)
+                    }
+                    if (!insideAllowedRoot) {
+                        result.error("INVALID_PATH", "APK path must be inside app storage", null)
+                        return@setMethodCallHandler
+                    }
                     if (!file.exists()) {
                         result.error("FILE_NOT_FOUND", "APK file does not exist at $filePath", null)
                         return@setMethodCallHandler
@@ -509,40 +550,19 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
-        audioEffectsPlugin?.cleanup()
-        audioEffectsPlugin = null
-        tagEditorPlugin?.cleanup()
-        tagEditorPlugin = null
-        visualizerPlugin?.cleanup()
-        visualizerPlugin = null
-        ringtonePlugin?.cleanup()
-        ringtonePlugin = null
-        scrobblerPlugin?.cleanup()
-        scrobblerPlugin = null
-        ytmExtractorPlugin?.cleanup()
-        ytmExtractorPlugin = null
-        ytDownloadPlugin?.cleanup()
-        ytDownloadPlugin = null
-        waveformPlugin?.cleanup()
-        waveformPlugin = null
-        proxyPlugin?.cleanup()
-        proxyPlugin = null
-        hiResDacPlugin?.dispose()
-        hiResDacPlugin = null
-        usbExclusivePlugin?.dispose()
-        usbExclusivePlugin = null
-        castDiscoveryPlugin?.dispose()
-        castDiscoveryPlugin = null
-        castSessionPlugin?.cleanup()
-        castSessionPlugin = null
-        roomCorrectionPlugin?.cleanup()
-        roomCorrectionPlugin = null
+        // Only Activity-scoped references may be dropped here. The cached
+        // FlutterEngine (and playback) outlives this Activity; engine-scoped
+        // plugins are torn down by PulsrEnginePlugins when the engine itself is
+        // destroyed, never while the service is still playing.
         updaterChannel?.setMethodCallHandler(null)
         updaterChannel = null
+        playbackTileChannel?.setMethodCallHandler(null)
+        playbackTileChannel = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)
         lyricsChannel = null
+        activityChannelsBound = false
         super.cleanUpFlutterEngine(flutterEngine)
     }
 

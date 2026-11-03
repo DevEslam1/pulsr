@@ -1797,37 +1797,56 @@ class MiniPlayerHorizontal extends StatelessWidget {
                         child: MediaQuery.withClampedTextScaling(
                           minScaleFactor: 0.8,
                           maxScaleFactor: 2.0,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              MarqueeText(
-                                text: song.title,
-                                textAlign: TextAlign.start,
-                                allowUserPause: false,
-                                velocity: 28.0,
-                                blankSpace: 36.0,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.bodySmall,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.textPrimary,
-                                  letterSpacing: -0.15,
-                                ),
+                          child: AnimatedSwitcher(
+                            duration: context.motionMs(220),
+                            transitionBuilder: (child, anim) => FadeTransition(
+                              opacity: anim,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0.0, 0.15),
+                                  end: Offset.zero,
+                                ).animate(CurvedAnimation(
+                                  parent: anim,
+                                  curve: Curves.easeOutCubic,
+                                )),
+                                child: child,
                               ),
-                              const SizedBox(height: 1),
-                              MarqueeText(
-                                text: song.artist,
-                                textAlign: TextAlign.start,
-                                allowUserPause: false,
-                                velocity: 24.0,
-                                blankSpace: 32.0,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.tiny,
-                                  fontWeight: FontWeight.w500,
-                                  color: p.textSecondary,
-                                ),
+                            ),
+                            child: KeyedSubtree(
+                              key: ValueKey('song_meta_${song.id}'),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  MarqueeText(
+                                    text: song.title,
+                                    textAlign: TextAlign.start,
+                                    allowUserPause: false,
+                                    velocity: 28.0,
+                                    blankSpace: 36.0,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.bodySmall,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.textPrimary,
+                                      letterSpacing: -0.15,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  MarqueeText(
+                                    text: song.artist,
+                                    textAlign: TextAlign.start,
+                                    allowUserPause: false,
+                                    velocity: 24.0,
+                                    blankSpace: 32.0,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.tiny,
+                                      fontWeight: FontWeight.w500,
+                                      color: p.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),

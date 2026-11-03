@@ -101,6 +101,7 @@ public final class AAudioAudioSink implements AudioSink {
     // Reusable scratch buffer for 32-bit → float32 conversion. Allocated
     // lazily in handleBuffer and grown on demand; never shrunk.
     private ByteBuffer pcm32ScratchBuffer;
+    private ByteBuffer nonDirectScratchBuffer;
 
     private float volume = 1.0f;
     private PlaybackParameters playbackParameters = PlaybackParameters.DEFAULT;
@@ -131,6 +132,10 @@ public final class AAudioAudioSink implements AudioSink {
     // the last (re)configuration/discontinuity, per the AudioSink contract.
     private boolean pendingBasePosition = true;
     private long basePositionUs = 0L;
+    // Frames already written when the position timeline was last re-based.
+    // Without this, frames read from the previous stream (or before a gapless
+    // discontinuity) are added to the new base position, jumping the timeline.
+    private long baseFramesWritten = 0L;
 
     public AAudioAudioSink(boolean preferExclusive, int targetBufferMs) {
         this.preferExclusive = preferExclusive;
@@ -180,12 +185,15 @@ public final class AAudioAudioSink implements AudioSink {
         if (framesRead > framesWritten) {
             framesRead = framesWritten;
         }
+        long deltaRead = Math.max(0L, framesRead - baseFramesWritten);
         long positionUs = basePositionUs
-                + (long) (framesRead * (1_000_000.0 / sampleRate));
+                + (long) (deltaRead * (1_000_000.0 / sampleRate));
         if (!sourceEnded) {
-            // Never report beyond what the app has actually written.
+            // Never report beyond what the app has actually written since the
+            // timeline base.
+            long deltaWritten = Math.max(0L, framesWritten - baseFramesWritten);
             long maxUs = basePositionUs
-                    + (long) (framesWritten * (1_000_000.0 / sampleRate));
+                    + (long) (deltaWritten * (1_000_000.0 / sampleRate));
             if (positionUs > maxUs) positionUs = maxUs;
         }
         return positionUs;
@@ -246,6 +254,7 @@ public final class AAudioAudioSink implements AudioSink {
         eosWritten = false;
         handledEndOfStream = false;
         pendingBasePosition = true;
+        baseFramesWritten = 0L;
         bridge.setVolume(handle, volume);
         if (!playing) bridge.pause(handle);
         Log.i(TAG, "AAudio sink configured: " + sampleRate + "Hz/" + channelCount
@@ -299,6 +308,7 @@ public final class AAudioAudioSink implements AudioSink {
         }
         if (pendingBasePosition) {
             basePositionUs = presentationStartUs;
+            baseFramesWritten = bridge.getFramesWritten(handle);
             pendingBasePosition = false;
         }
         int remaining = buffer.remaining();
@@ -318,10 +328,17 @@ public final class AAudioAudioSink implements AudioSink {
 
         if (!writeBuffer.isDirect()) {
             // Media3 hands the sink direct buffers; be defensive anyway.
-            ByteBuffer direct = ByteBuffer.allocateDirect(remaining);
-            direct.put(writeBuffer.duplicate());
-            direct.flip();
-            int written = bridge.write(handle, direct, 0,
+            // Reuse a class-level staging buffer instead of allocating a new
+            // direct buffer for every buffer.
+            if (nonDirectScratchBuffer == null
+                    || nonDirectScratchBuffer.capacity() < remaining) {
+                nonDirectScratchBuffer = ByteBuffer.allocateDirect(
+                        Math.max(remaining, 65536)).order(ByteOrder.nativeOrder());
+            }
+            nonDirectScratchBuffer.clear();
+            nonDirectScratchBuffer.put(writeBuffer.duplicate());
+            nonDirectScratchBuffer.flip();
+            int written = bridge.write(handle, nonDirectScratchBuffer, 0,
                     remaining);
             if (written < 0) {
                 throw new WriteException(-1, configuredFormat,
@@ -371,7 +388,10 @@ public final class AAudioAudioSink implements AudioSink {
         pcm32ScratchBuffer.clear();
         final IntBuffer ints = src.duplicate().order(ByteOrder.nativeOrder()).asIntBuffer();
         for (int i = 0; i < samples; i++) {
-            pcm32ScratchBuffer.putFloat(ints.get(i) / 2147483648f); // ÷ 2^31
+            // Widen to double before scaling so all 24 bits of float mantissa
+            // precision survive; int / float rounds through float first.
+            pcm32ScratchBuffer.putFloat(
+                    (float) (ints.get(i) * (1.0 / 2147483648.0))); // ÷ 2^31
         }
         pcm32ScratchBuffer.flip();
         return pcm32ScratchBuffer;
@@ -477,6 +497,7 @@ public final class AAudioAudioSink implements AudioSink {
         eosWritten = false;
         handledEndOfStream = false;
         pendingBasePosition = true;
+        baseFramesWritten = 0L;
         if (handle != 0L) bridge.flush(handle);
         if (playing && handle != 0L) bridge.play(handle);
     }
@@ -487,6 +508,7 @@ public final class AAudioAudioSink implements AudioSink {
         eosWritten = false;
         handledEndOfStream = false;
         pendingBasePosition = true;
+        baseFramesWritten = 0L;
         configuredFormat = null;
         sampleRate = 0;
         channelCount = 0;

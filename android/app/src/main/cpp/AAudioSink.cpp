@@ -43,6 +43,12 @@ aaudio_format_t ToAaudioFormat(AAudioSink::Encoding encoding) {
 
 }  // namespace
 
+AAudioSink::AAudioSink() {
+    // Fixed 64 KB scratch: enough for 2048 frames at 8ch/float32, and never
+    // resized while the stream is live.
+    volumeScratch_.resize(64 * 1024, 0);
+}
+
 bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
                          aaudio_performance_mode_t perf,
                          int64_t* recoverPrevFramesWritten,
@@ -108,35 +114,38 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
         AAudioStream_close(stream);
         return false;
     }
-    bytesPerFrame_ =
+    const int32_t frameBytes =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);
-    if (config_.targetBufferMs > 0) {
-        const int32_t capacity = static_cast<int32_t>(
-            (static_cast<int64_t>(config_.sampleRate) *
-             config_.targetBufferMs) / 1000);
-        AAudioStream_setBufferSizeInFrames(stream, capacity);
+    // Start at ~2 bursts so latency stays low; the configured target is the
+    // capacity ceiling the xrun governor may grow into.
+    int32_t initialBuffer = 0;
+    {
+        const int32_t burst = AAudioStream_getFramesPerBurst(stream);
+        const int32_t capacity = AAudioStream_getBufferCapacityInFrames(stream);
+        initialBuffer = burst > 0 ? burst * 2 : capacity;
+        if (capacity > 0) initialBuffer = std::min(initialBuffer, capacity);
+        if (initialBuffer > 0) {
+            AAudioStream_setBufferSizeInFrames(stream, initialBuffer);
+        }
     }
-    exclusive_ =
+    const bool exclusive =
         AAudioStream_getSharingMode(stream) == AAUDIO_SHARING_MODE_EXCLUSIVE;
+
+    // Stage all sink state locally. Nothing below is published until
+    // requestStart() succeeds: a failed start must not clear the disconnected
+    // flag or re-base the frame counters.
+    AAudioOpenState staged{};
     if (recoverPrevFramesWritten != nullptr && recoverPrevWrittenBase != nullptr) {
-        framesWritten_ = *recoverPrevFramesWritten;
-        framesWrittenBase_ = *recoverPrevWrittenBase;
-        readBase_ = AAudioStream_getFramesRead(stream);
+        staged.framesWritten = *recoverPrevFramesWritten;
+        staged.framesWrittenBase = *recoverPrevWrittenBase;
+        staged.readBase = AAudioStream_getFramesRead(stream);
         // Buffered frames from the disconnected stream cannot be drained.
         // Account for them as discarded so pending-data/EOS cannot hang.
-        readOffset_ = *recoverPrevFramesWritten - *recoverPrevWrittenBase;
-    } else {
-        framesWritten_ = 0;
-        framesWrittenBase_ = 0;
-        readBase_ = 0;
-        readOffset_ = 0;
+        staged.readOffset = *recoverPrevFramesWritten - *recoverPrevWrittenBase;
     }
-    lastXRunCount_.store(AAudioStream_getXRunCount(stream), std::memory_order_relaxed);
-    disconnected_.store(false, std::memory_order_release);
-    lastWriteResult_.store(AAUDIO_OK, std::memory_order_relaxed);
-
-    // Pre-allocate volume scratch buffer under streamMutex_ to prevent audio-thread allocation
-    volumeScratch_.resize(static_cast<size_t>(bytesPerFrame_ * config_.sampleRate));
+    staged.lastXRunCount = AAudioStream_getXRunCount(stream);
+    staged.initialBufferFrames = std::max(initialBuffer, 0);
+    staged.connected = true;
 
     const aaudio_result_t sr = AAudioStream_requestStart(stream);
     if (sr != AAUDIO_OK) {
@@ -145,16 +154,40 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
         AAudioStream_close(stream);
         return false;
     }
+
+    AAudioOpenState live{};
+    CommitOpenState(/*startSucceeded=*/true, staged, live);
+    bytesPerFrame_ = frameBytes;
+    exclusive_.store(exclusive, std::memory_order_release);
+    framesWritten_.store(live.framesWritten, std::memory_order_relaxed);
+    framesWrittenBase_.store(live.framesWrittenBase, std::memory_order_relaxed);
+    readBase_.store(live.readBase, std::memory_order_relaxed);
+    readOffset_.store(live.readOffset, std::memory_order_relaxed);
+    lastXRunCount_.store(live.lastXRunCount, std::memory_order_relaxed);
+    initialBufferFrames_.store(live.initialBufferFrames, std::memory_order_release);
+    {
+        const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        lastXRunTimestampMs_.store(nowMs, std::memory_order_release);
+        lastShrinkTimestampMs_.store(nowMs, std::memory_order_release);
+    }
+    recovery_.markConnected();
+    lastWriteResult_.store(AAUDIO_OK, std::memory_order_relaxed);
     stream_.store(stream, std::memory_order_release);
     LOGI("AAudio stream open: rate=%d ch=%d enc=%d exclusive=%d xrun=%d",
          AAudioStream_getSampleRate(stream), config_.channelCount,
-         static_cast<int>(config_.encoding), exclusive_ ? 1 : 0,
+         static_cast<int>(config_.encoding), exclusive ? 1 : 0,
          AAudioStream_getXRunCount(stream));
     return true;
 }
 
 bool AAudioSink::Open(const Config& config, std::string* error) {
     std::lock_guard<std::mutex> lock(streamMutex_);
+    // Repeated Open() must not leak the previous stream or let TryOpen resize
+    // scratch state under an active writer. Drain writers first (this is a
+    // control-thread call, not the audio thread).
+    CloseLocked(/* waitForWriters = */ true);
+    recoveryAttempts_ = 0;
     config_ = config;
     bytesPerFrame_ =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);
@@ -194,7 +227,7 @@ void AAudioSink::ErrorCallback(AAudioStream* stream, void* userData, aaudio_resu
     if (!sink) return;
     LOGW("AAudio stream error callback: %s (%d)", AAudio_convertResultToText(error), error);
     if (error == AAUDIO_ERROR_DISCONNECTED) {
-        sink->disconnected_.store(true, std::memory_order_release);
+        sink->recovery_.markDisconnected();
     }
 }
 
@@ -202,30 +235,34 @@ bool AAudioSink::RecoverDisconnected() {
     LOGW("Attempting to recover disconnected AAudio stream...");
     // Current writer thread is active, so do not wait for writers here
     CloseLocked(/* waitForWriters = */ false);
-    disconnected_.store(false, std::memory_order_release);
+    // The disconnected flag is deliberately not cleared here. TryOpen clears
+    // it only after a stream is actually live; if the whole ladder fails the
+    // flag must stay set so Write keeps retrying with backoff.
     int64_t prevFramesWritten = framesWritten_;
     int64_t prevWrittenBase = framesWrittenBase_;
 
-    if (bitPerfect_ &&
-        TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-                &prevFramesWritten, &prevWrittenBase)) {
-        LOGI("Recovered AAudio stream in EXCLUSIVE mode");
-        return true;
-    }
-    if (bitPerfect_) return false;
-    if (config_.lowLatency &&
-        TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-                &prevFramesWritten, &prevWrittenBase)) {
-        LOGI("Recovered AAudio stream in SHARED low-latency mode");
-        return true;
-    }
-    if (TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_NONE,
-                &prevFramesWritten, &prevWrittenBase)) {
-        LOGI("Recovered AAudio stream in SHARED mode");
-        return true;
-    }
-    LOGE("Failed to recover disconnected AAudio stream");
-    return false;
+    return recovery_.attempt([&]() {
+        if (bitPerfect_ &&
+            TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                    &prevFramesWritten, &prevWrittenBase)) {
+            LOGI("Recovered AAudio stream in EXCLUSIVE mode");
+            return true;
+        }
+        if (bitPerfect_) return false;
+        if (config_.lowLatency &&
+            TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                    &prevFramesWritten, &prevWrittenBase)) {
+            LOGI("Recovered AAudio stream in SHARED low-latency mode");
+            return true;
+        }
+        if (TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_NONE,
+                    &prevFramesWritten, &prevWrittenBase)) {
+            LOGI("Recovered AAudio stream in SHARED mode");
+            return true;
+        }
+        LOGE("Failed to recover disconnected AAudio stream");
+        return false;
+    });
 }
 
 void AAudioSink::CloseLocked(bool waitForWriters) {
@@ -268,7 +305,7 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
 
     if (releasing_.load(std::memory_order_acquire)) return -1;
 
-    if (disconnected_.load(std::memory_order_acquire)) {
+    if (recovery_.isDisconnected()) {
         std::unique_lock<std::mutex> lock(streamMutex_, std::try_to_lock);
         if (!lock.owns_lock() || releasing_.load(std::memory_order_acquire)) {
             return -1;
@@ -292,8 +329,7 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     if (st == nullptr || releasing_.load(std::memory_order_acquire)) return -1;
 
     const float curVol = volume_.load(std::memory_order_relaxed);
-    const bool applyVol =
-        (!bitPerfect_ && config_.encoding != Encoding::I24Packed && curVol != 1.0f);
+    const bool applyVol = (!bitPerfect_ && curVol != 1.0f);
 
     alignas(16) uint8_t stackScratch[2048];
     uint8_t* scratchPtr = nullptr;
@@ -344,19 +380,7 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
                     s[i] = static_cast<int16_t>(std::lrintf(v));
                 }
             } else if (config_.encoding == Encoding::I24Packed) {
-                const int numSamples = chunkBytes / 3;
-                for (int i = 0; i < numSamples; ++i) {
-                    uint8_t* p = scratchPtr + i * 3;
-                    const int32_t raw = static_cast<int32_t>(p[0]) |
-                                        (static_cast<int32_t>(p[1]) << 8) |
-                                        (static_cast<int32_t>(static_cast<int8_t>(p[2])) << 16);
-                    float v = static_cast<float>(raw) * curVol;
-                    v = std::clamp(v, -8388608.0f, 8388607.0f);
-                    const int32_t scaled = std::lrintf(v);
-                    p[0] = static_cast<uint8_t>(scaled & 0xFF);
-                    p[1] = static_cast<uint8_t>((scaled >> 8) & 0xFF);
-                    p[2] = static_cast<uint8_t>((scaled >> 16) & 0xFF);
-                }
+                ApplyI24PackedVolume(scratchPtr, chunkBytes, curVol);
             }
             writeSrc = scratchPtr;
         }
@@ -368,17 +392,25 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
             framesWritten_.fetch_add(w, std::memory_order_relaxed);
             retries = 0;
         } else if (w == AAUDIO_ERROR_TIMEOUT) {
-            CheckAndAdaptBuffer(st);
+            // A write timeout only delays this block; it is not evidence of an
+            // underrun. Buffer growth is driven exclusively by real xruns in
+            // XRunDelta(), otherwise a briefly busy device ratchets latency up
+            // permanently.
             if (++retries > kMaxRetries) break;
             continue;  // loop re-checks releasing_ so Close() is never blocked
         } else if (w == AAUDIO_ERROR_DISCONNECTED) {
-            disconnected_.store(true, std::memory_order_release);
+            recovery_.markDisconnected();
             break;
         } else {
             lastWriteResult_.store(w, std::memory_order_relaxed);
             break;
         }
     }
+
+    // Feed the buffer governor from the writer thread. XRunDelta() is the only
+    // adaptation trigger: real underruns grow the buffer, a quiet stream
+    // shrinks it back. Write timeouts must not affect the buffer size.
+    (void)XRunDelta();
 
     const int32_t framesWritten = totalFrames - framesLeft;
     return framesWritten > 0 ? (framesWritten * bytesPerFrame_) : (framesLeft == 0 ? sizeBytes : -1);
@@ -478,12 +510,39 @@ int32_t AAudioSink::XRunDelta() const {
         const int32_t cur = AAudioStream_getXRunCount(st);
         const int32_t prev = lastXRunCount_.exchange(cur, std::memory_order_relaxed);
         delta = cur > prev ? (cur - prev) : 0;
+        const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
         if (delta > 0) {
+            lastXRunTimestampMs_.store(nowMs, std::memory_order_release);
             const_cast<AAudioSink*>(this)->CheckAndAdaptBuffer(st);
+        } else {
+            // Slow shrink-back: after 30 s with no underruns, give back two
+            // bursts, at most once per 30 s, never below the initial size.
+            const int64_t lastXRun = lastXRunTimestampMs_.load(std::memory_order_acquire);
+            const int64_t lastShrink = lastShrinkTimestampMs_.load(std::memory_order_acquire);
+            if (lastXRun > 0 && nowMs - lastXRun >= 30000 && nowMs - lastShrink >= 30000) {
+                lastShrinkTimestampMs_.store(nowMs, std::memory_order_release);
+                const_cast<AAudioSink*>(this)->ShrinkBufferIfStable(st);
+            }
         }
     }
     activeReaders_.fetch_sub(1, std::memory_order_release);
     return delta;
+}
+
+void AAudioSink::ShrinkBufferIfStable(AAudioStream* st) {
+    if (st == nullptr || releasing_.load(std::memory_order_acquire)) return;
+    const int32_t currentSize = AAudioStream_getBufferSizeInFrames(st);
+    const int32_t burst = AAudioStream_getFramesPerBurst(st);
+    const int32_t initial = initialBufferFrames_.load(std::memory_order_acquire);
+    if (burst <= 0 || currentSize <= initial) return;
+    const int32_t newSize = std::max(initial, currentSize - burst * 2);
+    if (newSize >= currentSize) return;
+    const int32_t applied = AAudioStream_setBufferSizeInFrames(st, newSize);
+    if (applied > 0 && applied < currentSize) {
+        LOGI("AAudio adaptive governor: shrunk buffer: %d -> %d frames (initial=%d)",
+             currentSize, applied, initial);
+    }
 }
 
 int32_t AAudioSink::BufferCapacityFrames() const {

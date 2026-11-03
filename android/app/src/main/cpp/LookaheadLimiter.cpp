@@ -18,27 +18,28 @@
 // 1/8192, e.g. 0.9721679687500 = 7963/8192). Phase 0 aligns to the integer
 // sample, phases 1-3 evaluate the 1/4, 2/4, 3/4 inter-sample positions. Phase 3
 // is the time-reverse of phase 0 and phase 2 of phase 1 (linear-phase symmetry).
-// Per-phase DC gain (sum of the 12 taps): phase 0/3 = 1.0015869, phase 1/2 =
-// 0.9730225 — this is the standard filter's small passband ripple. The raw-sample
-// floor in estimateTruePeak() guarantees the estimate never drops below an actual
-// sample value despite the sub-unity branches.
+// All four branches are normalized to unity DC gain (the raw BS.1770 tables
+// have per-phase DC gains of 1.0015869 / 0.9730225 / 0.9730225 / 1.0015869);
+// without this, inter-sample peaks on phases 1/2 read ~0.24 dB low. The
+// raw-sample floor in estimateTruePeak() still guarantees the estimate never
+// drops below an actual sample value.
 const float LookaheadLimiter::polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE] = {
-    // Phase 0 (integer sample position)
-    {  0.0017089843750f,  0.0109863281250f, -0.0196533203125f,  0.0332031250000f,
-      -0.0594482421875f,  0.1373291015625f,  0.9721679687500f, -0.1022949218750f,
-       0.0476074218750f, -0.0266113281250f,  0.0148925781250f, -0.0083007812500f },
-    // Phase 1 (1/4 inter-sample)
-    { -0.0291748046875f,  0.0292968750000f, -0.0517578125000f,  0.0891113281250f,
-      -0.1665039062500f,  0.4650878906250f,  0.7797851562500f, -0.2003173828125f,
-       0.1015625000000f, -0.0582275390625f,  0.0330810546875f, -0.0189208984375f },
-    // Phase 2 (2/4 inter-sample)
-    { -0.0189208984375f,  0.0330810546875f, -0.0582275390625f,  0.1015625000000f,
-      -0.2003173828125f,  0.7797851562500f,  0.4650878906250f, -0.1665039062500f,
-       0.0891113281250f, -0.0517578125000f,  0.0292968750000f, -0.0291748046875f },
-    // Phase 3 (3/4 inter-sample)
-    { -0.0083007812500f,  0.0148925781250f, -0.0266113281250f,  0.0476074218750f,
-      -0.1022949218750f,  0.9721679687500f,  0.1373291015625f, -0.0594482421875f,
-       0.0332031250000f, -0.0196533203125f,  0.0109863281250f,  0.0017089843750f }
+    // Phase 0 (integer sample position), normalized to unity DC gain
+    {  0.0017062766845f,  0.0109689215434f, -0.0196221818721f,  0.0331505184423f,
+      -0.0593540532404f,  0.1371115192925f,  0.9706276796851f, -0.1021328472597f,
+       0.0475319933547f, -0.0265691655162f,  0.0148689825366f, -0.0082876296106f },
+    // Phase 1 (1/4 inter-sample), normalized to unity DC gain
+    { -0.0299836896757f,  0.0301091444442f, -0.0531928218515f,  0.0915819810179f,
+      -0.1711203042581f,  0.4779826680524f,  0.8014050612910f, -0.2058712751375f,
+       0.1043783674067f, -0.0598419245829f,  0.0339982422683f, -0.0194454891202f },
+    // Phase 2 (2/4 inter-sample), normalized to unity DC gain
+    { -0.0194454891202f,  0.0339982422683f, -0.0598419245829f,  0.1043783674067f,
+      -0.2058712751375f,  0.8014050612910f,  0.4779826680524f, -0.1711203042581f,
+       0.0915819810179f, -0.0531928218515f,  0.0301091444442f, -0.0299836896757f },
+    // Phase 3 (3/4 inter-sample), normalized to unity DC gain
+    { -0.0082876296106f,  0.0148689825366f, -0.0265691655162f,  0.0475319933547f,
+      -0.1021328472597f,  0.9706276796851f,  0.1371115192925f, -0.0593540532404f,
+       0.0331505184423f, -0.0196221818721f,  0.0109689215434f,  0.0017062766845f }
 };
 
 LookaheadLimiter::LookaheadLimiter() {
@@ -214,18 +215,18 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
     // transposed), so one fused multiply-add per tap accumulates all four branch
     // sums across the 4 SIMD lanes; vmaxvq then reduces to the max over phases.
     alignas(16) static const float kPhaseCoeffs[TAPS_PER_PHASE][4] = {
-        {  0.0017089843750f, -0.0291748046875f, -0.0189208984375f, -0.0083007812500f },
-        {  0.0109863281250f,  0.0292968750000f,  0.0330810546875f,  0.0148925781250f },
-        { -0.0196533203125f, -0.0517578125000f, -0.0582275390625f, -0.0266113281250f },
-        {  0.0332031250000f,  0.0891113281250f,  0.1015625000000f,  0.0476074218750f },
-        { -0.0594482421875f, -0.1665039062500f, -0.2003173828125f, -0.1022949218750f },
-        {  0.1373291015625f,  0.4650878906250f,  0.7797851562500f,  0.9721679687500f },
-        {  0.9721679687500f,  0.7797851562500f,  0.4650878906250f,  0.1373291015625f },
-        { -0.1022949218750f, -0.2003173828125f, -0.1665039062500f, -0.0594482421875f },
-        {  0.0476074218750f,  0.1015625000000f,  0.0891113281250f,  0.0332031250000f },
-        { -0.0266113281250f, -0.0582275390625f, -0.0517578125000f, -0.0196533203125f },
-        {  0.0148925781250f,  0.0330810546875f,  0.0292968750000f,  0.0109863281250f },
-        { -0.0083007812500f, -0.0189208984375f, -0.0291748046875f,  0.0017089843750f }
+        {  0.0017062766845f, -0.0299836896757f, -0.0194454891202f, -0.0082876296106f },
+        {  0.0109689215434f,  0.0301091444442f,  0.0339982422683f,  0.0148689825366f },
+        { -0.0196221818721f, -0.0531928218515f, -0.0598419245829f, -0.0265691655162f },
+        {  0.0331505184423f,  0.0915819810179f,  0.1043783674067f,  0.0475319933547f },
+        { -0.0593540532404f, -0.1711203042581f, -0.2058712751375f, -0.1021328472597f },
+        {  0.1371115192925f,  0.4779826680524f,  0.8014050612910f,  0.9706276796851f },
+        {  0.9706276796851f,  0.8014050612910f,  0.4779826680524f,  0.1371115192925f },
+        { -0.1021328472597f, -0.2058712751375f, -0.1711203042581f, -0.0593540532404f },
+        {  0.0475319933547f,  0.1043783674067f,  0.0915819810179f,  0.0331505184423f },
+        { -0.0265691655162f, -0.0598419245829f, -0.0531928218515f, -0.0196221818721f },
+        {  0.0148689825366f,  0.0339982422683f,  0.0301091444442f,  0.0109689215434f },
+        { -0.0082876296106f, -0.0194454891202f, -0.0299836896757f,  0.0017062766845f }
     };
     float32x4_t vAcc = vdupq_n_f32(0.0f);
     for (int t = 0; t < TAPS_PER_PHASE; ++t) {
@@ -236,18 +237,18 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
     peak = std::max(peak, vmaxvq_f32(vAbs));
 #elif defined(PULSR_HAS_SSE)
     alignas(16) static const float kPhaseCoeffs[TAPS_PER_PHASE][4] = {
-        {  0.0017089843750f, -0.0291748046875f, -0.0189208984375f, -0.0083007812500f },
-        {  0.0109863281250f,  0.0292968750000f,  0.0330810546875f,  0.0148925781250f },
-        { -0.0196533203125f, -0.0517578125000f, -0.0582275390625f, -0.0266113281250f },
-        {  0.0332031250000f,  0.0891113281250f,  0.1015625000000f,  0.0476074218750f },
-        { -0.0594482421875f, -0.1665039062500f, -0.2003173828125f, -0.1022949218750f },
-        {  0.1373291015625f,  0.4650878906250f,  0.7797851562500f,  0.9721679687500f },
-        {  0.9721679687500f,  0.7797851562500f,  0.4650878906250f,  0.1373291015625f },
-        { -0.1022949218750f, -0.2003173828125f, -0.1665039062500f, -0.0594482421875f },
-        {  0.0476074218750f,  0.1015625000000f,  0.0891113281250f,  0.0332031250000f },
-        { -0.0266113281250f, -0.0582275390625f, -0.0517578125000f, -0.0196533203125f },
-        {  0.0148925781250f,  0.0330810546875f,  0.0292968750000f,  0.0109863281250f },
-        { -0.0083007812500f, -0.0189208984375f, -0.0291748046875f,  0.0017089843750f }
+        {  0.0017062766845f, -0.0299836896757f, -0.0194454891202f, -0.0082876296106f },
+        {  0.0109689215434f,  0.0301091444442f,  0.0339982422683f,  0.0148689825366f },
+        { -0.0196221818721f, -0.0531928218515f, -0.0598419245829f, -0.0265691655162f },
+        {  0.0331505184423f,  0.0915819810179f,  0.1043783674067f,  0.0475319933547f },
+        { -0.0593540532404f, -0.1711203042581f, -0.2058712751375f, -0.1021328472597f },
+        {  0.1371115192925f,  0.4779826680524f,  0.8014050612910f,  0.9706276796851f },
+        {  0.9706276796851f,  0.8014050612910f,  0.4779826680524f,  0.1371115192925f },
+        { -0.1021328472597f, -0.2058712751375f, -0.1711203042581f, -0.0593540532404f },
+        {  0.0475319933547f,  0.1043783674067f,  0.0915819810179f,  0.0331505184423f },
+        { -0.0265691655162f, -0.0598419245829f, -0.0531928218515f, -0.0196221818721f },
+        {  0.0148689825366f,  0.0339982422683f,  0.0301091444442f,  0.0109689215434f },
+        { -0.0082876296106f, -0.0194454891202f, -0.0299836896757f,  0.0017062766845f }
     };
     __m128 vAcc = _mm_setzero_ps();
     for (int t = 0; t < TAPS_PER_PHASE; ++t) {
@@ -309,7 +310,7 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 
         gainBuf_[writeIdx_] = requiredGain;
 
-        pushGainDeque(requiredGain, sampleCount_++, lookaheadSamples_);
+        pushGainDeque(requiredGain, sampleCount_++, lookaheadSamples_ + 2);
         float targetGain = getMinGain();
 
         // Dynamic transient tracking for program-dependent release
@@ -327,12 +328,30 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 
         // Instantaneous attack to target minimum gain, smooth exponential release when lookahead window clears
         if (targetGain < envelope_) {
-            const float attackStep = std::max(
-                1.0f / static_cast<float>(lookaheadSamples_),
-                (envelope_ - targetGain) / static_cast<float>(lookaheadSamples_)
-            );
+            // Ramp exactly until the min-gain peak reaches readIdx. The
+            // previous max(1/lookahead, delta/lookahead) always chose the
+            // 1/lookahead floor, slamming small reductions in <1 ms.
+            const int64_t currentIdx = sampleCount_ - 1;
+            const int64_t minGainSampleIdx = getMinGainSampleIndex();
+            const int64_t deadline = minGainSampleIdx + lookaheadSamples_;
+            if (!attackActive_ || attackDeadlineIdx_ <= currentIdx) {
+                // First attack, or the previous deadline has already passed:
+                // schedule the ramp against the current peak.
+                attackActive_ = true;
+                attackDeadlineIdx_ = deadline;
+            } else {
+                // A newer peak lowered the target while an earlier peak is
+                // still pending. Keep the earlier deadline so the earlier peak
+                // cannot slip over the ceiling.
+                attackDeadlineIdx_ = std::min(attackDeadlineIdx_, deadline);
+            }
+            const int64_t remainingSamples = std::max<int64_t>(
+                1, attackDeadlineIdx_ - currentIdx);
+            const float attackStep =
+                (envelope_ - targetGain) / static_cast<float>(remainingSamples);
             envelope_ = std::max(targetGain, envelope_ - attackStep);
         } else {
+            attackActive_ = false;
             envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
             if (envelope_ > 0.99999f) {
                 envelope_ = 1.0f;
@@ -392,98 +411,8 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 }
 
 void LookaheadLimiter::processMono(float* inOut, int frames) {
-    syncPendingParams();
-
-    if (!enabled_ || frames <= 0) return;
-    disabledSinceProcess_ = false;
-
-    constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
-    float historyWindow[TAPS_PER_PHASE] = {};
-    float blockMinEnvelope = 1.0f;
-
-    for (int i = 0; i < frames; ++i) {
-        const float inSample = inOut[i];
-        delayBuf_[0][writeIdx_] = std::isfinite(inSample) ? inSample : 0.0f;
-
-        for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-            int histIdx = (writeIdx_ - (TAPS_PER_PHASE - 1 - tap)) & kMask;
-            historyWindow[tap] = delayBuf_[0][histIdx];
-        }
-
-        const float peak = estimateTruePeak(historyWindow);
-
-        float requiredGain = 1.0f;
-        if (peak > threshold_ && peak > 1e-6f) {
-            requiredGain = threshold_ / peak;
-        }
-
-        gainBuf_[writeIdx_] = requiredGain;
-
-        pushGainDeque(requiredGain, sampleCount_++, lookaheadSamples_);
-        float targetGain = getMinGain();
-
-        const float energyCoeff = 0.001f;
-        avgEnergy_ += energyCoeff * (peak - avgEnergy_);
-        if (avgEnergy_ < 1e-6f) avgEnergy_ = 1e-6f;
-        const float crest = peak / avgEnergy_;
-        float currentTransient = std::clamp((crest - 1.2f) / 2.0f, 0.0f, 1.0f);
-        if (currentTransient > transientWeight_) {
-            transientWeight_ = currentTransient;
-        } else {
-            transientWeight_ *= 0.999f;
-        }
-        const float effectiveReleaseCoeff = (1.0f - transientWeight_) * slowReleaseCoeff_ + transientWeight_ * fastReleaseCoeff_;
-
-        if (targetGain < envelope_) {
-            const float attackStep = std::max(
-                1.0f / static_cast<float>(lookaheadSamples_),
-                (envelope_ - targetGain) / static_cast<float>(lookaheadSamples_)
-            );
-            envelope_ = std::max(targetGain, envelope_ - attackStep);
-        } else {
-            envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
-            if (envelope_ > 0.99999f) {
-                envelope_ = 1.0f;
-            }
-        }
-        if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
-        blockMinEnvelope = std::min(blockMinEnvelope, envelope_);
-
-        if (bypassPending_ && !enableFading_ && envelope_ >= 0.999f) {
-            bypassTarget_ = 0.0f;
-            bypassHoldRemaining_ = 0;
-        }
-        float mix = 0.0f;
-        if (bypassHoldRemaining_ > 0) {
-            --bypassHoldRemaining_;
-        } else {
-            mix = advanceBypassMix();
-        }
-
-        int readIdx = (writeIdx_ - (lookaheadSamples_ + FILTER_DELAY)) & kMask;
-        const float wet = delayBuf_[0][readIdx] * envelope_;
-        const float dryRaw = delayBuf_[0][writeIdx_];
-        const float dryPeak = std::max(peak, std::abs(dryRaw));
-        const float dryGain = (bypassTarget_ > 0.0f && dryPeak > 1e-6f)
-            ? std::min(targetGain, threshold_ / dryPeak)
-            : 1.0f;
-        const float dry = dryRaw * dryGain;
-        if (mix >= 1.0f) {
-            enableFading_ = false;
-            inOut[i] = wet;
-        } else if (mix <= 0.0f) {
-            inOut[i] = dry;
-        } else {
-            inOut[i] = dry + mix * (wet - dry);
-        }
-        if (bypassTarget_ == 0.0f && bypassMix_ <= 0.0f) {
-            bypassPending_ = false;
-        }
-
-        writeIdx_ = (writeIdx_ + 1) & kMask;
-    }
-    const float gr = (blockMinEnvelope < 1.0f && blockMinEnvelope > 0.0f) ? (20.0f * std::log10(blockMinEnvelope)) : 0.0f;
-    gainReductionDb_.store(gr, std::memory_order_relaxed);
+    // One implementation only: mono is a 1-channel interleaved stream.
+    processInterleaved(inOut, frames, 1);
 }
 
 void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channels) {
@@ -523,7 +452,7 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
 
         gainBuf_[writeIdx_] = requiredGain;
 
-        pushGainDeque(requiredGain, sampleCount_++, lookaheadSamples_);
+        pushGainDeque(requiredGain, sampleCount_++, lookaheadSamples_ + 2);
         float targetGain = getMinGain();
 
         const float energyCoeff = 0.001f;
@@ -539,17 +468,35 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
         const float effectiveReleaseCoeff = (1.0f - transientWeight_) * slowReleaseCoeff_ + transientWeight_ * fastReleaseCoeff_;
 
         // Attack ramps linearly across the lookahead window instead of stepping
-        // instantly. A constant 1/lookaheadSamples rate is guaranteed to reach
-        // any targetGain before the peak that produced it reaches the output
-        // (the peak is delayed by exactly lookaheadSamples_), so the ceiling is
-        // still enforced while the gain discontinuity is removed.
+        // instantly. The ramp is scheduled to reach the current minimum by the
+        // time that minimum's peak reaches readIdx, and an earlier pending
+        // deadline is retained if a newer peak lowers the target, so the
+        // ceiling is enforced without an audible gain step.
         if (targetGain < envelope_) {
-            const float attackStep = std::max(
-                1.0f / static_cast<float>(lookaheadSamples_),
-                (envelope_ - targetGain) / static_cast<float>(lookaheadSamples_)
-            );
+            // Ramp exactly until the min-gain peak reaches readIdx. The
+            // previous max(1/lookahead, delta/lookahead) always chose the
+            // 1/lookahead floor, slamming small reductions in <1 ms.
+            const int64_t currentIdx = sampleCount_ - 1;
+            const int64_t minGainSampleIdx = getMinGainSampleIndex();
+            const int64_t deadline = minGainSampleIdx + lookaheadSamples_;
+            if (!attackActive_ || attackDeadlineIdx_ <= currentIdx) {
+                // First attack, or the previous deadline has already passed:
+                // schedule the ramp against the current peak.
+                attackActive_ = true;
+                attackDeadlineIdx_ = deadline;
+            } else {
+                // A newer peak lowered the target while an earlier peak is
+                // still pending. Keep the earlier deadline so the earlier peak
+                // cannot slip over the ceiling.
+                attackDeadlineIdx_ = std::min(attackDeadlineIdx_, deadline);
+            }
+            const int64_t remainingSamples = std::max<int64_t>(
+                1, attackDeadlineIdx_ - currentIdx);
+            const float attackStep =
+                (envelope_ - targetGain) / static_cast<float>(remainingSamples);
             envelope_ = std::max(targetGain, envelope_ - attackStep);
         } else {
+            attackActive_ = false;
             envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
             if (envelope_ > 0.99999f) {
                 envelope_ = 1.0f;

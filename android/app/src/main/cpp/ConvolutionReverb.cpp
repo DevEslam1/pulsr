@@ -522,6 +522,15 @@ ConvolutionReverb::ConvolutionReverb() {
     fftWorkR_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     accumFreqL_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     accumFreqR_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+    accumFreqL2_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+    accumFreqR2_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+    wetFifoWrite_ = 0;
+    wetFifoRead_ = 0;
+    wetFifoCount_ = 0;
+    surroundDelayIdx_ = 0;
+    for (auto& channel : surroundDelay_) {
+        std::fill(std::begin(channel), std::end(channel), 0.0f);
+    }
 
     // Lazy history partition allocation: inner buffers are grown on-demand up
     // to the active IR's numPartitions (capped at MAX_PREALLOC_PARTITIONS) on
@@ -553,22 +562,34 @@ ConvolutionReverb::ConvolutionReverb() {
 // set by the destructor to wake the thread so it could exit. Removed entirely.
 ConvolutionReverb::~ConvolutionReverb() = default;
 
-void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
-    if (!preparedIr_) return;
+void ConvolutionReverb::pushWetFifo(float l, float r) {
+    if (wetFifoCount_ >= WET_FIFO_SAMPLES) return;  // overrun: drop the newest
+    wetFifoL_[wetFifoWrite_] = l;
+    wetFifoR_[wetFifoWrite_] = r;
+    wetFifoWrite_ = (wetFifoWrite_ + 1) % WET_FIFO_SAMPLES;
+    ++wetFifoCount_;
+}
+
+bool ConvolutionReverb::popWetFifo(float& l, float& r) {
+    if (wetFifoCount_ <= 0) return false;
+    l = wetFifoL_[wetFifoRead_];
+    r = wetFifoR_[wetFifoRead_];
+    wetFifoRead_ = (wetFifoRead_ + 1) % WET_FIFO_SAMPLES;
+    --wetFifoCount_;
+    return true;
+}
+
+void ConvolutionReverb::accumulatePartitionLeft(
+        const PreparedIr* ir, std::vector<FftUtil::Complex>& accum,
+        int numPartitions) {
+    if (!ir) return;
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
     if (effectivePartitions <= 0) return;
+    if (historyHead_ >= effectivePartitions) historyHead_ = 0;
 
-    if (historyHead_ >= effectivePartitions) {
-        historyHead_ = 0;
-    }
-
-    const auto& irFreqL = preparedIr_->irFreqL;
-
-    FftUtil::fft(fftWorkL_);
-    inputHistoryFreqL_[historyHead_] = fftWorkL_;
-
-    std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
+    const auto& irFreqL = ir->irFreqL;
+    std::fill(accum.begin(), accum.end(), FftUtil::Complex(0.0f, 0.0f));
 
     for (int p = 0; p < effectivePartitions; ++p) {
         int histIdx = (historyHead_ - p) % effectivePartitions;
@@ -580,7 +601,7 @@ void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
 #if defined(PULSR_HAS_NEON)
         const float* pInL = reinterpret_cast<const float*>(inFreqL.data());
         const float* pIrL = reinterpret_cast<const float*>(irBlockL.data());
-        float* pAccL = reinterpret_cast<float*>(accumFreqL_.data());
+        float* pAccL = reinterpret_cast<float*>(accum.data());
 
         for (int k = 0; k < FFT_SIZE; k += 4) {
             float32x4x2_t vInL = vld2q_f32(pInL + k * 2);
@@ -596,7 +617,7 @@ void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
 #elif defined(PULSR_HAS_SSE)
         const float* pInL = reinterpret_cast<const float*>(inFreqL.data());
         const float* pIrL = reinterpret_cast<const float*>(irBlockL.data());
-        float* pAccL = reinterpret_cast<float*>(accumFreqL_.data());
+        float* pAccL = reinterpret_cast<float*>(accum.data());
         const __m128 kSignMask = _mm_set_ps(0.0f, -0.0f, 0.0f, -0.0f);
 
         for (int k = 0; k < FFT_SIZE; k += 2) {
@@ -615,29 +636,23 @@ void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
         }
 #else
         for (int k = 0; k < FFT_SIZE; ++k) {
-            accumFreqL_[k] += inFreqL[k] * irBlockL[k];
+            accum[k] += inFreqL[k] * irBlockL[k];
         }
 #endif
     }
-    FftUtil::fft(accumFreqL_, true);
 }
 
-void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
-    if (!preparedIr_) return;
+void ConvolutionReverb::accumulatePartitionRight(
+        const PreparedIr* ir, std::vector<FftUtil::Complex>& accum,
+        int numPartitions) {
+    if (!ir) return;
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
     if (effectivePartitions <= 0) return;
+    if (historyHead_ >= effectivePartitions) historyHead_ = 0;
 
-    if (historyHead_ >= effectivePartitions) {
-        historyHead_ = 0;
-    }
-
-    const auto& irFreqR = preparedIr_->irFreqR;
-
-    FftUtil::fft(fftWorkR_);
-    inputHistoryFreqR_[historyHead_] = fftWorkR_;
-
-    std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
+    const auto& irFreqR = ir->irFreqR;
+    std::fill(accum.begin(), accum.end(), FftUtil::Complex(0.0f, 0.0f));
 
     for (int p = 0; p < effectivePartitions; ++p) {
         int histIdx = (historyHead_ - p) % effectivePartitions;
@@ -649,7 +664,7 @@ void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
 #if defined(PULSR_HAS_NEON)
         const float* pInR = reinterpret_cast<const float*>(inFreqR.data());
         const float* pIrR = reinterpret_cast<const float*>(irBlockR.data());
-        float* pAccR = reinterpret_cast<float*>(accumFreqR_.data());
+        float* pAccR = reinterpret_cast<float*>(accum.data());
 
         for (int k = 0; k < FFT_SIZE; k += 4) {
             float32x4x2_t vInR = vld2q_f32(pInR + k * 2);
@@ -665,7 +680,7 @@ void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
 #elif defined(PULSR_HAS_SSE)
         const float* pInR = reinterpret_cast<const float*>(inFreqR.data());
         const float* pIrR = reinterpret_cast<const float*>(irBlockR.data());
-        float* pAccR = reinterpret_cast<float*>(accumFreqR_.data());
+        float* pAccR = reinterpret_cast<float*>(accum.data());
         const __m128 kSignMask = _mm_set_ps(0.0f, -0.0f, 0.0f, -0.0f);
 
         for (int k = 0; k < FFT_SIZE; k += 2) {
@@ -684,9 +699,52 @@ void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
         }
 #else
         for (int k = 0; k < FFT_SIZE; ++k) {
-            accumFreqR_[k] += inFreqR[k] * irBlockR[k];
+            accum[k] += inFreqR[k] * irBlockR[k];
         }
 #endif
+    }
+}
+
+void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
+    if (!preparedIr_) return;
+    const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
+    const int effectivePartitions = std::min(numPartitions, allocated);
+    if (effectivePartitions <= 0) return;
+    if (historyHead_ >= effectivePartitions) historyHead_ = 0;
+
+    FftUtil::fft(fftWorkL_);
+    inputHistoryFreqL_[historyHead_] = fftWorkL_;
+
+    accumulatePartitionLeft(preparedIr_.get(), accumFreqL_, effectivePartitions);
+    const bool crossfade =
+        isIrCrossfadeActive() && crossfadeIr_ &&
+        crossfadeIr_->numPartitions > 0;
+    if (crossfade) {
+        accumulatePartitionLeft(crossfadeIr_.get(), accumFreqL2_,
+                                crossfadeIr_->numPartitions);
+        FftUtil::fft(accumFreqL2_, true);
+    }
+    FftUtil::fft(accumFreqL_, true);
+}
+
+void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
+    if (!preparedIr_) return;
+    const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
+    const int effectivePartitions = std::min(numPartitions, allocated);
+    if (effectivePartitions <= 0) return;
+    if (historyHead_ >= effectivePartitions) historyHead_ = 0;
+
+    FftUtil::fft(fftWorkR_);
+    inputHistoryFreqR_[historyHead_] = fftWorkR_;
+
+    accumulatePartitionRight(preparedIr_.get(), accumFreqR_, effectivePartitions);
+    const bool crossfade =
+        isIrCrossfadeActive() && crossfadeIr_ &&
+        crossfadeIr_->numPartitions > 0;
+    if (crossfade) {
+        accumulatePartitionRight(crossfadeIr_.get(), accumFreqR2_,
+                                 crossfadeIr_->numPartitions);
+        FftUtil::fft(accumFreqR2_, true);
     }
     FftUtil::fft(accumFreqR_, true);
 }
@@ -812,19 +870,44 @@ size_t ConvolutionReverb::getHistoryAllocatedBytes() const {
     return bytes;
 }
 
+void ConvolutionReverb::retireIr(std::shared_ptr<const PreparedIr> ir) {
+    if (!ir) return;
+    const int head = retiredHead_.load(std::memory_order_relaxed);
+    const int nextHead = (head + 1) % kMaxRetired;
+    if (nextHead != retiredTail_.load(std::memory_order_acquire)) {
+        retiredRing_[head] = std::move(ir);
+        retiredHead_.store(nextHead, std::memory_order_release);
+    }
+}
+
 void ConvolutionReverb::setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir) {
     if (ir && ir->numPartitions > 0) {
         ensurePartitionCapacity(ir->numPartitions);
     }
-    irCrossfadeSamples_ = 0;
-    if (preparedIr_) {
-        const int head = retiredHead_.load(std::memory_order_relaxed);
-        const int nextHead = (head + 1) % kMaxRetired;
-        if (nextHead != retiredTail_.load(std::memory_order_acquire)) {
-            retiredRing_[head] = std::move(preparedIr_);
-            retiredHead_.store(nextHead, std::memory_order_release);
-        }
+    const bool liveWetPath =
+        targetEnabledMix_.load(std::memory_order_relaxed) > 1e-4f;
+    const bool samePartitionMode =
+        preparedIr_ && ir &&
+        ((preparedIr_->numPartitions > 0) == (ir->numPartitions > 0));
+    if (preparedIr_ && ir && preparedIr_.get() != ir.get() && liveWetPath &&
+        samePartitionMode) {
+        // Swap under a live wet path: keep the old kernel and run both for a
+        // short cosine crossfade so preset/IR changes cannot click. Cross-mode
+        // swaps (direct <-> partitioned) change the wet latency itself and are
+        // not blended.
+        retireIr(std::move(crossfadeIr_));
+        crossfadeIr_ = preparedIr_;
+        // The convolution runs at core rate for >48 kHz streams.
+        const double fadeRate = (sampleRate_ > 48000.0) ? coreRate_ : sampleRate_;
+        irCrossfadeTotal_ = std::max(
+            1, static_cast<int>(fadeRate * 0.015));  // 15 ms
+        irCrossfadeSamples_ = 0;
+    } else {
+        retireIr(std::move(crossfadeIr_));
+        irCrossfadeTotal_ = 0;
+        irCrossfadeSamples_ = 0;
     }
+    retireIr(std::move(preparedIr_));
     preparedIr_ = std::move(ir);
     updateReverbLatency();
 }
@@ -960,6 +1043,17 @@ void ConvolutionReverb::reset() {
     smoothedWet_ = targetWet_;
     smoothedEnabledMix_ = targetEnabledMix_.load(std::memory_order_relaxed);
     irCrossfadeSamples_ = 0;
+    irCrossfadeTotal_ = 0;
+    retireIr(std::move(crossfadeIr_));
+    std::fill(accumFreqL2_.begin(), accumFreqL2_.end(), FftUtil::Complex(0.0f, 0.0f));
+    std::fill(accumFreqR2_.begin(), accumFreqR2_.end(), FftUtil::Complex(0.0f, 0.0f));
+    wetFifoWrite_ = 0;
+    wetFifoRead_ = 0;
+    wetFifoCount_ = 0;
+    surroundDelayIdx_ = 0;
+    for (auto& channel : surroundDelay_) {
+        std::fill(std::begin(channel), std::end(channel), 0.0f);
+    }
 
     wetInResampler_.reset();
     wetOutResampler_.reset();
@@ -1026,6 +1120,14 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
             std::fill(hqDryR_.begin(), hqDryR_.end(), 0.0f);
             hqDryPos_ = 0;
         }
+        // Surround alignment delay belongs to the previous session too.
+        for (auto& channel : surroundDelay_) {
+            std::fill(std::begin(channel), std::end(channel), 0.0f);
+        }
+        surroundDelayIdx_ = 0;
+        wetFifoWrite_ = 0;
+        wetFifoRead_ = 0;
+        wetFifoCount_ = 0;
     }
 
     const float startMix = smoothedEnabledMix_;
@@ -1081,6 +1183,7 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
     // curMix is low (enable/disable ramp), on delayed dry once fully wet.
     const int hqCap = static_cast<int>(hqDryL_.size());
     const int hqDelay = std::clamp(reverbLatencyFrames_.load(std::memory_order_relaxed), 0, hqCap - 1);
+    int fifoIn = 0;
     for (int i = 0; i < frames; ++i) {
         const float curMix = startMix + mixStep * (i + 1);
         const double curWet = startWet + wetStep * (i + 1);
@@ -1099,12 +1202,23 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
         const float effectiveDryL = curMix * delayedDryL + (1.0f - curMix) * inL[i];
         const float effectiveDryR = curMix * delayedDryR + (1.0f - curMix) * inR[i];
 
-        const float wetL = (i < outWetFrames) ? resampleOutL_[i]
-                         : (outWetFrames > 0 ? resampleOutL_[outWetFrames - 1] : 0.0f);
-        const float wetR = (i < outWetFrames) ? resampleOutR_[i]
-                         : (outWetFrames > 0 ? resampleOutR_[outWetFrames - 1] : 0.0f);
+        // FIFO absorbs the rational-resampler's +/-1 sample jitter. Keep a
+        // running read deficit/surplus instead of repeating the last sample.
+        if (wetFifoCount_ == 0 && fifoIn < outWetFrames) {
+            pushWetFifo(resampleOutL_[fifoIn], resampleOutR_[fifoIn]);
+            ++fifoIn;
+        }
+        float wetL = 0.0f;
+        float wetR = 0.0f;
+        popWetFifo(wetL, wetR);
+
         outL[i] = effectiveDryL * dryGain + wetL * wetGain;
         outR[i] = effectiveDryR * dryGain + wetR * wetGain;
+    }
+    // Carry the sub-sample surplus into the next block (bounded by the FIFO).
+    while (fifoIn < outWetFrames && wetFifoCount_ < WET_FIFO_SAMPLES) {
+        pushWetFifo(resampleOutL_[fifoIn], resampleOutR_[fifoIn]);
+        ++fifoIn;
     }
 }
 
@@ -1201,6 +1315,27 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
 
             float wetSampleL = convL;
             float wetSampleR = convR;
+            if (isIrCrossfadeActive() && crossfadeIr_ &&
+                crossfadeIr_->numPartitions == 0 &&
+                crossfadeIr_->totalTaps > 0 &&
+                crossfadeIr_->totalTaps <= totalTaps) {
+                const int oldTaps = crossfadeIr_->totalTaps;
+                const float* oldIrL = crossfadeIr_->irL.data();
+                const float* oldIrR = crossfadeIr_->irR.data();
+                float oldL = 0.0f;
+                float oldR = 0.0f;
+                for (int tap = 0; tap < oldTaps; ++tap) {
+                    oldL += rL[-tap] * oldIrL[tap];
+                    oldR += rR[-tap] * oldIrR[tap];
+                }
+                const float progress = static_cast<float>(irCrossfadeSamples_) /
+                                       static_cast<float>(irCrossfadeTotal_);
+                const float oldW =
+                    0.5f * (1.0f + std::cos(static_cast<float>(M_PI) * progress));
+                wetSampleL = oldW * oldL + (1.0f - oldW) * wetSampleL;
+                wetSampleR = oldW * oldR + (1.0f - oldW) * wetSampleR;
+                ++irCrossfadeSamples_;
+            }
             if (crossChannel_ > 0.001) {
                 const float cross = static_cast<float>(crossChannel_);
                 const float cL = (1.0f - 0.5f * cross) * wetSampleL + (0.5f * cross) * wetSampleR;
@@ -1220,10 +1355,8 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
             const float dryGain = static_cast<float>(std::cos(effectiveWet * (M_PI / 2.0)));
             float curWetGain = static_cast<float>(std::sin(effectiveWet * (M_PI / 2.0)));
 
-            dryDelayL_[dryDelayPos_] = inL[i];
-            dryDelayR_[dryDelayPos_] = inR[i];
-            dryDelayPos_ = (dryDelayPos_ + 1) % PARTITION_SIZE;
-
+            // Direct FIR has zero partition latency; dryDelay_ is not used on
+            // this path (writing it here only polluted the partitioned state).
             outL[i] = inL[i] * dryGain + wetSampleL * curWetGain;
             outR[i] = inR[i] * dryGain + wetSampleR * curWetGain;
 
@@ -1268,6 +1401,20 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
 
         float wetSampleL = convSampleL;
         float wetSampleR = convSampleR;
+        if (isIrCrossfadeActive() && crossfadeIr_ &&
+            crossfadeIr_->numPartitions > 0) {
+            const float oldL =
+                accumFreqL2_[PARTITION_SIZE + inputBlockPos_].real();
+            const float oldR =
+                accumFreqR2_[PARTITION_SIZE + inputBlockPos_].real();
+            const float progress = static_cast<float>(irCrossfadeSamples_) /
+                                   static_cast<float>(irCrossfadeTotal_);
+            const float oldW =
+                0.5f * (1.0f + std::cos(static_cast<float>(M_PI) * progress));
+            wetSampleL = oldW * oldL + (1.0f - oldW) * wetSampleL;
+            wetSampleR = oldW * oldR + (1.0f - oldW) * wetSampleR;
+            ++irCrossfadeSamples_;
+        }
         if (crossChannel_ > 0.001) {
             const float cross = static_cast<float>(crossChannel_);
             const float cL = (1.0f - 0.5f * cross) * wetSampleL + (0.5f * cross) * wetSampleR;
@@ -1359,6 +1506,24 @@ void ConvolutionReverb::processInterleaved(float* buffer, int frames, int channe
         for (int i = 0; i < frames; ++i) {
             buffer[i * channels] = outL[i];
             buffer[i * channels + 1] = outR[i];
+        }
+        // The reverb convolves only L/R; dry surround channels must be delayed
+        // by the same wet-path latency or the multichannel image skews.
+        if (channels > 2) {
+            const int delay = std::clamp(
+                reverbLatencyFrames_.load(std::memory_order_relaxed), 0,
+                MAX_HQ_DRY_DELAY - 1);
+            const int surroundChannels = std::min(channels, 8);
+            for (int i = 0; i < frames; ++i) {
+                for (int ch = 2; ch < surroundChannels; ++ch) {
+                    const int slot = ch - 2;
+                    const float current = buffer[i * channels + ch];
+                    const float delayed = surroundDelay_[slot][surroundDelayIdx_];
+                    surroundDelay_[slot][surroundDelayIdx_] = current;
+                    buffer[i * channels + ch] = (delay > 0) ? delayed : current;
+                }
+                surroundDelayIdx_ = (surroundDelayIdx_ + 1) % MAX_HQ_DRY_DELAY;
+            }
         }
     }
 }

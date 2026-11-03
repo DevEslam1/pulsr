@@ -26,6 +26,7 @@ public:
     void setBitOrder(DsdBitOrder bitOrder) { bitOrder_ = bitOrder; }
     DsdBitOrder getBitOrder() const { return bitOrder_; }
     double getDecimationRatio() const { return decimationRatio_; }
+    int getCicDecimFactor() const { return cicDecimFactor_; }
     int getExpectedPcmFrames(int byteCount) const {
         if (decimationRatio_ <= 0.0 || byteCount <= 0) return 0;
         return static_cast<int>(std::ceil((byteCount * 8.0) / decimationRatio_)) + 64;
@@ -38,6 +39,8 @@ public:
 
 private:
     void generateFilters();
+    void convolveStage2(const float* bufL, const float* bufR,
+                        float& outL, float& outR);
 
     // Stage 2 Anti-Aliasing Decimation FIR filter coefficients
     static constexpr int DECIMATION_TAPS = 383;
@@ -70,6 +73,9 @@ private:
     float dcPole_ = 0.9993f;
 
     double decimationRatio_ = 16.0;
+    // CIC decimation keeps Stage 1 at a constant 352.8 kHz for every DSD rate
+    // (8x for DSD64, 16x DSD128, 32x DSD256, 64x DSD512).
+    int cicDecimFactor_ = 8;
     double phaseAcc_ = 0.0;
     DsdRate dsdRate_ = DsdRate::DSD64;
     DsdBitOrder bitOrder_ = DsdBitOrder::LSB_FIRST;

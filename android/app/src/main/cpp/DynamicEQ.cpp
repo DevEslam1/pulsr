@@ -59,6 +59,13 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
     const double newQ = std::clamp(params.q, 0.1, 12.0);
     const int newFilterType = std::clamp(params.filterType, 0, 2);
     const bool filterTypeChanged = (newFilterType != band.filterType);
+    // The detector cache depends only on frequency/Q/type. Snapshot churn from
+    // unrelated stages must not recompute cos/sin and invalidate the applied
+    // gain coefficients for this band.
+    const bool detectorChanged =
+        std::abs(newFreq - band.frequency) > 1e-6 ||
+        std::abs(newQ - band.q) > 1e-6 ||
+        filterTypeChanged;
 
     band.frequency = newFreq;
     band.q = newQ;
@@ -71,8 +78,10 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
     band.mode = std::clamp(params.mode, 0, 1);
     band.filterType = newFilterType;
     band.enabled = params.enabled;
-    updateBandCache(band);
-    band.lastCoeffGainDb = 1e9; // force recompute
+    if (detectorChanged) {
+        updateBandCache(band);
+        band.lastCoeffGainDb = 1e9; // force recompute
+    }
 
     // Only clear filter state if the filter topology actually changed; frequency/Q
     // changes update coefficients smoothly in-place without zeroing registers.
@@ -213,6 +222,13 @@ void DynamicEQ::process(float* L, float* R, int frames) {
     for (int b = 0; b < n; ++b) {
         BandState& band = bands_[b];
         if (!band.enabled || !enabled_) {
+            // Keep the detector cold: a disabled band that leaves stale biquad
+            // registers/envelopes spikes audibly on re-enable.
+            std::memset(band.dx1, 0, sizeof(band.dx1));
+            std::memset(band.dx2, 0, sizeof(band.dx2));
+            std::memset(band.dy1, 0, sizeof(band.dy1));
+            std::memset(band.dy2, 0, sizeof(band.dy2));
+            std::memset(band.env, 0, sizeof(band.env));
             if (std::abs(band.currentGainDb) > 1e-4) {
                 const double decayCoeff = std::exp(-1.0 / (sampleRate_ * 0.010));
                 for (int i = 0; i < frames; ++i) {
@@ -354,6 +370,13 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
     for (int b = 0; b < n; ++b) {
         BandState& band = bands_[b];
         if (!band.enabled || !enabled_) {
+            // Keep the detector cold: a disabled band that leaves stale biquad
+            // registers/envelopes spikes audibly on re-enable.
+            std::memset(band.dx1, 0, sizeof(band.dx1));
+            std::memset(band.dx2, 0, sizeof(band.dx2));
+            std::memset(band.dy1, 0, sizeof(band.dy1));
+            std::memset(band.dy2, 0, sizeof(band.dy2));
+            std::memset(band.env, 0, sizeof(band.env));
             if (std::abs(band.currentGainDb) > 1e-4) {
                 const double decayCoeff = std::exp(-1.0 / (sampleRate_ * 0.010));
                 for (int i = 0; i < frames; ++i) {
