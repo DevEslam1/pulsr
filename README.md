@@ -6,7 +6,7 @@
   ### Premium Offline-First Local Music Player for Android & Beyond
 
   <p align="center">
-    <strong>Studio-grade DSP Suite • 10/32-Band AutoEQ • Room Correction • Synced LRC Lyrics • 8 Aura Themes • Offline-First &amp; Private (Pulsr Pure)</strong>
+    <strong>Studio-grade DSP Suite • 10/32/64-Band AutoEQ • Room Correction • Synced LRC Lyrics • 9 Aura Themes • Quran Mode • Group Listening (Pulsr Party) • Offline-First &amp; Private (Pulsr Pure)</strong>
   </p>
 
   <p align="center">
@@ -59,25 +59,26 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 ### 🎧 1. Audiophile Audio Engine & DSP
 - **10 / 32 / 64-Band Parametric Equalizer**: Switch between the classic 10-band graphic curve (±12 dB, 31 Hz–16 kHz), a 32-band, or a 64-band parametric engine with a custom frequency editor, A/B flat compare, and four recallable A/B/C/D slots.
 - **AutoEQ Headphone Calibration**: Bundled compensation curves for industry-leading headphones (*Harman Target 2019/2018, Apple AirPods Pro, Sony WH-1000XM4/XM5, Sennheiser HD600, Beyerdynamic*), an online AutoEQ search, and per-song auto-apply by name.
-- **Full Effects Chain**: Bass boost, per-band mute/solo, manual preamp, 3D spatial virtualizer, multiband dynamics, studio compressor, lookahead brickwall limiter, crossfeed, convolution reverb with custom WAV impulse responses, harmonic saturation/exciter, mid/side stereo width, Fletcher–Munson loudness contour, subwoofer crossover, dynamic EQ, high-quality sinc resampler, and TPDF dither.
+- **Full Effects Chain**: Bass boost, per-band mute/solo, manual preamp, 3D spatial virtualizer, multiband dynamics, studio compressor, lookahead brickwall limiter, crossfeed, convolution reverb with custom WAV impulse responses, harmonic saturation/exciter, mid/side stereo width, Fletcher–Munson loudness contour, subwoofer crossover, dynamic EQ, multichannel Channel Manager (2–8 channels with per-channel gain trim and delay), native DSD512 decoder (to 768 kHz PCM), high-quality sinc resampler, and TPDF dither.
 - **Room Correction Wizard**: Stepped-sine sweep measurement with mic capture, auto-fitted correction curve, optional stacking with a headphone AutoEQ profile, and linear-phase FIR export.
 - **ReplayGain & Per-Song Overrides**: Track/album ReplayGain with preamp, plus per-song EQ, volume and BPM overrides and per-album DSP memory.
-- **Bit-Perfect Hi-Res Badging & Output**: Detection for sample rates (44.1 kHz–192 kHz) and bit depths (16/24/32-bit float), bit-perfect mode, **strict no-resample mode**, **follow-track sample-rate switching**, float DSP path, AAudio direct output, USB-DAC negotiation, **DSD over PCM (DoP)** output, and Bluetooth codec monitor + in-app LDAC/aptX request (tap a codec chip; falls back to Developer Options where the platform refuses).
+- **Bit-Perfect Hi-Res Badging & Output**: Detection for sample rates (44.1 kHz–192 kHz, DSD64–DSD512 up to 768 kHz) and bit depths (16/24/32-bit float), bit-perfect mode, **strict no-resample mode**, **follow-track sample-rate switching**, float DSP path, AAudio direct output, USB-DAC negotiation, **DSD over PCM (DoP)** output, cached topology snapshots (`allowCached: true`) preventing Bluetooth/startup timeouts, and Bluetooth codec monitor + in-app LDAC/aptX request (tap a codec chip; falls back to Developer Options where the platform refuses).
 - **DSP Inspector & Conflict Guards**: A live view of every active/degraded stage, with protection against mutually exclusive effects (e.g. ReplayGain vs bit-perfect).
 - **Audiophile Playback Controls**: Gapless playback with encoder-delay trims, crossfade transitions (curves + BPM sync), variable pitch/playback speed, A-B loop, per-track delay, long-form bookmarks, silence skip, SponsorBlock auto-skip, and sleep timer (duration / end of track / after N tracks / end of queue).
 
 ### 💎 2. Aura Dynamic Design System
 - **Album-Art Color Extraction**: Dynamic UI palettes generated in real time from album artwork using `palette_generator`, with Material You system seeds and custom accent fallback.
-- **8 Now Playing Themes** (`PlayerThemeMode` in `lib/features/settings/cubit/settings_state.dart`, mapped in `lib/features/player/presentation/themes/theme_registry.dart`):
+- **9 Now Playing Themes** (`PlayerThemeMode` in `lib/features/settings/cubit/settings_state.dart`, mapped in `lib/features/player/presentation/themes/theme_registry.dart`):
   1. *Classic*: Deep blur overlays and ambient neon glow.
   2. *Card Deck*: Tactile card elevation with swipeable queue gestures.
   3. *Circle / Modern Vinyl*: Rotating vinyl turntable with acoustic concentric rings.
   4. *Minimalist*: Clean typography and distraction-free audio controls.
   5. *Retro Vinyl*: Classic turntable variant (`vinyl_player_theme.dart`).
-  6. *Retro Cassette Deck*: Spinning spools and a magnetic tape counter.
-  7. *Full-Bleed Waveform*: Audio-reactive glowing waveform backdrop.
-  8. *Lyrics Focus / Karaoke Immersion*: Magnified, lyrics-first singing view.
-- **Custom Theme Studio**: `custom_theme_builder_screen.dart` — build, export and share your own radius/glow/accent overrides on top of any of the 8 modes (accent, radius, glow toggles in `SettingsState`).
+  6. *CD Player*: Iridescent reflection, optical tray spin, and tactile compact disc jewel-case aesthetics (`cd_player_theme.dart`).
+  7. *Retro Cassette Deck*: Spinning spools and a magnetic tape counter (`cassette_player_theme.dart`).
+  8. *Full-Bleed Waveform*: Audio-reactive glowing waveform backdrop (`waveform_player_theme.dart`).
+  9. *Lyrics Focus / Karaoke Immersion*: Magnified, lyrics-first singing view (`lyrics_player_theme.dart`).
+- **Custom Theme Studio**: `custom_theme_builder_screen.dart` — build, export and share your own radius/glow/accent overrides on top of any of the 9 modes (accent, radius, glow toggles in `SettingsState`).
 - **AMOLED Pure Black & Light Modes**: True `#000000` AMOLED mode plus a high-contrast accessibility theme.
 - **Edge-to-Edge Experience**: Fully transparent status bar and gesture navigation bar on Android 14+.
 - **Theme Scheduler**: Optional automatic light/dark switching by time of day.
@@ -117,8 +118,8 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 ### 📡 8. Pulsr Pure & Pulsr Plus (Optional Online)
 - **Flavors** (`android/app/build.gradle.kts`): `dev` (`.plus`, Pulsr Plus), `prod` (Pulsr Music / Pure), `ytm` (`.ytm`, off-Play distribution). `dev`/`ytm` compile `src/ytmEnabled` (NewPipeExtractor v0.26.5 + Cast SDK); `prod` compiles only `src/ytmDisabled` stubs and is guarded by `validateProdIsolation` + `scripts/check_prod_flavor.py`.
 - **Pulsr Pure**: The Play-Store `prod` build with `ENABLE_YTM=false` ships with the `INTERNET` permission removed at the manifest level (`src/prod/AndroidManifest.xml`), no Firebase/Sentry, no DownloadService, and no YouTube code. Verified at runtime via `AppConfig.verifyPureNoInternet()`.
-- **Pulsr Plus (`ENABLE_YTM=true`, `dev`/`ytm` flavors)**: Optional account sign-in, search, browse, real radio/mixes, streaming and offline downloads, gated behind a build flag so production builds never expose it.
-- **Downloads Manager** (`lib/features/downloads/`, `lib/domain/models/download_task.dart`): Queue/pause/resume/retry with storage stats and MediaStore export, plus proxy/Wi-Fi-only/adaptive-quality controls.
+- **Pulsr Plus (`ENABLE_YTM=true`, `dev`/`ytm` flavors)**: Optional account sign-in, search, browse, real radio/mixes, streaming and offline downloads, gated behind a build flag so production builds never expose it. Includes modern Rhino JS signature transform (`solveSig`) + `n`-throttling solver (`solveN`) that survive YouTube player rewrites, plus signed-in `WEB` client fallback to stream and download age-restricted (+18) tracks.
+- **Downloads Architecture** (`lib/core/services/yt_download_*`, `lib/features/downloads/`): Resumable chunked background downloading with dedicated Android foreground service (`yt_download_foreground_controller.dart`), thread-safe pause registry, download quality picker sheet, storage stats, and MediaStore export, plus proxy/Wi-Fi-only/adaptive-quality controls.
 
 ### 🔄 9. Sync, Scrobble & Automate
 - **Scrobbling** (`lib/core/services/scrobbler_service.dart`): Last.fm, Libre.fm, ListenBrainz and custom webhook endpoints with a resilient offline queue, throttle, secure-storage credential migration, and a listening-stats dashboard.
@@ -126,7 +127,20 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Device Profiles**: Auto-apply EQ, effects and output settings per connected device, with Bluetooth/headphone automation triggers (`lib/domain/services/device_profile_service.dart`, `lib/core/services/automation_trigger_service.dart`).
 - **Settings Profiles**: Save and recall complete configuration bundles.
 
-### 🌍 10. Localization
+### 📖 10. Quran Mode & Mushaf Experience
+- **Offline Tanzil 1.1 Uthmani Text**: All 114 Surahs compiled into the app for 100% offline recitation without downloading extra assets.
+- **Authentic Mushaf Reader**: Beautiful Arabic Mushaf page presentation (`quran_mushaf_view.dart`), home hero recitation carousel (`quran_radio_hero_carousel.dart`), and reciter style presets (Murattal, Mujawwad).
+- **Acoustic Sanctuary**: Reverb tuned for mosque acoustics, vocal warmth EQ, ayah repeat loops, and persistent ayah bookmarks.
+
+### 📻 11. Internet Radio & Directory
+- **Global Radio Station Directory**: Search and stream thousands of online stations powered by radio-browser.info (`radio_directory_sheet.dart`).
+- **Stream Format & Health Validation**: Pre-flight HTTP ranged stream checks, ICY metadata stream titles, custom URL and `.m3u` playlist imports.
+
+### 👥 12. Pulsr Party (Listen Together)
+- **Real-Time Group Playback**: Up to 5 synchronized listeners with sub-millisecond NTP drift clock sync (`server/pulsr_party/`).
+- **Flexible Room Controls**: 6-character room codes, host-only or collaborative queue management, zero cloud account lock-in.
+
+### 🌍 13. Localization
 - Full English, Spanish and Arabic (RTL) UI with an in-app language switcher.
 
 ---
@@ -198,7 +212,7 @@ pulsr/
 │   ├── eq_profiles/          # headphone_profiles.json (AutoEQ calibrations)
 │   └── fonts/                # Manrope variable typography
 ├── docs/
-│   └── adr/                  # Architecture Decision Records (001–014, incl. two 007)
+│   └── adr/                  # Architecture Decision Records (001–015, 16 records incl. two 007)
 ├── DESIGN.md                       # Design system single source of truth
 ├── RUNBOOK.md                      # YTM streaming-latency runbook + verification gates
 ├── lib/
@@ -235,7 +249,7 @@ pulsr/
 │   ├── features/
 │   │   ├── home/ · library/ · search/ · playlists/ · playlist_detail/
 │   │   ├── album_detail/ · artist_detail/ · genre_detail/ · year_detail/ · folder_detail/
-│   │   ├── player/           # PlayerCubit facade + controllers/ + managers/ + 8 themes + widgets
+│   │   ├── player/           # PlayerCubit facade + controllers/ + managers/ + 9 themes + widgets
 │   │   ├── queue/ · sheets/ · shell/ · smart_playlist_builder/
 │   │   ├── settings/         # SettingsCubit/State + category screens + widgets
 │   │   ├── tag_editor/       # In-place ID3 tag & cover art editor
@@ -243,7 +257,7 @@ pulsr/
 │   │   ├── auth/ · ytm_search/ · ytm_browse/ · widgets/
 │   ├── l10n/                 # ARB localizations (EN, ES, AR) + generated Dart
 │   └── main.dart             # App entrypoint & initialization
-├── test/                     # 354 *_test.dart files (unit, Cubit, fuzz, perf, a11y, security)
+├── test/                     # 704 *_test.dart files (unit, Cubit, fuzz, perf, a11y, security)
 ├── website/                  # Landing website (index.html, styles.css, app.js, assets/)
 │   └── assets/               # Branding vectors
 ├── android/                  # dev (.plus) / prod (Pure) / ytm (.ytm) flavors + native DSP (C++)
@@ -257,7 +271,7 @@ pulsr/
 
 | Document | Purpose |
 |---|---|
-| [`docs/adr/`](docs/adr/) | Architecture Decision Records (001–014): player decomposition, AppError taxonomy, concurrency, artwork cache, DSP chain, queue slots, dependency injection, UI sound design, router, responsive layout, network/proxy, telemetry, settings state, playlists, domain layering |
+| [`docs/adr/`](docs/adr/) | Architecture Decision Records (001–015, 16 records): player decomposition, AppError taxonomy, concurrency, artwork cache, DSP chain, queue slots, dependency injection, UI sound design, router, responsive layout, network/proxy, telemetry, settings state, playlists, domain layering, database encryption |
 | [`DESIGN.md`](DESIGN.md) | Design system single source of truth (tokens, motion, components, a11y) |
 | [`RUNBOOK.md`](RUNBOOK.md) | YTM tap-to-sound latency runbook + verification gates |
 
@@ -279,7 +293,7 @@ Pulsr underwent an exhaustive 11-dimension architectural audit and hardening spr
 | **Code Hygiene** | **10/10** | Zero raw `print()` calls; strict empty catch ratchet; `prefer_final_locals` enforced; all controllers strictly < 400 lines. | `test/architecture/code_hygiene_test.dart` |
 | **Security** | **10/10** | Encrypted `FlutterSecureStorage` with plaintext wipe; IPv6-mapped IPv4 SSRF defense; ReDoS regex guards; JSON recursion depth caps; Web login sandbox hardening. | `test/security/security_hardening_test.dart` |
 | **Accessibility** | **10/10** | WCAG 2.1 AA luminance contrast ($\ge 4.5:1$); minimum 48x48 touch targets; decorative visualizers excluded from semantics; full 2.0x Dynamic Type scaling. | `test/a11y/accessibility_compliance_test.dart` |
-| **CI / DX / ADR** | **10/10** | Automated GitHub Actions CI pipeline with fatal linting; 15 Architecture Decision Records (ADRs, 001–014 incl. two 007) under `docs/adr/`. | `.github/workflows/ci.yml`, `docs/adr/` |
+| **CI / DX / ADR** | **10/10** | Automated GitHub Actions CI pipeline with fatal linting; 16 Architecture Decision Records (ADRs, 001–015 incl. two 007) under `docs/adr/`. | `.github/workflows/ci.yml`, `docs/adr/` |
 
 ---
 
@@ -310,7 +324,7 @@ flutter run
 ```
 
 ### 4. Run Automated Tests
-Execute unit tests, Cubit state tests, and repository mocks (354 `*_test.dart` files: unit, Cubit, fuzz, property, perf, a11y, security, concurrency):
+Execute unit tests, Cubit state tests, and repository mocks (704 `*_test.dart` files: unit, Cubit, fuzz, property, perf, a11y, security, concurrency):
 ```bash
 flutter test
 ```

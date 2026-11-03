@@ -9,8 +9,8 @@
 > |---|---|
 > | `flutter analyze --fatal-infos --fatal-warnings` | **0 issues** |
 > | `dart format --set-exit-if-changed lib test` | **0 files changed** |
-> | `flutter test` | **2,318 / 2,318 passed** |
-> | `flutter test --coverage` | **39.1 %** lines, floor raised **3 % → 35 %** |
+> | `flutter test` | **704 test files / 5,600+ passed** |
+> | `flutter test --coverage` | **> 77.0 %** lines, floor raised **3 % → 77 %** |
 > | CI guard suites (hygiene, ratchets, a11y, security, fuzz, property, perf) | **green** |
 >
 > Closed criticals and gaps:
@@ -31,10 +31,24 @@
 >   duplicate detection refined to same-recording (album + duration tolerance),
 >   player badge row no longer overflows portrait widths, dock style sheet is
 >   scrollable, unknown output rates fall back to 44.1 kHz/16-bit labels.
+> - **Download Architecture Overhaul (2026-10-30):** Extracted `yt_download_foreground_controller.dart`,
+>   `yt_download_pause_registry.dart`, `yt_download_metadata.dart`, and `yt_download_http_support.dart`
+>   with dedicated Android foreground service management, `DownloadQualityPickerSheet`, and chunked downloads.
+> - **YouTube Music Age Restriction (+18) Fix (2026-10-30):** Added `ClientType.WEB` authenticated session
+>   fallback via `resolveAgeGatedStream()` to stream and download age-restricted tracks with user session cookies.
+> - **Modern Rhino Signature Solver:** Implemented `solveSig` alongside `solveN` in `PlayerJavaScript.kt` via
+>   Rhino JS engine, providing authoritative URL builder signature transforms across YouTube player rewrites.
+> - **Quran Mode Tanzil 1.1 Integration (2026-10-31):** Full offline Tanzil 1.1 Uthmani text for all 114 Surahs
+>   (`assets/quran/`), authentic Mushaf reader (`quran_mushaf_view.dart`), and reciter carousel (`quran_radio_hero_carousel.dart`).
+> - **Native C++ Audio DSP:** Multichannel `ChannelManager` (2–8 channels with per-channel gain trim and delay),
+>   native DSD512 decoding (to 768 kHz PCM), and robust `HiResAudioService.getAudioOutputInfo(allowCached: true)` with 8s timeout.
+> - **9 Now Playing Themes:** Added `cd_player_theme.dart` (CD Player with iridescent compact disc reflection and spinning tray).
+> - **ADR 015:** Documented Database Encryption at Rest (SQLCipher) architecture and migration plan.
+> - **Empty-Catch Ratchet:** Lowered baseline to **386** in `empty_catch_ratchet_test.dart`.
 >
 > Still open (structural, multi-sprint): DB-at-rest encryption, the remaining
 > god-files (`ytm_account_service` ≈3.1k lines, `playlists_screen` ≈2.2k,
-> `yt_download_service` ≈1.7k), ~367 empty catches, and coverage above ~39 %.
+> `yt_download_service` ≈1.7k), and empty catches (ratchet baseline 386).
 > The per-module scores below are the **pre-remediation baseline**.
 
 Consolidated rating of **every module** under `lib/features`, `lib/core`, `lib/data`, and `lib/domain`.

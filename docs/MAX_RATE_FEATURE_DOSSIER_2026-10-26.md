@@ -40,6 +40,16 @@
 > - `HiResDacPlugin` now coalesces route callbacks for 200 ms before publishing a topology, so USB attach + A2DP connect bursts cannot briefly arm Bit-Perfect on the wrong sink.
 > - The signal chain reports the ALSA/AAudio buffer estimate (`nativeFramesPerBuffer / nativeSampleRate`) next to the app-stream format; native underrun counts remain visible in the exclusive USB chip.
 > - Estimated feature movement: Q 8.4 → ~8.6, F 8.0 → ~8.2, X 7.6 → ~8.1; composite **8.1 → ~8.4**. Hardware validation on a physical DAC is still required for the final 10/10 claim.
+>
+> **Hardening & Expansion tranche — 2026-10-30 through 2026-11-04.**
+> - **YouTube Music Age Restriction (+18):** `resolveAgeGatedStream()` added via `ClientType.WEB` (name id 1) with session cookies, enabling streaming and downloads for age-restricted tracks.
+> - **Download Architecture Overhaul:** Refactored into modular `yt_download_foreground_controller.dart`, `yt_download_pause_registry.dart`, `yt_download_metadata.dart`, and `yt_download_http_support.dart` with dedicated foreground notification management and `DownloadQualityPickerSheet`.
+> - **Modern Rhino Signature Solver:** Implemented `solveSig` alongside `solveN` in `PlayerJavaScript.kt` via Rhino JS engine, using the player's own authoritative URL builder (`fE -> Vq/Lb`) to survive YouTube player rewrites without regex fragility.
+> - **Quran Mode Tanzil 1.1 Integration:** All 114 Surahs compiled into the app for 100% offline recitation without downloading extra assets, plus authentic Arabic Mushaf viewer (`quran_mushaf_view.dart`) and recitation carousel (`quran_radio_hero_carousel.dart`).
+> - **Audio DSP Engine:** Added multichannel `ChannelManager` (2–8 channels with per-channel gain trim and delay), native DSD512 decoding (to 768 kHz PCM), and robust `HiResAudioService.getAudioOutputInfo(allowCached: true)` with 8s timeout to avoid Bluetooth/startup jank.
+> - **9 Now Playing Themes:** Added `cd_player_theme.dart` (CD Player with iridescent compact disc reflection and spinning tray).
+> - **ADR 015:** Documented Database Encryption at Rest (SQLCipher) architecture and migration plan.
+> - **Test Suite:** Expanded to **704 test files** with over 5,600 tests passed.
 
 ---
 

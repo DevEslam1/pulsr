@@ -96,7 +96,7 @@ flutter test --coverage; python3 scripts/check_coverage.py
 | **Task 2: Resolved-stream LRU Cache** | 200-entry in-memory URL cache with safe expiry parsing and auto-retry. | Saved **2.5 – 4.0 s** on replaying tracks or switching back. |
 | **Task 3: Next-track Pre-resolution** | Background resolver pre-resolves upcoming track based on queue & shuffle. | Reduced next-track transition to **< 300 ms**. |
 | **Task 4: Hedged Racing & Client Winner Store** | Stripped slow TV client from stream chain; 350ms hedged race between fast clients. | Saved **3.0 – 5.0 s** serial client timeout cascade. |
-| **Task 5: Innertube-First & Decipher Cache** | Direct Innertube player calls; cached signature decipher transforms (24h TTL). | Saved **1.5 – 2.5 s** heavy HTML/JS scraping per stream. |
+| **Task 5: Innertube-First & Decipher Cache** | Direct Innertube player calls; cached signature decipher transforms (24h TTL) + authoritative Rhino JS URL builder fallback (`solveSig` & `solveN`). | Saved **1.5 – 2.5 s** heavy HTML/JS scraping per stream and eliminates regex breakage. |
 | **Task 6: Shared OkHttp, DNS Cache & TLS Pre-connect** | Persistent HTTP/2 connection pool (max 8 idle, 5m keep-alive), 10m DNS TTL + DoH, socket pre-warm. | Saved **400 – 800 ms** TCP/TLS/DNS handshake latency. |
 | **Task 7: Playback Start-Buffer Tuning** | Reduced start buffer from 2.5–5.0s to 800ms–1200ms via `AndroidLoadControl`. | Saved **1.5 – 3.5 s** waiting for buffer fill before sound. |
 
@@ -131,6 +131,12 @@ Every track resolution logs a structured telemetry report:
 4. **Proxy Overhead:**
    - *Cause:* Proxy enabled on a slow proxy node.
    - *Fix:* When proxy is disabled, `ProxyManager.getProxy()` returns `null` with 0 ms overhead. When enabled, verify `ProxyPool` rotated dead nodes.
+5. **Age-gated (+18) track returns LOGIN_REQUIRED:**
+   - *Cause:* YouTube enforces age verification on 18+ content; guest clients cannot pass.
+   - *Fix:* `YtmService` automatically retries via `resolveAgeGatedStream()` using the authenticated `WEB` client with session cookies.
+6. **Audio output route query timeouts during Bluetooth reconnect:**
+   - *Cause:* Re-probing the platform thread during startup or BT-restart jank produces timeouts.
+   - *Fix:* `HiResAudioService.getAudioOutputInfo(allowCached: true)` reuses the event channel's pushed snapshot, with method channel timeout raised to 8 s.
 
 ---
 

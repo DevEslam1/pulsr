@@ -12,8 +12,6 @@ pulsr/
 │   └── workflows/
 │       ├── ci.yml
 │       └── deploy-pages.yml
-├── .kilo/
-│   └── .gitignore
 ├── android/
 │   ├── .gradle/
 │   │   ├── 9.1.0/
@@ -46,7 +44,27 @@ pulsr/
 │   ├── app_icon/
 │   ├── eq_profiles/
 │   │   └── headphone_profiles.json
-│   └── fonts/
+│   ├── fonts/
+│   ├── Pictures/
+│   ├── quran/
+│   │   ├── README.md
+│   │   └── uthmani.xml
+│   └── sounds/
+│       ├── birds.ogg
+│       ├── cafe.ogg
+│       ├── fire.ogg
+│       ├── forest.ogg
+│       ├── ocean.ogg
+│       ├── rain.ogg
+│       ├── thunder.ogg
+│       ├── white_noise.ogg
+│       └── wind.ogg
+├── audit/
+│   ├── shots/
+│   ├── 02-motion.md
+│   ├── 03-resources.md
+│   ├── 05-a11y-ux.md
+│   └── _sheet.py
 ├── coverage/
 │   └── lcov.info
 ├── docs/
@@ -67,13 +85,20 @@ pulsr/
 │   │   ├── 013-playlists.md
 │   │   ├── 014-domain-layering.md
 │   │   └── 015-database-encryption.md
+│   ├── qa/
+│   │   └── dsp-device-validation.md
 │   ├── AUDIO_BRIDGE_VERIFICATION.md
 │   ├── AUDIO_DSP_HARDENING_2026-10-03.md
 │   ├── AUDIO_DSP_REVIEW_2026-10-03.md
 │   ├── AUDIO_OUTPUT_SHEET_AUDIT_2026-10-04.md
+│   ├── MAX_RATE_FEATURE_DOSSIER_2026-10-26.md
+│   ├── NATIVE_AUDIO_MATRIX.md
 │   ├── player_architecture.md
 │   ├── player_architecture_audit.md
-│   └── QURAN_BLUETOOTH_DEVICE_CHECK_2026-10-04.md
+│   ├── pulsr_max_rate_scorecard_2026-10-26.xlsx
+│   ├── QURAN_BLUETOOTH_DEVICE_CHECK_2026-10-04.md
+│   ├── YTM_AGE_GATE_FIX_2026-10-30.md
+│   └── YTM_STACK_REVIEW_2026-10-27.md
 ├── ios/
 │   ├── Flutter/
 │   │   ├── ephemeral/
@@ -125,6 +150,7 @@ pulsr/
 │   │   ├── lyrics/
 │   │   ├── models/
 │   │   ├── party/
+│   │   ├── quran/
 │   │   ├── repositories/
 │   │   ├── scanner/
 │   │   ├── services/
@@ -216,6 +242,15 @@ pulsr/
 │   │   └── RunnerTests.swift
 │   └── .gitignore
 ├── scratch/
+│   ├── age_probe.py
+│   ├── age_probe2.py
+│   ├── audit-data.md
+│   ├── audit-player.md
+│   ├── dev-env.ps1
+│   ├── generate_max_rate_scorecard.py
+│   ├── n_param_probe.py
+│   ├── patch_auth_service.py
+│   └── ui.xml
 ├── scripts/
 │   ├── audio_bridge_smoke/
 │   │   ├── AaudioSinkSmoke.java
@@ -224,8 +259,10 @@ pulsr/
 │   │   ├── NativeDspSmoke.java
 │   │   └── OutputRoutingSmoke.java
 │   ├── bench_native_dsp.cpp
+│   ├── check_bridge_parity.py
 │   ├── check_claude_dsp_docs.py
 │   ├── check_coverage.py
+│   ├── check_gradle_modernization.py
 │   ├── check_native_test_sources.py
 │   ├── check_prod_flavor.py
 │   ├── generate_ai_context.py
@@ -258,11 +295,14 @@ pulsr/
 │   └── milkdrop.frag
 ├── test/
 │   ├── a11y/
-│   │   └── accessibility_compliance_test.dart
+│   │   ├── accessibility_compliance_test.dart
+│   │   └── contrast_matrix_test.dart
 │   ├── architecture/
+│   │   ├── bridge_parity_test.dart
 │   │   ├── code_hygiene_test.dart
 │   │   ├── empty_catch_ratchet_test.dart
 │   │   ├── fat_file_ratchet_test.dart
+│   │   ├── motion_token_ratchet_test.dart
 │   │   ├── no_todo_markers_test.dart
 │   │   ├── player_controller_decomposition_test.dart
 │   │   ├── privacy_manifest_test.dart
@@ -289,6 +329,8 @@ pulsr/
 │   │   ├── regression_fixes_test.dart
 │   │   ├── remediation_audit_regression_test.dart
 │   │   └── remediation_tranche_audit_test.dart
+│   ├── audit_captures/
+│   ├── audit_captures_after/
 │   ├── benchmark/
 │   │   └── state_performance_benchmark_test.dart
 │   ├── concurrency/
@@ -332,9 +374,12 @@ pulsr/
 │   │   ├── models/
 │   │   ├── repositories/
 │   │   ├── services/
-│   │   └── usecases/
+│   │   ├── usecases/
+│   │   ├── audio_quality_info_badge_test.dart
+│   │   └── output_path_verdict_test.dart
 │   ├── errors/
 │   │   └── app_error_taxonomy_test.dart
+│   ├── failures/
 │   ├── features/
 │   │   ├── album_detail/
 │   │   ├── artist_detail/
@@ -398,6 +443,7 @@ pulsr/
 │   │   └── fake_audio_player_backend.dart
 │   ├── perf/
 │   │   ├── frame_budget_test.dart
+│   │   ├── library_virtualization_test.dart
 │   │   └── rebuild_audit_test.dart
 │   ├── property/
 │   │   └── state_property_test.dart
@@ -406,12 +452,14 @@ pulsr/
 │   │   ├── breakpoint_test.dart
 │   │   ├── content_max_width_unification_test.dart
 │   │   ├── layout_test.dart
+│   │   ├── phone_tablet_ui_matrix_test.dart
 │   │   ├── responsive_device_matrix_test.dart
 │   │   ├── responsive_extended_test.dart
 │   │   ├── responsive_layout_metrics_test.dart
 │   │   └── responsive_tokens_test.dart
 │   ├── security/
-│   │   └── security_hardening_test.dart
+│   │   ├── security_hardening_test.dart
+│   │   └── sentry_pii_scrubber_test.dart
 │   ├── services/
 │   │   ├── canvas/
 │   │   ├── discord/
@@ -422,15 +470,24 @@ pulsr/
 │   │   ├── fake_clock.dart
 │   │   └── fake_hi_res_audio_service.dart
 │   ├── ux/
+│   │   ├── modal_ux_contract_test.dart
 │   │   ├── player_responsive_regression_test.dart
 │   │   ├── recents_recovery_test.dart
 │   │   ├── settings_responsive_regression_test.dart
 │   │   ├── shared_ux_regression_test.dart
 │   │   └── utility_responsive_regression_test.dart
+│   ├── _audit_capture.dart
+│   ├── _audit_capture_after.dart
+│   ├── _audit_screens.dart
+│   ├── _audit_visual.dart
+│   ├── _probe_listtile_tmp.dart
+│   ├── _probe_search_focus_tmp.dart
 │   ├── firebase_options_test.dart
 │   ├── main_bootstrap_test.dart
 │   └── main_test.dart
 ├── tool/
+├── tools/
+│   └── generate_quran_text.py
 ├── web/
 │   ├── icons/
 │   ├── index.html
@@ -463,16 +520,18 @@ pulsr/
 │   ├── .gitignore
 │   └── CMakeLists.txt
 ├── .flutter-plugins-dependencies
+├── .flutter_tool_state
+├── .gitattributes
 ├── .gitignore
 ├── .metadata
 ├── analysis_options.yaml
-├── audio_pipeline_reference.md
 ├── build.yaml
 ├── CLAUDE.md
 ├── DESIGN.md
 ├── DESIGN_SYSTEM.md
 ├── devtools_options.yaml
 ├── firebase.json
+├── flutter_02.log
 ├── flutter_launcher_icons-dev.yaml
 ├── flutter_launcher_icons-ytm.yaml
 ├── gaps.md
@@ -480,11 +539,11 @@ pulsr/
 ├── LICENSE
 ├── pubspec.lock
 ├── pubspec.yaml
+├── pulsr-context.md
 ├── pulsr.iml
 ├── README.md
 ├── RUNBOOK.md
-├── skills-lock.json
-└── sounds.md
+└── skills-lock.json
 ```
 
 ---
@@ -504,7 +563,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^2.0.0
   flutter_bloc: ^9.1.1
   go_router: ^18.0.1
   just_audio: ^0.10.6
@@ -521,19 +580,20 @@ dependencies:
   dynamic_color: ^2.1.0
   flutter_animate: ^4.5.2
   permission_handler: ^13.0.2
+  package_info_plus: ^10.2.2
   shared_preferences: ^2.5.2
   fpdart: ^1.1.0
   get_it: ^9.2.1
   injectable: ^3.0.0
   freezed_annotation: ^3.1.0
-  file_picker: ^12.2.0
+  file_picker: ^13.3.1
   image_picker: ^1.1.2
   share_plus: ^13.3.0
-  home_widget: ^0.9.4
+  home_widget: ^0.10.0
   sentry_flutter: ^8.14.2
-  firebase_core: ^4.14.0
-  firebase_auth: ^6.6.1
-  cloud_firestore: ^6.9.0
+  firebase_core: ^5.1.0
+  firebase_auth: ^7.0.1
+  cloud_firestore: ^7.1.0
   google_sign_in: ^7.2.0
   flutter_inappwebview: ^6.1.5
   crypto: ^3.0.6
@@ -544,8 +604,9 @@ dependencies:
   flutter_secure_storage: ^11.0.0
   rxdart: ^0.28.0
   clock: ^1.1.2
-  connectivity_plus: ^6.1.4
-  flutter_lyric: ^3.0.7
+  collection: ^1.19.0
+  connectivity_plus: ^7.3.2
+  flutter_lyric: ^4.1.0
   video_player: ^2.14.1
   web_socket_channel: ^3.0.3
 
@@ -554,6 +615,10 @@ dependencies:
 dependency_overrides:
   just_audio:
     path: third_party/just_audio
+  on_audio_query_android:
+    path: third_party/on_audio_query_android
+  sentry_flutter:
+    path: third_party/sentry_flutter
 
 dev_dependencies:
   flutter_test:
@@ -581,6 +646,8 @@ flutter:
   assets:
     - assets/app_icon/
     - assets/eq_profiles/
+    - assets/Pictures/
+    - assets/sounds/
 
   shaders:
     - shaders/milkdrop.frag
@@ -628,6 +695,10 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    - third_party/**
+    # Scratch is an experiment area (WIP copies, one-off probes); it is not
+    # compiled into the app and must not gate `flutter analyze`.
+    - scratch/**
 include: package:flutter_lints/flutter.yaml
 
 linter:
@@ -697,6 +768,12 @@ if(ANDROID_ABI STREQUAL "armeabi-v7a")
     add_compile_options(-mfpu=neon-vfpv4 -mfloat-abi=softfp)
 endif()
 
+# Fast float32 recurrence and SIMD for biquad stages (ParametricEQ, DynamicEQ, LoudnessContour, ViperDdc)
+option(PULSR_F32_BIQUADS "Enable float32 fast path for biquad filter stages" ON)
+if(PULSR_F32_BIQUADS)
+    add_compile_definitions(PULSR_F32_BIQUADS=1)
+endif()
+
 set(DSP_CORE_SOURCES
     ParametricEQ.cpp
     Crossfeed.cpp
@@ -709,6 +786,7 @@ set(DSP_CORE_SOURCES
     StereoWidth.cpp
     LoudnessContour.cpp
     SubCrossover.cpp
+    ChannelManager.cpp
     DynamicEQ.cpp
     MultibandCompressor.cpp
     DynamicBass.cpp
@@ -792,10 +870,11 @@ android {
         // 28 (Android 9) is the floor for the true 10-band graphic EQ, which is
         // built on DynamicsProcessing postEq — added in API 28.
         minSdk = 28
-        targetSdk = 36
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appName"] = "Pulsr Music"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     externalNativeBuild {
@@ -893,6 +972,10 @@ android {
         unitTests.isIncludeAndroidResources = true
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     lint {
         checkReleaseBuilds = false
         abortOnError = false
@@ -939,6 +1022,10 @@ dependencies {
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
 
+    val rhino = "org.mozilla:rhino:1.8.1"
+    "devImplementation"(rhino)
+    "ytmImplementation"(rhino)
+
     // Google Cast SDK. Scoped to the dev/ytm flavors only: the prod (Play Store)
     // "Pure" variant strips INTERNET and must not ship Cast or Play Services
     // routing. The matching code lives in sourceSets dev/ytm (src/ytmEnabled).
@@ -948,6 +1035,14 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    // The vendored just_audio plugin exposes Media3 only through its AAR, so
+    // these Java lifecycle tests need the ExoPlayer API on the test classpath.
+    testImplementation("androidx.media3:media3-exoplayer:1.4.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
 }
 
 configurations.all {
@@ -1226,9 +1321,107 @@ tasks.register("validateProdIsolation") {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Flavor parity guards (2026-10-28 engine audit)
+// ---------------------------------------------------------------------------
+
+/**
+ * The dev and ytm flavor unit-test source sets must stay identical.
+ *
+ * They had drifted: six engine test classes (HedgedResolutionTest,
+ * JsDecipherCacheTest, PlayerJavaScriptTest, PoTokenStoreTest,
+ * SabrHardeningTest, YtmHttpClientTest) existed only in testDev, and three
+ * shared files had diverged - so the flavor that actually ships ran 39 fewer
+ * engine tests than the flavor that does not.
+ */
+tasks.register("validateFlavorTestParity") {
+    group = "verification"
+    description = "Fails when the dev and ytm unit-test source sets diverge."
+    doLast {
+        val devDir = file("src/testDev/kotlin")
+        val ytmDir = file("src/testYtm/kotlin")
+
+        fun collect(dir: File): Map<String, String> =
+            if (!dir.exists()) emptyMap()
+            else dir.walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                // Line endings are normalised before comparing: this working copy
+                // legitimately mixes CRLF and LF files (git core.autocrlf rewrites
+                // them on checkout), so a byte comparison would fail on checkout
+                // noise instead of on real drift.
+                .associate {
+                    it.relativeTo(dir).invariantSeparatorsPath to
+                        it.readText().replace("\r\n", "\n")
+                }
+
+        val dev = collect(devDir)
+        val ytm = collect(ytmDir)
+        val onlyDev = (dev.keys - ytm.keys).sorted()
+        val onlyYtm = (ytm.keys - dev.keys).sorted()
+        val differ = (dev.keys intersect ytm.keys).filter { dev[it] != ytm[it] }.sorted()
+
+        if (onlyDev.isNotEmpty() || onlyYtm.isNotEmpty() || differ.isNotEmpty()) {
+            throw GradleException(
+                "Flavor unit tests diverged. dev-only=" + onlyDev +
+                    " ytm-only=" + onlyYtm +
+                    " content-differs=" + differ
+            )
+        }
+        println(
+            "[validateFlavorTestParity] PASSED: " + dev.size +
+                " test files identical across dev and ytm."
+        )
+    }
+}
+
+/**
+ * The prod stub must implement at least every channel method the real plugin
+ * does.
+ *
+ * A stub that answers a read-only getter with an error, or omits a map key the
+ * Dart layer reads, is a "works in dev, throws in prod" bug waiting for a
+ * release; this makes the contract checkable instead of reviewable.
+ */
+tasks.register("validateChannelParity") {
+    group = "verification"
+    description = "Fails when the prod stub is missing a YTM channel method."
+    doLast {
+        fun methodsOf(path: File): Set<String> {
+            if (!path.exists()) throw GradleException("Missing plugin source: " + path.path)
+            val text = path.readText()
+            val start = text.indexOf("override fun onMethodCall")
+            if (start < 0) throw GradleException("No onMethodCall in " + path.path)
+            val end = text.indexOf("else ->", start)
+            val block = if (end > start) text.substring(start, end) else text.substring(start)
+            // Matches both `"name" -> ...` and the multi-label form
+            // `"a",\n "b",\n "c" -> ...`, which a `->`-only pattern silently
+            // skipped (it counted the last label of a group and dropped the rest).
+            return Regex("(?m)^\\s*\"([A-Za-z0-9_]+)\"\\s*(?:,|->)")
+                .findAll(block)
+                .map { it.groupValues[1] }
+                .toSet()
+        }
+
+        val enabled = methodsOf(file("src/ytmEnabled/kotlin/com/pulsr/music/YtmExtractorPlugin.kt"))
+        val disabled = methodsOf(file("src/ytmDisabled/kotlin/com/pulsr/music/YtmExtractorPlugin.kt"))
+        val missing = (enabled - disabled).sorted()
+        if (missing.isNotEmpty()) {
+            throw GradleException("Prod stub is missing channel methods: " + missing)
+        }
+        println(
+            "[validateChannelParity] PASSED: " + enabled.size +
+                " channel methods covered by the prod stub."
+        )
+    }
+}
+
 afterEvaluate {
     tasks.matching { it.name.startsWith("assemble") || it.name == "check" || it.name == "test" }.configureEach {
         dependsOn("validateProdIsolation")
+        // 2026-10-28 audit: the two flavor source sets had drifted, and the prod
+        // stub answered some channel methods with an error where the enabled
+        // plugin answers with a value. Both are build failures now.
+        dependsOn("validateFlavorTestParity", "validateChannelParity")
     }
 }
 
@@ -1301,6 +1494,7 @@ import 'features/auth/presentation/ytm_web_login_sheet.dart';
 import 'features/library/cubit/library_cubit.dart';
 import 'features/player/cubit/player_cubit.dart';
 import 'features/player/cubit/player_state.dart';
+import 'features/player/presentation/widgets/audio_visualizer.dart';
 import 'features/playlists/cubit/playlist_cubit.dart';
 import 'features/search/cubit/search_cubit.dart';
 import 'features/settings/cubit/settings_cubit.dart';
@@ -1312,11 +1506,34 @@ import 'features/downloads/cubit/downloads_cubit.dart';
 import 'services/discord/discord_rpc_service.dart';
 import 'services/updater/app_update_service.dart';
 
+/// Readiness helper for DI singletons. `isRegistered` is already true while a
+/// lazy async singleton is still pending, so a plain `getIt<T>()` can throw
+/// "not ready yet" during startup.
+bool _isDependencyReady<T extends Object>() {
+  if (!getIt.isRegistered<T>()) return false;
+  try {
+    return getIt.isReadySync<T>();
+  } on ArgumentError {
+    // Sync singletons and factories are ready by definition.
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Returns the instance immediately when it is ready, otherwise waits for the
+/// pending async singleton instead of throwing.
+Future<T> _resolveDependency<T extends Object>() {
+  if (_isDependencyReady<T>()) return Future<T>.value(getIt<T>());
+  return getIt.getAsync<T>();
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Cap the framework's decoded-image cache so artwork bitmaps cannot balloon
-  // RAM under heavy scrolling (80 MB ceiling).
+  // RAM under heavy scrolling (80 MB / 250 image ceiling).
   PaintingBinding.instance.imageCache.maximumSizeBytes = 80 << 20;
+  PaintingBinding.instance.imageCache.maximumSize = 250;
   HttpOverrides.global = AppHttpOverrides.instance;
   // A production build with dev flags cannot be patched at runtime: surface a
   // blocking configuration screen instead of logging and continuing with
@@ -1348,6 +1565,9 @@ Future<void> main() async {
     );
     return Builder(
       builder: (context) => Material(
+        // Theme may not be reachable when a build error happens high in the
+        // tree; a fixed dark surface keeps the fallback readable in both modes.
+        color: const Color(0xFF17191F),
         child: Center(
           child: Text(
             AppLocalizations.of(context)?.somethingWentWrong ?? 'Error',
@@ -1366,12 +1586,24 @@ Future<void> main() async {
     return;
   }
 
-  // Initialize in-memory SettingsCache and ArtworkCacheManager
+  // Resolve the installed version before any screen (Settings/About, updater)
+  // reads AppConfig.appVersion. Best-effort: the 1.0.0 fallback is only used
+  // when the platform channel is unavailable.
+  await AppConfig.loadInstalledVersion()
+      .timeout(const Duration(seconds: 2), onTimeout: () {});
+
+  // Initialize in-memory SettingsCache synchronously enough for the first
+  // frame. Artwork and UI-sound init are not needed to paint the shell, so they
+  // run behind the first frame instead of adding path_provider/prefs awaits to
+  // the cold-start critical path.
   try {
     await SettingsCache().init();
-    await ArtworkCacheManager().init();
-    await SoundFeedbackService.init();
   } catch (_) {}
+  unawaited(ArtworkCacheManager().init().catchError((e, st) {
+    ErrorLogger.log('ArtworkCacheManager init failed',
+        error: e, stackTrace: st, category: 'Startup');
+  }));
+  unawaited(SoundFeedbackService.init());
 
   // Rehydrate the GPU budget before first frame (persisted by SettingsCubit).
   try {
@@ -1388,6 +1620,8 @@ Future<void> main() async {
   unawaited(PlatformCapabilities.ensureLoaded()
       .timeout(const Duration(seconds: 5))
       .catchError((_) {}));
+  // Pre-warm GPU visualizer shader in background (never blocks cold start).
+  unawaited(AudioVisualizer.prewarmShader());
 
   // Firebase powers Auth + (optionally) cloud sync. Pure builds must perform
   // zero network work, so skip init there; elsewhere init best-effort so a
@@ -1416,7 +1650,8 @@ Future<void> main() async {
   );
 
   try {
-    await configureDependencies().timeout(const Duration(seconds: 15));
+    await configureDependencies(warmUpAsync: false)
+        .timeout(const Duration(seconds: 15));
   } catch (e, st) {
     ErrorLogger.log('DI configureDependencies failed or timed out',
         error: e, stackTrace: st, category: 'Startup');
@@ -1424,7 +1659,7 @@ Future<void> main() async {
 
   SoundFeedbackService.isMusicPlaying = () {
     try {
-      if (getIt.isRegistered<PulsrAudioHandler>()) {
+      if (_isDependencyReady<PulsrAudioHandler>()) {
         return getIt<PulsrAudioHandler>().playbackState.value.playing;
       }
     } catch (_) {}
@@ -1500,6 +1735,23 @@ Future<void> main() async {
                   error: e, stackTrace: st, category: 'Startup');
             }),
         ]);
+        // Optional remote override for the native client matrix. The channel could
+        // always apply one, but nothing in the app ever pushed JSON to it, so a client
+        // version or capability change needed a release. Opt-in: empty unless the build
+        // defines YTM_CAPABILITIES_URL, which keeps the packaged asset authoritative
+        // everywhere else. Fire-and-forget and failure-tolerant.
+        try {
+          const capabilitiesUrl =
+              String.fromEnvironment('YTM_CAPABILITIES_URL');
+          if (onlineAllowed &&
+              capabilitiesUrl.isNotEmpty &&
+              getIt.isRegistered<YtmService>()) {
+            unawaited(getIt<YtmService>()
+                .refreshClientCapabilitiesFrom(capabilitiesUrl)
+                .timeout(const Duration(seconds: 12))
+                .catchError((_) => false));
+          }
+        } catch (_) {}
         // Warm the native extractor (BotGuard WebView + client matrix) while
         // the user is still looking at the home screen, so the first YTM
         // search/tap doesn't pay cold-start attestation (~seconds).
@@ -1536,10 +1788,12 @@ Future<void> main() async {
         // Initialize Discord RPC if configured and online allowed
         try {
           if (onlineAllowed && prefs != null) {
-            unawaited(DiscordRpcService.instance.init(prefs).then((_) {
-              if (getIt.isRegistered<PlayerCubit>()) {
-                DiscordRpcService.instance.bindToPlayerCubit(getIt<PlayerCubit>());
-              }
+            unawaited(DiscordRpcService.instance.init(prefs).then((_) async {
+              // PlayerCubit is an async singleton; wait for readiness instead
+              // of calling getIt<T>() while the DI warm-up is still pending.
+              final player = await _resolveDependency<PlayerCubit>()
+                  .timeout(const Duration(seconds: 30));
+              DiscordRpcService.instance.bindToPlayerCubit(player);
             }).catchError((e, st) {
               ErrorLogger.log('DiscordRpcService init failed',
                   error: e, stackTrace: st, category: 'Startup');
@@ -1574,6 +1828,32 @@ Future<void> main() async {
           options.tracesSampleRate = AppConfig.isProd ? 0.2 : 1.0;
           options.sendDefaultPii = false;
           options.enableAutoPerformanceTracing = true;
+          options.beforeSend = (event, hint) {
+            final msg = event.message;
+            final scrubbedMessage = msg != null
+                ? SentryMessage(
+                    ErrorLogger.redactPii(msg.formatted),
+                    template: msg.template != null
+                        ? ErrorLogger.redactPii(msg.template!)
+                        : null,
+                    params: msg.params
+                        ?.map((p) => p is String ? ErrorLogger.redactPii(p) : p)
+                        .toList(),
+                  )
+                : null;
+            // Exception values (HTTP/URL/session errors) bypass the message
+            // field, so scrub them too before the event leaves the device.
+            final scrubbedExceptions = event.exceptions
+                ?.map((e) => e.value == null
+                    ? e
+                    : e.copyWith(value: ErrorLogger.redactPii(e.value!)))
+                .toList();
+            return event.copyWith(
+              user: null,
+              message: scrubbedMessage,
+              exceptions: scrubbedExceptions,
+            );
+          };
         },
         appRunner: () {
           appStarted = true;
@@ -1612,6 +1892,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   bool _dependenciesReady = false;
   bool _bootstrapFailed = false;
   bool _bootstrapInFlight = false;
+  bool _pausedSinceStart = false;
+  bool _resumeScanInFlight = false;
 
   @override
   void initState() {
@@ -1650,6 +1932,11 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     final ready = await ensureAppDependenciesReady();
     _bootstrapInFlight = false;
     if (!mounted) return;
+    if (ready) {
+      // The router can only be built once MediaScannerService is resolvable.
+      // With the deferred warm-up this is the first point where that is true.
+      _router ??= _createRouterSafely();
+    }
     setState(() {
       _dependenciesReady = ready;
       _bootstrapFailed = !ready;
@@ -1704,35 +1991,41 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   /// works but the lock-screen / shade controls silently do not exist. Surface
   /// it once so the user is not left wondering where the media notification is.
   void _watchPlatformBridgeHealth() {
-    try {
-      if (!getIt.isRegistered<PulsrAudioHandler>()) return;
-      final handler = getIt<PulsrAudioHandler>();
-      void surface() {
-        if (!handler.platformBridgeDegraded.value) return;
-        final ctx = rootNavigatorKey.currentContext;
-        if (ctx == null || !ctx.mounted) return;
-        PulsrToast.show(
-          ctx,
-          message: 'Background media controls are unavailable on this launch. '
-              'Playback works, but the lock-screen controls could not start.',
-          icon: Icons.warning_amber_rounded,
-          isError: true,
-          duration: const Duration(seconds: 5),
-        );
-      }
+    // PulsrAudioHandler is an async singleton: isRegistered() is already true
+    // while the instance is still pending, so wait for readiness instead of
+    // calling getIt<T>() and throwing "not ready yet".
+    unawaited(() async {
+      try {
+        final handler = await _resolveDependency<PulsrAudioHandler>()
+            .timeout(const Duration(seconds: 30));
+        if (!mounted) return;
+        void surface() {
+          if (!handler.platformBridgeDegraded.value) return;
+          final ctx = rootNavigatorKey.currentContext;
+          if (ctx == null || !ctx.mounted) return;
+          PulsrToast.show(
+            ctx,
+            message: 'Background media controls are unavailable on this launch. '
+                'Playback works, but the lock-screen controls could not start.',
+            icon: Icons.warning_amber_rounded,
+            isError: true,
+            duration: const Duration(seconds: 5),
+          );
+        }
 
-      if (handler.platformBridgeDegraded.value) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => surface());
-      } else {
-        handler.platformBridgeDegraded.addListener(surface);
-        _platformBridgeDegradedListener = surface;
+        if (handler.platformBridgeDegraded.value) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => surface());
+        } else if (_platformBridgeDegradedListener == null) {
+          handler.platformBridgeDegraded.addListener(surface);
+          _platformBridgeDegradedListener = surface;
+        }
+      } catch (e, st) {
+        // Best-effort diagnostic only; never let it block startup (e.g. a test
+        // double of the handler that does not expose the notifier).
+        ErrorLogger.log('Failed to watch platform bridge health',
+            error: e, stackTrace: st, category: 'Startup');
       }
-    } catch (e, st) {
-      // Best-effort diagnostic only; never let it block startup (e.g. a test
-      // double of the handler that does not expose the notifier).
-      ErrorLogger.log('Failed to watch platform bridge health',
-          error: e, stackTrace: st, category: 'Startup');
-    }
+    }());
   }
 
   /// Watches output-device changes (Bluetooth/headphones) and fires the
@@ -1752,18 +2045,53 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // No-op: locale is stable; avoid AssetManager thrash (LOG-16)
+      // No-op for locale; pick up media-store changes after a real background
+      // stint using the scanner's 15-minute delta gate.
+      if (_pausedSinceStart) {
+        unawaited(_maybeRescanOnResume());
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
+      _pausedSinceStart = true;
       // Flush the debounced queue-slot write before the process can be killed.
       try {
-        if (getIt.isRegistered<PlayerCubit>()) {
+        if (_isDependencyReady<PlayerCubit>()) {
           unawaited(getIt<PlayerCubit>().persistQueueSlotsNow());
         }
       } catch (e, st) {
         ErrorLogger.log('Failed to persist queue slots on detach',
             error: e, stackTrace: st, category: 'PulsrApp');
       }
+    }
+  }
+
+  /// Runs a silent, time-gated delta scan so tracks added while the app was
+  /// backgrounded appear without the user manually opening Settings.
+  Future<void> _maybeRescanOnResume() async {
+    // MediaStore/photo permissions only exist on mobile; desktop scans on an
+    // explicit request. Skipping keeps widget tests and desktop startup quiet.
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    if (_resumeScanInFlight) return;
+    _resumeScanInFlight = true;
+    try {
+      final scanner = getIt<MediaScannerService>();
+      if (!scanner.shouldRescanOnResume()) return;
+      if (!await scanner.checkPermission()) return;
+      if (!mounted) return;
+      final settings = getIt<SettingsCubit>().state;
+      final prefs = await SharedPreferences.getInstance();
+      await scanner.scanDeviceLibrary(
+        ignoreShortFiles: settings.minDurationSec > 0,
+        minDurationSec: settings.minDurationSec,
+        minSizeKb: prefs.getInt('setting_min_file_size_kb') ?? 0,
+        autoHideSystemMedia: settings.autoHideSystemMedia,
+        incremental: true,
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Resume media scan failed',
+          error: e, stackTrace: st, category: 'PulsrApp');
+    } finally {
+      _resumeScanInFlight = false;
     }
   }
 
@@ -1847,11 +2175,25 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 error: e, stackTrace: st, category: 'PulsrApp');
           }
           try {
-            if (getIt.isRegistered<PulsrAudioHandler>()) {
+            if (_isDependencyReady<PulsrAudioHandler>()) {
               getIt<PulsrAudioHandler>().clearNetworkCaches();
             }
           } catch (e, st) {
             ErrorLogger.log('Failed clearing audio handler network caches',
+                error: e, stackTrace: st, category: 'PulsrApp');
+          }
+          try {
+            if (getIt.isRegistered<IDownloadRepository>()) {
+              final resumed =
+                  await getIt<IDownloadRepository>().resumeAutoPaused();
+              if (resumed > 0) {
+                ErrorLogger.log(
+                    'Network restored — resumed $resumed auto-paused downloads',
+                    category: 'PulsrApp');
+              }
+            }
+          } catch (e, st) {
+            ErrorLogger.log('Failed resuming policy-paused downloads',
                 error: e, stackTrace: st, category: 'PulsrApp');
           }
         });
@@ -1870,7 +2212,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _networkMonitor?.dispose();
     _automationTriggerService?.dispose();
     if (_platformBridgeDegradedListener != null &&
-        getIt.isRegistered<PulsrAudioHandler>()) {
+        _isDependencyReady<PulsrAudioHandler>()) {
       getIt<PulsrAudioHandler>()
           .platformBridgeDegraded
           .removeListener(_platformBridgeDegradedListener!);
@@ -1882,7 +2224,9 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       try {
-        await getIt<FileIntentHandler>().checkInitialUri();
+        final handler = await getIt.getAsync<FileIntentHandler>();
+        if (!mounted) return;
+        await handler.checkInitialUri();
       } catch (e, st) {
         if (!mounted) return;
         ErrorLogger.log('Failed to process initial audio intent on startup',
@@ -2399,15 +2743,13 @@ class _DependencyBootstrapScreen extends StatelessWidget {
 
 ### Dependency Injection Graph (`lib/core/di/injection.dart`)
 **Registered Singletons & Services:**
-- `LyricsRepository`
-- `AppUpdateService`
-- `DownloadService`
 - `DiscordRpcService`
-- `SpotifyImporterService`
+- `AppUpdateService`
+- `QuranRepository`
 
 **Pre-warmed Singletons (Async Initialization):**
-- `T`
 - `PlayerCubit`
+- `T`
 
 ---
 
@@ -2453,6 +2795,11 @@ class _DependencyBootstrapScreen extends StatelessWidget {
   String _parentDir(String path) {
   class FolderSongEntry {
   const FolderSongEntry({
+```
+
+### `lib/domain/repositories/quran_repository.dart`
+```dart
+  abstract class QuranRepository {
 ```
 
 ### `lib/domain/repositories/smart_playlist_engine_interface.dart`

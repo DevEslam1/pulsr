@@ -12,7 +12,7 @@ class FakeHiResAudioService extends HiResAudioService {
   AudioOutputInfo? get currentOutputInfo => stubbedInfo;
 
   @override
-  Future<AudioOutputInfo> getAudioOutputInfo() async {
+  Future<AudioOutputInfo> getAudioOutputInfo({bool allowCached = false}) async {
     return stubbedInfo ??
         const AudioOutputInfo(
           deviceName: 'Speaker',

@@ -55,6 +55,9 @@ internal object PlayerJavaScript {
     private var rhinoNSolverFunc: RhinoFunction? = null
 
     @Volatile
+    private var rhinoSigSolverFunc: RhinoFunction? = null
+
+    @Volatile
     private var rhinoNSolverPlayerUrl: String? = null
 
     @Volatile
@@ -121,6 +124,7 @@ internal object PlayerJavaScript {
             cachedSts = null
             rhinoNScope = null
             rhinoNSolverFunc = null
+            rhinoSigSolverFunc = null
             rhinoNSolverPlayerUrl = null
             nextFetchAttemptAt = 0L
             appContext?.let { ctx ->
@@ -301,6 +305,15 @@ internal object PlayerJavaScript {
         val nativeSteps = parseAndCacheSteps()
         if (cachedStepsExtracted && nativeSteps.isNotEmpty()) {
             return JsDecipherCache().applyTransforms(signature, nativeSteps)
+        }
+
+        // The regex extractor is build-specific; the player's own URL builder
+        // (fE -> Vq/Lb) remains authoritative across player rewrites.
+        ensureRhinoNSolver()
+        val rhinoSig = transformSignatureWithRhino(signature)
+        if (!rhinoSig.isNullOrEmpty()) {
+            logI(TAG, "Rhino signature transform succeeded for $playerUrl")
+            return rhinoSig
         }
 
         try {
@@ -607,13 +620,24 @@ internal object PlayerJavaScript {
                   }
                   return url.get('n');
                 };
+                // The player's own URL builder is the authoritative signature
+                // transform: fE(url, param, value) applies Vq/Lb and stores the
+                // encoded result under 'param'. This survives player rewrites
+                // that break the regex rule extractor.
+                globalThis.solveSig = function(sig) {
+                  var url = globalThis._solver('https://youtube.com/watch?v=yt-dlp-wins', 's', sig);
+                  var transformed = url.get('s');
+                  return transformed == null ? null : decodeURIComponent(transformed);
+                };
             """.trimIndent()
             cx.evaluateString(scope, helperScript, "helper", 1, null)
 
             val solverFunc = scope.get("solveN", scope) as? RhinoFunction
+            val sigSolverFunc = scope.get("solveSig", scope) as? RhinoFunction
             if (solverFunc != null) {
                 rhinoNScope = scope
                 rhinoNSolverFunc = solverFunc
+                rhinoSigSolverFunc = sigSolverFunc
                 rhinoNSolverPlayerUrl = playerUrl
                 logI(TAG, "Modern Rhino n-solver ($funcName) initialized successfully for $targetUrl")
             }
@@ -640,6 +664,32 @@ internal object PlayerJavaScript {
             }
         } catch (t: Throwable) {
             logW(TAG, "Modern Rhino n-solver invocation failed: ${t.message}")
+            null
+        } finally {
+            RhinoContext.exit()
+        }
+    }
+
+    private fun transformSignatureWithRhino(signature: String): String? {
+        val scope = rhinoNScope ?: return null
+        val func = rhinoSigSolverFunc ?: return null
+        val cx = RhinoContext.enter()
+        return try {
+            cx.optimizationLevel = -1
+            cx.languageVersion = RhinoContext.VERSION_ES6
+            val res = func.call(cx, scope, scope, arrayOf(signature))
+            val transformed = res?.toString()
+            if (!transformed.isNullOrEmpty() &&
+                transformed != "null" &&
+                transformed != "undefined" &&
+                transformed != signature
+            ) {
+                transformed
+            } else {
+                null
+            }
+        } catch (t: Throwable) {
+            logW(TAG, "Rhino signature transform failed: ${t.message}")
             null
         } finally {
             RhinoContext.exit()
@@ -733,6 +783,7 @@ internal object PlayerJavaScript {
             cachedSts = null
             rhinoNScope = null
             rhinoNSolverFunc = null
+            rhinoSigSolverFunc = null
             rhinoNSolverPlayerUrl = null
             try {
                 YoutubeJavaScriptPlayerManager.clearAllCaches()

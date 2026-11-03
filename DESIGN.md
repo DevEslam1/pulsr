@@ -279,6 +279,9 @@ Center(child: ConstrainedBox(
 | `StaggeredReveal` | `core/widgets/staggered_reveal.dart` | sort/re-flow entrance |
 | `EntityByIdLoader<T>` | `core/widgets/entity_by_id_loader.dart` | id-based deep links |
 | `SettingSliderRow` | `features/settings/presentation/widgets/settings_slider_row.dart` | labelled slider |
+| `QuranMushafView` | `features/player/presentation/widgets/quran_mushaf_view.dart` | authentic Arabic Mushaf text presentation |
+| `QuranRadioHeroCarousel` | `features/home/presentation/widgets/quran_radio_hero_carousel.dart` | Quran recitation & radio hero carousel |
+| `DownloadQualityPickerSheet` | `features/downloads/presentation/widgets/download_quality_picker_sheet.dart` | download format/quality selection |
 
 ---
 

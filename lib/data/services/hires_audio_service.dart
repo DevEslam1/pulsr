@@ -152,7 +152,11 @@ class HiResAudioService {
     }
   }
 
-  Future<AudioOutputInfo> getAudioOutputInfo() async {
+  /// [allowCached] lets route-change callers reuse the snapshot the native
+  /// event channel just pushed instead of issuing a second probe during
+  /// startup/BT-restart jank. A fresh probe is still used when nothing is
+  /// cached.
+  Future<AudioOutputInfo> getAudioOutputInfo({bool allowCached = false}) async {
     if (!PlatformCapabilities.isAndroid) {
       const fb = AudioOutputInfo(
           deviceName: 'Default Audio Output',
@@ -163,10 +167,16 @@ class HiResAudioService {
       _cachedOutputInfo = fb;
       return fb;
     }
+    if (allowCached) {
+      final cached = _cachedOutputInfo;
+      if (cached != null) return cached;
+    }
     try {
       final Map<dynamic, dynamic>? res = await _methodChannel
           .invokeMapMethod<dynamic, dynamic>('getAudioOutputInfo')
-          .timeout(const Duration(seconds: 3));
+          // Startup/JS warm-up can block the platform thread for several
+          // seconds; 3 s expired before the handler was even dispatched.
+          .timeout(const Duration(seconds: 8));
       if (res != null) {
         final info = AudioOutputInfo.fromMap(res);
         // Avoid duplicate stream emission if same as cached. Compare every

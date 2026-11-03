@@ -61,3 +61,56 @@ All focus losses, noisy unplug events, system sound dings, and call interruption
   1. `adaptive_runtime_quality` (if adaptive quality is enabled and active).
   2. `setting_streaming_quality` (user's explicit setting).
   3. Default fallback: `'high'`.
+
+---
+
+## 5. Now Playing Themes Architecture (`ThemeRegistry`)
+
+`ThemeRegistry` (`lib/features/player/presentation/themes/theme_registry.dart`) maps `PlayerThemeMode` values to modular widget builders:
+1. `PlayerThemeMode.classic` — `ClassicPlayerTheme`
+2. `PlayerThemeMode.card` — `CardPlayerTheme`
+3. `PlayerThemeMode.circle` — `CirclePlayerTheme`
+4. `PlayerThemeMode.minimal` — `MinimalPlayerTheme`
+5. `PlayerThemeMode.vinyl` — `VinylPlayerTheme`
+6. `PlayerThemeMode.cd` — `CdPlayerTheme` (compact disc with rainbow sheen and rotating optical tray)
+7. `PlayerThemeMode.cassette` — `CassettePlayerTheme` (animated magnetic tape spools and tape counter)
+8. `PlayerThemeMode.waveform` — `WaveformPlayerTheme`
+9. `PlayerThemeMode.lyricsFocus` — `LyricsPlayerTheme`
+
+Each theme composes `PlayerThemeScaffold` and `PlayerThemeChrome` with dedicated canvas painters under `themes/painters/`.
+
+---
+
+## 6. Multi-Slot Queue Persistence (`QueueSlotCodec`)
+
+Queue persistence across application restarts is managed via `QueueSlotCodec` (`lib/features/player/cubit/queue_slot_codec.dart`):
+- Supports **3 independent queue slots** (indices 0, 1, 2; `maxSlotIndex = 2`).
+- Off-isolate JSON encode/decode using `compute()`.
+- Debounced disk writes to avoid main-thread jank during reordering.
+- Atomic rollback on failed queue reorders or item removals.
+
+---
+
+## 7. Output Topology & Cached Snapshots (`HiResAudioService`)
+
+- `HiResAudioService.getAudioOutputInfo({bool allowCached = false})`:
+  - When `allowCached = true`, route-change callers reuse the fresh snapshot pushed by the native event channel instead of issuing a second probe during Bluetooth/startup connection jank.
+  - Method channel probe timeout is set to 8 seconds to prevent false-positive timeouts during heavy JS engine warmup.
+
+---
+
+## 8. Quran Mode Architecture (`QuranModeService`)
+
+- Offline Tanzil 1.1 Uthmani Quran catalog (`assets/quran/`) provides all 114 Surahs offline without network assets.
+- `QuranModeService` coordinates persistent reciter profiles, style presets (Murattal, Mujawwad), mosque ambience convolution reverb, vocal warmth EQ, and ayah-precision bookmarks.
+- Supported in UI by `QuranMushafView` (`lib/features/player/presentation/widgets/quran_mushaf_view.dart`) and `QuranRadioHeroCarousel` (`lib/features/home/presentation/widgets/quran_radio_hero_carousel.dart`).
+
+---
+
+## 9. Resilient Stream Resolution & Modern Rhino Deciphering
+
+- **Rhino JS URL Builder (`solveSig` & `solveN`)**:
+  - `PlayerJavaScript.kt` runs embedded Rhino 1.8.1 with the player's own authoritative URL builder (`fE -> Vq/Lb`).
+  - Deciphers signatures and transforms `n`-throttling parameters reliably across YouTube player rewrites without regex fragility.
+- **Age-Gated (+18) Track Fallback**:
+  - `InnertubeClient.resolveAgeGatedStream()` retries restricted content using the authenticated `WEB` client carrying the user's session cookies.

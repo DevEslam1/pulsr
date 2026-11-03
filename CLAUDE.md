@@ -52,16 +52,16 @@
 
 | Feature Domain | Capabilities & Implementation Details | Key Files |
 | :--- | :--- | :--- |
-| **Audiophile Playback** | Bit-perfect playback, gapless playback, crossfade state machine, ReplayGain (EBU R128), A/B loop, dynamic silence skip, sleep timer with gradual volume fade, DoP/DSD decoder, MQA helper, and CUE sheet parsing. | `lib/data/audio/` |
-| **Native C++ DSP Engine** | 10-band graphic & arbitrary frequency EQ, 128-band parametric EQ, convolution reverb (IR files), lookahead peak limiter, multiband compressor, dynamic bass boost, loudness contour, sinc resampler, spatial panner, stereo widener, ViPER-DDC presets, and LiveProg JSFX scripting. | `android/app/src/main/cpp/`, `lib/features/player/cubit/controllers/` |
+| **Audiophile Playback** | Bit-perfect playback, gapless playback, crossfade state machine, ReplayGain (EBU R128), A/B loop, dynamic silence skip, sleep timer with gradual volume fade, DoP/DSD decoder (up to DSD512 / 768 kHz), multichannel Channel Manager (2–8 ch trim/delay), MQA helper, and CUE sheet parsing. | `lib/data/audio/` |
+| **Native C++ DSP Engine** | 10-band graphic & arbitrary frequency EQ, 128-band parametric EQ, multichannel Channel Manager (2–8 channels, per-channel trim and delay), DSD512 decoder (to 768 kHz PCM), convolution reverb (IR files), lookahead peak limiter, multiband compressor, dynamic bass boost, loudness contour, sinc resampler, spatial panner, stereo widener, ViPER-DDC presets, and LiveProg JSFX scripting. | `android/app/src/main/cpp/`, `lib/features/player/cubit/controllers/` |
 | **Local Music Library** | Complete MediaStore & filesystem scanner, metadata enrichment, embedded ID3 tag editor with artwork extraction, album/artist/genre/folder/year indexer, duplicate audio finder, and library statistics. | `lib/data/scanner/`, `lib/features/library/`, `lib/features/tag_editor/` |
-| **YouTube Music Integration** | InnerTube catalog search, stream pre-resolution, chunked background audio downloader with resumable storage, rate limiting, circuit breaker, OAuth / WebView session login, and geo-block recovery. | `lib/core/services/ytm_*`, `lib/core/services/yt_download_*`, `lib/features/ytm_search/` |
+| **YouTube Music Integration** | InnerTube catalog search, stream pre-resolution, modern Rhino JS signature transform (`solveSig`) + `n`-throttling solver (`solveN`), authenticated `WEB` client fallback for age-restricted (+18) tracks, chunked background audio downloader with resumable storage, rate limiting, circuit breaker, OAuth / WebView session login, and geo-block recovery. | `lib/core/services/ytm_*`, `lib/core/services/yt_download_*`, `lib/features/ytm_search/` |
 | **Skeuomorphic Player Themes** | 9 distinct Now Playing designs: Vinyl Deck (spinning disc), Cassette Tape (custom animated spools), CD Player (reflective surface), Circle, Classic, Minimal, Card, Waveform, and Lyrics-focused. Custom Theme Builder included. | `lib/features/player/presentation/themes/` |
 | **Synchronized Lyrics & Karaoke** | Real-time synchronized LRC parser, LRCLIB API client, millisecond offset manual editor, multi-language lyrics translation, lyric card sharing, and Karaoke mode screen. | `lib/data/lyrics/`, `lib/features/player/presentation/widgets/lyrics*` |
 | **Pulsr Party (Listen Together)** | Low-latency room-based group listening over WebSockets; sub-millisecond drift clock synchronization, host-only or democratic queue control. | `server/pulsr_party/`, `lib/data/party/`, `lib/features/party/` |
 | **Visualizers & Shaders** | Real-time audio reactive Milkdrop visualizer powered by a custom OpenGL fragment shader (`shaders/milkdrop.frag`) and platform audio visualizer taps. | `shaders/milkdrop.frag`, `lib/features/player/presentation/widgets/visualizer/` |
 | **Smart Playlists** | Dynamic rule-based query engine filtering by play count, rating, bitrate, date added, duration, genre, and artist. | `lib/data/repositories/smart_playlist_engine.dart`, `lib/features/smart_playlist_builder/` |
-| **Quran Mode** | Specialized recitation experience with surah/ayah tracking, dedicated audio profiles, bookmarking, and automated state restoration. | `lib/core/services/quran_mode_service.dart`, `lib/features/quran_mode/` |
+| **Quran Mode** | Specialized recitation experience with surah/ayah tracking, offline Tanzil 1.1 Uthmani text (all 114 Surahs), Mushaf page reader view, reciter audio profiles, mosque ambience reverb, bookmarking, and automated state restoration. | `lib/core/services/quran_mode_service.dart`, `lib/features/quran_mode/` |
 | **System Integrations** | Android home-screen widgets (`home_widget`), Last.fm & ListenBrainz scrobbling, Discord Rich Presence, SponsorBlock segment skipping, AutoEq headphone profile auto-matcher, and Bluetooth latency calibration. | `lib/core/services/`, `lib/services/` |
 
 ---
@@ -137,7 +137,7 @@ pulsr/
 - **`core/services/device_profile_service.dart`**: Saves distinct EQ and volume presets per connected audio output device.
 - **`core/services/duplicate_finder_service.dart`**: Identifies duplicate songs based on duration, title, and audio fingerprints.
 - **`core/services/file_intent_handler.dart`**: Handles opening audio files sent from external apps (e.g. file managers).
-- **`core/services/hires_audio_service.dart`**: Detects 24-bit/96kHz+ tracks and monitors DAC sample rate output.
+- **`core/services/hires_audio_service.dart`**: Detects 24-bit/96kHz+ tracks and monitors DAC sample rate output, with cached topology snapshots (`allowCached`) and extended 8s timeout to avoid BT/startup jank.
 - **`core/services/library_cache_manager.dart`**: In-memory caching layer for instant library screen rendering.
 - **`core/services/lrclib_service.dart`**: Client for the open-source LRCLIB lyrics API.
 - **`core/services/missing_artwork_service.dart`**: Scans and fetches missing cover art online.
@@ -155,7 +155,7 @@ pulsr/
 - **`core/services/waveform_service.dart`**: Computes and caches visual waveform peaks for audio files.
 - **`core/services/ytm_service.dart`, `ytm_browse_service.dart`, `ytm_account_service.dart`**: Core YouTube Music API clients.
 - **`core/services/ytm_oauth_service.dart` & `ytm_client_version_resolver.dart`**: Handles InnerTube authentication tokens and client version spoofing.
-- **`core/services/yt_download_service.dart`**: Multithreaded background audio downloader with chunking and tag writing.
+- **`core/services/yt_download_service.dart`**, **`yt_download_foreground_controller.dart`**, **`yt_download_pause_registry.dart`**, **`yt_download_metadata.dart`**, **`yt_download_http_support.dart`**: Multithreaded background audio downloader with chunking, Android foreground service lifecycle management, pause registry, metadata formatting, and tag writing.
 
 #### `core/utils/` & `core/widgets/`
 - **`core/utils/yin_pitch_detector.dart`**: YIN pitch detection algorithm for live vocal pitch tracking in Karaoke mode.
@@ -272,7 +272,7 @@ pulsr/
 #### `features/ytm_search/` & `features/ytm_browse/` & `features/downloads/`
 - **`features/ytm_search/presentation/ytm_search_screen.dart`**: Real-time search interface for YouTube Music tracks, albums, and artists.
 - **`features/ytm_browse/presentation/ytm_browse_screen.dart`**: Explores YouTube Music charts, new releases, and mood categories.
-- **`features/downloads/presentation/downloads_screen.dart`**: Download queue dashboard with download speed, paused tasks, completed files, and disk storage stats.
+- **`features/downloads/presentation/downloads_screen.dart`**: Download queue dashboard with download speed, paused tasks, completed files, download quality picker sheet (`download_quality_picker_sheet.dart`), and disk storage stats.
 
 #### `features/settings/` (65+ Configuration Screens & Sections)
 - **`features/settings/presentation/settings_screen.dart`**: Central settings navigation hub.
@@ -288,7 +288,7 @@ pulsr/
 
 #### `features/party/` & `features/quran_mode/` & `features/tag_editor/`
 - **`features/party/presentation/party_sheet.dart`**: Join or host a "Pulsr Party" room with live sync status.
-- **`features/quran_mode/presentation/quran_mode_screen.dart`**: Dedicated interface for Quran recitations with surah selector and bookmark manager.
+- **`features/quran_mode/presentation/quran_mode_screen.dart`**: Dedicated interface for Quran recitations with surah selector, authentic Arabic Mushaf viewer (`quran_mushaf_view.dart`), home hero carousel (`quran_radio_hero_carousel.dart`), and bookmark manager.
 - **`features/tag_editor/tag_editor_screen.dart`**: Direct ID3 tag editor (Title, Artist, Album, Genre, Year, Track Number, Artwork).
 
 ---

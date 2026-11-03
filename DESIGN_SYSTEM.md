@@ -134,7 +134,7 @@ loading defaults to `SkeletonList`, error to a retry card, empty to
 
 `PlayerThemeChrome` provides the shared top bar, symmetrical track header,
 controls column, view switcher, dock icons and favourite button used by all
-eight themes; `PlayerThemeScaffold` composes them for new themes.
+nine themes (Classic, Card, Circle, Minimal, Vinyl, CD Player, Cassette, Waveform, Lyrics Focus); `PlayerThemeScaffold` composes them for new themes.
 Player-only painters live under `themes/painters/`.
 
 ### Async / feedback

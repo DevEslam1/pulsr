@@ -811,7 +811,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       final service = _hiResAudioService;
       if (service == null) return;
       final wasBluetooth = _equalizerManager.isBluetoothRoute;
-      final info = await service.getAudioOutputInfo();
+      // The native event channel already pushed the fresh snapshot that
+      // triggered this refresh; re-probing during BT/startup jank only
+      // produces timeouts.
+      final info = await service.getAudioOutputInfo(allowCached: true);
       _equalizerManager.isBluetoothRoute = info.isBluetooth;
       if (wasBluetooth != info.isBluetooth) {
         await _equalizerManager.resyncActiveEffects();
@@ -843,7 +846,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<AudioOutputInfo?> _getOutputInfo() async {
     final service = _hiResAudioService;
     if (service == null) return null;
-    return service.getAudioOutputInfo();
+    return service.getAudioOutputInfo(allowCached: true);
   }
 
   Set<String> _outputDeviceIds(AudioOutputInfo info) {

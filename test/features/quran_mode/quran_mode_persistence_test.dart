@@ -26,7 +26,8 @@ class _FakeHiResAudioService extends HiResAudioService {
   AudioOutputInfo? get currentOutputInfo => _info;
 
   @override
-  Future<AudioOutputInfo> getAudioOutputInfo() async => _info;
+  Future<AudioOutputInfo> getAudioOutputInfo({bool allowCached = false}) async =>
+      _info;
 }
 
 /// Forces [detectEarbudCapabilities] onto its async path and lets a test hold
@@ -41,7 +42,7 @@ class _GatedHiResAudioService extends HiResAudioService {
   AudioOutputInfo? get currentOutputInfo => null;
 
   @override
-  Future<AudioOutputInfo> getAudioOutputInfo() async {
+  Future<AudioOutputInfo> getAudioOutputInfo({bool allowCached = false}) async {
     final gate = Completer<void>();
     gates.add(gate);
     await gate.future;

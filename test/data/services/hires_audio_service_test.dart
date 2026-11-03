@@ -92,6 +92,17 @@ void main() {
     expect(service.currentOutputInfo?.deviceName, 'Test DAC');
   });
 
+  test('allowCached returns the pushed snapshot without re-probing', () async {
+    final first = await service.getAudioOutputInfo();
+    expect(first.deviceName, 'Test DAC');
+
+    _messenger.setMockMethodCallHandler(
+        _method, (call) async => _output(name: 'Changed DAC'));
+
+    final second = await service.getAudioOutputInfo(allowCached: true);
+    expect(second.deviceName, 'Test DAC');
+  });
+
   test('getDirectCapabilities parses the format list', () async {
     responder = (call) => <String, Object?>{
           'directFormats': [
