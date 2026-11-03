@@ -517,6 +517,7 @@ public final class AAudioAudioSink implements AudioSink {
         // ByteBuffers on Android). Null pcmEncoding so a stale 32-bit format
         // from a previous stream cannot bleed into a newly opened one.
         pcm32ScratchBuffer = null;
+        nonDirectScratchBuffer = null;
         pcmEncoding = C.ENCODING_PCM_FLOAT;
     }
 

@@ -365,6 +365,11 @@ struct HeadphoneSafetyParamSet {
 struct BypassCompareParamSet {
     bool enabled = false;
     double gainCompensationLinear = 1.0;
+    double gainCompensationDb = 0.0;
+    // When true (or when the caller sends the -999 dB "measure it" sentinel),
+    // the A/B dry path is level-matched with the inverse of the measured
+    // input/output loudness delta of the DSP chain instead of a static trim.
+    bool autoGainMatch = false;
 };
 
 struct DspParamSnapshot {

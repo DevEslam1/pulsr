@@ -66,6 +66,8 @@ object ProxyManager {
         "*.local",
     )
 
+    private val LEGACY_DEFAULT_BYPASS = listOf("localhost", "127.0.0.1")
+
     @Volatile
     private var bypassList: List<String> = defaultBypassList
 
@@ -95,44 +97,20 @@ object ProxyManager {
         this.failClosed = failClosed
         this.blocked = false
         this.directFallbackLogged = false
-        this.bypassList = if (bypassHosts == null) {
+        val parsedBypass = if (bypassHosts == null) {
             defaultBypassList
         } else {
             bypassHosts.split(",")
                 .map { it.trim().lowercase() }
                 .filter { it.isNotEmpty() }
         }
-
-        synchronized(authLock) {
-            if (enabled) {
-                val auth = object : Authenticator() {
-                    override fun getPasswordAuthentication(): PasswordAuthentication? {
-                        if (requestorType != RequestorType.PROXY) return null
-                        // HTTPS CONNECT authenticates here, never via a header.
-                        // Match credentials to the exact proxy endpoint that
-                        // challenged us, so rotating pools authenticate with
-                        // the node that is actually serving the tunnel.
-                        val fromPool = ProxyPool.credentialsFor(requestingHost, requestingPort)
-                        if (fromPool != null) {
-                            return PasswordAuthentication(fromPool.first, fromPool.second.toCharArray())
-                        }
-                        if (this@ProxyManager.username.isNotEmpty() &&
-                            requestingHost.equals(this@ProxyManager.host, ignoreCase = true) &&
-                            (requestingPort == this@ProxyManager.port || requestingPort == -1)) {
-                            return PasswordAuthentication(
-                                this@ProxyManager.username,
-                                this@ProxyManager.password.toCharArray()
-                            )
-                        }
-                        return null
-                    }
-                }
-                proxyAuthenticator = auth
-                Authenticator.setDefault(auth)
-            } else {
-                Authenticator.setDefault(null)
-                proxyAuthenticator = null
-            }
+        // The Dart settings layer still ships 'localhost, 127.0.0.1' as its
+        // default. Treat that exact legacy value as "no custom list" so the
+        // private-range/::1/*.local defaults actually protect LAN requests.
+        this.bypassList = if (parsedBypass == LEGACY_DEFAULT_BYPASS) {
+            defaultBypassList
+        } else {
+            parsedBypass
         }
 
         // Also configure ProxyPool if host is non-empty, unless an explicit multi-proxy pool was set
@@ -156,7 +134,51 @@ object ProxyManager {
             }
         }
 
+        // Install/refresh the JVM Authenticator after the pool is updated so a
+        // pool-only configuration (setProxyPool without setProxy) can still
+        // authenticate HTTPS CONNECT tunnels.
+        refreshAuthenticator()
+
         logI(TAG, "Proxy configured: enabled=$enabled, type=$proxyType, host=${this.host}:${this.port}, hasAuth=${this.username.isNotEmpty()}")
+    }
+
+    /**
+     * Installs the proxy Authenticator for the current pool/single-proxy
+     * configuration. Safe to call after setProxyPool; credentials are resolved
+     * at challenge time, so the authenticator never captures a stale node.
+     */
+    fun refreshAuthenticator() {
+        synchronized(authLock) {
+            if (!enabled && !ProxyPool.isPoolConfigured()) {
+                Authenticator.setDefault(null)
+                proxyAuthenticator = null
+                return
+            }
+            val auth = object : Authenticator() {
+                override fun getPasswordAuthentication(): PasswordAuthentication? {
+                    if (requestorType != RequestorType.PROXY) return null
+                    // HTTPS CONNECT authenticates here, never via a header.
+                    // Match credentials to the exact proxy endpoint that
+                    // challenged us, so rotating pools authenticate with
+                    // the node that is actually serving the tunnel.
+                    val fromPool = ProxyPool.credentialsFor(requestingHost, requestingPort)
+                    if (fromPool != null) {
+                        return PasswordAuthentication(fromPool.first, fromPool.second.toCharArray())
+                    }
+                    if (this@ProxyManager.username.isNotEmpty() &&
+                        requestingHost.equals(this@ProxyManager.host, ignoreCase = true) &&
+                        (requestingPort == this@ProxyManager.port || requestingPort == -1)) {
+                        return PasswordAuthentication(
+                            this@ProxyManager.username,
+                            this@ProxyManager.password.toCharArray()
+                        )
+                    }
+                    return null
+                }
+            }
+            proxyAuthenticator = auth
+            Authenticator.setDefault(auth)
+        }
     }
 
     private fun logI(tag: String, msg: String) {

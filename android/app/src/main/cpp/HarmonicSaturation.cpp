@@ -61,6 +61,10 @@ void HarmonicSaturation::configure(double drive, double mix, double tilt, int mo
         }
         mode_ = newMode;
     }
+    if (multiband != multiband_ && !enabled_ && smoothedEnabledMix_ < 1e-4f) {
+        // Dormant stage: no audible transition to smooth.
+        multibandMix_ = multiband ? 1.0f : 0.0f;
+    }
     multiband_ = multiband;
     for (int c = 0; c < MAX_CHANNELS / 2; ++c) {
         crossover_[c].configure(sampleRate_, kMultibandCrossoverHz);
@@ -101,6 +105,7 @@ void HarmonicSaturation::reset() {
     smoothedTilt_ = tilt_;
     prevMode_ = mode_;
     modeCrossfadeProgress_ = 1.0f;
+    multibandMix_ = multiband_ ? 1.0f : 0.0f;
 }
 
 void HarmonicSaturation::smoothParameters(int frames) {
@@ -148,7 +153,8 @@ static inline float shapeSample(float x, double k, float invNorm, int mode) {
 }
 
 inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& outL, float& outR,
-                                                   float currentEnabledMix, double k, float mix,
+                                                   float currentEnabledMix, float multibandMix,
+                                                   double k, float mix,
                                                    float tilt, float hpCoeff, int mode, float invNorm) {
     if (!std::isfinite(inL)) inL = 0.0f;
     if (!std::isfinite(inR)) inR = 0.0f;
@@ -158,13 +164,15 @@ inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& 
     float subL = 0.0f;
     float subR = 0.0f;
 
-    if (multiband_) {
+    if (multibandMix > 0.0001f) {
         double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
         crossover_[0].process(inL, inR, outLpL, outLpR, outHpL, outHpR);
-        subL = static_cast<float>(outLpL);
-        subR = static_cast<float>(outLpR);
-        satInL = static_cast<float>(outHpL);
-        satInR = static_cast<float>(outHpR);
+        // Blend the split routing with the full-band path so a live multiband
+        // toggle is continuous instead of switching the shaper's input source.
+        subL = static_cast<float>(outLpL) * multibandMix;
+        subR = static_cast<float>(outLpR) * multibandMix;
+        satInL = multibandMix * static_cast<float>(outHpL) + (1.0f - multibandMix) * inL;
+        satInR = multibandMix * static_cast<float>(outHpR) + (1.0f - multibandMix) * inR;
     }
 
     const float dryL = dryDelay_[0][dryDelayPos_];
@@ -188,8 +196,11 @@ inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& 
 
     float dryTapL = dryL;
     float dryTapR = dryR;
-    float subTapL = delayedSubL;
-    float subTapR = delayedSubR;
+    // Scale the delayed low-band re-injection by the current routing weight so
+    // the ring's residual (written at the previous weight) cannot leak a
+    // double-bass transient after a multiband toggle-off.
+    float subTapL = delayedSubL * multibandMix;
+    float subTapR = delayedSubR * multibandMix;
     float wetL = dryL;
     float wetR = dryR;
 
@@ -316,10 +327,8 @@ inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& 
 
         dryTapL = dryL;
         dryTapR = dryR;
-        if (multiband_) {
-            subTapL = delayedSubL;
-            subTapR = delayedSubR;
-        }
+        subTapL = delayedSubL * multibandMix;
+        subTapR = delayedSubR * multibandMix;
     }
 
     if (!std::isfinite(wetL)) wetL = 0.0f;
@@ -328,8 +337,8 @@ inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& 
     const float midHighL = (1.0f - mix) * dryTapL + mix * wetL;
     const float midHighR = (1.0f - mix) * dryTapR + mix * wetR;
 
-    const float fullOutL = multiband_ ? (subTapL + midHighL) : midHighL;
-    const float fullOutR = multiband_ ? (subTapR + midHighR) : midHighR;
+    const float fullOutL = subTapL + midHighL;
+    const float fullOutR = subTapR + midHighR;
 
     if (currentEnabledMix >= 0.9999f) {
         outL = fullOutL;
@@ -365,6 +374,15 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
     const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
     float currentEnabledMix = startEnabledMix;
 
+    // 15 ms multiband routing crossfade for click-free live toggles.
+    const float mbTarget = multiband_ ? 1.0f : 0.0f;
+    const double mbSmoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * 0.015));
+    const float startMbMix = multibandMix_;
+    multibandMix_ += static_cast<float>(mbSmoothFactor * (mbTarget - multibandMix_));
+    if (std::abs(multibandMix_ - mbTarget) < 1e-4f) multibandMix_ = mbTarget;
+    const float mbStep = (multibandMix_ - startMbMix) / static_cast<float>(frames);
+    float currentMbMix = startMbMix;
+
     smoothParameters(frames);
     const double k = smoothedDrive_ * kMaxDrive;
     const float mix = static_cast<float>(smoothedMix_);
@@ -376,10 +394,11 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
     for (int i = 0; i < frames; ++i) {
         float outL = 0.0f, outR = 0.0f;
         processFrameStereo(L[i], R[i], outL, outR,
-                           currentEnabledMix, k, mix, tilt, hpCoeff, mode, invNorm);
+                           currentEnabledMix, currentMbMix, k, mix, tilt, hpCoeff, mode, invNorm);
         L[i] = outL;
         R[i] = outR;
         currentEnabledMix += mixStep;
+        currentMbMix += mbStep;
     }
 }
 
@@ -401,6 +420,15 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
     const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
     float currentEnabledMix = startEnabledMix;
 
+    // 15 ms multiband routing crossfade for click-free live toggles.
+    const float mbTarget = multiband_ ? 1.0f : 0.0f;
+    const double mbSmoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * 0.015));
+    const float startMbMix = multibandMix_;
+    multibandMix_ += static_cast<float>(mbSmoothFactor * (mbTarget - multibandMix_));
+    if (std::abs(multibandMix_ - mbTarget) < 1e-4f) multibandMix_ = mbTarget;
+    const float mbStep = (multibandMix_ - startMbMix) / static_cast<float>(frames);
+    float currentMbMix = startMbMix;
+
     smoothParameters(frames);
     if (stride == 2) {
         const double k = smoothedDrive_ * kMaxDrive;
@@ -413,10 +441,11 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
         for (int i = 0; i < frames; ++i) {
             float outL = 0.0f, outR = 0.0f;
             processFrameStereo(buffer[i * 2], buffer[i * 2 + 1], outL, outR,
-                               currentEnabledMix, k, mix, tilt, hpCoeff, mode, invNorm);
+                               currentEnabledMix, currentMbMix, k, mix, tilt, hpCoeff, mode, invNorm);
             buffer[i * 2] = outL;
             buffer[i * 2 + 1] = outR;
             currentEnabledMix += mixStep;
+            currentMbMix += mbStep;
         }
         return;
     }
@@ -431,17 +460,19 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
     for (int i = 0; i < frames; ++i) {
         float subArr[MAX_CHANNELS] = {};
         float satInArr[MAX_CHANNELS] = {};
-        if (multiband_) {
+        if (currentMbMix > 0.0001f) {
             for (int p = 0; p < channels / 2 && p < MAX_CHANNELS / 2; ++p) {
                 const int ch0 = p * 2;
                 const int ch1 = ch0 + 1;
                 double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
                 crossover_[p].process(buffer[i * stride + ch0], buffer[i * stride + ch1],
                                       outLpL, outLpR, outHpL, outHpR);
-                subArr[ch0] = static_cast<float>(outLpL);
-                subArr[ch1] = static_cast<float>(outLpR);
-                satInArr[ch0] = static_cast<float>(outHpL);
-                satInArr[ch1] = static_cast<float>(outHpR);
+                subArr[ch0] = currentMbMix * static_cast<float>(outLpL);
+                subArr[ch1] = currentMbMix * static_cast<float>(outLpR);
+                satInArr[ch0] = currentMbMix * static_cast<float>(outHpL) +
+                                (1.0f - currentMbMix) * buffer[i * stride + ch0];
+                satInArr[ch1] = currentMbMix * static_cast<float>(outHpR) +
+                                (1.0f - currentMbMix) * buffer[i * stride + ch1];
             }
             if (channels % 2 != 0) {
                 const int chLast = channels - 1;
@@ -450,17 +481,18 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                     double outLpL = 0.0, outLpR = 0.0, outHpL = 0.0, outHpR = 0.0;
                     crossover_[p].process(buffer[i * stride + chLast], buffer[i * stride + chLast],
                                           outLpL, outLpR, outHpL, outHpR);
-                    subArr[chLast] = static_cast<float>(outLpL);
-                    satInArr[chLast] = static_cast<float>(outHpL);
+                    subArr[chLast] = currentMbMix * static_cast<float>(outLpL);
+                    satInArr[chLast] = currentMbMix * static_cast<float>(outHpL) +
+                                       (1.0f - currentMbMix) * buffer[i * stride + chLast];
                 }
             }
         }
 
         for (int ch = 0; ch < channels; ++ch) {
             const int idx = i * stride + ch;
-            float inSample = multiband_ ? satInArr[ch] : buffer[idx];
+            float inSample = (currentMbMix > 0.0001f) ? satInArr[ch] : buffer[idx];
             if (!std::isfinite(inSample)) inSample = 0.0f;
-            float subSample = multiband_ ? subArr[ch] : 0.0f;
+            float subSample = (currentMbMix > 0.0001f) ? subArr[ch] : 0.0f;
 
             // FIX M-13: per-channel dry delay (position advanced once per frame
             // below, after every channel of this frame is stored).
@@ -477,7 +509,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
             float wet = dryDelayed;
             float dryTap = dryDelayed;
-            float subTap = delayedSub;
+            float subTap = delayedSub * currentMbMix;
 
             if (k > 1e-9) {
                 // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
@@ -539,33 +571,31 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
                 // Align dry tap with wet delay.
                 dryTap = dryDelayed;
-                if (multiband_) {
-                    subTap = delayedSub;
-                }
+                subTap = delayedSub * currentMbMix;
             }
 
             if (!std::isfinite(wet)) wet = 0.0f;
 
             const float midHigh = (1.0f - mix) * dryTap + mix * wet;
-            const float outCh = multiband_ ? (subTap + midHigh) : midHigh;
+            const float outCh = subTap + midHigh;
 
-            // Equal-power crossfading for wet/dry enable/disable
-            float dryW, wetW;
-            if (currentEnabledMix >= 0.9999f) {
-                dryW = 0.0f;
-                wetW = 1.0f;
-            } else if (currentEnabledMix <= 0.0001f) {
-                dryW = 1.0f;
-                wetW = 0.0f;
+            // Equal-power crossfading for wet/dry enable/disable. Below the
+            // bypass threshold the sample is left bit-identical: writing the
+            // delayed dry tap here would start the 7-sample alignment delay
+            // while the stage is supposed to be transparent.
+            if (currentEnabledMix <= 0.0001f) {
+                // untouched
+            } else if (currentEnabledMix >= 0.9999f) {
+                buffer[idx] = outCh;
             } else {
                 const float angle = currentEnabledMix * (static_cast<float>(M_PI) * 0.5f);
-                dryW = std::cos(angle);
-                wetW = std::sin(angle);
+                const float dryW = std::cos(angle);
+                const float wetW = std::sin(angle);
+                buffer[idx] = dryW * dryTap + wetW * outCh;
             }
-
-            buffer[idx] = dryW * buffer[idx] + wetW * outCh;
         }
         currentEnabledMix += mixStep;
+        currentMbMix += mbStep;
         // FIX M-13: advance the shared dry-delay position once per frame.
         dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
     }

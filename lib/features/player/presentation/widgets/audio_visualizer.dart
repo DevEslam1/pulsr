@@ -86,6 +86,9 @@ class AudioVisualizer extends StatefulWidget {
 
   static bool? _isTestingOverride;
 
+  /// Pre-warms the MilkDrop GPU fragment program in the background.
+  static Future<void> prewarmShader() => AudioVisualizerState.prewarmShader();
+
   @visibleForTesting
   static set isTestingOverride(bool? value) => _isTestingOverride = value;
 
@@ -184,14 +187,30 @@ class AudioVisualizerState extends State<AudioVisualizer>
   /// so a silent style swap never claims to be MilkDrop.
   bool _shaderFailed = false;
 
+  static ui.FragmentProgram? _cachedMilkProgram;
+
+  /// Pre-warms the GPU Milkdrop fragment program in the background so opening
+  /// the visualizer incurs 0 runtime shader compilation latency.
+  static Future<void> prewarmShader() async {
+    if (_cachedMilkProgram != null) return;
+    try {
+      _cachedMilkProgram =
+          await ui.FragmentProgram.fromAsset('shaders/milkdrop.frag');
+    } catch (_) {
+      // Ignored: best-effort prewarm. If unsupported, the visualizer gracefully
+      // falls back to the high-fidelity Canvas approximation.
+    }
+  }
+
   /// True when the GPU shader path is unavailable and the Canvas fallback is
   /// rendering. Exposed for tests / UI badge.
   bool get isFallbackActive => _shaderFailed || _milkShader == null;
   Future<void> _loadMilkShader() async {
     if (_milkShader != null) return;
     try {
-      final program =
+      final program = _cachedMilkProgram ??
           await ui.FragmentProgram.fromAsset('shaders/milkdrop.frag');
+      _cachedMilkProgram ??= program;
       final shader = program.fragmentShader();
       if (!mounted) {
         shader.dispose();

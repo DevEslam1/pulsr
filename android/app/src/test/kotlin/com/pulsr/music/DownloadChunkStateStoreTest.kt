@@ -65,6 +65,33 @@ class DownloadChunkStateStoreTest {
     }
 
     @Test
+    fun singleChunkProgressCoalescesUntilBytesComplete() {
+        DownloadChunkStateStore.saveChunkProgress(context, "v4", 0, 1, 100, 9000)
+        // First write for a video flushes immediately.
+        assertEquals(
+            100L,
+            DownloadChunkStateStore.ChunkState.fromJson(prefs().getString("chunk_v4_0", null)!!)?.downloadedBytes
+        )
+
+        DownloadChunkStateStore.saveChunkProgress(context, "v4", 0, 1, 200, 9000)
+        // Not byte-complete: buffered in memory, disk still holds the old value.
+        assertEquals(
+            200L,
+            DownloadChunkStateStore.getChunkProgress(context, "v4", 0)?.downloadedBytes
+        )
+        assertEquals(
+            100L,
+            DownloadChunkStateStore.ChunkState.fromJson(prefs().getString("chunk_v4_0", null)!!)?.downloadedBytes
+        )
+
+        DownloadChunkStateStore.flushPending(context)
+        assertEquals(
+            200L,
+            DownloadChunkStateStore.ChunkState.fromJson(prefs().getString("chunk_v4_0", null)!!)?.downloadedBytes
+        )
+    }
+
+    @Test
     fun purgeDropsEntriesOlderThanThirtyDays() {
         val old = DownloadChunkStateStore.ChunkState(
             videoId = "old",

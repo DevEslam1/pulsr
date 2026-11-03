@@ -51,6 +51,10 @@ class DownloadService : Service() {
         const val EXTRA_VIDEO_ID = "videoId"
         const val EXTRA_PAUSED = "paused"
         const val EXTRA_CANCEL_ALL = "cancelAll"
+        // Optional byte counters; callers that know them get a live transfer
+        // rate in the notification. Omitted by older Dart callers.
+        const val EXTRA_DOWNLOADED_BYTES = "downloadedBytes"
+        const val EXTRA_TOTAL_BYTES = "totalBytes"
 
         private const val REQUEST_CODE_OPEN = 1001
         private const val REQUEST_CODE_CANCEL = 1002
@@ -127,13 +131,22 @@ class DownloadService : Service() {
             }
         }
 
-        fun updateProgress(context: Context, videoId: String, title: String, progress: Int) {
+        fun updateProgress(
+            context: Context,
+            videoId: String,
+            title: String,
+            progress: Int,
+            downloadedBytes: Long = -1L,
+            totalBytes: Long = -1L
+        ) {
             val appContext = context.applicationContext ?: context
             val intent = Intent(appContext, DownloadService::class.java).apply {
                 action = ACTION_UPDATE
                 putExtra(EXTRA_VIDEO_ID, videoId)
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_PROGRESS, progress)
+                if (downloadedBytes >= 0L) putExtra(EXTRA_DOWNLOADED_BYTES, downloadedBytes)
+                if (totalBytes >= 0L) putExtra(EXTRA_TOTAL_BYTES, totalBytes)
             }
             try {
                 appContext.startService(intent)
@@ -172,6 +185,9 @@ class DownloadService : Service() {
     // throw ConcurrentModificationException during iteration (render/timeout).
     private var activeDownloads = java.util.concurrent.ConcurrentHashMap<String, Int>() // videoId -> progress 0..100
     private var downloadTitles = java.util.concurrent.ConcurrentHashMap<String, String>() // videoId -> title
+
+    private class SpeedState(var lastBytes: Long, var lastAt: Long, var bytesPerSecond: Double)
+    private val speedStates = java.util.concurrent.ConcurrentHashMap<String, SpeedState>()
     private val pausedDownloads: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet<String>() // videoId
     private var foregroundStarted = false
     private var degraded = false
@@ -218,6 +234,7 @@ class DownloadService : Service() {
                     ?: getString(R.string.download_notification_default_title)
                 activeDownloads[vid] = 0
                 downloadTitles[vid] = title
+                speedStates.remove(vid)
                 pausedDownloads.remove(vid)
                 timeoutPausedIds.remove(vid)
                 renderCurrentNotification(vid)
@@ -229,9 +246,33 @@ class DownloadService : Service() {
                 val progress = intent.getIntExtra(EXTRA_PROGRESS, 0).coerceIn(0, 100)
                 activeDownloads[vid] = progress
                 downloadTitles[vid] = title
+                val downloadedBytes = intent.getLongExtra(EXTRA_DOWNLOADED_BYTES, -1L)
+                if (downloadedBytes >= 0L) {
+                    // Exponential moving average over successive progress
+                    // reports so the notification shows a stable transfer rate
+                    // instead of jittering with each buffer.
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    val state = speedStates[vid]
+                    if (state == null || now <= state.lastAt) {
+                        speedStates[vid] = SpeedState(downloadedBytes, now, 0.0)
+                    } else {
+                        val deltaBytes = downloadedBytes - state.lastBytes
+                        if (deltaBytes >= 0L) {
+                            val instant = deltaBytes * 1000.0 / (now - state.lastAt).toDouble()
+                            state.bytesPerSecond = if (state.bytesPerSecond <= 0.0) {
+                                instant
+                            } else {
+                                0.30 * instant + 0.70 * state.bytesPerSecond
+                            }
+                        }
+                        state.lastBytes = downloadedBytes
+                        state.lastAt = now
+                    }
+                }
                 // Remove completed ones
                 if (progress >= 100) {
                     try { DownloadChunkStateStore.clearChunksForVideo(this, vid) } catch (_: Exception) {}
+                    speedStates.remove(vid)
                     activeDownloads.remove(vid)
                     downloadTitles.remove(vid)
                     pausedDownloads.remove(vid)
@@ -252,6 +293,7 @@ class DownloadService : Service() {
                     activeDownloads.clear()
                     downloadTitles.clear()
                     pausedDownloads.clear()
+                    speedStates.clear()
                     timeoutPausedIds.removeAll(ids.toSet())
                     for (id in ids) {
                         try { DownloadChunkStateStore.clearChunksForVideo(this, id) } catch (_: Exception) {}
@@ -267,6 +309,7 @@ class DownloadService : Service() {
                         // stale tap would delete the finished download and its row.
                         val wasActive = activeDownloads.remove(vid) != null
                         downloadTitles.remove(vid)
+                        speedStates.remove(vid)
                         pausedDownloads.remove(vid)
                         timeoutPausedIds.remove(vid)
                         try { DownloadChunkStateStore.clearChunksForVideo(this, vid) } catch (_: Exception) {}
@@ -274,13 +317,21 @@ class DownloadService : Service() {
                             try { onDownloadCancelledListener?.invoke(vid) } catch (_: Exception) {}
                         }
                     }
-                    renderCurrentNotification(activeDownloads.keys.firstOrNull())
+                    if (activeDownloads.isEmpty()) {
+                        stopForegroundAndSelf()
+                    } else {
+                        renderCurrentNotification(activeDownloads.keys.firstOrNull())
+                    }
                 }
             }
             ACTION_PAUSE -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 if (vid != null) {
                     pausedDownloads.add(vid)
+                    speedStates.remove(vid)
+                    // Persist chunk offsets before the transfer goes dormant:
+                    // process death while paused must not lose resumable state.
+                    runCatching { DownloadChunkStateStore.flushPending(this) }
                     renderCurrentNotification(vid)
                     // C-7: the Dart engine owns the transfer; it performs the pause.
                     try { onDownloadPausedListener?.invoke(vid) } catch (_: Exception) {}
@@ -299,7 +350,11 @@ class DownloadService : Service() {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 val paused = intent.getBooleanExtra(EXTRA_PAUSED, false)
                 if (vid != null) {
-                    if (paused) pausedDownloads.add(vid) else {
+                    if (paused) {
+                        pausedDownloads.add(vid)
+                        speedStates.remove(vid)
+                        runCatching { DownloadChunkStateStore.flushPending(this) }
+                    } else {
                         pausedDownloads.remove(vid)
                         timeoutPausedIds.remove(vid)
                     }
@@ -311,6 +366,7 @@ class DownloadService : Service() {
                 activeDownloads.clear()
                 downloadTitles.clear()
                 pausedDownloads.clear()
+                speedStates.clear()
                 timeoutPausedIds.clear()
                 stopForegroundAndSelf()
             }
@@ -421,6 +477,7 @@ class DownloadService : Service() {
         activeDownloads.clear()
         downloadTitles.clear()
         pausedDownloads.clear()
+        speedStates.clear()
     }
 
     private fun transportAction(
@@ -476,6 +533,14 @@ class DownloadService : Service() {
 
         if (degraded) {
             builder.setSubText(getString(R.string.download_notification_degraded))
+        } else if (!paused) {
+            // Live transfer rate; hidden once updates go stale so a stopped
+            // stream cannot leave a frozen "2.4 MB/s" on screen.
+            val speed = targetVideoId?.let { speedStates[it] }
+            val age = if (speed != null) android.os.SystemClock.elapsedRealtime() - speed.lastAt else Long.MAX_VALUE
+            if (speed != null && age <= 3000L && speed.bytesPerSecond > 0.0) {
+                builder.setSubText(formatSpeed(speed.bytesPerSecond))
+            }
         }
 
         if (showTransport && targetVideoId != null) {
@@ -503,6 +568,16 @@ class DownloadService : Service() {
         return builder.build()
     }
 
+    private fun formatSpeed(bytesPerSecond: Double): String {
+        val kb = 1024.0
+        val mb = kb * 1024.0
+        return when {
+            bytesPerSecond >= mb -> String.format(java.util.Locale.US, "%.1f MB/s", bytesPerSecond / mb)
+            bytesPerSecond >= kb -> String.format(java.util.Locale.US, "%.0f KB/s", bytesPerSecond / kb)
+            else -> String.format(java.util.Locale.US, "%.0f B/s", bytesPerSecond)
+        }
+    }
+
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -522,10 +597,13 @@ class DownloadService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Flush coalesced chunk offsets before the process may go away.
+        runCatching { DownloadChunkStateStore.flushPending(this) }
         cancelIdleStop()
         activeDownloads.clear()
         downloadTitles.clear()
         pausedDownloads.clear()
+        speedStates.clear()
         foregroundStarted = false
         // Listeners are lifecycle-managed by YtDownloadPlugin (cleared in plugin cleanup)
         // so that transient service restarts do not drop notification action events.
@@ -545,6 +623,7 @@ class DownloadService : Service() {
      */
     override fun onTimeout(startId: Int, fgsType: Int) {
         android.util.Log.w(TAG, "dataSync foreground-time budget exhausted; pausing downloads")
+        runCatching { DownloadChunkStateStore.flushPending(this) }
         // Snapshot before stopForegroundAndSelf() wipes instance maps below —
         // listeners and the timeout notice must see consistent state, and the
         // paused mark must survive the stop via timeoutPausedIds (Dart owns it

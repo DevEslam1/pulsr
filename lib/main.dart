@@ -59,6 +59,7 @@ import 'features/auth/presentation/ytm_web_login_sheet.dart';
 import 'features/library/cubit/library_cubit.dart';
 import 'features/player/cubit/player_cubit.dart';
 import 'features/player/cubit/player_state.dart';
+import 'features/player/presentation/widgets/audio_visualizer.dart';
 import 'features/playlists/cubit/playlist_cubit.dart';
 import 'features/search/cubit/search_cubit.dart';
 import 'features/settings/cubit/settings_cubit.dart';
@@ -162,6 +163,8 @@ Future<void> main() async {
   unawaited(PlatformCapabilities.ensureLoaded()
       .timeout(const Duration(seconds: 5))
       .catchError((_) {}));
+  // Pre-warm GPU visualizer shader in background (never blocks cold start).
+  unawaited(AudioVisualizer.prewarmShader());
 
   // Firebase powers Auth + (optionally) cloud sync. Pure builds must perform
   // zero network work, so skip init there; elsewhere init best-effort so a

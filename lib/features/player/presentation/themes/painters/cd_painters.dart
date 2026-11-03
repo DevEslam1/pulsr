@@ -72,7 +72,9 @@ class _CdDiscPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5;
 
-    for (double r = labelRadius + 10; r < leadOutRadius; r += 2.2) {
+    final isGpuSaver = GpuBudget.isGpuSaverActive;
+    final trackStep = isGpuSaver ? 4.8 : 2.2;
+    for (double r = labelRadius + 10; r < leadOutRadius; r += trackStep) {
       final isSubTrack = (r > labelRadius + 32 && r < labelRadius + 35) ||
           (r > labelRadius + 68 && r < labelRadius + 71) ||
           (r > labelRadius + 105 && r < labelRadius + 108);

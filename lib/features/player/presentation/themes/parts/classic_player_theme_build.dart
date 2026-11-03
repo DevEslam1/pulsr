@@ -257,12 +257,12 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                     final double availableWidth =
                         splitConstraints.maxWidth - (isTablet ? 48.0 : 32.0);
                     final double availableHeight =
-                        splitConstraints.maxHeight - 340.0;
+                        splitConstraints.maxHeight - 330.0;
                     final double rawSize =
                         math.min(availableWidth, availableHeight);
                     final double dynamicArtSize =
-                        (rawSize <= 0 ? 220.0 : math.min(rawSize, 400.0))
-                            .clamp(180.0, 420.0);
+                        (rawSize <= 0 ? 180.0 : math.min(rawSize, 400.0))
+                            .clamp(120.0, 400.0);
 
                     return Padding(
                       padding:

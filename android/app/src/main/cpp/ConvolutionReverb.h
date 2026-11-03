@@ -96,6 +96,7 @@ private:
         return crossfadeIr_ != nullptr && irCrossfadeTotal_ > 0 &&
                irCrossfadeSamples_ < irCrossfadeTotal_;
     }
+    void advanceIrCrossfade();
     void accumulatePartitionLeft(const PreparedIr* ir,
                                  std::vector<FftUtil::Complex>& accum,
                                  int numPartitions);

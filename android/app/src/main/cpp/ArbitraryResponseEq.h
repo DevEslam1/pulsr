@@ -43,10 +43,11 @@ public:
     void reset();
 
     /**
-     * Control-thread resolver for kernels that could not be synthesized on the
-     * audio thread (sample-rate mismatch). Returns true when work was done.
+     * True when applyParams deferred a kernel rebuild (sample-rate mismatch).
+     * The control thread resolves it by publishing a PreparedArbitraryEqFilter
+     * through the param snapshot; applyParams clears the flag when it swaps in
+     * a matching kernel. The live stage must never be mutated off-thread.
      */
-    bool resynthesizeIfNeeded();
     bool needsResynthesis() const { return needsResynthesis_.load(std::memory_order_acquire); }
 
     bool loadGraphicEqString(const std::string& eqString, bool linearPhase = false);

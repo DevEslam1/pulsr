@@ -51,7 +51,8 @@ public:
 private:
     void smoothParameters(int frames);
     inline void processFrameStereo(float inL, float inR, float& outL, float& outR,
-                                   float currentEnabledMix, double k, float mix,
+                                   float currentEnabledMix, float multibandMix,
+                                   double k, float mix,
                                    float tilt, float hpCoeff, int mode, float invNorm);
 
     static constexpr int OVERSAMPLE_FACTOR = 4;
@@ -76,6 +77,10 @@ private:
     int prevMode_ = 0;
     float modeCrossfadeProgress_ = 1.0f;
     bool multiband_ = false;    // 6-band crossover mid-band warmth mode
+    // Smoothed multiband routing weight (0 = full-band saturation, 1 = split).
+    // Toggling multiband_ while the stage is audible ramps this over 15 ms so
+    // the low-band re-injection and highpass-fed shaper cannot click.
+    float multibandMix_ = 0.0f;
     double k_ = 0.0;            // drive sharpness
     float tiltHpCoeff_ = 0.0f;  // one-pole HP coeff for pre-emphasis
     float dcCoeff_ = 0.9995f;   // DC-blocker pole (rate-derived in configure)

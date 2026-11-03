@@ -33,7 +33,9 @@ class _VinylGroovesPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.75;
 
-    for (double r = labelRadius + 14; r < leadInRadius; r += 2.5) {
+    final isGpuSaver = GpuBudget.isGpuSaverActive;
+    final grooveStep = isGpuSaver ? 5.0 : 2.5;
+    for (double r = labelRadius + 14; r < leadInRadius; r += grooveStep) {
       final isBandGap = (r > labelRadius + 38 && r < labelRadius + 42) ||
           (r > labelRadius + 74 && r < labelRadius + 78);
       if (isBandGap) {

@@ -34,6 +34,23 @@ std::vector<float> makeSignal(int frames, int channels) {
     return buf;
 }
 
+// Block-periodic signal: an integer number of cycles per block, so repeating
+// the same block across calls is sample-continuous at block boundaries. A
+// repeated non-periodic block ends in a step, which a true-peak limiter
+// legitimately reacts to (startup GR) and which would pollute level tests.
+std::vector<float> makeLoopSignal(int frames, int channels) {
+    std::vector<float> buf(static_cast<size_t>(frames) * channels);
+    for (int i = 0; i < frames; ++i) {
+        for (int ch = 0; ch < channels; ++ch) {
+            const double phase = 2.0 * 3.14159265358979323846 * 5.0 * static_cast<double>(i) /
+                                 static_cast<double>(frames) + ch * 0.4;
+            buf[static_cast<size_t>(i) * channels + ch] =
+                static_cast<float>(0.50 * std::sin(phase) + 0.15 * std::sin(phase * 7.0));
+        }
+    }
+    return buf;
+}
+
 // Bitwise, not epsilon: "transparent" means the samples were never touched.
 bool bitIdentical(const std::vector<float>& a, const std::vector<float>& b) {
     return a.size() == b.size() &&
@@ -157,6 +174,82 @@ int main() {
         snap->replayGain.trackGainDb = 8.0;
         check(runBlocks(*engine, snap, frames, channels, 8),
               "bit-perfect bypass must be bit-identical with every stage armed");
+    }
+
+    {
+        // STAGE_PANNER is present in the mask but the panner is at its neutral
+        // setting (balance 0, mono off). With every other stage flag off, the
+        // raw panner bit alone must not drag the chain off the fast path.
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->activeStages = 0xFFFFFFFFu;
+        snap->eq.enabled = false;
+        snap->crossfeed.enabled = false;
+        snap->reverb.enabled = false;
+        snap->limiter.enabled = false;
+        snap->resampler.enabled = false;
+        snap->saturation.enabled = false;
+        snap->stereoWidth.enabled = false;
+        snap->loudness.enabled = false;
+        snap->subCrossover.enabled = false;
+        snap->dynamicEq.enabled = false;
+        snap->multibandCompressor.enabled = false;
+        snap->dynamicBass.enabled = false;
+        snap->viperDdc.enabled = false;
+        snap->arbitraryEq.enabled = false;
+        snap->liveProg.enabled = false;
+        snap->directVolume.enabled = false;
+        snap->replayGain.enabled = false;
+        snap->headphoneSafety.enabled = false;
+        snap->channelManager.enabled = false;
+        // panner.balance / monoMix intentionally left at their neutral defaults.
+        check(runBlocks(*engine, snap, frames, channels, 8),
+              "centered panner with every other stage off must be bit-exact");
+        check(engine->getPipelineLatencyFrames() == 0,
+              "centered panner must not insert limiter/pipeline latency");
+    }
+
+    {
+        // Loudness-delta telemetry: a +0.83 dB direct-volume gain must settle
+        // near +0.83 dB, and Auto-Level A/B must cancel it on the dry path.
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->directVolume.enabled = true;
+        snap->directVolume.gainLinear = 1.1; // 20*log10(1.1) = 0.828 dB
+        snap->limiter.enabled = false;
+        snap->headphoneSafety.enabled = false;
+        engine->setSampleRate(snap->sampleRate);
+        engine->setAutoDegradeMonitorEnabled(false);
+        engine->publishParams(snap);
+
+        // The DVC boost makes the engine insert the lookahead limiter. A block
+        // that is periodic at the block boundary keeps the repeated test signal
+        // continuous, so the limiter sees no artificial step and applies no GR.
+        const std::vector<float> input = makeLoopSignal(frames, channels);
+        for (int b = 0; b < 120; ++b) {
+            auto work = input;
+            engine->processInterleaved(work.data(), frames, channels);
+        }
+        const double measuredDb = engine->getLoudnessDeltaDb();
+        check(std::abs(measuredDb + 0.828) < 0.15,
+              "loudness delta must report the input/output change of the gain");
+
+        engine->setBypassCompare(true, -999.0);
+        auto dry = input;
+        engine->processInterleaved(dry.data(), frames, channels);
+        const double appliedGain = std::pow(10.0, -measuredDb / 20.0);
+        double maxDiff = 0.0;
+        for (size_t i = 0; i < dry.size(); ++i) {
+            // Auto-Level scales the dry path by the inverse delta so it
+            // matches the processed signal's loudness.
+            const double expected = static_cast<double>(input[i]) * appliedGain;
+            maxDiff = std::max(maxDiff, std::abs(static_cast<double>(dry[i]) - expected));
+        }
+        check(maxDiff < 5e-4,
+              "Auto-Level A/B must apply the inverse of the measured loudness delta");
+        check(std::abs(engine->getLoudnessDeltaDb() - measuredDb) < 1e-6,
+              "A/B bypass must freeze (not reset) the measured loudness delta");
+        engine->setBypassCompare(false, 0.0);
     }
 
     {

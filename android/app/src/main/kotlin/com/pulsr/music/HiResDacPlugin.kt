@@ -139,36 +139,36 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         probeHandler.postDelayed(deviceChangeDebounce, 200L)
     }
 
-    private var bitPerfectRequested: Boolean = false
+    @Volatile private var bitPerfectRequested: Boolean = false
     @Volatile private var directRouteFallbackActive: Boolean = false
-    private var mixerAttributesApplied: Boolean = false
-    private var bitPerfectUsbDeviceId: Int? = null
+    @Volatile private var mixerAttributesApplied: Boolean = false
+    @Volatile private var bitPerfectUsbDeviceId: Int? = null
     private val mediaAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
         .build()
-    private var lastBitPerfectReason: String? = null
-    private var selectedDeviceId: Int? = null
+    @Volatile private var lastBitPerfectReason: String? = null
+    @Volatile private var selectedDeviceId: Int? = null
     private var routeRequestGeneration = 0
     /// True only when the platform actually accepted the preferred-device request.
     /// Without it the UI would highlight a device the audio never moved to.
-    private var preferredRouteApplied: Boolean = false
+    @Volatile private var preferredRouteApplied: Boolean = false
     private var cachedMediaStrategy: Any? = null
-    private var targetSampleRate: Int = 0
-    private var targetBitDepth: Int = 0
+    @Volatile private var targetSampleRate: Int = 0
+    @Volatile private var targetBitDepth: Int = 0
     private var audioDeviceCallback: AudioDeviceCallback? = null
     private var usbReceiver: BroadcastReceiver? = null
     // Cached reflection methods to avoid thrashing on every getAudioOutputDetails()
-    private var cachedMixerBehaviorMethod: java.lang.reflect.Method? = null
-    private var cachedGetSupportedMixerMethod: java.lang.reflect.Method? = null
-    private var cachedSetMixerMethod: java.lang.reflect.Method? = null
-    private var cachedClearMixerMethod: java.lang.reflect.Method? = null
-    private var cachedGetMixerMethod: java.lang.reflect.Method? = null
-    private var cachedGetCodecStatusMethod: java.lang.reflect.Method? = null
-    private var cachedGetCodecConfigMethod: java.lang.reflect.Method? = null
-    private var cachedGetCodecsLocalCapabilitiesMethod: java.lang.reflect.Method? = null
-    private var cachedGetCodecsSelectableCapabilitiesMethod: java.lang.reflect.Method? = null
-    private var cachedSetCodecPrefMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedMixerBehaviorMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedGetSupportedMixerMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedSetMixerMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedClearMixerMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedGetMixerMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedGetCodecStatusMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedGetCodecConfigMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedGetCodecsLocalCapabilitiesMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedGetCodecsSelectableCapabilitiesMethod: java.lang.reflect.Method? = null
+    @Volatile private var cachedSetCodecPrefMethod: java.lang.reflect.Method? = null
 
     @Volatile private var cachedOutputDetails: Map<String, Any?>? = null
     @Volatile private var outputDetailsCacheTimestamp: Long = 0L
@@ -180,7 +180,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     // Bluetooth A2DP codec control
-    private var bluetoothA2dp: BluetoothA2dp? = null
+    @Volatile private var bluetoothA2dp: BluetoothA2dp? = null
     private val codecControlAvailable: Boolean by lazy {
         try {
             BluetoothA2dp::class.java.getDeclaredMethod(
@@ -482,8 +482,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
         try { eventChannel.setStreamHandler(null) } catch (_: Exception) {}
         eventSink = null
+        probeHandler.removeCallbacks(deviceChangeDebounce)
         probeHandler.removeCallbacks(routePoll)
         probeHandler.removeCallbacks(notifyRunnable)
+        routeHandler.removeCallbacksAndMessages(null)
         probeThread.quitSafely()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioManager != null && audioDeviceCallback != null) {
             try { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) } catch (_: Exception) {}
@@ -852,13 +854,23 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val a2dp = bluetoothA2dp ?: return false
         val device = getConnectedA2dpDevice() ?: return false
         return try {
-            // Read current codec via reflection
-            val getCodecStatusMethod = BluetoothA2dp::class.java
-                .getDeclaredMethod("getCodecStatus", BluetoothDevice::class.java)
-            getCodecStatusMethod.isAccessible = true
+            // Read current codec via reflection, reusing the cached Methods so a
+            // slider drag does not re-run class/method lookup per tick.
+            val getCodecStatusMethod = cachedGetCodecStatusMethod ?: run {
+                BluetoothA2dp::class.java
+                    .getDeclaredMethod("getCodecStatus", BluetoothDevice::class.java).apply {
+                        isAccessible = true
+                        cachedGetCodecStatusMethod = this
+                    }
+            }
             val status = getCodecStatusMethod.invoke(a2dp, device) ?: return false
 
-            val current = status.javaClass.getMethod("getCodecConfig").invoke(status)
+            val getCodecConfigMethod = cachedGetCodecConfigMethod ?: run {
+                status.javaClass.getMethod("getCodecConfig").apply {
+                    cachedGetCodecConfigMethod = this
+                }
+            }
+            val current = getCodecConfigMethod.invoke(status)
                 as? BluetoothCodecConfig ?: return false
 
             val targetCodecType = if (codec != null) {
@@ -878,7 +890,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
             @Suppress("UNCHECKED_CAST")
             val selectableCaps: List<BluetoothCodecConfig> =
-                (status.javaClass.getMethod("getCodecsSelectableCapabilities").invoke(status) as? List<*>)
+                ((cachedGetCodecsSelectableCapabilitiesMethod ?: run {
+                    status.javaClass.getMethod("getCodecsSelectableCapabilities").apply {
+                        cachedGetCodecsSelectableCapabilitiesMethod = this
+                    }
+                }).invoke(status) as? List<*>)
                     ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
 
             // Validate against device selectable capabilities
@@ -947,8 +963,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             }
             setCodecPrefMethod.invoke(a2dp, device, newConfig)
 
-            Log.d(TAG, "BT codec set: type=${codecTypeName(targetCodecType)} rate=${sampleRateHz}Hz bits=${bitDepth}")
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            android.util.Log.d(TAG, "BT codec set: type=${codecTypeName(targetCodecType)} rate=${sampleRateHz}Hz bits=${bitDepth}")
+            mainHandler.postDelayed({
                 try { notifyDeviceChange() } catch (_: Exception) {}
             }, 600)
             true

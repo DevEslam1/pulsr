@@ -218,8 +218,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                         ),
                       ),
 
-                    // Subtle top status-bar protection vignette for legibility
-                    Positioned(
+                    // Subtle top status-bar protection vignette for legibility (portrait only)
+                    if (MediaQuery.orientationOf(context) !=
+                        Orientation.landscape)
+                      Positioned(
                       top: 0,
                       left: 0,
                       right: 0,

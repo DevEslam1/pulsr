@@ -36,7 +36,9 @@ object DnsOverHttpsResolver {
         }
     }
 
-    private val executor = Executors.newFixedThreadPool(4)
+    private val executor = Executors.newCachedThreadPool { runnable ->
+        Thread(runnable, "PulsrDoH").apply { isDaemon = true }
+    }
 
     @Volatile
     private var appContext: Context? = null
@@ -56,6 +58,11 @@ object DnsOverHttpsResolver {
             }
         }
         if (ip.contains(':') && ip.count { it == ':' } >= 2) {
+            // Require at least one hex digit (rejects ":::"/"::") and at most one
+            // "::" compression run, so malformed strings are never mistaken for
+            // literals and handed to the socket layer.
+            val hasHexDigit = ip.any { c -> c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F' }
+            if (!hasHexDigit || ip.split("::").size > 2) return false
             val hexParts = ip.split(':')
             return hexParts.all { it.isEmpty() || (it.length <= 4 && it.all { c -> c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F' }) }
         }
@@ -90,6 +97,11 @@ object DnsOverHttpsResolver {
      * deadline so a dead DoH endpoint cannot stall playback.
      */
     fun resolveAll(hostname: String): List<InetAddress> {
+        // A literal address needs no resolver round-trip (and a DoH query for
+        // "1.2.3.4" cannot answer anyway).
+        if (isNumericIp(hostname)) {
+            return runCatching { listOf(InetAddress.getByName(hostname)) }.getOrDefault(emptyList())
+        }
         cached(hostname)?.let { return orderAddresses(it.addresses) }
 
         val deadline = now() + HARD_DEADLINE_MS
@@ -103,9 +115,59 @@ object DnsOverHttpsResolver {
             }
         }
 
-        collect(queryBoth("https://1.1.1.1/dns-query", hostname, deadline))
+        fun startProvider(baseUrl: String, latch: CountDownLatch) {
+            for (recordType in listOf("A", "AAAA")) {
+                executor.execute {
+                    try {
+                        val remaining = deadline - now()
+                        if (remaining > 0) {
+                            val timeout = minOf(QUERY_TIMEOUT_MS.toLong(), remaining).toInt()
+                            collect(queryDoH(baseUrl, hostname, recordType, timeout))
+                        }
+                    } catch (_: Exception) {
+                    } finally {
+                        latch.countDown()
+                    }
+                }
+            }
+        }
+
+        // Happy Eyeballs for DoH: Cloudflare starts immediately. If it has not
+        // produced a usable answer within 250 ms (or settles without one),
+        // Google races in parallel instead of waiting for the full timeout.
+        val cfLatch = CountDownLatch(2)
+        startProvider("https://1.1.1.1/dns-query", cfLatch)
+        try {
+            cfLatch.await(250L, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+        var googleLatch: CountDownLatch? = null
+        // Cloudflare settling without an answer (NXDOMAIN or both queries
+        // empty) must still race Google; only a usable answer skips the fallback.
         if (answers.isEmpty() && now() < deadline) {
-            collect(queryBoth("https://dns.google/resolve", hostname, deadline))
+            val latch = CountDownLatch(2)
+            googleLatch = latch
+            startProvider("https://dns.google/resolve", latch)
+        }
+
+        // Return as soon as either provider has finished with a usable answer
+        // instead of blocking on the slower provider's full timeout. Latches
+        // cannot wait on "either", so poll in short slices and re-check both.
+        try {
+            while (true) {
+                val cfDone = cfLatch.count == 0L
+                val google = googleLatch
+                val googleDone = google == null || google.count == 0L
+                if (cfDone && googleDone) break
+                if (answers.isNotEmpty() && (cfDone || google?.count == 0L)) break
+                val remaining = deadline - now()
+                if (remaining <= 0L) break
+                val waiter = if (!cfDone) cfLatch else google ?: break
+                waiter.await(minOf(remaining, 25L), TimeUnit.MILLISECONDS)
+            }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
         }
 
         val addresses = answers.map { it.first }
@@ -119,36 +181,6 @@ object DnsOverHttpsResolver {
         else (minTtl.get() * 1000L).coerceIn(NEGATIVE_TTL_MS, CACHE_TTL_MS)
         putInCache(hostname, addresses, ttl)
         return orderAddresses(addresses)
-    }
-
-    /** Runs A and AAAA queries concurrently; waits until both finish or the deadline passes. */
-    private fun queryBoth(
-        baseUrl: String,
-        hostname: String,
-        deadline: Long,
-    ): List<Pair<InetAddress, Long>> {
-        val results = ConcurrentLinkedQueue<Pair<InetAddress, Long>>()
-        val latch = CountDownLatch(2)
-        for (recordType in listOf("A", "AAAA")) {
-            executor.execute {
-                try {
-                    val remaining = deadline - now()
-                    if (remaining > 0) {
-                        val timeout = minOf(QUERY_TIMEOUT_MS.toLong(), remaining).toInt()
-                        results.addAll(queryDoH(baseUrl, hostname, recordType, timeout))
-                    }
-                } catch (_: Exception) {
-                } finally {
-                    latch.countDown()
-                }
-            }
-        }
-        try {
-            latch.await((deadline - now()).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-        }
-        return results.toList()
     }
 
     private fun queryDoH(

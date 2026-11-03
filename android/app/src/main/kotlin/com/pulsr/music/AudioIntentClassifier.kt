@@ -2,6 +2,7 @@ package com.pulsr.music
 
 import android.content.Intent
 import android.net.Uri
+import java.io.File
 
 /**
  * Pure, side-effect-free classification of inbound audio intents.
@@ -39,7 +40,8 @@ object AudioIntentClassifier {
     /** Host-based check (kept `Uri`-free so it is unit-testable). */
     fun isYouTubeHost(host: String?): Boolean {
         val h = host?.lowercase() ?: return false
-        return h.endsWith("youtu.be") || h.endsWith("youtube.com")
+        return h == "youtube.com" || h.endsWith(".youtube.com") ||
+            h == "youtu.be" || h.endsWith(".youtu.be")
     }
 
     fun isYouTubeUrl(text: String): Boolean {
@@ -65,7 +67,19 @@ object AudioIntentClassifier {
         if (s !in ALLOWED_SCHEMES) return false
         if (s == "file") {
             val p = path ?: return false
-            return allowedFileRoots.any { p.startsWith(it) }
+            // Reject traversal segments before canonicalization; canonicalPath
+            // alone still resolves them, which would let `root/../secret` pass
+            // the prefix test below if the resolved file happens to stay inside
+            // the root, and silently import a file outside it otherwise.
+            if (p.split('/', '\\').any { it == ".." }) return false
+            val normalized = runCatching { File(p).canonicalPath }.getOrNull() ?: return false
+            return allowedFileRoots.any { root ->
+                val cleanRoot = runCatching { File(root).canonicalPath }.getOrNull()
+                    ?: return@any false
+                normalized == cleanRoot ||
+                    normalized.startsWith("$cleanRoot/") ||
+                    normalized.startsWith("$cleanRoot${File.separator}")
+            }
         }
         return true
     }
@@ -96,16 +110,19 @@ object AudioIntentClassifier {
         mimeType: String?,
         textExtra: String?,
     ): Boolean {
+        // Plain-text ACTION_SEND intents carry no data URI, so scheme is null;
+        // the shared link must be classified before the scheme gate rejects it.
+        if (action == Intent.ACTION_SEND &&
+            !textExtra.isNullOrEmpty() &&
+            (isYouTubeUrl(textExtra) || isProxyText(textExtra))
+        ) {
+            return true
+        }
         val s = scheme?.lowercase() ?: return false
         if (s == "pulsrwidget") return false
         if (s == "pulsr") return true
         if (isYouTubeHost(host)) return true
         if (action == Intent.ACTION_SEND) {
-            if (!textExtra.isNullOrEmpty() &&
-                (isYouTubeUrl(textExtra) || isProxyText(textExtra))
-            ) {
-                return true
-            }
             return mimeType?.startsWith("audio/") == true ||
                 mimeType?.startsWith("text/") == true ||
                 (s == "content" && mimeType == null)

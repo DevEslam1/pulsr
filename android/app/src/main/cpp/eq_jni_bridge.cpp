@@ -602,6 +602,30 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetActiveStages(
 }
 
 JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetChannelManagerEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jint channelCount) {
+    const bool on = (enabled == JNI_TRUE);
+    const int count = static_cast<int>(channelCount);
+    AudioDspEngine::instance().updateParams([on, count](DspParamSnapshot& snap) {
+        snap.channelManager.enabled = on;
+        snap.channelManager.channelCount = count;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetChannelManagerChannel(
+        JNIEnv* /* env */, jobject /* thiz */, jint channel, jdouble trimDb, jdouble delayMs) {
+    const int ch = static_cast<int>(channel);
+    if (ch < 0 || ch >= ChannelManager::MAX_CHANNELS) return;
+    const float trim = static_cast<float>(trimDb);
+    const float delay = static_cast<float>(delayMs);
+    AudioDspEngine::instance().updateParams([ch, trim, delay](DspParamSnapshot& snap) {
+        snap.channelManager.trimDb[ch] = trim;
+        snap.channelManager.delayMs[ch] = delay;
+    });
+}
+
+JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetCacheBudgetBytes(
         JNIEnv* /* env */, jobject /* thiz */, jlong budgetBytes) {
     PreparedIr::setCacheBudgetBytes(static_cast<size_t>(budgetBytes));

@@ -9,19 +9,21 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 object EgressSignals {
     private val listeners = CopyOnWriteArrayList<(String) -> Unit>()
+
+    // Legacy single-slot listener. Kept out of [listeners] so assigning the
+    // property cannot enqueue the same lambda twice (which made notify()
+    // recurse through its own synthetic getter lambda).
+    @Volatile
     private var legacyListener: ((String) -> Unit)? = null
 
     var onEgressChanged: ((String) -> Unit)?
-        get() = legacyListener ?: if (listeners.isEmpty()) null else { egressId: String -> notify(egressId) }
+        get() = if (legacyListener != null || listeners.isNotEmpty()) {
+            { egressId: String -> notify(egressId) }
+        } else {
+            null
+        }
         set(value) {
-            val old = legacyListener
-            if (old != null) {
-                listeners.remove(old)
-            }
             legacyListener = value
-            if (value != null && !listeners.contains(value)) {
-                listeners.add(value)
-            }
         }
 
     fun addListener(listener: (String) -> Unit) {
@@ -38,6 +40,9 @@ object EgressSignals {
     }
 
     fun notify(egressId: String) {
+        try {
+            legacyListener?.invoke(egressId)
+        } catch (_: Throwable) {}
         for (listener in listeners) {
             try {
                 listener(egressId)

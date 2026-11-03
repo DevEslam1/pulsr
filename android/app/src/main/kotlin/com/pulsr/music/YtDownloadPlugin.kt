@@ -245,8 +245,14 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 val videoId = call.argument<String>("videoId") ?: ""
                 val title = call.argument<String>("title") ?: ""
                 val progress = (call.argument<Int>("progress") ?: 0).coerceIn(0, 100)
+                // Optional: when the caller reports byte counters, the service
+                // derives a live transfer rate for the notification.
+                val downloadedBytes = call.argument<Number>("downloadedBytes")?.toLong() ?: -1L
+                val totalBytes = call.argument<Number>("totalBytes")?.toLong() ?: -1L
                 try {
-                    DownloadService.updateProgress(currentContext, videoId, title, progress)
+                    DownloadService.updateProgress(
+                        currentContext, videoId, title, progress, downloadedBytes, totalBytes
+                    )
                     result.success(true)
                 } catch (e: Exception) {
                     result.success(false)

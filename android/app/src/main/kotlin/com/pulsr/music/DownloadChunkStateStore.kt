@@ -89,8 +89,7 @@ object DownloadChunkStateStore {
             totalBytes = totalBytes,
             updatedAt = System.currentTimeMillis(),
         )
-        val chunkComplete = chunkIndex >= totalChunks - 1 ||
-            (totalBytes > 0L && downloadedBytes >= totalBytes)
+        val chunkComplete = totalBytes > 0L && downloadedBytes >= totalBytes
         val appContext = context.applicationContext
         val now = System.currentTimeMillis()
         synchronized(lock) {

@@ -37,6 +37,9 @@ object AudioTempFiles {
         "audio/3gpp" to ".3gp",
     )
 
+    private val ALLOWED_EXTENSIONS =
+        MIME_TO_EXTENSION.values.toSet() + setOf(".alac", ".mka", ".aifc")
+
     fun extensionFor(context: Context, uri: Uri): String {
         val fromName = runCatching { displayName(context, uri) }
             .getOrNull()
@@ -44,7 +47,7 @@ object AudioTempFiles {
             ?.lowercase()
             ?.filter { it in 'a'..'z' || it in '0'..'9' }
             ?.takeIf { it.length in 1..8 }
-        if (fromName != null) return ".$fromName"
+        if (fromName != null && ".$fromName" in ALLOWED_EXTENSIONS) return ".$fromName"
 
         val mime = runCatching { context.contentResolver.getType(uri) }
             .getOrNull()
@@ -145,6 +148,9 @@ object AudioTempFiles {
             if (n < 0) break
             out.write(buffer, 0, n)
             remaining -= n
+        }
+        if (remaining == 0L && input.read() != -1) {
+            throw IOException("Source exceeds maxBytes ($maxBytes)")
         }
     }
 }

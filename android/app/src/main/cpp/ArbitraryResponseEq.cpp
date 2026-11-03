@@ -310,27 +310,6 @@ std::vector<float> ArbitraryResponseEq::synthesizeFirKernel(
     return filter;
 }
 
-bool ArbitraryResponseEq::resynthesizeIfNeeded() {
-    if (!needsResynthesis_.exchange(false, std::memory_order_acq_rel)) {
-        return false;
-    }
-    if (loadedString_ != "" && nodes_.empty()) {
-        std::vector<std::pair<double, double>> parsed;
-        if (parseGraphicEq(loadedString_, parsed)) {
-            nodes_.assign(parsed.begin(), parsed.end());
-            hasResponse_ = true;
-        }
-    }
-    if (!hasResponse_ || nodes_.empty()) {
-        std::fill(firFilter_.begin(), firFilter_.end(), 0.0f);
-        firFilter_[0] = 1.0f;
-        firSynthesizedRate_ = sampleRate_;
-        return true;
-    }
-    synthesizeFir();
-    return true;
-}
-
 void ArbitraryResponseEq::synthesizeFir() {
     // Use the scratch-buffer synthesizers, not synthesizeFirKernel(): the
     // latter allocates two vectors (filter + spectrum) and is only safe for
@@ -495,11 +474,14 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
                 hasResponse_ = true;
                 firSynthesizedRate_ = params.preparedFilter->sampleRate;
             }
+            // A matching kernel (published by the control thread) resolves a
+            // deferred sample-rate rebuild.
+            needsResynthesis_.store(false, std::memory_order_release);
             return;
         }
         // Sample rate mismatch: FFT synthesis must never run on the audio
-        // thread. Keep the current kernel (or passthrough) and ask the control
-        // thread to rebuild it via resynthesizeIfNeeded().
+        // thread. Keep the current kernel (or passthrough) and let the control
+        // thread publish a matching PreparedArbitraryEqFilter.
         if (params.preparedFilter->nodes) {
             const bool hadResponse = hasResponse_;
             preparedNodesRef_ = params.preparedFilter->nodes;
@@ -540,7 +522,7 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
     }
 
     // Legacy paths: no FFT may run here (audio thread). Remember the requested
-    // response and let a control-thread resynthesizeIfNeeded() build the kernel.
+    // response; the control thread publishes a matching kernel in the snapshot.
     if (params.parsedNodes) {
         if (params.parsedNodes != preparedNodesRef_ ||
             params.linearPhase != linearPhase_ ||

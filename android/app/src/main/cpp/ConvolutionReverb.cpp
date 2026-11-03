@@ -880,6 +880,19 @@ void ConvolutionReverb::retireIr(std::shared_ptr<const PreparedIr> ir) {
     }
 }
 
+void ConvolutionReverb::advanceIrCrossfade() {
+    if (irCrossfadeTotal_ <= 0) return;
+    ++irCrossfadeSamples_;
+    if (irCrossfadeSamples_ >= irCrossfadeTotal_) {
+        // The cosine blend has fully reached the new kernel: retire the old IR
+        // and stop the dual-partition evaluation immediately instead of
+        // continuing to compute a weighted branch that is already silent.
+        irCrossfadeTotal_ = 0;
+        irCrossfadeSamples_ = 0;
+        retireIr(std::move(crossfadeIr_));
+    }
+}
+
 void ConvolutionReverb::setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir) {
     if (ir && ir->numPartitions > 0) {
         ensurePartitionCapacity(ir->numPartitions);
@@ -1202,9 +1215,11 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
         const float effectiveDryL = curMix * delayedDryL + (1.0f - curMix) * inL[i];
         const float effectiveDryR = curMix * delayedDryR + (1.0f - curMix) * inR[i];
 
-        // FIFO absorbs the rational-resampler's +/-1 sample jitter. Keep a
-        // running read deficit/surplus instead of repeating the last sample.
-        if (wetFifoCount_ == 0 && fifoIn < outWetFrames) {
+        // FIFO absorbs the rational-resampler's +/-1 sample jitter. Push one
+        // sample per output frame unconditionally (the previous "only when
+        // empty" guard inserted extra latency and skipped samples whenever the
+        // resampler produced a surplus).
+        if (fifoIn < outWetFrames) {
             pushWetFifo(resampleOutL_[fifoIn], resampleOutR_[fifoIn]);
             ++fifoIn;
         }
@@ -1334,7 +1349,7 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
                     0.5f * (1.0f + std::cos(static_cast<float>(M_PI) * progress));
                 wetSampleL = oldW * oldL + (1.0f - oldW) * wetSampleL;
                 wetSampleR = oldW * oldR + (1.0f - oldW) * wetSampleR;
-                ++irCrossfadeSamples_;
+                advanceIrCrossfade();
             }
             if (crossChannel_ > 0.001) {
                 const float cross = static_cast<float>(crossChannel_);
@@ -1413,7 +1428,7 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
                 0.5f * (1.0f + std::cos(static_cast<float>(M_PI) * progress));
             wetSampleL = oldW * oldL + (1.0f - oldW) * wetSampleL;
             wetSampleR = oldW * oldR + (1.0f - oldW) * wetSampleR;
-            ++irCrossfadeSamples_;
+            advanceIrCrossfade();
         }
         if (crossChannel_ > 0.001) {
             const float cross = static_cast<float>(crossChannel_);
@@ -1515,12 +1530,13 @@ void ConvolutionReverb::processInterleaved(float* buffer, int frames, int channe
                 MAX_HQ_DRY_DELAY - 1);
             const int surroundChannels = std::min(channels, 8);
             for (int i = 0; i < frames; ++i) {
+                const int readIdx = (surroundDelayIdx_ - delay + MAX_HQ_DRY_DELAY) % MAX_HQ_DRY_DELAY;
                 for (int ch = 2; ch < surroundChannels; ++ch) {
                     const int slot = ch - 2;
                     const float current = buffer[i * channels + ch];
-                    const float delayed = surroundDelay_[slot][surroundDelayIdx_];
+                    const float delayed = (delay > 0) ? surroundDelay_[slot][readIdx] : current;
                     surroundDelay_[slot][surroundDelayIdx_] = current;
-                    buffer[i * channels + ch] = (delay > 0) ? delayed : current;
+                    buffer[i * channels + ch] = delayed;
                 }
                 surroundDelayIdx_ = (surroundDelayIdx_ + 1) % MAX_HQ_DRY_DELAY;
             }

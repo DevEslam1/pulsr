@@ -36,12 +36,35 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
 
     private val activeDecodes = java.util.concurrent.ConcurrentHashMap<String, AtomicBoolean>()
 
+    // 64-entry access-ordered LRU keyed by path+mtime+count so repeated
+    // waveform requests for the same track are served from memory.
+    private val waveformCache = object : LinkedHashMap<String, DoubleArray>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DoubleArray>?): Boolean =
+            size > WAVEFORM_CACHE_ENTRIES
+    }
+
+    private fun cacheKey(path: String, count: Int): String {
+        val stamp = runCatching { File(path).lastModified() }.getOrDefault(0L)
+        return "$path:$stamp:$count"
+    }
+
+    private fun lookupCache(key: String): DoubleArray? = synchronized(waveformCache) {
+        waveformCache[key]?.copyOf()
+    }
+
+    private fun storeCache(key: String, value: DoubleArray) {
+        synchronized(waveformCache) {
+            waveformCache[key] = value.copyOf()
+        }
+    }
+
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/waveform"
         private const val TAG = "WaveformPlugin"
         private const val DEQUEUE_TIMEOUT_US = 10_000L
         private const val SPARSE_MIN_DURATION_US = 600_000_000L // 10 minutes
         private const val SPARSE_WINDOW_US = 100_000L          // ~100 ms per bucket
+        private const val WAVEFORM_CACHE_ENTRIES = 64
 
         private fun newExecutor(): ExecutorService =
             Executors.newFixedThreadPool(2) { runnable ->
@@ -107,6 +130,14 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                 // block uses the 2-arg remove, so it cannot evict this new flag.
                 activeDecodes.put(decodeId, cancellationFlag)?.set(true)
 
+                val key = cacheKey(path, count)
+                val cached = lookupCache(key)
+                if (cached != null) {
+                    activeDecodes.remove(decodeId, cancellationFlag)
+                    result.success(cached.toList())
+                    return
+                }
+
                 val executor = ensureExecutor()
                 try {
                     executor.execute {
@@ -117,6 +148,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                         }
                         try {
                             val buckets = decodeToBuckets(path, count, timeoutMs, cancellationFlag)
+                            storeCache(key, buckets)
                             postSuccess(result, buckets.toList())
                         } catch (e: java.util.concurrent.CancellationException) {
                             postError(result, "CANCELLED", "Waveform decode cancelled for $path")

@@ -47,6 +47,13 @@ class AudioIntentClassifierTest {
         assertFalse(AudioIntentClassifier.isYouTubeUrl("just some text"))
     }
 
+    @Test
+    fun youtubeLookalikeHostsAreRejected() {
+        assertFalse(AudioIntentClassifier.isYouTubeHost("evilyoutube.com"))
+        assertFalse(AudioIntentClassifier.isYouTubeHost("notyoutu.be"))
+        assertFalse(AudioIntentClassifier.isYouTubeHost("youtube.com."))
+    }
+
     // ---- Safe URI ----
 
     @Test
@@ -73,6 +80,23 @@ class AudioIntentClassifierTest {
             AudioIntentClassifier.isSafeUriParts("file", "/etc/passwd", roots)
         )
         assertFalse(AudioIntentClassifier.isSafeUriParts("file", null, roots))
+    }
+
+    @Test
+    fun fileUrisRejectTraversalSegments() {
+        assertFalse(
+            AudioIntentClassifier.isSafeUriParts("file", "/storage/../etc/passwd", roots)
+        )
+        assertFalse(
+            AudioIntentClassifier.isSafeUriParts(
+                "file", "/storage/emulated/0/../../../etc/passwd", roots
+            )
+        )
+        // Directory-boundary matching: a sibling with the root as a string
+        // prefix is not inside the root.
+        assertFalse(
+            AudioIntentClassifier.isSafeUriParts("file", "/storagex/song.mp3", roots)
+        )
     }
 
     // ---- Audio intent matrix ----
@@ -173,6 +197,36 @@ class AudioIntentClassifierTest {
             AudioIntentClassifier.isAudioIntentParts(
                 action = "android.intent.action.SEND",
                 scheme = "content",
+                path = null,
+                host = null,
+                mimeType = "text/plain",
+                textExtra = "proxy 10.0.0.1:8080",
+            )
+        )
+    }
+
+    @Test
+    fun sharedYouTubeTextWithoutDataUriIsAnAudioIntent() {
+        // ACTION_SEND from browsers carries EXTRA_TEXT with no data URI, so
+        // scheme is null; the link must be classified before the scheme gate.
+        assertTrue(
+            AudioIntentClassifier.isAudioIntentParts(
+                action = "android.intent.action.SEND",
+                scheme = null,
+                path = null,
+                host = null,
+                mimeType = "text/plain",
+                textExtra = "https://youtu.be/abc",
+            )
+        )
+    }
+
+    @Test
+    fun sharedProxyTextWithoutDataUriIsAnAudioIntent() {
+        assertTrue(
+            AudioIntentClassifier.isAudioIntentParts(
+                action = "android.intent.action.SEND",
+                scheme = null,
                 path = null,
                 host = null,
                 mimeType = "text/plain",

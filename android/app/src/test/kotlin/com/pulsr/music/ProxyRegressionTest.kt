@@ -152,6 +152,38 @@ class ProxyRegressionTest {
         }
 
     @Test
+    fun legacyDefaultBypassStringStillGetsPrivateRangeProtection() {
+        ProxyManager.setProxy(
+            enabled = true,
+            type = "http",
+            host = "proxy.example",
+            port = 8080,
+            username = null,
+            password = null,
+            // This is still the default string sent by the Dart settings layer.
+            bypassHosts = "localhost, 127.0.0.1",
+        )
+        assertTrue(ProxyManager.isBypassed("http://10.1.2.3/file"))
+        assertTrue(ProxyManager.isBypassed("http://192.168.1.10/file"))
+        assertTrue(ProxyManager.isBypassed("http://printer.local/file"))
+        assertFalse(ProxyManager.isBypassed("https://example.com/"))
+    }
+
+    @Test
+    fun poolOnlyConfigurationResolvesProxyCredentials() {
+        ProxyManager.dispose()
+        ProxyPool.setProxies(
+            listOf(node("auth", "proxy.example", username = "user"))
+        )
+        // Android's Authenticator has no getDefault(); verify the lookup the
+        // installed authenticator performs, then exercise the install path.
+        val credentials = ProxyPool.credentialsFor("proxy.example", 8080)
+        assertEquals("user", credentials?.first)
+        assertEquals("secret", credentials?.second)
+        ProxyManager.refreshAuthenticator()
+    }
+
+    @Test
     fun proxyAuthorizationHeaderIsOnlySentForPlainHttp() {
         val secured = node("secured", "proxy.example", username = "user")
         ProxyPool.setProxies(listOf(secured))

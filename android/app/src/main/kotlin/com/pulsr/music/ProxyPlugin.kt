@@ -121,6 +121,9 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 // explicit (user-supplied) pool; otherwise ProxyManager stops
                 // honoring the single-proxy configuration.
                 ProxyPool.setProxies(nodes, isExplicit = nodes.isNotEmpty())
+                // The JVM Authenticator resolves HTTPS CONNECT credentials from
+                // the pool; a pool-only configuration must install it too.
+                ProxyManager.refreshAuthenticator()
                 result.success(true)
             }
             "testProxy" -> {

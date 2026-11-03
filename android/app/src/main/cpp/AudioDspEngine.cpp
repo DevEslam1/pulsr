@@ -169,6 +169,8 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
 
     s.bypassCompare.gainCompensationLinear =
         clampFinite(s.bypassCompare.gainCompensationLinear, 0.001, 16.0, 1.0);
+    s.bypassCompare.gainCompensationDb =
+        clampFinite(s.bypassCompare.gainCompensationDb, -60.0, 24.0, 0.0);
 }
 
 } // namespace
@@ -219,13 +221,10 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
 }
 
 void AudioDspEngine::applySampleRateLocked(double sampleRate) {
-    // Resolve any kernel the audio thread deferred while the old rate was
-    // active. This is a control-thread synthesis; the render path only swaps
-    // the ready kernel through the published snapshot.
-    if (arbitraryEq_.needsResynthesis()) {
-        arbitraryEq_.setSampleRate(sampleRate, /*resynthesize=*/true);
-    }
     auto current = currentParams_.load();
+    // A deferred ARB kernel rebuild (audio thread saw a rate mismatch) must
+    // publish a new snapshot even when the rate/IR look unchanged.
+    const bool arbNeedsRebuild = arbitraryEq_.needsResynthesis();
     // Unchanged-rate resync: do nothing. This is the common case for a seek or a
     // gapless same-format transition, where regenerating the synthetic reverb IR
     // would allocate and could glitch. Only skip when the existing IR already
@@ -242,7 +241,7 @@ void AudioDspEngine::applySampleRateLocked(double sampleRate) {
             !current->reverb.enabled ||
             !current->reverb.preparedIr ||
             current->reverb.preparedIr->createdSampleRate == expectedIrRate;
-        if (irMatches) {
+        if (irMatches && !arbNeedsRebuild) {
             return;
         }
     }
@@ -267,21 +266,35 @@ void AudioDspEngine::applySampleRateLocked(double sampleRate) {
             reverb_.ensurePartitionCapacity(prewarmedIr->numPartitions);
         }
     }
-    // Pre-synthesize Arbitrary EQ filter for the new rate on the control thread
-    if (current->arbitraryEq.enabled && current->arbitraryEq.parsedNodes && !current->arbitraryEq.parsedNodes->empty()) {
-        auto fir = ArbitraryResponseEq::synthesizeFirKernel(
-            *current->arbitraryEq.parsedNodes,
-            current->arbitraryEq.linearPhase,
-            sampleRate);
-        auto prep = std::make_shared<const PreparedArbitraryEqFilter>(PreparedArbitraryEqFilter{
-            current->arbitraryEq.parsedNodes,
-            std::move(fir),
-            current->arbitraryEq.linearPhase,
-            sampleRate
-        });
-        updated->arbitraryEq.preparedFilter = prep;
-    }
+    // Pre-synthesize the Arbitrary EQ kernel for the new rate on the control
+    // thread. applyParams only ever swaps an already-built kernel.
+    ensureArbitraryEqPrepared(*updated);
     swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(updated));
+}
+
+void AudioDspEngine::ensureArbitraryEqPrepared(DspParamSnapshot& snap) {
+    auto& eq = snap.arbitraryEq;
+    if (eq.preparedFilter &&
+        std::abs(eq.preparedFilter->sampleRate - snap.sampleRate) < 0.5) {
+        return;
+    }
+    std::shared_ptr<const std::vector<std::pair<double, double>>> nodes =
+        eq.parsedNodes;
+    if ((!nodes || nodes->empty()) && !eq.graphicEqString.empty()) {
+        auto parsed = std::make_shared<std::vector<std::pair<double, double>>>();
+        if (ArbitraryResponseEq::parseGraphicEq(eq.graphicEqString, *parsed) &&
+            !parsed->empty()) {
+            nodes = std::move(parsed);
+            eq.parsedNodes = nodes;
+        }
+    }
+    if (!nodes || nodes->empty()) return;
+    auto fir = ArbitraryResponseEq::synthesizeFirKernel(
+        *nodes, eq.linearPhase, snap.sampleRate);
+    eq.preparedFilter = std::make_shared<const PreparedArbitraryEqFilter>(
+        PreparedArbitraryEqFilter{
+            nodes, std::move(fir), eq.linearPhase, snap.sampleRate
+        });
 }
 
 void AudioDspEngine::swapCurrentLocked(const std::shared_ptr<const DspParamSnapshot>& snap) {
@@ -616,6 +629,9 @@ void DspEngineRegistry::getTelemetry(double* outArray, int size) {
     if (size >= 17) {
         outArray[16] = eng->isSafetyAttenuationActive() ? 1.0 : 0.0;
     }
+    if (size >= 18) {
+        outArray[17] = eng->getLoudnessDeltaDb();
+    }
 }
 
 double DspEngineRegistry::getWeeklyDose() {
@@ -762,14 +778,19 @@ void AudioDspEngine::setBypassCompare(bool enabled, double gainCompensationDb) {
     // Sanitize at the source: the A/B bypass path applies this gain and returns
     // before the non-finite scrubber in processInterleaved(), so a NaN/Inf or
     // absurd compensation would poison the output buffer.
+    // -999 dB is the "measure the chain and match it automatically" sentinel.
+    const bool autoGainMatch = enabled && std::isfinite(gainCompensationDb) &&
+                               gainCompensationDb <= -999.0;
     double compDb = 0.0;
-    if (std::isfinite(gainCompensationDb)) {
+    if (std::isfinite(gainCompensationDb) && !autoGainMatch) {
         compDb = std::clamp(gainCompensationDb, -60.0, 24.0);
     }
     const double gainLinear = std::pow(10.0, compDb / 20.0);
-    updateParams([enabled, gainLinear](DspParamSnapshot& snap) {
+    updateParams([enabled, gainLinear, compDb, autoGainMatch](DspParamSnapshot& snap) {
         snap.bypassCompare.enabled = enabled;
         snap.bypassCompare.gainCompensationLinear = gainLinear;
+        snap.bypassCompare.gainCompensationDb = compDb;
+        snap.bypassCompare.autoGainMatch = autoGainMatch;
     });
 }
 
@@ -798,22 +819,9 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
                     snapshot->reverb.preset,
                     static_cast<float>(snapshot->reverb.damping));
             }
-            if (snapshot->arbitraryEq.parsedNodes && !snapshot->arbitraryEq.parsedNodes->empty()) {
-                auto fir = ArbitraryResponseEq::synthesizeFirKernel(
-                    *snapshot->arbitraryEq.parsedNodes,
-                    snapshot->arbitraryEq.linearPhase,
-                    mySr);
-                mutableSnap->arbitraryEq.preparedFilter = std::make_shared<const PreparedArbitraryEqFilter>(
-                    PreparedArbitraryEqFilter{
-                        snapshot->arbitraryEq.parsedNodes,
-                        std::move(fir),
-                        snapshot->arbitraryEq.linearPhase,
-                        mySr
-                    }
-                );
-            }
         }
     }
+    ensureArbitraryEqPrepared(*mutableSnap);
     if (mutableSnap->reverb.preparedIr && mutableSnap->reverb.preparedIr->numPartitions > 0) {
         reverb_.ensurePartitionCapacity(mutableSnap->reverb.preparedIr->numPartitions);
     }
@@ -854,6 +862,7 @@ void AudioDspEngine::resetInternal() {
     smoothedSafetyGain_ = 1.0;
     std::memset(ditherErrorHistory_, 0, sizeof(ditherErrorHistory_));
     limiterGrDb_.store(0.0f, std::memory_order_relaxed);
+    shortTermLoudnessDeltaDb_.store(0.0f, std::memory_order_relaxed);
     for (int b = 0; b < DynamicEqParamSet::MAX_BANDS; ++b) {
         dynEqGrDb_[b].store(0.0f, std::memory_order_relaxed);
     }
@@ -1125,11 +1134,25 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         limiter_.setProcessingActive(false);
-        if (std::abs(snapshot->bypassCompare.gainCompensationLinear - 1.0) > 1e-4) {
+        // Auto-Level: cancel the DSP chain's measured loudness change on the dry
+        // signal. If the chain measured +3 dB, the dry path is trimmed -3 dB so
+        // the comparison is level-matched. Clamp the correction so a momentary
+        // silence or a very hot chain cannot produce a huge jump.
+        double bypassGainDb = std::log10(
+            std::max(0.001, snapshot->bypassCompare.gainCompensationLinear)) * 20.0;
+        if (snapshot->bypassCompare.autoGainMatch) {
+            const double measuredDb = static_cast<double>(
+                shortTermLoudnessDeltaDb_.load(std::memory_order_relaxed));
+            // Compensation applied to the dry path is the inverse of the
+            // chain's measured change, bounded to [-18, +12] dB.
+            bypassGainDb = std::clamp(-measuredDb, -18.0, 12.0);
+        }
+        if (std::abs(bypassGainDb) > 1e-3) {
             const int totalSamples = frames * channels;
-            const float gain = static_cast<float>(snapshot->bypassCompare.gainCompensationLinear);
+            const float gain = static_cast<float>(std::pow(10.0, bypassGainDb / 20.0));
             for (int i = 0; i < totalSamples; ++i) {
-                buffer[i] *= gain;
+                const float x = buffer[i];
+                buffer[i] = std::isfinite(x) ? x * gain : 0.0f;
             }
         }
         // Level matching must not turn into a safety bypass: dose metering is
@@ -1259,7 +1282,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         (((stages & STAGE_EQ) != 0) && snapshot->eq.enabled) || eq_.isRamping() ||
         (((stages & STAGE_DYNEQ) != 0) && snapshot->dynamicEq.enabled) || dynamicEq_.isRamping() ||
         (((stages & STAGE_CROSSFEED) != 0) && snapshot->crossfeed.enabled) || crossfeed_.isRamping() ||
-        ((stages & STAGE_PANNER) != 0) || panner_.isRamping() ||
+        // A raw STAGE_PANNER bit is not evidence of work either: a centered
+        // balance with monoMix off is an exact pass-through, and treating it as
+        // active would defeat the bit-exact fast path for the common
+        // activeStages=0xFFFFFFFF snapshot.
+        (((stages & STAGE_PANNER) != 0) && (snapshot->panner.monoMix || std::abs(snapshot->panner.balance) > 0.001)) || panner_.isRamping() ||
         (((stages & STAGE_WIDTH) != 0) && snapshot->stereoWidth.enabled) || stereoWidth_.isRamping() ||
         (((stages & STAGE_CROSSOVER) != 0) && snapshot->subCrossover.enabled) || subCrossover_.isRamping() ||
         (((stages & STAGE_DYNAMIC_BASS) != 0) && snapshot->dynamicBass.enabled) || dynamicBass_.isRamping() ||
@@ -1278,6 +1305,21 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                               dvcActive ||
                               (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4) ||
                               runLimiter;
+
+    // Loudness-delta metering: capture the block's input energy before any
+    // stage runs, then compare it with the post-chain energy measured just
+    // before the safety stage below. RT-safe: one pass over the block, no
+    // allocation, no locks.
+    const int64_t totalSamples64 = static_cast<int64_t>(frames) * channels;
+    double blockInputMeanSquare = 0.0;
+    if (nonUnityGain && totalSamples64 > 0) {
+        double sum = 0.0;
+        for (int64_t i = 0; i < totalSamples64; ++i) {
+            const double x = buffer[i];
+            sum += x * x;
+        }
+        blockInputMeanSquare = sum / static_cast<double>(totalSamples64);
+    }
 
     if (nonUnityGain) {
         // Apply smoothed ReplayGain pre-gain before EQ stage
@@ -1438,6 +1480,38 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
     } else {
         smoothedDirectVolume_ = 1.0;
+    }
+
+    // 10b. Post-chain loudness delta (before safety), smoothed over 400 ms.
+    // A fully transparent block reports 0 dB; the EMA decays there rather than
+    // freezing a stale value from an earlier processing session.
+    {
+        const double sr = std::max(1.0, sampleRate_.load(std::memory_order_acquire));
+        const double alpha = 1.0 - std::exp(-static_cast<double>(frames) / (sr * 0.400));
+        const float current = shortTermLoudnessDeltaDb_.load(std::memory_order_relaxed);
+        if (nonUnityGain && totalSamples64 > 0 && blockInputMeanSquare > 1e-12) {
+            double outSum = 0.0;
+            for (int64_t i = 0; i < totalSamples64; ++i) {
+                const double x = buffer[i];
+                outSum += x * x;
+            }
+            const double outMeanSquare = outSum / static_cast<double>(totalSamples64);
+            if (outMeanSquare > 1e-12) {
+                // Input/output level ratio: positive means the chain makes the
+                // signal quieter. A/B Auto-Level applies the inverse (out/in)
+                // to the dry path so the comparison is loudness-matched.
+                const double deltaDb = std::clamp(
+                    10.0 * std::log10(blockInputMeanSquare / outMeanSquare),
+                    -60.0, 60.0);
+                shortTermLoudnessDeltaDb_.store(
+                    current + static_cast<float>(alpha * (deltaDb - current)),
+                    std::memory_order_relaxed);
+            }
+        } else if (!nonUnityGain) {
+            shortTermLoudnessDeltaDb_.store(
+                current - static_cast<float>(alpha * current),
+                std::memory_order_relaxed);
+        }
     }
 
     // 11. Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870)

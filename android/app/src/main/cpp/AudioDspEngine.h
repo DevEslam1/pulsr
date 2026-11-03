@@ -176,6 +176,11 @@ public:
     void setThermalLevel(int level) { thermalLevel_.store(std::clamp(level, 0, 3), std::memory_order_relaxed); }
     int getThermalLevel() const { return thermalLevel_.load(std::memory_order_relaxed); }
     float getLimiterGrDb() const { return limiterGrDb_.load(std::memory_order_relaxed); }
+    // Smoothed (400 ms) input/output loudness ratio of the DSP chain, in dB:
+    // positive means the chain is quieter than its input. A/B Auto-Level
+    // applies its inverse (output/input) to the dry path. Also exposed as
+    // telemetry index 17 when the caller provides an 18-slot array.
+    double getLoudnessDeltaDb() const { return shortTermLoudnessDeltaDb_.load(std::memory_order_relaxed); }
     float getDynEqGrDb(int band) const {
         if (band >= 0 && band < DynamicEqParamSet::MAX_BANDS) {
             return dynEqGrDb_[band].load(std::memory_order_relaxed);
@@ -224,6 +229,9 @@ public:
 private:
     void setSampleRateInternal(double sampleRate);
     void applySampleRateLocked(double sampleRate);
+    // Synthesizes the Arbitrary EQ kernel for snap.sampleRate on the calling
+    // (control) thread and stores it as the snapshot's preparedFilter.
+    void ensureArbitraryEqPrepared(DspParamSnapshot& snap);
     void resetInternal();
 
     // Publishes `snap` as the live snapshot and retires the previous owner.
@@ -377,6 +385,7 @@ private:
 
     // Telemetry cache (lock-free atomics, updated per audio buffer)
     std::atomic<float> limiterGrDb_{0.0f};
+    std::atomic<float> shortTermLoudnessDeltaDb_{0.0f};
     std::atomic<float> dynEqGrDb_[DynamicEqParamSet::MAX_BANDS]{};
     std::atomic<float> mbCompGrDb_[MultibandCompressor::NUM_BANDS]{};
 

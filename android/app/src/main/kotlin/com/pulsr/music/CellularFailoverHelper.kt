@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.os.Build
 import android.util.Log
 import androidx.annotation.WorkerThread
+import java.io.FilterInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
@@ -38,8 +39,22 @@ private class UnregisterOnDisconnectConnection(
     }
 
     override fun usingProxy(): Boolean = delegate.usingProxy()
-    override fun getInputStream(): InputStream = delegate.inputStream
-    override fun getErrorStream(): InputStream? = delegate.errorStream
+    override fun getInputStream(): InputStream = closeAwareStream(delegate.inputStream)
+    override fun getErrorStream(): InputStream? = delegate.errorStream?.let { closeAwareStream(it) }
+
+    // Closing the stream is the common way callers finish a download; release
+    // the network callback there too so it cannot leak until process death.
+    private fun closeAwareStream(stream: InputStream): InputStream =
+        object : FilterInputStream(stream) {
+            override fun close() {
+                try {
+                    super.close()
+                } finally {
+                    disconnect()
+                }
+            }
+        }
+
     override fun getOutputStream(): OutputStream = delegate.outputStream
     override fun getResponseCode(): Int = delegate.responseCode
     override fun getResponseMessage(): String? = delegate.responseMessage
@@ -50,6 +65,29 @@ private class UnregisterOnDisconnectConnection(
     override fun getContentLength(): Int = delegate.contentLength
     override fun getContentLengthLong(): Long = delegate.contentLengthLong
     override fun getContentType(): String? = delegate.contentType
+
+    // Timeouts and headers must reach the wrapped connection; the base
+    // HttpURLConnection would otherwise keep its own (unused) defaults and the
+    // caller's timeout/header settings would silently do nothing.
+    override fun setConnectTimeout(timeout: Int) {
+        delegate.connectTimeout = timeout
+    }
+
+    override fun getConnectTimeout(): Int = delegate.connectTimeout
+
+    override fun setReadTimeout(timeout: Int) {
+        delegate.readTimeout = timeout
+    }
+
+    override fun getReadTimeout(): Int = delegate.readTimeout
+
+    override fun setRequestProperty(key: String?, value: String?) {
+        delegate.setRequestProperty(key, value)
+    }
+
+    override fun addRequestProperty(key: String?, value: String?) {
+        delegate.addRequestProperty(key, value)
+    }
 }
 
 /**

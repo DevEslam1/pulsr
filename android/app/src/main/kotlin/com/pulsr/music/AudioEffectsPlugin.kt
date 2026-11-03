@@ -59,7 +59,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         "setSubCrossoverEnabled", "setSubCrossoverParams", "setDynamicEqEnabled", "setDynamicEqBandCount", "setDynamicEqBand",
         "setMultibandCompressorEnabled", "setMultibandCompressorBand", "setMultibandCompressorCrossovers", "setDynamicBassParams",
         "setViperDdcEnabled", "loadViperDdc", "setArbitraryEqEnabled", "loadArbitraryEq",
-        "setLiveProgEnabled", "loadLiveProgCode", "setLiveProgSlider", "setHeadphoneSafetyParams"
+        "setLiveProgEnabled", "loadLiveProgCode", "setLiveProgSlider", "setHeadphoneSafetyParams",
+        "setChannelManagerEnabled", "setChannelManagerChannel"
     )
     private lateinit var methodChannel: MethodChannel
     private var context: Context? = null
@@ -192,8 +193,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var isArbitraryEqEnabled = false
     @Volatile private var isLiveProgEnabled = false
     @Volatile private var isHeadphoneSafetyEnabled = false
+    @Volatile private var headphoneSafetyDoseThreshold = 1.0
+    @Volatile private var headphoneSafetyCeilingDb = -6.0
+    @Volatile private var isChannelManagerEnabled = false
+    @Volatile private var channelManagerChannelCount = 2
 
-    @Volatile private var isSincResamplerEnabled = true
+    @Volatile private var isSincResamplerEnabled = false
     @Volatile private var resamplerInRate = 48000.0
     @Volatile private var resamplerOutRate = 48000.0
     @Volatile private var resamplerQuality = 3
@@ -431,6 +436,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int, resetState: Boolean): FloatArray?
     private external fun nativeResetDsdDecoder()
     private external fun nativeSetActiveStages(bitmask: Int)
+    private external fun nativeSetChannelManagerEnabled(enabled: Boolean, channelCount: Int)
+    private external fun nativeSetChannelManagerChannel(channel: Int, trimDb: Double, delayMs: Double)
     private external fun nativeSetCacheBudgetBytes(budgetBytes: Long)
     private external fun nativeGetAutoDegradedStages(): Int
     private external fun nativeGetLimiterGrDb(): Double
@@ -746,7 +753,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER or STAGE_SATURATION or STAGE_WIDTH or STAGE_LOUDNESS or STAGE_CROSSOVER or STAGE_DYNEQ or STAGE_DITHER
+    private var activeDspStages: Int = 0
 
     fun recalculateActiveStages() {
         synchronized(stateLock) {
@@ -804,6 +811,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isArbitraryEqEnabled) mask = mask or STAGE_ARBITRARY_EQ
         if (isLiveProgEnabled) mask = mask or STAGE_LIVE_PROG
         if (isHeadphoneSafetyEnabled) mask = mask or STAGE_HEADPHONE_SAFETY
+        if (isChannelManagerEnabled) mask = mask or STAGE_CHANNEL_MANAGER
         // Dither is a standalone stage: it must run even with every other
         // effect off, so it is gated by its own bit rather than by chain gain.
         if (isDitherEnabled) mask = mask or STAGE_DITHER
@@ -1504,6 +1512,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         safeCall(TAG, "restoreViperDdc") { nativeSetViperDdcEnabled(isViperDdcEnabled) }
         safeCall(TAG, "restoreArbitraryEq") { nativeSetArbitraryEqEnabled(isArbitraryEqEnabled) }
         safeCall(TAG, "restoreLiveProg") { nativeSetLiveProgEnabled(isLiveProgEnabled) }
+        safeCall(TAG, "restoreHeadphoneSafety") {
+            nativeSetHeadphoneSafetyParams(isHeadphoneSafetyEnabled, headphoneSafetyDoseThreshold, headphoneSafetyCeilingDb)
+        }
+        safeCall(TAG, "restoreChannelManager") {
+            nativeSetChannelManagerEnabled(isChannelManagerEnabled, channelManagerChannelCount)
+        }
         // FIX M-10: clear MBC dedup cache so all band params are re-pushed after bypass restore
         lastNativeMultibandCompressorBands.clear()
         lastNativeMultibandCompressorCrossovers = null
@@ -1574,7 +1588,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setDynamicBassParams", "getTelemetry", "getLimiterGrDb", "getDynEqGrDb", "getMultibandGrDb", "getRollingRtf",
                 "getRtfGovernorStatus", "setRtfGovernorEnabled", "setBypassCompare",
                 "getThermalStatus", "getDspBatteryDrainEstimate", "getChainOfCustodyReport",
-                "getWeeklyDose", "resetWeeklyDose", "isSafetyAttenuationActive", "setHeadphoneSafetyParams" -> {
+                "getWeeklyDose", "resetWeeklyDose", "isSafetyAttenuationActive", "setHeadphoneSafetyParams",
+                "setChannelManagerEnabled", "setChannelManagerChannel" -> {
                     synchronized(stateLock) {
                         handleNativeDspCall(call, result)
                     }
@@ -2038,8 +2053,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "awaitDspControlUpdates" -> {
                     // Acknowledge only after earlier IR/preparation jobs finish.
-                    safeReverbExecute(onDropped = { result.success(false) }) {
-                        result.success(!disposed.get())
+                    val scheduled = safeReverbExecute(
+                        onDropped = { mainHandler.post { result.success(false) } },
+                    ) {
+                        mainHandler.post { result.success(!disposed.get()) }
+                    }
+                    if (!scheduled) {
+                        mainHandler.post { result.success(false) }
                     }
                 }
 
@@ -2144,9 +2164,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
 
                     val copy = irList.toList()
-                    val scheduled = safeReverbExecute(onDropped = { result.success(false) }) {
+                    val scheduled = safeReverbExecute(
+                        onDropped = { mainHandler.post { result.success(false) } },
+                    ) {
                         if (disposed.get() || !isNativeDspLoaded) {
-                            result.success(false)
+                            mainHandler.post { result.success(false) }
                             return@safeReverbExecute
                         }
                         try {
@@ -2160,14 +2182,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 Log.w(TAG, "IR too large or exceeds budget")
                             }
                             // Report the real native result instead of assuming success.
-                            result.success(loaded)
+                            mainHandler.post { result.success(loaded) }
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeLoadImpulseResponse async failed: ${e.message}")
-                            result.success(notApplied("IR load failed: ${e.message}"))
+                            mainHandler.post { result.success(notApplied("IR load failed: ${e.message}")) }
                         }
                     }
                     if (!scheduled) {
-                        result.success(false)
+                        mainHandler.post { result.success(false) }
                     }
                 }
 
@@ -2206,14 +2228,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             if (telemetry != null) {
                                 result.success(telemetry.toList())
                             } else {
-                                result.success(DoubleArray(15).toList())
+                                result.success(DoubleArray(17).toList())
                             }
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeGetTelemetry failed: ${e.message}")
-                            result.success(DoubleArray(15).toList())
+                            result.success(DoubleArray(17).toList())
                         }
                     } else {
-                        result.success(DoubleArray(15).toList())
+                        result.success(DoubleArray(17).toList())
                     }
                 }
 
@@ -2379,6 +2401,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val threshold = (call.argument<Number>("doseThreshold"))?.toDouble() ?: 1.0
                     val ceilingDb = (call.argument<Number>("safetyCeilingDb"))?.toDouble() ?: -6.0
                     isHeadphoneSafetyEnabled = enabled
+                    headphoneSafetyDoseThreshold = threshold
+                    headphoneSafetyCeilingDb = ceilingDb
                     if (isNativeDspLoaded) {
                         try {
                             nativeSetHeadphoneSafetyParams(enabled, threshold, ceilingDb)
@@ -2391,6 +2415,46 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         recalculateActiveStages()
                         result.success(true)
                     }
+                }
+
+                // Multichannel trim/delay (2-8 channels). Runs before the native
+                // lookahead limiter, so surround boosts still hit the brickwall.
+                "setChannelManagerEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val channelCount = (call.argument<Int>("channelCount") ?: 2).coerceIn(2, 8)
+                    isChannelManagerEnabled = enabled
+                    channelManagerChannelCount = channelCount
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetChannelManagerEnabled(enabled, channelCount)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetChannelManagerEnabled failed: ${e.message}")
+                            result.error("NATIVE_ERROR", e.message, null)
+                            return
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setChannelManagerChannel" -> {
+                    val channel = call.argument<Int>("channel") ?: 0
+                    if (channel !in 0..7) {
+                        result.error("INVALID_ARGUMENT", "Channel index out of range [0..7]: $channel", null)
+                        return
+                    }
+                    val trimDb = clamp((call.argument<Number>("trimDb"))?.toDouble() ?: 0.0, -30.0, 12.0)
+                    val delayMs = clamp((call.argument<Number>("delayMs"))?.toDouble() ?: 0.0, 0.0, 50.0)
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetChannelManagerChannel(channel, trimDb, delayMs)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetChannelManagerChannel failed: ${e.message}")
+                            result.error("NATIVE_ERROR", e.message, null)
+                            return
+                        }
+                    }
+                    result.success(true)
                 }
 
                 // Stereo Balance & Mono Mix — native SpatialPanner. Constant-power
@@ -3783,6 +3847,81 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             }
         ))
 
+        // 19. ViPER-DDC (Native C++)
+        val vddcActive = isViperDdcEnabled && !isBitPerfectBypassActive
+        if (vddcActive) activeNames.add("ViPER DDC (Digital Dynamic Correction)")
+        stagesList.add(buildDspStage(
+            name = "ViPER DDC (Digital Dynamic Correction)",
+            category = "Native C++ Engine",
+            isSupported = isNativeDspLoaded,
+            isEnabled = isViperDdcEnabled,
+            isBypassed = isBitPerfectBypassActive,
+            isDegraded = ((autoDegraded and STAGE_VIPER_DDC) != 0),
+            parameters = emptyMap<String, Any?>(),
+            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isViperDdcEnabled) "Profile Active" else "Disabled"
+        ))
+
+        // 20. Arbitrary Response EQ (Native C++)
+        val arEqActive = isArbitraryEqEnabled && !isBitPerfectBypassActive
+        if (arEqActive) activeNames.add("Arbitrary Response EQ")
+        stagesList.add(buildDspStage(
+            name = "Arbitrary Response EQ (GraphicEQ)",
+            category = "Native C++ Engine",
+            isSupported = isNativeDspLoaded,
+            isEnabled = isArbitraryEqEnabled,
+            isBypassed = isBitPerfectBypassActive,
+            isDegraded = ((autoDegraded and STAGE_ARBITRARY_EQ) != 0),
+            parameters = emptyMap<String, Any?>(),
+            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isArbitraryEqEnabled) "Filter Active" else "Disabled"
+        ))
+
+        // 21. LiveProg (Native C++)
+        val liveProgActive = isLiveProgEnabled && !isBitPerfectBypassActive
+        if (liveProgActive) activeNames.add("LiveProg Script")
+        stagesList.add(buildDspStage(
+            name = "LiveProg Programmable DSP",
+            category = "Native C++ Engine",
+            isSupported = isNativeDspLoaded,
+            isEnabled = isLiveProgEnabled,
+            isBypassed = isBitPerfectBypassActive,
+            isDegraded = ((autoDegraded and STAGE_LIVE_PROG) != 0),
+            parameters = emptyMap<String, Any?>(),
+            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLiveProgEnabled) "Script Active" else "Disabled"
+        ))
+
+        // 22. Headphone Safety / Dose Limiter (Native C++)
+        val safetyActive = isHeadphoneSafetyEnabled && !isBitPerfectBypassActive
+        if (safetyActive) activeNames.add("Headphone Safety (Ceiling: $headphoneSafetyCeilingDb dB)")
+        stagesList.add(buildDspStage(
+            name = "Headphone Safety & Dose Limiter",
+            category = "Native C++ Engine",
+            isSupported = isNativeDspLoaded,
+            isEnabled = isHeadphoneSafetyEnabled,
+            isBypassed = isBitPerfectBypassActive,
+            isDegraded = false,
+            parameters = mapOf(
+                "doseThreshold" to headphoneSafetyDoseThreshold,
+                "safetyCeilingDb" to headphoneSafetyCeilingDb
+            ),
+            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isHeadphoneSafetyEnabled) "Ceiling: $headphoneSafetyCeilingDb dB" else "Disabled"
+        ))
+
+        // 23. Multichannel Trim/Delay (Native C++)
+        val channelManagerActive = isChannelManagerEnabled && !isBitPerfectBypassActive
+        if (channelManagerActive) activeNames.add("Channel Manager ($channelManagerChannelCount channels)")
+        stagesList.add(buildDspStage(
+            name = "Channel Manager (Trim/Delay)",
+            category = "Native C++ Engine",
+            isSupported = isNativeDspLoaded,
+            isEnabled = isChannelManagerEnabled,
+            isBypassed = isBitPerfectBypassActive,
+            isDegraded = ((autoDegraded and STAGE_CHANNEL_MANAGER) != 0),
+            parameters = mapOf(
+                "channelCount" to channelManagerChannelCount
+            ),
+            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isChannelManagerEnabled) "$channelManagerChannelCount channels" else "Disabled"
+        ))
+
         val nativeAppliedSampleRate = if (isNativeDspLoaded) {
             try { nativeGetAppliedSampleRate() } catch (_: Exception) { 0.0 }
         } else 0.0
@@ -4065,8 +4204,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     /**
      * Renders a [DYNAMICS_PRESETS] entry through the native 4-band
      * MultibandCompressor. The three preset bands map onto the native bands
-     * 0..2 with the preset's band edges as crossovers; native band 3 is left
-     * neutral. Returns false only when the native engine rejects the params.
+     * 0..2 with the preset's band edges as crossovers; native band 3 mirrors
+     * the top preset band so the full spectrum is compressed. Returns false
+     * only when the native engine rejects the params.
      */
     private fun applyNativeDynamicsPreset(presetName: String, enabled: Boolean): Boolean {
         if (!isNativeDspLoaded) return false
@@ -4094,34 +4234,33 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         return try {
             val f0 = activeConfig.bands.getOrNull(0)?.cutoffFrequency?.toDouble() ?: 200.0
             val f1 = activeConfig.bands.getOrNull(1)?.cutoffFrequency?.toDouble() ?: 3500.0
-            val f2 = activeConfig.bands.getOrNull(2)?.cutoffFrequency?.toDouble() ?: 20000.0
+            // Preset band 2 ends at 20 kHz; keep the crossover clear of Nyquist.
+            val f2 = minOf(
+                activeConfig.bands.getOrNull(2)?.cutoffFrequency?.toDouble() ?: 20000.0,
+                16000.0,
+            )
             nativeSetMultibandCompressorCrossovers(f0, f1, f2)
             lastNativeMultibandCompressorCrossovers =
                 String.format(java.util.Locale.US, "%.1f:%.1f:%.1f", f0, f1, f2)
 
+            val topBand = activeConfig.bands.last()
             for (i in 0 until 4) {
-                val b = config.bands.getOrNull(i)
-                if (b != null) {
-                    val thresholdDb = b.threshold.toDouble()
-                    val ratio = b.ratio.toDouble()
-                    val attackMs = b.attackTime.toDouble()
-                    val releaseMs = b.releaseTime.toDouble()
-                    val kneeDb = b.kneeWidth.toDouble()
-                    val makeupGainDb = b.postGain.toDouble()
-                    nativeSetMultibandCompressorBand(
-                        i, thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, true
-                    )
-                    lastNativeMultibandCompressorBands[i] = String.format(
-                        java.util.Locale.US, "%.1f:%.1f:%.1f:%.1f:%.1f:%.1f:%b",
-                        thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, true
-                    )
-                } else {
-                    nativeSetMultibandCompressorBand(
-                        i, -12.0, 1.0, 15.0, 100.0, 3.0, 0.0, false
-                    )
-                    // H-01 / F-09: Clear neutral band from dedup cache so subsequent standalone MBC config pushes are not skipped
-                    lastNativeMultibandCompressorBands.remove(i)
-                }
+                // The native engine has four bands while presets define three;
+                // mirror the top preset band instead of leaving band 3 flat.
+                val b = activeConfig.bands.getOrNull(i) ?: topBand
+                val thresholdDb = b.threshold.toDouble()
+                val ratio = b.ratio.toDouble()
+                val attackMs = b.attackTime.toDouble()
+                val releaseMs = b.releaseTime.toDouble()
+                val kneeDb = b.kneeWidth.toDouble()
+                val makeupGainDb = b.postGain.toDouble()
+                nativeSetMultibandCompressorBand(
+                    i, thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, true
+                )
+                lastNativeMultibandCompressorBands[i] = String.format(
+                    java.util.Locale.US, "%.1f:%.1f:%.1f:%.1f:%.1f:%.1f:%b",
+                    thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, true
+                )
             }
             nativeSetMultibandCompressorEnabled(true)
             lastNativeMultibandCompressorEnabled = true
@@ -4210,8 +4349,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             updateEqInPlace()
             updatePreampInPlace()
             // Keep DP enabled for any stage that still needs it (limiter,
-            // dynamics, balance/mono). The EQ term is suppression-aware so a
-            // suppressed EQ neither applies gains nor keeps DP alive.
+            // dynamics). The EQ term is suppression-aware so a suppressed EQ
+            // neither applies gains nor keeps DP alive.
             updateDpEnabled()
         } else {
             buildDynamicsProcessing()
@@ -4311,8 +4450,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
      *          to native/HAL processing on clean ROMs.
      * "native" → never suppress (default).
      *
-     * Note: HAL limiter and balance/mono are NOT suppressed — they don't process the
-     * frequency spectrum and therefore don't interact adversely with Dolby-style engines.
+     * Note: the HAL limiter is NOT suppressed — it does not process the
+     * frequency spectrum and therefore does not interact adversely with
+     * Dolby-style engines.
      */
     private fun isHalEqSuppressed(): Boolean {
         if (!isNativeDspLoaded) return false
@@ -4329,12 +4469,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isBitPerfectBypassActive) return false
         val effectiveEqEnabled = isEqEnabled && !isHalEqSuppressed()
         val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive
-        val needsBalanceMono = monoMix || abs(stereoBalance) > 0.001
         // The native lookahead limiter owns output protection whenever the C++
         // chain is loaded; running the HAL limiter too applies two limiters in
         // series (over-compression + stacked release). Single-owner only.
         val halLimiterActive = isLimiterEnabled && !isNativeDspLoaded
-        return effectiveEqEnabled || dynamicsActive || halLimiterActive || needsBalanceMono
+        // Stereo balance and mono mix live exclusively in the native STAGE_PANNER.
+        return effectiveEqEnabled || dynamicsActive || halLimiterActive
     }
 
     private fun updateDpEnabled() {
@@ -4345,8 +4485,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun buildPostEq(): DynamicsProcessing.Eq {
         val eq = DynamicsProcessing.Eq(true, true, eqBandCount)
         // HAL EQ suppressed (native/oem owns the band gains): build the postEq
-        // flat so a DP instance kept alive by limiter/dynamics/balance-mono
-        // cannot apply the curve on top of the native EQ (double-processing).
+        // flat so a DP instance kept alive by limiter/dynamics cannot apply the
+        // curve on top of the native EQ (double-processing).
         val effectiveEqEnabled = isEqEnabled && !isHalEqSuppressed()
         for (i in 0 until eqBandCount) {
             val band = eq.getBand(i)
@@ -4377,13 +4517,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive
-        val needsBalanceMono = monoMix || kotlin.math.abs(stereoBalance) > 0.001
         // Native lookahead limiter owns output protection when loaded.
         val halLimiterActive = isLimiterEnabled && !isNativeDspLoaded
         // When dspPreference is "oem" (or "auto" + OEM detected), suppress the HAL
         // graphic EQ to avoid double-processing through Dolby / Dirac / SoundAlive.
-        // Limiter and balance/mono still run through DP — they don't colour the
-        // frequency spectrum and are safe alongside system-level OEM engines.
+        // The limiter still runs through DP — it doesn't colour the frequency
+        // spectrum and is safe alongside system-level OEM engines.
         val halEqSuppressed = isHalEqSuppressed()
         val effectiveEqEnabled = isEqEnabled && !halEqSuppressed
         if (halEqSuppressed && isEqEnabled) {
@@ -4394,9 +4533,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         } else {
             lastLoggedHalEqSuppressed = null
         }
-        // Build DynamicsProcessing whenever EQ, dynamics, limiter, or balance/mono are active.
-        // Limiter and balance/mono route through the same DynamicsProcessing engine.
-        if (!effectiveEqEnabled && !dynamicsActive && !halLimiterActive && !needsBalanceMono) {
+        // Build DynamicsProcessing whenever EQ, dynamics, or the HAL limiter is active.
+        if (!effectiveEqEnabled && !dynamicsActive && !halLimiterActive) {
             try { oldDp?.release() } catch (_: Exception) {}
             updateLegacyEqualizer()
             return
@@ -4436,7 +4574,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 neutralizeDynamics(dp)
             }
 
-            // Enable the engine whenever any stage is active (EQ, dynamics, limiter, or balance/mono).
+            // Enable the engine whenever any stage is active (EQ, dynamics, or limiter).
             // isDpNeeded keeps the EQ term suppression-aware (single source of truth).
             dp.enabled = isDpNeeded()
             dynamicsProcessing = dp
@@ -4817,12 +4955,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     (isVirtualizerEnabled && virtualizerStrength > 0) ||
                     (volumeBoostMilliBels > 0) ||
                     (bassBoostStrength > 0) ||
-                    (isLimiterEnabled && !isNativeDspLoaded) ||
-                    (abs(stereoBalance) > 0.001) ||
-                    monoMix
+                    (isLimiterEnabled && !isNativeDspLoaded)
 
             val nativeActive = isNativeDspLoaded && (
                     isEqEnabled ||
+                    (abs(stereoBalance) > 0.001 || monoMix) ||
+                    isHeadphoneSafetyEnabled ||
+                    isChannelManagerEnabled ||
                     isCrossfeedEnabled ||
                     isLimiterEnabled ||
                     isReverbEnabled ||
@@ -4839,8 +4978,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isLiveProgEnabled ||
                     isDitherEnabled ||
                     isReplayGainEnabled ||
-                    dvcActive ||
-                    isSincResamplerEnabled
+                    dvcActive
             )
 
             return halActive || nativeActive

@@ -175,6 +175,8 @@ void LookaheadLimiter::reset() {
     writeIdx_ = 0;
     envelope_ = 1.0f;
     minGain_ = 1.0f;
+    attackDeadlineIdx_ = 0;
+    attackActive_ = false;
     dequeHead_ = 0;
     dequeTail_ = 0;
     sampleCount_ = 0;

@@ -142,8 +142,12 @@ class CastDiscoveryPlugin(
             }
 
             override fun onServiceLost(serviceInfo: NsdServiceInfo?) {
-                val key = serviceInfo?.serviceName ?: return
-                devices.remove(key)
+                val name = serviceInfo?.serviceName ?: return
+                // The map is keyed by the receiver's `id` attribute when present,
+                // so the mDNS service name must also be matched inside the value.
+                devices.entries.removeAll { (key, value) ->
+                    key == name || value["serviceName"] == name
+                }
                 emitDevices()
             }
 
@@ -162,6 +166,10 @@ class CastDiscoveryPlugin(
             }
         }
         discoveryListener = listener
+        // A new run may target a different Wi-Fi network; receivers resolved on
+        // the previous one are unreachable and must not linger in the list.
+        devices.clear()
+        emitDevices()
         try {
             nsd.discoverServices(CAST_SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
         } catch (e: Exception) {
@@ -215,6 +223,7 @@ class CastDiscoveryPlugin(
                         devices[id] = mapOf(
                             "id" to id,
                             "name" to (attrs["fn"] ?: info.serviceName),
+                            "serviceName" to info.serviceName,
                             "model" to (attrs["md"] ?: ""),
                             "host" to host,
                             "port" to info.port,

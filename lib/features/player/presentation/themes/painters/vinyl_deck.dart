@@ -373,6 +373,62 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                           ),
                         ),
 
+                        // 3c. Real-time analog scrub delta pill indicator
+                        if (_isScrubbing)
+                          PositionedDirectional(
+                            start: vinylLeft,
+                            top: vinylTop,
+                            width: vinylSize,
+                            height: vinylSize,
+                            child: Center(
+                              child: IgnorePointer(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.sm,
+                                    vertical: AppSpacing.s6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.82),
+                                    borderRadius: AppRadii.full,
+                                    border: Border.all(
+                                      color: activeColor.withValues(alpha: 0.65),
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: activeColor.withValues(alpha: 0.40),
+                                        blurRadius: 18,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        (_scrubTurns * 1800) >= 0
+                                            ? Icons.rotate_right_rounded
+                                            : Icons.rotate_left_rounded,
+                                        size: 15,
+                                        color: activeColor,
+                                      ),
+                                      const SizedBox(width: AppSpacing.xxs),
+                                      Text(
+                                        's',
+                                        style: const TextStyle(
+                                          fontSize: AppFontSize.label,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                          letterSpacing: AppTracking.label,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
                         // 4. Animated Tonearm Assembly Layer
                         Positioned.fill(
                           child: IgnorePointer(
