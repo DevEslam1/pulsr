@@ -187,6 +187,12 @@ class HiResAudioService {
         ErrorLogger.log('Failed to getAudioOutputInfo',
             error: e, stackTrace: st, category: 'HiResAudio');
       }
+      // A timeout while the audio/Bluetooth stack restarts does not mean the
+      // route changed. Keep the last good snapshot instead of replacing it
+      // with a fabricated "Default Audio Output" (which would flip
+      // isBluetoothRoute and trigger a spurious effect resync).
+      final cached = _cachedOutputInfo;
+      if (cached != null) return cached;
     }
 
     const fallback = AudioOutputInfo(
@@ -196,7 +202,6 @@ class HiResAudioService {
       bitDepth: 0,
       isBitPerfectActive: false,
     );
-    _cachedOutputInfo = fallback;
     return fallback;
   }
 

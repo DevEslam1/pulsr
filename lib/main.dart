@@ -71,6 +71,28 @@ import 'features/downloads/cubit/downloads_cubit.dart';
 import 'services/discord/discord_rpc_service.dart';
 import 'services/updater/app_update_service.dart';
 
+/// Readiness helper for DI singletons. `isRegistered` is already true while a
+/// lazy async singleton is still pending, so a plain `getIt<T>()` can throw
+/// "not ready yet" during startup.
+bool _isDependencyReady<T extends Object>() {
+  if (!getIt.isRegistered<T>()) return false;
+  try {
+    return getIt.isReadySync<T>();
+  } on ArgumentError {
+    // Sync singletons and factories are ready by definition.
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Returns the instance immediately when it is ready, otherwise waits for the
+/// pending async singleton instead of throwing.
+Future<T> _resolveDependency<T extends Object>() {
+  if (_isDependencyReady<T>()) return Future<T>.value(getIt<T>());
+  return getIt.getAsync<T>();
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Cap the framework's decoded-image cache so artwork bitmaps cannot balloon
@@ -202,7 +224,7 @@ Future<void> main() async {
 
   SoundFeedbackService.isMusicPlaying = () {
     try {
-      if (getIt.isRegistered<PulsrAudioHandler>()) {
+      if (_isDependencyReady<PulsrAudioHandler>()) {
         return getIt<PulsrAudioHandler>().playbackState.value.playing;
       }
     } catch (_) {}
@@ -331,11 +353,12 @@ Future<void> main() async {
         // Initialize Discord RPC if configured and online allowed
         try {
           if (onlineAllowed && prefs != null) {
-            unawaited(DiscordRpcService.instance.init(prefs).then((_) {
-              if (getIt.isRegistered<PlayerCubit>()) {
-                DiscordRpcService.instance
-                    .bindToPlayerCubit(getIt<PlayerCubit>());
-              }
+            unawaited(DiscordRpcService.instance.init(prefs).then((_) async {
+              // PlayerCubit is an async singleton; wait for readiness instead
+              // of calling getIt<T>() while the DI warm-up is still pending.
+              final player = await _resolveDependency<PlayerCubit>()
+                  .timeout(const Duration(seconds: 30));
+              DiscordRpcService.instance.bindToPlayerCubit(player);
             }).catchError((e, st) {
               ErrorLogger.log('DiscordRpcService init failed',
                   error: e, stackTrace: st, category: 'Startup');
@@ -533,35 +556,41 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   /// works but the lock-screen / shade controls silently do not exist. Surface
   /// it once so the user is not left wondering where the media notification is.
   void _watchPlatformBridgeHealth() {
-    try {
-      if (!getIt.isRegistered<PulsrAudioHandler>()) return;
-      final handler = getIt<PulsrAudioHandler>();
-      void surface() {
-        if (!handler.platformBridgeDegraded.value) return;
-        final ctx = rootNavigatorKey.currentContext;
-        if (ctx == null || !ctx.mounted) return;
-        PulsrToast.show(
-          ctx,
-          message: 'Background media controls are unavailable on this launch. '
-              'Playback works, but the lock-screen controls could not start.',
-          icon: Icons.warning_amber_rounded,
-          isError: true,
-          duration: const Duration(seconds: 5),
-        );
-      }
+    // PulsrAudioHandler is an async singleton: isRegistered() is already true
+    // while the instance is still pending, so wait for readiness instead of
+    // calling getIt<T>() and throwing "not ready yet".
+    unawaited(() async {
+      try {
+        final handler = await _resolveDependency<PulsrAudioHandler>()
+            .timeout(const Duration(seconds: 30));
+        if (!mounted) return;
+        void surface() {
+          if (!handler.platformBridgeDegraded.value) return;
+          final ctx = rootNavigatorKey.currentContext;
+          if (ctx == null || !ctx.mounted) return;
+          PulsrToast.show(
+            ctx,
+            message: 'Background media controls are unavailable on this launch. '
+                'Playback works, but the lock-screen controls could not start.',
+            icon: Icons.warning_amber_rounded,
+            isError: true,
+            duration: const Duration(seconds: 5),
+          );
+        }
 
-      if (handler.platformBridgeDegraded.value) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => surface());
-      } else {
-        handler.platformBridgeDegraded.addListener(surface);
-        _platformBridgeDegradedListener = surface;
+        if (handler.platformBridgeDegraded.value) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => surface());
+        } else if (_platformBridgeDegradedListener == null) {
+          handler.platformBridgeDegraded.addListener(surface);
+          _platformBridgeDegradedListener = surface;
+        }
+      } catch (e, st) {
+        // Best-effort diagnostic only; never let it block startup (e.g. a test
+        // double of the handler that does not expose the notifier).
+        ErrorLogger.log('Failed to watch platform bridge health',
+            error: e, stackTrace: st, category: 'Startup');
       }
-    } catch (e, st) {
-      // Best-effort diagnostic only; never let it block startup (e.g. a test
-      // double of the handler that does not expose the notifier).
-      ErrorLogger.log('Failed to watch platform bridge health',
-          error: e, stackTrace: st, category: 'Startup');
-    }
+    }());
   }
 
   /// Watches output-device changes (Bluetooth/headphones) and fires the
@@ -591,7 +620,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       _pausedSinceStart = true;
       // Flush the debounced queue-slot write before the process can be killed.
       try {
-        if (getIt.isRegistered<PlayerCubit>()) {
+        if (_isDependencyReady<PlayerCubit>()) {
           unawaited(getIt<PlayerCubit>().persistQueueSlotsNow());
         }
       } catch (e, st) {
@@ -711,7 +740,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 error: e, stackTrace: st, category: 'PulsrApp');
           }
           try {
-            if (getIt.isRegistered<PulsrAudioHandler>()) {
+            if (_isDependencyReady<PulsrAudioHandler>()) {
               getIt<PulsrAudioHandler>().clearNetworkCaches();
             }
           } catch (e, st) {
@@ -748,7 +777,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _networkMonitor?.dispose();
     _automationTriggerService?.dispose();
     if (_platformBridgeDegradedListener != null &&
-        getIt.isRegistered<PulsrAudioHandler>()) {
+        _isDependencyReady<PulsrAudioHandler>()) {
       getIt<PulsrAudioHandler>()
           .platformBridgeDegraded
           .removeListener(_platformBridgeDegradedListener!);

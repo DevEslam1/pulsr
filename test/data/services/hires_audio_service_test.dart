@@ -78,6 +78,20 @@ void main() {
     expect(info.sampleRate, 0);
   });
 
+  test('keeps the last good output info when a probe fails', () async {
+    final first = await service.getAudioOutputInfo();
+    expect(first.deviceName, 'Test DAC');
+
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      throw PlatformException(code: 'probe_timeout');
+    });
+
+    final second = await service.getAudioOutputInfo();
+    // A timeout during an audio/BT restart must not fabricate a route change.
+    expect(second.deviceName, 'Test DAC');
+    expect(service.currentOutputInfo?.deviceName, 'Test DAC');
+  });
+
   test('getDirectCapabilities parses the format list', () async {
     responder = (call) => <String, Object?>{
           'directFormats': [

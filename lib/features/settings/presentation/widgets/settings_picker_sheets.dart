@@ -306,10 +306,25 @@ void showAboutSheet(BuildContext context) {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: p.accentContainer,
                 borderRadius: AppRadii.r18All,
+                boxShadow: [
+                  BoxShadow(
+                    color: p.accent.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Icon(Icons.graphic_eq_rounded, color: p.accent, size: 34),
+              child: ClipRRect(
+                borderRadius: AppRadii.r18All,
+                child: Image.asset(
+                  'assets/app_icon/app_icon_plus.png',
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.cover,
+                  semanticLabel: AppConfig.appTitle,
+                ),
+              ),
             ),
             const SizedBox(height: AppSpacing.s14),
             Text(

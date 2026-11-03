@@ -13,6 +13,8 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../../domain/models/radio_station.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 
@@ -516,6 +518,117 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
 
 /// The individual stylized hero card for a single Quran station.
 class _QuranHeroCard extends StatelessWidget {
+  void _showHideOptionSheet(BuildContext context) {
+    final p = context.palette;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.12),
+                      borderRadius: AppRadii.r12All,
+                    ),
+                    child: Icon(
+                      Icons.radio_rounded,
+                      color: p.accent,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isArabic ? 'بطاقات الراديو' : 'Radio Cards',
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.title,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          isArabic
+                              ? 'يمكنك إظهارها مجددًا في أي وقت من صفحة الراديو'
+                              : 'You can restore them anytime from the Radio page',
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.caption,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              // Hide Action
+              ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadii.r14All,
+                ),
+                tileColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+                leading: Icon(
+                  Icons.visibility_off_rounded,
+                  color: p.favorite,
+                  size: 22,
+                ),
+                title: Text(
+                  isArabic
+                      ? 'إخفاء بطاقات الراديو من الرئيسية'
+                      : 'Hide Radio Cards from Home',
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: AppFontSize.bodySmall,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  isArabic
+                      ? 'إخفاء شريط راديو القرآن من الصفحة الرئيسية'
+                      : 'Hide the radio carousel from your home screen',
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.tiny,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await RadioStationStore.setHeroCardsVisible(false);
+                  if (context.mounted) {
+                    PulsrToast.show(
+                      context,
+                      message: isArabic
+                          ? 'تم إخفاء بطاقات الراديو. يمكنك إظهارها من صفحة الراديو.'
+                          : 'Radio cards hidden. You can show them again from the Radio page.',
+                      isSuccess: true,
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   final QuranHeroItem item;
   final int index;
   final int total;
@@ -576,6 +689,10 @@ class _QuranHeroCard extends StatelessWidget {
             child: InkWell(
               borderRadius: AppRadii.r24All,
               onTap: onTap,
+              onLongPress: () {
+                HapticFeedback.heavyImpact();
+                _showHideOptionSheet(context);
+              },
               child: Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(

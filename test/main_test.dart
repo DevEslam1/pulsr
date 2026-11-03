@@ -244,6 +244,10 @@ void main() {
       ));
       await tester.pump();
 
+      // DownloadsCubit owns a periodic watchdog timer and is a DI singleton,
+      // so the widget tree cannot dispose it. Close it before the test's
+      // pending-timer invariant check.
+      await getIt<DownloadsCubit>().close();
       await audioHandler.dispose();
       await db.close();
       httpClient.close(force: true);

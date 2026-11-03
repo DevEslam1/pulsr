@@ -128,7 +128,7 @@ class _RadioScreenState extends State<RadioScreen> {
 
   String _nameForUrl(String url) {
     final uri = Uri.tryParse(url);
-    if (uri == null || uri.host.isEmpty) return url; // fallback to full URL
+    if (uri == null || uri.host.isEmpty) return url;
     return uri.host;
   }
 
@@ -198,8 +198,6 @@ class _RadioScreenState extends State<RadioScreen> {
     );
     if (station == null || !mounted) return;
 
-    // Refuse a URL that already belongs to a different station: `add`/`replace`
-    // would otherwise silently delete that station.
     final collision = _store.hasUrlCollision(
       station.url,
       exceptId: initial?.id ?? station.id,
@@ -312,6 +310,550 @@ class _RadioScreenState extends State<RadioScreen> {
     }
   }
 
+  Widget _buildSearchField(PulsrPalette p, {required bool isCompact}) {
+    return TextField(
+      controller: _searchController,
+      style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+      decoration: InputDecoration(
+        hintText: context.l10n.radioSearchHint,
+        hintStyle:
+            TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
+        prefixIcon:
+            Icon(Icons.search_rounded, color: p.textSecondary, size: 20),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                icon:
+                    Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
+                tooltip: context.l10n.clear,
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+        isDense: isCompact,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: isCompact ? AppSpacing.xxs : AppSpacing.xs,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.hairline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.hairline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.accent, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenreStrip(
+    PulsrPalette p,
+    List<String> availableGenres, {
+    EdgeInsetsGeometry padding =
+        const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+  }) {
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: padding,
+        itemCount: availableGenres.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+        itemBuilder: (context, idx) {
+          final g = availableGenres[idx];
+          final isSelected = _selectedGenre == g;
+          return FilterChip(
+            label: Text(g == 'All' ? context.l10n.all : g),
+            selected: isSelected,
+            selectedColor: p.accent.withValues(alpha: 0.2),
+            checkmarkColor: p.accent,
+            labelStyle: TextStyle(
+              color: isSelected ? p.accent : p.textSecondary,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: AppFontSize.caption,
+            ),
+            side: BorderSide(
+              color: isSelected ? p.accent.withValues(alpha: 0.4) : p.hairline,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadii.r12All,
+            ),
+            onSelected: (_) {
+              setState(() => _selectedGenre = g);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCardsHiddenBanner(
+    PulsrPalette p, {
+    required bool isArabic,
+    required bool isCompactLandscape,
+  }) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: RadioStationStore.heroCardsVisible,
+      builder: (context, visible, _) {
+        if (visible) return const SizedBox.shrink();
+        return Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.md,
+            isCompactLandscape ? AppSpacing.xxs : AppSpacing.xs,
+            AppSpacing.md,
+            isCompactLandscape ? AppSpacing.xxs : AppSpacing.xs,
+          ),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: isCompactLandscape ? AppSpacing.xs : AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: p.accentContainer.withValues(alpha: 0.35),
+              borderRadius: AppRadii.r16All,
+              border: Border.all(
+                color: p.accent.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.visibility_off_rounded,
+                    color: p.accent,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        isArabic
+                            ? 'بطاقات الراديو مخفية من الرئيسية'
+                            : 'Radio cards are hidden from Home',
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontSize: AppFontSize.callout,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isArabic
+                            ? 'انقر هنا لإعادة إظهارها في الشاشة الرئيسية'
+                            : 'Tap to restore the radio carousel on Home',
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.caption,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                FilledButton.tonal(
+                  onPressed: () async {
+                    await RadioStationStore.setHeroCardsVisible(true);
+                    if (!context.mounted) return;
+                    PulsrToast.show(
+                      context,
+                      message: isArabic
+                          ? 'تمت استعادة بطاقات الراديو في الشاشة الرئيسية'
+                          : 'Radio cards restored to Home screen',
+                      isSuccess: true,
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: p.accent,
+                    foregroundColor: p.onAccent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xxs,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r12All,
+                    ),
+                  ),
+                  child: Text(
+                    isArabic ? 'إظهار' : 'Show',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTopControls(
+    PulsrPalette p,
+    List<String> availableGenres, {
+    required bool useSingleRowHeader,
+    required bool isCompactLandscape,
+  }) {
+    final hasGenres = availableGenres.length > 2;
+
+    if (useSingleRowHeader && hasGenres) {
+      return Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md,
+          isCompactLandscape ? AppSpacing.xs : AppSpacing.sm,
+          0,
+          AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: _buildSearchField(p, isCompact: isCompactLandscape),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _buildGenreStrip(
+                p,
+                availableGenres,
+                padding: const EdgeInsetsDirectional.only(end: AppSpacing.md),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.md,
+            isCompactLandscape ? AppSpacing.xs : AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.xs,
+          ),
+          child: _buildSearchField(p, isCompact: isCompactLandscape),
+        ),
+        if (hasGenres) ...[
+          _buildGenreStrip(p, availableGenres),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStationItem(
+    BuildContext context, {
+    required RadioStation station,
+    required PlayerCubit playerCubit,
+    required bool isCardMode,
+    required bool isCompactLandscape,
+  }) {
+    final p = context.palette;
+
+    return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (prev, curr) =>
+          prev.currentSong?.path != curr.currentSong?.path ||
+          prev.currentSong?.album != curr.currentSong?.album ||
+          prev.isPlaying != curr.isPlaying,
+      builder: (context, playerState) {
+        final isCurrent = playerState.currentSong?.path == station.url;
+        final isPlaying = isCurrent && playerState.isPlaying;
+        final icyNowPlaying =
+            isCurrent ? (playerState.currentSong?.album.trim() ?? '') : '';
+
+        final langCode = Localizations.localeOf(context).languageCode;
+        final isArabic = langCode == 'ar';
+        final displayStationName =
+            RadioStationStore.localizedStationName(station, langCode);
+        final localizedStation = station.copyWith(name: displayStationName);
+
+        final tile = ListTile(
+          dense: isCompactLandscape,
+          contentPadding: EdgeInsetsDirectional.fromSTEB(
+            isCardMode ? AppSpacing.sm : AppSpacing.md,
+            isCompactLandscape ? 0 : AppSpacing.xxs,
+            isCardMode ? AppSpacing.xs : AppSpacing.sm,
+            isCompactLandscape ? 0 : AppSpacing.xxs,
+          ),
+          leading: _StationArtwork(
+            station: station,
+            isPlaying: isPlaying,
+          ),
+          title: MarqueeText(
+            text: displayStationName,
+            textAlign: TextAlign.start,
+            allowUserPause: false,
+            velocity: 28.0,
+            blankSpace: 36.0,
+            style: TextStyle(
+              color: isCurrent ? p.accent : p.textPrimary,
+              fontWeight: FontWeight.w600,
+              fontSize: AppFontSize.callout,
+            ),
+          ),
+          subtitle: Row(
+            children: [
+              if (station.genre != null && station.genre!.isNotEmpty) ...[
+                Container(
+                  margin: const EdgeInsetsDirectional.only(end: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: p.accentContainer.withValues(alpha: 0.35),
+                    borderRadius: AppRadii.r6All,
+                  ),
+                  child: Text(
+                    station.genre!,
+                    style: TextStyle(
+                      color: p.accent,
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+              Expanded(
+                child: MarqueeText(
+                  text: icyNowPlaying.isNotEmpty
+                      ? '♫ $icyNowPlaying'
+                      : _stationFallbackSubtitle(station, isArabic: isArabic),
+                  textAlign: TextAlign.start,
+                  allowUserPause: false,
+                  velocity: 24.0,
+                  blankSpace: 32.0,
+                  style: TextStyle(
+                    color:
+                        icyNowPlaying.isNotEmpty ? p.accent : p.textSecondary,
+                    fontWeight: icyNowPlaying.isNotEmpty
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    fontSize: AppFontSize.label,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                tooltip: context.l10n.radioEdit,
+                icon: Icon(
+                  Icons.edit_rounded,
+                  color: p.textSecondary,
+                  size: 20,
+                ),
+                onPressed: () => _showAddDialog(initial: station),
+              ),
+              IconButton(
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                tooltip:
+                    isPlaying ? context.l10n.pause : context.l10n.radioPlay,
+                icon: Icon(
+                  isPlaying
+                      ? Icons.pause_circle_filled_rounded
+                      : Icons.play_circle_fill_rounded,
+                  color: p.accent,
+                  size: 32,
+                ),
+                onPressed: () {
+                  if (isCurrent) {
+                    playerCubit.togglePlayPause();
+                  } else {
+                    playerCubit.playRadioStation(localizedStation);
+                  }
+                },
+              ),
+            ],
+          ),
+          onTap: () {
+            if (isCurrent) {
+              playerCubit.togglePlayPause();
+            } else {
+              playerCubit.playRadioStation(localizedStation);
+            }
+          },
+          onLongPress: () => _showStationActions(station),
+        );
+
+        if (!isCardMode) return tile;
+
+        return Material(
+          color: isCurrent
+              ? p.accentContainer.withValues(alpha: 0.18)
+              : p.surfaceContainer.withValues(alpha: 0.65),
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadii.r14All,
+            side: BorderSide(
+              color: isCurrent ? p.accent.withValues(alpha: 0.45) : p.hairline,
+              width: isCurrent ? 1.2 : 1.0,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Center(child: tile),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyLibraryState(
+    PulsrPalette p,
+    BoxConstraints viewport, {
+    required bool isCompactLandscape,
+  }) {
+    final avatarSize = isCompactLandscape ? 56.0 : 76.0;
+    final iconSize = isCompactLandscape ? 28.0 : 38.0;
+
+    return RefreshIndicator(
+      onRefresh: _reload,
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: viewport.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.xl,
+                vertical: isCompactLandscape ? AppSpacing.md : AppSpacing.xl,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: avatarSize,
+                      height: avatarSize,
+                      decoration: BoxDecoration(
+                        color: p.accentContainer.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: p.accent.withValues(alpha: 0.25),
+                          width: 1.5,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.radio_rounded,
+                        size: iconSize,
+                        color: p.accent,
+                      ),
+                    ),
+                    SizedBox(
+                      height:
+                          isCompactLandscape ? AppSpacing.sm : AppSpacing.s20,
+                    ),
+                    Text(
+                      context.l10n.radioEmptyTitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontSize: AppFontSize.title,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      context.l10n.radioEmptySubtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.bodySmall,
+                        height: 1.45,
+                      ),
+                    ),
+                    SizedBox(
+                      height:
+                          isCompactLandscape ? AppSpacing.md : AppSpacing.lg,
+                    ),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.s10,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _showAddDialog,
+                          icon: const Icon(Icons.add_rounded, size: 20),
+                          label: Text(
+                            context.l10n.radioAddStation,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: AppSpacing.sm,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadii.r14All,
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _importCurated,
+                          icon: const Icon(Icons.explore_rounded, size: 18),
+                          label: Text(context.l10n.radioCuratedBrowse),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: p.accent,
+                            side: BorderSide(
+                              color: p.accent.withValues(alpha: 0.5),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s20,
+                              vertical: AppSpacing.sm,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadii.r14All,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -319,536 +861,267 @@ class _RadioScreenState extends State<RadioScreen> {
     final availableGenres = _availableGenres;
     final filtered = _filteredStations;
 
+    final mq = MediaQuery.of(context);
+    final screenWidth = mq.size.width;
+    final screenHeight = mq.size.height;
+    final isLandscape = screenWidth > screenHeight;
+    final isCompactLandscape = isLandscape && screenHeight < 520;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    final baseMaxWidth =
+        PulsrLayoutMetrics.contentConstraints(context).maxWidth;
+    final effectiveMaxWidth = screenWidth >= 600
+        ? (baseMaxWidth < 1160 ? 1160.0 : baseMaxWidth)
+        : baseMaxWidth;
+
     return PulsrPagePopScope(
-        child: Scaffold(
-      backgroundColor: p.bg,
-      appBar: AppBar(
-        backgroundColor: p.surface,
-        elevation: 0,
-        leading: const PulsrBackButton(),
-        title: Text(context.l10n.radioTitle),
-        actions: [
-          IconButton(
-            constraints: const BoxConstraints(
+      child: Scaffold(
+        backgroundColor: p.bg,
+        appBar: AppBar(
+          toolbarHeight: isCompactLandscape ? 48 : kToolbarHeight,
+          backgroundColor: p.surface,
+          elevation: 0,
+          leading: const PulsrBackButton(),
+          title: Text(context.l10n.radioTitle),
+          actions: [
+            ValueListenableBuilder<bool>(
+              valueListenable: RadioStationStore.heroCardsVisible,
+              builder: (context, visible, _) {
+                if (visible) return const SizedBox.shrink();
+                return IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
+                  tooltip: isArabic
+                      ? 'إظهار بطاقات الراديو في الرئيسية'
+                      : 'Show radio cards on Home',
+                  icon: Icon(Icons.visibility_rounded, color: p.accent),
+                  onPressed: () async {
+                    await RadioStationStore.setHeroCardsVisible(true);
+                    if (!context.mounted) return;
+                    PulsrToast.show(
+                      context,
+                      message: isArabic
+                          ? 'تمت استعادة بطاقات الراديو في الشاشة الرئيسية'
+                          : 'Radio cards restored to Home screen',
+                      isSuccess: true,
+                    );
+                  },
+                );
+              },
+            ),
+            IconButton(
+              constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
-                minHeight: AppSpacing.minTouchTarget),
-            tooltip: context.l10n.radioDirectoryBrowse,
-            icon: const Icon(Icons.public_rounded),
-            onPressed: () => RadioDirectorySheet.show(context, store: _store),
-          ),
-          IconButton(
-            constraints: const BoxConstraints(
+                minHeight: AppSpacing.minTouchTarget,
+              ),
+              tooltip: context.l10n.radioDirectoryBrowse,
+              icon: const Icon(Icons.public_rounded),
+              onPressed: () async {
+                await RadioDirectorySheet.show(context, store: _store);
+                _refresh();
+              },
+            ),
+            IconButton(
+              constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
-                minHeight: AppSpacing.minTouchTarget),
-            tooltip: context.l10n.radioCuratedBrowse,
-            icon: const Icon(Icons.explore_rounded),
-            onPressed: _importCurated,
-          ),
-          IconButton(
-            constraints: const BoxConstraints(
+                minHeight: AppSpacing.minTouchTarget,
+              ),
+              tooltip: context.l10n.radioCuratedBrowse,
+              icon: const Icon(Icons.explore_rounded),
+              onPressed: _importCurated,
+            ),
+            IconButton(
+              constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
-                minHeight: AppSpacing.minTouchTarget),
-            tooltip: context.l10n.radioImportPlaylist,
-            icon: const Icon(Icons.playlist_add_rounded),
-            onPressed: _showImportDialog,
-          ),
-          IconButton(
-            constraints: const BoxConstraints(
+                minHeight: AppSpacing.minTouchTarget,
+              ),
+              tooltip: context.l10n.radioImportPlaylist,
+              icon: const Icon(Icons.playlist_add_rounded),
+              onPressed: _showImportDialog,
+            ),
+            IconButton(
+              constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
-                minHeight: AppSpacing.minTouchTarget),
-            tooltip: context.l10n.radioAddStation,
-            icon: const Icon(Icons.add_rounded),
-            onPressed: _showAddDialog,
-          ),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: PulsrLayoutMetrics.contentConstraints(context),
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _loadFailed && _stations.isEmpty
-                  ? RefreshIndicator(
-                      onRefresh: _reload,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height -
-                                kToolbarHeight -
-                                140,
-                            child: PulsrEmptyState(
-                              icon: Icons.error_outline_rounded,
-                              title: context.l10n.somethingWentWrong,
-                              subtitle: context.l10n.radioEmptySubtitle,
-                              primaryActionLabel: context.l10n.retry,
-                              onPrimaryAction: _reload,
-                            ),
+                minHeight: AppSpacing.minTouchTarget,
+              ),
+              tooltip: context.l10n.radioAddStation,
+              icon: const Icon(Icons.add_rounded),
+              onPressed: _showAddDialog,
+            ),
+          ],
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: effectiveMaxWidth),
+            child: LayoutBuilder(
+              builder: (context, viewport) {
+                if (_loading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (_loadFailed && _stations.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: _reload,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints:
+                            BoxConstraints(minHeight: viewport.maxHeight),
+                        child: Center(
+                          child: PulsrEmptyState(
+                            icon: Icons.error_outline_rounded,
+                            title: context.l10n.somethingWentWrong,
+                            subtitle: context.l10n.radioEmptySubtitle,
+                            primaryActionLabel: context.l10n.retry,
+                            onPrimaryAction: _reload,
                           ),
-                        ],
+                        ),
                       ),
-                    )
-                  : _stations.isEmpty
-                      ? RefreshIndicator(
-                          onRefresh: _reload,
-                          color: p.accent,
-                          backgroundColor: p.surfaceContainer,
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            child: SizedBox(
-                              height: MediaQuery.of(context).size.height -
-                                  kToolbarHeight -
-                                  100,
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(AppSpacing.xl),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 76,
-                                        height: 76,
-                                        decoration: BoxDecoration(
-                                          color: p.accentContainer
-                                              .withValues(alpha: 0.35),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: p.accent
-                                                .withValues(alpha: 0.25),
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Icon(Icons.radio_rounded,
-                                            size: 38, color: p.accent),
-                                      ),
-                                      const SizedBox(height: AppSpacing.s20),
-                                      Text(
-                                        context.l10n.radioEmptyTitle,
-                                        style: TextStyle(
-                                          color: p.textPrimary,
-                                          fontSize: AppFontSize.title,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: AppSpacing.xs),
-                                      Text(
-                                        context.l10n.radioEmptySubtitle,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: p.textSecondary,
-                                          fontSize: AppFontSize.bodySmall,
-                                          height: 1.45,
-                                        ),
-                                      ),
-                                      const SizedBox(height: AppSpacing.lg),
-                                      FilledButton.icon(
-                                        onPressed: _showAddDialog,
-                                        icon: const Icon(Icons.add_rounded,
-                                            size: 20),
-                                        label: Text(
-                                          context.l10n.radioAddStation,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w700),
-                                        ),
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: p.accent,
-                                          foregroundColor: p.onAccent,
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 22,
-                                              vertical: AppSpacing.sm),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: AppRadii.r14All,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: AppSpacing.s10),
-                                      OutlinedButton.icon(
-                                        onPressed: _importCurated,
-                                        icon: const Icon(Icons.explore_rounded,
-                                            size: 18),
-                                        label: Text(
-                                            context.l10n.radioCuratedBrowse),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: p.accent,
-                                          side: BorderSide(
-                                              color: p.accent
-                                                  .withValues(alpha: 0.5)),
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: AppSpacing.s20,
-                                              vertical: AppSpacing.sm),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: AppRadii.r14All,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsetsDirectional.fromSTEB(
-                                  AppSpacing.md,
-                                  AppSpacing.sm,
-                                  AppSpacing.md,
-                                  AppSpacing.xs),
-                              child: TextField(
-                                controller: _searchController,
-                                style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: AppFontSize.bodySmall),
-                                decoration: InputDecoration(
-                                  hintText: context.l10n.radioSearchHint,
-                                  hintStyle: TextStyle(
-                                      color: p.textTertiary,
-                                      fontSize: AppFontSize.bodySmall),
-                                  prefixIcon: Icon(Icons.search_rounded,
-                                      color: p.textSecondary, size: 20),
-                                  suffixIcon: _searchQuery.isNotEmpty
-                                      ? IconButton(
-                                          constraints: const BoxConstraints(
-                                              minWidth:
-                                                  AppSpacing.minTouchTarget,
-                                              minHeight:
-                                                  AppSpacing.minTouchTarget),
-                                          icon: Icon(Icons.close_rounded,
-                                              color: p.textSecondary, size: 18),
-                                          tooltip: context.l10n.clear,
-                                          onPressed: () {
-                                            _searchController.clear();
-                                            setState(() => _searchQuery = '');
-                                          },
-                                        )
-                                      : null,
-                                  filled: true,
-                                  fillColor: p.surfaceContainerHigh
-                                      .withValues(alpha: 0.5),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.md,
-                                      vertical: AppSpacing.xs),
-                                  border: OutlineInputBorder(
-                                    borderRadius: AppRadii.r12All,
-                                    borderSide: BorderSide(color: p.hairline),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: AppRadii.r12All,
-                                    borderSide: BorderSide(color: p.hairline),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: AppRadii.r12All,
-                                    borderSide:
-                                        BorderSide(color: p.accent, width: 1.5),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (availableGenres.length > 2)
-                              SizedBox(
-                                height: 38,
-                                child: ListView.separated(
-                                  scrollDirection: Axis.horizontal,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.md),
-                                  itemCount: availableGenres.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(width: AppSpacing.xs),
-                                  itemBuilder: (context, idx) {
-                                    final g = availableGenres[idx];
-                                    final isSelected = _selectedGenre == g;
-                                    return FilterChip(
-                                      label: Text(
-                                          g == 'All' ? context.l10n.all : g),
-                                      selected: isSelected,
-                                      selectedColor:
-                                          p.accent.withValues(alpha: 0.2),
-                                      checkmarkColor: p.accent,
-                                      labelStyle: TextStyle(
-                                        color: isSelected
-                                            ? p.accent
-                                            : p.textSecondary,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                        fontSize: AppFontSize.caption,
-                                      ),
-                                      side: BorderSide(
-                                        color: isSelected
-                                            ? p.accent.withValues(alpha: 0.4)
-                                            : p.hairline,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: AppRadii.r12All,
-                                      ),
-                                      onSelected: (_) {
-                                        setState(() => _selectedGenre = g);
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Expanded(
-                              child: filtered.isEmpty
-                                  ? RefreshIndicator(
-                                      onRefresh: () async => _refresh(),
-                                      color: p.accent,
-                                      backgroundColor: p.surfaceContainer,
-                                      child: SingleChildScrollView(
-                                        physics:
-                                            const AlwaysScrollableScrollPhysics(),
-                                        child: SizedBox(
-                                          height: 350,
-                                          child: PulsrEmptyState(
-                                            icon: Icons.search_off_rounded,
-                                            title: context.l10n
-                                                .radioNoStationsMatch(
-                                                    _searchQuery),
-                                            subtitle: context
-                                                .l10n.radioNoStationsMatchDesc,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  : RefreshIndicator(
-                                      onRefresh: () async => _refresh(),
-                                      color: p.accent,
-                                      backgroundColor: p.surfaceContainer,
-                                      child: ListView.separated(
-                                        padding: EdgeInsets.only(
-                                            top: AppSpacing.xs,
-                                            bottom:
-                                                PulsrLayoutMetrics.scrollBottom(
-                                                    context)),
-                                        itemCount: filtered.length,
-                                        separatorBuilder: (_, __) => Divider(
-                                          height: 1,
-                                          indent: 72,
-                                          endIndent: 16,
-                                          color: p.hairline,
-                                        ),
-                                        itemBuilder: (context, index) {
-                                          final station = filtered[index];
-                                          return StaggeredReveal(
-                                            index: index,
-                                            groupKey: filtered.length,
-                                            child: BlocBuilder<PlayerCubit,
-                                                PlayerState>(
-                                              buildWhen: (prev, curr) =>
-                                                  prev.currentSong?.path !=
-                                                      curr.currentSong?.path ||
-                                                  prev.currentSong?.album !=
-                                                      curr.currentSong?.album ||
-                                                  prev.isPlaying !=
-                                                      curr.isPlaying,
-                                              builder: (context, playerState) {
-                                                final isCurrent = playerState
-                                                        .currentSong?.path ==
-                                                    station.url;
-                                                final isPlaying = isCurrent &&
-                                                    playerState.isPlaying;
-                                                final icyNowPlaying = isCurrent
-                                                    ? (playerState
-                                                            .currentSong?.album
-                                                            .trim() ??
-                                                        '')
-                                                    : '';
+                    ),
+                  );
+                }
 
-                                                final langCode = Localizations.localeOf(context).languageCode;
-                                                final isArabic = langCode == 'ar';
-                                                final displayStationName =
-                                                    RadioStationStore
-                                                        .localizedStationName(
-                                                            station, langCode);
-                                                final localizedStation =
-                                                    station.copyWith(
-                                                        name: displayStationName);
+                if (_stations.isEmpty) {
+                  return _buildEmptyLibraryState(
+                    p,
+                    viewport,
+                    isCompactLandscape: isCompactLandscape,
+                  );
+                }
 
-                                                return ListTile(
-                                                  contentPadding:
-                                                      const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal:
-                                                              AppSpacing.md,
-                                                          vertical:
-                                                              AppSpacing.xxs),
-                                                  leading: _StationArtwork(
-                                                    station: station,
-                                                    isPlaying: isPlaying,
-                                                  ),
-                                                  title: MarqueeText(
-                                                    text: displayStationName,
-                                                    textAlign: TextAlign.start,
-                                                    allowUserPause: false,
-                                                    velocity: 28.0,
-                                                    blankSpace: 36.0,
-                                                    style: TextStyle(
-                                                      color: isCurrent
-                                                          ? p.accent
-                                                          : p.textPrimary,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontSize:
-                                                          AppFontSize.callout,
-                                                    ),
-                                                  ),
-                                                  subtitle: Row(
-                                                    children: [
-                                                      if (station.genre !=
-                                                              null &&
-                                                          station.genre!
-                                                              .isNotEmpty) ...[
-                                                        Container(
-                                                          margin:
-                                                              const EdgeInsetsDirectional
-                                                                  .only(end: 6),
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                                  horizontal: 6,
-                                                                  vertical:
-                                                                      1.5),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: p
-                                                                .accentContainer
-                                                                .withValues(
-                                                                    alpha:
-                                                                        0.35),
-                                                            borderRadius:
-                                                                AppRadii.r6All,
-                                                          ),
-                                                          child: Text(
-                                                            station.genre!,
-                                                            style: TextStyle(
-                                                              color: p.accent,
-                                                              fontSize:
-                                                                  AppFontSize
-                                                                      .tiny,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w700,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                      Expanded(
-                                                        child: MarqueeText(
-                                                          text: icyNowPlaying
-                                                                  .isNotEmpty
-                                                              ? '♫ $icyNowPlaying'
-                                                              : _stationFallbackSubtitle(
-                                                                  station,
-                                                                  isArabic:
-                                                                      isArabic),
-                                                          textAlign:
-                                                              TextAlign.start,
-                                                          allowUserPause: false,
-                                                          velocity: 24.0,
-                                                          blankSpace: 32.0,
-                                                          style: TextStyle(
-                                                              color: icyNowPlaying
-                                                                      .isNotEmpty
-                                                                  ? p.accent
-                                                                  : p
-                                                                      .textSecondary,
-                                                              fontWeight: icyNowPlaying
-                                                                      .isNotEmpty
-                                                                  ? FontWeight
-                                                                      .w600
-                                                                  : FontWeight
-                                                                      .normal,
-                                                              fontSize:
-                                                                  AppFontSize
-                                                                      .label),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  trailing: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      IconButton(
-                                                        constraints: const BoxConstraints(
-                                                            minWidth: AppSpacing
-                                                                .minTouchTarget,
-                                                            minHeight: AppSpacing
-                                                                .minTouchTarget),
-                                                        tooltip: context
-                                                            .l10n.radioEdit,
-                                                        icon: Icon(
-                                                            Icons.edit_rounded,
-                                                            color:
-                                                                p.textSecondary,
-                                                            size: 22),
-                                                        onPressed: () =>
-                                                            _showAddDialog(
-                                                                initial:
-                                                                    station),
-                                                      ),
-                                                      IconButton(
-                                                        constraints: const BoxConstraints(
-                                                            minWidth: AppSpacing
-                                                                .minTouchTarget,
-                                                            minHeight: AppSpacing
-                                                                .minTouchTarget),
-                                                        tooltip: isPlaying
-                                                            ? context.l10n.pause
-                                                            : context
-                                                                .l10n.radioPlay,
-                                                        icon: Icon(
-                                                          isPlaying
-                                                              ? Icons
-                                                                  .pause_circle_filled_rounded
-                                                              : Icons
-                                                                  .play_circle_fill_rounded,
-                                                          color: p.accent,
-                                                          size: 32,
-                                                        ),
-                                                        onPressed: () {
-                                                          if (isCurrent) {
-                                                            playerCubit
-                                                                .togglePlayPause();
-                                                          } else {
-                                                            playerCubit
-                                                                .playRadioStation(
-                                                                    localizedStation);
-                                                          }
-                                                        },
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  onTap: () {
-                                                    if (isCurrent) {
-                                                      playerCubit
-                                                          .togglePlayPause();
-                                                    } else {
-                                                      playerCubit
-                                                          .playRadioStation(
-                                                              localizedStation);
-                                                    }
-                                                  },
-                                                  onLongPress: () =>
-                                                      _showStationActions(
-                                                          station),
-                                                );
-                                              },
-                                            ),
-                                          );
-                                        },
+                final width = viewport.maxWidth;
+                final crossAxisCount = width >= 960
+                    ? 3
+                    : width >= 600
+                        ? 2
+                        : 1;
+                final useSingleRowHeader = isCompactLandscape || width >= 680;
+                final bottomPadding = PulsrLayoutMetrics.scrollBottom(context);
+
+                return Column(
+                  children: [
+                    _buildCardsHiddenBanner(
+                      p,
+                      isArabic: isArabic,
+                      isCompactLandscape: isCompactLandscape,
+                    ),
+                    _buildTopControls(
+                      p,
+                      availableGenres,
+                      useSingleRowHeader: useSingleRowHeader,
+                      isCompactLandscape: isCompactLandscape,
+                    ),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? LayoutBuilder(
+                              builder: (context, emptyConstraints) {
+                                return RefreshIndicator(
+                                  onRefresh: () async => _refresh(),
+                                  color: p.accent,
+                                  backgroundColor: p.surfaceContainer,
+                                  child: SingleChildScrollView(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(),
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        minHeight: emptyConstraints.maxHeight,
+                                      ),
+                                      child: Center(
+                                        child: PulsrEmptyState(
+                                          icon: Icons.search_off_rounded,
+                                          title: context.l10n
+                                              .radioNoStationsMatch(
+                                                  _searchQuery),
+                                          subtitle: context
+                                              .l10n.radioNoStationsMatchDesc,
+                                        ),
                                       ),
                                     ),
+                                  ),
+                                );
+                              },
+                            )
+                          : RefreshIndicator(
+                              onRefresh: () async => _refresh(),
+                              color: p.accent,
+                              backgroundColor: p.surfaceContainer,
+                              child: crossAxisCount == 1
+                                  ? ListView.separated(
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
+                                      padding: EdgeInsets.only(
+                                        top: AppSpacing.xs,
+                                        bottom: bottomPadding,
+                                      ),
+                                      itemCount: filtered.length,
+                                      separatorBuilder: (_, __) => Divider(
+                                        height: 1,
+                                        indent: 72,
+                                        endIndent: 16,
+                                        color: p.hairline,
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final station = filtered[index];
+                                        return StaggeredReveal(
+                                          index: index,
+                                          groupKey: filtered.length,
+                                          child: _buildStationItem(
+                                            context,
+                                            station: station,
+                                            playerCubit: playerCubit,
+                                            isCardMode: false,
+                                            isCompactLandscape:
+                                                isCompactLandscape,
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : GridView.builder(
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
+                                      padding: EdgeInsetsDirectional.fromSTEB(
+                                        AppSpacing.md,
+                                        AppSpacing.xs,
+                                        AppSpacing.md,
+                                        bottomPadding,
+                                      ),
+                                      gridDelegate:
+                                          SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: crossAxisCount,
+                                        mainAxisExtent:
+                                            isCompactLandscape ? 68 : 76,
+                                        crossAxisSpacing: AppSpacing.sm,
+                                        mainAxisSpacing: AppSpacing.sm,
+                                      ),
+                                      itemCount: filtered.length,
+                                      itemBuilder: (context, index) {
+                                        final station = filtered[index];
+                                        return StaggeredReveal(
+                                          index: index,
+                                          groupKey: filtered.length,
+                                          child: _buildStationItem(
+                                            context,
+                                            station: station,
+                                            playerCubit: playerCubit,
+                                            isCardMode: true,
+                                            isCompactLandscape:
+                                                isCompactLandscape,
+                                          ),
+                                        );
+                                      },
+                                    ),
                             ),
-                          ],
-                        ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         ),
       ),
-    ));
+    );
   }
 }
 
@@ -973,7 +1246,6 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     } catch (_) {}
   }
 
-  /// Returns a user-facing reason the URL is invalid, or null when valid.
   String? _validateUrl(String raw) {
     final url = raw.trim();
     if (url.isEmpty) return context.l10n.radioErrorEnterUrl;
@@ -1021,11 +1293,13 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     final p = context.palette;
     return ChoiceChip(
       avatar: ClipOval(
-        child: Image.asset(assetPath,
-            width: 18,
-            height: 18,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 14)),
+        child: Image.asset(
+          assetPath,
+          width: 18,
+          height: 18,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 14),
+        ),
       ),
       label: Text(label, style: const TextStyle(fontSize: 11)),
       selected: isSelected,
@@ -1036,191 +1310,249 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     );
   }
 
+  Widget _buildArtworkAndPresets(PulsrPalette p) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Center(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadii.r16All,
+                    color: p.surfaceContainerHigh,
+                    border: Border.all(color: p.hairline),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: _artworkUrl != null && _artworkUrl!.isNotEmpty
+                      ? CachedArtwork(
+                          id: 0,
+                          remoteUrl: _artworkUrl,
+                          size: 68,
+                          borderRadius: 16,
+                          fallbackIcon: Icons.radio_rounded,
+                        )
+                      : Icon(Icons.radio_rounded, color: p.accent, size: 36),
+                ),
+              ),
+              PositionedDirectional(
+                end: -4,
+                bottom: -4,
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: p.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      color: p.onAccent,
+                      size: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s10),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xxs,
+          alignment: WrapAlignment.center,
+          children: [
+            _buildPresetChip(
+                'القرآن - القاهرة', RadioStationStore.quranCairoArtwork),
+            _buildPresetChip('الحصري', RadioStationStore.hussaryArtwork),
+            _buildPresetChip('المنشاوي', RadioStationStore.minshawiArtwork),
+            _buildPresetChip('عبد الباسط', RadioStationStore.abdulBasitArtwork),
+            _buildPresetChip(
+                'مصطفى إسماعيل', RadioStationStore.mustafaIsmailArtwork),
+            _buildPresetChip('تراتيل', RadioStationStore.tarteelArtwork),
+            if (_artworkUrl != null)
+              ActionChip(
+                avatar: const Icon(Icons.clear_rounded, size: 14),
+                label:
+                    const Text('إلغاء الصورة', style: TextStyle(fontSize: 11)),
+                onPressed: () => setState(() => _artworkUrl = null),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNameField(PulsrPalette p) {
+    return TextField(
+      controller: _nameController,
+      textInputAction: TextInputAction.next,
+      onChanged: (text) {
+        if (_artworkUrl == null ||
+            _artworkUrl!.startsWith('assets/Pictures/')) {
+          final detected = RadioStationStore.resolveArtworkForStation(
+            name: text,
+            url: _urlController.text,
+          );
+          if (detected != _artworkUrl) {
+            setState(() => _artworkUrl = detected);
+          }
+        }
+      },
+      style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+      decoration: InputDecoration(
+        labelText: context.l10n.radioStationName,
+        labelStyle: TextStyle(color: p.textSecondary),
+        hintText: context.l10n.browseRadioNameHint,
+        hintStyle: TextStyle(color: p.textTertiary),
+        filled: true,
+        fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+        border: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.hairline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.hairline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.accent, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenreField(PulsrPalette p) {
+    return TextField(
+      controller: _genreController,
+      textInputAction: TextInputAction.next,
+      style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+      decoration: InputDecoration(
+        labelText: context.l10n.radioGenreLabel,
+        labelStyle: TextStyle(color: p.textSecondary),
+        hintText: context.l10n.radioGenreHint,
+        hintStyle: TextStyle(color: p.textTertiary),
+        filled: true,
+        fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+        border: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.hairline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.hairline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.accent, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUrlField(PulsrPalette p) {
+    return TextField(
+      controller: _urlController,
+      keyboardType: TextInputType.url,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _submit(),
+      style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+      decoration: InputDecoration(
+        labelText: context.l10n.radioStationUrl,
+        labelStyle: TextStyle(color: p.textSecondary),
+        hintText: 'https://...',
+        hintStyle: TextStyle(color: p.textTertiary),
+        errorText: _urlError,
+        filled: true,
+        fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+        border: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.hairline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.hairline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r12All,
+          borderSide: BorderSide(color: p.accent, width: 1.5),
+        ),
+      ),
+      onChanged: (_) {
+        if (_urlError != null) {
+          setState(() => _urlError = null);
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final size = MediaQuery.sizeOf(context);
+    final useTwoColumnLayout =
+        (size.width >= 580 && size.height < 640) || size.width >= 700;
+
     return PulsrDialog(
       icon: Icon(Icons.radio_rounded, color: p.accent, size: 28),
-      title: Text(_isEditing
-          ? context.l10n.radioEditStation
-          : context.l10n.radioAddStation),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      width: 68,
-                      height: 68,
-                      decoration: BoxDecoration(
-                        borderRadius: AppRadii.r16All,
-                        color: p.surfaceContainerHigh,
-                        border: Border.all(color: p.hairline),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: _artworkUrl != null && _artworkUrl!.isNotEmpty
-                          ? CachedArtwork(
-                              id: 0,
-                              remoteUrl: _artworkUrl,
-                              size: 68,
-                              borderRadius: 16,
-                              fallbackIcon: Icons.radio_rounded,
-                            )
-                          : Icon(Icons.radio_rounded,
-                              color: p.accent, size: 36),
+      title: Text(
+        _isEditing
+            ? context.l10n.radioEditStation
+            : context.l10n.radioAddStation,
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: useTwoColumnLayout ? 620 : 420,
+        ),
+        child: SingleChildScrollView(
+          child: useTwoColumnLayout
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 210,
+                      child: _buildArtworkAndPresets(p),
                     ),
-                  ),
-                  PositionedDirectional(
-                    end: -4,
-                    bottom: -4,
-                    child: GestureDetector(
-                      onTap: _pickImage,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: p.accent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.camera_alt_rounded,
-                            color: p.onAccent, size: 14),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(flex: 3, child: _buildNameField(p)),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(flex: 2, child: _buildGenreField(p)),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.s14),
+                          _buildUrlField(p),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s10),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xxs,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildPresetChip(
-                    'القرآن - القاهرة', RadioStationStore.quranCairoArtwork),
-                _buildPresetChip('الحصري', RadioStationStore.hussaryArtwork),
-                _buildPresetChip('المنشاوي', RadioStationStore.minshawiArtwork),
-                _buildPresetChip(
-                    'عبد الباسط', RadioStationStore.abdulBasitArtwork),
-                _buildPresetChip(
-                    'مصطفى إسماعيل', RadioStationStore.mustafaIsmailArtwork),
-                _buildPresetChip('تراتيل', RadioStationStore.tarteelArtwork),
-                if (_artworkUrl != null)
-                  ActionChip(
-                    avatar: const Icon(Icons.clear_rounded, size: 14),
-                    label: const Text('إلغاء الصورة',
-                        style: TextStyle(fontSize: 11)),
-                    onPressed: () => setState(() => _artworkUrl = null),
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.s14),
-            TextField(
-              controller: _nameController,
-              textInputAction: TextInputAction.next,
-              onChanged: (text) {
-                if (_artworkUrl == null ||
-                    _artworkUrl!.startsWith('assets/Pictures/')) {
-                  final detected = RadioStationStore.resolveArtworkForStation(
-                    name: text,
-                    url: _urlController.text,
-                  );
-                  if (detected != _artworkUrl) {
-                    setState(() => _artworkUrl = detected);
-                  }
-                }
-              },
-              style:
-                  TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
-              decoration: InputDecoration(
-                labelText: context.l10n.radioStationName,
-                labelStyle: TextStyle(color: p.textSecondary),
-                hintText: context.l10n.browseRadioNameHint,
-                hintStyle: TextStyle(color: p.textTertiary),
-                filled: true,
-                fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
-                border: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.hairline),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildArtworkAndPresets(p),
+                    const SizedBox(height: AppSpacing.s14),
+                    _buildNameField(p),
+                    const SizedBox(height: AppSpacing.s14),
+                    _buildGenreField(p),
+                    const SizedBox(height: AppSpacing.s14),
+                    _buildUrlField(p),
+                  ],
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.accent, width: 1.5),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s14),
-            TextField(
-              controller: _genreController,
-              textInputAction: TextInputAction.next,
-              style:
-                  TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
-              decoration: InputDecoration(
-                labelText: context.l10n.radioGenreLabel,
-                labelStyle: TextStyle(color: p.textSecondary),
-                hintText: context.l10n.radioGenreHint,
-                hintStyle: TextStyle(color: p.textTertiary),
-                filled: true,
-                fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
-                border: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.accent, width: 1.5),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s14),
-            TextField(
-              controller: _urlController,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
-              style:
-                  TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
-              decoration: InputDecoration(
-                labelText: context.l10n.radioStationUrl,
-                labelStyle: TextStyle(color: p.textSecondary),
-                hintText: 'https://...',
-                hintStyle: TextStyle(color: p.textTertiary),
-                errorText: _urlError,
-                filled: true,
-                fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
-                border: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: AppRadii.r12All,
-                  borderSide: BorderSide(color: p.accent, width: 1.5),
-                ),
-              ),
-              onChanged: (_) {
-                if (_urlError != null) {
-                  setState(() => _urlError = null);
-                }
-              },
-            ),
-          ],
         ),
       ),
       actions: [
@@ -1237,7 +1569,9 @@ class _AddStationDialogState extends State<_AddStationDialog> {
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+              horizontal: AppSpacing.s20,
+              vertical: AppSpacing.sm,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: AppRadii.r12All,
             ),
@@ -1277,32 +1611,42 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final size = MediaQuery.sizeOf(context);
+    final isCompactLandscape = size.width > size.height && size.height < 520;
+
     return PulsrDialog(
       icon: Icon(Icons.download_rounded, color: p.accent, size: 28),
       title: Text(context.l10n.radioImportTitle),
-      content: SingleChildScrollView(
-        child: TextField(
-          controller: _controller,
-          maxLines: 6,
-          style:
-              TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
-          decoration: InputDecoration(
-            hintText: context.l10n.radioImportHint,
-            hintStyle: TextStyle(
-                color: p.textTertiary, fontSize: AppFontSize.bodySmall),
-            filled: true,
-            fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
-            border: OutlineInputBorder(
-              borderRadius: AppRadii.r12All,
-              borderSide: BorderSide(color: p.hairline),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SingleChildScrollView(
+          child: TextField(
+            controller: _controller,
+            maxLines: isCompactLandscape ? 3 : 6,
+            style: TextStyle(
+              color: p.textPrimary,
+              fontSize: AppFontSize.bodySmall,
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: AppRadii.r12All,
-              borderSide: BorderSide(color: p.hairline),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: AppRadii.r12All,
-              borderSide: BorderSide(color: p.accent, width: 1.5),
+            decoration: InputDecoration(
+              hintText: context.l10n.radioImportHint,
+              hintStyle: TextStyle(
+                color: p.textTertiary,
+                fontSize: AppFontSize.bodySmall,
+              ),
+              filled: true,
+              fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+              border: OutlineInputBorder(
+                borderRadius: AppRadii.r12All,
+                borderSide: BorderSide(color: p.hairline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: AppRadii.r12All,
+                borderSide: BorderSide(color: p.hairline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: AppRadii.r12All,
+                borderSide: BorderSide(color: p.accent, width: 1.5),
+              ),
             ),
           ),
         ),
@@ -1322,7 +1666,9 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+              horizontal: AppSpacing.s20,
+              vertical: AppSpacing.sm,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: AppRadii.r12All,
             ),

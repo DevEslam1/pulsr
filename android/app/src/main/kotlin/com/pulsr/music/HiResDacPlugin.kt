@@ -278,7 +278,36 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "getAudioOutputInfo" -> {
-                result.success(getAudioOutputDetails())
+                // Probing AudioTrack/Bluetooth Binder state can stall while
+                // the audio/BT stack restarts. Run it on the existing probe
+                // thread so the platform main thread (and every other
+                // MethodChannel call) never blocks on it.
+                val posted = probeHandler.post {
+                    val details = try {
+                        getAudioOutputDetails()
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "getAudioOutputInfo probe failed: ${t.message}")
+                        null
+                    }
+                    mainHandler.post {
+                        if (details != null) {
+                            result.success(details)
+                        } else {
+                            result.error(
+                                "AUDIO_OUTPUT_PROBE_FAILED",
+                                "Failed to read audio output details",
+                                null,
+                            )
+                        }
+                    }
+                }
+                if (!posted) {
+                    result.error(
+                        "AUDIO_OUTPUT_PROBE_FAILED",
+                        "Audio probe thread is unavailable",
+                        null,
+                    )
+                }
             }
             "isBitPerfectSupported" -> {
                 result.success(isBitPerfectSupportedOnPlatform())

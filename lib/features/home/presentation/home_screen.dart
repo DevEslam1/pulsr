@@ -29,6 +29,7 @@ import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../cubit/home_cubit.dart';
+import '../../../core/services/radio_station_store.dart';
 import 'widgets/quran_radio_hero_carousel.dart';
 import 'widgets/quick_tile.dart';
 import 'widgets/online_category_section.dart';
@@ -745,47 +746,62 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 trailingIconSize: 20,
               );
 
-              if (isTablet) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 11,
-                      child: QuranRadioHeroCarousel(
-                        height: 148,
+              return ValueListenableBuilder<bool>(
+                valueListenable: RadioStationStore.heroCardsVisible,
+                builder: (context, showRadioCards, _) {
+                  if (!showRadioCards) {
+                    return Row(
+                      children: [
+                        Expanded(child: favTile),
+                        const SizedBox(width: AppSpacing.s10),
+                        Expanded(child: focusTile),
+                      ],
+                    );
+                  }
+
+                  if (isTablet) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 11,
+                          child: QuranRadioHeroCarousel(
+                            height: 148,
+                            playerCubit: playerCubit,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.s12),
+                        Expanded(
+                          flex: 9,
+                          child: Column(
+                            children: [
+                              favTile,
+                              const SizedBox(height: AppSpacing.s10),
+                              focusTile,
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      QuranRadioHeroCarousel(
+                        height: 142,
                         playerCubit: playerCubit,
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.s12),
-                    Expanded(
-                      flex: 9,
-                      child: Column(
+                      const SizedBox(height: AppSpacing.s10),
+                      Row(
                         children: [
-                          favTile,
-                          const SizedBox(height: AppSpacing.s10),
-                          focusTile,
+                          Expanded(child: favTile),
+                          const SizedBox(width: AppSpacing.s10),
+                          Expanded(child: focusTile),
                         ],
                       ),
-                    ),
-                  ],
-                );
-              }
-
-              return Column(
-                children: [
-                  QuranRadioHeroCarousel(
-                    height: 142,
-                    playerCubit: playerCubit,
-                  ),
-                  const SizedBox(height: AppSpacing.s10),
-                  Row(
-                    children: [
-                      Expanded(child: favTile),
-                      const SizedBox(width: AppSpacing.s10),
-                      Expanded(child: focusTile),
                     ],
-                  ),
-                ],
+                  );
+                },
               );
             },
           ),

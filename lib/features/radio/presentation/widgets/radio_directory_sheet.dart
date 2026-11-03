@@ -30,12 +30,17 @@ class RadioDirectorySheet extends StatefulWidget {
     RadioBrowserService? service,
     RadioStationStore? store,
   }) {
+    final size = MediaQuery.sizeOf(context);
+    final isLandscape = size.width > size.height;
+
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 820),
       builder: (_) => FractionallySizedBox(
-        heightFactor: 0.88,
+        heightFactor: isLandscape ? 0.94 : 0.88,
         child: RadioDirectorySheet(
           service: service ?? RadioBrowserService(),
           store: store ?? RadioStationStore(),
@@ -61,6 +66,9 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
   @override
   void initState() {
     super.initState();
+    for (final existing in widget.store.list) {
+      _addedIds.add(existing.id);
+    }
     _search('');
   }
 
@@ -68,6 +76,11 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  bool _isStationAlreadySaved(RadioStation station) {
+    return _addedIds.contains(station.id) ||
+        widget.store.hasUrlCollision(station.url);
   }
 
   Future<void> _search(String query) async {
@@ -94,7 +107,7 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
   }
 
   Future<void> _add(RadioStation station) async {
-    if (_addedIds.contains(station.id) || _checkingIds.contains(station.id)) {
+    if (_isStationAlreadySaved(station) || _checkingIds.contains(station.id)) {
       return;
     }
     setState(() => _checkingIds.add(station.id));
@@ -128,73 +141,234 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildStationResultTile(
+    BuildContext context,
+    RadioStation station, {
+    required bool isCompact,
+  }) {
     final p = context.palette;
+    final added = _isStationAlreadySaved(station);
+    final checking = _checkingIds.contains(station.id);
 
     return Material(
-      color: p.surface,
-      borderRadius:
-          const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+      color: p.surfaceContainer,
+      borderRadius: AppRadii.r14All,
       clipBehavior: Clip.antiAlias,
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            const SizedBox(height: AppSpacing.sm),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: p.hairline,
-                borderRadius: AppRadii.r2All,
-              ),
+      child: Center(
+        child: ListTile(
+          dense: isCompact,
+          contentPadding: EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.sm,
+            isCompact ? 0 : AppSpacing.xxs,
+            AppSpacing.xs,
+            isCompact ? 0 : AppSpacing.xxs,
+          ),
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: p.surface,
+              borderRadius: AppRadii.r12All,
             ),
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                  AppSpacing.s20, AppSpacing.md, AppSpacing.sm, AppSpacing.xs),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      context.l10n.radioDirectoryBrowse,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w800,
-                      ),
+            clipBehavior: Clip.antiAlias,
+            child: station.artworkUrl != null
+                ? Image.network(
+                    station.artworkUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Icon(Icons.radio_rounded, color: p.textTertiary),
+                  )
+                : Icon(Icons.radio_rounded, color: p.textTertiary),
+          ),
+          title: MarqueeText(
+            text: station.name,
+            textAlign: TextAlign.start,
+            allowUserPause: false,
+            velocity: 28.0,
+            blankSpace: 36.0,
+            style: TextStyle(
+              color: p.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: AppFontSize.bodySmall,
+            ),
+          ),
+          subtitle: station.genre == null
+              ? null
+              : Text(
+                  station.genre!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.caption,
+                  ),
+                ),
+          trailing: TextButton.icon(
+            onPressed: added || checking ? null : () => _add(station),
+            icon: checking
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: p.accent,
                     ),
+                  )
+                : Icon(
+                    added ? Icons.check_rounded : Icons.add_rounded,
+                    size: 18,
                   ),
-                  IconButton(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    tooltip: context.l10n.cancel,
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: Icon(Icons.close_rounded, color: p.textSecondary),
-                  ),
-                ],
-              ),
+            label: Text(
+              added ? context.l10n.radioDirectoryAdded : context.l10n.radioAdd,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: PulsrSearchField(
-                controller: _controller,
-                hintText: context.l10n.radioDirectoryHint,
-                debounceDuration: const Duration(milliseconds: 350),
-                onChanged: _search,
-                onClear: () => _search(''),
-              ),
+            style: TextButton.styleFrom(
+              foregroundColor: added ? p.textTertiary : p.accent,
+              minimumSize: const Size(64, AppSpacing.minTouchTarget),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Expanded(child: _buildBody(context)),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final mq = MediaQuery.of(context);
+    final isCompactLandscape =
+        mq.size.width > mq.size.height && mq.size.height < 520;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+      child: Material(
+        color: p.surface,
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+        clipBehavior: Clip.antiAlias,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              SizedBox(
+                height: isCompactLandscape ? AppSpacing.xs : AppSpacing.sm,
+              ),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: p.hairline,
+                  borderRadius: AppRadii.r2All,
+                ),
+              ),
+              if (isCompactLandscape)
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s20,
+                    AppSpacing.xs,
+                    AppSpacing.sm,
+                    AppSpacing.xs,
+                  ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        flex: 2,
+                        child: Text(
+                          context.l10n.radioDirectoryBrowse,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.body,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        flex: 3,
+                        child: PulsrSearchField(
+                          controller: _controller,
+                          hintText: context.l10n.radioDirectoryHint,
+                          debounceDuration: const Duration(milliseconds: 350),
+                          onChanged: _search,
+                          onClear: () => _search(''),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        tooltip: context.l10n.cancel,
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        icon: Icon(Icons.close_rounded, color: p.textSecondary),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s20,
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.xs,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          context.l10n.radioDirectoryBrowse,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.title,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        tooltip: context.l10n.cancel,
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        icon: Icon(Icons.close_rounded, color: p.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                  child: PulsrSearchField(
+                    controller: _controller,
+                    hintText: context.l10n.radioDirectoryHint,
+                    debounceDuration: const Duration(milliseconds: 350),
+                    onChanged: _search,
+                    onClear: () => _search(''),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+              Expanded(
+                child: _buildBody(
+                  context,
+                  isCompactLandscape: isCompactLandscape,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context, {
+    required bool isCompactLandscape,
+  }) {
     final p = context.palette;
 
     if (_loading) {
@@ -202,102 +376,83 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
         child: CircularProgressIndicator(color: p.accent),
       );
     }
-    if (_failed) {
-      return PulsrEmptyState(
-        icon: Icons.cloud_off_rounded,
-        iconColor: p.error,
-        title: context.l10n.radioDirectoryError,
-        subtitle: context.l10n.downloadErrorNetwork,
-        primaryActionLabel: context.l10n.retry,
-        primaryActionIcon: Icons.refresh_rounded,
-        onPrimaryAction: () => _search(_controller.text),
-      );
-    }
-    if (_results.isEmpty) {
-      return PulsrEmptyState(
-        icon: Icons.radio_rounded,
-        title: context.l10n.radioDirectoryEmpty,
-        subtitle: context.l10n.radioDirectoryHint,
-      );
-    }
 
-    return ListView.separated(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-          AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.lg),
-      itemCount: _results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
-      itemBuilder: (context, index) {
-        final station = _results[index];
-        final added = _addedIds.contains(station.id);
-        final checking = _checkingIds.contains(station.id);
-        return Material(
-          color: p.surfaceContainer,
-          borderRadius: AppRadii.r14All,
-          clipBehavior: Clip.antiAlias,
-          child: ListTile(
-            contentPadding: const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.sm, AppSpacing.xxs, AppSpacing.xs, AppSpacing.xxs),
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: p.surface,
-                borderRadius: AppRadii.r12All,
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: station.artworkUrl != null
-                  ? Image.network(
-                      station.artworkUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          Icon(Icons.radio_rounded, color: p.textTertiary),
-                    )
-                  : Icon(Icons.radio_rounded, color: p.textTertiary),
-            ),
-            title: MarqueeText(
-              text: station.name,
-              textAlign: TextAlign.start,
-              allowUserPause: false,
-              velocity: 28.0,
-              blankSpace: 36.0,
-              style: TextStyle(
-                color: p.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: AppFontSize.bodySmall,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (_failed) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: PulsrEmptyState(
+                  icon: Icons.cloud_off_rounded,
+                  iconColor: p.error,
+                  title: context.l10n.radioDirectoryError,
+                  subtitle: context.l10n.downloadErrorNetwork,
+                  primaryActionLabel: context.l10n.retry,
+                  primaryActionIcon: Icons.refresh_rounded,
+                  onPrimaryAction: () => _search(_controller.text),
+                ),
               ),
             ),
-            subtitle: station.genre == null
-                ? null
-                : Text(
-                    station.genre!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: p.textSecondary, fontSize: AppFontSize.caption),
-                  ),
-            trailing: TextButton.icon(
-              onPressed: added || checking ? null : () => _add(station),
-              icon: checking
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: p.accent,
-                      ),
-                    )
-                  : Icon(
-                      added ? Icons.check_rounded : Icons.add_rounded,
-                      size: 18,
-                    ),
-              label: Text(added
-                  ? context.l10n.radioDirectoryAdded
-                  : context.l10n.radioAdd),
-              style: TextButton.styleFrom(
-                foregroundColor: added ? p.textTertiary : p.accent,
-                minimumSize: const Size(64, AppSpacing.minTouchTarget),
+          );
+        }
+
+        if (_results.isEmpty) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: PulsrEmptyState(
+                  icon: Icons.radio_rounded,
+                  title: context.l10n.radioDirectoryEmpty,
+                  subtitle: context.l10n.radioDirectoryHint,
+                ),
               ),
             ),
+          );
+        }
+
+        final useGrid = constraints.maxWidth >= 560;
+
+        if (!useGrid) {
+          return ListView.separated(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20,
+              0,
+              AppSpacing.s20,
+              AppSpacing.lg,
+            ),
+            itemCount: _results.length,
+            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
+            itemBuilder: (context, index) => _buildStationResultTile(
+              context,
+              _results[index],
+              isCompact: isCompactLandscape,
+            ),
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.s20,
+            AppSpacing.xxs,
+            AppSpacing.s20,
+            AppSpacing.lg,
+          ),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisExtent: isCompactLandscape ? 64 : 72,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
+          ),
+          itemCount: _results.length,
+          itemBuilder: (context, index) => _buildStationResultTile(
+            context,
+            _results[index],
+            isCompact: isCompactLandscape,
           ),
         );
       },

@@ -18,7 +18,6 @@ import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/pulsr_haptics.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
-import '../../../core/widgets/pulsr_logo.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../settings/cubit/settings_cubit.dart';
 
@@ -699,12 +698,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: PulsrLogo(
-                      size: isLandscape ? 42 : 64,
-                      color: p.accent,
-                      glowColor: p.glow,
-                      animate: true,
+                  child: ClipRRect(
+                    borderRadius:
+                        isLandscape ? AppRadii.r20All : AppRadii.r28All,
+                    child: Image.asset(
+                      'assets/app_icon/app_icon_plus.png',
+                      width: isLandscape ? 72 : 108,
+                      height: isLandscape ? 72 : 108,
+                      fit: BoxFit.cover,
+                      semanticLabel: context.l10n.appTitle,
                     ),
                   ),
                 ),

@@ -18,7 +18,21 @@ import '../utils/error_logger.dart';
 /// For test isolation, use [resetForTesting] in `setUp`/`tearDown`.
 class RadioStationStore {
   static const String prefsKey = 'radio_stations_v1';
+  static const String prefsKeyHeroCardsVisible =
+      'setting_radio_hero_cards_visible_v1';
   static const int maxEntries = 500;
+
+  /// Global reactive visibility notifier for homescreen radio hero cards.
+  static final ValueNotifier<bool> heroCardsVisible = ValueNotifier<bool>(true);
+
+  /// Toggles and persists whether the homescreen radio hero carousel is visible.
+  static Future<void> setHeroCardsVisible(bool visible) async {
+    heroCardsVisible.value = visible;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(prefsKeyHeroCardsVisible, visible);
+    } catch (_) {}
+  }
 
   static const String quranCairoArtwork = 'assets/Pictures/quran_cairo.jpg';
   static const String minshawiArtwork = 'assets/Pictures/minshawi.jpg';
@@ -540,6 +554,7 @@ class RadioStationStore {
   @visibleForTesting
   static void resetForTesting() {
     _stations.clear();
+    heroCardsVisible.value = true;
   }
 
   RadioStationStore() {
@@ -681,6 +696,10 @@ class RadioStationStore {
     _loadFailed = false;
     try {
       final prefs = await SharedPreferences.getInstance();
+      final storedHeroVisible = prefs.getBool(prefsKeyHeroCardsVisible);
+      if (storedHeroVisible != null) {
+        heroCardsVisible.value = storedHeroVisible;
+      }
       final raw = prefs.getString(prefsKey);
       // The station list is process-static, so an empty/missing store must
       // clear it — otherwise stations from a previous session (or a cleared
