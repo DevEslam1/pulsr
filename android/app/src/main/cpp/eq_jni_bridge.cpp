@@ -1515,12 +1515,8 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeCustodyTake(
     const jsize total = static_cast<jsize>(kCustodyHeaderBytes + payload * 2);
     jbyteArray result = env->NewByteArray(total);
     if (result == nullptr) return nullptr;  // OutOfMemoryError already pending
-    void* body = env->GetByteArrayElements(result, nullptr);
-    if (body == nullptr) {
-        env->DeleteByteArray(result);
-        return nullptr;
-    }
-    jbyte* bytes = static_cast<jbyte*>(body);
+    jbyte* bytes = env->GetByteArrayElements(result, nullptr);
+    if (bytes == nullptr) return nullptr;  // OutOfMemoryError already pending
     writeLe32(bytes + 0, static_cast<uint32_t>(frames));
     writeLe32(bytes + 4, static_cast<uint32_t>(CustodyVerifier::kChannels));
     writeLe64(bytes + 8, generation);
@@ -1531,7 +1527,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeCustodyTake(
     bytes[34] = truncated ? 1 : 0;
     std::memcpy(bytes + kCustodyHeaderBytes, input.data(), payload);
     std::memcpy(bytes + kCustodyHeaderBytes + payload, output.data(), payload);
-    env->ReleaseByteArrayElements(result, body, 0);
+    env->ReleaseByteArrayElements(result, bytes, 0);
     return result;
 }
 
