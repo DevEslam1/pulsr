@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
+import '../../core/services/sound_dose_tracker_service.dart';
 import '../../core/telemetry/dsp_reliability_tracker.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
@@ -490,6 +491,11 @@ class EqualizerManager {
     _cachedPrefs = await SharedPreferences.getInstance();
     await _effectsChannel.init();
     await _effectsLock.lock(() => _restorePreferences());
+    // The native safety stage and its dose budget default to "off / unlimited"
+    // and the plugin's fields reset every process, so a saved budget has to be
+    // re-applied here — not only when the headphone safety sheet opens.
+    await SoundDoseTrackerService(effectsChannel: _effectsChannel)
+        .applyPersistedState();
   }
 
   List<double> get activeFrequencies => eqBandCount == 64

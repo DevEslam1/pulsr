@@ -4239,6 +4239,23 @@
   "weeklySoundAllowance": "Asignación semanal de sonido",
   "safetyLimiterActiveDesc": "Limitador de seguridad activo (techo de -6 dBFS activado para prevenir daños auditivos)",
   "highSoundDoseWarning": "Dosis de sonido alta: Considere reducir el volumen para proteger la audición",
+  "doseBudgetLabel": "Presupuesto de dosis semanal",
+  "@doseBudgetLabel": {
+    "description": "Title of the dose budget tier selector in the headphone safety sheet"
+  },
+  "doseBudgetDesc": "El audio se limita cuando se consume esta parte de la dosis de referencia de 40 h a 80 dBA.",
+  "@doseBudgetDesc": {
+    "description": "Explains that the budget is a fraction of the EN 62368-1 reference dose"
+  },
+  "doseQuietUntilClear": "El límite se retira tras unos {time} sin reproducción",
+  "@doseQuietUntilClear": {
+    "description": "Quiet time needed before the native safety stage releases",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "optimalExposureDesc": "Exposición óptima: Niveles de escucha seguros dentro del límite de 40 horas",
   "latencySyncDiagnostics": "Diagnóstico de latencia y sincronización",
   "latencySyncDiagnosticsDesc": "Métricas de retardo de procesamiento y salida en tiempo real reportadas directamente desde receptores de hardware nativos.",

@@ -7238,6 +7238,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'High sound dose: Consider reducing volume to protect hearing';
 
   @override
+  String get doseBudgetLabel => 'Weekly dose budget';
+
+  @override
+  String get doseBudgetDesc =>
+      'Sound is limited once this share of the 40 h at 80 dBA reference dose is used.';
+
+  @override
+  String doseQuietUntilClear(String time) {
+    return 'Limit lifts after about $time with no playback';
+  }
+
+  @override
   String get optimalExposureDesc =>
       'Optimal exposure: Safe listening levels within 40-hour allowance';
 

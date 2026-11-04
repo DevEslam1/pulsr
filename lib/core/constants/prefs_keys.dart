@@ -26,6 +26,11 @@ class PrefsKeys {
   static const String soundFeedbackEnabled = 'setting_sound_feedback_enabled';
   static const String headphoneSafetyEnabled =
       'setting_headphone_safety_enabled';
+  // Weekly sound-dose budget as a fraction of the EN 62368-1 reference
+  // (1.0 = 40 h at 80 dBA). Applied to the native engine as its engagement
+  // threshold, so a smaller budget attenuates sooner rather than adding a
+  // second, separate limiter.
+  static const String audioDoseBudget = 'audio_dose_budget';
   static const String themeMode = 'setting_theme_mode';
   // Live store is 'setting_custom_accent' (SettingsCubit._keyCustomAccent);
   // the '_color' suffixed value was a dead duplicate (orphan 20-01).

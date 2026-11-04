@@ -4239,6 +4239,23 @@
   "weeklySoundAllowance": "الحصة الصوتية الأسبوعية",
   "safetyLimiterActiveDesc": "محدد الأمان نشط (سقف -6 dBFS مفعل لمنع تلف السمع)",
   "highSoundDoseWarning": "جرعة صوتية عالية: يُرجى تقليل مستوى الصوت لحماية السمع",
+  "doseBudgetLabel": "ميزانية الجرعة الأسبوعية",
+  "@doseBudgetLabel": {
+    "description": "Title of the dose budget tier selector in the headphone safety sheet"
+  },
+  "doseBudgetDesc": "يتم تحديد الصوت بعد استهلاك هذه النسبة من جرعة المرجع 40 ساعة عند 80 dBA.",
+  "@doseBudgetDesc": {
+    "description": "Explains that the budget is a fraction of the EN 62368-1 reference dose"
+  },
+  "doseQuietUntilClear": "يرتفع الحد بعد نحو {time} دون تشغيل",
+  "@doseQuietUntilClear": {
+    "description": "Quiet time needed before the native safety stage releases",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "optimalExposureDesc": "تعرض مثالي: مستويات استماع آمنة ضمن بدل الـ 40 ساعة",
   "latencySyncDiagnostics": "تشخيصات التأخير والمزامنة",
   "latencySyncDiagnosticsDesc": "مقاييس تأخير المعالجة والإخراج المباشرة من أجهزة الصوت الأصلية.",

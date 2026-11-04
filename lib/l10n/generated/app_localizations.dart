@@ -13043,6 +13043,24 @@ abstract class AppLocalizations {
   /// **'High sound dose: Consider reducing volume to protect hearing'**
   String get highSoundDoseWarning;
 
+  /// Title of the dose budget tier selector in the headphone safety sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly dose budget'**
+  String get doseBudgetLabel;
+
+  /// Explains that the budget is a fraction of the EN 62368-1 reference dose
+  ///
+  /// In en, this message translates to:
+  /// **'Sound is limited once this share of the 40 h at 80 dBA reference dose is used.'**
+  String get doseBudgetDesc;
+
+  /// Quiet time needed before the native safety stage releases
+  ///
+  /// In en, this message translates to:
+  /// **'Limit lifts after about {time} with no playback'**
+  String doseQuietUntilClear(String time);
+
   /// No description provided for @optimalExposureDesc.
   ///
   /// In en, this message translates to:

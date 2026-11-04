@@ -7183,6 +7183,18 @@ class AppLocalizationsAr extends AppLocalizations {
       'جرعة صوتية عالية: يُرجى تقليل مستوى الصوت لحماية السمع';
 
   @override
+  String get doseBudgetLabel => 'ميزانية الجرعة الأسبوعية';
+
+  @override
+  String get doseBudgetDesc =>
+      'يتم تحديد الصوت بعد استهلاك هذه النسبة من جرعة المرجع 40 ساعة عند 80 dBA.';
+
+  @override
+  String doseQuietUntilClear(String time) {
+    return 'يرتفع الحد بعد نحو $time دون تشغيل';
+  }
+
+  @override
   String get optimalExposureDesc =>
       'تعرض مثالي: مستويات استماع آمنة ضمن بدل الـ 40 ساعة';
 

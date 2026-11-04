@@ -7280,6 +7280,18 @@ class AppLocalizationsEs extends AppLocalizations {
       'Dosis de sonido alta: Considere reducir el volumen para proteger la audición';
 
   @override
+  String get doseBudgetLabel => 'Presupuesto de dosis semanal';
+
+  @override
+  String get doseBudgetDesc =>
+      'El audio se limita cuando se consume esta parte de la dosis de referencia de 40 h a 80 dBA.';
+
+  @override
+  String doseQuietUntilClear(String time) {
+    return 'El límite se retira tras unos $time sin reproducción';
+  }
+
+  @override
   String get optimalExposureDesc =>
       'Exposición óptima: Niveles de escucha seguros dentro del límite de 40 horas';
 

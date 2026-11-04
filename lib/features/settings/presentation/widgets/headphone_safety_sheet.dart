@@ -7,12 +7,12 @@ import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/services/sound_dose_tracker_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
-import '../../../../data/audio/audio_effects_channel.dart';
 
 /// Sheet displaying WHO-ITU H.870 / EN 62368-1 sound dose tracking and
 /// automatic headphone safety protection controls.
@@ -31,13 +31,20 @@ class HeadphoneSafetySheet extends StatefulWidget {
 }
 
 class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
-  final AudioEffectsChannel _channel = AudioEffectsChannel();
+  final SoundDoseTrackerService _dose = SoundDoseTrackerService();
   Timer? _pollTimer;
 
   double _weeklyDose = 0.0;
-  bool _safetyEnabled = true;
+  double _budget = SoundDoseTrackerService.defaultBudget;
+  bool _safetyEnabled = false;
   bool _attenuationActive = false;
   bool _loading = true;
+
+  /// Dose consumed as a fraction of the user's budget — at a 25 % budget the
+  /// gauge is full after a quarter of the reference dose, which is the whole
+  /// point of choosing one.
+  double get _usedFraction => SoundDoseTrackerService.budgetUsedFraction(
+      weeklyDose: _weeklyDose, budget: _budget);
 
   @override
   void initState() {
@@ -57,13 +64,12 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
 
   Future<void> _refreshState() async {
     try {
-      final dose = await _channel.getWeeklyDose();
-      if (!mounted) return;
-      final active = await _channel.isSafetyAttenuationActive();
+      final snapshot = await _dose.read();
       if (!mounted) return;
       setState(() {
-        _weeklyDose = dose;
-        _attenuationActive = active;
+        _weeklyDose = snapshot.weeklyDose;
+        _budget = snapshot.budget;
+        _attenuationActive = snapshot.attenuationActive;
         _loading = false;
       });
     } catch (e, st) {
@@ -98,14 +104,13 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
 
   Future<void> _pollTelemetry() async {
     try {
-      final dose = await _channel.getWeeklyDose();
+      final snapshot = await _dose.read();
       if (!mounted) return;
-      final active = await _channel.isSafetyAttenuationActive();
-      if (!mounted) return;
-      if (dose != _weeklyDose || active != _attenuationActive) {
+      if (snapshot.weeklyDose != _weeklyDose ||
+          snapshot.attenuationActive != _attenuationActive) {
         setState(() {
-          _weeklyDose = dose;
-          _attenuationActive = active;
+          _weeklyDose = snapshot.weeklyDose;
+          _attenuationActive = snapshot.attenuationActive;
         });
       }
     } catch (e, st) {
@@ -116,16 +121,30 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
 
   Future<void> _toggleSafety(bool enabled) async {
     try {
-      await _channel.setHeadphoneSafetyParams(
-        enabled: enabled,
-        doseThreshold: 1.0,
-        safetyCeilingDb: -6.0,
-      );
+      await _dose.applyBudget(budget: _budget, safetyEnabled: enabled);
       if (!mounted) return;
       setState(() => _safetyEnabled = enabled);
       unawaited(_persistSafetyEnabled(enabled));
+      await _refreshState();
     } catch (e, st) {
       ErrorLogger.log('Headphone safety was not applied',
+          error: e, stackTrace: st, category: 'HeadphoneSafetySheet');
+    }
+  }
+
+  /// The budget IS the native engagement threshold, so choosing a smaller one
+  /// makes the existing safety stage act sooner instead of adding a second
+  /// limiter that could disagree with it.
+  Future<void> _selectBudget(double tier) async {
+    final normalized = SoundDoseTrackerService.normalizeBudget(tier);
+    if (normalized == _budget) return;
+    try {
+      setState(() => _budget = normalized);
+      await _dose.applyBudget(
+          budget: normalized, safetyEnabled: _safetyEnabled);
+      await _refreshState();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply the sound dose budget',
           error: e, stackTrace: st, category: 'HeadphoneSafetySheet');
     }
   }
@@ -142,7 +161,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
     );
 
     if (confirmed == true && mounted) {
-      await _channel.resetWeeklyDose();
+      await _dose.resetDose();
       await _refreshState();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -156,16 +175,32 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
   }
 
   Color _getDoseColor(PulsrPalette p) {
-    if (_weeklyDose >= 1.0) return AppColors.error;
-    if (_weeklyDose >= 0.8) return p.warning;
+    final used = _usedFraction;
+    if (used >= 1.0) return AppColors.error;
+    if (used >= 0.8) return p.warning;
     return p.accent;
+  }
+
+  /// Compact quiet-time wording. The engine releases at 95 % of the budget, so
+  /// the figure is derived from the same decay constant the native stage uses.
+  String _formatQuietTime(Duration duration) {
+    final minutes = duration.inMinutes;
+    if (minutes < 60) return '${minutes}m';
+    final hours = minutes ~/ 60;
+    if (hours < 48) return '${hours}h ${minutes % 60}m';
+    return '${(minutes / 1440).toStringAsFixed(1)}d';
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final dosePercent = (_weeklyDose * 100.0).clamp(0.0, 999.0);
+    final dosePercent = (_usedFraction * 100.0).clamp(0.0, 999.0);
     final doseColor = _getDoseColor(p);
+    final quietTime = DoseSnapshot(
+      weeklyDose: _weeklyDose,
+      budget: _budget,
+      attenuationActive: _attenuationActive,
+    ).quietTimeUntilClear;
 
     return SafeArea(
       child: Padding(
@@ -258,7 +293,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                   ClipRRect(
                     borderRadius: AppRadii.r8All,
                     child: LinearProgressIndicator(
-                      value: (_weeklyDose).clamp(0.0, 1.0),
+                      value: _usedFraction.clamp(0.0, 1.0),
                       minHeight: 10,
                       backgroundColor: p.surface,
                       valueColor: AlwaysStoppedAnimation<Color>(doseColor),
@@ -270,7 +305,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                       Icon(
                         _attenuationActive
                             ? Icons.warning_amber_rounded
-                            : (_weeklyDose >= 0.8
+                            : (_usedFraction >= 0.8
                                 ? Icons.info_outline_rounded
                                 : Icons.check_circle_outline_rounded),
                         color: doseColor,
@@ -281,7 +316,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                         child: Text(
                           _attenuationActive
                               ? context.l10n.safetyLimiterActiveDesc
-                              : (_weeklyDose >= 0.8
+                              : (_usedFraction >= 0.8
                                   ? context.l10n.highSoundDoseWarning
                                   : context.l10n.optimalExposureDesc),
                           style: TextStyle(
@@ -293,10 +328,60 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                       ),
                     ],
                   ),
+                  if (quietTime != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xs),
+                      child: Text(
+                        context.l10n.doseQuietUntilClear(
+                            _formatQuietTime(quietTime)),
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.caption,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.md),
+
+            // Weekly dose budget selector
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.doseBudgetLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppFontSize.body,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    context.l10n.doseBudgetDesc,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.caption,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.s10),
+                  Wrap(
+                    spacing: AppSpacing.s10,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      for (final tier in SoundDoseTrackerService.budgetTiers)
+                        ChoiceChip(
+                          label: Text('${(tier * 100).round()} %'),
+                          selected: _budget == tier,
+                          onSelected: (_) => unawaited(_selectBudget(tier)),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
             // Protection Switch Tile
             SwitchListTile(
