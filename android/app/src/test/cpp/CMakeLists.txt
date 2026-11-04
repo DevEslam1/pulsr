@@ -69,6 +69,7 @@ set(DSP_SRCS
     ${MAIN_CPP}/ViperDdc.cpp
     ${MAIN_CPP}/ArbitraryResponseEq.cpp
     ${MAIN_CPP}/LiveProg.cpp
+    ${MAIN_CPP}/CustodyVerifier.cpp
     ${MAIN_CPP}/AudioDspEngine.cpp
     ${MAIN_CPP}/UsbAudioSink.cpp
 )
@@ -85,6 +86,7 @@ endfunction()
 pulsr_add_test(test_native_all ${DSP_SRCS})
 pulsr_add_test(test_dsp_stress ${DSP_SRCS})
 pulsr_add_test(test_bypass_transparency ${DSP_SRCS})
+pulsr_add_test(test_custody_verifier ${DSP_SRCS})
 pulsr_add_test(test_safety_bypass ${DSP_SRCS})
 pulsr_add_test(test_aaudio_sink_support)
 pulsr_add_test(test_ir_bounds)

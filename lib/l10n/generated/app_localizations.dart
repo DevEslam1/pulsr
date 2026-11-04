@@ -5423,6 +5423,54 @@ abstract class AppLocalizations {
   /// **'DSP Signal Inspector'**
   String get dspInspector;
 
+  /// Measured chain-of-custody action in the DSP inspector
+  ///
+  /// In en, this message translates to:
+  /// **'Verify signal chain'**
+  String get custodyVerifyTitle;
+
+  /// Progress label while the native engine captures PCM
+  ///
+  /// In en, this message translates to:
+  /// **'Measuring a capture window...'**
+  String get custodyVerifying;
+
+  /// Verdict: captured input and output digests were identical
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-exact (measured)'**
+  String get custodyBitExact;
+
+  /// Verdict: DSP stages measurably altered the samples
+  ///
+  /// In en, this message translates to:
+  /// **'Chain modified samples'**
+  String get custodyChainModified;
+
+  /// Verdict: nothing was measured, so no claim is made
+  ///
+  /// In en, this message translates to:
+  /// **'Not verified - no capture completed'**
+  String get custodyUnverified;
+
+  /// Verdict: no native capture path outside Android
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on this platform'**
+  String get custodyNotSupported;
+
+  /// Hint shown when verification is attempted while paused
+  ///
+  /// In en, this message translates to:
+  /// **'Play this track to measure its chain'**
+  String get custodyRequiresPlayback;
+
+  /// Confirmation after exporting the certificate JSON
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate saved'**
+  String get custodyCertificateSaved;
+
   /// tranche6 eq l10n
   ///
   /// In en, this message translates to:

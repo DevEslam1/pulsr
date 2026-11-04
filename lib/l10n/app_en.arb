@@ -1594,6 +1594,38 @@
   "@dspInspector": {
     "description": "tranche6 eq l10n"
   },
+  "custodyVerifyTitle": "Verify signal chain",
+  "@custodyVerifyTitle": {
+    "description": "Measured chain-of-custody action in the DSP inspector"
+  },
+  "custodyVerifying": "Measuring a capture window...",
+  "@custodyVerifying": {
+    "description": "Progress label while the native engine captures PCM"
+  },
+  "custodyBitExact": "Bit-exact (measured)",
+  "@custodyBitExact": {
+    "description": "Verdict: captured input and output digests were identical"
+  },
+  "custodyChainModified": "Chain modified samples",
+  "@custodyChainModified": {
+    "description": "Verdict: DSP stages measurably altered the samples"
+  },
+  "custodyUnverified": "Not verified - no capture completed",
+  "@custodyUnverified": {
+    "description": "Verdict: nothing was measured, so no claim is made"
+  },
+  "custodyNotSupported": "Not available on this platform",
+  "@custodyNotSupported": {
+    "description": "Verdict: no native capture path outside Android"
+  },
+  "custodyRequiresPlayback": "Play this track to measure its chain",
+  "@custodyRequiresPlayback": {
+    "description": "Hint shown when verification is attempted while paused"
+  },
+  "custodyCertificateSaved": "Certificate saved",
+  "@custodyCertificateSaved": {
+    "description": "Confirmation after exporting the certificate JSON"
+  },
   "autoEqSearch": "AutoEQ 2.0 Search",
   "@autoEqSearch": {
     "description": "tranche6 eq l10n"

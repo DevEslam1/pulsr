@@ -67,6 +67,7 @@ set(DSP_CORE_SOURCES
     ViperDdc.cpp
     ArbitraryResponseEq.cpp
     LiveProg.cpp
+    CustodyVerifier.cpp
     AudioDspEngine.cpp
     AAudioSink.cpp
     UsbAudioSink.cpp

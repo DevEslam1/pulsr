@@ -20,6 +20,7 @@
 #include "ViperDdc.h"
 #include "ArbitraryResponseEq.h"
 #include "LiveProg.h"
+#include "CustodyVerifier.h"
 
 #include <vector>
 #include <memory>
@@ -148,6 +149,10 @@ public:
     ViperDdc& viperDdc() { return viperDdc_; }
     ArbitraryResponseEq& arbitraryEq() { return arbitraryEq_; }
     LiveProg& liveProg() { return liveProg_; }
+
+    // Measured chain-of-custody capture. Control threads arm/take windows; the
+    // render thread only fills them (see CustodyVerifier.h).
+    CustodyVerifier& custody() { return custody_; }
 
     // Render-observed delay. Control threads never read mutable DSP objects.
     int getPipelineLatencyFrames() const {
@@ -383,6 +388,10 @@ private:
     ArbitraryResponseEq arbitraryEq_;
     LiveProg liveProg_;
 
+    // Measured bit-exactness capture (64 KB, allocated with the engine so the
+    // render thread never allocates while filling a window).
+    CustodyVerifier custody_;
+
     // Telemetry cache (lock-free atomics, updated per audio buffer)
     std::atomic<float> limiterGrDb_{0.0f};
     std::atomic<float> shortTermLoudnessDeltaDb_{0.0f};
@@ -461,6 +470,19 @@ public:
     void setThermalLevel(int level);
     void setReverbThreadingMode(ReverbThreadingMode mode);
     void drainRetireQueues();
+
+    // Measured chain-of-custody, control-thread API. These operate on the engine
+    // that actually renders (selectActiveEngineLocked), because the singleton
+    // control engine never runs processInterleaved and would capture nothing.
+    bool custodyArm(int frames, double sampleRate, bool bitPerfect, bool bypassCompare);
+    void custodyDisarm();
+    /// Copies a completed window into caller storage under the registry lock:
+    /// the capture buffers belong to the engine and the next arm() overwrites
+    /// them. Returns frames captured, or -1 when no window is ready. capacity is
+    /// the float count available in EACH of inputOut/outputOut.
+    int custodyTake(float* inputOut, float* outputOut, int capacityFloats, double* sampleRate,
+                    uint32_t* activeStages, uint64_t* generation, bool* bitPerfect,
+                    bool* bypassCompare, bool* truncated);
 
 private:
     struct Slot {

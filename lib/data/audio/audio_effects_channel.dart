@@ -2299,6 +2299,79 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Asks the native engine to capture the next [frames] of PCM on both sides of
+  /// the DSP chain. Fails when a window is already pending; nothing is measured
+  /// unless playback is actually feeding blocks.
+  Future<Map<String, dynamic>> armCustodyWindow({
+    required int frames,
+    required double sampleRate,
+    required bool bitPerfect,
+    required bool bypassCompare,
+  }) async {
+    if (!_isAndroid) {
+      return const {'armed': false, 'reason': 'unsupportedPlatform'};
+    }
+    try {
+      final res = await _channel
+          .invokeMapMethod<String, dynamic>('armCustodyWindow', {
+        'frames': frames,
+        'sampleRate': sampleRate,
+        'bitPerfect': bitPerfect,
+        'bypassCompare': bypassCompare,
+      }).timeout(const Duration(seconds: 2));
+      return res ?? const {'armed': false, 'reason': 'noResponse'};
+    } catch (e, st) {
+      ErrorLogger.log(
+        'armCustodyWindow failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return const {'armed': false, 'reason': 'channelError'};
+    }
+  }
+
+  /// Collects the captured window with SHA-256 digests of both halves. Returns
+  /// `{'available': false, ...}` when nothing was captured — the caller must
+  /// treat that as "unverified", never as a pass.
+  Future<Map<String, dynamic>> collectCustodyWindow() async {
+    if (!_isAndroid) {
+      return const {'available': false, 'reason': 'unsupportedPlatform'};
+    }
+    try {
+      final res = await _channel
+          .invokeMapMethod<String, dynamic>('collectCustodyWindow')
+          .timeout(const Duration(seconds: 3));
+      return res ?? const {'available': false, 'reason': 'noResponse'};
+    } catch (e, st) {
+      ErrorLogger.log(
+        'collectCustodyWindow failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return const {'available': false, 'reason': 'channelError'};
+    }
+  }
+
+  /// Abandons a pending window (e.g. the user left the sheet before playback
+  /// filled it) so a later arm() is not blocked by it.
+  Future<void> cancelCustodyWindow() async {
+    if (!_isAndroid) return;
+    try {
+      await _channel.invokeMethod<void>('cancelCustodyWindow').timeout(
+            const Duration(seconds: 2),
+          );
+    } catch (e, st) {
+      ErrorLogger.log(
+        'cancelCustodyWindow failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
   /// Verifies active DSP effect parameters against native hardware state.
   Future<Map<String, dynamic>?> verifyState() async {
     if (!_isAndroid) return null;

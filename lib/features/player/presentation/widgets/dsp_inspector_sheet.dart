@@ -24,6 +24,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'engine_telemetry_panel.dart';
+import 'custody_certificate_card.dart';
 import 'sync_diagnostics_sheet.dart';
 
 class DspInspectorSheet extends StatefulWidget {
@@ -383,6 +384,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                               const EngineTelemetryPanel(initialExpanded: true),
                               const SizedBox(height: AppSpacing.md),
                               _buildReliabilityCard(p),
+                              const SizedBox(height: AppSpacing.md),
+                              const CustodyCertificateCard(),
                               const SizedBox(height: AppSpacing.md),
 
                               // Active Effects Summary Header

@@ -2973,6 +2973,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspInspector => 'DSP Signal Inspector';
 
   @override
+  String get custodyVerifyTitle => 'Verify signal chain';
+
+  @override
+  String get custodyVerifying => 'Measuring a capture window...';
+
+  @override
+  String get custodyBitExact => 'Bit-exact (measured)';
+
+  @override
+  String get custodyChainModified => 'Chain modified samples';
+
+  @override
+  String get custodyUnverified => 'Not verified - no capture completed';
+
+  @override
+  String get custodyNotSupported => 'Not available on this platform';
+
+  @override
+  String get custodyRequiresPlayback => 'Play this track to measure its chain';
+
+  @override
+  String get custodyCertificateSaved => 'Certificate saved';
+
+  @override
   String get autoEqSearch => 'AutoEQ 2.0 Search';
 
   @override

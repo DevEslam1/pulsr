@@ -521,6 +521,41 @@ int DspEngineRegistry::getMaxPipelineLatencyFrames() {
     return maxLatency;
 }
 
+bool DspEngineRegistry::custodyArm(int frames, double sampleRate, bool bitPerfect,
+                                   bool bypassCompare) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return selectActiveEngineLocked()->custody().arm(frames, sampleRate, bitPerfect,
+                                                     bypassCompare);
+}
+
+void DspEngineRegistry::custodyDisarm() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    selectActiveEngineLocked()->custody().disarm();
+}
+
+int DspEngineRegistry::custodyTake(float* inputOut, float* outputOut, int capacityFloats,
+                                   double* sampleRate, uint32_t* activeStages,
+                                   uint64_t* generation, bool* bitPerfect, bool* bypassCompare,
+                                   bool* truncated) {
+    if (!inputOut || !outputOut) return -1;
+    std::lock_guard<std::mutex> lock(mutex_);
+    CustodyVerifier::Window window;
+    if (!selectActiveEngineLocked()->custody().take(window)) return -1;
+    const int floats = window.frames * CustodyVerifier::kChannels;
+    // Half-copying a window would leave the digest describing samples the caller
+    // never received, so an undersized buffer reports "no window" instead.
+    if (floats > capacityFloats) return -1;
+    std::memcpy(inputOut, window.input, static_cast<size_t>(floats) * sizeof(float));
+    std::memcpy(outputOut, window.output, static_cast<size_t>(floats) * sizeof(float));
+    if (sampleRate) *sampleRate = window.sampleRate;
+    if (activeStages) *activeStages = window.activeStages;
+    if (generation) *generation = window.snapshotGeneration;
+    if (bitPerfect) *bitPerfect = window.bitPerfectAtArm;
+    if (bypassCompare) *bypassCompare = window.bypassCompareAtArm;
+    if (truncated) *truncated = window.truncated;
+    return window.frames;
+}
+
 float DspEngineRegistry::getLimiterGrDb() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (engines_.empty()) {
@@ -1035,6 +1070,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         resetInternal();
         lastResetGeneration_ = resetGeneration;
     }
+    // Measured custody: capture the exact bytes this block enters with, and (via
+    // the guard's destructor) leaves with. Placed after the pending reset so a
+    // window's first block cannot pair pre-reset input with post-reset output,
+    // and before any stage touches the buffer. Scoped so the bit-perfect and A/B
+    // bypass returns are covered — those are precisely the paths a "bit-exact"
+    // claim rests on.
+    CustodyCaptureGuard custodyGuard{&custody_, buffer, frames, channels,
+                                     snapshot->generation,
+                                     snapshot->activeStages &
+                                         ~autoDegradedStages_.load(std::memory_order_relaxed)};
     int blockLatency = 0;
     limiterActive_.store(false, std::memory_order_relaxed);
 

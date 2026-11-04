@@ -1265,6 +1265,38 @@
   "@dspInspector": {
     "description": "tranche6 eq l10n"
   },
+  "custodyVerifyTitle": "تحقق من سلسلة الإشارة",
+  "@custodyVerifyTitle": {
+    "description": "Measured chain-of-custody action in the DSP inspector"
+  },
+  "custodyVerifying": "جارٍ قياس نافذة الالتقاط...",
+  "@custodyVerifying": {
+    "description": "Progress label while the native engine captures PCM"
+  },
+  "custodyBitExact": "مطابقة تامة للبتات (مقيسة)",
+  "@custodyBitExact": {
+    "description": "Verdict: captured input and output digests were identical"
+  },
+  "custodyChainModified": "السلسلة عدّلت العينات",
+  "@custodyChainModified": {
+    "description": "Verdict: DSP stages measurably altered the samples"
+  },
+  "custodyUnverified": "غير متحقق - لم يكتمل الالتقاط",
+  "@custodyUnverified": {
+    "description": "Verdict: nothing was measured, so no claim is made"
+  },
+  "custodyNotSupported": "غير متاح على هذا النظام",
+  "@custodyNotSupported": {
+    "description": "Verdict: no native capture path outside Android"
+  },
+  "custodyRequiresPlayback": "شغّل المقطع لقياس سلسلته",
+  "@custodyRequiresPlayback": {
+    "description": "Hint shown when verification is attempted while paused"
+  },
+  "custodyCertificateSaved": "تم حفظ الشهادة",
+  "@custodyCertificateSaved": {
+    "description": "Confirmation after exporting the certificate JSON"
+  },
   "autoEqSearch": "بحث AutoEQ 2.0",
   "@autoEqSearch": {
     "description": "tranche6 eq l10n"

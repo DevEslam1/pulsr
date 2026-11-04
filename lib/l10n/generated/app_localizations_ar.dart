@@ -2992,6 +2992,30 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspInspector => 'فاحص اشارة DSP';
 
   @override
+  String get custodyVerifyTitle => 'تحقق من سلسلة الإشارة';
+
+  @override
+  String get custodyVerifying => 'جارٍ قياس نافذة الالتقاط...';
+
+  @override
+  String get custodyBitExact => 'مطابقة تامة للبتات (مقيسة)';
+
+  @override
+  String get custodyChainModified => 'السلسلة عدّلت العينات';
+
+  @override
+  String get custodyUnverified => 'غير متحقق - لم يكتمل الالتقاط';
+
+  @override
+  String get custodyNotSupported => 'غير متاح على هذا النظام';
+
+  @override
+  String get custodyRequiresPlayback => 'شغّل المقطع لقياس سلسلته';
+
+  @override
+  String get custodyCertificateSaved => 'تم حفظ الشهادة';
+
+  @override
   String get autoEqSearch => 'بحث AutoEQ 2.0';
 
   @override

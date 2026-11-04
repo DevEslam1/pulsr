@@ -1448,4 +1448,91 @@ Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetBufferedMs(
     return pulsr::UsbAudioSink::instance().GetBufferedMs();
 }
 
+// ---------------------------------------------------------------------------
+// Measured chain-of-custody. Control-thread only; the render thread's part lives
+// entirely inside AudioDspEngine::processInterleaved's capture guard.
+// ---------------------------------------------------------------------------
+
+namespace {
+constexpr jsize kCustodyHeaderBytes = 40;
+
+void writeLe32(jbyte* at, uint32_t value) {
+    for (int i = 0; i < 4; ++i) at[i] = static_cast<jbyte>((value >> (8 * i)) & 0xFF);
+}
+void writeLe64(jbyte* at, uint64_t value) {
+    for (int i = 0; i < 8; ++i) at[i] = static_cast<jbyte>((value >> (8 * i)) & 0xFF);
+}
+}  // namespace
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeCustodyArm(
+        JNIEnv* /* env */, jobject /* thiz */, jint frames, jdouble sampleRate,
+        jboolean bitPerfect, jboolean bypassCompare) {
+    const bool armed = DspEngineRegistry::instance().custodyArm(
+        static_cast<int>(frames), sampleRate, bitPerfect == JNI_TRUE,
+        bypassCompare == JNI_TRUE);
+    return armed ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeCustodyDisarm(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    DspEngineRegistry::instance().custodyDisarm();
+}
+
+/**
+ * Serialises one completed capture window, or returns null when none is ready.
+ *
+ * Layout (little-endian, so Kotlin can wrap it in a direct ByteBuffer without
+ * per-field conversion):
+ *   0  int32 frames            4  int32 channels        8  int64 snapshotGeneration
+ *  16 int32 activeStages      24  float64 sampleRate   32/33/34 bitPerfect/bypass/truncated
+ *  40  input PCM (frames*channels float32)
+ *  40+payload  output PCM, same shape
+ * The caller hashes both halves; equal digests are the measured proof of
+ * bit-exactness, and unequal digests under an active stage are the chain
+ * fingerprint the certificate reports instead.
+ */
+JNIEXPORT jbyteArray JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeCustodyTake(
+        JNIEnv* env, jobject /* thiz */) {
+    std::vector<float> input(CustodyVerifier::kCapacity);
+    std::vector<float> output(CustodyVerifier::kCapacity);
+    double sampleRate = 0.0;
+    uint32_t activeStages = 0;
+    uint64_t generation = 0;
+    bool bitPerfect = false;
+    bool bypassCompare = false;
+    bool truncated = false;
+
+    const int frames = DspEngineRegistry::instance().custodyTake(
+            input.data(), output.data(), static_cast<int>(input.size()), &sampleRate,
+            &activeStages, &generation, &bitPerfect, &bypassCompare, &truncated);
+    if (frames <= 0) return nullptr;
+
+    const size_t payload = static_cast<size_t>(frames) * CustodyVerifier::kChannels *
+                           sizeof(float);
+    const jsize total = static_cast<jsize>(kCustodyHeaderBytes + payload * 2);
+    jbyteArray result = env->NewByteArray(total);
+    if (result == nullptr) return nullptr;  // OutOfMemoryError already pending
+    void* body = env->GetByteArrayElements(result, nullptr);
+    if (body == nullptr) {
+        env->DeleteByteArray(result);
+        return nullptr;
+    }
+    jbyte* bytes = static_cast<jbyte*>(body);
+    writeLe32(bytes + 0, static_cast<uint32_t>(frames));
+    writeLe32(bytes + 4, static_cast<uint32_t>(CustodyVerifier::kChannels));
+    writeLe64(bytes + 8, generation);
+    writeLe32(bytes + 16, activeStages);
+    std::memcpy(bytes + 24, &sampleRate, sizeof(double));
+    bytes[32] = bitPerfect ? 1 : 0;
+    bytes[33] = bypassCompare ? 1 : 0;
+    bytes[34] = truncated ? 1 : 0;
+    std::memcpy(bytes + kCustodyHeaderBytes, input.data(), payload);
+    std::memcpy(bytes + kCustodyHeaderBytes + payload, output.data(), payload);
+    env->ReleaseByteArrayElements(result, body, 0);
+    return result;
+}
+
 } // extern "C"

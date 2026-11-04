@@ -21,6 +21,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.security.MessageDigest
 import java.util.UUID
 import kotlin.math.abs
 
@@ -457,6 +458,93 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetPerformanceProfile(profile: Int)
     private external fun nativeSetThermalLevel(level: Int)
     private external fun nativeSetReverbThreadingMode(mode: Int)
+    private external fun nativeCustodyArm(frames: Int, sampleRate: Double, bitPerfect: Boolean,
+                                         bypassCompare: Boolean): Boolean
+    private external fun nativeCustodyDisarm()
+    private external fun nativeCustodyTake(): ByteArray?
+
+    // --- Measured chain-of-custody ------------------------------------------
+    // The engine captures one window of PCM on both sides of the DSP chain; the
+    // digests computed here are what makes a "bit-exact" claim measurable rather
+    // than inferred from which stage flags happen to be set.
+
+    private fun leInt(raw: ByteArray, offset: Int): Int =
+        if (offset + 4 > raw.size) 0 else
+            (raw[offset].toInt() and 0xFF) or
+            ((raw[offset + 1].toInt() and 0xFF) shl 8) or
+            ((raw[offset + 2].toInt() and 0xFF) shl 16) or
+            ((raw[offset + 3].toInt() and 0xFF) shl 24)
+
+    private fun leLong(raw: ByteArray, offset: Int): Long =
+        if (offset + 8 > raw.size) 0L else {
+            var value = 0L
+            for (i in 0 until 8) {
+                value = value or ((raw[offset + i].toLong() and 0xFF) shl (8 * i))
+            }
+            value
+        }
+
+    private fun sha256Hex(raw: ByteArray, from: Int, to: Int): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.update(raw, from, to - from)
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun collectCustodyWindow(): Map<String, Any?> {
+        if (!isNativeDspLoaded) {
+            return mapOf("available" to false, "reason" to "nativeDspNotLoaded")
+        }
+        val raw = try {
+            nativeCustodyTake()
+        } catch (e: Exception) {
+            Log.e(TAG, "nativeCustodyTake failed: ${e.message}", e)
+            null
+        } ?: return mapOf("available" to false, "reason" to "noWindowCaptured")
+
+        if (raw.size < CUSTODY_HEADER_BYTES) {
+            return mapOf("available" to false, "reason" to "truncatedPayload")
+        }
+        val frames = leInt(raw, 0)
+        val channels = leInt(raw, 4)
+        val generation = leLong(raw, 8)
+        val activeStages = leInt(raw, 16)
+        val sampleRate = java.lang.Double.longBitsToDouble(leLong(raw, 24))
+        val bitPerfectAtArm = raw[32].toInt() != 0
+        val bypassCompareAtArm = raw[33].toInt() != 0
+        val truncated = raw[34].toInt() != 0
+
+        val payload = frames.toLong() * channels * 4
+        // The bridge only serialises a window that fits, so a mismatch here means
+        // the two sides disagree on the layout: report it instead of hashing
+        // whatever bytes happen to be left.
+        if (payload <= 0L || payload > (raw.size - CUSTODY_HEADER_BYTES).toLong() / 2) {
+            return mapOf("available" to false, "reason" to "payloadSizeMismatch")
+        }
+        val inputFrom = CUSTODY_HEADER_BYTES
+        val inputTo = inputFrom + payload.toInt()
+        val outputTo = inputTo + payload.toInt()
+        val inputSha = sha256Hex(raw, inputFrom, inputTo)
+        val outputSha = sha256Hex(raw, inputTo, outputTo)
+
+        return mapOf(
+            "available" to true,
+            "frames" to frames,
+            "channels" to channels,
+            "sampleRate" to sampleRate,
+            "snapshotGeneration" to generation,
+            "activeStages" to activeStages,
+            "bitPerfectAtArm" to bitPerfectAtArm,
+            "bypassCompareAtArm" to bypassCompareAtArm,
+            "truncated" to truncated,
+            "inputSha256" to inputSha,
+            "outputSha256" to outputSha,
+            // Measured, not configured: identical digests mean the chain did not
+            // touch these samples.
+            "bitExactMeasured" to (inputSha == outputSha),
+            "windowMs" to if (sampleRate > 0.0) frames / sampleRate * 1000.0 else 0.0
+        )
+    }
+
 
     @Volatile private var isRtfGovernorEnabled = true
     @Volatile private var consecutiveHighRtfCount = 0
@@ -843,6 +931,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 }
 
     companion object {
+        // Must match kCustodyHeaderBytes in eq_jni_bridge.cpp.
+        const val CUSTODY_HEADER_BYTES = 40
+        // Must match CustodyVerifier::kMaxFrames.
+        const val CUSTODY_MAX_FRAMES = 4096
+
         const val STAGE_EQ = 1 shl 0
         const val STAGE_CROSSFEED = 1 shl 1
         const val STAGE_REVERB = 1 shl 2
@@ -1588,6 +1681,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setDynamicBassParams", "getTelemetry", "getLimiterGrDb", "getDynEqGrDb", "getMultibandGrDb", "getRollingRtf",
                 "getRtfGovernorStatus", "setRtfGovernorEnabled", "setBypassCompare",
                 "getThermalStatus", "getDspBatteryDrainEstimate", "getChainOfCustodyReport",
+                "armCustodyWindow", "collectCustodyWindow", "cancelCustodyWindow",
                 "getWeeklyDose", "resetWeeklyDose", "isSafetyAttenuationActive", "setHeadphoneSafetyParams",
                 "setChannelManagerEnabled", "setChannelManagerChannel" -> {
                     synchronized(stateLock) {
@@ -2346,6 +2440,50 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "getChainOfCustodyReport" -> {
                     result.success(getChainOfCustodyReport())
+                }
+
+                "armCustodyWindow" -> {
+                    // Capture runs on the render thread and needs a live engine,
+                    // so arming can only ever be attempted while the native DSP
+                    // is loaded. Report the reason rather than a fake success.
+                    if (!isNativeDspLoaded) {
+                        result.success(mapOf("armed" to false, "reason" to "nativeDspNotLoaded"))
+                    } else {
+                        val frames = call.argument<Int>("frames") ?: 0
+                        val sampleRate = call.argument<Double>("sampleRate") ?: 0.0
+                        val bitPerfect = call.argument<Boolean>("bitPerfect") ?: false
+                        val bypassCompare = call.argument<Boolean>("bypassCompare") ?: false
+                        val armed = try {
+                            nativeCustodyArm(
+                                frames.coerceIn(0, CUSTODY_MAX_FRAMES),
+                                sampleRate, bitPerfect, bypassCompare
+                            )
+                        } catch (e: Exception) {
+                            Log.e(TAG, "nativeCustodyArm failed: ${e.message}", e)
+                            false
+                        }
+                        result.success(
+                            mapOf(
+                                "armed" to armed,
+                                "reason" to if (armed) "ok" else "windowAlreadyPending"
+                            )
+                        )
+                    }
+                }
+
+                "collectCustodyWindow" -> {
+                    result.success(collectCustodyWindow())
+                }
+
+                "cancelCustodyWindow" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeCustodyDisarm()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "nativeCustodyDisarm failed: ${e.message}", e)
+                        }
+                    }
+                    result.success(true)
                 }
 
                 "getWeeklyDose" -> {

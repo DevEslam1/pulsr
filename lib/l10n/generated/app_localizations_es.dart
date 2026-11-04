@@ -3006,6 +3006,31 @@ class AppLocalizationsEs extends AppLocalizations {
   String get dspInspector => 'Inspector de senal DSP';
 
   @override
+  String get custodyVerifyTitle => 'Verificar cadena de senal';
+
+  @override
+  String get custodyVerifying => 'Midiendo ventana de captura...';
+
+  @override
+  String get custodyBitExact => 'Bit-exacta (medido)';
+
+  @override
+  String get custodyChainModified => 'La cadena modifico las muestras';
+
+  @override
+  String get custodyUnverified => 'Sin verificar - captura incompleta';
+
+  @override
+  String get custodyNotSupported => 'No disponible en esta plataforma';
+
+  @override
+  String get custodyRequiresPlayback =>
+      'Reproduce la pista para medir su cadena';
+
+  @override
+  String get custodyCertificateSaved => 'Certificado guardado';
+
+  @override
   String get autoEqSearch => 'Busqueda AutoEQ 2.0';
 
   @override
