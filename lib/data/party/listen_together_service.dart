@@ -8,14 +8,17 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../../core/constants/prefs_keys.dart';
 import '../../core/di/injection.dart';
 import '../../core/services/ytm_account_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
+import '../../features/settings/cubit/settings_cubit.dart';
 import '../db/app_database.dart';
 import 'party_models.dart';
+import 'party_sync_controller.dart';
 import 'server_clock.dart';
 
 enum PartyConnectionState { offline, connecting, live }
@@ -30,13 +33,19 @@ class ListenTogetherService {
   static const String prefSavedCodeKey = 'setting_party_saved_code';
   static const String prefSavedTokenKey = 'setting_party_saved_token';
 
-  static const double maxAllowedDriftSeconds = 1.2;
-  static const int driftLimitMs = 1200; // 1.2 seconds
   static const int pingIntervalMs = 10000; // 10s ping loop
-  static const int maxDriftStrikes = 2; // 2 consecutive ticks exceeding drift
 
   final ServerClock _clock = ServerClock();
   ServerClock get clock => _clock;
+
+  /// Audible-time sync arithmetic. Thresholds live here, not in constants
+  /// duplicated on this class.
+  final PartySyncController _sync = PartySyncController();
+
+  /// Resolved output latency of this device in ms, cached because it is read on
+  /// every reconciliation tick.
+  int _outputLatencyMs = 0;
+  Timer? _scheduledStartTimer;
 
   final ValueNotifier<PartyConnectionState> connectionState =
       ValueNotifier<PartyConnectionState>(PartyConnectionState.offline);
@@ -72,8 +81,10 @@ class ListenTogetherService {
   String? get currentPartyCode => _activeCode;
 
   // Drift correction state
-  int _consecutiveDriftStrikes = 0;
   int _lastHandledSeq = -1;
+
+  /// Local monotonic time before which reconciliation must stay quiet, so a
+  /// track load or a seek is not immediately re-corrected by the next tick.
   int _reconcileQuietUntilMs = 0;
 
   // Subscriptions to local PlayerCubit
@@ -381,6 +392,10 @@ class ListenTogetherService {
     _pingTimer = null;
     _reconcileTimer?.cancel();
     _reconcileTimer = null;
+    // A pending anchored start must not fire into a room we just left.
+    _scheduledStartTimer?.cancel();
+    _scheduledStartTimer = null;
+    _sync.reset();
     _channelSub?.cancel();
     _channelSub = null;
     try {
@@ -595,21 +610,22 @@ class ListenTogetherService {
       final changed =
           songKey != lastSongKey || state.isPlaying != lastPlaying || seeked;
       final heartbeatDue = lastAt == null ||
-          now.difference(lastAt!) >= const Duration(seconds: 2);
+          now.difference(lastAt!) >= const Duration(milliseconds: 1000);
       if (!changed && !(state.isPlaying && heartbeatDue)) return;
       lastAt = now;
       lastPosition = state.position;
       lastSongKey = songKey;
       lastPlaying = state.isPlaying;
-      _broadcastHostPlayback(
-          state.currentSong, state.isPlaying, state.position);
+      unawaited(_broadcastHostPlayback(
+          state.currentSong, state.isPlaying, state.position));
     });
   }
 
-  void _broadcastHostPlayback(
-      SongsTableData? song, bool isPlaying, Duration position) {
+  Future<void> _broadcastHostPlayback(
+      SongsTableData? song, bool isPlaying, Duration position) async {
     if (!inParty) return;
 
+    await _resolveOutputLatencyMs();
     final serverNow =
         _clock.serverNowMs() ?? DateTime.now().millisecondsSinceEpoch;
     final track = song != null
@@ -627,8 +643,70 @@ class ListenTogetherService {
       'action': 'setTrack',
       'track': track?.toJson(),
       'isPlaying': isPlaying,
-      'positionMs': position.inMilliseconds,
+      // Publish AUDIBLE time, not the position this device rendered: followers
+      // align to whatever this value says, so the host's own speaker delay has to
+      // be part of the timeline rather than a private offset everyone inherits.
+      'positionMs': PartySyncController.audibleAnchorPositionMs(
+        hostRenderPositionMs: position.inMilliseconds,
+        hostOutputLatencyMs: _outputLatencyMs,
+      ),
       'anchorMs': serverNow,
+    });
+  }
+
+  /// This device's output latency in ms, from the Bluetooth calibration the user
+  /// measured. Resolved per check because the route changes under us: applying a
+  /// saved Bluetooth offset while a USB DAC is active would mistime playback by
+  /// the whole offset instead of correcting it.
+  Future<void> _resolveOutputLatencyMs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.get(PrefsKeys.bluetoothLatencyOffsetMs);
+      final calibrated = raw is num ? raw.toInt() : 0;
+      var onBluetooth = false;
+      if (getIt.isRegistered<SettingsCubit>()) {
+        onBluetooth = getIt<SettingsCubit>().state.currentOutputDevice?.isBluetooth ?? false;
+      }
+      _outputLatencyMs = (onBluetooth && calibrated > 0) ? calibrated : 0;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to resolve party output latency',
+          error: e, stackTrace: st, category: 'PARTY');
+      _outputLatencyMs = 0;
+    }
+  }
+
+  /// Starts on the server's anchor instant instead of on frame arrival. The
+  /// server schedules PlayLeadMs into the future precisely so members whose state
+  /// frames land at different times still begin together; playing on arrival
+  /// threw that lead away and made network jitter part of the audible offset.
+  Future<void> _startAtAnchor(PartyPlayback playback) async {
+    _scheduledStartTimer?.cancel();
+    final nowServer = _clock.serverNowMs();
+    final plan = nowServer == null
+        ? const StartPlan(wait: Duration.zero, applied: Duration.zero)
+        : PartySyncController.planStart(
+            anchorServerMs: playback.anchorMs, nowServerMs: nowServer);
+
+    if (plan.startImmediately) {
+      _isReconcilingInbound = true;
+      try {
+        await getIt<PlayerCubit>().play();
+      } finally {
+        _isReconcilingInbound = false;
+      }
+      return;
+    }
+
+    _scheduledStartTimer = Timer(plan.applied, () async {
+      if (!inParty || _isHost) return;
+      final snapshot = partySnapshot.value;
+      if (snapshot == null || !snapshot.playback.isPlaying) return;
+      _isReconcilingInbound = true;
+      try {
+        await getIt<PlayerCubit>().play();
+      } finally {
+        _isReconcilingInbound = false;
+      }
     });
   }
 
@@ -648,7 +726,9 @@ class ListenTogetherService {
 
   void _startReconciliationTicker() {
     _reconcileTimer?.cancel();
-    _reconcileTimer = Timer.periodic(const Duration(milliseconds: 1000), (_) {
+    _reconcileTimer = Timer.periodic(
+        const Duration(milliseconds: PartySyncController.reconcileTickMs),
+        (_) {
       if (!inParty || _isHost) return;
       final snap = partySnapshot.value;
       if (snap == null) return;
@@ -678,6 +758,8 @@ class ListenTogetherService {
     final now = _clock.nowMs();
     if (now < _reconcileQuietUntilMs) return;
 
+    await _resolveOutputLatencyMs();
+
     // 1. Reconcile Track: verify current track matches target videoId
     final currentSong = playerState.currentSong;
     final currentVideoId = currentSong?.remoteId ?? currentSong?.id.toString();
@@ -705,37 +787,32 @@ class ListenTogetherService {
       }
       return;
     } else if (playback.isPlaying && !playerState.isPlaying) {
+      await _startAtAnchor(playback);
+    }
+
+    // 3. Audible-time correction. Compared against the latency-compensated
+    // target: matching raw positions is not enough when one member hears the
+    // music 200 ms after it is rendered and another hears it immediately.
+    if (!playback.isPlaying || !_clock.synced) return;
+
+    final roomPosition = effectivePartyPositionMs(playback);
+    if (roomPosition == null) return;
+
+    final decision = _sync.evaluatePosition(
+      localRenderMs: playerState.position.inMilliseconds,
+      roomPositionMs: roomPosition,
+      outputLatencyMs: _outputLatencyMs,
+      durationMs: targetTrack.durationMs,
+    );
+
+    if (decision.action == SyncAction.seek) {
       _isReconcilingInbound = true;
+      _reconcileQuietUntilMs = now + 1500;
       try {
-        await playerCubit.play();
+        await playerCubit.seek(Duration(milliseconds: decision.seekToMs!));
       } finally {
         _isReconcilingInbound = false;
       }
-    }
-
-    // 3. Drift check
-    if (!playback.isPlaying || !_clock.synced) return;
-
-    final effectivePos = effectivePartyPositionMs(playback);
-    if (effectivePos == null) return;
-
-    final localPos = playerState.position.inMilliseconds;
-    final drift = (localPos - effectivePos).abs();
-
-    if (drift > driftLimitMs) {
-      _consecutiveDriftStrikes++;
-      if (_consecutiveDriftStrikes >= maxDriftStrikes) {
-        _consecutiveDriftStrikes = 0;
-        _isReconcilingInbound = true;
-        _reconcileQuietUntilMs = now + 1500;
-        try {
-          await playerCubit.seek(Duration(milliseconds: effectivePos));
-        } finally {
-          _isReconcilingInbound = false;
-        }
-      }
-    } else {
-      _consecutiveDriftStrikes = 0;
     }
   }
 
