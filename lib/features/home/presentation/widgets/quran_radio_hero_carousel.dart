@@ -78,13 +78,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           url:
               'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi_mojawwad',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.minshawiArtwork,
+          artworkUrl: RadioStationStore.minshawiHomeCard,
         ),
         reciterTitleAr: 'الشيخ محمد صديق المنشاوي',
         reciterTitleEn: 'Sheikh Mohamed Siddiq El-Minshawi',
         subtitleAr: 'المصحف المجود • تلاوة خاشعة',
         subtitleEn: 'Holy Quran • Reverent Mujawwad Recitation',
-        artworkAsset: RadioStationStore.minshawiArtwork,
+        artworkAsset: RadioStationStore.minshawiHomeCard,
         badgeTextAr: 'تلاوة خاشعة',
         badgeTextEn: 'Khashia Recitation',
       ),
@@ -94,13 +94,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           name: 'إذاعة تلاوات خاشعة نادرة',
           url: 'https://backup.qurango.net/radio/salma',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.tarteelArtwork,
+          artworkUrl: RadioStationStore.khashiaHomeCard,
         ),
         reciterTitleAr: 'إذاعة تلاوات خاشعة نادرة',
         reciterTitleEn: 'Rare Khashia Recitations Radio',
         subtitleAr: 'تلاوات خاشعة ومؤثرة • كبار القراء',
         subtitleEn: 'Rare Reverent Recitations • Master Reciters',
-        artworkAsset: RadioStationStore.tarteelArtwork,
+        artworkAsset: RadioStationStore.khashiaHomeCard,
         badgeTextAr: 'تلاوات خاشعة',
         badgeTextEn: 'Rare Recitations',
       ),
@@ -110,13 +110,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           name: 'إذاعة الشيخ محمد صديق المنشاوي (تلاوات نادرة)',
           url: 'https://radio.xecod.com/station/alminshawi',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.minshawiArtwork,
+          artworkUrl: RadioStationStore.minshawiHomeCard,
         ),
         reciterTitleAr: 'الشيخ محمد صديق المنشاوي',
         reciterTitleEn: 'Sheikh Mohamed Siddiq El-Minshawi',
         subtitleAr: 'تلاوات نادرة ومحافل خاشعة',
         subtitleEn: 'Rare Historic Recitations & Concerts',
-        artworkAsset: RadioStationStore.minshawiArtwork,
+        artworkAsset: RadioStationStore.minshawiHomeCard,
         badgeTextAr: 'تلاوات نادرة',
         badgeTextEn: 'Historic Recitations',
       ),
@@ -126,13 +126,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           name: 'إذاعة القرآن الكريم المصرية - القاهرة',
           url: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.quranCairoArtwork,
+          artworkUrl: RadioStationStore.quranCairoHomeCard,
         ),
         reciterTitleAr: 'إذاعة القرآن الكريم - القاهرة',
         reciterTitleEn: 'Holy Quran Radio - Cairo',
         subtitleAr: 'بث مباشر من القاهرة • عبر الأثير',
         subtitleEn: 'Live from Cairo • Over the Air',
-        artworkAsset: RadioStationStore.quranCairoArtwork,
+        artworkAsset: RadioStationStore.quranCairoHomeCard,
         badgeTextAr: 'بث مباشر',
         badgeTextEn: 'Live Broadcast',
       ),
@@ -143,13 +143,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           url:
               'https://backup.qurango.net/radio/abdulbasit_abdulsamad_mojawwad',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.abdulBasitArtwork,
+          artworkUrl: RadioStationStore.abdulBasitHomeCard,
         ),
         reciterTitleAr: 'الشيخ عبد الباسط عبد الصمد',
         reciterTitleEn: 'Sheikh Abdulbasit Abdulsamad',
         subtitleAr: 'صوت مكة • المصحف المجود',
         subtitleEn: 'Voice of Mecca • Holy Quran Mujawwad',
-        artworkAsset: RadioStationStore.abdulBasitArtwork,
+        artworkAsset: RadioStationStore.abdulBasitHomeCard,
         badgeTextAr: 'المصحف المجود',
         badgeTextEn: 'Mujawwad Mushaf',
       ),
@@ -159,13 +159,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           name: 'إذاعة الشيخ محمود خليل الحصري (مرتل)',
           url: 'https://backup.qurango.net/radio/mahmoud_khalil_alhussary',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.hussaryArtwork,
+          artworkUrl: RadioStationStore.hussaryHomeCard,
         ),
         reciterTitleAr: 'الشيخ محمود خليل الحصري',
         reciterTitleEn: 'Sheikh Mahmoud Khalil Al-Hussary',
         subtitleAr: 'شيخ عموم المقارئ المصرية • المصحف المعلم',
         subtitleEn: 'Master of Reciters • Teaching Mushaf',
-        artworkAsset: RadioStationStore.hussaryArtwork,
+        artworkAsset: RadioStationStore.hussaryHomeCard,
         badgeTextAr: 'المصحف المعلم',
         badgeTextEn: 'Teacher Mushaf',
       ),
@@ -175,13 +175,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           name: 'إذاعة الشيخ مصطفى إسماعيل (مجود)',
           url: 'https://backup.qurango.net/radio/mustafa_ismail',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.mustafaIsmailArtwork,
+          artworkUrl: RadioStationStore.mustafaIsmailHomeCard,
         ),
         reciterTitleAr: 'الشيخ مصطفى إسماعيل',
         reciterTitleEn: 'Sheikh Mustafa Ismail',
         subtitleAr: 'قارئ الملوك والرؤساء • إعجاز التلاوة',
         subtitleEn: 'Legendary Reciter • Miraculous Recitation',
-        artworkAsset: RadioStationStore.mustafaIsmailArtwork,
+        artworkAsset: RadioStationStore.mustafaIsmailHomeCard,
         badgeTextAr: 'المصحف المجود',
         badgeTextEn: 'Mujawwad Mushaf',
       ),
@@ -192,13 +192,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           url:
               'https://backup.qurango.net/radio/mahmoud_ali__albanna_mojawwad',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.quranCairoArtwork,
+          artworkUrl: RadioStationStore.bannaHomeCard,
         ),
         reciterTitleAr: 'الشيخ محمود علي البنا',
         reciterTitleEn: 'Sheikh Mahmoud Ali Al-Banna',
         subtitleAr: 'المصحف المجود • صوت شجي خاشع',
         subtitleEn: 'Holy Quran Mujawwad • Melodious Voice',
-        artworkAsset: RadioStationStore.quranCairoArtwork,
+        artworkAsset: RadioStationStore.bannaHomeCard,
         badgeTextAr: 'المصحف المجود',
         badgeTextEn: 'Mujawwad Mushaf',
       ),
@@ -208,13 +208,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           name: 'إذاعة الشيخ محمد محمود الطبلاوي',
           url: 'https://backup.qurango.net/radio/mohammad_altablaway',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.quranCairoArtwork,
+          artworkUrl: RadioStationStore.tablawayHomeCard,
         ),
         reciterTitleAr: 'الشيخ محمد محمود الطبلاوي',
         reciterTitleEn: 'Sheikh Mohammad Al-Tablaway',
         subtitleAr: 'تلاوات خاشعة نادرة • نبرة مميزة',
         subtitleEn: 'Rare Recitations • Distinctive Tone',
-        artworkAsset: RadioStationStore.quranCairoArtwork,
+        artworkAsset: RadioStationStore.tablawayHomeCard,
         badgeTextAr: 'تلاوات خاشعة',
         badgeTextEn: 'Khashia Recitations',
       ),
@@ -224,13 +224,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           name: 'إذاعة تراتيل قصيرة متميزة',
           url: 'https://backup.qurango.net/radio/tarateel',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.tarteelArtwork,
+          artworkUrl: RadioStationStore.tarteelHomeCard,
         ),
         reciterTitleAr: 'إذاعة تراتيل القرآن الكريم',
         reciterTitleEn: 'Holy Quran Short Recitations Radio',
         subtitleAr: 'تلاوات عذبة مختارة على مدار الساعة',
         subtitleEn: 'Sweet Recitations 24/7',
-        artworkAsset: RadioStationStore.tarteelArtwork,
+        artworkAsset: RadioStationStore.tarteelHomeCard,
         badgeTextAr: 'تراتيل عذبة',
         badgeTextEn: 'Sweet Tarteel',
       ),
@@ -240,13 +240,13 @@ class QuranRadioHeroCarousel extends StatefulWidget {
           name: 'إذاعة القرآن الكريم - القاهرة (بث بديل)',
           url: 'https://radio.xecod.com/station/quran-cairo',
           genre: 'Quran',
-          artworkUrl: RadioStationStore.quranCairoArtwork,
+          artworkUrl: RadioStationStore.quranCairoHomeCard,
         ),
         reciterTitleAr: 'إذاعة القرآن الكريم - القاهرة',
         reciterTitleEn: 'Holy Quran Radio - Cairo',
         subtitleAr: 'بث بديل عالي الجودة',
         subtitleEn: 'High Quality Backup Stream',
-        artworkAsset: RadioStationStore.quranCairoArtwork,
+        artworkAsset: RadioStationStore.quranCairoHomeCard,
         badgeTextAr: 'بث بديل',
         badgeTextEn: 'Backup Stream',
       ),
@@ -284,6 +284,11 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
         if (!existingUrls.contains(s.url)) {
           existingUrls.add(s.url);
           final fallbackGenre = s.genre?.isNotEmpty == true ? s.genre! : null;
+          final homeCard = RadioStationStore.resolveHomeCardForStation(
+            id: s.id,
+            name: s.name,
+            url: s.url,
+          );
           extraItems.add(
             QuranHeroItem(
               station: s,
@@ -291,7 +296,8 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
               reciterTitleEn: s.name,
               subtitleAr: fallbackGenre ?? 'إذاعة القرآن الكريم',
               subtitleEn: fallbackGenre ?? 'Holy Quran Radio',
-              artworkAsset: s.artworkUrl ?? RadioStationStore.minshawiArtwork,
+              artworkAsset:
+                  homeCard ?? s.artworkUrl ?? RadioStationStore.minshawiHomeCard,
               badgeTextAr: 'إذاعة مخصصة',
               badgeTextEn: 'Custom Station',
             ),
@@ -453,7 +459,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
               // Quick "All Stations" tonal action chip
               Semantics(
                 button: true,
-                label: 'View all radio stations',
+                label: context.l10n.viewAllRadioStations,
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
@@ -520,8 +526,6 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
 class _QuranHeroCard extends StatelessWidget {
   void _showHideOptionSheet(BuildContext context) {
     final p = context.palette;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
     PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       builder: (sheetContext) => SafeArea(
@@ -555,7 +559,7 @@ class _QuranHeroCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isArabic ? 'بطاقات الراديو' : 'Radio Cards',
+                          context.l10n.radioCardsTitle,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontSize: AppFontSize.title,
@@ -563,9 +567,7 @@ class _QuranHeroCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          isArabic
-                              ? 'يمكنك إظهارها مجددًا في أي وقت من صفحة الراديو'
-                              : 'You can restore them anytime from the Radio page',
+                          context.l10n.radioCardsRestoreHint,
                           style: TextStyle(
                             color: p.textSecondary,
                             fontSize: AppFontSize.caption,
@@ -589,9 +591,7 @@ class _QuranHeroCard extends StatelessWidget {
                   size: 22,
                 ),
                 title: Text(
-                  isArabic
-                      ? 'إخفاء بطاقات الراديو من الرئيسية'
-                      : 'Hide Radio Cards from Home',
+                  context.l10n.hideRadioCardsFromHome,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: AppFontSize.bodySmall,
@@ -599,9 +599,7 @@ class _QuranHeroCard extends StatelessWidget {
                   ),
                 ),
                 subtitle: Text(
-                  isArabic
-                      ? 'إخفاء شريط راديو القرآن من الصفحة الرئيسية'
-                      : 'Hide the radio carousel from your home screen',
+                  context.l10n.hideRadioCardsSubtitle,
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: AppFontSize.tiny,
@@ -613,9 +611,7 @@ class _QuranHeroCard extends StatelessWidget {
                   if (context.mounted) {
                     PulsrToast.show(
                       context,
-                      message: isArabic
-                          ? 'تم إخفاء بطاقات الراديو. يمكنك إظهارها من صفحة الراديو.'
-                          : 'Radio cards hidden. You can show them again from the Radio page.',
+                      message: context.l10n.radioCardsHiddenToast,
                       isSuccess: true,
                     );
                   }
@@ -670,8 +666,7 @@ class _QuranHeroCard extends StatelessWidget {
             rawIcyTitle.isNotEmpty ? rawIcyTitle : defaultSubtitle;
         final reciterTitle = item.getReciterTitle(isArabic);
         final badgeText = item.getBadgeText(isArabic);
-        final defaultBadge =
-            isArabic ? 'إذاعة القرآن الكريم' : 'Holy Quran Radio';
+        final defaultBadge = context.l10n.holyQuranRadio;
 
         final baseSurface = p.surfaceContainer;
         final elevatedSurface = Color.alphaBlend(
@@ -679,10 +674,13 @@ class _QuranHeroCard extends StatelessWidget {
           p.surfaceContainerHigh,
         );
 
+        final isHomeCard = item.artworkAsset.contains('home card') ||
+            item.artworkAsset.contains('home_card');
+
         return Semantics(
           button: true,
-          label:
-              '$reciterTitle, $displaySubtitle. ${isPlaying ? (isArabic ? "قيد التشغيل، اضغط للإيقاف" : "Playing, double tap to pause") : (isArabic ? "اضغط للتشغيل" : "Double tap to play live stream")}',
+          label: '$reciterTitle, $displaySubtitle. '
+              '${isPlaying ? context.l10n.radioNowPlayingSemantics : context.l10n.radioTapToPlaySemantics}',
           child: Material(
             color: Colors.transparent,
             borderRadius: AppRadii.r24All,
@@ -726,100 +724,154 @@ class _QuranHeroCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Ambient radial glow behind the reciter portrait stage
-                    PositionedDirectional(
-                      end: -10,
-                      top: -10,
-                      bottom: -10,
-                      width: 210,
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              colors: [
-                                p.accent.withValues(
-                                    alpha: isPlaying ? 0.20 : 0.10),
-                                Colors.transparent,
-                              ],
+                    if (isHomeCard) ...[
+                      // Full-bleed panoramic Home Card artwork (2172x724 banner)
+                      Positioned.fill(
+                        child: Image.asset(
+                          item.artworkAsset,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: p.surfaceContainerHigh,
+                            child: Icon(
+                              Icons.radio_rounded,
+                              size: 48,
+                              color: p.accent.withValues(alpha: 0.3),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                      // Smooth gradient scrim on text side (start side) for high contrast and readability
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: AlignmentDirectional.centerStart,
+                              end: AlignmentDirectional.centerEnd,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.82),
+                                Colors.black.withValues(alpha: 0.58),
+                                Colors.black.withValues(alpha: 0.20),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.40, 0.72, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Soft vertical vignette for top and bottom controls
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.30),
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.35),
+                              ],
+                              stops: const [0.0, 0.50, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      // Ambient radial glow behind the reciter portrait stage
+                      PositionedDirectional(
+                        end: -10,
+                        top: -10,
+                        bottom: -10,
+                        width: 210,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                colors: [
+                                  p.accent.withValues(
+                                      alpha: isPlaying ? 0.20 : 0.10),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
 
-                    // Reciter Ambient Artwork (Wide cinematic alignment with smooth theme-aware fade)
-                    PositionedDirectional(
-                      end: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 195,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isNetwork =
-                              item.artworkAsset.startsWith('http://') ||
-                                  item.artworkAsset.startsWith('https://');
+                      // Reciter Ambient Artwork (Wide cinematic alignment with smooth theme-aware fade)
+                      PositionedDirectional(
+                        end: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 195,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isNetwork =
+                                item.artworkAsset.startsWith('http://') ||
+                                    item.artworkAsset.startsWith('https://');
 
-                          return Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              if (isNetwork)
-                                CachedArtwork(
-                                  id: 0,
-                                  remoteUrl: item.artworkAsset,
-                                  size: 195,
-                                  fallbackIcon: Icons.radio_rounded,
-                                )
-                              else
-                                Image.asset(
-                                  item.artworkAsset,
-                                  fit: BoxFit.cover,
-                                  alignment: Alignment.centerRight,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: p.accentContainer
-                                        .withValues(alpha: 0.2),
-                                    child: Icon(
-                                      Icons.radio_rounded,
-                                      size: 48,
-                                      color: p.accent.withValues(alpha: 0.3),
+                            return Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                if (isNetwork)
+                                  CachedArtwork(
+                                    id: 0,
+                                    remoteUrl: item.artworkAsset,
+                                    size: 195,
+                                    fallbackIcon: Icons.radio_rounded,
+                                  )
+                                else
+                                  Image.asset(
+                                    item.artworkAsset,
+                                    fit: BoxFit.cover,
+                                    alignment: Alignment.centerRight,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: p.accentContainer
+                                          .withValues(alpha: 0.2),
+                                      child: Icon(
+                                        Icons.radio_rounded,
+                                        size: 48,
+                                        color: p.accent.withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                  ),
+                                // Smooth multi-stop fade from card surface into the portrait
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: AlignmentDirectional.centerStart,
+                                      end: AlignmentDirectional.centerEnd,
+                                      colors: [
+                                        baseSurface,
+                                        baseSurface.withValues(alpha: 0.96),
+                                        baseSurface.withValues(alpha: 0.72),
+                                        baseSurface.withValues(alpha: 0.25),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.20, 0.45, 0.75, 1.0],
                                     ),
                                   ),
                                 ),
-                              // Smooth multi-stop fade from card surface into the portrait (dark/light theme-aware, no green)
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: AlignmentDirectional.centerStart,
-                                    end: AlignmentDirectional.centerEnd,
-                                    colors: [
-                                      baseSurface,
-                                      baseSurface.withValues(alpha: 0.96),
-                                      baseSurface.withValues(alpha: 0.72),
-                                      baseSurface.withValues(alpha: 0.25),
-                                      Colors.transparent,
-                                    ],
-                                    stops: const [0.0, 0.20, 0.45, 0.75, 1.0],
+                                // Subtle vertical soft blend
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        baseSurface.withValues(alpha: p.isDark ? 0.25 : 0.12),
+                                      ],
+                                      stops: const [0.70, 1.0],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              // Subtle vertical soft blend for contrast without murkiness
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.transparent,
-                                      baseSurface.withValues(alpha: p.isDark ? 0.25 : 0.12),
-                                    ],
-                                    stops: const [0.70, 1.0],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                    ),
+                    ],
 
                     // Top inner specular highlight hairline
                     Positioned(
@@ -901,9 +953,7 @@ class _QuranHeroCard extends StatelessWidget {
                                         const SizedBox(width: 4.5),
                                         Flexible(
                                           child: Text(
-                                            isArabic
-                                                ? 'بث مباشر'
-                                                : 'LIVE ON AIR',
+                                            context.l10n.radioLiveOnAirBadge,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
@@ -980,11 +1030,20 @@ class _QuranHeroCard extends StatelessWidget {
                             velocity: 28.0,
                             blankSpace: 36.0,
                             style: TextStyle(
-                              color: p.textPrimary,
+                              color: isHomeCard ? Colors.white : p.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                               height: 1.15,
                               letterSpacing: -0.2,
+                              shadows: isHomeCard
+                                  ? const [
+                                      Shadow(
+                                        color: Colors.black87,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
                             ),
                           ),
 
@@ -1011,12 +1070,24 @@ class _QuranHeroCard extends StatelessWidget {
                                   velocity: 24.0,
                                   blankSpace: 32.0,
                                   style: TextStyle(
-                                    color:
-                                        isPlaying ? p.accent : p.textSecondary,
+                                    color: isPlaying
+                                        ? p.accent
+                                        : (isHomeCard
+                                            ? Colors.white.withValues(alpha: 0.90)
+                                            : p.textSecondary),
                                     fontSize: 11.5,
                                     fontWeight: isPlaying
                                         ? FontWeight.w700
                                         : FontWeight.w500,
+                                    shadows: isHomeCard
+                                        ? const [
+                                            Shadow(
+                                              color: Colors.black87,
+                                              blurRadius: 6,
+                                              offset: Offset(0, 1),
+                                            ),
+                                          ]
+                                        : null,
                                   ),
                                 ),
                               ),
@@ -1120,7 +1191,7 @@ class _QuranHeroCard extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        isArabic ? 'بث حي' : 'LIVE',
+                                        context.l10n.radioLiveShortBadge,
                                         style: TextStyle(
                                           color: p.accent,
                                           fontSize: 11,
@@ -1136,7 +1207,7 @@ class _QuranHeroCard extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        isArabic ? 'استمع الآن' : 'Listen Now',
+                                        context.l10n.radioListenNow,
                                         style: TextStyle(
                                           color: p.textSecondary,
                                           fontSize: 11,

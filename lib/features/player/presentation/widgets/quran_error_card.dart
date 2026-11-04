@@ -4,6 +4,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 
 class QuranErrorCard extends StatelessWidget {
@@ -31,7 +32,7 @@ class QuranErrorCard extends StatelessWidget {
             Icon(Icons.error_outline_rounded, color: p.textSecondary),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: Text(message,
+              child: Text(resolveUiErrorMessage(context, message),
                   style: TextStyle(
                       color: p.textPrimary, fontSize: AppFontSize.label)),
             ),

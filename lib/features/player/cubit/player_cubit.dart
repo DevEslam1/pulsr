@@ -246,6 +246,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     _listenToSettings();
     _listenToAudioService();
     AmbientSoundService().onPlayerPlaybackStateChanged(state.isPlaying);
+    AmbientSoundService().setQuranModeActive(state.isQuranModeEnabled);
+    // The cubit's stream completes on close(), which ends this subscription.
+    stream
+        .map((s) => s.isQuranModeEnabled)
+        .distinct()
+        .listen(AmbientSoundService().setQuranModeActive);
     _syncAudioEffects(force: true);
     unawaited(_audioHandler.effectsReady.then((_) async {
       if (isClosed) return;

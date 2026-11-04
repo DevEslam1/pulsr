@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/utils/l10n_extensions.dart';
+import '../../core/utils/l10n_holder.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
@@ -138,8 +139,12 @@ class FileIntentHandler {
 
       final track = YtmTrack(
         videoId: videoId,
-        title: stream.title.isNotEmpty ? stream.title : 'YouTube Track',
-        artist: stream.artist.isNotEmpty ? stream.artist : 'YouTube Music',
+        title: stream.title.isNotEmpty
+            ? stream.title
+            : (L10nHolder.current?.ytmFallbackTrackTitle ?? 'YouTube Track'),
+        artist: stream.artist.isNotEmpty
+            ? stream.artist
+            : (L10nHolder.current?.browseYouTubeMusic ?? 'YouTube Music'),
         duration: stream.duration,
         artworkUrl: stream.artworkUrl,
       );
@@ -154,7 +159,7 @@ class FileIntentHandler {
       if (ctx != null && ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(
-            content: Text('Failed to load YouTube track: ${e.toString()}'),
+            content: Text(ctx.l10n.fileIntentLoadTrackFailed(e.toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -345,7 +350,7 @@ class FileIntentHandler {
       // 2. If not yet indexed in database, build standalone playable SongsTableData
       // Use negative ID to guarantee zero collision with positive MediaStore database IDs
       final isContentScheme = uriOrPath.startsWith('content://');
-      String title = 'Audio File';
+      String title = L10nHolder.current?.fileIntentAudioFile ?? 'Audio File';
       int? fileSize;
 
       if (isContentScheme) {
@@ -372,9 +377,11 @@ class FileIntentHandler {
 
       final tempSong = SongsTableData(
         id: _getNextTempId(),
-        title: title.isNotEmpty ? title : 'External Audio',
-        artist: 'External Audio',
-        album: 'Files',
+        title: title.isNotEmpty
+            ? title
+            : (L10nHolder.current?.fileIntentExternalAudio ?? 'External Audio'),
+        artist: L10nHolder.current?.fileIntentExternalAudio ?? 'External Audio',
+        album: L10nHolder.current?.fileIntentFilesAlbum ?? 'Files',
         durationMs: 0,
         path: cleanPath,
         uri: uriOrPath,

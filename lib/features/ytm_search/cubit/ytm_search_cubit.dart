@@ -12,6 +12,7 @@ import '../../../core/services/ytm_search_cache.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/ytm_rate_limiter.dart';
+import '../../../core/utils/l10n_holder.dart';
 import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 
@@ -324,8 +325,13 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           if (effectiveGeneration != _generation || isClosed) return;
           final track = YtmTrack(
             videoId: videoId,
-            title: stream.title.isNotEmpty ? stream.title : 'YouTube Track',
-            artist: stream.artist.isNotEmpty ? stream.artist : 'YouTube Music',
+            title: stream.title.isNotEmpty
+                ? stream.title
+                : (L10nHolder.current?.ytmFallbackTrackTitle ??
+                    'YouTube Track'),
+            artist: stream.artist.isNotEmpty
+                ? stream.artist
+                : (L10nHolder.current?.browseYouTubeMusic ?? 'YouTube Music'),
             duration: stream.duration,
             artworkUrl: stream.artworkUrl,
           );

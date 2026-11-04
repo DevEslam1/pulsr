@@ -25,6 +25,7 @@ import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
 import '../errors/ytm_error_classifier.dart';
 import '../utils/error_logger.dart';
+import '../utils/l10n_holder.dart';
 import '../utils/input_sanitizer.dart';
 import '../utils/lrc_parser.dart';
 import '../utils/ytm_locale.dart';
@@ -1526,8 +1527,8 @@ class YtmAccountService {
       final likedTracks = await fetchLikedSongs(maxTracks: maxTracks);
       return YtmPlaylistDetails(
         id: playlistId,
-        title: 'Liked Music',
-        author: 'Auto Playlist',
+        title: L10nHolder.current?.likedMusic ?? 'Liked Music',
+        author: L10nHolder.current?.ytmAutoPlaylistAuthor ?? 'Auto Playlist',
         artworkUrl: likedTracks.firstOrNull?.artworkUrl,
         tracks: likedTracks,
       );
@@ -3281,8 +3282,8 @@ class YtmAccountService {
 
       if (videoId == null || videoId.length != 11) return null;
 
-      String title = 'Unknown Title';
-      String artist = 'Unknown Artist';
+      String title = L10nHolder.current?.ytmUnknownTitle ?? 'Unknown Title';
+      String artist = L10nHolder.current?.unknownArtist ?? 'Unknown Artist';
       int durationMs = 0;
 
       final flexColumns = renderer['flexColumns'] as List<dynamic>? ?? const [];
@@ -3400,7 +3401,10 @@ class YtmAccountService {
 
               results.add(YtmAccountPlaylist(
                 playlistId: cleanId,
-                title: title.isNotEmpty ? title : 'Playlist',
+                title: title.isNotEmpty
+                    ? title
+                    : (L10nHolder.current?.ytmFallbackPlaylistTitle ??
+                        'Playlist'),
                 subtitle: subtitle,
                 artworkUrl: artwork,
               ));
@@ -3424,7 +3428,8 @@ class YtmAccountService {
                 !seenIds.contains(cleanId)) {
               seenIds.add(cleanId);
 
-              String title = 'Playlist';
+              String title = L10nHolder.current?.ytmFallbackPlaylistTitle ??
+                  'Playlist';
               final flexCols = renderer['flexColumns'] as List<dynamic>?;
               if (flexCols != null && flexCols.isNotEmpty) {
                 final r = flexCols[0]
@@ -3435,7 +3440,8 @@ class YtmAccountService {
                 }
               }
 
-              String subtitle = 'YouTube Music';
+              String subtitle =
+                  L10nHolder.current?.browseYouTubeMusic ?? 'YouTube Music';
               if (flexCols != null && flexCols.length > 1) {
                 final r = flexCols[1]
                         ['musicResponsiveListItemFlexColumnRenderer']?['text']

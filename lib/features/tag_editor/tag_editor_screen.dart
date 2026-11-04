@@ -90,7 +90,7 @@ class _TagEditorViewState extends State<_TagEditorView> {
           context,
           title: Text(l10n.partialBatchDetected),
           content: Text(
-            '${checkpoint.length} file(s) were not updated due to an interrupted batch.',
+            l10n.tagEditorBatchInterrupted(checkpoint.length),
           ),
           actions: [
             TextButton(
@@ -106,7 +106,7 @@ class _TagEditorViewState extends State<_TagEditorView> {
                   Navigator.of(context).pop();
                   _retryInterruptedBatch(remaining);
                 },
-                child: Text('Retry remaining ${remaining.length} files'),
+                child: Text(l10n.tagEditorRetryRemaining(remaining.length)),
               ),
           ],
         );

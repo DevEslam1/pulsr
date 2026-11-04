@@ -47,7 +47,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
   Future<void> _saveToken() async {
     final token = _tokenController.text.trim();
     if (token.isEmpty) {
-      setState(() => _statusError = 'Token cannot be empty');
+      setState(() => _statusError = context.l10n.discordTokenEmpty);
       return;
     }
 
@@ -63,14 +63,15 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
       setState(() {
         _isSaving = false;
         if (user == null) {
-          _statusError = 'Could not verify token. Please check and try again.';
+          _statusError = context.l10n.discordTokenVerifyFailed;
         }
       });
       if (user != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content:
-                Text('Connected as ${user.globalName} (@${user.username})'),
+                Text(context.l10n.discordConnectedAs(
+                    user.globalName, user.username)),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -155,7 +156,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Discord Rich Presence',
+                            context.l10n.discordRichPresenceTitle,
                             style: TextStyle(
                               color: p.textPrimary,
                               fontSize: AppFontSize.title,
@@ -164,7 +165,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                           ),
                           const SizedBox(height: AppSpacing.xxs),
                           Text(
-                            'Display currently playing song on your profile',
+                            context.l10n.discordRichPresenceSubtitle,
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: AppFontSize.bodySmall,
@@ -194,7 +195,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Rich Presence Status',
+                              context.l10n.discordRichPresenceStatus,
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontWeight: FontWeight.w700,
@@ -204,8 +205,8 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
                               _rpcService.isEnabled
-                                  ? 'Active (streaming to Discord)'
-                                  : 'Disabled',
+                                  ? context.l10n.discordStatusStreaming
+                                  : context.l10n.discordStatusInactive,
                               style: TextStyle(
                                 color: _rpcService.isEnabled
                                     ? p.success
@@ -221,9 +222,9 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                         onChanged: (val) async {
                           if (val && _rpcService.token.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
+                              SnackBar(
                                 content: Text(
-                                  'Please enter your Discord User Token first',
+                                  context.l10n.discordTokenRequiredFirst,
                                 ),
                                 behavior: SnackBarBehavior.floating,
                               ),
@@ -306,7 +307,9 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
 
                 // Token input field
                 Text(
-                  hasToken ? 'Discord User Token' : 'Enter Discord Token',
+                  hasToken
+                      ? context.l10n.discordUserTokenLabel
+                      : context.l10n.discordEnterTokenLabel,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -315,7 +318,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                 ),
                 const SizedBox(height: AppSpacing.xxs),
                 Text(
-                  'Your Discord account user token (Authorization header). Stored locally in your app preferences.',
+                  context.l10n.discordTokenHelp,
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: AppFontSize.bodySmall,
@@ -328,7 +331,7 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                   controller: _tokenController,
                   obscureText: _obscureToken,
                   decoration: InputDecoration(
-                    hintText: 'Paste token here...',
+                    hintText: context.l10n.discordTokenHint,
                     hintStyle: TextStyle(color: p.textTertiary),
                     filled: true,
                     fillColor: p.surfaceContainer,
@@ -402,8 +405,9 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                                   color: Colors.white,
                                 ),
                               )
-                            : Text(
-                                hasToken ? 'Update Token' : 'Connect Account'),
+                            : Text(hasToken
+                                ? context.l10n.discordUpdateToken
+                                : context.l10n.discordConnectAccount),
                       ),
                     ),
                   ],

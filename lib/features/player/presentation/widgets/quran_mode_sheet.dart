@@ -231,7 +231,9 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ),
                   Semantics(
                     label: context.l10n.quranMode,
-                    value: state.isQuranModeEnabled ? 'On' : 'Off',
+                    value: state.isQuranModeEnabled
+                        ? context.l10n.semanticsStateOn
+                        : context.l10n.semanticsStateOff,
                     child: PulsrSwitch(
                       value: state.isQuranModeEnabled,
                       onChanged: _isApplying
@@ -257,7 +259,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                             _runQuranAction(cubit.resetQuranAutoMode()),
                           ),
                   icon: const Icon(Icons.auto_mode_rounded, size: 18),
-                  label: const Text('Auto-detect recitations'),
+                  label: Text(context.l10n.quranAutoDetectRecitations),
                   style: TextButton.styleFrom(
                     foregroundColor: p.textSecondary,
                     padding: EdgeInsets.zero,

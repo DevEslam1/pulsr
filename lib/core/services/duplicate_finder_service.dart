@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
+import '../../core/utils/l10n_holder.dart';
 
 class DuplicateGroup {
   final String key;
@@ -79,7 +80,8 @@ class DuplicateFinderService {
           result.add(DuplicateGroup(
             key: '${entry.key}-${anchor.id}',
             songs: cluster,
-            reason: 'Identical Title & Artist (${cluster.length} copies)',
+            reason: L10nHolder.current?.dupReasonTitleArtist(cluster.length) ??
+                'Identical Title & Artist (${cluster.length} copies)',
           ));
           for (final song in cluster) {
             capturedSongIds.add(song.id);
@@ -99,7 +101,8 @@ class DuplicateFinderService {
             result.add(DuplicateGroup(
               key: '${entry.key}-${cluster.first.id}',
               songs: cluster,
-              reason: 'Identical Audio Content (Checksum Verified)',
+              reason: L10nHolder.current?.dupReasonChecksum ??
+                  'Identical Audio Content (Checksum Verified)',
             ));
             for (final song in cluster) {
               capturedSongIds.add(song.id);

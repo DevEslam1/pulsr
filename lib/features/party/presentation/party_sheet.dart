@@ -372,7 +372,7 @@ class _PartySheetState extends State<PartySheet> {
                 maxLength: 6,
                 decoration: InputDecoration(
                   counterText: '',
-                  hintText: '6-CHAR CODE',
+                  hintText: context.l10n.partyCodeHint,
                   prefixIcon: const Icon(Icons.vpn_key_rounded),
                   border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   contentPadding:
@@ -581,7 +581,7 @@ class _PartySheetState extends State<PartySheet> {
                           if (isMe) ...[
                             const SizedBox(width: 6),
                             Text(
-                              '(You)',
+                              context.l10n.partyYouLabel,
                               style: TextStyle(
                                   fontSize: AppFontSize.tiny,
                                   color: p.textSecondary),

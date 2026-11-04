@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/utils/l10n_extensions.dart';
 import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
 import 'update_dialog.dart';
@@ -289,8 +290,8 @@ class AppUpdateService {
 
     if (userInitiated) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Checking for updates...'),
+        SnackBar(
+          content: Text(context.l10n.updateChecking),
           duration: Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
@@ -305,9 +306,8 @@ class AppUpdateService {
     } else if (userInitiated) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'You are on the latest version (v${AppConfig.appVersion})',
-          ),
+          content: Text(context.l10n.updateUpToDate(
+              'v${AppConfig.appVersion}')),
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
         ),

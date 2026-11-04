@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
+import '../../core/utils/l10n_holder.dart';
 
 class PlaylistSuggestion {
   final String title;
@@ -119,26 +120,34 @@ class PlaylistSuggestionsService {
     return <PlaylistSuggestion>[
       if (heavyRotation.isNotEmpty)
         PlaylistSuggestion(
-          title: 'Heavy Rotation Mix',
-          description: 'Your most played tracks on repeat',
+          title: L10nHolder.current?.suggestionHeavyRotationTitle ??
+              'Heavy Rotation Mix',
+          description: L10nHolder.current?.suggestionHeavyRotationDesc ??
+              'Your most played tracks on repeat',
           songs: heavyRotation,
         ),
       if (forgotten.isNotEmpty)
         PlaylistSuggestion(
-          title: 'Forgotten Favorites',
-          description: 'Starred gems you haven\'t heard in a while',
+          title: L10nHolder.current?.suggestionForgottenFavoritesTitle ??
+              'Forgotten Favorites',
+          description: L10nHolder.current?.suggestionForgottenFavoritesDesc ??
+              'Starred gems you haven\'t heard in a while',
           songs: forgotten,
         ),
       if (audiophile.isNotEmpty)
         PlaylistSuggestion(
-          title: 'Hi-Res Audiophile Showcase',
-          description: 'Studio master 24-bit lossless fidelity',
+          title: L10nHolder.current?.suggestionHiResTitle ??
+              'Hi-Res Audiophile Showcase',
+          description: L10nHolder.current?.suggestionHiResDesc ??
+              'Studio master 24-bit lossless fidelity',
           songs: audiophile,
         ),
       if (upbeat.isNotEmpty)
         PlaylistSuggestion(
-          title: 'Quick Energy Boost',
-          description: 'High-energy fast tracks to power your day',
+          title: L10nHolder.current?.suggestionEnergyBoostTitle ??
+              'Quick Energy Boost',
+          description: L10nHolder.current?.suggestionEnergyBoostDesc ??
+              'High-energy fast tracks to power your day',
           songs: upbeat,
         ),
     ];

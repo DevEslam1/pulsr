@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:injectable/injectable.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
+import '../utils/l10n_holder.dart';
 import 'ytm_service.dart';
 
 class YtmBrowseItem {
@@ -136,20 +137,24 @@ class YtmBrowseService {
       final rawSections = [
         YtmBrowseSection(
           id: YtmBrowseSection.chartsId,
-          title: 'Top Charts & Trending',
-          subtitle: 'Most played tracks right now',
+          title: L10nHolder.current?.ytmBrowseChartsTitle ??
+              'Top Charts & Trending',
+          subtitle: L10nHolder.current?.ytmBrowseChartsSubtitle ??
+              'Most played tracks right now',
           items: charts,
         ),
         YtmBrowseSection(
           id: YtmBrowseSection.newReleasesId,
-          title: 'New Releases',
-          subtitle: 'Fresh albums & singles',
+          title: L10nHolder.current?.ytmBrowseNewReleasesTitle ?? 'New Releases',
+          subtitle: L10nHolder.current?.ytmBrowseNewReleasesSubtitle ??
+              'Fresh albums & singles',
           items: newReleases,
         ),
         YtmBrowseSection(
           id: YtmBrowseSection.moodsId,
-          title: 'Moods & Genres',
-          subtitle: 'Popular tracks from YouTube Music moods & genres',
+          title: L10nHolder.current?.ytmBrowseMoodsTitle ?? 'Moods & Genres',
+          subtitle: L10nHolder.current?.ytmBrowseMoodsSubtitle ??
+              'Popular tracks from YouTube Music moods & genres',
           items: moods,
         ),
       ];

@@ -51,6 +51,22 @@ class RadioStationStore {
   static const String indieArtwork = 'assets/Pictures/radio_indie.jpg';
   static const String newsArtwork = 'assets/Pictures/radio_news.jpg';
 
+  // Panoramic Home Cards (2172 x 724)
+  static const String minshawiHomeCard = 'assets/Pictures/home card/minshawi.jpg';
+  static const String hussaryHomeCard = 'assets/Pictures/home card/hussary.jpg';
+  static const String abdulBasitHomeCard = 'assets/Pictures/home card/abdulbasit.jpg';
+  static const String mustafaIsmailHomeCard =
+      'assets/Pictures/home card/mustafa_ismail.jpg';
+  static const String quranCairoHomeCard =
+      'assets/Pictures/home card/quran_cairo.jpg';
+  static const String bannaHomeCard = 'assets/Pictures/home card/banna.jpg';
+  static const String tablawayHomeCard =
+      'assets/Pictures/home card/tablaway.jpg';
+  static const String khashiaHomeCard = 'assets/Pictures/home card/khashia.jpg';
+  static const String tarteelHomeCard = 'assets/Pictures/home card/tarteel.jpg';
+  static const String makkahHomeCard =
+      'assets/Pictures/home card/quran_makkah.jpg';
+
   static const Map<String, String> _curatedArtwork = {
     'cur-quran-cairo': quranCairoArtwork,
     'cur-quran-cairo-backup': quranCairoArtwork,
@@ -428,6 +444,121 @@ class RadioStationStore {
 
     if (id != null && _curatedArtwork.containsKey(id)) {
       return _curatedArtwork[id];
+    }
+
+    return null;
+  }
+
+  /// Resolves matching panoramic Home Card banner (2172x724) for Quran stations.
+  static String? resolveHomeCardForStation({
+    String? id,
+    String? name,
+    String? url,
+  }) {
+    final lowerId = id?.toLowerCase().trim() ?? '';
+    final lowerUrl = url?.toLowerCase().trim() ?? '';
+    final lowerName = name?.toLowerCase().trim() ?? '';
+
+    // Cairo Quran Radio
+    if (lowerId == 'cur-quran-cairo' ||
+        lowerId == 'cur-quran-cairo-backup' ||
+        lowerUrl.contains('8s5u') ||
+        lowerUrl.contains('quran-cairo') ||
+        lowerName.contains('القاهرة')) {
+      return quranCairoHomeCard;
+    }
+
+    // Hussary
+    if (lowerId == 'cur-quran-hussary' ||
+        lowerId == 'cur-quran-hussary-mojawwad' ||
+        lowerUrl.contains('hussary') ||
+        lowerUrl.contains('alhussary') ||
+        lowerName.contains('الحصري') ||
+        lowerName.contains('حصري') ||
+        lowerName.contains('hussary')) {
+      return hussaryHomeCard;
+    }
+
+    // Minshawi
+    if (lowerId == 'cur-quran-minshawi' ||
+        lowerId == 'cur-quran-minshawi-rare' ||
+        lowerId == 'cur-quran-minshawi-murattal' ||
+        lowerUrl.contains('minshawi') ||
+        lowerName.contains('منشاوي') ||
+        lowerName.contains('المنشاوي') ||
+        lowerName.contains('minshawi')) {
+      return minshawiHomeCard;
+    }
+
+    // Abdulbasit
+    if (lowerId == 'cur-quran-abdulbasit' ||
+        lowerId == 'cur-quran-abdulbasit-murattal' ||
+        lowerUrl.contains('abdulbasit') ||
+        lowerUrl.contains('abdulsamad') ||
+        lowerName.contains('عبد الباسط') ||
+        lowerName.contains('عبدالباسط') ||
+        lowerName.contains('عبد الصمد') ||
+        lowerName.contains('abdulbasit')) {
+      return abdulBasitHomeCard;
+    }
+
+    // Mustafa Ismail
+    if (lowerId == 'cur-quran-mustafa' ||
+        lowerUrl.contains('mustafa_ismail') ||
+        lowerName.contains('مصطفى إسماعيل') ||
+        lowerName.contains('مصطفي اسماعيل') ||
+        lowerName.contains('mustafa')) {
+      return mustafaIsmailHomeCard;
+    }
+
+    // Banna
+    if (lowerId == 'cur-quran-banna-mojawwad' ||
+        lowerId == 'cur-quran-banna-murattal' ||
+        lowerUrl.contains('albanna') ||
+        lowerUrl.contains('banna') ||
+        lowerName.contains('البنا') ||
+        lowerName.contains('بنا')) {
+      return bannaHomeCard;
+    }
+
+    // Tablaway
+    if (lowerId == 'cur-quran-tablaway' ||
+        lowerUrl.contains('tablaway') ||
+        lowerName.contains('الطبلاوي') ||
+        lowerName.contains('طبلاوي')) {
+      return tablawayHomeCard;
+    }
+
+    // Khashia
+    if (lowerId == 'cur-quran-khashia' ||
+        lowerUrl.contains('salma') ||
+        lowerName.contains('خاشع')) {
+      return khashiaHomeCard;
+    }
+
+    // Mecca
+    if (lowerId == 'cur-quran-makkah' ||
+        lowerName.contains('مكة') ||
+        lowerName.contains('مكه') ||
+        lowerName.contains('mecca') ||
+        lowerName.contains('makkah')) {
+      return makkahHomeCard;
+    }
+
+    // Tarateel & Sakeenah
+    if (lowerId == 'cur-quran-tarteel' ||
+        lowerId == 'cur-quran-sakeenah' ||
+        lowerUrl.contains('tarteel') ||
+        lowerUrl.contains('tarateel') ||
+        lowerUrl.contains('sakeenah') ||
+        lowerName.contains('تراتيل') ||
+        lowerName.contains('سكينة')) {
+      return tarteelHomeCard;
+    }
+
+    // Generic fallback for any other Quran stream
+    if (isQuranStation(RadioStation(id: lowerId, name: lowerName, url: lowerUrl))) {
+      return tarteelHomeCard;
     }
 
     return null;

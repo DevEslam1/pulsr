@@ -1298,7 +1298,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Pulsr Audio Engine',
+                                  context.l10n.onboardingAudioEngine,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(

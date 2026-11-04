@@ -58,6 +58,20 @@ String resolveUiErrorMessage(BuildContext context, String message) {
       return l10n.errIrRejected;
     case 'Local match unavailable, streaming online':
       return l10n.errLocalMatchStreaming;
+    case 'Failed to save Quran style adjustments':
+      return l10n.errQuranSaveStyleAdjustments;
+    case 'Failed to save Quran Mode setting':
+      return l10n.errQuranSaveModeSetting;
+    case 'Failed to apply Quran audio profile':
+      return l10n.errQuranApplyAudioProfile;
+    case 'Failed to restore audio settings from Quran Mode':
+      return l10n.errQuranRestoreSettings;
+    case 'Failed to save Quran reciter style':
+      return l10n.errQuranSaveReciterStyle;
+    case 'Failed to reset Quran style adjustments':
+      return l10n.errQuranResetStyleAdjustments;
+    case 'Failed to set Quran learning speed':
+      return l10n.errQuranSetLearningSpeed;
   }
 
   // Technical DSP/file failures: translate the template, keep the raw detail

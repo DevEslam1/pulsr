@@ -101,7 +101,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('VOLUMES'), findsOneWidget);
-      expect(find.byType(Slider), findsOneWidget);
+      // One slider for rain + the master volume slider.
+      expect(find.byType(Slider), findsNWidgets(2));
     });
 
     testWidgets('shows paused badge when player is not playing', (tester) async {

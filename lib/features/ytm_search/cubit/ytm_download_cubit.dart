@@ -17,6 +17,7 @@ import '../../../domain/models/ytm_track.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../downloads/cubit/downloads_cubit.dart';
 import '../../downloads/cubit/downloads_state.dart';
+import '../../../core/utils/l10n_holder.dart';
 import '../../player/cubit/player_cubit.dart';
 
 enum YtDownloadStatus { idle, queued, running, paused, done, failed, canceled }
@@ -314,8 +315,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       if (resumed.isRight()) {
         return (outcome: _AdmitOutcome.queued, error: null);
       }
-      final message =
-          resumed.getLeft().toNullable()?.message ?? 'Download failed';
+      final message = resumed.getLeft().toNullable()?.message ??
+          (L10nHolder.current?.downloadErrorGeneric ?? 'Download failed');
       _set(videoId,
           YtDownloadItem(status: YtDownloadStatus.failed, error: message));
       return (outcome: _AdmitOutcome.failed, error: message);

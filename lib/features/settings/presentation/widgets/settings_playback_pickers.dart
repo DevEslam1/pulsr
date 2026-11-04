@@ -472,26 +472,23 @@ void showDspPreferencePickerSheet(
     (
       key: 'native',
       title: context.l10n.dspEngineNative,
-      subtitle:
-          'Custom 64-bit real-time DSP with parametric EQ, limiter, convolution reverb, and Bit-Perfect audio.',
+      subtitle: context.l10n.dspPrefNativeSubtitle,
       icon: Icons.tune_rounded,
-      badge: 'RECOMMENDED',
+      badge: context.l10n.badgeRecommended,
     ),
     (
       key: 'oem',
       title: context.l10n.dspEngineOem,
-      subtitle:
-          'Vendor hardware sound effects (Dolby Atmos, Dirac, Xiaomi Sound, etc.) via Android system effects.',
+      subtitle: context.l10n.dspPrefSystemSubtitle,
       icon: Icons.speaker_group_rounded,
-      badge: 'SYSTEM',
+      badge: context.l10n.badgeSystem,
     ),
     (
       key: 'auto',
       title: context.l10n.dspEngineAuto,
-      subtitle:
-          'Uses Native Studio DSP by default, falling back to system AudioFX when native engine is unavailable.',
+      subtitle: context.l10n.dspPrefAutoSubtitle,
       icon: Icons.auto_mode_rounded,
-      badge: 'AUTO',
+      badge: context.l10n.badgeAuto,
     ),
   ];
 

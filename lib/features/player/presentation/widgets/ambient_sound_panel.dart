@@ -66,6 +66,65 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
     if (mounted) setState(() {});
   }
 
+  bool _isTimerChoice(int? minutes) {
+    final remaining = _service.sleepTimeRemaining;
+    if (minutes == null) return remaining == null;
+    if (remaining == null) return false;
+    // Selected chip = smallest preset that still covers the remaining time.
+    const presets = [15, 30, 60, 120];
+    final chosen = presets.firstWhere(
+      (m) => remaining <= Duration(minutes: m),
+      orElse: () => presets.last,
+    );
+    return chosen == minutes;
+  }
+
+  String _formatRemaining(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+
+  Widget _sectionLabel(String text, dynamic p) => Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: p.textSecondary,
+          fontSize: AppFontSize.caption,
+          fontWeight: FontWeight.w800,
+          letterSpacing: AppTracking.overline,
+        ),
+      );
+
+  Future<void> _promptSaveMix() async {
+    final l10n = context.l10n;
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.ambientSaveMix),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: l10n.ambientMixName),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.ambientCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: Text(l10n.ambientSave),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name != null && name.trim().isNotEmpty) _service.saveMix(name);
+  }
+
   @override
   void dispose() {
     _service.removeListener(_onServiceChanged);
@@ -116,7 +175,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                   ),
                   Text(
                     _service.isEnabled && !_service.isPlayerPlaying
-                        ? 'Paused with player'
+                        ? context.l10n.ambientPausedWithPlayer
                         : _service.isEnabled
                             ? _service.activeEffects
                                 .map((e) => e.emoji)
@@ -146,7 +205,9 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                   ),
                 ),
                 child: Text(
-                  '${_service.activeEffects.length} ON',
+                  context.l10n
+                      .ambientActiveCount(_service.activeEffects.length)
+                      .toUpperCase(),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -155,6 +216,26 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                   ),
                 ),
               ),
+          ],
+        ),
+
+        // ── Quran mode behaviour ──────────────────────────────────────────────
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                context.l10n.ambientAllowDuringQuran,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Switch(
+              value: _service.allowDuringQuran,
+              onChanged: (v) => unawaited(_service.setAllowDuringQuran(v)),
+            ),
           ],
         ),
 
@@ -173,7 +254,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
 
         // ── Effect chips ──────────────────────────────────────────────────────
         Text(
-          'EFFECTS',
+          context.l10n.ambientEffectsHeader.toUpperCase(),
           style: TextStyle(
             color: p.textSecondary,
             fontSize: AppFontSize.caption,
@@ -188,7 +269,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
           children: AmbientSoundEffect.values.map((effect) {
             final selected = _service.isEffectActive(effect);
             return Semantics(
-              label: effect.displayName,
+              label: effect.localizedDisplayName(context.l10n),
               selected: selected,
               child: ChoiceChip(
                 selected: selected,
@@ -200,7 +281,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                   effect.emoji,
                   style: const TextStyle(fontSize: 16),
                 ),
-                label: Text(effect.label),
+                label: Text(effect.localizedLabel(context.l10n)),
                 labelStyle: TextStyle(
                   color: selected ? p.onAccent : p.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -223,7 +304,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
           Divider(height: 1, color: p.hairline),
           const SizedBox(height: AppSpacing.s10),
           Text(
-            'VOLUMES',
+            context.l10n.ambientVolumesHeader.toUpperCase(),
             style: TextStyle(
               color: p.textSecondary,
               fontSize: AppFontSize.caption,
@@ -240,6 +321,84 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                     palette: p,
                     onChanged: (v) => _service.setEffectVolume(effect, v),
                   )),
+          _MasterVolumeRow(
+            label: context.l10n.ambientMasterVolume,
+            volume: _service.masterVolume,
+            palette: p,
+            onChanged: _service.setMasterVolume,
+          ),
+        ],
+
+        // ── Sleep timer ───────────────────────────────────────────────────────
+        if (_service.isEnabled) ...[
+          const SizedBox(height: AppSpacing.s10),
+          Divider(height: 1, color: p.hairline),
+          const SizedBox(height: AppSpacing.s10),
+          _sectionLabel(context.l10n.ambientSleepTimer, p),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final minutes in const [null, 15, 30, 60, 120])
+                ChoiceChip(
+                  selected: _isTimerChoice(minutes),
+                  showCheckmark: false,
+                  label: Text(minutes == null
+                      ? context.l10n.ambientSleepTimerOff
+                      : context.l10n.ambientSleepTimerMinutes(minutes)),
+                  onSelected: (_) {
+                    HapticFeedback.selectionClick();
+                    _service.setSleepTimer(
+                        minutes == null ? null : Duration(minutes: minutes));
+                  },
+                ),
+            ],
+          ),
+          if (_service.sleepTimeRemaining != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              child: Text(
+                _formatRemaining(_service.sleepTimeRemaining!),
+                style: TextStyle(
+                  color: p.accent,
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+
+        // ── Saved mixes ───────────────────────────────────────────────────────
+        if (_service.isEnabled || _service.savedMixes.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s10),
+          Divider(height: 1, color: p.hairline),
+          const SizedBox(height: AppSpacing.s10),
+          Row(
+            children: [
+              Expanded(
+                child: _sectionLabel(context.l10n.ambientSavedMixes, p),
+              ),
+              if (_service.isEnabled)
+                TextButton.icon(
+                  onPressed: _promptSaveMix,
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                  label: Text(context.l10n.ambientSaveMix),
+                ),
+            ],
+          ),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final name in _service.savedMixes.keys)
+                InputChip(
+                  label: Text(name),
+                  onPressed: () => unawaited(_service.applyMix(name)),
+                  onDeleted: () => _service.deleteMix(name),
+                ),
+            ],
+          ),
         ],
       ],
     );
@@ -295,13 +454,64 @@ class _StatusBadge extends StatelessWidget {
         ),
       ),
       child: Text(
-        isPlaying ? 'Playing' : 'Paused',
+        isPlaying
+            ? context.l10n.ambientStatusPlaying
+            : context.l10n.ambientStatusPaused,
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
           color: isPlaying ? p.accent : p.textSecondary,
         ),
       ),
+    );
+  }
+}
+
+// ─── Master volume row ────────────────────────────────────────────────────────
+
+class _MasterVolumeRow extends StatelessWidget {
+  final String label;
+  final double volume;
+  final dynamic palette;
+  final ValueChanged<double> onChanged;
+
+  const _MasterVolumeRow({
+    required this.label,
+    required this.volume,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palette;
+    return Row(
+      children: [
+        Icon(Icons.volume_up_rounded, size: 16, color: p.accent),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Slider(
+            value: volume,
+            onChanged: onChanged,
+            label: label,
+            activeColor: p.accent,
+            inactiveColor: p.hairline,
+            semanticFormatterCallback: (v) => '$label ${(v * 100).round()}%',
+          ),
+        ),
+        SizedBox(
+          width: 38,
+          child: Text(
+            '${(volume * 100).round()}%',
+            style: TextStyle(
+              color: p.accent,
+              fontSize: AppFontSize.label,
+              fontWeight: FontWeight.w700,
+            ),
+            textAlign: TextAlign.end,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -333,7 +543,7 @@ class _VolumeRow extends StatelessWidget {
           SizedBox(
             width: 72,
             child: Text(
-              effect.label,
+              effect.localizedLabel(context.l10n),
               style: TextStyle(
                 color: p.textPrimary,
                 fontSize: AppFontSize.label,

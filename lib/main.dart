@@ -537,8 +537,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
           if (ctx != null && ctx.mounted) {
             PulsrToast.show(
               ctx,
-              message:
-                  'Pulsr Pure integrity check failed: this build can access the network.',
+              message: ctx.l10n.pureIntegrityCheckFailed,
               icon: Icons.warning_amber_rounded,
               isError: true,
               duration: const Duration(seconds: 6),
@@ -570,8 +569,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
           if (ctx == null || !ctx.mounted) return;
           PulsrToast.show(
             ctx,
-            message: 'Background media controls are unavailable on this launch. '
-                'Playback works, but the lock-screen controls could not start.',
+            message: ctx.l10n.backgroundMediaControlsUnavailable,
             icon: Icons.warning_amber_rounded,
             isError: true,
             duration: const Duration(seconds: 5),

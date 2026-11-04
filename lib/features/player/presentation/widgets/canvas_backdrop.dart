@@ -9,6 +9,7 @@ import 'package:video_player/video_player.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../services/canvas/canvas_repository.dart';
@@ -378,7 +379,9 @@ class CanvasToggleChip extends StatelessWidget {
           PulsrToast.show(
             context,
             message:
-                next ? 'Canvas & Motion Artwork enabled' : 'Canvas disabled',
+                next
+                    ? context.l10n.canvasEnabled
+                    : context.l10n.canvasDisabled,
             icon: next
                 ? Icons.motion_photos_on_rounded
                 : Icons.motion_photos_off_rounded,

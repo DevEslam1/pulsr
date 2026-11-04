@@ -333,7 +333,8 @@ class AudioQualitySheet extends StatelessWidget {
                           const SizedBox(height: AppSpacing.s6),
                           Text(
                             outputDevice?.isUsbDac == true
-                                ? 'USB DAC: ${outputDevice?.usbDacLabel ?? "-"} ($uacLabel)'
+                                ? context.l10n.usbDacConnectedSummary(
+                                    outputDevice?.usbDacLabel ?? '-', uacLabel)
                                 : context.l10n.usbDacNoneAttached,
                             style: TextStyle(
                               fontSize: AppFontSize.label,
@@ -448,15 +449,15 @@ class AudioQualitySheet extends StatelessWidget {
                           context,
                           icon: Icons.speed_rounded,
                           label: info.bitrateEstimated
-                              ? 'Container average (estimated)'
+                              ? context.l10n.containerAverageEstimated
                               : context.l10n.dspSourceBitrate,
                           value: info.bitrateKbps != null
                               ? '${info.bitrateKbps} kbps'
-                              : 'Unknown',
+                              : context.l10n.dspUnknown,
                           subValue:
                               info.tier == AudioQualityTier.hiResLossless ||
                                       info.tier == AudioQualityTier.lossless
-                                  ? 'Lossless source (output fidelity separate)'
+                                  ? context.l10n.losslessOutputFidelityNote
                                   : context.l10n.dspCompressedStream,
                           p: p,
                         ),
@@ -602,7 +603,8 @@ class AudioQualitySheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    outputDevice?.deviceName ?? 'Output route unverified',
+                    outputDevice?.deviceName ??
+                        context.l10n.outputRouteUnverified,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -793,17 +795,17 @@ class AudioQualitySheet extends StatelessWidget {
     final options = [
       (
         quality: YtmAudioQuality.high,
-        label: 'High • 160k',
+        label: context.l10n.ytmQualityHighBitrate,
         icon: Icons.high_quality_rounded
       ),
       (
         quality: YtmAudioQuality.medium,
-        label: 'Med • 128k',
+        label: context.l10n.ytmQualityMediumBitrate,
         icon: Icons.graphic_eq_rounded
       ),
       (
         quality: YtmAudioQuality.low,
-        label: 'Low • 64k',
+        label: context.l10n.ytmQualityLowBitrate,
         icon: Icons.data_saver_on_rounded
       ),
     ];
@@ -994,7 +996,8 @@ class AudioQualitySheet extends StatelessWidget {
                 const SizedBox(width: AppSpacing.s6),
                 Flexible(
                   child: Text(
-                    'Exclusive mixer • ${_outputStreamDescription(outputDevice)}',
+                    context.l10n.exclusiveMixerPrefix(
+                        _outputStreamDescription(outputDevice)),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1086,7 +1089,8 @@ class AudioQualitySheet extends StatelessWidget {
                 const SizedBox(width: AppSpacing.s6),
                 Flexible(
                   child: Text(
-                    'Exclusive mixer • ${_outputStreamDescription(outputDevice)}',
+                    context.l10n.exclusiveMixerPrefix(
+                        _outputStreamDescription(outputDevice)),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2072,8 +2076,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                             ),
                           ),
                           Text(
-                            '${sampleRateHz > 0 ? _sampleRateLabel(sampleRateHz) : "Rate unknown"}'
-                            '${bitDepth > 0 ? " / $bitDepth-bit" : " / Depth unknown"}'
+                            '${sampleRateHz > 0 ? _sampleRateLabel(sampleRateHz) : context.l10n.outputRateUnknown}'
+                            '${bitDepth > 0 ? " / ${context.l10n.bitDepthValue('$bitDepth')}" : " / ${context.l10n.depthUnknown}"}'
                             '${outputDevice?.btEstimatedBitrateKbps != null ? " · ~${outputDevice!.btEstimatedBitrateKbps} kbps" : ""}',
                             style: TextStyle(
                               fontSize: AppFontSize.label,
@@ -2352,7 +2356,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                           children: [
                             Expanded(
                               child: Text(
-                                bitDepth > 0 ? '$bitDepth-bit' : 'Unknown',
+                                bitDepth > 0
+                                    ? context.l10n.bitDepthValue('$bitDepth')
+                                    : context.l10n.dspUnknown,
                                 style: const TextStyle(
                                   color: _btAccent,
                                   fontSize: AppFontSize.body,

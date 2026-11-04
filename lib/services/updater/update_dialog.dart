@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/config/app_config.dart';
+import '../../core/utils/l10n_extensions.dart';
 import '../../core/constants/app_radii.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
@@ -121,7 +122,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Update Available',
+                            context.l10n.updateAvailableTitle,
                             style: TextStyle(
                               color: p.textPrimary,
                               fontSize: AppFontSize.title,
@@ -151,7 +152,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
                               ),
                               const SizedBox(width: AppSpacing.xs),
                               Text(
-                                '(Current: v${AppConfig.appVersion})',
+                                context.l10n.updateCurrentVersionSuffix(
+                                    'v${AppConfig.appVersion}'),
                                 style: TextStyle(
                                   color: p.textSecondary,
                                   fontSize: AppFontSize.tiny,
@@ -207,7 +209,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Downloading update...',
+                            context.l10n.updateDownloading,
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: AppFontSize.bodySmall,
@@ -278,7 +280,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                         Navigator.of(context).pop();
                       },
                       child: Text(
-                        'Later',
+                        context.l10n.updateLater,
                         style: TextStyle(color: p.textSecondary),
                       ),
                     ),
@@ -292,7 +294,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                         onPressed: _installDownloaded,
                         icon:
                             const Icon(Icons.install_mobile_rounded, size: 18),
-                        label: const Text('Install Now'),
+                        label: Text(context.l10n.updateInstallNow),
                       ),
                     ] else if (!_downloading) ...[
                       FilledButton.icon(
@@ -302,7 +304,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                         ),
                         onPressed: _startDownload,
                         icon: const Icon(Icons.download_rounded, size: 18),
-                        label: const Text('Download & Install'),
+                        label: Text(context.l10n.updateDownloadAndInstall),
                       ),
                     ],
                   ],

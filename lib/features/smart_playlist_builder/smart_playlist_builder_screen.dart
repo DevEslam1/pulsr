@@ -206,7 +206,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                             controller: _nameController,
                             onChanged: cubit.updateName,
                             decoration: InputDecoration(
-                              hintText: 'e.g. 80s Rock Hits, Heavy Rotation...',
+                              hintText: context.l10n.smartPlaylistNameHint,
                               filled: true,
                               fillColor: p.surfaceContainerHigh,
                               border: const OutlineInputBorder(
@@ -774,7 +774,7 @@ class _RuleCardState extends State<_RuleCard> {
             if (widget.rule.field == SmartRuleField.isFavorite ||
                 widget.rule.field == SmartRuleField.isLossless)
               Semantics(
-                label: 'Value',
+                label: context.l10n.smartPlaylistValueLabel,
                 child: DropdownButtonFormField<String>(
                   initialValue: widget.rule.value.toLowerCase() == 'true' ||
                           widget.rule.value == '1'
@@ -805,7 +805,7 @@ class _RuleCardState extends State<_RuleCard> {
               )
             else
               Semantics(
-                label: 'Value',
+                label: context.l10n.smartPlaylistValueLabel,
                 child: TextField(
                   controller: _valueController,
                   onChanged: (val) {
@@ -822,7 +822,7 @@ class _RuleCardState extends State<_RuleCard> {
                           : TextInputType.text,
                   decoration: InputDecoration(
                     hintText: _getHintForField(
-                        widget.rule.field, widget.rule.operator),
+                        context, widget.rule.field, widget.rule.operator),
                     filled: true,
                     fillColor: p.surfaceContainerHigh,
                     contentPadding: const EdgeInsets.symmetric(
@@ -840,36 +840,38 @@ class _RuleCardState extends State<_RuleCard> {
     );
   }
 
-  String _getHintForField(SmartRuleField field, SmartOperator op) {
-    if (op == SmartOperator.withinDays) return 'e.g. 30 (days)';
-    if (op == SmartOperator.between) return 'e.g. 5, 20 or 5..20';
+  String _getHintForField(
+      BuildContext context, SmartRuleField field, SmartOperator op) {
+    final l = context.l10n;
+    if (op == SmartOperator.withinDays) return l.smartPlaylistHintDays;
+    if (op == SmartOperator.between) return l.smartPlaylistHintBetween;
     switch (field) {
       case SmartRuleField.playCount:
-        return 'e.g. 5';
+        return l.smartPlaylistHintPlayCount;
       case SmartRuleField.artist:
-        return 'e.g. Queen, Daft Punk...';
+        return l.smartPlaylistHintArtist;
       case SmartRuleField.album:
-        return 'e.g. Discovery, Rumours...';
+        return l.smartPlaylistAlbumHint;
       case SmartRuleField.title:
-        return 'e.g. Bohemian, Love...';
+        return l.smartPlaylistTitleHint;
       case SmartRuleField.genre:
-        return 'e.g. Rock, Pop, Jazz...';
+        return l.smartPlaylistGenreHint;
       case SmartRuleField.year:
-        return 'e.g. 2024';
+        return l.smartPlaylistHintYear;
       case SmartRuleField.decade:
-        return 'e.g. 1980, 1990, 2000, 2020...';
+        return l.smartPlaylistHintDecade;
       case SmartRuleField.isLossless:
-        return 'FLAC, WAV, ALAC';
+        return l.smartPlaylistHintLossless;
       case SmartRuleField.dateAdded:
-        return 'e.g. 30';
+        return l.smartPlaylistHintDateAdded;
       case SmartRuleField.durationMs:
-        return 'e.g. 300000 (ms = 5 mins)';
+        return l.smartPlaylistHintDuration;
       case SmartRuleField.lastPlayed:
-        return 'e.g. 7';
+        return l.smartPlaylistHintLastPlayed;
       case SmartRuleField.rating:
-        return 'e.g. 4 (stars 0–5)';
+        return l.smartPlaylistHintRating;
       default:
-        return 'Value...';
+        return l.smartPlaylistHintValueDefault;
     }
   }
 }

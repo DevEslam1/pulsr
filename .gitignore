@@ -38,7 +38,8 @@ test/golden/failures/
 .opencode/
 .zwork/
 docs/
-
+scratch/
+tool/
 
 # Symbolication related
 app.*.symbols

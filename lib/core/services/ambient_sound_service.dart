@@ -1,9 +1,13 @@
 // lib/core/services/ambient_sound_service.dart
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../l10n/generated/app_localizations.dart';
 
 /// All available ambient sound effects.
 enum AmbientSoundEffect {
@@ -84,6 +88,33 @@ enum AmbientSoundEffect {
   final String remoteUrl;
 
   String get displayName => '$emoji $label';
+
+  /// Station-independent UI name. The const [label] stays English because the
+  /// enum is built before any locale exists; widgets resolve it here instead.
+  String localizedLabel(AppLocalizations l) {
+    switch (this) {
+      case AmbientSoundEffect.rain:
+        return l.ambientEffectRain;
+      case AmbientSoundEffect.fire:
+        return l.ambientEffectFire;
+      case AmbientSoundEffect.forest:
+        return l.ambientEffectForest;
+      case AmbientSoundEffect.ocean:
+        return l.ambientEffectOcean;
+      case AmbientSoundEffect.wind:
+        return l.ambientEffectWind;
+      case AmbientSoundEffect.thunder:
+        return l.ambientEffectThunder;
+      case AmbientSoundEffect.birds:
+        return l.ambientEffectBirds;
+      case AmbientSoundEffect.cafe:
+        return l.ambientEffectCafe;
+      case AmbientSoundEffect.whiteNoise:
+        return l.ambientEffectWhiteNoise;
+    }
+  }
+
+  String localizedDisplayName(AppLocalizations l) => '$emoji ${localizedLabel(l)}';
 }
 
 /// Singleton manager for looping ambient background sounds.
@@ -103,6 +134,9 @@ class AmbientSoundService extends ChangeNotifier {
   // ─── Prefs keys ────────────────────────────────────────────────────────────
   static const _keyActiveEffects = 'ambient_active_effects';
   static const _keyVolumePrefix = 'ambient_volume_';
+  static const _keyMaster = 'ambient_master_volume';
+  static const _keyAllowQuran = 'ambient_allow_during_quran';
+  static const _keyMixes = 'ambient_saved_mixes_v1';
 
   // ─── State ─────────────────────────────────────────────────────────────────
   final Set<AmbientSoundEffect> _activeEffects = {};
@@ -112,12 +146,202 @@ class AmbientSoundService extends ChangeNotifier {
   final Map<AmbientSoundEffect, bool> _loadingEffects = {};
   String? _errorMessage;
   bool _isPlayerPlaying = false;
+  bool _quranModeActive = false;
+  bool _allowDuringQuran = false;
+
+  /// True when the sounds should currently be audible: the main player is
+  /// playing and Quran Mode is not asking for a clean, undisturbed recitation.
+  bool get _shouldPlay =>
+      _isPlayerPlaying && (!_quranModeActive || _allowDuringQuran);
+
+  /// Whether ambient sounds keep playing while Quran Mode is on.
+  bool get allowDuringQuran => _allowDuringQuran;
+
+  /// True when ambient sounds are held back because Quran Mode is on.
+  bool get isSuppressedByQuran => _quranModeActive && !_allowDuringQuran;
+
+  /// Called by the player when Quran Mode turns on or off.
+  void setQuranModeActive(bool active) {
+    if (_quranModeActive == active) return;
+    final before = _shouldPlay;
+    _quranModeActive = active;
+    notifyListeners();
+    if (before != _shouldPlay) unawaited(_applyPlayerState());
+  }
+
+  Future<void> setAllowDuringQuran(bool allow) async {
+    if (_allowDuringQuran == allow) return;
+    final before = _shouldPlay;
+    _allowDuringQuran = allow;
+    notifyListeners();
+    if (before != _shouldPlay) unawaited(_applyPlayerState());
+    _persist();
+  }
+
+  double _masterVolume = 1.0;
+  final Map<String, Map<String, double>> _mixes = {};
+  Timer? _sleepTimer;
+  Timer? _sleepTicker;
+  DateTime? _sleepEndsAt;
+  int _fadeEpoch = 0;
+
+  static const Duration _fadeDuration = Duration(milliseconds: 400);
+
+  // --- Master volume, mixes, sleep timer ---
+
+  /// Master volume (0.0 to 1.0) applied on top of each effect's own volume.
+  double get masterVolume => _masterVolume;
+
+  /// Saved mixes: name to (effect name to volume).
+  Map<String, Map<String, double>> get savedMixes => Map.unmodifiable(_mixes);
+
+  /// Time left on the sleep timer, or null when no timer is running.
+  Duration? get sleepTimeRemaining {
+    final end = _sleepEndsAt;
+    if (end == null) return null;
+    final left = end.difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  double _effectiveVolume(AmbientSoundEffect e) =>
+      ((_volumes[e] ?? 0.5) * _masterVolume * _duckFactor).clamp(0.0, 1.0);
+
+  double _duckFactor = 1.0;
+  StreamSubscription<AudioInterruptionEvent>? _interruptionSub;
+
+  /// Lowers the ambient sounds while a transient interruption (navigation
+  /// prompt, assistant) ducks the main player, and restores them afterwards.
+  Future<void> _listenForDucking() async {
+    try {
+      final session = await AudioSession.instance;
+      _interruptionSub = session.interruptionEventStream.listen((event) {
+        if (event.type != AudioInterruptionType.duck) return;
+        _duckFactor = event.begin ? 0.3 : 1.0;
+        for (final entry in _players.entries.toList()) {
+          unawaited(entry.value
+              .setVolume(_effectiveVolume(entry.key))
+              .catchError((Object _) {}));
+        }
+      });
+    } catch (_) {
+      // No audio session available (e.g. unit tests): ducking is optional.
+    }
+  }
+
+  Future<void> setMasterVolume(double volume) async {
+    _masterVolume = volume.clamp(0.0, 1.0);
+    for (final entry in _players.entries.toList()) {
+      unawaited(entry.value
+          .setVolume(_effectiveVolume(entry.key))
+          .catchError((Object _) {}));
+    }
+    notifyListeners();
+    _persist();
+  }
+
+  /// Starts (or with null cancels) a timer that fades out and stops all
+  /// ambient effects.
+  void setSleepTimer(Duration? duration) {
+    _sleepTimer?.cancel();
+    _sleepTicker?.cancel();
+    _sleepTimer = null;
+    _sleepTicker = null;
+    _sleepEndsAt = null;
+    if (duration != null && duration > Duration.zero) {
+      _sleepEndsAt = DateTime.now().add(duration);
+      _sleepTimer = Timer(duration, () => unawaited(_onSleepTimerFired()));
+      _sleepTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!_disposed) notifyListeners();
+      });
+    }
+    notifyListeners();
+  }
+
+  Future<void> _onSleepTimerFired() async {
+    _sleepTimer = null;
+    _sleepTicker?.cancel();
+    _sleepTicker = null;
+    _sleepEndsAt = null;
+    final epoch = ++_fadeEpoch;
+    await _fadeAll(0, epoch);
+    for (final e in List.of(_activeEffects)) {
+      _activeEffects.remove(e);
+      await _stopEffectPlayer(e);
+    }
+    if (!_disposed) notifyListeners();
+    _persist();
+  }
+
+  /// Saves the current active effects and their volumes as [name].
+  void saveMix(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || _activeEffects.isEmpty) return;
+    _mixes[trimmed] = {
+      for (final e in _activeEffects) e.name: _volumes[e] ?? 0.5,
+    };
+    notifyListeners();
+    _persist();
+  }
+
+  void deleteMix(String name) {
+    if (_mixes.remove(name) != null) {
+      notifyListeners();
+      _persist();
+    }
+  }
+
+  /// Replaces the active effects with those of the saved mix [name].
+  Future<void> applyMix(String name) async {
+    final mix = _mixes[name];
+    if (mix == null) return;
+    final wanted = <AmbientSoundEffect>{};
+    for (final entry in mix.entries) {
+      for (final e in AmbientSoundEffect.values) {
+        if (e.name == entry.key) {
+          wanted.add(e);
+          _volumes[e] = entry.value.clamp(0.0, 1.0);
+        }
+      }
+    }
+    for (final e in List.of(_activeEffects)) {
+      if (!wanted.contains(e)) await toggleEffect(e);
+    }
+    for (final e in wanted) {
+      if (_activeEffects.contains(e)) {
+        await _players[e]?.setVolume(_effectiveVolume(e));
+      } else {
+        await toggleEffect(e);
+      }
+    }
+    notifyListeners();
+    _persist();
+  }
+
+  Future<void> _fadeAll(double target, int epoch) async {
+    const steps = 8;
+    final stepDelay =
+        Duration(milliseconds: _fadeDuration.inMilliseconds ~/ steps);
+    final players = _players.entries.toList();
+    final starts = {
+      for (final e in players) e.key: e.value.volume,
+    };
+    for (var i = 1; i <= steps; i++) {
+      if (epoch != _fadeEpoch || _disposed) return;
+      final t = i / steps;
+      for (final e in players) {
+        final goal = target == 0 ? 0.0 : _effectiveVolume(e.key);
+        final v = starts[e.key]! + (goal - starts[e.key]!) * t;
+        unawaited(
+            e.value.setVolume(v.clamp(0.0, 1.0)).catchError((Object _) {}));
+      }
+      await Future<void>.delayed(stepDelay);
+    }
+  }
 
   // ─── Public read-only access ───────────────────────────────────────────────
 
   /// The set of currently active (toggled-on) ambient effects.
-  Set<AmbientSoundEffect> get activeEffects =>
-      Set.unmodifiable(_activeEffects);
+  Set<AmbientSoundEffect> get activeEffects => Set.unmodifiable(_activeEffects);
 
   /// Returns true if at least one effect is active.
   bool get isEnabled => _activeEffects.isNotEmpty;
@@ -127,8 +351,7 @@ class AmbientSoundService extends ChangeNotifier {
       _activeEffects.contains(effect);
 
   /// Volume (0.0–1.0) for the given [effect].
-  double volumeFor(AmbientSoundEffect effect) =>
-      _volumes[effect] ?? 0.5;
+  double volumeFor(AmbientSoundEffect effect) => _volumes[effect] ?? 0.5;
 
   /// True if any ambient audio is loading.
   bool get isLoading => _loadingEffects.values.any((v) => v);
@@ -142,7 +365,7 @@ class AmbientSoundService extends ChangeNotifier {
 
   /// True when ambient audio is actively emitting (at least one player running).
   bool get isAudioPlaying =>
-      isEnabled && _isPlayerPlaying && _players.values.any((p) => p.playing);
+      isEnabled && _shouldPlay && _players.values.any((p) => p.playing);
 
   // ─── Legacy single-effect API (deprecated, kept for smooth migration) ──────
 
@@ -158,9 +381,13 @@ class AmbientSoundService extends ChangeNotifier {
 
   // ─── Internal players ──────────────────────────────────────────────────────
   @visibleForTesting
-  static AudioPlayer Function() playerFactory = () => AudioPlayer();
+  // Interruptions (calls, navigation prompts) are handled centrally by following
+  // the main player, so ambient players never pause/resume on their own.
+  static AudioPlayer Function() playerFactory =
+      () => AudioPlayer(handleInterruptions: false);
 
   final Map<AmbientSoundEffect, AudioPlayer> _players = {};
+  final Map<AmbientSoundEffect, int> _generation = {};
   bool _disposed = false;
   bool _initialized = false;
 
@@ -184,7 +411,7 @@ class AmbientSoundService extends ChangeNotifier {
   /// Set the volume for a specific effect (0.0–1.0).
   Future<void> setEffectVolume(AmbientSoundEffect effect, double volume) async {
     _volumes[effect] = volume.clamp(0.0, 1.0);
-    await _players[effect]?.setVolume(_volumes[effect]!);
+    await _players[effect]?.setVolume(_effectiveVolume(effect));
     notifyListeners();
     _persist();
   }
@@ -237,18 +464,30 @@ class AmbientSoundService extends ChangeNotifier {
     _isPlayerPlaying = isPlaying;
     notifyListeners();
 
-    for (final entry in _players.entries) {
-      try {
-        if (_isPlayerPlaying) {
-          if (!(entry.value.playing)) {
-            unawaited(entry.value.play().catchError((Object _) {}));
-          }
-        } else {
-          if (entry.value.playing) {
-            unawaited(entry.value.pause().catchError((Object _) {}));
-          }
-        }
-      } catch (_) {}
+    unawaited(_applyPlayerState());
+  }
+
+  Future<void> _applyPlayerState() async {
+    final epoch = ++_fadeEpoch;
+    final players = _players.values.toList();
+    if (_shouldPlay) {
+      for (final p in players) {
+        try {
+          await p.setVolume(0);
+          if (!p.playing) unawaited(p.play().catchError((Object _) {}));
+        } catch (_) {}
+      }
+      await _fadeAll(1, epoch);
+    } else {
+      await _fadeAll(0, epoch);
+      if (epoch != _fadeEpoch) return;
+      // Always pause (no `playing` guard): the flag can be stale while a
+      // play() call is still in flight, which left sounds running.
+      for (final p in players) {
+        try {
+          unawaited(p.pause().catchError((Object _) {}));
+        } catch (_) {}
+      }
     }
   }
 
@@ -256,8 +495,28 @@ class AmbientSoundService extends ChangeNotifier {
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
+    unawaited(_listenForDucking());
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      _masterVolume = (prefs.getDouble(_keyMaster) ?? 1.0).clamp(0.0, 1.0);
+      _allowDuringQuran = prefs.getBool(_keyAllowQuran) ?? false;
+      final rawMixes = prefs.getString(_keyMixes);
+      if (rawMixes != null && rawMixes.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(rawMixes);
+          if (decoded is Map) {
+            decoded.forEach((k, v) {
+              if (v is Map) {
+                _mixes['$k'] = {
+                  for (final e in v.entries)
+                    '${e.key}': (e.value as num).toDouble(),
+                };
+              }
+            });
+          }
+        } catch (_) {}
+      }
 
       // Load volumes
       for (final effect in AmbientSoundEffect.values) {
@@ -291,6 +550,9 @@ class AmbientSoundService extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    unawaited(_interruptionSub?.cancel());
+    _sleepTimer?.cancel();
+    _sleepTicker?.cancel();
     for (final player in _players.values) {
       player.dispose();
     }
@@ -306,16 +568,23 @@ class AmbientSoundService extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    final token = _generation[effect] = (_generation[effect] ?? 0) + 1;
+    bool stale() =>
+        _disposed ||
+        _generation[effect] != token ||
+        !_activeEffects.contains(effect);
+
     try {
       // Dispose any existing player for this effect
       final existing = _players.remove(effect);
       await existing?.stop();
       await existing?.dispose();
+      if (stale()) return;
 
       final player = playerFactory();
       _players[effect] = player;
 
-      await player.setVolume(_volumes[effect]!);
+      await player.setVolume(_effectiveVolume(effect));
       await player.setLoopMode(LoopMode.all);
 
       // Attempt to load from offline bundled asset first; fallback to remote URL.
@@ -335,22 +604,22 @@ class AmbientSoundService extends ChangeNotifier {
         }
       }
 
-      if (_disposed || !_activeEffects.contains(effect)) {
+      if (stale()) {
+        if (identical(_players[effect], player)) _players.remove(effect);
         await player.dispose();
-        _players.remove(effect);
         return;
       }
 
       // Respect the main player's playback state
-      if (_isPlayerPlaying) {
+      if (_shouldPlay) {
         await player.play();
       } else {
         await player.pause();
       }
 
-      if (_disposed || !_activeEffects.contains(effect)) {
+      if (stale()) {
+        if (identical(_players[effect], player)) _players.remove(effect);
         await player.dispose();
-        _players.remove(effect);
         return;
       }
 
@@ -367,6 +636,7 @@ class AmbientSoundService extends ChangeNotifier {
   }
 
   Future<void> _stopEffectPlayer(AmbientSoundEffect effect) async {
+    _generation[effect] = (_generation[effect] ?? 0) + 1;
     final player = _players.remove(effect);
     await player?.stop();
     await player?.dispose();
@@ -375,6 +645,9 @@ class AmbientSoundService extends ChangeNotifier {
 
   void _persist() {
     SharedPreferences.getInstance().then((prefs) {
+      prefs.setDouble(_keyMaster, _masterVolume);
+      prefs.setBool(_keyAllowQuran, _allowDuringQuran);
+      prefs.setString(_keyMixes, jsonEncode(_mixes));
       prefs.setStringList(
         _keyActiveEffects,
         _activeEffects.map((e) => e.name).toList(),

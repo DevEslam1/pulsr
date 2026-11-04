@@ -467,6 +467,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
   Future<void> _saveImage() async {
     setState(() => _isGenerating = true);
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     try {
       final sortedIndices = _selectedIndices.toList()..sort();
       final lines = sortedIndices.map((i) => widget.lyrics[i]).toList();
@@ -485,7 +486,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
 
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Card saved to: ${file.path}'),
+          content: Text(l10n.lyricsShareCardSaved(file.path)),
           duration: const Duration(seconds: 3),
         ),
       );

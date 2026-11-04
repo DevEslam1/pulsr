@@ -164,7 +164,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Paste a public Spotify playlist link or URI to match and import its tracks into your Pulsr library.',
+              context.l10n.spotifyImportHelp,
               style: TextStyle(
                 color: p.textSecondary,
                 fontSize: AppFontSize.body,
@@ -270,7 +270,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
             ],
             const SizedBox(height: AppSpacing.md),
             Text(
-              _statusMessage ?? 'Importing playlist...',
+              _statusMessage ?? context.l10n.spotifyImporting,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: p.textSecondary,
@@ -308,7 +308,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
             if (res.unmatchedTracks.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Unmatched Tracks (${res.unmatchedCount})',
+                context.l10n.spotifyUnmatchedTracks(res.unmatchedCount),
                 style: TextStyle(
                   color: p.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -365,7 +365,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
             border: Border.all(color: p.error.withValues(alpha: 0.32)),
           ),
           child: Text(
-            _errorMessage ?? 'An error occurred during import.',
+            _errorMessage ?? context.l10n.spotifyImportFailed,
             style: TextStyle(
               color: p.error,
               fontSize: AppFontSize.bodySmall,

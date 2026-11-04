@@ -21,6 +21,7 @@ import '../../data/audio/hedged_stream_resolver.dart';
 import '../../domain/models/ytm_track.dart';
 import '../telemetry/playback_latency_tracker.dart';
 import '../utils/error_logger.dart';
+import '../utils/l10n_holder.dart';
 import '../utils/ytm_rate_limiter.dart';
 
 import '../errors/ytm_error_classifier.dart';
@@ -846,8 +847,10 @@ class YtmService {
                     as Map<String, dynamic>;
                 final flexCols = r['flexColumns'] as List<dynamic>? ?? [];
                 String? videoId;
-                String title = 'Unknown Title';
-                String artist = 'Unknown Artist';
+                String title =
+                    L10nHolder.current?.ytmUnknownTitle ?? 'Unknown Title';
+                String artist =
+                    L10nHolder.current?.unknownArtist ?? 'Unknown Artist';
 
                 final pData = r['playlistItemData'] as Map<String, dynamic>?;
                 videoId = pData?['videoId'] as String?;
@@ -894,7 +897,8 @@ class YtmService {
                 String? videoId = nav?['watchEndpoint']?['videoId'] as String?;
                 final titleObj = r['title'] as Map<String, dynamic>?;
                 final titleRuns = titleObj?['runs'] as List<dynamic>?;
-                String title = 'Unknown Title';
+                String title =
+                    L10nHolder.current?.ytmUnknownTitle ?? 'Unknown Title';
                 if (titleRuns != null && titleRuns.isNotEmpty) {
                   title = titleRuns[0]['text'] as String? ?? title;
                   videoId ??= (titleRuns[0]['navigationEndpoint']

@@ -115,11 +115,11 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   /// it was superseded and unwind without touching state or the error banner.
   int _runToken = 0;
 
-  static const List<String> _pointNames = [
-    'Listening Position (Center)',
-    '1 meter Left',
-    '1 meter Right',
-  ];
+  static List<String> _pointNames(AppLocalizations l) => [
+        l.rcPointListeningCenter,
+        l.rcPointOneMeterLeft,
+        l.rcPointOneMeterRight,
+      ];
 
   Color get _snrColor {
     final snr = _snrDb ?? 20.0;
@@ -128,11 +128,11 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
     return context.palette.warning;
   }
 
-  String get _snrLabel {
+  String _snrLabel(AppLocalizations l) {
     final snr = _snrDb ?? 20.0;
-    if (snr >= 25) return 'Excellent';
-    if (snr >= 16) return 'Good';
-    return 'Moderate Noise';
+    if (snr >= 25) return l.rcSnrExcellent;
+    if (snr >= 16) return l.rcSnrGood;
+    return l.rcSnrModerate;
   }
 
   @override
@@ -583,7 +583,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
               ),
               const Spacer(),
               Text(
-                'max ${v.loopback.maxDeviationDb.toStringAsFixed(2)} dB',
+                l10n.rcMaxDeviation(
+                    v.loopback.maxDeviationDb.toStringAsFixed(2)),
                 style: TextStyle(
                   color: p.textTertiary,
                   fontSize: AppFontSize.caption,
@@ -852,7 +853,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                               _phase == _RcPhase.verifying
                                   ? l10n.rcVerifying
                                   : (_multiPointMode
-                                      ? 'Measuring ${_pointNames[_currentPoint]}'
+                                      ? l10n.rcMeasuringPoint(
+                                          _pointNames(l10n)[_currentPoint])
                                       : l10n.rcMeasuring),
                               style: TextStyle(
                                 color: p.textPrimary,
@@ -864,7 +866,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                 _phase != _RcPhase.verifying) ...[
                               const SizedBox(height: AppSpacing.xxs),
                               Text(
-                                'Point ${_currentPoint + 1} of 3',
+                                l10n.rcPointOfTotal(_currentPoint + 1, 3),
                                 style: TextStyle(
                                   color: p.accent,
                                   fontSize: AppFontSize.caption,
@@ -911,7 +913,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
-                              'Position ${_currentPoint + 1} of 3',
+                              l10n.rcPositionOfTotal(_currentPoint + 1, 3),
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontWeight: FontWeight.w700,
@@ -920,7 +922,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              'Move your device to: ${_pointNames[_currentPoint]}',
+                              l10n.rcMoveDeviceTo(_pointNames(l10n)[_currentPoint]),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: p.textSecondary,
@@ -942,7 +944,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                 icon: const Icon(Icons.play_arrow_rounded,
                                     size: 20),
                                 label: Text(
-                                    'Measure Position ${_currentPoint + 1}'),
+                                    l10n.rcMeasurePosition(_currentPoint + 1)),
                                 onPressed: _measureCurrentPoint,
                               ),
                             ),
@@ -952,8 +954,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                 final tones = RoomCorrectionService.tonePlan();
                                 _finishMeasurements(tones);
                               },
-                              child: Text(
-                                  'Finish with current measurements (${_pointResponses.length}/3)'),
+                              child: Text(l10n.rcFinishWithMeasurements(
+                                  _pointResponses.length)),
                             ),
                           ],
                         ),
@@ -987,7 +989,9 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                       size: 14, color: _snrColor),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'SNR: ${_snrDb!.toStringAsFixed(1)} dB ($_snrLabel)',
+                                    l10n.rcSnrReading(
+                                        _snrDb!.toStringAsFixed(1),
+                                        _snrLabel(l10n)),
                                     style: TextStyle(
                                       color: _snrColor,
                                       fontSize: AppFontSize.caption,

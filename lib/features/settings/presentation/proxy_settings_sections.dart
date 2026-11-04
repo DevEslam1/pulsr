@@ -814,7 +814,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                   p: p,
                 ),
                 _presetChip(
-                  label: 'Local HTTP (8080)',
+                  label: context.l10n.proxyPresetLocalHttp,
                   icon: Icons.http_rounded,
                   onTap: () => _applyPreset(
                     name: 'Local HTTP',
@@ -825,7 +825,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                   p: p,
                 ),
                 _presetChip(
-                  label: 'Local SOCKS5 (1080)',
+                  label: context.l10n.proxyPresetLocalSocks,
                   icon: Icons.shield_outlined,
                   onTap: () => _applyPreset(
                     name: 'Local SOCKS5',

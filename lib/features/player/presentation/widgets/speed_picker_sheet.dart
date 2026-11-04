@@ -319,7 +319,7 @@ class SpeedPickerSheet extends StatelessWidget {
                           color: automixEnabled ? p.accent : p.textSecondary,
                         ),
                         title: Text(
-                          'Automix / Smart Transitions',
+                          context.l10n.speedPickerAutomixTitle,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontWeight: FontWeight.w700,
@@ -327,7 +327,7 @@ class SpeedPickerSheet extends StatelessWidget {
                           ),
                         ),
                         subtitle: Text(
-                          'Beatmatch tempo, align cue grids & swap bass',
+                          context.l10n.speedPickerAutomixDesc,
                           style: TextStyle(
                             color: p.textSecondary,
                             fontSize: AppFontSize.caption,

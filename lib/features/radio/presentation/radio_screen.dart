@@ -401,7 +401,6 @@ class _RadioScreenState extends State<RadioScreen> {
 
   Widget _buildCardsHiddenBanner(
     PulsrPalette p, {
-    required bool isArabic,
     required bool isCompactLandscape,
   }) {
     return ValueListenableBuilder<bool>(
@@ -449,9 +448,7 @@ class _RadioScreenState extends State<RadioScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        isArabic
-                            ? 'بطاقات الراديو مخفية من الرئيسية'
-                            : 'Radio cards are hidden from Home',
+                        context.l10n.radioCardsHiddenFromHome,
                         style: TextStyle(
                           color: p.textPrimary,
                           fontSize: AppFontSize.callout,
@@ -460,9 +457,7 @@ class _RadioScreenState extends State<RadioScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        isArabic
-                            ? 'انقر هنا لإعادة إظهارها في الشاشة الرئيسية'
-                            : 'Tap to restore the radio carousel on Home',
+                        context.l10n.tapToRestoreRadioCards,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontSize: AppFontSize.caption,
@@ -478,9 +473,7 @@ class _RadioScreenState extends State<RadioScreen> {
                     if (!context.mounted) return;
                     PulsrToast.show(
                       context,
-                      message: isArabic
-                          ? 'تمت استعادة بطاقات الراديو في الشاشة الرئيسية'
-                          : 'Radio cards restored to Home screen',
+                      message: context.l10n.radioCardsRestoredToast,
                       isSuccess: true,
                     );
                   },
@@ -497,7 +490,7 @@ class _RadioScreenState extends State<RadioScreen> {
                     ),
                   ),
                   child: Text(
-                    isArabic ? 'إظهار' : 'Show',
+                    context.l10n.radioShowAction,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -866,7 +859,6 @@ class _RadioScreenState extends State<RadioScreen> {
     final screenHeight = mq.size.height;
     final isLandscape = screenWidth > screenHeight;
     final isCompactLandscape = isLandscape && screenHeight < 520;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     final baseMaxWidth =
         PulsrLayoutMetrics.contentConstraints(context).maxWidth;
@@ -893,18 +885,14 @@ class _RadioScreenState extends State<RadioScreen> {
                     minWidth: AppSpacing.minTouchTarget,
                     minHeight: AppSpacing.minTouchTarget,
                   ),
-                  tooltip: isArabic
-                      ? 'إظهار بطاقات الراديو في الرئيسية'
-                      : 'Show radio cards on Home',
+                  tooltip: context.l10n.radioShowCardsTooltip,
                   icon: Icon(Icons.visibility_rounded, color: p.accent),
                   onPressed: () async {
                     await RadioStationStore.setHeroCardsVisible(true);
                     if (!context.mounted) return;
                     PulsrToast.show(
                       context,
-                      message: isArabic
-                          ? 'تمت استعادة بطاقات الراديو في الشاشة الرئيسية'
-                          : 'Radio cards restored to Home screen',
+                      message: context.l10n.radioCardsRestoredToast,
                       isSuccess: true,
                     );
                   },
@@ -1004,7 +992,6 @@ class _RadioScreenState extends State<RadioScreen> {
                   children: [
                     _buildCardsHiddenBanner(
                       p,
-                      isArabic: isArabic,
                       isCompactLandscape: isCompactLandscape,
                     ),
                     _buildTopControls(
@@ -1379,8 +1366,8 @@ class _AddStationDialogState extends State<_AddStationDialog> {
             if (_artworkUrl != null)
               ActionChip(
                 avatar: const Icon(Icons.clear_rounded, size: 14),
-                label:
-                    const Text('إلغاء الصورة', style: TextStyle(fontSize: 11)),
+                label: Text(context.l10n.radioCancelImageAction,
+                    style: const TextStyle(fontSize: 11)),
                 onPressed: () => setState(() => _artworkUrl = null),
               ),
           ],

@@ -44,6 +44,7 @@ import 'sleep_timer_manager.dart';
 import 'position_crash_guard.dart';
 import 'ytm_resolving_source.dart';
 import '../../core/services/ytm_cache_manager.dart';
+import '../../core/utils/l10n_holder.dart';
 import 'adaptive_buffer_engine.dart';
 import 'audio_memory_manager.dart';
 import 'battery_aware_playback.dart';
@@ -178,41 +179,49 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
-  static final controlFavorite = MediaControl.custom(
-    androidIcon: 'drawable/ic_favorite',
-    label: 'Unfavorite',
-    name: 'toggleFavorite',
-  );
-  static final controlUnfavorite = MediaControl.custom(
-    androidIcon: 'drawable/ic_favorite_border',
-    label: 'Favorite',
-    name: 'toggleFavorite',
-  );
-  static final controlShuffleOn = MediaControl.custom(
-    androidIcon: 'drawable/ic_shuffle_on',
-    label: 'Shuffle',
-    name: 'toggleShuffle',
-  );
-  static final controlShuffleOff = MediaControl.custom(
-    androidIcon: 'drawable/ic_shuffle',
-    label: 'Shuffle',
-    name: 'toggleShuffle',
-  );
-  static final controlRepeatOne = MediaControl.custom(
-    androidIcon: 'drawable/ic_repeat_one',
-    label: 'Repeat',
-    name: 'cycleRepeat',
-  );
-  static final controlRepeatAll = MediaControl.custom(
-    androidIcon: 'drawable/ic_repeat_all',
-    label: 'Repeat',
-    name: 'cycleRepeat',
-  );
-  static final controlRepeatOff = MediaControl.custom(
-    androidIcon: 'drawable/ic_repeat',
-    label: 'Repeat',
-    name: 'cycleRepeat',
-  );
+  // Getters, not finals: the notification is rebuilt on every state change, so
+  // each one picks up the locale that is active at that moment.
+  static String get _favoriteOffLabel =>
+      L10nHolder.current?.mediaControlUnfavorite ?? 'Unfavorite';
+  static String get _favoriteOnLabel => L10nHolder.current?.favorite ?? 'Favorite';
+  static String get _shuffleLabel => L10nHolder.current?.shuffle ?? 'Shuffle';
+  static String get _repeatLabel => L10nHolder.current?.repeat ?? 'Repeat';
+
+  static MediaControl get controlFavorite => MediaControl.custom(
+        androidIcon: 'drawable/ic_favorite',
+        label: _favoriteOffLabel,
+        name: 'toggleFavorite',
+      );
+  static MediaControl get controlUnfavorite => MediaControl.custom(
+        androidIcon: 'drawable/ic_favorite_border',
+        label: _favoriteOnLabel,
+        name: 'toggleFavorite',
+      );
+  static MediaControl get controlShuffleOn => MediaControl.custom(
+        androidIcon: 'drawable/ic_shuffle_on',
+        label: _shuffleLabel,
+        name: 'toggleShuffle',
+      );
+  static MediaControl get controlShuffleOff => MediaControl.custom(
+        androidIcon: 'drawable/ic_shuffle',
+        label: _shuffleLabel,
+        name: 'toggleShuffle',
+      );
+  static MediaControl get controlRepeatOne => MediaControl.custom(
+        androidIcon: 'drawable/ic_repeat_one',
+        label: _repeatLabel,
+        name: 'cycleRepeat',
+      );
+  static MediaControl get controlRepeatAll => MediaControl.custom(
+        androidIcon: 'drawable/ic_repeat_all',
+        label: _repeatLabel,
+        name: 'cycleRepeat',
+      );
+  static MediaControl get controlRepeatOff => MediaControl.custom(
+        androidIcon: 'drawable/ic_repeat',
+        label: _repeatLabel,
+        name: 'cycleRepeat',
+      );
 
   @override
   final AudioPlayer _playerA;

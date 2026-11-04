@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -68,7 +69,7 @@ class QuranModeBadge extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.s6),
                 Text(
-                  'Quran Mode',
+                  context.l10n.quranMode,
                   style: TextStyle(
                     color: context.palette.textPrimary,
                     fontSize: compact ? AppFontSize.tiny : AppFontSize.label,

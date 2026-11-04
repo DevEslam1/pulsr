@@ -8,6 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../domain/models/ytm_track.dart';
 import '../telemetry/clock.dart';
+import '../utils/l10n_holder.dart';
 
 /// Representation of a cached direct stream URL for a YouTube Music track.
 class YtmUrlCacheEntry {
@@ -52,8 +53,8 @@ class YtmUrlCacheEntry {
       container: url.contains('mime=audio%2Fwebm') ? 'webm' : 'm4a',
       bitrateKbps: quality == 'high' ? 256 : (quality == 'medium' ? 128 : 64),
       duration: Duration.zero,
-      title: 'YouTube Track',
-      artist: 'YouTube Music',
+      title: L10nHolder.current?.ytmFallbackTrackTitle ?? 'YouTube Track',
+      artist: L10nHolder.current?.browseYouTubeMusic ?? 'YouTube Music',
       userAgent: userAgent,
       cookies: cookies,
       expiresAt: expiresAt.millisecondsSinceEpoch,

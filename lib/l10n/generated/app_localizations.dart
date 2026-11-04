@@ -15654,6 +15654,1182 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{Remove 1 completed download?} other{Remove {count} completed downloads?}}'**
   String clearCompletedDownloadsConfirm(int count);
+
+  /// No description provided for @ambientEffectsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Effects'**
+  String get ambientEffectsHeader;
+
+  /// No description provided for @ambientVolumesHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Volumes'**
+  String get ambientVolumesHeader;
+
+  /// No description provided for @ambientPausedWithPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused with player'**
+  String get ambientPausedWithPlayer;
+
+  /// No description provided for @ambientStatusPlaying.
+  ///
+  /// In en, this message translates to:
+  /// **'Playing'**
+  String get ambientStatusPlaying;
+
+  /// No description provided for @ambientStatusPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get ambientStatusPaused;
+
+  /// No description provided for @ambientActiveCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} on'**
+  String ambientActiveCount(int count);
+
+  /// No description provided for @ambientMasterVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Master volume'**
+  String get ambientMasterVolume;
+
+  /// No description provided for @ambientSleepTimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep timer'**
+  String get ambientSleepTimer;
+
+  /// No description provided for @ambientSleepTimerOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get ambientSleepTimerOff;
+
+  /// No description provided for @ambientSleepTimerMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String ambientSleepTimerMinutes(int minutes);
+
+  /// No description provided for @ambientSaveMix.
+  ///
+  /// In en, this message translates to:
+  /// **'Save mix'**
+  String get ambientSaveMix;
+
+  /// No description provided for @ambientMixName.
+  ///
+  /// In en, this message translates to:
+  /// **'Mix name'**
+  String get ambientMixName;
+
+  /// No description provided for @ambientSavedMixes.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved mixes'**
+  String get ambientSavedMixes;
+
+  /// No description provided for @ambientSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get ambientSave;
+
+  /// No description provided for @ambientCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get ambientCancel;
+
+  /// No description provided for @ambientAllowDuringQuran.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep playing in Quran mode'**
+  String get ambientAllowDuringQuran;
+
+  /// Title of the Discord Rich Presence settings sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Discord Rich Presence'**
+  String get discordRichPresenceTitle;
+
+  /// Subtitle explaining Discord Rich Presence
+  ///
+  /// In en, this message translates to:
+  /// **'Display currently playing song on your profile'**
+  String get discordRichPresenceSubtitle;
+
+  /// Label for the Rich Presence on/off row
+  ///
+  /// In en, this message translates to:
+  /// **'Rich Presence Status'**
+  String get discordRichPresenceStatus;
+
+  /// Status shown when Rich Presence is on
+  ///
+  /// In en, this message translates to:
+  /// **'Active (streaming to Discord)'**
+  String get discordStatusStreaming;
+
+  /// Status shown when Rich Presence is off
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get discordStatusInactive;
+
+  /// Toast when enabling Rich Presence without a token
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your Discord User Token first'**
+  String get discordTokenRequiredFirst;
+
+  /// Field label when a token is already saved
+  ///
+  /// In en, this message translates to:
+  /// **'Discord User Token'**
+  String get discordUserTokenLabel;
+
+  /// Field label when no token is saved yet
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Discord Token'**
+  String get discordEnterTokenLabel;
+
+  /// Help text under the Discord token field
+  ///
+  /// In en, this message translates to:
+  /// **'Your Discord account user token (Authorization header). Stored locally in your app preferences.'**
+  String get discordTokenHelp;
+
+  /// Input hint for the Discord token field
+  ///
+  /// In en, this message translates to:
+  /// **'Paste token here...'**
+  String get discordTokenHint;
+
+  /// Button label when a token already exists
+  ///
+  /// In en, this message translates to:
+  /// **'Update Token'**
+  String get discordUpdateToken;
+
+  /// Button label to connect Discord for the first time
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Account'**
+  String get discordConnectAccount;
+
+  /// Toast confirming the Discord account that was linked
+  ///
+  /// In en, this message translates to:
+  /// **'Connected as {name} (@{username})'**
+  String discordConnectedAs(String name, String username);
+
+  /// Error shown when the Discord token is rejected
+  ///
+  /// In en, this message translates to:
+  /// **'Could not verify token. Please check and try again.'**
+  String get discordTokenVerifyFailed;
+
+  /// Title of the app update dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Update Available'**
+  String get updateAvailableTitle;
+
+  /// Current installed version next to the update version
+  ///
+  /// In en, this message translates to:
+  /// **'(Current: {version})'**
+  String updateCurrentVersionSuffix(String version);
+
+  /// Label shown while the update APK downloads
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update...'**
+  String get updateDownloading;
+
+  /// Dismiss button on the update dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get updateLater;
+
+  /// Button that starts the APK install
+  ///
+  /// In en, this message translates to:
+  /// **'Install Now'**
+  String get updateInstallNow;
+
+  /// Button that downloads then installs the update
+  ///
+  /// In en, this message translates to:
+  /// **'Download & Install'**
+  String get updateDownloadAndInstall;
+
+  /// Toast shown while manually checking for updates
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates...'**
+  String get updateChecking;
+
+  /// Toast shown when no update exists
+  ///
+  /// In en, this message translates to:
+  /// **'You are on the latest version ({version})'**
+  String updateUpToDate(String version);
+
+  /// Startup warning shown when the offline-only build has network access
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr Pure integrity check failed: this build can access the network.'**
+  String get pureIntegrityCheckFailed;
+
+  /// Startup warning when the audio_service platform bridge failed
+  ///
+  /// In en, this message translates to:
+  /// **'Background media controls are unavailable on this launch. Playback works, but the lock-screen controls could not start.'**
+  String get backgroundMediaControlsUnavailable;
+
+  /// Error when saving an empty Discord token
+  ///
+  /// In en, this message translates to:
+  /// **'Token cannot be empty'**
+  String get discordTokenEmpty;
+
+  /// Title of the radio-cards visibility sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Radio Cards'**
+  String get radioCardsTitle;
+
+  /// Subtitle explaining how to bring radio cards back
+  ///
+  /// In en, this message translates to:
+  /// **'You can restore them anytime from the Radio page'**
+  String get radioCardsRestoreHint;
+
+  /// Action row to hide the home radio carousel
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Radio Cards from Home'**
+  String get hideRadioCardsFromHome;
+
+  /// Subtitle of the hide-radio-cards row
+  ///
+  /// In en, this message translates to:
+  /// **'Hide the radio carousel from your home screen'**
+  String get hideRadioCardsSubtitle;
+
+  /// Toast after hiding the home radio carousel
+  ///
+  /// In en, this message translates to:
+  /// **'Radio cards hidden. You can show them again from the Radio page.'**
+  String get radioCardsHiddenToast;
+
+  /// Row title when radio cards are shown on Home
+  ///
+  /// In en, this message translates to:
+  /// **'Radio cards are visible on Home'**
+  String get radioCardsVisibleOnHome;
+
+  /// Fallback reciter title for Quran radio hero cards
+  ///
+  /// In en, this message translates to:
+  /// **'Holy Quran Radio'**
+  String get holyQuranRadio;
+
+  /// Accessibility hint while a live station plays
+  ///
+  /// In en, this message translates to:
+  /// **'Playing, double tap to pause'**
+  String get radioNowPlayingSemantics;
+
+  /// Accessibility hint on a stopped live station
+  ///
+  /// In en, this message translates to:
+  /// **'Double tap to play live stream'**
+  String get radioTapToPlaySemantics;
+
+  /// Badge shown on the live Quran radio hero card
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE ON AIR'**
+  String get radioLiveOnAirBadge;
+
+  /// Compact live badge on the radio card
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get radioLiveShortBadge;
+
+  /// Call-to-action button on the radio hero card
+  ///
+  /// In en, this message translates to:
+  /// **'Listen Now'**
+  String get radioListenNow;
+
+  /// Button that opens the full radio station list
+  ///
+  /// In en, this message translates to:
+  /// **'View all radio stations'**
+  String get viewAllRadioStations;
+
+  /// Row title when radio cards are hidden
+  ///
+  /// In en, this message translates to:
+  /// **'Radio cards are hidden from Home'**
+  String get radioCardsHiddenFromHome;
+
+  /// Subtitle of the restore-radio-cards row
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to restore the radio carousel on Home'**
+  String get tapToRestoreRadioCards;
+
+  /// Toast after restoring the home radio carousel
+  ///
+  /// In en, this message translates to:
+  /// **'Radio cards restored to Home screen'**
+  String get radioCardsRestoredToast;
+
+  /// Button that restores the hidden radio cards
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get radioShowAction;
+
+  /// Tooltip for the restore-radio-cards action
+  ///
+  /// In en, this message translates to:
+  /// **'Show radio cards on Home'**
+  String get radioShowCardsTooltip;
+
+  /// Action that aborts picking a station artwork image
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel image'**
+  String get radioCancelImageAction;
+
+  /// Name of the rain ambient sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'Rain'**
+  String get ambientEffectRain;
+
+  /// Name of the campfire ambient sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'Fire'**
+  String get ambientEffectFire;
+
+  /// Name of the forest ambient sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'Forest'**
+  String get ambientEffectForest;
+
+  /// Name of the ocean ambient sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'Ocean'**
+  String get ambientEffectOcean;
+
+  /// Name of the wind ambient sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'Wind'**
+  String get ambientEffectWind;
+
+  /// Name of the thunder ambient sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'Thunder'**
+  String get ambientEffectThunder;
+
+  /// Name of the birds ambient sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'Birds'**
+  String get ambientEffectBirds;
+
+  /// Name of the cafe ambience sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'Café'**
+  String get ambientEffectCafe;
+
+  /// Name of the white noise ambient sound effect
+  ///
+  /// In en, this message translates to:
+  /// **'White Noise'**
+  String get ambientEffectWhiteNoise;
+
+  /// Lock-screen action that removes the current track from favorites
+  ///
+  /// In en, this message translates to:
+  /// **'Unfavorite'**
+  String get mediaControlUnfavorite;
+
+  /// Fallback title when a YouTube stream reports no title
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Track'**
+  String get ytmFallbackTrackTitle;
+
+  /// Title for an audio file opened from outside the app
+  ///
+  /// In en, this message translates to:
+  /// **'Audio File'**
+  String get fileIntentAudioFile;
+
+  /// Artist/album fallback for externally opened audio
+  ///
+  /// In en, this message translates to:
+  /// **'External Audio'**
+  String get fileIntentExternalAudio;
+
+  /// Album label grouping externally opened files
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get fileIntentFilesAlbum;
+
+  /// Reason shown for a duplicate group matched on metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Identical Title & Artist ({count} copies)'**
+  String dupReasonTitleArtist(int count);
+
+  /// Reason shown for a duplicate group matched on audio checksum
+  ///
+  /// In en, this message translates to:
+  /// **'Identical Audio Content (Checksum Verified)'**
+  String get dupReasonChecksum;
+
+  /// Title of the YouTube Music charts browse section
+  ///
+  /// In en, this message translates to:
+  /// **'Top Charts & Trending'**
+  String get ytmBrowseChartsTitle;
+
+  /// Subtitle of the charts browse section
+  ///
+  /// In en, this message translates to:
+  /// **'Most played tracks right now'**
+  String get ytmBrowseChartsSubtitle;
+
+  /// Title of the new releases browse section
+  ///
+  /// In en, this message translates to:
+  /// **'New Releases'**
+  String get ytmBrowseNewReleasesTitle;
+
+  /// Subtitle of the new releases browse section
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh albums & singles'**
+  String get ytmBrowseNewReleasesSubtitle;
+
+  /// Title of the moods and genres browse section
+  ///
+  /// In en, this message translates to:
+  /// **'Moods & Genres'**
+  String get ytmBrowseMoodsTitle;
+
+  /// Subtitle of the moods and genres browse section
+  ///
+  /// In en, this message translates to:
+  /// **'Popular tracks from YouTube Music moods & genres'**
+  String get ytmBrowseMoodsSubtitle;
+
+  /// Fallback title when YouTube returns no track name
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Title'**
+  String get ytmUnknownTitle;
+
+  /// Author label for generated playlists like Liked Music
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Playlist'**
+  String get ytmAutoPlaylistAuthor;
+
+  /// Fallback title when a remote playlist has no name
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist'**
+  String get ytmFallbackPlaylistTitle;
+
+  /// Title of the auto-suggested most-played playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Heavy Rotation Mix'**
+  String get suggestionHeavyRotationTitle;
+
+  /// Description of the heavy rotation suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'Your most played tracks on repeat'**
+  String get suggestionHeavyRotationDesc;
+
+  /// Title of the starred-but-unheard playlist suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'Forgotten Favorites'**
+  String get suggestionForgottenFavoritesTitle;
+
+  /// Description of the forgotten favorites suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'Starred gems you haven\'t heard in a while'**
+  String get suggestionForgottenFavoritesDesc;
+
+  /// Title of the hi-res lossless playlist suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-Res Audiophile Showcase'**
+  String get suggestionHiResTitle;
+
+  /// Description of the hi-res suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'Studio master 24-bit lossless fidelity'**
+  String get suggestionHiResDesc;
+
+  /// Title of the upbeat playlist suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Energy Boost'**
+  String get suggestionEnergyBoostTitle;
+
+  /// Description of the energy boost suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'High-energy fast tracks to power your day'**
+  String get suggestionEnergyBoostDesc;
+
+  /// Fallback message when a download fails for an unclassified reason
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get downloadErrorGeneric;
+
+  /// Error toast when a shared YouTube link cannot be resolved
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load YouTube track: {detail}'**
+  String fileIntentLoadTrackFailed(String detail);
+
+  /// Label for the karaoke pitch accuracy score
+  ///
+  /// In en, this message translates to:
+  /// **'Score'**
+  String get karaokeScoreLabel;
+
+  /// Reverb wet/dry mix readout
+  ///
+  /// In en, this message translates to:
+  /// **'{pct}% Wet'**
+  String eqWetMixPercent(String pct);
+
+  /// Progress label at the top of the audio setup wizard
+  ///
+  /// In en, this message translates to:
+  /// **'Step {step} of {total}'**
+  String wizardStepLabel(int step, int total);
+
+  /// Audio setup wizard output option
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC / Dongle'**
+  String get wizardUsbDacTitle;
+
+  /// Subtitle for the USB DAC wizard option
+  ///
+  /// In en, this message translates to:
+  /// **'External hardware DAC with bit-perfect & DSD support'**
+  String get wizardUsbDacSubtitle;
+
+  /// Audio setup wizard output option
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Audio'**
+  String get wizardBluetoothTitle;
+
+  /// Subtitle for the Bluetooth wizard option
+  ///
+  /// In en, this message translates to:
+  /// **'Wireless headphones, TWS earbuds, or car audio'**
+  String get wizardBluetoothSubtitle;
+
+  /// Audio setup wizard output option
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker / Built-in'**
+  String get wizardSpeakerTitle;
+
+  /// Subtitle for the built-in speaker wizard option
+  ///
+  /// In en, this message translates to:
+  /// **'Phone speakers with system equalization and loudness'**
+  String get wizardSpeakerSubtitle;
+
+  /// Audio setup wizard output option
+  ///
+  /// In en, this message translates to:
+  /// **'Wired Headphones'**
+  String get wizardWiredTitle;
+
+  /// Subtitle for the wired headphones wizard option
+  ///
+  /// In en, this message translates to:
+  /// **'3.5mm jack or passive analog headset'**
+  String get wizardWiredSubtitle;
+
+  /// Subtitle for the crossfade transition wizard option
+  ///
+  /// In en, this message translates to:
+  /// **'3.0s smooth blending between tracks'**
+  String get wizardCrossfadeSubtitle;
+
+  /// Subtitle for the no-transition wizard option
+  ///
+  /// In en, this message translates to:
+  /// **'Standard track separation with zero overlap'**
+  String get wizardNoOverlapSubtitle;
+
+  /// Signal-to-noise quality rating during room correction
+  ///
+  /// In en, this message translates to:
+  /// **'Excellent'**
+  String get rcSnrExcellent;
+
+  /// Signal-to-noise quality rating during room correction
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get rcSnrGood;
+
+  /// Signal-to-noise quality rating during room correction
+  ///
+  /// In en, this message translates to:
+  /// **'Moderate Noise'**
+  String get rcSnrModerate;
+
+  /// First measurement point in room correction
+  ///
+  /// In en, this message translates to:
+  /// **'Listening Position (Center)'**
+  String get rcPointListeningCenter;
+
+  /// Second measurement point in room correction
+  ///
+  /// In en, this message translates to:
+  /// **'1 meter Left'**
+  String get rcPointOneMeterLeft;
+
+  /// Third measurement point in room correction
+  ///
+  /// In en, this message translates to:
+  /// **'1 meter Right'**
+  String get rcPointOneMeterRight;
+
+  /// Title while a room correction point is being measured
+  ///
+  /// In en, this message translates to:
+  /// **'Measuring {point}'**
+  String rcMeasuringPoint(String point);
+
+  /// Room correction multi-point progress
+  ///
+  /// In en, this message translates to:
+  /// **'Point {point} of {total}'**
+  String rcPointOfTotal(int point, int total);
+
+  /// Room correction position progress
+  ///
+  /// In en, this message translates to:
+  /// **'Position {point} of {total}'**
+  String rcPositionOfTotal(int point, int total);
+
+  /// Instruction to reposition the phone between measurements
+  ///
+  /// In en, this message translates to:
+  /// **'Move your device to: {point}'**
+  String rcMoveDeviceTo(String point);
+
+  /// Button that starts one room correction measurement
+  ///
+  /// In en, this message translates to:
+  /// **'Measure Position {point}'**
+  String rcMeasurePosition(int point);
+
+  /// Button that accepts a partial room correction sweep
+  ///
+  /// In en, this message translates to:
+  /// **'Finish with current measurements ({count}/3)'**
+  String rcFinishWithMeasurements(int count);
+
+  /// Live signal-to-noise readout during room correction
+  ///
+  /// In en, this message translates to:
+  /// **'SNR: {db} dB ({label})'**
+  String rcSnrReading(String db, String label);
+
+  /// Worst-case loopback deviation shown in room correction results
+  ///
+  /// In en, this message translates to:
+  /// **'max {db} dB'**
+  String rcMaxDeviation(String db);
+
+  /// Subtitle for the native Pulsr DSP preference
+  ///
+  /// In en, this message translates to:
+  /// **'Custom 64-bit real-time DSP with parametric EQ, limiter, convolution reverb, and Bit-Perfect audio.'**
+  String get dspPrefNativeSubtitle;
+
+  /// Subtitle for the system/vendor DSP preference
+  ///
+  /// In en, this message translates to:
+  /// **'Vendor hardware sound effects (Dolby Atmos, Dirac, Xiaomi Sound, etc.) via Android system effects.'**
+  String get dspPrefSystemSubtitle;
+
+  /// Subtitle for the automatic DSP preference
+  ///
+  /// In en, this message translates to:
+  /// **'Uses Native Studio DSP by default, falling back to system AudioFX when native engine is unavailable.'**
+  String get dspPrefAutoSubtitle;
+
+  /// All-caps badge marking the preferred option
+  ///
+  /// In en, this message translates to:
+  /// **'RECOMMENDED'**
+  String get badgeRecommended;
+
+  /// All-caps badge marking an OS-provided option
+  ///
+  /// In en, this message translates to:
+  /// **'SYSTEM'**
+  String get badgeSystem;
+
+  /// All-caps badge marking an automatic option
+  ///
+  /// In en, this message translates to:
+  /// **'AUTO'**
+  String get badgeAuto;
+
+  /// Proxy quick-preset chip for a local HTTP proxy
+  ///
+  /// In en, this message translates to:
+  /// **'Local HTTP (8080)'**
+  String get proxyPresetLocalHttp;
+
+  /// Proxy quick-preset chip for a local SOCKS5 proxy
+  ///
+  /// In en, this message translates to:
+  /// **'Local SOCKS5 (1080)'**
+  String get proxyPresetLocalSocks;
+
+  /// Accessibility value for an enabled switch
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get semanticsStateOn;
+
+  /// Accessibility value for a disabled switch
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get semanticsStateOff;
+
+  /// Tab and badge label for the AutoEq headphone-profile feature
+  ///
+  /// In en, this message translates to:
+  /// **'AutoEq'**
+  String get autoEqLabel;
+
+  /// Output device category label
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth'**
+  String get outputBluetooth;
+
+  /// Output device category label
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC'**
+  String get outputUsbDac;
+
+  /// Button that re-enables automatic Quran recitation detection
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-detect recitations'**
+  String get quranAutoDetectRecitations;
+
+  /// Status line when the automatic preamp is preventing clipping
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Preamp: Active (Clipping Protected)'**
+  String get autoPreampActiveClipping;
+
+  /// Explanation text in the Spotify import dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a public Spotify playlist link or URI to match and import its tracks into your Pulsr library.'**
+  String get spotifyImportHelp;
+
+  /// Default status line while a Spotify playlist imports
+  ///
+  /// In en, this message translates to:
+  /// **'Importing playlist...'**
+  String get spotifyImporting;
+
+  /// Header for Spotify tracks that could not be matched locally
+  ///
+  /// In en, this message translates to:
+  /// **'Unmatched Tracks ({count})'**
+  String spotifyUnmatchedTracks(int count);
+
+  /// Default error line in the Spotify import dialog
+  ///
+  /// In en, this message translates to:
+  /// **'An error occurred during import.'**
+  String get spotifyImportFailed;
+
+  /// Marker next to your own name in the listen-together roster
+  ///
+  /// In en, this message translates to:
+  /// **'(You)'**
+  String get partyYouLabel;
+
+  /// Input hint for joining a listen-together room
+  ///
+  /// In en, this message translates to:
+  /// **'6-CHAR CODE'**
+  String get partyCodeHint;
+
+  /// Row title for the automix transition feature
+  ///
+  /// In en, this message translates to:
+  /// **'Automix / Smart Transitions'**
+  String get speedPickerAutomixTitle;
+
+  /// Description of what automix does
+  ///
+  /// In en, this message translates to:
+  /// **'Beatmatch tempo, align cue grids & swap bass'**
+  String get speedPickerAutomixDesc;
+
+  /// Song info row that opens party mode
+  ///
+  /// In en, this message translates to:
+  /// **'Listen Together (Party Mode)'**
+  String get listenTogetherPartyMode;
+
+  /// Label on the audio engine graphic in onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr Audio Engine'**
+  String get onboardingAudioEngine;
+
+  /// Banner offering to resume an interrupted tag write batch
+  ///
+  /// In en, this message translates to:
+  /// **'{count} file(s) were not updated due to an interrupted batch.'**
+  String tagEditorBatchInterrupted(int count);
+
+  /// Button that resumes an interrupted tag write batch
+  ///
+  /// In en, this message translates to:
+  /// **'Retry remaining {count} files'**
+  String tagEditorRetryRemaining(int count);
+
+  /// Label of the operand field in a smart playlist rule row
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get smartPlaylistValueLabel;
+
+  /// Input hint for the new smart playlist name
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 80s Rock Hits, Heavy Rotation...'**
+  String get smartPlaylistNameHint;
+
+  /// Input hint for a title-matching smart playlist rule
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Bohemian, Love...'**
+  String get smartPlaylistTitleHint;
+
+  /// Shown when the app cannot determine the active audio output device
+  ///
+  /// In en, this message translates to:
+  /// **'Output route unverified'**
+  String get outputRouteUnverified;
+
+  /// Generic name for the system default audio output
+  ///
+  /// In en, this message translates to:
+  /// **'Default Audio Output'**
+  String get defaultAudioOutput;
+
+  /// Bitrate label when only the container average is known
+  ///
+  /// In en, this message translates to:
+  /// **'Container average (estimated)'**
+  String get containerAverageEstimated;
+
+  /// Sub-note under the source bitrate for lossless tracks
+  ///
+  /// In en, this message translates to:
+  /// **'Lossless source (output fidelity separate)'**
+  String get losslessOutputFidelityNote;
+
+  /// Streaming quality option label
+  ///
+  /// In en, this message translates to:
+  /// **'High • 160k'**
+  String get ytmQualityHighBitrate;
+
+  /// Streaming quality option label
+  ///
+  /// In en, this message translates to:
+  /// **'Med • 128k'**
+  String get ytmQualityMediumBitrate;
+
+  /// Streaming quality option label
+  ///
+  /// In en, this message translates to:
+  /// **'Low • 64k'**
+  String get ytmQualityLowBitrate;
+
+  /// Sample rate readout when the device reports none
+  ///
+  /// In en, this message translates to:
+  /// **'Rate unknown'**
+  String get outputRateUnknown;
+
+  /// Output path readout when an exclusive mixer is active
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive mixer • {detail}'**
+  String exclusiveMixerPrefix(String detail);
+
+  /// Input hint for an album-matching smart playlist rule
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Discovery, Rumours...'**
+  String get smartPlaylistAlbumHint;
+
+  /// Input hint for a genre-matching smart playlist rule
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Rock, Pop, Jazz...'**
+  String get smartPlaylistGenreHint;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 30 (days)'**
+  String get smartPlaylistHintDays;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 5, 20 or 5..20'**
+  String get smartPlaylistHintBetween;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 5'**
+  String get smartPlaylistHintPlayCount;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Queen, Daft Punk...'**
+  String get smartPlaylistHintArtist;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 2024'**
+  String get smartPlaylistHintYear;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 1980, 1990, 2000, 2020...'**
+  String get smartPlaylistHintDecade;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'FLAC, WAV, ALAC'**
+  String get smartPlaylistHintLossless;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 30'**
+  String get smartPlaylistHintDateAdded;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 300000 (ms = 5 mins)'**
+  String get smartPlaylistHintDuration;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 7'**
+  String get smartPlaylistHintLastPlayed;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 4 (stars 0–5)'**
+  String get smartPlaylistHintRating;
+
+  /// Input hint for a smart playlist rule field
+  ///
+  /// In en, this message translates to:
+  /// **'Value...'**
+  String get smartPlaylistHintValueDefault;
+
+  /// Bit depth readout
+  ///
+  /// In en, this message translates to:
+  /// **'{bit}-bit'**
+  String bitDepthValue(String bit);
+
+  /// Bit depth readout when the device reports none
+  ///
+  /// In en, this message translates to:
+  /// **'Depth unknown'**
+  String get depthUnknown;
+
+  /// Summary line for the attached USB DAC
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC: {device} ({uac})'**
+  String usbDacConnectedSummary(String device, String uac);
+
+  /// Label for the exclusive output mixer path
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive mixer'**
+  String get exclusiveMixerLabel;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save Quran style adjustments'**
+  String get errQuranSaveStyleAdjustments;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save Quran Mode setting'**
+  String get errQuranSaveModeSetting;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to apply Quran audio profile'**
+  String get errQuranApplyAudioProfile;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to restore audio settings from Quran Mode'**
+  String get errQuranRestoreSettings;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save Quran reciter style'**
+  String get errQuranSaveReciterStyle;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to reset Quran style adjustments'**
+  String get errQuranResetStyleAdjustments;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to set Quran learning speed'**
+  String get errQuranSetLearningSpeed;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to set Quran vocal warmth'**
+  String get errQuranSetVocalWarmth;
+
+  /// Quran mode failure surfaced in the player error card
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to set Quran ambience'**
+  String get errQuranSetAmbience;
+
+  /// Badge shown when the queue switches to autoplay
+  ///
+  /// In en, this message translates to:
+  /// **'AUTOPLAY'**
+  String get autoplayBadgeLabel;
+
+  /// Placeholder first row when starting a new lyric file
+  ///
+  /// In en, this message translates to:
+  /// **'First lyric line...'**
+  String get lyricsEditorFirstLine;
+
+  /// Placeholder text for a newly added lyric row
+  ///
+  /// In en, this message translates to:
+  /// **'New line...'**
+  String get lyricsEditorNewLine;
+
+  /// Toast confirming the saved lyrics share card
+  ///
+  /// In en, this message translates to:
+  /// **'Card saved to: {path}'**
+  String lyricsShareCardSaved(String path);
+
+  /// Toast when the animated artwork canvas turns on
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas & Motion Artwork enabled'**
+  String get canvasEnabled;
+
+  /// Toast when the animated artwork canvas turns off
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas disabled'**
+  String get canvasDisabled;
+
+  /// Version line at the bottom of the layout preview
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr {version} • Audiophile Engine'**
+  String aboutStatusLine(String version);
+
+  /// Home widget subtitle when nothing is playing
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing playing'**
+  String get widgetNothingPlaying;
 }
 
 class _AppLocalizationsDelegate

@@ -93,6 +93,7 @@ flutter:
     - assets/app_icon/
     - assets/eq_profiles/
     - assets/Pictures/
+    - assets/Pictures/home card/
     - assets/sounds/
 
   shaders:

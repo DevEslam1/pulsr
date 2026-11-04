@@ -8829,4 +8829,669 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get ambientEffectsHeader => 'Effects';
+
+  @override
+  String get ambientVolumesHeader => 'Volumes';
+
+  @override
+  String get ambientPausedWithPlayer => 'Paused with player';
+
+  @override
+  String get ambientStatusPlaying => 'Playing';
+
+  @override
+  String get ambientStatusPaused => 'Paused';
+
+  @override
+  String ambientActiveCount(int count) {
+    return '$count on';
+  }
+
+  @override
+  String get ambientMasterVolume => 'Master volume';
+
+  @override
+  String get ambientSleepTimer => 'Sleep timer';
+
+  @override
+  String get ambientSleepTimerOff => 'Off';
+
+  @override
+  String ambientSleepTimerMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get ambientSaveMix => 'Save mix';
+
+  @override
+  String get ambientMixName => 'Mix name';
+
+  @override
+  String get ambientSavedMixes => 'Saved mixes';
+
+  @override
+  String get ambientSave => 'Save';
+
+  @override
+  String get ambientCancel => 'Cancel';
+
+  @override
+  String get ambientAllowDuringQuran => 'Keep playing in Quran mode';
+
+  @override
+  String get discordRichPresenceTitle => 'Discord Rich Presence';
+
+  @override
+  String get discordRichPresenceSubtitle =>
+      'Display currently playing song on your profile';
+
+  @override
+  String get discordRichPresenceStatus => 'Rich Presence Status';
+
+  @override
+  String get discordStatusStreaming => 'Active (streaming to Discord)';
+
+  @override
+  String get discordStatusInactive => 'Disabled';
+
+  @override
+  String get discordTokenRequiredFirst =>
+      'Please enter your Discord User Token first';
+
+  @override
+  String get discordUserTokenLabel => 'Discord User Token';
+
+  @override
+  String get discordEnterTokenLabel => 'Enter Discord Token';
+
+  @override
+  String get discordTokenHelp =>
+      'Your Discord account user token (Authorization header). Stored locally in your app preferences.';
+
+  @override
+  String get discordTokenHint => 'Paste token here...';
+
+  @override
+  String get discordUpdateToken => 'Update Token';
+
+  @override
+  String get discordConnectAccount => 'Connect Account';
+
+  @override
+  String discordConnectedAs(String name, String username) {
+    return 'Connected as $name (@$username)';
+  }
+
+  @override
+  String get discordTokenVerifyFailed =>
+      'Could not verify token. Please check and try again.';
+
+  @override
+  String get updateAvailableTitle => 'Update Available';
+
+  @override
+  String updateCurrentVersionSuffix(String version) {
+    return '(Current: $version)';
+  }
+
+  @override
+  String get updateDownloading => 'Downloading update...';
+
+  @override
+  String get updateLater => 'Later';
+
+  @override
+  String get updateInstallNow => 'Install Now';
+
+  @override
+  String get updateDownloadAndInstall => 'Download & Install';
+
+  @override
+  String get updateChecking => 'Checking for updates...';
+
+  @override
+  String updateUpToDate(String version) {
+    return 'You are on the latest version ($version)';
+  }
+
+  @override
+  String get pureIntegrityCheckFailed =>
+      'Pulsr Pure integrity check failed: this build can access the network.';
+
+  @override
+  String get backgroundMediaControlsUnavailable =>
+      'Background media controls are unavailable on this launch. Playback works, but the lock-screen controls could not start.';
+
+  @override
+  String get discordTokenEmpty => 'Token cannot be empty';
+
+  @override
+  String get radioCardsTitle => 'Radio Cards';
+
+  @override
+  String get radioCardsRestoreHint =>
+      'You can restore them anytime from the Radio page';
+
+  @override
+  String get hideRadioCardsFromHome => 'Hide Radio Cards from Home';
+
+  @override
+  String get hideRadioCardsSubtitle =>
+      'Hide the radio carousel from your home screen';
+
+  @override
+  String get radioCardsHiddenToast =>
+      'Radio cards hidden. You can show them again from the Radio page.';
+
+  @override
+  String get radioCardsVisibleOnHome => 'Radio cards are visible on Home';
+
+  @override
+  String get holyQuranRadio => 'Holy Quran Radio';
+
+  @override
+  String get radioNowPlayingSemantics => 'Playing, double tap to pause';
+
+  @override
+  String get radioTapToPlaySemantics => 'Double tap to play live stream';
+
+  @override
+  String get radioLiveOnAirBadge => 'LIVE ON AIR';
+
+  @override
+  String get radioLiveShortBadge => 'LIVE';
+
+  @override
+  String get radioListenNow => 'Listen Now';
+
+  @override
+  String get viewAllRadioStations => 'View all radio stations';
+
+  @override
+  String get radioCardsHiddenFromHome => 'Radio cards are hidden from Home';
+
+  @override
+  String get tapToRestoreRadioCards =>
+      'Tap to restore the radio carousel on Home';
+
+  @override
+  String get radioCardsRestoredToast => 'Radio cards restored to Home screen';
+
+  @override
+  String get radioShowAction => 'Show';
+
+  @override
+  String get radioShowCardsTooltip => 'Show radio cards on Home';
+
+  @override
+  String get radioCancelImageAction => 'Cancel image';
+
+  @override
+  String get ambientEffectRain => 'Rain';
+
+  @override
+  String get ambientEffectFire => 'Fire';
+
+  @override
+  String get ambientEffectForest => 'Forest';
+
+  @override
+  String get ambientEffectOcean => 'Ocean';
+
+  @override
+  String get ambientEffectWind => 'Wind';
+
+  @override
+  String get ambientEffectThunder => 'Thunder';
+
+  @override
+  String get ambientEffectBirds => 'Birds';
+
+  @override
+  String get ambientEffectCafe => 'Café';
+
+  @override
+  String get ambientEffectWhiteNoise => 'White Noise';
+
+  @override
+  String get mediaControlUnfavorite => 'Unfavorite';
+
+  @override
+  String get ytmFallbackTrackTitle => 'YouTube Track';
+
+  @override
+  String get fileIntentAudioFile => 'Audio File';
+
+  @override
+  String get fileIntentExternalAudio => 'External Audio';
+
+  @override
+  String get fileIntentFilesAlbum => 'Files';
+
+  @override
+  String dupReasonTitleArtist(int count) {
+    return 'Identical Title & Artist ($count copies)';
+  }
+
+  @override
+  String get dupReasonChecksum => 'Identical Audio Content (Checksum Verified)';
+
+  @override
+  String get ytmBrowseChartsTitle => 'Top Charts & Trending';
+
+  @override
+  String get ytmBrowseChartsSubtitle => 'Most played tracks right now';
+
+  @override
+  String get ytmBrowseNewReleasesTitle => 'New Releases';
+
+  @override
+  String get ytmBrowseNewReleasesSubtitle => 'Fresh albums & singles';
+
+  @override
+  String get ytmBrowseMoodsTitle => 'Moods & Genres';
+
+  @override
+  String get ytmBrowseMoodsSubtitle =>
+      'Popular tracks from YouTube Music moods & genres';
+
+  @override
+  String get ytmUnknownTitle => 'Unknown Title';
+
+  @override
+  String get ytmAutoPlaylistAuthor => 'Auto Playlist';
+
+  @override
+  String get ytmFallbackPlaylistTitle => 'Playlist';
+
+  @override
+  String get suggestionHeavyRotationTitle => 'Heavy Rotation Mix';
+
+  @override
+  String get suggestionHeavyRotationDesc => 'Your most played tracks on repeat';
+
+  @override
+  String get suggestionForgottenFavoritesTitle => 'Forgotten Favorites';
+
+  @override
+  String get suggestionForgottenFavoritesDesc =>
+      'Starred gems you haven\'t heard in a while';
+
+  @override
+  String get suggestionHiResTitle => 'Hi-Res Audiophile Showcase';
+
+  @override
+  String get suggestionHiResDesc => 'Studio master 24-bit lossless fidelity';
+
+  @override
+  String get suggestionEnergyBoostTitle => 'Quick Energy Boost';
+
+  @override
+  String get suggestionEnergyBoostDesc =>
+      'High-energy fast tracks to power your day';
+
+  @override
+  String get downloadErrorGeneric => 'Download failed';
+
+  @override
+  String fileIntentLoadTrackFailed(String detail) {
+    return 'Failed to load YouTube track: $detail';
+  }
+
+  @override
+  String get karaokeScoreLabel => 'Score';
+
+  @override
+  String eqWetMixPercent(String pct) {
+    return '$pct% Wet';
+  }
+
+  @override
+  String wizardStepLabel(int step, int total) {
+    return 'Step $step of $total';
+  }
+
+  @override
+  String get wizardUsbDacTitle => 'USB DAC / Dongle';
+
+  @override
+  String get wizardUsbDacSubtitle =>
+      'External hardware DAC with bit-perfect & DSD support';
+
+  @override
+  String get wizardBluetoothTitle => 'Bluetooth Audio';
+
+  @override
+  String get wizardBluetoothSubtitle =>
+      'Wireless headphones, TWS earbuds, or car audio';
+
+  @override
+  String get wizardSpeakerTitle => 'Speaker / Built-in';
+
+  @override
+  String get wizardSpeakerSubtitle =>
+      'Phone speakers with system equalization and loudness';
+
+  @override
+  String get wizardWiredTitle => 'Wired Headphones';
+
+  @override
+  String get wizardWiredSubtitle => '3.5mm jack or passive analog headset';
+
+  @override
+  String get wizardCrossfadeSubtitle => '3.0s smooth blending between tracks';
+
+  @override
+  String get wizardNoOverlapSubtitle =>
+      'Standard track separation with zero overlap';
+
+  @override
+  String get rcSnrExcellent => 'Excellent';
+
+  @override
+  String get rcSnrGood => 'Good';
+
+  @override
+  String get rcSnrModerate => 'Moderate Noise';
+
+  @override
+  String get rcPointListeningCenter => 'Listening Position (Center)';
+
+  @override
+  String get rcPointOneMeterLeft => '1 meter Left';
+
+  @override
+  String get rcPointOneMeterRight => '1 meter Right';
+
+  @override
+  String rcMeasuringPoint(String point) {
+    return 'Measuring $point';
+  }
+
+  @override
+  String rcPointOfTotal(int point, int total) {
+    return 'Point $point of $total';
+  }
+
+  @override
+  String rcPositionOfTotal(int point, int total) {
+    return 'Position $point of $total';
+  }
+
+  @override
+  String rcMoveDeviceTo(String point) {
+    return 'Move your device to: $point';
+  }
+
+  @override
+  String rcMeasurePosition(int point) {
+    return 'Measure Position $point';
+  }
+
+  @override
+  String rcFinishWithMeasurements(int count) {
+    return 'Finish with current measurements ($count/3)';
+  }
+
+  @override
+  String rcSnrReading(String db, String label) {
+    return 'SNR: $db dB ($label)';
+  }
+
+  @override
+  String rcMaxDeviation(String db) {
+    return 'max $db dB';
+  }
+
+  @override
+  String get dspPrefNativeSubtitle =>
+      'Custom 64-bit real-time DSP with parametric EQ, limiter, convolution reverb, and Bit-Perfect audio.';
+
+  @override
+  String get dspPrefSystemSubtitle =>
+      'Vendor hardware sound effects (Dolby Atmos, Dirac, Xiaomi Sound, etc.) via Android system effects.';
+
+  @override
+  String get dspPrefAutoSubtitle =>
+      'Uses Native Studio DSP by default, falling back to system AudioFX when native engine is unavailable.';
+
+  @override
+  String get badgeRecommended => 'RECOMMENDED';
+
+  @override
+  String get badgeSystem => 'SYSTEM';
+
+  @override
+  String get badgeAuto => 'AUTO';
+
+  @override
+  String get proxyPresetLocalHttp => 'Local HTTP (8080)';
+
+  @override
+  String get proxyPresetLocalSocks => 'Local SOCKS5 (1080)';
+
+  @override
+  String get semanticsStateOn => 'On';
+
+  @override
+  String get semanticsStateOff => 'Off';
+
+  @override
+  String get autoEqLabel => 'AutoEq';
+
+  @override
+  String get outputBluetooth => 'Bluetooth';
+
+  @override
+  String get outputUsbDac => 'USB DAC';
+
+  @override
+  String get quranAutoDetectRecitations => 'Auto-detect recitations';
+
+  @override
+  String get autoPreampActiveClipping =>
+      'Auto Preamp: Active (Clipping Protected)';
+
+  @override
+  String get spotifyImportHelp =>
+      'Paste a public Spotify playlist link or URI to match and import its tracks into your Pulsr library.';
+
+  @override
+  String get spotifyImporting => 'Importing playlist...';
+
+  @override
+  String spotifyUnmatchedTracks(int count) {
+    return 'Unmatched Tracks ($count)';
+  }
+
+  @override
+  String get spotifyImportFailed => 'An error occurred during import.';
+
+  @override
+  String get partyYouLabel => '(You)';
+
+  @override
+  String get partyCodeHint => '6-CHAR CODE';
+
+  @override
+  String get speedPickerAutomixTitle => 'Automix / Smart Transitions';
+
+  @override
+  String get speedPickerAutomixDesc =>
+      'Beatmatch tempo, align cue grids & swap bass';
+
+  @override
+  String get listenTogetherPartyMode => 'Listen Together (Party Mode)';
+
+  @override
+  String get onboardingAudioEngine => 'Pulsr Audio Engine';
+
+  @override
+  String tagEditorBatchInterrupted(int count) {
+    return '$count file(s) were not updated due to an interrupted batch.';
+  }
+
+  @override
+  String tagEditorRetryRemaining(int count) {
+    return 'Retry remaining $count files';
+  }
+
+  @override
+  String get smartPlaylistValueLabel => 'Value';
+
+  @override
+  String get smartPlaylistNameHint => 'e.g. 80s Rock Hits, Heavy Rotation...';
+
+  @override
+  String get smartPlaylistTitleHint => 'e.g. Bohemian, Love...';
+
+  @override
+  String get outputRouteUnverified => 'Output route unverified';
+
+  @override
+  String get defaultAudioOutput => 'Default Audio Output';
+
+  @override
+  String get containerAverageEstimated => 'Container average (estimated)';
+
+  @override
+  String get losslessOutputFidelityNote =>
+      'Lossless source (output fidelity separate)';
+
+  @override
+  String get ytmQualityHighBitrate => 'High • 160k';
+
+  @override
+  String get ytmQualityMediumBitrate => 'Med • 128k';
+
+  @override
+  String get ytmQualityLowBitrate => 'Low • 64k';
+
+  @override
+  String get outputRateUnknown => 'Rate unknown';
+
+  @override
+  String exclusiveMixerPrefix(String detail) {
+    return 'Exclusive mixer • $detail';
+  }
+
+  @override
+  String get smartPlaylistAlbumHint => 'e.g. Discovery, Rumours...';
+
+  @override
+  String get smartPlaylistGenreHint => 'e.g. Rock, Pop, Jazz...';
+
+  @override
+  String get smartPlaylistHintDays => 'e.g. 30 (days)';
+
+  @override
+  String get smartPlaylistHintBetween => 'e.g. 5, 20 or 5..20';
+
+  @override
+  String get smartPlaylistHintPlayCount => 'e.g. 5';
+
+  @override
+  String get smartPlaylistHintArtist => 'e.g. Queen, Daft Punk...';
+
+  @override
+  String get smartPlaylistHintYear => 'e.g. 2024';
+
+  @override
+  String get smartPlaylistHintDecade => 'e.g. 1980, 1990, 2000, 2020...';
+
+  @override
+  String get smartPlaylistHintLossless => 'FLAC, WAV, ALAC';
+
+  @override
+  String get smartPlaylistHintDateAdded => 'e.g. 30';
+
+  @override
+  String get smartPlaylistHintDuration => 'e.g. 300000 (ms = 5 mins)';
+
+  @override
+  String get smartPlaylistHintLastPlayed => 'e.g. 7';
+
+  @override
+  String get smartPlaylistHintRating => 'e.g. 4 (stars 0–5)';
+
+  @override
+  String get smartPlaylistHintValueDefault => 'Value...';
+
+  @override
+  String bitDepthValue(String bit) {
+    return '$bit-bit';
+  }
+
+  @override
+  String get depthUnknown => 'Depth unknown';
+
+  @override
+  String usbDacConnectedSummary(String device, String uac) {
+    return 'USB DAC: $device ($uac)';
+  }
+
+  @override
+  String get exclusiveMixerLabel => 'Exclusive mixer';
+
+  @override
+  String get errQuranSaveStyleAdjustments =>
+      'Failed to save Quran style adjustments';
+
+  @override
+  String get errQuranSaveModeSetting => 'Failed to save Quran Mode setting';
+
+  @override
+  String get errQuranApplyAudioProfile => 'Failed to apply Quran audio profile';
+
+  @override
+  String get errQuranRestoreSettings =>
+      'Failed to restore audio settings from Quran Mode';
+
+  @override
+  String get errQuranSaveReciterStyle => 'Failed to save Quran reciter style';
+
+  @override
+  String get errQuranResetStyleAdjustments =>
+      'Failed to reset Quran style adjustments';
+
+  @override
+  String get errQuranSetLearningSpeed => 'Failed to set Quran learning speed';
+
+  @override
+  String get errQuranSetVocalWarmth => 'Failed to set Quran vocal warmth';
+
+  @override
+  String get errQuranSetAmbience => 'Failed to set Quran ambience';
+
+  @override
+  String get autoplayBadgeLabel => 'AUTOPLAY';
+
+  @override
+  String get lyricsEditorFirstLine => 'First lyric line...';
+
+  @override
+  String get lyricsEditorNewLine => 'New line...';
+
+  @override
+  String lyricsShareCardSaved(String path) {
+    return 'Card saved to: $path';
+  }
+
+  @override
+  String get canvasEnabled => 'Canvas & Motion Artwork enabled';
+
+  @override
+  String get canvasDisabled => 'Canvas disabled';
+
+  @override
+  String aboutStatusLine(String version) {
+    return 'Pulsr $version • Audiophile Engine';
+  }
+
+  @override
+  String get widgetNothingPlaying => 'Nothing playing';
 }

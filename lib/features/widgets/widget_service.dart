@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/services/artwork_cache_manager.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/l10n_holder.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../data/db/app_database.dart';
 
@@ -234,10 +235,12 @@ class WidgetService {
       _lastProgressDurationMs = durMs;
 
       final resolvedTitle =
-          hasSong && song.title.trim().isNotEmpty ? song.title : 'Pulsr Music';
+          hasSong && song.title.trim().isNotEmpty
+              ? song.title
+              : (L10nHolder.current?.appTitle ?? 'Pulsr Music');
       final resolvedArtist = hasSong && song.artist.trim().isNotEmpty
           ? song.artist
-          : 'Nothing playing';
+          : (L10nHolder.current?.widgetNothingPlaying ?? 'Nothing playing');
       final resolvedAlbum = hasSong &&
               song.album.trim().isNotEmpty &&
               song.album != 'Unknown Album'

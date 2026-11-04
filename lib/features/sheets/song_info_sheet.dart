@@ -559,7 +559,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                   },
                   icon: Icon(Icons.group_rounded, size: 20, color: p.accent),
                   label: Text(
-                    'Listen Together (Party Mode)',
+                    context.l10n.listenTogetherPartyMode,
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: p.textPrimary,
@@ -1538,7 +1538,7 @@ class _EqPresetPickerSheetState extends State<_EqPresetPickerSheet> {
                             if (option.isAutoEq) ...[
                               const SizedBox(width: AppSpacing.xs),
                               Text(
-                                'AutoEQ',
+                                context.l10n.autoEqLabel,
                                 style: TextStyle(
                                   color: p.textTertiary,
                                   fontSize: AppFontSize.caption,

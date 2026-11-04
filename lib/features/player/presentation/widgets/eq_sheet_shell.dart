@@ -456,7 +456,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       dividerColor: Colors.transparent,
                       tabs: [
                         Tab(text: context.l10n.equalizer),
-                        Tab(text: 'AutoEq'),
+                        Tab(text: context.l10n.autoEqLabel),
                         Tab(text: context.l10n.dspSpatialTab),
                       ],
                     ),
@@ -563,7 +563,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 dividerColor: Colors.transparent,
                                 tabs: [
                                   Tab(text: context.l10n.equalizer),
-                                  Tab(text: 'AutoEq'),
+                                  Tab(text: context.l10n.autoEqLabel),
                                   Tab(text: context.l10n.dspSpatialTab),
                                 ],
                               ),
@@ -2212,7 +2212,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     children: [
                       Tooltip(
                         message: _autoPreampEnabled
-                            ? 'Auto Preamp: Active (Clipping Protected)'
+                            ? context.l10n.autoPreampActiveClipping
                             : 'Auto Preamp: Off (Tap to protect against clipping)',
                         child: InkWell(
                           borderRadius: AppRadii.r8All,
@@ -3533,7 +3533,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                 },
               ),
               _buildDeviceTypeChip(
-                label: 'Bluetooth',
+                label: context.l10n.outputBluetooth,
                 icon: Icons.bluetooth_audio_rounded,
                 isActive: isBt,
                 p: p,
@@ -3545,7 +3545,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                 },
               ),
               _buildDeviceTypeChip(
-                label: 'USB DAC',
+                label: context.l10n.outputUsbDac,
                 icon: Icons.album_rounded,
                 isActive: isUsb,
                 p: p,

@@ -300,7 +300,7 @@ mixin PhoneLayoutSection
         case 'about':
         default:
           statusLine = Text(
-            'Pulsr v${AppConfig.appVersion} • Audiophile Engine',
+            context.l10n.aboutStatusLine('v${AppConfig.appVersion}'),
             style: TextStyle(
               color: p.textSecondary,
               fontSize: AppFontSize.caption,

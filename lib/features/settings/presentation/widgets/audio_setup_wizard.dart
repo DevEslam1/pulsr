@@ -178,7 +178,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                         ),
                       ),
                       Text(
-                        'Step ${_currentStep + 1} of 3',
+                        l10n.wizardStepLabel(_currentStep + 1, 3),
                         style: TextStyle(
                           color: p.accent,
                           fontSize: AppFontSize.caption,
@@ -331,8 +331,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
         _buildOptionCard(
           context,
           icon: Icons.usb_rounded,
-          title: 'USB DAC / Dongle',
-          subtitle: 'External hardware DAC with bit-perfect & DSD support',
+          title: l10n.wizardUsbDacTitle,
+          subtitle: l10n.wizardUsbDacSubtitle,
           isSelected: _selectedOutput == AudioWizardOutputType.usbDac,
           onTap: () =>
               setState(() => _selectedOutput = AudioWizardOutputType.usbDac),
@@ -341,8 +341,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
         _buildOptionCard(
           context,
           icon: Icons.bluetooth_audio_rounded,
-          title: 'Bluetooth Audio',
-          subtitle: 'Wireless headphones, TWS earbuds, or car audio',
+          title: l10n.wizardBluetoothTitle,
+          subtitle: l10n.wizardBluetoothSubtitle,
           isSelected: _selectedOutput == AudioWizardOutputType.bluetooth,
           onTap: () =>
               setState(() => _selectedOutput = AudioWizardOutputType.bluetooth),
@@ -351,8 +351,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
         _buildOptionCard(
           context,
           icon: Icons.speaker_rounded,
-          title: 'Speaker / Built-in',
-          subtitle: 'Phone speakers with system equalization and loudness',
+          title: l10n.wizardSpeakerTitle,
+          subtitle: l10n.wizardSpeakerSubtitle,
           isSelected: _selectedOutput == AudioWizardOutputType.speaker,
           onTap: () =>
               setState(() => _selectedOutput = AudioWizardOutputType.speaker),
@@ -361,8 +361,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
         _buildOptionCard(
           context,
           icon: Icons.headphones_rounded,
-          title: 'Wired Headphones',
-          subtitle: '3.5mm jack or passive analog headset',
+          title: l10n.wizardWiredTitle,
+          subtitle: l10n.wizardWiredSubtitle,
           isSelected: _selectedOutput == AudioWizardOutputType.headphones,
           onTap: () => setState(
               () => _selectedOutput = AudioWizardOutputType.headphones),
@@ -470,7 +470,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           context,
           icon: Icons.shuffle_rounded,
           title: l10n.crossfade,
-          subtitle: '3.0s smooth blending between tracks',
+          subtitle: l10n.wizardCrossfadeSubtitle,
           isSelected: _selectedTransition == AudioWizardTransition.crossfade,
           onTap: () => setState(
               () => _selectedTransition = AudioWizardTransition.crossfade),
@@ -480,7 +480,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           context,
           icon: Icons.stop_circle_outlined,
           title: l10n.rgOff,
-          subtitle: 'Standard track separation with zero overlap',
+          subtitle: l10n.wizardNoOverlapSubtitle,
           isSelected: _selectedTransition == AudioWizardTransition.none,
           onTap: () =>
               setState(() => _selectedTransition = AudioWizardTransition.none),

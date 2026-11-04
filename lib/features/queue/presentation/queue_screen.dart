@@ -531,7 +531,7 @@ class QueueScreen extends StatelessWidget {
                                       borderRadius: AppRadii.circular(4),
                                     ),
                                     child: Text(
-                                      'AUTOPLAY',
+                                      context.l10n.autoplayBadgeLabel,
                                       style: TextStyle(
                                         color: p.accent,
                                         fontSize: 9,

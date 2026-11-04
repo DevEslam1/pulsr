@@ -16,6 +16,7 @@ import '../../../core/utils/error_logger.dart';
 import '../../../data/db/tables.dart' show OnlineLibraryKind;
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
+import '../../../core/utils/l10n_holder.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import 'playlist_state.dart';
@@ -853,11 +854,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       work.add(job.copyWithPlaylistId(canonical));
     }
 
-    addJob(const _OnlineCacheJob(
+    addJob(_OnlineCacheJob(
       playlistId: kLikedMusicPlaylistId,
       kind: OnlineLibraryKind.liked,
-      title: 'Liked Music',
-      author: 'YouTube Music',
+      title: L10nHolder.current?.likedMusic ?? 'Liked Music',
+      author: L10nHolder.current?.browseYouTubeMusic ?? 'YouTube Music',
     ));
     for (var i = 0; i < onlineState.accountPlaylists.length; i++) {
       final playlist = onlineState.accountPlaylists[i];

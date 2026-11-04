@@ -8770,4 +8770,667 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get ambientEffectsHeader => 'المؤثرات';
+
+  @override
+  String get ambientVolumesHeader => 'مستويات الصوت';
+
+  @override
+  String get ambientPausedWithPlayer => 'متوقف مع المشغل';
+
+  @override
+  String get ambientStatusPlaying => 'يعمل';
+
+  @override
+  String get ambientStatusPaused => 'متوقف مؤقتًا';
+
+  @override
+  String ambientActiveCount(int count) {
+    return '$count مفعّل';
+  }
+
+  @override
+  String get ambientMasterVolume => 'المستوى العام';
+
+  @override
+  String get ambientSleepTimer => 'مؤقت النوم';
+
+  @override
+  String get ambientSleepTimerOff => 'إيقاف';
+
+  @override
+  String ambientSleepTimerMinutes(int minutes) {
+    return '$minutes د';
+  }
+
+  @override
+  String get ambientSaveMix => 'حفظ المزيج';
+
+  @override
+  String get ambientMixName => 'اسم المزيج';
+
+  @override
+  String get ambientSavedMixes => 'المزيجات المحفوظة';
+
+  @override
+  String get ambientSave => 'حفظ';
+
+  @override
+  String get ambientCancel => 'إلغاء';
+
+  @override
+  String get ambientAllowDuringQuran => 'استمرار التشغيل في وضع القرآن';
+
+  @override
+  String get discordRichPresenceTitle => 'الحضور الغني على Discord';
+
+  @override
+  String get discordRichPresenceSubtitle =>
+      'اعرض الأغنية قيد التشغيل حاليًا على ملفك الشخصي';
+
+  @override
+  String get discordRichPresenceStatus => 'حالة الحضور الغني';
+
+  @override
+  String get discordStatusStreaming => 'نشطة (تُبث إلى Discord)';
+
+  @override
+  String get discordStatusInactive => 'معطّلة';
+
+  @override
+  String get discordTokenRequiredFirst => 'يرجى إدخال رمز مستخدم Discord أولًا';
+
+  @override
+  String get discordUserTokenLabel => 'رمز مستخدم Discord';
+
+  @override
+  String get discordEnterTokenLabel => 'أدخل رمز Discord';
+
+  @override
+  String get discordTokenHelp =>
+      'رمز مستخدم حساب Discord الخاص بك (ترويسة Authorization). يُحفظ محليًا في إعدادات التطبيق.';
+
+  @override
+  String get discordTokenHint => 'الصق الرمز هنا...';
+
+  @override
+  String get discordUpdateToken => 'تحديث الرمز';
+
+  @override
+  String get discordConnectAccount => 'ربط الحساب';
+
+  @override
+  String discordConnectedAs(String name, String username) {
+    return 'تم الاتصال باسم $name (@$username)';
+  }
+
+  @override
+  String get discordTokenVerifyFailed =>
+      'تعذّر التحقق من الرمز. يرجى مراجعته والمحاولة مرة أخرى.';
+
+  @override
+  String get updateAvailableTitle => 'يتوفر تحديث';
+
+  @override
+  String updateCurrentVersionSuffix(String version) {
+    return '(الحالي: $version)';
+  }
+
+  @override
+  String get updateDownloading => 'جارٍ تنزيل التحديث...';
+
+  @override
+  String get updateLater => 'لاحقًا';
+
+  @override
+  String get updateInstallNow => 'تثبيت الآن';
+
+  @override
+  String get updateDownloadAndInstall => 'تنزيل وتثبيت';
+
+  @override
+  String get updateChecking => 'جارٍ التحقق من التحديثات...';
+
+  @override
+  String updateUpToDate(String version) {
+    return 'أنت تستخدم أحدث إصدار ($version)';
+  }
+
+  @override
+  String get pureIntegrityCheckFailed =>
+      'فشل فحص سلامة إصدار Pulsr Pure: هذا البناء يستطيع الوصول إلى الشبكة.';
+
+  @override
+  String get backgroundMediaControlsUnavailable =>
+      'أدوات التحكم في الوسائط في الخلفية غير متاحة في هذا التشغيل. تعمل الوسائط، لكن تعذّر بدء أزرار شاشة القفل.';
+
+  @override
+  String get discordTokenEmpty => 'لا يمكن أن يكون الرمز فارغًا';
+
+  @override
+  String get radioCardsTitle => 'بطاقات الراديو';
+
+  @override
+  String get radioCardsRestoreHint =>
+      'يمكنك إظهارها مجددًا في أي وقت من صفحة الراديو';
+
+  @override
+  String get hideRadioCardsFromHome => 'إخفاء بطاقات الراديو من الرئيسية';
+
+  @override
+  String get hideRadioCardsSubtitle =>
+      'إخفاء شريط راديو القرآن من الصفحة الرئيسية';
+
+  @override
+  String get radioCardsHiddenToast =>
+      'تم إخفاء بطاقات الراديو. يمكنك إظهارها من صفحة الراديو.';
+
+  @override
+  String get radioCardsVisibleOnHome => 'بطاقات الراديو ظاهرة في الرئيسية';
+
+  @override
+  String get holyQuranRadio => 'إذاعة القرآن الكريم';
+
+  @override
+  String get radioNowPlayingSemantics => 'قيد التشغيل، اضغط للإيقاف';
+
+  @override
+  String get radioTapToPlaySemantics => 'اضغط للتشغيل';
+
+  @override
+  String get radioLiveOnAirBadge => 'بث مباشر';
+
+  @override
+  String get radioLiveShortBadge => 'بث حي';
+
+  @override
+  String get radioListenNow => 'استمع الآن';
+
+  @override
+  String get viewAllRadioStations => 'عرض كل محطات الراديو';
+
+  @override
+  String get radioCardsHiddenFromHome => 'بطاقات الراديو مخفية من الرئيسية';
+
+  @override
+  String get tapToRestoreRadioCards =>
+      'انقر هنا لإعادة إظهارها في الشاشة الرئيسية';
+
+  @override
+  String get radioCardsRestoredToast =>
+      'تمت استعادة بطاقات الراديو في الشاشة الرئيسية';
+
+  @override
+  String get radioShowAction => 'إظهار';
+
+  @override
+  String get radioShowCardsTooltip => 'إظهار بطاقات الراديو في الرئيسية';
+
+  @override
+  String get radioCancelImageAction => 'إلغاء الصورة';
+
+  @override
+  String get ambientEffectRain => 'مطر';
+
+  @override
+  String get ambientEffectFire => 'نار';
+
+  @override
+  String get ambientEffectForest => 'غابة';
+
+  @override
+  String get ambientEffectOcean => 'محيط';
+
+  @override
+  String get ambientEffectWind => 'رياح';
+
+  @override
+  String get ambientEffectThunder => 'رعد';
+
+  @override
+  String get ambientEffectBirds => 'طيور';
+
+  @override
+  String get ambientEffectCafe => 'مقهى';
+
+  @override
+  String get ambientEffectWhiteNoise => 'ضوضاء بيضاء';
+
+  @override
+  String get mediaControlUnfavorite => 'إزالة من المفضلة';
+
+  @override
+  String get ytmFallbackTrackTitle => 'مقطع من YouTube';
+
+  @override
+  String get fileIntentAudioFile => 'ملف صوتي';
+
+  @override
+  String get fileIntentExternalAudio => 'صوت خارجي';
+
+  @override
+  String get fileIntentFilesAlbum => 'الملفات';
+
+  @override
+  String dupReasonTitleArtist(int count) {
+    return 'عنوان وفنان متطابق ($count نسخ)';
+  }
+
+  @override
+  String get dupReasonChecksum =>
+      'محتوى صوتي متطابق (تم التحقق بالبصمة الرقمية)';
+
+  @override
+  String get ytmBrowseChartsTitle => 'الأفضل ورائجًا';
+
+  @override
+  String get ytmBrowseChartsSubtitle => 'الأكثر تشغيلًا في الوقت الحالي';
+
+  @override
+  String get ytmBrowseNewReleasesTitle => 'إصدارات جديدة';
+
+  @override
+  String get ytmBrowseNewReleasesSubtitle => 'ألبومات وأغانٍ منفردة جديدة';
+
+  @override
+  String get ytmBrowseMoodsTitle => 'الحالات والأنواع';
+
+  @override
+  String get ytmBrowseMoodsSubtitle =>
+      'أغانٍ رائجة من حالات وأنواع YouTube Music';
+
+  @override
+  String get ytmUnknownTitle => 'عنوان غير معروف';
+
+  @override
+  String get ytmAutoPlaylistAuthor => 'قائمة تشغيل تلقائية';
+
+  @override
+  String get ytmFallbackPlaylistTitle => 'قائمة تشغيل';
+
+  @override
+  String get suggestionHeavyRotationTitle => 'مزيج الأكثر تشغيلًا';
+
+  @override
+  String get suggestionHeavyRotationDesc => 'أكثر أغانٍ تشغيلًا لديك';
+
+  @override
+  String get suggestionForgottenFavoritesTitle => 'المفضلة المنسية';
+
+  @override
+  String get suggestionForgottenFavoritesDesc =>
+      'أغانٍ مميزة لم تسمعها منذ فترة';
+
+  @override
+  String get suggestionHiResTitle => 'عرض عالي الدقة لعشاق الصوت';
+
+  @override
+  String get suggestionHiResDesc => 'جودة أستوديو 24-bit بلا فقد بيانات';
+
+  @override
+  String get suggestionEnergyBoostTitle => 'دفعة طاقة سريعة';
+
+  @override
+  String get suggestionEnergyBoostDesc => 'أغانٍ سريعة عالية الطاقة لبدء يومك';
+
+  @override
+  String get downloadErrorGeneric => 'فشل التنزيل';
+
+  @override
+  String fileIntentLoadTrackFailed(String detail) {
+    return 'تعذّر تحميل مقطع YouTube: $detail';
+  }
+
+  @override
+  String get karaokeScoreLabel => 'النتيجة';
+
+  @override
+  String eqWetMixPercent(String pct) {
+    return '$pct% مبلل';
+  }
+
+  @override
+  String wizardStepLabel(int step, int total) {
+    return 'الخطوة $step من $total';
+  }
+
+  @override
+  String get wizardUsbDacTitle => 'محول USB DAC / دونجل';
+
+  @override
+  String get wizardUsbDacSubtitle => 'محول DAC خارجي مع دعم البت الكامل وDSD';
+
+  @override
+  String get wizardBluetoothTitle => 'صوت Bluetooth';
+
+  @override
+  String get wizardBluetoothSubtitle =>
+      'سماعات لاسلكية أو سماعات أذن أو صوت السيارة';
+
+  @override
+  String get wizardSpeakerTitle => 'مكبر الصوت / المدمج';
+
+  @override
+  String get wizardSpeakerSubtitle =>
+      'مكبرات الهاتف مع تعديل الصوت والعلو من النظام';
+
+  @override
+  String get wizardWiredTitle => 'سماعات سلكية';
+
+  @override
+  String get wizardWiredSubtitle => 'موصل 3.5 مم أو سماعة تناظرية سلبية';
+
+  @override
+  String get wizardCrossfadeSubtitle => 'دمج سلس بين الأغانٍ لمدة 3.0 ثانية';
+
+  @override
+  String get wizardNoOverlapSubtitle => 'فصل قياسي للأغاني بدون أي تداخل';
+
+  @override
+  String get rcSnrExcellent => 'ممتاز';
+
+  @override
+  String get rcSnrGood => 'جيد';
+
+  @override
+  String get rcSnrModerate => 'ضوضاء متوسطة';
+
+  @override
+  String get rcPointListeningCenter => 'موضع الاستماع (المنتصف)';
+
+  @override
+  String get rcPointOneMeterLeft => 'متر واحد يسارًا';
+
+  @override
+  String get rcPointOneMeterRight => 'متر واحد يمينًا';
+
+  @override
+  String rcMeasuringPoint(String point) {
+    return 'جارٍ قياس $point';
+  }
+
+  @override
+  String rcPointOfTotal(int point, int total) {
+    return 'النقطة $point من $total';
+  }
+
+  @override
+  String rcPositionOfTotal(int point, int total) {
+    return 'الموضع $point من $total';
+  }
+
+  @override
+  String rcMoveDeviceTo(String point) {
+    return 'انقل جهازك إلى: $point';
+  }
+
+  @override
+  String rcMeasurePosition(int point) {
+    return 'قس الموضع $point';
+  }
+
+  @override
+  String rcFinishWithMeasurements(int count) {
+    return 'أنهِ بالقياسات الحالية ($count/3)';
+  }
+
+  @override
+  String rcSnrReading(String db, String label) {
+    return 'نسبة الإشارة إلى الضوضاء: $db ديسيبل ($label)';
+  }
+
+  @override
+  String rcMaxDeviation(String db) {
+    return 'أقصى $db ديسيبل';
+  }
+
+  @override
+  String get dspPrefNativeSubtitle =>
+      'معالجة صوتية مخصّصة لحظية بدقة 64-bit مع EQ بارامتري وواحد ومحاكاة صدى تلافيفية وصوت Bit-Perfect.';
+
+  @override
+  String get dspPrefSystemSubtitle =>
+      'مؤثرات صوتية من الشركة المصنّعة (Dolby Atmos وDirac وXiaomi Sound وغيرها) عبر مؤثرات نظام Android.';
+
+  @override
+  String get dspPrefAutoSubtitle =>
+      'يستخدم معالجة Native Studio افتراضيًا ويعود إلى AudioFX من النظام عند عدم توفّر المحرك الأصلي.';
+
+  @override
+  String get badgeRecommended => 'موصى به';
+
+  @override
+  String get badgeSystem => 'النظام';
+
+  @override
+  String get badgeAuto => 'تلقائي';
+
+  @override
+  String get proxyPresetLocalHttp => 'HTTP محلي (8080)';
+
+  @override
+  String get proxyPresetLocalSocks => 'SOCKS5 محلي (1080)';
+
+  @override
+  String get semanticsStateOn => 'تشغيل';
+
+  @override
+  String get semanticsStateOff => 'إيقاف';
+
+  @override
+  String get autoEqLabel => 'AutoEq';
+
+  @override
+  String get outputBluetooth => 'Bluetooth';
+
+  @override
+  String get outputUsbDac => 'محول USB DAC';
+
+  @override
+  String get quranAutoDetectRecitations => 'كشف التلاوات تلقائيًا';
+
+  @override
+  String get autoPreampActiveClipping =>
+      'المقدمة التلقائية: نشطة (محمي من القطع)';
+
+  @override
+  String get spotifyImportHelp =>
+      'الصق رابط قائمة تشغيل Spotify العامة أو المعرّف URI لمطابقة أغانٍ منها واستيرادها إلى مكتبة Pulsr.';
+
+  @override
+  String get spotifyImporting => 'جارٍ استيراد قائمة التشغيل...';
+
+  @override
+  String spotifyUnmatchedTracks(int count) {
+    return 'أغانٍ غير مطابقة ($count)';
+  }
+
+  @override
+  String get spotifyImportFailed => 'حدث خطأ أثناء الاستيراد.';
+
+  @override
+  String get partyYouLabel => '(أنت)';
+
+  @override
+  String get partyCodeHint => 'رمز من 6 أحرف';
+
+  @override
+  String get speedPickerAutomixTitle => 'المزج التلقائي / انتقالات ذكية';
+
+  @override
+  String get speedPickerAutomixDesc =>
+      'موازنة الإيقاع ومحاذاة شبكة النقاط وتبديل الجهير';
+
+  @override
+  String get listenTogetherPartyMode => 'الاستماع معًا (وضع الحفلة)';
+
+  @override
+  String get onboardingAudioEngine => 'محرك صوت Pulsr';
+
+  @override
+  String tagEditorBatchInterrupted(int count) {
+    return 'لم يتم تحديث $count ملفًا بسبب انقطاع الدفعة.';
+  }
+
+  @override
+  String tagEditorRetryRemaining(int count) {
+    return 'إعادة المحاولة لـ $count ملفًا متبقيًا';
+  }
+
+  @override
+  String get smartPlaylistValueLabel => 'القيمة';
+
+  @override
+  String get smartPlaylistNameHint =>
+      'مثال: روك الثمانينيات، الأكثر تشغيلًا...';
+
+  @override
+  String get smartPlaylistTitleHint => 'مثال: بوهيميان، حب...';
+
+  @override
+  String get outputRouteUnverified => 'لم يتم التحقق من مسار الصوت';
+
+  @override
+  String get defaultAudioOutput => 'مخرج الصوت الافتراضي';
+
+  @override
+  String get containerAverageEstimated => 'متوسط الحاوية (تقديري)';
+
+  @override
+  String get losslessOutputFidelityNote =>
+      'مصدر بلا فقد (جودة الإخراج أمر منفصل)';
+
+  @override
+  String get ytmQualityHighBitrate => 'مرتفع • 160k';
+
+  @override
+  String get ytmQualityMediumBitrate => 'متوسط • 128k';
+
+  @override
+  String get ytmQualityLowBitrate => 'منخفض • 64k';
+
+  @override
+  String get outputRateUnknown => 'معدل غير معروف';
+
+  @override
+  String exclusiveMixerPrefix(String detail) {
+    return 'مازج حصري • $detail';
+  }
+
+  @override
+  String get smartPlaylistAlbumHint => 'مثال: Discovery, Rumours...';
+
+  @override
+  String get smartPlaylistGenreHint => 'مثال: روك، بوب، جاز...';
+
+  @override
+  String get smartPlaylistHintDays => 'مثال: 30 (يومًا)';
+
+  @override
+  String get smartPlaylistHintBetween => 'مثال: 5، 20 أو 5..20';
+
+  @override
+  String get smartPlaylistHintPlayCount => 'مثال: 5';
+
+  @override
+  String get smartPlaylistHintArtist => 'مثال: Queen، Daft Punk...';
+
+  @override
+  String get smartPlaylistHintYear => 'مثال: 2024';
+
+  @override
+  String get smartPlaylistHintDecade => 'مثال: 1980، 1990، 2000، 2020...';
+
+  @override
+  String get smartPlaylistHintLossless => 'FLAC، WAV، ALAC';
+
+  @override
+  String get smartPlaylistHintDateAdded => 'مثال: 30';
+
+  @override
+  String get smartPlaylistHintDuration => 'مثال: 300000 (ملي ثانية = 5 دقائق)';
+
+  @override
+  String get smartPlaylistHintLastPlayed => 'مثال: 7';
+
+  @override
+  String get smartPlaylistHintRating => 'مثال: 4 (نجوم من 0 إلى 5)';
+
+  @override
+  String get smartPlaylistHintValueDefault => 'القيمة...';
+
+  @override
+  String bitDepthValue(String bit) {
+    return '$bit-بت';
+  }
+
+  @override
+  String get depthUnknown => 'عمق غير معروف';
+
+  @override
+  String usbDacConnectedSummary(String device, String uac) {
+    return 'محول USB DAC: $device ($uac)';
+  }
+
+  @override
+  String get exclusiveMixerLabel => 'مازج حصري';
+
+  @override
+  String get errQuranSaveStyleAdjustments => 'تعذّر حفظ تعديلات أسلوب التلاوة';
+
+  @override
+  String get errQuranSaveModeSetting => 'تعذّر حفظ إعداد وضع القرآن';
+
+  @override
+  String get errQuranApplyAudioProfile => 'تعذّر تطبيق الملف الصوتي للقرآن';
+
+  @override
+  String get errQuranRestoreSettings =>
+      'تعذّر استعادة إعدادات الصوت من وضع القرآن';
+
+  @override
+  String get errQuranSaveReciterStyle => 'تعذّر حفظ أسلوب القارئ';
+
+  @override
+  String get errQuranResetStyleAdjustments =>
+      'تعذّر إعادة تعيين تعديلات أسلوب التلاوة';
+
+  @override
+  String get errQuranSetLearningSpeed => 'تعذّر ضبط سرعة التعلم';
+
+  @override
+  String get errQuranSetVocalWarmth => 'تعذّر ضبط دفء الصوت';
+
+  @override
+  String get errQuranSetAmbience => 'تعذّر ضبط الأجواء الصوتية';
+
+  @override
+  String get autoplayBadgeLabel => 'تشغيل تلقائي';
+
+  @override
+  String get lyricsEditorFirstLine => 'سطر الكلمات الأول...';
+
+  @override
+  String get lyricsEditorNewLine => 'سطر جديد...';
+
+  @override
+  String lyricsShareCardSaved(String path) {
+    return 'تم حفظ البطاقة في: $path';
+  }
+
+  @override
+  String get canvasEnabled => 'تم تفعيل Canvas وحركة الغلاف';
+
+  @override
+  String get canvasDisabled => 'تم تعطيل Canvas';
+
+  @override
+  String aboutStatusLine(String version) {
+    return 'Pulsr $version • محرك audiophile';
+  }
+
+  @override
+  String get widgetNothingPlaying => 'لا يوجد ما يُشغَّل الآن';
 }
