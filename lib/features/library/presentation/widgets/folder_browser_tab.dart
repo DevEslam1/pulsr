@@ -627,9 +627,9 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                             ),
                     ),
                     // Folder badge top right
-                    Positioned(
+                    PositionedDirectional(
                       top: 6,
-                      right: 6,
+                      end: 6,
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
@@ -650,9 +650,9 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                       ),
                     ),
                     // Quick play button bottom right
-                    Positioned(
+                    PositionedDirectional(
                       bottom: 6,
-                      right: 6,
+                      end: 6,
                       child: Material(
                         color: p.accent,
                         shape: const CircleBorder(),

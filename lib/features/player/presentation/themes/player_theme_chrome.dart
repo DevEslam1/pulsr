@@ -780,13 +780,19 @@ class PlayerBottomActionDock extends StatelessWidget {
                     ? Icons.speaker_rounded
                     : Icons.headphones_rounded)));
 
-    final double effectiveBarWidth = math.max(
-      barWidth,
-      math.min(
-        MediaQuery.sizeOf(context).width - (isTablet ? 64.0 : 20.0),
-        isTablet ? 480.0 : 364.0,
-      ),
-    );
+    final isInSplit = PlayerSplitViewScope.of(context);
+    final double effectiveBarWidth = isInSplit
+        ? math.min(
+            barWidth,
+            MediaQuery.sizeOf(context).width * 0.42,
+          )
+        : math.max(
+            barWidth,
+            math.min(
+              MediaQuery.sizeOf(context).width - (isTablet ? 64.0 : 20.0),
+              isTablet ? 480.0 : 364.0,
+            ),
+          );
 
     return Center(
       child: ConstrainedBox(
@@ -1354,6 +1360,7 @@ class PlayerTrackHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveAlignStart = alignStart || PlayerSplitViewScope.of(context);
     final p = context.palette;
     final state = props.state;
     final song = state.currentSong;
@@ -1400,7 +1407,7 @@ class PlayerTrackHeader extends StatelessWidget {
             children: [
               // Minimal distils the header: add-to-playlist lives in the More
               // sheet, so the title can start at the screen gutter.
-              if (!alignStart)
+              if (!effectiveAlignStart)
                 SizedBox(
                   width: resolvedActionButtonSize,
                   height: resolvedActionButtonSize,
@@ -1446,12 +1453,12 @@ class PlayerTrackHeader extends StatelessWidget {
               Expanded(
                 child: Padding(
                   padding: EdgeInsetsDirectional.only(
-                    start: alignStart ? 0 : AppSpacing.s10,
+                    start: effectiveAlignStart ? 0 : AppSpacing.s10,
                     end: AppSpacing.s10,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: alignStart
+                    crossAxisAlignment: effectiveAlignStart
                         ? CrossAxisAlignment.start
                         : CrossAxisAlignment.center,
                     children: [
@@ -1459,8 +1466,9 @@ class PlayerTrackHeader extends StatelessWidget {
                         width: double.infinity,
                         child: MarqueeText(
                           text: song?.title ?? context.l10n.noTrackSelected,
-                          textAlign:
-                              alignStart ? TextAlign.start : TextAlign.center,
+                          textAlign: effectiveAlignStart
+                              ? TextAlign.start
+                              : TextAlign.center,
                           style: TextStyle(
                             fontSize: resolvedTitleFontSize,
                             fontWeight: FontWeight.w900,
@@ -1475,8 +1483,9 @@ class PlayerTrackHeader extends StatelessWidget {
                         width: double.infinity,
                         child: MarqueeText(
                           text: song?.artist ?? context.l10n.unknownArtist,
-                          textAlign:
-                              alignStart ? TextAlign.start : TextAlign.center,
+                          textAlign: effectiveAlignStart
+                              ? TextAlign.start
+                              : TextAlign.center,
                           style: TextStyle(
                             fontSize: resolvedSubtitleFontSize,
                             fontWeight: FontWeight.w600,
@@ -1533,12 +1542,47 @@ class PlayerTrackHeader extends StatelessWidget {
                   ),
                 ),
               ),
+              if (effectiveAlignStart) ...[
+                const SizedBox(width: AppSpacing.s6),
+                SizedBox(
+                  width: resolvedActionButtonSize,
+                  height: resolvedActionButtonSize,
+                  child: Material(
+                    color: p.isDark
+                        ? AppColors.specularAt(0.07)
+                        : p.surfaceContainer,
+                    shape: CircleBorder(
+                      side: BorderSide(
+                        color: p.isDark
+                            ? AppColors.specularAt(0.13)
+                            : p.hairline,
+                        width: 1.0,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        PlayerMoreSheet.show(context,
+                            song: song, activeColor: props.activeColor);
+                      },
+                      child: Center(
+                        child: Icon(
+                          Icons.more_horiz_rounded,
+                          size: iconSize,
+                          color: resolvedSubtitle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           if (showQualityBadge && qualityBadge != null) ...[
             SizedBox(height: badgeGap),
             Align(
-              alignment: alignStart
+              alignment: effectiveAlignStart
                   ? AlignmentDirectional.centerStart
                   : AlignmentDirectional.center,
               child: FittedBox(

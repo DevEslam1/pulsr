@@ -173,6 +173,12 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
+      // DownloadsCubit owns a 30s periodic timer. The pending-timer invariant is
+      // checked at the end of the test body, before any tearDown, so the cubit
+      // has to be closed here rather than in teardown.
+      if (getIt.isRegistered<DownloadsCubit>()) {
+        await getIt<DownloadsCubit>().close();
+      }
     });
 
     await audioHandler.dispose();

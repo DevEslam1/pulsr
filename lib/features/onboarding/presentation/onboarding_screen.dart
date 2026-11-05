@@ -327,10 +327,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: Stack(
         children: [
           // Subtle ambient radial glow tied to the active accent color
-          Positioned(
+          PositionedDirectional(
             top: -120,
-            left: 0,
-            right: 0,
+            start: 0,
+            end: 0,
             child: IgnorePointer(
               child: AnimatedContainer(
                 duration: context.motionMs(450),

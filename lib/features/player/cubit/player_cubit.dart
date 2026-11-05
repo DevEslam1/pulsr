@@ -252,6 +252,14 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         .map((s) => s.isQuranModeEnabled)
         .distinct()
         .listen(AmbientSoundService().setQuranModeActive);
+    // Follow every emitted play/pause, not just engine events: transport
+    // actions emit isPlaying optimistically, so the engine observer later sees
+    // "no change" and never told the ambient service — sounds kept playing
+    // after pause (or stayed silent after play).
+    stream
+        .map((s) => s.isPlaying)
+        .distinct()
+        .listen(AmbientSoundService().onPlayerPlaybackStateChanged);
     _syncAudioEffects(force: true);
     unawaited(_audioHandler.effectsReady.then((_) async {
       if (isClosed) return;

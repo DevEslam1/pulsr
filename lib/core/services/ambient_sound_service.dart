@@ -610,9 +610,11 @@ class AmbientSoundService extends ChangeNotifier {
         return;
       }
 
-      // Respect the main player's playback state
+      // Respect the main player's playback state. Never await play(): its
+      // future only completes when playback stops, which left the effect
+      // "loading" and blocked toggleEffect()/_persist() while it played.
       if (_shouldPlay) {
-        await player.play();
+        unawaited(player.play().catchError((Object _) {}));
       } else {
         await player.pause();
       }

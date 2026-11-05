@@ -606,10 +606,10 @@ class MiniPlayerState extends State<MiniPlayer> {
                           alignment: Alignment.topCenter,
                           children: [
                             // Subtle top inner specular highlight
-                            Positioned(
+                            PositionedDirectional(
                               top: 0,
-                              left: 20,
-                              right: 20,
+                              start: 20,
+                              end: 20,
                               child: IgnorePointer(
                                 child: Container(
                                   height: 1,
@@ -1443,10 +1443,10 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                             ),
                             // Scrub thumb & floating time readout while dragging
                             if (isDragging) ...[
-                              Positioned(
+                              PositionedDirectional(
                                 top: -24,
-                                left: 12,
-                                right: 12,
+                                start: 12,
+                                end: 12,
                                 child: Align(
                                   alignment: Alignment(
                                       thumbAlignX.clamp(-0.85, 0.85), 0),
@@ -1901,9 +1901,9 @@ class MiniPlayerHorizontal extends StatelessWidget {
                     ],
                   ),
                   // Subtle bottom progress hairline for horizontal dock
-                  Positioned(
-                    left: AppSpacing.xs,
-                    right: AppSpacing.xs,
+                  PositionedDirectional(
+                    start: AppSpacing.xs,
+                    end: AppSpacing.xs,
                     bottom: 0,
                     child: IgnorePointer(
                       child: BlocSelector<PlayerCubit, PlayerState, Duration>(

@@ -1452,7 +1452,7 @@ class _OnlinePlaylistDetailScreenState
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: const EdgeInsetsDirectional.fromSTEB(
               AppSpacing.s18,
               AppSpacing.xs,
               AppSpacing.s18,

@@ -97,10 +97,12 @@ void main() {
         ]))));
     await tester.pumpAndSettle();
 
-    expect(find.text('My List'), findsOneWidget);
+    // The name is carried by both the app bar (for scroll context) and the
+    // hero header, so assert both rather than a single copy.
+    expect(find.text('My List'), findsNWidgets(2));
     expect(find.byType(SongTile), findsNWidgets(2));
     expect(find.widgetWithText(FilledButton, 'Play All'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Shuffle'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Shuffle'), findsOneWidget);
   });
 
   testWidgets('renders an empty state when the playlist has no tracks',

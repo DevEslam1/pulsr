@@ -21,6 +21,15 @@ void main() {
     //   yt_download_service.dart -773B (foreground controller, pause registry,
     //     HTTP response/IO support)
     //   ytm_service.dart -291B (YtmMediaHelpers: artwork/playability parsing)
+    // Caps lowered after the cookie/search decomposition tranche:
+    //   ytm_account_service.dart -6167B (YtmCookieCodec: cookie header folding,
+    //     YouTube scoping, Set-Cookie split/merge, session-cookie validation)
+    //   ytm_service.dart -7003B (ytm_service_internals part: InnerTube search
+    //     response traversal, track parsing, locale args, client descriptor)
+    //   yt_download_service.dart -1907B (yt_download_service_types part:
+    //     progress/queue value types, Range-ignored marker, part retention)
+    //   playlists_screen.dart -12174B (playlists_screen_components part:
+    //     hero card, playlist card and the dashed-border wrapper)
     const caps = {
       'lib/data/audio/audio_handler.dart': 223500,
       'lib/features/player/cubit/player_cubit.dart': 170000,
@@ -31,10 +40,10 @@ void main() {
       // the current size so they can only shrink; extract a collaborator and
       // lower the cap, never raise it. (Re-pinned after the null-safety fix in
       // ytm_account_service and the bounded-failure-map guard in ytm_service.)
-      'lib/core/services/ytm_account_service.dart': 141050,
-      'lib/core/services/yt_download_service.dart': 76000,
-      'lib/core/services/ytm_service.dart': 78000,
-      'lib/features/playlists/presentation/playlists_screen.dart': 91411,
+      'lib/core/services/ytm_account_service.dart': 134883,
+      'lib/core/services/yt_download_service.dart': 75731,
+      'lib/core/services/ytm_service.dart': 76161,
+      'lib/features/playlists/presentation/playlists_screen.dart': 80551,
     };
     final offenders = <String>[];
     caps.forEach((path, cap) {

@@ -15,6 +15,7 @@ import '../../../../data/services/hires_audio_service.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
@@ -1303,7 +1304,7 @@ class AudioQualitySheet extends StatelessWidget {
                 activeThumbColor: Colors.white,
                 onChanged: (blockedReason != null && !isBitPerfectEnabled)
                     ? null
-                    : (val) {
+                    : (val) async {
                         if (blockedReason != null && val) {
                           ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                             SnackBar(
@@ -1314,9 +1315,22 @@ class AudioQualitySheet extends StatelessWidget {
                           return;
                         }
                         HapticFeedback.selectionClick();
-                        if (cubit != null) {
-                          requestBitPerfectOutput(context, val);
-                        }
+                        if (cubit == null) return;
+                        final attempted =
+                            await requestBitPerfectOutput(context, val);
+                        // The cubit's errorMessage is only surfaced by the
+                        // Settings screen listener; from this sheet a refusal
+                        // looked like a switch that silently snapped back.
+                        if (!attempted || !val || !context.mounted) return;
+                        if (cubit.state.bitPerfectOutput) return;
+                        PulsrToast.show(
+                          context,
+                          isError: true,
+                          duration: const Duration(seconds: 6),
+                          position: PulsrToastPosition.top,
+                          message: cubit.state.errorMessage ??
+                              'Bit-Perfect output is not supported by the current output device.',
+                        );
                       },
               ),
             ],

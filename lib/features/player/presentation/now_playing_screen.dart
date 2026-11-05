@@ -221,10 +221,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                     // Subtle top status-bar protection vignette for legibility (portrait only)
                     if (MediaQuery.orientationOf(context) !=
                         Orientation.landscape)
-                      Positioned(
+                      PositionedDirectional(
                       top: 0,
-                      left: 0,
-                      right: 0,
+                      start: 0,
+                      end: 0,
                       height: 88,
                       child: IgnorePointer(
                         child: DecoratedBox(
@@ -492,10 +492,10 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
                           child: child,
                         ),
                         // Top specular rim & dynamic grab pill during pull-down
-                        Positioned(
+                        PositionedDirectional(
                           top: 0,
-                          left: 0,
-                          right: 0,
+                          start: 0,
+                          end: 0,
                           child: IgnorePointer(
                             child: Opacity(
                               opacity: thresholdRatio,

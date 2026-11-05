@@ -874,10 +874,10 @@ class _QuranHeroCard extends StatelessWidget {
                     ],
 
                     // Top inner specular highlight hairline
-                    Positioned(
+                    PositionedDirectional(
                       top: 0,
-                      left: 16,
-                      right: 16,
+                      start: 16,
+                      end: 16,
                       child: IgnorePointer(
                         child: Container(
                           height: 1.2,

@@ -72,7 +72,10 @@ class _LyricsViewState extends State<LyricsView> {
       ValueNotifier(Duration.zero);
 
   bool get _hasWordSync => widget.lyrics.any((l) => l.words.isNotEmpty);
-  bool get _useAdvancedView => _hasWordSync || _translationMode > 0;
+  bool get _useAdvancedView =>
+      _hasWordSync ||
+      _translationMode > 0 ||
+      (PlayerSplitViewScope.of(context) && _isSynced);
   List<LyricsLine> get _displayLyrics =>
       (_translationMode > 0 && _translatedLyrics != null)
           ? _translatedLyrics!
@@ -617,11 +620,14 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   Widget _buildPlainTextList(PulsrPalette p) {
+    final isInSplit = PlayerSplitViewScope.of(context);
     return ListView.builder(
       addAutomaticKeepAlives: false,
       addRepaintBoundaries: true,
-      padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.lg, horizontal: AppSpacing.s20),
+      padding: EdgeInsets.symmetric(
+        vertical: AppSpacing.lg,
+        horizontal: isInSplit ? AppSpacing.md : AppSpacing.s20,
+      ),
       itemCount: widget.lyrics.length,
       itemBuilder: (context, index) {
         final line = widget.lyrics[index];
@@ -631,11 +637,13 @@ class _LyricsViewState extends State<LyricsView> {
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
             child: Text(
               line.text,
-              textAlign: TextAlign.center,
+              textAlign: isInSplit ? TextAlign.start : TextAlign.center,
               style: TextStyle(
-                fontSize: AppFontSize.bodyLarge,
+                fontSize: isInSplit ? 20.0 : AppFontSize.bodyLarge,
                 fontWeight: FontWeight.w500,
-                color: p.textPrimary,
+                color: isInSplit
+                    ? Colors.white.withValues(alpha: 0.88)
+                    : p.textPrimary,
                 height: 1.4,
               ),
             ),
@@ -657,34 +665,40 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   Widget _buildSyncedLyricView(PulsrPalette p) {
+    final isInSplit = PlayerSplitViewScope.of(context);
     final activeCol =
         widget.activeColor == Colors.white ? p.accent : widget.activeColor;
     final preset = LyricPreset(
       textStyle: TextStyle(
-        fontSize: 19.0,
-        fontWeight: FontWeight.w500,
-        color: p.textSecondary.withValues(alpha: 0.7),
-        height: 1.4,
+        fontSize: isInSplit ? 20.0 : 19.0,
+        fontWeight: FontWeight.w600,
+        color: isInSplit
+            ? Colors.white.withValues(alpha: 0.46)
+            : p.textSecondary.withValues(alpha: 0.7),
+        height: isInSplit ? 1.42 : 1.4,
       ),
       activeTextStyle: TextStyle(
-        fontSize: AppFontSize.headline,
+        fontSize: isInSplit ? 27.0 : AppFontSize.headline,
         fontWeight: FontWeight.w800,
-        color: activeCol,
-        height: 1.3,
+        color: isInSplit ? Colors.white : activeCol,
+        height: 1.35,
         shadows: [
           Shadow(
-            color: activeCol.withValues(alpha: 0.4),
-            blurRadius: 16,
+            color: activeCol.withValues(alpha: 0.55),
+            blurRadius: 18,
           ),
         ],
       ),
       highlight: LyricHighlight.solid(activeCol),
-      textAlign: TextAlign.center,
-      contentAlignment: LyricContentAlignment.center,
-      lineSpacing: 20,
-      activeAnchor: const LyricAnchor.fraction(0.42),
-      selectionAnchor: const LyricAnchor.fraction(0.42),
-      edgeFade: const LyricEdgeFade.pixels(top: 36, bottom: 36),
+      textAlign: isInSplit ? TextAlign.start : TextAlign.center,
+      contentAlignment: isInSplit
+          ? LyricContentAlignment.start
+          : LyricContentAlignment.center,
+      lineSpacing: isInSplit ? 26 : 20,
+      activeAnchor: LyricAnchor.fraction(isInSplit ? 0.36 : 0.42),
+      selectionAnchor: LyricAnchor.fraction(isInSplit ? 0.36 : 0.42),
+      edgeFade: LyricEdgeFade.pixels(
+          top: isInSplit ? 56 : 36, bottom: isInSplit ? 80 : 36),
       selectionSnapDelay: const Duration(seconds: 2),
       resumeDelay: const Duration(seconds: 4),
       scrollAnimation: LyricScrollAnimation.fixed(

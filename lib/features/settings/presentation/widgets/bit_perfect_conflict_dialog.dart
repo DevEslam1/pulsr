@@ -21,11 +21,15 @@ class _Conflict {
 /// reverb, crossfade, ReplayGain... would be bypassed or would break it. When
 /// such features are on, a popup lists them and offers to turn them off before
 /// enabling. Turning Bit-Perfect OFF never needs a prompt.
-Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
+///
+/// Returns true when the platform round-trip was actually attempted (false
+/// when the user cancelled the conflict prompt), so callers outside the
+/// Settings screen can surface the cubit's `errorMessage` on refusal.
+Future<bool> requestBitPerfectOutput(BuildContext context, bool enable) async {
   final settings = context.read<SettingsCubit>();
   if (!enable) {
     await settings.setBitPerfectOutput(false);
-    return;
+    return true;
   }
   // If the device can't do bit-perfect anyway, let the cubit show the reason
   // instead of asking the user to disable things for nothing.
@@ -34,7 +38,7 @@ Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
       ) !=
       null) {
     await settings.setBitPerfectOutput(true);
-    return;
+    return true;
   }
 
   PlayerCubit? player;
@@ -94,7 +98,7 @@ Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
 
   if (conflicts.isEmpty) {
     await settings.setBitPerfectOutput(true);
-    return;
+    return true;
   }
 
   final confirmed = await PulsrDialogHelper.showPulsrDialog<bool>(
@@ -131,7 +135,7 @@ Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
       ),
     ],
   );
-  if (confirmed != true) return;
+  if (confirmed != true) return false;
 
   // Enable FIRST: the native route may still refuse exclusive output (e.g. the
   // DAC dropped, another app grabbed it, target format unavailable). Disabling
@@ -140,7 +144,7 @@ Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
   // Bit-Perfect is actually on. The native DSP bypass already mutes them in
   // the meantime; these calls just make the saved preference match.
   await settings.setBitPerfectOutput(true);
-  if (!settings.state.bitPerfectOutput) return;
+  if (!settings.state.bitPerfectOutput) return true;
 
   for (final c in conflicts) {
     try {
@@ -149,4 +153,5 @@ Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
       // Keep going: Bit-Perfect's own DSP bypass still covers what we missed.
     }
   }
+  return true;
 }

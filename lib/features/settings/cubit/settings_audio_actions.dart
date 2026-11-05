@@ -28,9 +28,13 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// attributes: the direct UAC2 sink writes the PCM straight to the DAC while
   /// the native DSP tee mutes the HAL path. Returns true when the stream runs.
   Future<bool> _tryStartDirectUsbStreaming() async {
+    _lastDirectUsbFailure = null;
     if (!PlatformCapabilities.isAndroid) return false;
     // AAudio Direct bypasses the ExoPlayer DSP chain the USB tee lives in.
-    if (state.aaudioOutputEnabled) return false;
+    if (state.aaudioOutputEnabled) {
+      _lastDirectUsbFailure = 'AAudio Direct output is on — turn it off to use the direct USB path';
+      return false;
+    }
     // The direct sink writes to the USB device it opens; never start it while
     // the media route is on Bluetooth, the speaker, or an unknown route.
     if (state.currentOutputDevice?.isUsbDac != true) {
@@ -40,10 +44,20 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     try {
       final usb = UsbExclusiveService();
       final status = await usb.getStatus();
-      if (!status.attached || !status.streamingSupported) return false;
+      if (!status.attached) {
+        _lastDirectUsbFailure = 'the USB DAC is not visible to the app';
+        return false;
+      }
+      if (!status.streamingSupported) {
+        _lastDirectUsbFailure = 'this DAC does not expose a streamable USB Audio interface';
+        return false;
+      }
       if (!status.permitted) {
         final granted = await usb.requestPermission();
-        if (!granted) return false;
+        if (!granted) {
+          _lastDirectUsbFailure = 'USB access permission was not granted';
+          return false;
+        }
       }
       final song = getIt.isRegistered<PulsrAudioHandler>()
           ? getIt<PulsrAudioHandler>().currentSong : null;

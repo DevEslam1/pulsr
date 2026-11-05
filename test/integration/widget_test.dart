@@ -492,6 +492,11 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
+      // Unmounting the tree does not close app-level cubits, and DownloadsCubit
+      // owns a 30s periodic timer; release it or the fake-async invariant trips.
+      if (getIt.isRegistered<DownloadsCubit>()) {
+        await getIt<DownloadsCubit>().close();
+      }
       await audioHandler.stop();
       await db.close();
     });

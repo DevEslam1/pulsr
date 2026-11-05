@@ -56,7 +56,9 @@ void main() {
     expect(tail, findsOneWidget);
     final width = tester.getSize(tail).width;
     expect(width, lessThanOrEqualTo(320));
-    expect(width, greaterThan(300));
+    // The body stretches to the capped surface minus the sheet's own horizontal
+    // padding; it must not shrink-wrap to the widest child.
+    expect(width, greaterThan(250));
 
     // The sheet starts at the bottom of the 1200dp viewport.
     expect(tester.getBottomRight(tail).dy, greaterThan(1150));

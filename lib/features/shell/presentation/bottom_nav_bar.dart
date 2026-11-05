@@ -167,10 +167,10 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                               alignment: Alignment.center,
                               children: [
                                 // Subtle top inner specular highlight hairline
-                                Positioned(
+                                PositionedDirectional(
                                   top: 0,
-                                  left: 24,
-                                  right: 24,
+                                  start: 24,
+                                  end: 24,
                                   child: IgnorePointer(
                                     child: Container(
                                       height: 1,

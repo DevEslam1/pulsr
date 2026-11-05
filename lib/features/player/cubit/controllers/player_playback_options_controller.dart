@@ -272,38 +272,6 @@ class PlayerPlaybackOptionsController {
     return success;
   }
 
-  Future<void> setSongEqOverrideById(int songId, String? presetName) async {
-    await _perSongEqStore.setPresetForTrack(songId.toString(), presetName);
-    final s = _getState();
-    final currentSong = s.currentSong;
-    if (currentSong?.id == songId) {
-      _emit(s.copyWith(
-          playback: s.playback.copyWith(currentSongEqOverride: presetName)));
-      final applyOverride = _onPerSongEqOverride;
-      if (applyOverride != null) {
-        unawaited(applyOverride(currentSong!, presetName));
-      }
-    }
-  }
-
-  Future<void> setCurrentSongEqOverride(String? presetName) async {
-    final songId = _getState().currentSong?.id;
-    if (songId != null) {
-      await setSongEqOverrideById(songId, presetName);
-    }
-  }
-
-  Future<void> setSongEqOverride(Object? songIdOrPreset,
-      [String? presetName]) async {
-    if (songIdOrPreset is int) {
-      await setSongEqOverrideById(songIdOrPreset, presetName);
-    } else if (songIdOrPreset is String) {
-      await setCurrentSongEqOverride(songIdOrPreset);
-    } else if (songIdOrPreset == null && presetName == null) {
-      await setCurrentSongEqOverride(null);
-    }
-  }
-
   Future<void> setSongVolumeOverride(int songId, double gainDb) async {
     final clamped = gainDb.clamp(-24.0, 24.0);
     await _perSongVolumeStore.setGainDbForTrack(songId.toString(), clamped);

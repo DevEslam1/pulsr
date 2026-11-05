@@ -78,6 +78,40 @@ extension PlayerPlaybackOptionsTrackState on PlayerPlaybackOptionsController {
     }
   }
 
+  Future<void> setSongEqOverrideById(int songId, String? presetName) async {
+    await _perSongEqStore.setPresetForTrack(songId.toString(), presetName);
+    final s = _getState();
+    final currentSong = s.currentSong;
+    if (currentSong?.id == songId) {
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(currentSongEqOverride: presetName)));
+      final applyOverride = _onPerSongEqOverride;
+      if (applyOverride != null) {
+        unawaited(applyOverride(currentSong!, presetName));
+      }
+    }
+  }
+
+  Future<void> setCurrentSongEqOverride(String? presetName) async {
+    final songId = _getState().currentSong?.id;
+    if (songId != null) {
+      await setSongEqOverrideById(songId, presetName);
+    }
+  }
+
+  /// Accepts either `(songId, presetName)` or `(presetName)` for the current
+  /// track, matching the two call shapes the equalizer UI has always used.
+  Future<void> setSongEqOverride(Object? songIdOrPreset,
+      [String? presetName]) async {
+    if (songIdOrPreset is int) {
+      await setSongEqOverrideById(songIdOrPreset, presetName);
+    } else if (songIdOrPreset is String) {
+      await setCurrentSongEqOverride(songIdOrPreset);
+    } else if (songIdOrPreset == null && presetName == null) {
+      await setCurrentSongEqOverride(null);
+    }
+  }
+
   void _syncTrackDelayFromHandler() {
     final int delay;
     try {

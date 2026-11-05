@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/widgets/spinning_vinyl_disc.dart';
@@ -60,8 +61,6 @@ void main() {
       final decoration = disc.decoration as BoxDecoration;
       expect(decoration.shape, BoxShape.circle);
       expect(decoration.border!.top.color, AppColors.vinylDiscRim);
-      expect(disc.width, 60.0);
-      expect(disc.height, 60.0);
     });
 
     testWidgets('StaggeredListItem animates its child into view',

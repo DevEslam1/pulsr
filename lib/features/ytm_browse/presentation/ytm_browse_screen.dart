@@ -702,9 +702,9 @@ class _BrowseTrackCard extends StatelessWidget {
                             palette: p,
                           ),
                         // Bottom gradient for badge legibility
-                        Positioned(
-                          left: 0,
-                          right: 0,
+                        PositionedDirectional(
+                          start: 0,
+                          end: 0,
                           bottom: 0,
                           height: 42,
                           child: DecoratedBox(

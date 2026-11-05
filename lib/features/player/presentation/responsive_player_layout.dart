@@ -30,6 +30,7 @@ import 'widgets/player_controls.dart';
 import 'widgets/player_seek_bar.dart';
 import 'widgets/quran_mode_sheet.dart';
 import 'widgets/quran_mushaf_view.dart';
+import 'widgets/player_more_sheet.dart';
 
 /// Responsive layout coordinator for the Now Playing screen.
 ///
@@ -186,17 +187,14 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
       );
     }
 
-    // 2. Tablet / Desktop Split-View
-    // Must be an actual tablet or desktop (height >= 500) in landscape orientation
-    // (width > height) to trigger the 2-pane tablet split.
-    // Portrait tablets and landscape phones render the full-screen player theme directly.
+    // 2. Tablet / Desktop Split-View (Apple Music Tablet Landscape)
     final isLandscapeOrientation =
         width > mediaQuery.size.height || Adaptive.isLandscape(context);
     final isTabletLandscape =
-        ((width >= 840 && mediaQuery.size.height >= 500) ||
+        ((width >= 720 && mediaQuery.size.height >= 460) ||
                 (Adaptive.isTablet(context) &&
-                    width >= 720 &&
-                    mediaQuery.size.height >= 500)) &&
+                    width >= 600 &&
+                    mediaQuery.size.height >= 400)) &&
             isLandscapeOrientation;
     if (isTabletLandscape) {
       _wasSplitView = true;
@@ -207,12 +205,15 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
       return PlayerSplitViewScope(
         isInSplitView: true,
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            // 1. Unified Dynamic Ambient Backdrop (Full-Canvas, Zero Clipping Seams)
+            // 1. Unified Radiant Dynamic Ambient Backdrop (Continuous Edge-to-Edge Canvas)
             Positioned.fill(
               child: RepaintBoundary(
                 child: Stack(
+                  fit: StackFit.expand,
                   children: [
+                    // Deep ambient base gradient
                     Positioned.fill(
                       child: AnimatedContainer(
                         duration: context.motionMs(500),
@@ -223,14 +224,14 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                               Color.lerp(
                                     widget.bgColor,
                                     widget.activeColor,
-                                    p.isDark ? 0.12 : 0.08,
+                                    p.isDark ? 0.16 : 0.10,
                                   ) ??
                                   widget.bgColor,
                               widget.bgColor,
                               Color.lerp(
                                     widget.bgColor,
-                                    p.isDark ? Colors.black : Colors.white,
-                                    p.isDark ? 0.22 : 0.06,
+                                    Colors.black,
+                                    p.isDark ? 0.32 : 0.08,
                                   ) ??
                                   widget.bgColor,
                             ],
@@ -249,44 +250,44 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                           duration: context.motionMs(500),
                           decoration: BoxDecoration(
                             gradient: RadialGradient(
-                              center: const Alignment(-0.52, -0.22),
-                              radius: 1.25,
+                              center: const Alignment(-0.55, -0.22),
+                              radius: 1.35,
                               colors: [
                                 widget.activeColor.withValues(
-                                  alpha: p.isDark ? 0.28 : 0.18,
+                                  alpha: p.isDark ? 0.36 : 0.22,
                                 ),
                                 widget.activeColor.withValues(
-                                  alpha: p.isDark ? 0.11 : 0.06,
+                                  alpha: p.isDark ? 0.14 : 0.08,
                                 ),
-                                widget.activeColor.withValues(alpha: 0.01),
+                                widget.activeColor.withValues(alpha: 0.02),
                                 Colors.transparent,
                               ],
-                              stops: const [0.0, 0.45, 0.82, 1.0],
+                              stops: const [0.0, 0.45, 0.80, 1.0],
                             ),
                           ),
                         ),
                       ),
                     ),
 
-                    // Subtle Studio Aura across Right Console
+                    // Soft Atmospheric Aura across Right Canvas
                     Positioned.fill(
                       child: IgnorePointer(
                         child: AnimatedContainer(
                           duration: context.motionMs(500),
                           decoration: BoxDecoration(
                             gradient: RadialGradient(
-                              center: const Alignment(0.55, -0.15),
-                              radius: 1.30,
+                              center: const Alignment(0.60, 0.15),
+                              radius: 1.40,
                               colors: [
                                 widget.activeColor.withValues(
-                                  alpha: p.isDark ? 0.12 : 0.07,
+                                  alpha: p.isDark ? 0.14 : 0.07,
                                 ),
                                 widget.activeColor.withValues(
                                   alpha: p.isDark ? 0.04 : 0.02,
                                 ),
                                 Colors.transparent,
                               ],
-                              stops: const [0.0, 0.50, 1.0],
+                              stops: const [0.0, 0.55, 1.0],
                             ),
                           ),
                         ),
@@ -297,344 +298,137 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
               ),
             ),
 
-            // 2. Foreground 2-Pane Studio Console Split
+            // 2. Foreground 2-Pane Split Canvas
             SafeArea(
               top: true,
               bottom: true,
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Left Pane: Navigation Header + Full-Fidelity Player Theme
                   Expanded(
                     flex: 5,
-                    child: Column(
-                      children: [
-                        PlayerTopBar(
-                          props: PlayerThemeProps(
-                            state: widget.state,
-                            cubit: widget.cubit,
-                            activeColor: widget.activeColor,
-                            bgColor: widget.bgColor,
-                          ),
-                          isTablet: true,
-                          horizontalPadding: AppSpacing.md,
-                          tabletHorizontalPadding: AppSpacing.md,
-                          verticalPadding: AppSpacing.s4,
-                          onDismiss: () {
-                            HapticFeedback.lightImpact();
-                            try {
-                              final router = GoRouter.of(context);
-                              if (router.canPop()) {
-                                router.pop();
-                              } else {
-                                router.go('/');
-                              }
-                            } catch (_) {
-                              Navigator.of(context).maybePop();
-                            }
-                          },
-                        ),
-                        Expanded(
-                          child: widget.themeWidget,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Subtle vertical studio console divider
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.xl),
-                    child: Container(
-                      width: 1,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            p.hairline.withValues(alpha: 0.5),
-                            widget.activeColor.withValues(alpha: 0.28),
-                            p.hairline.withValues(alpha: 0.5),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.2, 0.5, 0.8, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: AppSpacing.xs),
-
-                  // Right Pane: Framed Interactive Console (Mushaf / Lyrics, Queue, Quick DSP)
-                  Expanded(
-                    flex: 6,
                     child: Padding(
                       padding: const EdgeInsetsDirectional.only(
-                        start: AppSpacing.xs,
+                        start: AppSpacing.lg,
                         end: AppSpacing.md,
-                        top: 0,
+                        top: AppSpacing.xs,
                         bottom: AppSpacing.sm,
                       ),
                       child: Column(
                         children: [
-                          // Top Console Dock: Segmented Tab Capsule (Height-matched with Left TopBar)
-                          SizedBox(
-                            height: 54,
-                            child: Center(
-                              child: RepaintBoundary(
-                                child: Container(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 320),
-                                  height: 42,
-                                  padding: const EdgeInsets.all(3.5),
-                                  decoration: BoxDecoration(
-                                    color: Color.alphaBlend(
-                                      widget.bgColor.withValues(
-                                        alpha: p.isDark ? 0.32 : 0.18,
-                                      ),
-                                      p.surfaceContainer.withValues(
-                                        alpha: p.isDark ? 0.72 : 0.88,
-                                      ),
-                                    ),
-                                    borderRadius: AppRadii.r20All,
-                                    border: Border.all(
-                                      color: Color.alphaBlend(
-                                        widget.activeColor
-                                            .withValues(alpha: 0.20),
-                                        p.hairline,
-                                      ),
-                                      width: 1.0,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: p.isDark ? 0.28 : 0.05,
-                                        ),
-                                        blurRadius: 14,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
-                                  ),
-                                  child: TabBar(
-                                    controller: _tabController,
-                                    isScrollable: false,
-                                    dividerColor: Colors.transparent,
-                                    indicatorSize: TabBarIndicatorSize.tab,
-                                    splashBorderRadius: AppRadii.r16All,
-                                    onTap: (_) =>
-                                        HapticFeedback.selectionClick(),
-                                    indicator: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          widget.activeColor
-                                              .withValues(alpha: 0.36),
-                                          widget.activeColor
-                                              .withValues(alpha: 0.18),
-                                        ],
-                                      ),
-                                      borderRadius: AppRadii.r16All,
-                                      border: Border.all(
-                                        color: widget.activeColor
-                                            .withValues(alpha: 0.60),
-                                        width: 1,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: widget.activeColor
-                                              .withValues(alpha: 0.24),
-                                          blurRadius: 12,
-                                          spreadRadius: -2,
-                                        ),
-                                      ],
-                                    ),
-                                    labelColor: p.textPrimary,
-                                    unselectedLabelColor: p.textSecondary,
-                                    labelStyle: const TextStyle(
-                                      fontSize: AppFontSize.label,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.2,
-                                    ),
-                                    unselectedLabelStyle: const TextStyle(
-                                      fontSize: AppFontSize.label,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.1,
-                                    ),
-                                    tabs: [
-                                      Tab(
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              isQuran
-                                                  ? Icons.menu_book_rounded
-                                                  : Icons.lyrics_rounded,
-                                              size: 15,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Flexible(
-                                              child: Text(
-                                                isQuran
-                                                    ? context.l10n.quranMode
-                                                    : context.l10n.lyrics,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Tab(
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.queue_music_rounded,
-                                              size: 15,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Flexible(
-                                              child: Text(
-                                                context.l10n.queueTab,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Tab(
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.tune_rounded,
-                                              size: 15,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Flexible(
-                                              child: Text(
-                                                context.l10n.dspLabel,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                          PlayerTopBar(
+                            props: PlayerThemeProps(
+                              state: widget.state,
+                              cubit: widget.cubit,
+                              activeColor: widget.activeColor,
+                              bgColor: widget.bgColor,
                             ),
+                            isTablet: true,
+                            showMore: false,
+                            horizontalPadding: 0,
+                            tabletHorizontalPadding: 0,
+                            verticalPadding: AppSpacing.s2,
+                            onDismiss: () {
+                              HapticFeedback.lightImpact();
+                              try {
+                                final router = GoRouter.of(context);
+                                if (router.canPop()) {
+                                  router.pop();
+                                } else {
+                                  router.go('/');
+                                }
+                              } catch (_) {
+                                Navigator.of(context).maybePop();
+                              }
+                            },
                           ),
-
-                          const SizedBox(height: AppSpacing.xs),
-
-                          // Framed Studio Glass Surface for Tab Contents
                           Expanded(
-                            child: Container(
-                              margin: const EdgeInsetsDirectional.only(
-                                start: AppSpacing.xs,
-                                end: AppSpacing.xs,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Color.alphaBlend(
-                                  widget.bgColor.withValues(
-                                    alpha: p.isDark ? 0.30 : 0.18,
-                                  ),
-                                  p.surfaceContainer.withValues(
-                                    alpha: p.isDark ? 0.72 : 0.88,
-                                  ),
-                                ),
-                                borderRadius: AppRadii.r24All,
-                                border: Border.all(
-                                  color: Color.alphaBlend(
-                                    widget.activeColor.withValues(alpha: 0.20),
-                                    p.hairline,
-                                  ),
-                                  width: 1.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(
-                                      alpha: p.isDark ? 0.28 : 0.05,
-                                    ),
-                                    blurRadius: 22,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: AppRadii.r24All,
-                                child: TabBarView(
-                                  controller: _tabController,
-                                  children: [
-                                    // 1. Quran Mushaf View (when Quran track/mode) or Lyrics View
-                                    if (isQuran)
-                                      Padding(
-                                        padding: const EdgeInsetsDirectional.all(
-                                          AppSpacing.sm,
-                                        ),
-                                        child: QuranMushafView(
-                                          key: ValueKey(
-                                            'tablet_mushaf_${widget.state.currentSong?.uri ?? widget.state.currentSong?.path}_${_quranMetadata?.surahNumber}',
-                                          ),
-                                          metadata: _quranMetadata,
-                                          currentPosition: widget.state.position,
-                                          onSeek: (pos) => widget.cubit.seek(pos),
-                                          isExpanded: true,
-                                        ),
-                                      )
-                                    else
-                                      Padding(
-                                        padding:
-                                            const EdgeInsetsDirectional.fromSTEB(
-                                          AppSpacing.md,
-                                          AppSpacing.xs,
-                                          AppSpacing.md,
-                                          AppSpacing.md,
-                                        ),
-                                        child: LyricsView(
-                                          key: ValueKey(
-                                            'tablet_lyrics_${widget.state.currentSong?.id}_${widget.state.currentSong?.remoteId}',
-                                          ),
-                                          lyrics: widget.state.lyrics,
-                                          isLoading:
-                                              widget.state.isLoadingLyrics,
-                                          activeColor: widget.activeColor,
-                                          source: widget.state.lyricsSource,
-                                        ),
-                                      ),
-                                    // 2. Queue View (Tab 1)
-                                    const Padding(
-                                      padding: EdgeInsetsDirectional.fromSTEB(
-                                        AppSpacing.md,
-                                        AppSpacing.xs,
-                                        AppSpacing.md,
-                                        AppSpacing.md,
-                                      ),
-                                      child: NowPlayingQueueView(),
-                                    ),
-                                    // 3. Quick DSP Controls (Tab 2)
-                                    Padding(
-                                      padding: const EdgeInsets.all(
-                                        AppSpacing.lg,
-                                      ),
-                                      child: _QuickDspControls(
-                                        cubit: widget.cubit,
-                                        state: widget.state,
-                                        activeColor: widget.activeColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                            child: widget.themeWidget,
                           ),
                         ],
                       ),
+                    ),
+                  ),
+
+                  // Natural Open Gutter (No hard dividing line, breathing room like Apple Music)
+                  const SizedBox(width: AppSpacing.md),
+
+                  // Right Pane: Seamless Apple Music Lyrics & Queue Canvas + Floating Bottom Actions
+                  Expanded(
+                    flex: 6,
+                    child: Stack(
+                      children: [
+                        // Seamless Full-Bleed Content (TabBarView for Lyrics / Quran, Queue, DSP)
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                              start: AppSpacing.sm,
+                              end: AppSpacing.xl,
+                              top: AppSpacing.sm,
+                              bottom: 64.0,
+                            ),
+                            child: TabBarView(
+                              controller: _tabController,
+                              physics: const BouncingScrollPhysics(),
+                              children: [
+                                // Tab 0: Quran Mushaf View (when Quran track/mode) or Lyrics View
+                                if (isQuran)
+                                  QuranMushafView(
+                                    key: ValueKey(
+                                      'tablet_mushaf_${widget.state.currentSong?.uri ?? widget.state.currentSong?.path}_${_quranMetadata?.surahNumber}',
+                                    ),
+                                    metadata: _quranMetadata,
+                                    currentPosition: widget.state.position,
+                                    onSeek: (pos) => widget.cubit.seek(pos),
+                                    isExpanded: true,
+                                  )
+                                else
+                                  LyricsView(
+                                    key: ValueKey(
+                                      'tablet_lyrics_${widget.state.currentSong?.id}_${widget.state.currentSong?.remoteId}',
+                                    ),
+                                    lyrics: widget.state.lyrics,
+                                    isLoading: widget.state.isLoadingLyrics,
+                                    activeColor: widget.activeColor,
+                                    source: widget.state.lyricsSource,
+                                  ),
+
+                                // Tab 1: Queue View
+                                const NowPlayingQueueView(),
+
+                                // Tab 2: Quick DSP Controls
+                                Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.lg),
+                                  child: _QuickDspControls(
+                                    cubit: widget.cubit,
+                                    state: widget.state,
+                                    activeColor: widget.activeColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Floating Bottom-Right Apple Music Pill Action Dock
+                        PositionedDirectional(
+                          end: AppSpacing.xl,
+                          bottom: AppSpacing.md,
+                          child: _TabletLandscapeFloatingDock(
+                            controller: _tabController,
+                            activeColor: widget.activeColor,
+                            isQuran: isQuran,
+                            cubit: widget.cubit,
+                            props: PlayerThemeProps(
+                              state: widget.state,
+                              cubit: widget.cubit,
+                              activeColor: widget.activeColor,
+                              bgColor: widget.bgColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -685,7 +479,7 @@ class _FoldableTabletopLayout extends StatelessWidget {
           height: topHeight,
           width: double.infinity,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: const EdgeInsetsDirectional.fromSTEB(
               AppSpacing.md,
               AppSpacing.sm,
               AppSpacing.md,
@@ -1406,6 +1200,161 @@ class _DspModuleBentoCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Floating Frosted Pill Action Dock for Tablet Landscape (Apple Music iPad style).
+class _TabletLandscapeFloatingDock extends StatelessWidget {
+  final TabController controller;
+  final Color activeColor;
+  final bool isQuran;
+  final PlayerCubit cubit;
+  final PlayerThemeProps props;
+
+  const _TabletLandscapeFloatingDock({
+    required this.controller,
+    required this.activeColor,
+    required this.isQuran,
+    required this.cubit,
+    required this.props,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AnimatedBuilder(
+      animation: controller.animation ?? controller,
+      builder: (context, _) {
+        final currentIdx = controller.index;
+
+        Widget dockButton({
+          required IconData icon,
+          required String tooltip,
+          required bool isSelected,
+          required VoidCallback onTap,
+        }) {
+          return Tooltip(
+            message: tooltip,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onTap();
+                },
+                borderRadius: AppRadii.r16All,
+                child: AnimatedContainer(
+                  duration: context.motionMs(220),
+                  curve: context.motionCurve(Curves.easeOutCubic),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14.0,
+                    vertical: 8.0,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? activeColor.withValues(alpha: isDark ? 0.32 : 0.22)
+                        : Colors.transparent,
+                    borderRadius: AppRadii.r16All,
+                    border: Border.all(
+                      color: isSelected
+                          ? activeColor.withValues(alpha: isDark ? 0.70 : 0.50)
+                          : Colors.transparent,
+                      width: 1.0,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: activeColor.withValues(alpha: 0.32),
+                              blurRadius: 12,
+                              spreadRadius: -1,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: isSelected
+                        ? (isDark ? Colors.white : activeColor)
+                        : p.textSecondary.withValues(alpha: 0.70),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return RepaintBoundary(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 4.0),
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                props.bgColor.withValues(alpha: isDark ? 0.35 : 0.25),
+                p.surfaceContainer.withValues(alpha: isDark ? 0.72 : 0.88),
+              ),
+              borderRadius: AppRadii.r24All,
+              border: Border.all(
+                color: Color.alphaBlend(
+                  activeColor.withValues(alpha: 0.22),
+                  p.hairline,
+                ),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.32 : 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                dockButton(
+                  icon: isQuran
+                      ? Icons.menu_book_rounded
+                      : Icons.chat_bubble_rounded,
+                  tooltip:
+                      isQuran ? context.l10n.quranMode : context.l10n.lyrics,
+                  isSelected: currentIdx == 0,
+                  onTap: () => controller.animateTo(0),
+                ),
+                const SizedBox(width: 3),
+                dockButton(
+                  icon: Icons.format_list_bulleted_rounded,
+                  tooltip: context.l10n.queueTab,
+                  isSelected: currentIdx == 1,
+                  onTap: () => controller.animateTo(1),
+                ),
+                const SizedBox(width: 3),
+                dockButton(
+                  icon: Icons.tune_rounded,
+                  tooltip: context.l10n.dspLabel,
+                  isSelected: currentIdx == 2,
+                  onTap: () => controller.animateTo(2),
+                ),
+                const SizedBox(width: 3),
+                dockButton(
+                  icon: Icons.more_horiz_rounded,
+                  tooltip: context.l10n.moreOptions,
+                  isSelected: false,
+                  onTap: () {
+                    PlayerMoreSheet.show(
+                      context,
+                      song: props.state.currentSong,
+                      activeColor: activeColor,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -9,6 +9,7 @@ import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:pulsr/core/performance/gpu_budget.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/domain/models/lyrics_line.dart';
+import '../../themes/player_theme.dart';
 
 /// Advanced word-level / syllable sweep karaoke lyrics renderer.
 ///
@@ -147,8 +148,9 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
     final activeIdx = _findActiveIndex(widget.currentPosition);
     final posMs = widget.currentPosition.inMilliseconds;
     final viewportHeight = MediaQuery.sizeOf(context).height;
+    final isInSplit = PlayerSplitViewScope.of(context);
 
-    return NotificationListener<UserScrollNotification>(
+    final Widget listView = NotificationListener<UserScrollNotification>(
       onNotification: (_) {
         _userIsScrolling = true;
         _lastUserScrollTime = DateTime.now();
@@ -156,9 +158,13 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
       },
       child: ListView.builder(
         controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.symmetric(
-          vertical: math.max(AppSpacing.xxl, viewportHeight * 0.32),
-          horizontal: AppSpacing.lg,
+          vertical: math.max(
+            AppSpacing.xxl,
+            viewportHeight * (isInSplit ? 0.30 : 0.32),
+          ),
+          horizontal: isInSplit ? AppSpacing.md : AppSpacing.lg,
         ),
         itemCount: widget.lyrics.length,
         itemBuilder: (context, index) {
@@ -192,6 +198,28 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
         },
       ),
     );
+
+    if (isInSplit) {
+      return ShaderMask(
+        shaderCallback: (Rect bounds) {
+          return const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              Colors.white,
+              Colors.white,
+              Colors.transparent,
+            ],
+            stops: [0.0, 0.08, 0.88, 1.0],
+          ).createShader(bounds);
+        },
+        blendMode: BlendMode.dstIn,
+        child: listView,
+      );
+    }
+
+    return listView;
   }
 }
 
@@ -267,7 +295,7 @@ class _LyricLineWidget extends StatelessWidget {
             !replaceOriginalWithTranslation)
           _buildWordLevelKaraokeLine(isBackground, alignEnd)
         else
-          _buildStandardLine(displayText, isBackground, textAlign),
+          _buildStandardLine(displayText, isBackground, textAlign, context),
         if (subText != null && subText.isNotEmpty && subText != displayText)
           Padding(
             padding: const EdgeInsets.only(top: AppSpacing.xxs),
@@ -323,20 +351,27 @@ class _LyricLineWidget extends StatelessWidget {
   }
 
   Widget _buildStandardLine(
-      String text, bool isBackground, TextAlign textAlign) {
+      String text, bool isBackground, TextAlign textAlign, BuildContext context) {
+    final isInSplit = PlayerSplitViewScope.of(context);
     final TextStyle baseStyle = TextStyle(
-      fontSize: isBackground ? 17.0 : (isActive ? 22.0 : 19.0),
+      fontSize: isBackground
+          ? (isInSplit ? 18.0 : 17.0)
+          : (isActive
+              ? (isInSplit ? 27.0 : 22.0)
+              : (isInSplit ? 20.0 : 19.0)),
       fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
       fontStyle: isBackground ? FontStyle.italic : FontStyle.normal,
-      height: 1.35,
+      height: isInSplit ? 1.40 : 1.35,
       color: isActive
-          ? palette.textPrimary
-          : palette.textSecondary.withValues(alpha: 0.45),
+          ? (isInSplit ? Colors.white : palette.textPrimary)
+          : (isInSplit
+              ? Colors.white.withValues(alpha: 0.46)
+              : palette.textSecondary.withValues(alpha: 0.45)),
       shadows: isActive
           ? [
               Shadow(
                 color: activeColor.withValues(alpha: 0.55),
-                blurRadius: 18,
+                blurRadius: isInSplit ? 20 : 18,
               ),
             ]
           : null,
