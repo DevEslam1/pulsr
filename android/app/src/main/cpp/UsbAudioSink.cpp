@@ -70,7 +70,7 @@ namespace pulsr {
 
 namespace {
 constexpr int kNumUrbs = 4;
-constexpr int kPacketsPerUrb = 8; // 8 ms of 1 ms isochronous packets
+constexpr int kTargetUrbDurationUs = 8000;
 } // namespace
 
 UsbAudioSink& UsbAudioSink::instance() {
@@ -101,7 +101,8 @@ bool UsbAudioSink::submitAll() {
 UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
                                    int altSetting, int sampleRate, int channels,
                                    int bytesPerSample) {
-    if (fd < 0 || channels <= 0 || channels > 8 || bytesPerSample <= 0) {
+    if (fd < 0 || channels <= 0 || channels > 8 || bytesPerSample < 2 ||
+        bytesPerSample > 4) {
         lastError_.store(EINVAL, std::memory_order_relaxed);
         return UsbStreamResult::InvalidArgs;
     }
@@ -120,6 +121,12 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     if (!validRate) {
         lastError_.store(EINVAL, std::memory_order_relaxed);
         return UsbStreamResult::RateUnsupported;
+    }
+    // Isochronous OUT endpoint: addresses 1-15 with the IN bit clear. Checked
+    // after the rate so an unsupported rate keeps reporting itself.
+    if (endpointAddress <= 0 || endpointAddress > 0x0f || (endpointAddress & 0x80) != 0) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        return UsbStreamResult::InvalidArgs;
     }
 
     // Never tear down a live sink implicitly; caller must Stop first.
@@ -154,14 +161,32 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     altSetting_ = altSetting;
     sampleRate_ = sampleRate;
     channels_ = channels;
-    bytesPerSample_ = std::clamp(bytesPerSample, 2, 4);
-    // Tell the engine the container depth it must satisfy. Packing here is the
-    // last quantizer on this path, so noise shaping has to target the same grid
-    // or the shaping is re-quantized away by the pack below.
-    AudioDspEngine::instance().setSinkBitDepth(bytesPerSample_ * 8);
+    bytesPerSample_ = bytesPerSample;
+    producerDither_ = {};
+    workerDither_ = {};
     gapFader_.configure(sampleRate, channels, bytesPerSample_);
 
 #if defined(__linux__) || defined(__ANDROID__)
+    const int speed = ioctl(fd_, USBDEVFS_GET_SPEED);
+    const auto config = fetchConfigDescriptor(fd_);
+    const auto timing = ParseEndpointTiming(config.data(), config.size(),
+                                           interfaceNumber_, altSetting_, endpoint_, speed);
+    if (timing.intervalUs <= 0 || timing.maxPacketBytes <= 0) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        releaseResources();
+        return UsbStreamResult::InvalidArgs;
+    }
+    serviceIntervalUs_ = timing.intervalUs;
+    const int frameBytes = channels_ * bytesPerSample_;
+    const int capacityFrames = timing.maxPacketBytes / frameBytes;
+    const uint64_t samplesPerInterval = static_cast<uint64_t>(sampleRate_) * serviceIntervalUs_;
+    const int nominalFrames = static_cast<int>((samplesPerInterval + 999999) / 1000000);
+    if (capacityFrames < nominalFrames) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        releaseResources();
+        return UsbStreamResult::RateUnsupported;
+    }
+    maxFramesPerPacket_ = std::min(capacityFrames, nominalFrames + 1);
     // Claim the AudioStreaming interface (force: detaches the kernel audio
     // driver so the HAL can no longer own the endpoint) and select the alt
     // setting that exposes the isochronous OUT endpoint.
@@ -185,14 +210,9 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         }
     }
 
-    // Frames per 1 ms packet is ceil(sampleRate / 1000) for fractional rates
-    // like 44.1 kHz. Reserve ONE extra frame of headroom per packet so a
-    // positive feedback adjustment (FIX 2) can lengthen a packet without ever
-    // overflowing the preallocated URB buffer.
-    maxFramesPerPacket_ = (sampleRate_ + 999) / 1000 + 1;
-    const int maxBytesPerPacket = maxFramesPerPacket_ * channels_ * bytesPerSample_;
+    const int maxBytesPerPacket = maxFramesPerPacket_ * frameBytes;
     bytesPerPacket_ = maxBytesPerPacket;
-    packetsPerUrb_ = kPacketsPerUrb;
+    packetsPerUrb_ = std::max(1, kTargetUrbDurationUs / serviceIntervalUs_);
     bytesPerUrb_ = maxBytesPerPacket * packetsPerUrb_;
 
     // Packet-sizing / feedback state consumed by the worker thread.
@@ -226,7 +246,6 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     // Nominal (feedback-free) initial packet lengths. frameAccumulator_ is a
     // member so the worker thread continues the same fractional cadence when it
     // refills URBs (and later feedback-adjusts it).
-    const int frameBytes = channels_ * bytesPerSample_;
     for (int i = 0; i < numUrbs_; ++i) {
         auto* urb = reinterpret_cast<struct usbdevfs_urb*>(
             urbStorage_.data() + static_cast<size_t>(i) * urbStride_);
@@ -246,7 +265,8 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         int urbTotalBytes = 0;
         for (int p = 0; p < packetsPerUrb_; ++p) {
             const int framesInPacket = NextPacketFrames(
-                frameAccumulator_, static_cast<uint32_t>(sampleRate_), maxFramesPerPacket_);
+                frameAccumulator_, static_cast<uint32_t>(sampleRate_),
+                serviceIntervalUs_, maxFramesPerPacket_);
             const int pktBytes = framesInPacket * frameBytes;
             urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktBytes);
             urb->iso_frame_desc[p].actual_length = 0;
@@ -274,14 +294,18 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         }
     }
 
+    // The container this sink packs into is the grid every rendering engine
+    // must shape for; the broadcast reaches the registered players and engines
+    // registered later inherit it.
+    DspEngineRegistry::instance().setSinkBitDepth(bytesPerSample_ * 8);
     running_.store(true, std::memory_order_release);
     active_.store(true, std::memory_order_release);
     worker_ = std::thread([this] { workerLoop(); });
     return UsbStreamResult::Ok;
 #else
-    running_.store(true, std::memory_order_release);
-    active_.store(true, std::memory_order_release);
-    return UsbStreamResult::Ok;
+    lastError_.store(ENOSYS, std::memory_order_relaxed);
+    releaseResources();
+    return UsbStreamResult::InvalidArgs;
 #endif
 }
 
@@ -560,7 +584,7 @@ void UsbAudioSink::workerLoop() {
         const uint32_t ratePerSec = static_cast<uint32_t>(feedbackRatePerSec_);
         for (int p = 0; p < urb->number_of_packets; ++p) {
             const int framesInPacket = NextPacketFrames(
-                frameAccumulator_, ratePerSec, maxFramesPerPacket_);
+                frameAccumulator_, ratePerSec, serviceIntervalUs_, maxFramesPerPacket_);
             const size_t pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
 
             const size_t w = ringWrite_.load(std::memory_order_acquire);
@@ -572,11 +596,11 @@ void UsbAudioSink::workerLoop() {
                 readPos += pktLen;
                 // Leaving a gap: ride the envelope back to unity instead of
                 // stepping straight onto the resumed audio.
-                gapFader_.applyReal(dst, framesInPacket, sinkDither_);
+                gapFader_.applyReal(dst, framesInPacket, workerDither_);
             } else if (pktLen > 0) {
                 // Decay the last emitted frame to silence rather than cutting
                 // it off, so the gap itself cannot click.
-                gapFader_.fillGap(dst, framesInPacket, sinkDither_);
+                gapFader_.fillGap(dst, framesInPacket, workerDither_);
                 underrunCount_.fetch_add(1, std::memory_order_relaxed);
             }
             urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktLen);
@@ -652,7 +676,7 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
             uint8_t packed[4];
             // This pack is the last quantizer on the direct USB path: whatever
             // the engine did, the bits written here are what the DAC receives.
-            PackPcmSample(sample, packed, bps, sinkDither_);
+            PackPcmSample(sample, packed, bps, producerDither_);
             for (int b = 0; b < bps; ++b) {
                 ring_[(w + b) & mask] = packed[b];
             }
@@ -680,15 +704,14 @@ double UsbAudioSink::GetBufferedMs() {
     if (frameBytes > 0 && sampleRate_ > 0) {
         ringMs = (static_cast<double>(count) / static_cast<double>(frameBytes * sampleRate_)) * 1000.0;
     }
-    const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_);
+    const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_) * serviceIntervalUs_ / 1000.0;
     return ringMs + urbMs;
 }
 
 bool UsbAudioSink::setupFeedbackUrbs() {
 #if defined(__linux__) || defined(__ANDROID__)
     if (feedbackEndpoint_ == 0 || fd_ < 0) return false;
-    if (feedbackPacketSize_ < 4) feedbackPacketSize_ = 4;    // >= HS 16.16 (4 bytes)
-    if (feedbackPacketSize_ > 64) feedbackPacketSize_ = 64;  // clamp pathological sizes
+    if (feedbackPacketSize_ != 3 && feedbackPacketSize_ != 4) return false;
     numFeedbackUrbs_ = 2;
     feedbackPacketsPerUrb_ = 4;
     feedbackUrbStride_ = sizeof(struct usbdevfs_urb) +
@@ -753,17 +776,10 @@ bool UsbAudioSink::setupFeedbackUrbs() {
 void UsbAudioSink::applyFeedback(const uint8_t* data, int len) {
     const int decoded = DecodeFeedbackRatePerSec(data, len, sampleRate_);
     if (decoded > 0) feedbackRatePerSec_ = decoded;
-    // TODO(device-test): the FS(10.14)/HS(16.16) selection and the frame vs
-    // microframe time base here follow the USB spec, but real DACs vary (some
-    // report per-frame values on a high-speed feedback endpoint, etc.). The
-    // ratio form + 0.1% clamp keep this safe regardless, but the correction
-    // loop's gain still needs tuning on hardware. The OUT path also sizes iso
-    // packets as 1 ms units; if the device is high-speed (125 us microframe
-    // packets) that pre-existing assumption must be validated on hardware too.
 }
 
 int UsbAudioSink::DecodeFeedbackRatePerSec(const uint8_t* data, int len, int nominalRate) {
-    if (data == nullptr || nominalRate <= 0) return 0;
+    if (data == nullptr || nominalRate <= 0 || (len != 3 && len != 4)) return 0;
 
     // Express the DAC's request as a ratio to nominal, independent of the
     // frame/microframe time base:
@@ -806,12 +822,62 @@ int UsbAudioSink::DecodeFeedbackRatePerSec(const uint8_t* data, int len, int nom
     return static_cast<int>(target + 0.5);
 }
 
-int UsbAudioSink::NextPacketFrames(uint32_t& accumulator, uint32_t ratePerSec, int maxFramesPerPacket) {
-    accumulator += ratePerSec;
-    int framesInPacket = static_cast<int>(accumulator / 1000);
-    accumulator %= 1000;
-    if (framesInPacket > maxFramesPerPacket) framesInPacket = maxFramesPerPacket;
-    return framesInPacket;
+UsbAudioSink::EndpointTiming UsbAudioSink::ParseEndpointTiming(
+        const uint8_t* desc, size_t len, int interfaceNumber, int altSetting,
+        int endpointAddress, int usbSpeed) {
+    const bool fullSpeed = usbSpeed == 2;
+    const bool highSpeed = usbSpeed == 3;
+    const bool superSpeed = usbSpeed == 5 || usbSpeed == 6;
+    if (desc == nullptr || (!fullSpeed && !highSpeed && !superSpeed)) return {};
+    bool selectedInterface = false;
+    for (size_t i = 0; i + 2 <= len;) {
+        const size_t length = desc[i];
+        if (length < 2 || length > len - i) return {};
+        const uint8_t type = desc[i + 1];
+        if (type == 0x04) {
+            if (length < 9) return {};
+            selectedInterface = desc[i + 2] == interfaceNumber &&
+                desc[i + 3] == altSetting && desc[i + 5] == 0x01 && desc[i + 6] == 0x02;
+        } else if (type == 0x05 && selectedInterface) {
+            if (length < 7) return {};
+            if (desc[i + 2] == endpointAddress) {
+                const int attributes = desc[i + 3];
+                const int interval = desc[i + 6];
+                if ((endpointAddress & 0x80) != 0 || (attributes & 0x03) != 0x01 ||
+                    (attributes & 0x30) == 0x10 || interval < 1 || interval > 16) return {};
+                const int packet = desc[i + 4] | (desc[i + 5] << 8);
+                const int payload = packet & 0x07ff;
+                const int transactions = (packet >> 11) & 0x03;
+                if ((packet & 0xe000) != 0 || payload <= 0 ||
+                    payload > (fullSpeed ? 1023 : 1024) ||
+                    (highSpeed ? transactions == 3 : transactions != 0)) return {};
+                int capacity = payload * (transactions + 1);
+                if (superSpeed) {
+                    const size_t companion = i + length;
+                    if (companion + 6 > len || desc[companion] < 6 ||
+                        desc[companion] > len - companion || desc[companion + 1] != 0x30) return {};
+                    const int burst = desc[companion + 2];
+                    const int mult = desc[companion + 3] & 0x03;
+                    const int bytesPerInterval = desc[companion + 4] | (desc[companion + 5] << 8);
+                    if (burst > 15 || mult > 2 || bytesPerInterval <= 0 ||
+                        bytesPerInterval > payload * (burst + 1) * (mult + 1)) return {};
+                    capacity = bytesPerInterval;
+                }
+                return {(fullSpeed ? 1000 : 125) * (1 << (interval - 1)), capacity};
+            }
+        }
+        i += length;
+    }
+    return {};
+}
+
+int UsbAudioSink::NextPacketFrames(uint64_t& accumulator, uint32_t ratePerSec,
+                                   int intervalUs, int maxFramesPerPacket) {
+    if (intervalUs <= 0 || maxFramesPerPacket <= 0) return 0;
+    accumulator += static_cast<uint64_t>(ratePerSec) * static_cast<uint64_t>(intervalUs);
+    const uint64_t frames = accumulator / 1000000;
+    accumulator %= 1000000;
+    return static_cast<int>(std::min(frames, static_cast<uint64_t>(maxFramesPerPacket)));
 }
 
 std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(

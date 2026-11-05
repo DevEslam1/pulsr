@@ -146,7 +146,7 @@ void main() {
     );
     expect(find.byType(HighlightedSongTile), findsWidgets);
 
-    await tester.tap(find.byIcon(Icons.clear_rounded));
+    await tester.tap(find.byIcon(Icons.cancel_rounded));
     await tester.pump();
     verify(() => searchCubit.clearQuery()).called(1);
 

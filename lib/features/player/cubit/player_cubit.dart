@@ -360,6 +360,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       var prevPreampWithoutRg = settingsCubit.state.replayGainPreampWithoutRg;
       var prevFollowSampleRate = settingsCubit.state.followTrackSampleRate;
       var prevBitPerfect = settingsCubit.state.bitPerfectOutput;
+      var prevBypassDsp = settingsCubit.state.bypassDspOnBitPerfect;
+      var prevUsbHardwareVolume = settingsCubit.state.usbHardwareVolumeEnabled;
 
       autoSub(settingsCubit.stream, (settingsState) {
         final crossfadeChanged =
@@ -369,7 +371,14 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         final volumeRelatedChanged =
             settingsState.replayGainMode != prevReplayGainMode ||
                 settingsState.replayGainPreampWithRg != prevPreampWithRg ||
-                settingsState.replayGainPreampWithoutRg != prevPreampWithoutRg;
+                settingsState.replayGainPreampWithoutRg != prevPreampWithoutRg ||
+                // Each of these moves the composed gain between software and
+                // hardware/DVC ownership; leaving the old player gain in place
+                // would keep attenuating (or boosting) a stream the user just
+                // asked to be bit-perfect.
+                settingsState.bitPerfectOutput != prevBitPerfect ||
+                settingsState.bypassDspOnBitPerfect != prevBypassDsp ||
+                settingsState.usbHardwareVolumeEnabled != prevUsbHardwareVolume;
         final sampleRateRelatedChanged =
             settingsState.followTrackSampleRate != prevFollowSampleRate ||
                 settingsState.bitPerfectOutput != prevBitPerfect;
@@ -382,6 +391,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         prevPreampWithoutRg = settingsState.replayGainPreampWithoutRg;
         prevFollowSampleRate = settingsState.followTrackSampleRate;
         prevBitPerfect = settingsState.bitPerfectOutput;
+        prevBypassDsp = settingsState.bypassDspOnBitPerfect;
+        prevUsbHardwareVolume = settingsState.usbHardwareVolumeEnabled;
 
         if (crossfadeChanged) {
           _audioHandler.setCrossfadeDuration(

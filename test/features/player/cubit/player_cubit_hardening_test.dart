@@ -719,6 +719,13 @@ void main() {
             sampleRate: any(named: 'sampleRate'),
             bitDepth: any(named: 'bitDepth'),
           )).thenAnswer((_) async => true);
+      when(() => mockSettings.setBitPerfectTrackFormat(
+            sampleRate: any(named: 'sampleRate'),
+            bitDepth: any(named: 'bitDepth'),
+          )).thenAnswer((inv) => mockHiRes.setTargetOutputFormat(
+            sampleRate: inv.namedArguments[#sampleRate] as int,
+            bitDepth: inv.namedArguments[#bitDepth] as int,
+          ));
 
       var state = const PlayerState();
       final dspController = PlayerDspController(
@@ -780,6 +787,14 @@ void main() {
         }
         return true;
       });
+      // Format switches go through the mode owner, which also owns teardown.
+      when(() => mockSettings.setBitPerfectTrackFormat(
+            sampleRate: any(named: 'sampleRate'),
+            bitDepth: any(named: 'bitDepth'),
+          )).thenAnswer((inv) => mockHiRes.setTargetOutputFormat(
+            sampleRate: inv.namedArguments[#sampleRate] as int,
+            bitDepth: inv.namedArguments[#bitDepth] as int,
+          ));
 
       var state = const PlayerState();
       final dspController = PlayerDspController(

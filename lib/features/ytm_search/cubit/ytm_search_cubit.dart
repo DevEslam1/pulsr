@@ -309,8 +309,11 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
     if (query.trim().isEmpty) {
       _resetPaging();
-      safeEmit(
-          state.copyWith(results: [], isLoading: false, errorMessage: null));
+      safeEmit(state.copyWith(
+          results: [],
+          isLoading: false,
+          hasSearched: false,
+          errorMessage: null));
       return;
     }
 
@@ -365,7 +368,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
         safeEmit(state.copyWith(
           results: const [],
           isLoading: false,
-          
+          // Without this the phase stays "not searched yet" and the screen
+          // shows the history list instead of the no-results state.
+          hasSearched: true,
           loadMoreFailed: false,
           errorMessage: null,
         ));
@@ -379,7 +384,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       safeEmit(state.copyWith(
           results: List<YtmTrack>.unmodifiable(results),
           isLoading: false,
-          
+          hasSearched: true,
           loadMoreFailed: false,
           errorMessage: null));
       if (results.isNotEmpty) {

@@ -16,8 +16,12 @@ extension PlayerDspFollowRate on PlayerDspController {
       final settings = _settingsCubit!.state;
       // The user's "Per-Track Output Format Negotiation" switch is the master
       // gate: off means keep one manual/manufacturer output format for the
-      // whole session instead of renegotiating per track.
-      if (!settings.outputFormatNegotiationEnabled) return;
+      // whole session instead of renegotiating per track. Strict bit-perfect
+      // promises the track's own format, so it cannot be silently muted by
+      // that switch.
+      if (!settings.outputFormatNegotiationEnabled && !settings.strictBitPerfect) {
+        return;
+      }
       // Bluetooth Hi-Res: the A2DP link owns the format, so exclusive
       // bit-perfect is impossible, but when the codec advertises the track's
       // native rate we can ask it to switch — avoiding an unnecessary platform
@@ -36,8 +40,11 @@ extension PlayerDspFollowRate on PlayerDspController {
           ? song.bitDepth!
           : PlayerConstants.defaultBitDepth;
       final device = settings.currentOutputDevice;
+      // The mode belongs in the dedup key: switching Bit-Perfect off and on
+      // reopens the output, so the previous confirmation is no longer valid.
       final route =
-          '${device?.deviceName}|${device?.activeDeviceType}|${device?.isUsbDac}';
+          '${device?.deviceName}|${device?.activeDeviceType}|${device?.isUsbDac}'
+          '|${settings.bitPerfectOutput}|${settings.strictBitPerfect}';
       final rate = HiResAudioService.followTrackRateToApply(
         trackSampleRate: song.sampleRate,
         lastRequestedSampleRate:
@@ -78,44 +85,42 @@ extension PlayerDspFollowRate on PlayerDspController {
         bitPerfectActive: false,
       );
       if (!decision.applied) return;
+      // Strict bit-perfect promises the track's own format. A negotiated
+      // downgrade would be a silent resample behind a bit-perfect badge, so
+      // refuse it through the mode owner rather than applying it anyway.
+      if (settings.strictBitPerfect &&
+          (decision.sampleRate != rate || decision.bitDepth < depth)) {
+        _lastFollowedSampleRate = null;
+        ErrorLogger.log(
+            'Strict bit-perfect refused: output cannot carry $rate Hz/$depth-bit '
+            '(negotiated ${decision.sampleRate} Hz/${decision.bitDepth}-bit)',
+            category: 'PlayerDspController');
+        await _settingsCubit!.setBitPerfectOutput(false);
+        return;
+      }
       try {
-        if (directStreaming) {
+        if (directStreaming && decision.sampleRate != rate) {
           // The UAC2 tee forwards decoded PCM at the track rate with no
-          // resampler. Opening the isochronous endpoint at a different
-          // negotiated rate would play the whole track fast/slow (e.g. 44.1k
-          // frames into a 48k stream). Leave direct streaming and let the
-          // Android mixer resample instead.
-          if (decision.sampleRate != rate) {
-            _lastFollowedSampleRate = null;
-            ErrorLogger.log(
-                'USB DAC lacks track rate $rate Hz (negotiated '
-                '${decision.sampleRate} Hz); leaving direct USB streaming '
-                'for platform resampling',
-                category: 'PlayerDspController');
-            await usb.stopStreaming();
-            await _settingsCubit!.refreshOutputDevice();
-            return;
-          }
-          final res = await usb.startStreaming(
-            sampleRate: decision.sampleRate,
-            bitDepth: decision.bitDepth,
-          );
-          if (!res.isOk) {
-            _lastFollowedSampleRate = null;
-            ErrorLogger.log(
-                'Follow-track direct USB rate switch failed (${decision.sampleRate}, ${res.name})',
-                category: 'PlayerDspController');
-            await _settingsCubit!.refreshOutputDevice();
-            return;
-          }
-        } else {
-          final applied = await service.setTargetOutputFormat(
-              sampleRate: decision.sampleRate, bitDepth: decision.bitDepth);
-          if (!applied) {
-            _lastFollowedSampleRate = null;
-            await _settingsCubit!.refreshOutputDevice();
-            return;
-          }
+          // resampler. Opening the endpoint at a negotiated rate would play the
+          // whole track fast/slow (44.1k frames into a 48k stream), and leaving
+          // the sink running while the mixer resamples would strand ownership.
+          _lastFollowedSampleRate = null;
+          ErrorLogger.log(
+              'USB DAC lacks track rate $rate Hz (negotiated '
+              '${decision.sampleRate} Hz); releasing direct USB streaming',
+              category: 'PlayerDspController');
+          await _settingsCubit!.setBitPerfectOutput(false);
+          await _settingsCubit!.refreshOutputDevice();
+          return;
+        }
+        // One owner applies the format and tears the mode down coherently if
+        // the transport rejects it, instead of leaving a live endpoint behind.
+        final applied = await _settingsCubit!.setBitPerfectTrackFormat(
+            sampleRate: decision.sampleRate, bitDepth: decision.bitDepth);
+        if (!applied) {
+          _lastFollowedSampleRate = null;
+          await _settingsCubit!.refreshOutputDevice();
+          return;
         }
         if (_isClosed()) return;
         _lastFollowedSampleRate = decision.sampleRate;

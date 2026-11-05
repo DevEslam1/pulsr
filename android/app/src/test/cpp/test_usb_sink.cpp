@@ -176,6 +176,9 @@ int main() {
               "null feedback must be rejected");
         check(UsbAudioSink::DecodeFeedbackRatePerSec(nom, 4, 0) == 0,
               "non-positive nominal rate must be rejected");
+        const uint8_t shortFeedback[2] = {0, 1};
+        check(UsbAudioSink::DecodeFeedbackRatePerSec(shortFeedback, 2, 48000) == 0,
+              "truncated feedback must be rejected before reading three bytes");
     }
     {
         // 3-byte Q10.14 full-speed: nominal 48000 => 48.0 samples/frame.
@@ -195,23 +198,23 @@ int main() {
     // ---- Fractional packet sizing ----------------------------------------
     {
         // 48000 is an integer number of frames per 1 ms packet: always 48.
-        uint32_t acc = 0;
+        uint64_t acc = 0;
         const int maxF = (48000 + 999) / 1000 + 1; // 49
         bool all48 = true;
         for (int i = 0; i < 100; ++i) {
-            if (UsbAudioSink::NextPacketFrames(acc, 48000, maxF) != 48) all48 = false;
+            if (UsbAudioSink::NextPacketFrames(acc, 48000, 1000, maxF) != 48) all48 = false;
         }
         check(all48, "48000 must emit exactly 48 frames per 1 ms packet");
         check(acc == 0, "48000 must leave zero fractional remainder");
     }
     {
         // 44100 emits 44/45 frames so every 10 packets sum to exactly 441.
-        uint32_t acc = 0;
+        uint64_t acc = 0;
         const int maxF = (44100 + 999) / 1000 + 1; // 45
         int sum = 0;
         bool in4445 = true;
         for (int i = 0; i < 10; ++i) {
-            const int f = UsbAudioSink::NextPacketFrames(acc, 44100, maxF);
+            const int f = UsbAudioSink::NextPacketFrames(acc, 44100, 1000, maxF);
             if (f != 44 && f != 45) in4445 = false;
             sum += f;
         }
@@ -220,15 +223,81 @@ int main() {
         // Over 1000 packets the accumulator must produce exactly 44100 frames.
         acc = 0;
         long total = 0;
-        for (int i = 0; i < 1000; ++i) total += UsbAudioSink::NextPacketFrames(acc, 44100, maxF);
+        for (int i = 0; i < 1000; ++i) total += UsbAudioSink::NextPacketFrames(acc, 44100, 1000, maxF);
         check(total == 44100, "44100 must emit exactly 44100 frames per 1000 packets");
     }
     {
         // The clamp caps a packet so feedback can never overflow the URB buffer.
-        uint32_t acc = 0;
-        const int f = UsbAudioSink::NextPacketFrames(acc, 48000, 10);
+        uint64_t acc = 0;
+        const int f = UsbAudioSink::NextPacketFrames(acc, 48000, 1000, 10);
         check(f == 10, "NextPacketFrames must clamp to maxFramesPerPacket");
         check(acc == 0, "clamp must still consume the whole 1 ms remainder");
+    }
+
+    {
+        uint64_t acc = 0;
+        int total = 0;
+        for (int i = 0; i < 8000; ++i) {
+            total += UsbAudioSink::NextPacketFrames(acc, 48000, 125, 7);
+        }
+        check(total == 48000,
+              "48 kHz at 125 us service intervals must send 48000 frames per second");
+    }
+
+    {
+        for (int rate : {44100, 48000, 96000, 192000, 768000}) {
+            for (int interval : {125, 250, 500, 1000, 2000}) {
+                uint64_t acc = 0;
+                int total = 0;
+                const int maxFrames = (rate * interval + 999999) / 1000000 + 1;
+                for (int i = 0; i < 1000000 / interval; ++i) {
+                    total += UsbAudioSink::NextPacketFrames(acc, rate, interval, maxFrames);
+                }
+                check(total == rate && acc == 0, "service-interval cadence must preserve one second of PCM");
+            }
+        }
+        uint64_t acc = 0;
+        check(UsbAudioSink::NextPacketFrames(acc, 768000, 4096000, 4000000) == 3145728,
+              "long service intervals must not overflow 32-bit rate products");
+        check(UsbAudioSink::NextPacketFrames(acc, 48000, 0, 48) == 0,
+              "invalid service interval must not emit frames");
+    }
+    {
+        std::vector<uint8_t> d;
+        pushInterface(d, 1, 1, 0x01, 0x02);
+        d.insert(d.end(), {7, 0x05, 0x01, 0x05, 0xc0, 0x00, 1});
+        auto timing = UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 1, 1, 3);
+        check(timing.intervalUs == 125 && timing.maxPacketBytes == 192,
+              "HS bInterval=1 must use 125 us and the advertised packet capacity");
+        timing = UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 1, 1, 2);
+        check(timing.intervalUs == 1000, "FS bInterval=1 must use 1 ms");
+        d[15] = 4;
+        timing = UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 1, 1, 3);
+        check(timing.intervalUs == 1000, "HS bInterval=4 must use 1 ms");
+        d[13] = 0;
+        d[14] = 0x14;
+        timing = UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 1, 1, 3);
+        check(timing.maxPacketBytes == 3072, "HS high-bandwidth packet capacity must include transactions");
+        check(UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 2, 1, 3).intervalUs == 0,
+              "wrong alternate setting must not supply packet timing");
+        check(UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 1, 1, 0).intervalUs == 0,
+              "unknown USB speed must not guess a service interval");
+        d[14] = 0x1c;
+        check(UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 1, 1, 3).intervalUs == 0,
+              "reserved HS transaction count must be rejected");
+        d[14] = 4;
+        d[15] = 1;
+        d.insert(d.end(), {6, 0x30, 1, 1, 0, 0x10});
+        timing = UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 1, 1, 5);
+        check(timing.intervalUs == 125 && timing.maxPacketBytes == 4096,
+              "SuperSpeed capacity must use the endpoint companion's bytes per interval");
+        for (size_t length = 0; length < d.size(); ++length) {
+            check(UsbAudioSink::ParseEndpointTiming(d.data(), length, 1, 1, 1, 5).intervalUs == 0,
+                  "truncated descriptors must not invent endpoint timing");
+        }
+        d[15] = 0;
+        check(UsbAudioSink::ParseEndpointTiming(d.data(), d.size(), 1, 1, 1, 5).intervalUs == 0,
+              "zero endpoint interval must be rejected");
     }
 
     if (gFailures != 0) {

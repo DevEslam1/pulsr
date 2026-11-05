@@ -7,10 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/channels.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/audio/audio_effects_channel.dart';
 import 'package:pulsr/features/settings/presentation/widgets/headphone_safety_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +25,12 @@ void main() {
   final calls = <String>[];
 
   setUp(() {
+    // The sheet reads its budget and its safety opt-in through SharedPreferences;
+    // without mocks the snapshot load fails and the switch never reflects the
+    // persisted state the toggle tests start from.
+    SharedPreferences.setMockInitialValues({
+      PrefsKeys.headphoneSafetyEnabled: true,
+    });
     dose = 0.3;
     attenuation = false;
     safetyApplied = true;

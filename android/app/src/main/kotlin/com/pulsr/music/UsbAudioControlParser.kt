@@ -27,7 +27,14 @@ object UsbAudioControlParser {
         val interfaceNumber: Int,
         val channels: Int,
         val volumeOnMaster: Boolean,
-    )
+        val writableChannels: List<Int> = if (volumeOnMaster) listOf(0) else emptyList(),
+    ) {
+        val controlChannels: List<Int> get() = when {
+            0 in writableChannels -> listOf(0)
+            channels > 0 && (1..channels).all { it in writableChannels } -> (1..channels).toList()
+            else -> emptyList()
+        }
+    }
 
     /** The AudioStreaming isochronous OUT endpoint used for exclusive playback. */
     data class StreamingEndpoint(
@@ -90,7 +97,7 @@ object UsbAudioControlParser {
         val clockSource: ClockSource? = null,
         val altSettingFormats: List<AltSettingFormat> = emptyList(),
     ) {
-        val hasVolumeControl: Boolean get() = volumeUnit != null
+        val hasVolumeControl: Boolean get() = volumeUnit?.controlChannels?.isNotEmpty() == true
         val hasFeedbackEndpoint: Boolean get() = feedbackEndpoint != null
     }
 
@@ -208,6 +215,13 @@ object UsbAudioControlParser {
 
             when (bType) {
                 DESC_INTERFACE -> {
+                    if (bLength < 9) {
+                        flushAltSetting()
+                        currentClass = 0
+                        currentSubclass = 0
+                        i += bLength
+                        continue
+                    }
                     // A new interface descriptor closes the previous alt setting:
                     // flush whatever FORMAT_TYPE_I + endpoints we accumulated.
                     flushAltSetting()
@@ -247,7 +261,7 @@ object UsbAudioControlParser {
                     // asynchronous feedback IN endpoints (Pillar 3).
                     if (currentClass == CLASS_AUDIO &&
                         currentSubclass == SUBCLASS_AUDIOSTREAMING &&
-                        i + OFF_EP_MAX_PACKET + 1 < descriptors.size
+                        bLength >= 7
                     ) {
                         val address = descriptors[i + OFF_EP_ADDRESS].toInt() and 0xFF
                         val attributes = descriptors[i + OFF_EP_ATTRIBUTES].toInt() and 0xFF
@@ -310,40 +324,23 @@ object UsbAudioControlParser {
                         val subtype = descriptors[i + 2].toInt() and 0xFF
                         if (subtype == SUBTYPE_FEATURE_UNIT && volumeUnit == null && bLength >= 7) {
                             val unitId = descriptors[i + 3].toInt() and 0xFF
-                            // i+4 = bSourceID, i+5 = bControlSize
-                            val controlSize = descriptors[i + 5].toInt() and 0xFF
-                            if (controlSize in 1..4) {
-                                // Master controls start at i+6; number of channels
-                                // = (bLength - 7) / bControlSize.
-                                val masterStart = i + 6
-                                if (masterStart < i + bLength) {
-                                    var masterHasVolume = false
-                                    var anyHasVolume = false
-                                    var channels = 0
-                                    var p = masterStart
-                                    while (p + controlSize <= i + bLength) {
-                                        var vol = false
-                                        for (b in 0 until controlSize) {
-                                            if ((descriptors[p + b].toInt() and 0xFF) and CONTROL_VOLUME != 0) {
-                                                vol = true
-                                                break
-                                            }
-                                        }
-                                        if (channels == 0) masterHasVolume = vol
-                                        if (vol) anyHasVolume = true
-                                        if (channels > 0) { /* per-channel */ }
-                                        channels += 1
-                                        p += controlSize
-                                    }
-                                    if (anyHasVolume) {
-                                        volumeUnit = FeatureUnitVolume(
-                                            unitId = unitId,
-                                            interfaceNumber = currentAcInterface,
-                                            channels = (channels - 1).coerceAtLeast(0),
-                                            volumeOnMaster = masterHasVolume,
-                                        )
-                                    }
+                            val uac2 = uacVersion == UAC2
+                            val controlSize = if (uac2) 4 else descriptors[i + 5].toInt() and 0xFF
+                            val prefix = if (uac2) 5 else 6
+                            val bitmapBytes = bLength - prefix - 1 // Exclude iFeature.
+                            if (uacVersion in UAC1..UAC2 && unitId > 0 &&
+                                controlSize in 1..4 && bitmapBytes >= controlSize &&
+                                bitmapBytes % controlSize == 0
+                            ) {
+                                val count = bitmapBytes / controlSize
+                                val writable = (0 until count).filter { channel ->
+                                    val low = descriptors[i + prefix + channel * controlSize].toInt() and 0xFF
+                                    if (uac2) ((low shr 2) and 3) == 3 else (low and CONTROL_VOLUME) != 0
                                 }
+                                val candidate = FeatureUnitVolume(
+                                    unitId, currentAcInterface, count - 1, 0 in writable, writable,
+                                )
+                                if (candidate.controlChannels.isNotEmpty()) volumeUnit = candidate
                             }
                         } else if (subtype == SUBTYPE_CLOCK_SOURCE &&
                             clockSource == null && bLength >= 6
@@ -446,5 +443,154 @@ object UsbAudioControlParser {
             clockSource = clockSource,
             altSettingFormats = altSettingFormats.toList(),
         )
+    }
+}
+
+internal fun interface UsbControlTransfer {
+    fun transfer(type: Int, request: Int, value: Int, index: Int, buffer: ByteArray): Int
+}
+
+internal class UsbHardwareVolume(
+    private val version: Int,
+    private val unit: UsbAudioControlParser.FeatureUnitVolume,
+    private val transport: UsbControlTransfer,
+) {
+    private data class Range(val min: Int, val max: Int, val res: Int)
+    private var ranges: Map<Int, List<Range>> = emptyMap()
+    private var expected: Map<Int, Int>? = null
+    var currentDb: Double? = null
+        private set
+    val ready: Boolean get() = ranges.isNotEmpty() && currentDb != null
+    val applied: Boolean get() = ready && expected != null
+    val minDb: Double? get() = ranges.values.maxOfOrNull { rs -> rs.minOf { it.min } }?.div(256.0)
+    val maxDb: Double? get() = ranges.values.minOfOrNull { rs -> rs.maxOf { it.max } }?.div(256.0)
+
+    fun invalidate() {
+        ranges = emptyMap()
+        expected = null
+        currentDb = null
+    }
+
+    private fun transfer(request: Int, channel: Int, data: ByteArray, write: Boolean = false): Boolean = try {
+        transport.transfer(if (write) 0x21 else 0xA1, request, 0x200 or channel,
+            (unit.unitId shl 8) or unit.interfaceNumber, data) == data.size
+    } catch (_: Exception) { false }
+
+    private fun unsigned(data: ByteArray, offset: Int = 0): Int =
+        (data[offset].toInt() and 255) or ((data[offset + 1].toInt() and 255) shl 8)
+
+    private fun signed(data: ByteArray, offset: Int = 0): Int = unsigned(data, offset).toShort().toInt()
+
+    private fun read(request: Int, channel: Int, signed: Boolean = true): Int? {
+        val data = ByteArray(2)
+        if (!transfer(request, channel, data)) return null
+        return if (signed) signed(data) else unsigned(data)
+    }
+
+    private fun readRanges(channel: Int): List<Range>? {
+        val result = when (version) {
+            UsbAudioControlParser.UAC1 -> listOf(Range(
+                read(0x82, channel) ?: return null,
+                read(0x83, channel) ?: return null,
+                read(0x84, channel, false) ?: return null,
+            ))
+            UsbAudioControlParser.UAC2 -> {
+                val countBytes = ByteArray(2)
+                if (!transfer(0x02, channel, countBytes)) return null
+                val count = unsigned(countBytes)
+                // Bound the device-supplied allocation to a control-transfer payload.
+                if (count !in 1..1024) return null
+                val data = ByteArray(2 + count * 6)
+                if (!transfer(0x02, channel, data) || unsigned(data) != count) return null
+                (0 until count).map { n ->
+                    val p = 2 + n * 6
+                    Range(signed(data, p), signed(data, p + 2), unsigned(data, p + 4))
+                }
+            }
+            else -> return null
+        }
+        return result.takeIf { rs -> rs.all { it.min > -32768 && it.min <= it.max && it.res > 0 } }
+    }
+
+    fun refresh(): Boolean {
+        fun fail(): Boolean { invalidate(); return false }
+        val channels = unit.controlChannels
+        if (channels.isEmpty()) return fail()
+        val discovered = mutableMapOf<Int, List<Range>>()
+        val values = mutableMapOf<Int, Int>()
+        for (channel in channels) {
+            val rs = readRanges(channel) ?: return fail()
+            val raw = read(if (version == 2) 0x01 else 0x81, channel) ?: return fail()
+            if (rs.none { raw in it.min..it.max }) return fail()
+            discovered[channel] = rs
+            values[channel] = raw
+        }
+        ranges = discovered
+        currentDb = values.values.maxOrNull()!! / 256.0
+        if (expected != values) expected = null
+        return true
+    }
+
+    fun setDb(db: Double): Boolean {
+        expected = null
+        if (!db.isFinite()) { invalidate(); return false }
+        if (!refresh()) return false
+        val target = kotlin.math.floor(db * 256.0).coerceAtMost(32767.0)
+        val targets = mutableMapOf<Int, Int>()
+        for ((channel, rs) in ranges) {
+            // Round toward attenuation; never raise a request below the supported minimum.
+            targets[channel] = rs.filter { it.min <= target }.maxOfOrNull { r ->
+                r.min + ((minOf(target, r.max.toDouble()) - r.min) / r.res).toInt() * r.res
+            } ?: return false
+        }
+        for ((channel, raw) in targets) {
+            val data = byteArrayOf(raw.toByte(), (raw shr 8).toByte())
+            if (!transfer(0x01, channel, data, write = true)) { invalidate(); return false }
+        }
+        expected = targets
+        if (!refresh()) return false
+        return applied
+    }
+}
+
+internal object UsbAudioProtocol {
+    fun mixerConfirmed(applied: Boolean, routedDevice: Int, rate: Int, encoding: Int, mixerRate: Int, mixerEncoding: Int): Boolean =
+        applied && routedDevice > 0 && rate > 0 && encoding > 0 && rate == mixerRate && encoding == mixerEncoding
+
+    data class StreamFormat(val sampleRate: Int, val bitDepth: Int, val channels: Int) {
+        fun matches(rate: Int, depth: Int, count: Int, nativeActive: Boolean): Boolean =
+            nativeActive && sampleRate == rate && bitDepth == depth && channels == count
+    }
+
+    fun selectFormat(parsed: UsbAudioControlParser.Result, rate: Int, depth: Int, channels: Int): UsbAudioControlParser.AltSettingFormat? {
+        if (rate <= 0 || channels <= 0 || depth !in listOf(16, 24, 32) || parsed.uacVersion !in 1..2) return null
+        return parsed.altSettingFormats.filter { fmt ->
+            (parsed.streamingInterface == null || fmt.interfaceNumber == parsed.streamingInterface) &&
+                fmt.altSetting > 0 && fmt.channels == channels &&
+                fmt.subslotSize in 2..4 && fmt.bitResolution in depth..(fmt.subslotSize * 8) &&
+                (if (parsed.uacVersion == 2) true else rate in fmt.supportedRates)
+        }.minWithOrNull(compareBy({ it.bitResolution }, { it.subslotSize }))
+    }
+
+    fun setSampleRate(
+        transport: UsbControlTransfer, version: Int, clock: UsbAudioControlParser.ClockSource?,
+        endpoint: Int, rate: Int, fixedUac1: Boolean,
+    ): Boolean {
+        if (rate <= 0 || version !in 1..2 || (version == 2 && clock == null)) return false
+        val size = if (version == 2) 4 else 3
+        if (size == 3 && rate > 0xFFFFFF) return false
+        val index = if (version == 2) (clock!!.clockId shl 8) or clock.controlInterface else endpoint
+        val setType = if (version == 2) 0x21 else 0x22
+        val programmable = if (version == 2) clock!!.frequencyProgrammable else !fixedUac1
+        return try {
+            if (programmable) {
+                val data = ByteArray(size) { (rate shr (8 * it)).toByte() }
+                if (transport.transfer(setType, 1, 0x100, index, data) != size) return false
+            }
+            val data = ByteArray(size)
+            if (transport.transfer(setType or 0x80, if (version == 2) 1 else 0x81, 0x100, index, data) != size) return false
+            val actual = data.indices.fold(0L) { acc, i -> acc or ((data[i].toLong() and 255) shl (8 * i)) }
+            actual == rate.toLong()
+        } catch (_: Exception) { false }
     }
 }

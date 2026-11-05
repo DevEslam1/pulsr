@@ -126,11 +126,21 @@ void main() {
     expect(find.text('2 tracks'), findsOneWidget);
     expect(find.text('Kept'), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.auto_awesome_rounded));
+    // Both the app bar and each group offer auto-select; the global action is
+    // the one under test.
+    await tester.tap(find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byIcon(Icons.auto_awesome_rounded),
+    ));
     await tester.pumpAndSettle();
 
     expect(find.text('Selected highest quality for 1 groups'), findsOneWidget);
     expect(find.text('Kept'), findsOneWidget);
+
+    // The confirmation toast absorbs pointers until its timer expires;
+    // pumpAndSettle alone never advances that timer.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).last);
     await tester.pumpAndSettle();
@@ -286,11 +296,25 @@ void main() {
           bitrateKbps: 320),
     ]);
 
-    await tester.tap(find.byIcon(Icons.auto_awesome_rounded));
+    // Both the app bar and each group offer auto-select; the global action is
+    // the one under test.
+    await tester.tap(find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byIcon(Icons.auto_awesome_rounded),
+    ));
     await tester.pumpAndSettle();
     expect(find.text('Kept'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.delete_sweep_rounded));
+    // Let the auto-select toast retire; it absorbs pointers until its timer
+    // fires, which pumpAndSettle alone never does.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    // The bulk sweep lives in the app bar, not in each group card.
+    await tester.tap(find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byIcon(Icons.delete_sweep_rounded),
+    ));
     await tester.pumpAndSettle();
 
     expect(

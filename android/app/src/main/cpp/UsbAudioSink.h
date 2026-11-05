@@ -75,10 +75,16 @@ public:
     // accepted decode is hard-clamped to +/-0.1% of nominal.
     static int DecodeFeedbackRatePerSec(const uint8_t* data, int len, int nominalRate);
 
-    // Advances the fractional samples-per-packet accumulator by ratePerSec and
-    // returns the whole frames for the next 1 ms packet, clamped to
-    // maxFramesPerPacket so feedback can never overflow the preallocated URB.
-    static int NextPacketFrames(uint32_t& accumulator, uint32_t ratePerSec, int maxFramesPerPacket);
+    struct EndpointTiming {
+        int intervalUs = 0;
+        int maxPacketBytes = 0;
+    };
+
+    static EndpointTiming ParseEndpointTiming(const uint8_t* desc, size_t len,
+                                              int interfaceNumber, int altSetting,
+                                              int endpointAddress, int usbSpeed);
+    static int NextPacketFrames(uint64_t& accumulator, uint32_t ratePerSec,
+                                int intervalUs, int maxFramesPerPacket);
 
     // Audio-thread call: packs float [-1,1] to the configured interleaved wire
     // format (S16_LE / S24_3LE / S32_LE per bytesPerSample_) and appends to the
@@ -136,7 +142,8 @@ private:
     // TPDF state for the packing step. Persists across blocks on purpose: a
     // per-call state would restart the sequence every block and make the dither
     // noise periodic, which is a tonal artifact instead of a noise floor.
-    SinkDitherState sinkDither_;
+    SinkDitherState producerDither_;
+    SinkDitherState workerDither_;
     // Rides the output to silence on a ring underrun and back up on resume, so
     // neither boundary is a step. Inert (pass-through) while the ring has data.
     UsbGapFader gapFader_;
@@ -152,7 +159,8 @@ private:
     // the preallocated URB buffer. feedbackRatePerSec_ is the clamped target
     // sample rate the feedback endpoint last reported (== sampleRate_ until a
     // feedback sample arrives).
-    uint32_t frameAccumulator_ = 0;
+    uint64_t frameAccumulator_ = 0;
+    int serviceIntervalUs_ = 0;
     int maxFramesPerPacket_ = 0;
     int feedbackRatePerSec_ = 0;
 

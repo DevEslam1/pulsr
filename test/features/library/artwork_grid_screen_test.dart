@@ -136,8 +136,10 @@ void main() {
   });
 
   testWidgets('scrolling near the end reveals more albums', (tester) async {
+    // Two full pages plus a remainder, so the first frame cannot show
+    // everything and the growth is observable.
     await pumpGrid(
-        tester, [for (var i = 0; i < 60; i++) _album(i + 1, 'Album $i')]);
+        tester, [for (var i = 0; i < 150; i++) _album(i + 1, 'Album $i')]);
 
     int itemCount() {
       final grid = tester.widget<GridView>(find.byType(GridView));
@@ -146,12 +148,12 @@ void main() {
           0;
     }
 
-    expect(itemCount(), 50);
+    expect(itemCount(), 60);
 
     await tester.drag(find.byType(GridView), const Offset(0, -12000));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(itemCount(), 60);
+    expect(itemCount(), 120);
   });
 }

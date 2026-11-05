@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <thread>
@@ -102,6 +103,67 @@ int main() {
         worker.join();
         check(registry.acquireForRender(handle).engine == nullptr,
               "concurrent teardown leaves no live slot");
+    }
+
+    {
+        auto first = std::make_unique<AudioDspEngine>();
+        check(registry.registerEngine(first.get()), "register before sink opens");
+        registry.setSinkBitDepth(16);
+        check(first->getSinkBitDepth() == 16, "sink depth reaches existing render engine");
+
+        auto second = std::make_unique<AudioDspEngine>();
+        check(registry.registerEngine(second.get()), "register after sink opens");
+        check(second->getSinkBitDepth() == 16, "new render engine inherits sink depth");
+        second->setSinkBitDepth(24);
+        AudioDspEngine::instance().setSinkBitDepth(32);  // independent AAudio open
+        AudioDspEngine::instance().setSinkBitDepth(0);   // independent AAudio close
+        check(first->getSinkBitDepth() == 16 && second->getSinkBitDepth() == 24,
+              "local sinks and AAudio teardown cannot overwrite other render engines");
+
+        auto snap = std::make_shared<DspParamSnapshot>();
+        snap->sampleRate = 48000.0;
+        snap->activeStages = STAGE_DITHER;
+        snap->dither.enabled = true;
+        snap->dither.targetBitDepth = 24;
+        first->setSampleRate(48000.0);
+        snap->generation = first->getPublishedGeneration() + 1;
+        first->publishParams(snap);
+        auto render = [&](int bits, bool expectFineSamples) {
+            auto lease = registry.acquireForRender(handleOf(first.get()));
+            check(lease.engine == first.get(), "dither uses registered JNI render target");
+            if (!lease.engine) return;
+            std::vector<float> pcm(2048, 0.0f);
+            check(lease.engine->processInterleaved(pcm.data(), 1024, 2) == 1024,
+                  "registered dither preserves frame count");
+            registry.releaseForRender(lease.slot);
+            bool onGrid = true, nonZero = false, off16Grid = false;
+            const double scale = std::ldexp(1.0, bits - 1);
+            for (float value : pcm) {
+                const double k = value * scale;
+                onGrid &= std::abs(k - std::rint(k)) < 1e-6;
+                nonZero |= value != 0.0f;
+                const double k16 = value * 32768.0;
+                off16Grid |= std::abs(k16 - std::rint(k16)) > 1e-6;
+            }
+            check(onGrid && nonZero, "registered output dithers onto effective sink grid");
+            check(off16Grid == expectFineSamples, "sink depth overrides requested 24-bit grid only when coarser");
+        };
+        render(16, false);
+
+        registry.setSinkBitDepth(0);
+        check(first->getSinkBitDepth() == 0 && second->getSinkBitDepth() == 0,
+              "sink teardown clears every render engine depth");
+        render(24, true);
+        auto third = std::make_unique<AudioDspEngine>();
+        check(registry.registerEngine(third.get()), "register after sink teardown");
+        check(third->getSinkBitDepth() == 0, "new engine does not inherit stale sink depth");
+
+        for (auto* engine : {first.get(), second.get(), third.get()}) {
+            const int slot = registry.beginTeardown(handleOf(engine));
+            registry.waitForRenderers(slot);
+            registry.unregisterEngine(engine);
+            registry.finishTeardown(slot);
+        }
     }
 
     if (gFailures != 0) {

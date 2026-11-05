@@ -25,9 +25,12 @@ public class AAudioAudioSinkTest {
         int writeResult;
         long framesWritten;
         long framesRead;
+        int openedEncoding;
+        byte[] writtenBytes;
 
         @Override public long openForDevice(int sampleRate, int channelCount, int encoding,
                 boolean preferExclusive, int targetBufferMs, int deviceId) {
+            openedEncoding = encoding;
             return 1L;
         }
 
@@ -36,6 +39,10 @@ public class AAudioAudioSinkTest {
         @Override public void close(long handle) {}
 
         @Override public int write(long handle, ByteBuffer buffer, int offset, int length) {
+            writtenBytes = new byte[length];
+            ByteBuffer view = buffer.duplicate();
+            view.position(offset);
+            view.get(writtenBytes);
             return writeResult;
         }
 
@@ -106,6 +113,53 @@ public class AAudioAudioSinkTest {
 
         assertFalse(consumed);
         assertEquals(500, buffer.position());
+    }
+
+    @Test
+    public void exclusiveRejectsInt32RatherThanClaimingExactFloatConversion() throws Exception {
+        AAudioAudioSink sink = new AAudioAudioSink(true, 50);
+        FakeBridge bridge = new FakeBridge();
+        sink.setBridgeForTest(bridge);
+        assertEquals(AudioSink.SINK_FORMAT_UNSUPPORTED, sink.getFormatSupport(pcm32()));
+        try {
+            sink.configure(pcm32(), 0, null);
+            org.junit.Assert.fail("exclusive int32 must not open a float stream");
+        } catch (AudioSink.ConfigurationException expected) {
+            assertEquals(0, bridge.openedEncoding);
+        }
+    }
+
+    @Test
+    public void sharedInt32ReportsFloatTranscodingAndDemonstratesLostLowBits() throws Exception {
+        FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 8;
+        AAudioAudioSink sink = newSink(bridge);
+        assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_WITH_TRANSCODING,
+                sink.getFormatSupport(pcm32()));
+        sink.configure(pcm32(), 0, null);
+        assertEquals(AaudioNativeBridge.ENCODING_PCM_FLOAT, bridge.openedEncoding);
+        assertEquals(android.media.AudioFormat.ENCODING_PCM_FLOAT, sink.measuredStream()[2]);
+        ByteBuffer input = ByteBuffer.allocateDirect(8).order(java.nio.ByteOrder.nativeOrder());
+        input.putInt(0x40000000).putInt(0x40000001).flip();
+        assertTrue(sink.handleBuffer(input, 100L, 1));
+        ByteBuffer written = ByteBuffer.wrap(bridge.writtenBytes).order(java.nio.ByteOrder.nativeOrder());
+        assertEquals(written.getFloat(), written.getFloat(), 0f);
+    }
+
+    @Test
+    public void packed24ExclusiveBypassPreservesLeastSignificantBits() throws Exception {
+        FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 6;
+        AAudioAudioSink sink = new AAudioAudioSink(true, 50);
+        sink.setBridgeForTest(bridge);
+        Format format = pcm16().buildUpon().setPcmEncoding(C.ENCODING_PCM_24BIT).build();
+        sink.configure(format, 0, null);
+        byte[] raw = new byte[] {0, 0, 64, 1, 0, 64};
+        ByteBuffer input = ByteBuffer.allocateDirect(raw.length);
+        input.put(raw).flip();
+        assertTrue(sink.handleBuffer(input, 0L, 1));
+        org.junit.Assert.assertArrayEquals(raw, bridge.writtenBytes);
+        assertEquals(AaudioNativeBridge.ENCODING_PCM_I24_PACKED, bridge.openedEncoding);
     }
 
     @Test

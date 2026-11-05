@@ -1,13 +1,17 @@
 // test/features/ytm_browse/ytm_browse_screen_test.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/ytm_browse_service.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/ytm_browse/presentation/ytm_browse_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../helpers/screen_harness.dart';
 
 class MockYtmBrowseService extends Mock implements YtmBrowseService {}
 
@@ -30,11 +34,16 @@ void main() {
     await getIt.reset();
   });
 
-  Widget host() => MaterialApp(
-        theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const YtmBrowseScreen(),
+  // Track cards select from PlayerCubit, so the host has to provide it exactly
+  // as the app's root MultiBlocProvider does.
+  Widget host() => MultiBlocProvider(
+        providers: [BlocProvider<PlayerCubit>.value(value: stubPlayerCubit())],
+        child: MaterialApp(
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const YtmBrowseScreen(),
+        ),
       );
 
   testWidgets('renders loading skeleton while the feed is in flight',

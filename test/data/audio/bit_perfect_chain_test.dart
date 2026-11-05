@@ -93,7 +93,8 @@ void main() {
       expect(result.verdict, BitPerfectChainVerdict.verified);
     });
 
-    test('treats DoP carrier-rate differences as verified', () {
+    test('treats DoP as an unmeasured carrier rather than a verified chain',
+        () {
       final result = assessBitPerfectChain(
         requested: true,
         active: true,
@@ -104,8 +105,41 @@ void main() {
         isDsdDop: true,
       );
 
-      expect(result.verdict, BitPerfectChainVerdict.verified);
+      // Rate agreement is impossible for a DSD-in-PCM carrier, and the marker
+      // bits are never inspected here, so nothing can be claimed.
+      expect(result.verdict, BitPerfectChainVerdict.unverified);
+      expect(result.reasonCode, 'dop_carrier_not_measured');
       expect(result.isProblem, isFalse);
+    });
+
+    test('a known-modifying chain is never reported as verified', () {
+      final result = assessBitPerfectChain(
+        requested: true,
+        active: true,
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        outputSampleRate: 96000,
+        outputBitDepth: 24,
+        samplesModified: true,
+      );
+
+      expect(result.verdict, BitPerfectChainVerdict.unverified);
+      expect(result.reasonCode, 'samples_modified');
+      expect(result.isVerified, isFalse);
+    });
+
+    test('an unknown source depth cannot claim identity', () {
+      final result = assessBitPerfectChain(
+        requested: true,
+        active: true,
+        sourceSampleRate: 96000,
+        sourceBitDepth: 0,
+        outputSampleRate: 96000,
+        outputBitDepth: 32,
+      );
+
+      expect(result.verdict, BitPerfectChainVerdict.unverified);
+      expect(result.reasonCode, 'source_depth_unknown');
     });
 
     test('does not guess when either side reports no rate', () {

@@ -13,7 +13,10 @@ enum BitPerfectChainVerdict {
   /// Bit-Perfect was requested but the platform/direct sink is not active.
   inactive,
 
-  /// The output reports the source rate and at least the source depth.
+  /// The output reports the source rate and at least the source depth, and
+  /// nothing in the chain is known to have altered the samples. Format
+  /// agreement alone is not sample identity: it never proves the bytes that
+  /// reached the DAC are the bytes that came out of the decoder.
   verified,
 
   /// The output rate differs from the source: the platform resampled.
@@ -65,7 +68,13 @@ class BitPerfectChainAssessment {
 ///
 /// [isDsdDop] suppresses the rate comparison: DSD-over-PCM intentionally
 /// carries 1-bit DSD in a PCM carrier at a different rate (usually 176.4 or
-/// 352.8 kHz), so a mismatch is expected and does not mean a resample.
+/// 352.8 kHz), so a mismatch is expected and does not mean a resample. It does
+/// not prove identity either - the carrier and marker bits are not measured
+/// here, so DoP stays unverified rather than claiming a verified PCM chain.
+///
+/// [samplesModified] means something upstream is known to change the samples
+/// (an active DSP stage, or int32 source audio entering a float32 pipeline).
+/// No format agreement can make that chain bit-perfect.
 BitPerfectChainAssessment assessBitPerfectChain({
   required bool requested,
   required bool active,
@@ -74,6 +83,7 @@ BitPerfectChainAssessment assessBitPerfectChain({
   required int outputSampleRate,
   required int outputBitDepth,
   bool isDsdDop = false,
+  bool samplesModified = false,
   String? failureReason,
 }) {
   if (!requested) {
@@ -96,14 +106,27 @@ BitPerfectChainAssessment assessBitPerfectChain({
     );
   }
 
-  // DoP is a carrier, not a resample; the DAC receives the DSD stream.
+  // DoP is a carrier, not a resample - but the carrier/marker integrity is not
+  // observable from here, so it cannot be reported as a verified chain.
   if (isDsdDop) {
     return BitPerfectChainAssessment(
-      verdict: BitPerfectChainVerdict.verified,
+      verdict: BitPerfectChainVerdict.unverified,
       sourceSampleRate: sourceSampleRate,
       sourceBitDepth: sourceBitDepth,
       outputSampleRate: outputSampleRate,
       outputBitDepth: outputBitDepth,
+      reasonCode: 'dop_carrier_not_measured',
+    );
+  }
+
+  if (samplesModified) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.unverified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: 'samples_modified',
     );
   }
 
@@ -129,27 +152,27 @@ BitPerfectChainAssessment assessBitPerfectChain({
     );
   }
 
-  if (sourceBitDepth > 0) {
-    if (outputBitDepth <= 0) {
-      return BitPerfectChainAssessment(
-        verdict: BitPerfectChainVerdict.unverified,
-        sourceSampleRate: sourceSampleRate,
-        sourceBitDepth: sourceBitDepth,
-        outputSampleRate: outputSampleRate,
-        outputBitDepth: outputBitDepth,
-        reasonCode: 'depth_unknown',
-      );
-    }
-    if (outputBitDepth < sourceBitDepth) {
-      return BitPerfectChainAssessment(
-        verdict: BitPerfectChainVerdict.depthReduced,
-        sourceSampleRate: sourceSampleRate,
-        sourceBitDepth: sourceBitDepth,
-        outputSampleRate: outputSampleRate,
-        outputBitDepth: outputBitDepth,
-        reasonCode: 'depth_truncated',
-      );
-    }
+  // Neither side of a depth comparison can be unknown: agreeing rates with an
+  // unmeasured container depth prove nothing about the samples.
+  if (sourceBitDepth <= 0 || outputBitDepth <= 0) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.unverified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: sourceBitDepth <= 0 ? 'source_depth_unknown' : 'depth_unknown',
+    );
+  }
+  if (outputBitDepth < sourceBitDepth) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.depthReduced,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: 'depth_truncated',
+    );
   }
 
   return BitPerfectChainAssessment(

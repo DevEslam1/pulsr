@@ -1430,6 +1430,10 @@ class AudioQualitySheet extends StatelessWidget {
   ) {
     final bool isBitPerfect = settingsState?.bitPerfectOutput == true &&
         outputDevice?.isBitPerfectActive == true;
+    // Requesting bit-perfect does not bypass the chain on its own; the user's
+    // guardrail toggle decides whether processing is actually skipped.
+    final bool dspBypassed =
+        isBitPerfect && (settingsState?.bypassDspOnBitPerfect ?? true);
     final bool isDsd = info.format.toUpperCase().contains('DSD') ||
         info.codecName.toUpperCase().contains('DSD');
 
@@ -1466,7 +1470,7 @@ class AudioQualitySheet extends StatelessWidget {
       if (crossfeedOn) 'BS2B Crossfeed',
       if (reverbOn) 'Reverb',
     ];
-    final String dspLabel = isBitPerfect
+    final String dspLabel = dspBypassed
         ? 'Bypassed (Bit-Perfect Guardrail)'
         : (activeStages.isEmpty
             ? 'None (Clean Path)'
@@ -1479,6 +1483,10 @@ class AudioQualitySheet extends StatelessWidget {
       outputSampleRate: outputDevice?.sampleRate ?? 0,
       outputBitDepth: outputDevice?.bitDepth ?? 0,
       isDsdDop: AudioQualityInfo.dsdDopActive,
+      // Every Android PCM path here is float32; 32-bit integer sources cannot
+      // survive that conversion, so format agreement is not sample identity.
+      samplesModified: currentSong?.bitDepth == 32 ||
+          (!dspBypassed && activeStages.isNotEmpty),
       failureReason: outputDevice?.bitPerfectFailureReason,
     );
     final resamplerLabel = switch (assessment.verdict) {

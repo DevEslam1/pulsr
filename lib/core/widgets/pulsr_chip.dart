@@ -65,6 +65,16 @@ class PulsrChip extends StatelessWidget {
     final Color iconColor = textColor;
     final bool showLeadingIcon =
         icon != null || (selected && variant == PulsrChipVariant.filter);
+    final Widget leadingSlot = showLeadingIcon
+        ? Padding(
+            padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
+            child: Icon(
+              icon ?? Icons.check_rounded,
+              size: icon != null ? 16.0 : 15.0,
+              color: iconColor,
+            ),
+          )
+        : const SizedBox.shrink();
 
     return Semantics(
       button: true,
@@ -138,22 +148,18 @@ class PulsrChip extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  AnimatedSize(
-                    duration: context.motionMs(180),
-                    curve: Curves.easeOutCubic,
-                    child: showLeadingIcon
-                        ? Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                              end: AppSpacing.xs,
-                            ),
-                            child: Icon(
-                              icon ?? Icons.check_rounded,
-                              size: icon != null ? 16.0 : 15.0,
-                              color: iconColor,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
+                  // AnimatedSize with a collapsed (reduced-motion) duration
+                  // re-dirties itself inside its own layout pass and trips the
+                  // framework's mutation assertion, so animate only when motion
+                  // is actually available.
+                  if (context.motionEnabled)
+                    AnimatedSize(
+                      duration: context.motionMs(180),
+                      curve: Curves.easeOutCubic,
+                      child: leadingSlot,
+                    )
+                  else
+                    leadingSlot,
                   Flexible(
                     child: Text(
                       label,

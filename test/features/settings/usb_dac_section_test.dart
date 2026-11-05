@@ -33,6 +33,7 @@ void main() {
   late bool grantPermission;
   late bool refuseStreaming;
   final List<MethodCall> usbCalls = [];
+  final List<bool> modeRequests = [];
 
   const usbChannel = MethodChannel(PulsrChannels.usbExclusive);
   const usbEvents = MethodChannel(PulsrChannels.usbExclusiveEvents);
@@ -60,6 +61,13 @@ void main() {
         'streamingActive': streamingActive,
         'streamingSupported': streamingSupported,
         'supportedRates': <int>[44100, 48000, 96000],
+        // A start is only confirmed against the device-matched, actually
+        // opened endpoint format, never against a bare boolean.
+        'deviceId': 7,
+        'streamingSampleRate': streamingActive ? 48000 : 0,
+        'streamingBitDepth': streamingActive ? 16 : 0,
+        'streamingChannels': streamingActive ? 2 : 0,
+        'hardwareVolumeApplied': false,
       };
 
   void installChannelHandler() {
@@ -108,6 +116,10 @@ void main() {
 
     cubit = MockSettingsCubit();
     when(() => cubit.state).thenReturn(const SettingsState());
+    modeRequests.clear();
+    when(() => cubit.setBitPerfectOutput(any())).thenAnswer((inv) async {
+      modeRequests.add(inv.positionalArguments.first as bool);
+    });
     when(() => cubit.setUsbHardwareVolumeEnabled(any()))
         .thenAnswer((inv) async {
       hwVolumeCalls.add(inv.positionalArguments.first as bool);
@@ -233,7 +245,7 @@ void main() {
     expect(usbCalls.any((c) => c.method == 'setExclusive'), isTrue);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('bit-perfect streaming starts and reports success',
+  testWidgets('the streaming switch delegates the mode to SettingsCubit',
       (tester) async {
     status = attachedStatus(streamingSupported: true, streamingActive: false);
     await pump(tester);
@@ -243,57 +255,48 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    final start = usbCalls.firstWhere((c) => c.method == 'startStreaming');
-    final args = (start.arguments as Map).cast<String, dynamic>();
-    expect(args['sampleRate'], 48000);
+    expect(modeRequests, [true]);
+    // Starting the endpoint from the widget used to bypass the DSP bypass,
+    // crossfade exclusion, strict contract and rollback only the owner does.
+    expect(usbCalls.where((c) => c.method == 'startStreaming'), isEmpty);
     expect(find.textContaining(l10n.usbBpFailed), findsNothing);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('a refused streaming start surfaces the retry snackbar',
+  testWidgets('a refused mode from the owner surfaces the retry snackbar',
       (tester) async {
     status = attachedStatus(streamingSupported: true, streamingActive: false);
-    refuseStreaming = true;
     await pump(tester);
+    var state = const SettingsState();
+    when(() => cubit.state).thenAnswer((_) => state);
+    when(() => cubit.setBitPerfectOutput(true)).thenAnswer((_) async {
+      modeRequests.add(true);
+      state = state.copyWith(errorMessage: 'claim_failed');
+    });
 
     await tester.tap(find.text(l10n.settingsUsbBitPerfectStreaming));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-
     expect(find.textContaining(l10n.usbBpFailed), findsOneWidget);
 
-    // The Retry action re-runs the streaming start.
+    // The Retry action re-runs the same owned transition.
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byType(SnackBarAction), warnIfMissed: false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
-    expect(usbCalls.where((c) => c.method == 'startStreaming').length,
-        greaterThanOrEqualTo(2));
+    expect(modeRequests.where((v) => v).length, greaterThanOrEqualTo(2));
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('streaming refuses to start without permission', (tester) async {
-    status = attachedStatus(
-      permitted: false,
-      streamingSupported: true,
-      streamingActive: false,
-    );
-    grantPermission = false;
-    await pump(tester);
-
-    await tester.tap(find.text(l10n.settingsUsbBitPerfectStreaming));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(usbCalls.any((c) => c.method == 'startStreaming'), isFalse);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
-
-  testWidgets('streaming can be stopped from the active state', (tester) async {
+  testWidgets('disabling the owned mode goes through SettingsCubit too',
+      (tester) async {
     status = attachedStatus(streamingSupported: true, streamingActive: true);
-    await pump(tester);
+    await pump(tester, state: const SettingsState(bitPerfectOutput: true));
+    await tester.pump();
 
     await tester.tap(find.text(l10n.settingsUsbBitPerfectStreaming));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(usbCalls.any((c) => c.method == 'stopStreaming'), isTrue);
+    expect(modeRequests, [false]);
+    expect(usbCalls.where((c) => c.method == 'stopStreaming'), isEmpty);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 }

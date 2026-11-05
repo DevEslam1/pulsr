@@ -1683,8 +1683,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val mixerActive = isUsb && !isBluetooth && isBitPerfectActive &&
             (activeMixerRate == 0 || stream[1] == activeMixerRate) &&
             (activeMixerEncoding == 0 || stream[2] == activeMixerEncoding)
-        val directActive =
-            isUsb && !isBluetooth && UsbExclusivePlugin.directStreamingActive
+        // Confirmed only when the sink itself is alive AND still owns the
+        // endpoint it opened: a boolean alone could outlive a device unplug.
+        val directStream = UsbExclusivePlugin.confirmedDirectStream()
+        val directActive = isUsb && !isBluetooth && directStream != null
         val finalIsBitPerfectActive = isUsb && !isBluetooth && (mixerActive || directActive)
         val failureReason = when {
             finalIsBitPerfectActive -> null
@@ -1701,13 +1703,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["deviceName"] = deviceName
         result["isUsbDac"] = isUsb
         result["isDirectRouteFallback"] = directRouteFallbackActive
-        // Actual output format. Only the accepted mixer attributes report a real
-        // rate/depth; otherwise the HAL mixer rate is the closest truth there is.
-        // The requested values stay in targetSampleRate/targetBitDepth.
-        result["sampleRate"] = stream[1]
+        // Actual output format. When Pulsr owns the isochronous endpoint the
+        // DAC truly receives the confirmed stream format; otherwise the only
+        // readable truth is the mixer attributes/AHAL rate the platform opened.
+        result["sampleRate"] = directStream?.sampleRate ?: stream[1]
         result["nativeSampleRate"] = nativeSampleRate
         result["nativeFramesPerBuffer"] = nativeFrames
-        result["bitDepth"] = encodingBitDepth(stream[2])
+        result["bitDepth"] = directStream?.bitDepth ?: encodingBitDepth(stream[2])
+        result["outputChannels"] = directStream?.channels ?: 0
         result["pcmEncoding"] = stream[2]
         result["isBitPerfectActive"] = finalIsBitPerfectActive
         result["isBitPerfectSupported"] = finalIsBitPerfectSupported

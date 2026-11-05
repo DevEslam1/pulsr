@@ -19,6 +19,7 @@ import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/battery_optimization_service.dart';
 import '../services/hires_audio_service.dart';
+import '../services/usb_exclusive_service.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../core/telemetry/audio_session_log.dart';
@@ -1186,13 +1187,27 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// in [_notifyTrackChanged] corrects it once real header rates arrive.
   static const double assumedOutputSampleRate = 48000.0;
 
+  bool _hardwareVolumeOwned = false;
+
+  /// Software gain may only be released when the DAC itself is holding the
+  /// level: a saved preference plus a USB route proves neither permission,
+  /// capability, nor a value that actually landed in the hardware register.
+  bool _hardwareVolumeOwnsOutput() {
+    if (!(_cachedPrefs?.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false)) {
+      return false;
+    }
+    final usb = UsbExclusiveService().lastStatus;
+    return usb.attached &&
+        usb.permitted &&
+        usb.streamingActive &&
+        usb.hardwareVolumeApplied;
+  }
+
   void _syncVolumeControllerSettings() {
     final prefs = _cachedPrefs;
     final bitPerfect = (prefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
         (prefs?.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
-    final hardwareVolume =
-        (prefs?.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false) &&
-            (_hiResAudioService?.currentOutputInfo?.isUsbDac ?? false);
+    final hardwareVolume = _hardwareVolumeOwnsOutput();
     _volumeController?.updateSettings(
       userVolume: _volume,
       replayGainMode: prefs?.getString(PrefsKeys.replayGainMode) ?? 'off',
@@ -1239,10 +1254,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
         (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
     if (bitPerfect) {
-      final hardwareVolume =
-          (prefs.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false) &&
-              (_hiResAudioService?.currentOutputInfo?.isUsbDac ?? false);
-      return hardwareVolume ? 1.0 : _volume;
+      return _hardwareVolumeOwnsOutput() ? 1.0 : _volume;
     }
     if (_nativeRgActive && Platform.isAndroid) {
       final perSongDb = _perSongVolumeDbFor(song);
@@ -1908,6 +1920,16 @@ class PulsrAudioHandler extends BaseAudioHandler
       getInactivePlayer: () => _inactivePlayer,
     );
     _syncVolumeControllerSettings();
+    _hardwareVolumeOwned = _hardwareVolumeOwnsOutput();
+    _subscriptions.add(UsbExclusiveService().statusStream.listen((_) {
+      if (_disposed) return;
+      final owned = _hardwareVolumeOwnsOutput();
+      if (owned == _hardwareVolumeOwned) return;
+      _hardwareVolumeOwned = owned;
+      // Ownership flip: re-run the whole gain path so software attenuation is
+      // restored the moment the DAC stops confirming the hardware level.
+      unawaited(setVolume(_volume));
+    }));
     unawaited(HeadsetControlConfig.load(_cachedPrefs).then((cfg) {
       _cachedHeadsetConfig = cfg;
     }).catchError((Object e, StackTrace st) {

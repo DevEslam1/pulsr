@@ -330,6 +330,15 @@ void main() {
             sampleRate: any(named: 'sampleRate'),
             bitDepth: any(named: 'bitDepth'),
           )).thenAnswer((_) async => true);
+      // The mode owner applies the format so a rejected switch can tear the
+      // transport down; forward it to the service the assertions watch.
+      when(() => settings.setBitPerfectTrackFormat(
+            sampleRate: any(named: 'sampleRate'),
+            bitDepth: any(named: 'bitDepth'),
+          )).thenAnswer((inv) => hiRes.setTargetOutputFormat(
+            sampleRate: inv.namedArguments[#sampleRate] as int,
+            bitDepth: inv.namedArguments[#bitDepth] as int,
+          ));
       when(() => settings.refreshOutputDevice()).thenAnswer((_) async {});
 
       final cubit = buildCubit(settingsCubit: settings, hiRes: hiRes);

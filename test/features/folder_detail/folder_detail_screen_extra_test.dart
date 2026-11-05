@@ -133,8 +133,11 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.favorite_rounded));
+    // Rows show their own favorite icons, so the header control is addressed
+    // by its tooltip rather than by icon alone.
+    final favoriteAll = find.byTooltip(l10n.removeFromFavorites);
+    expect(favoriteAll, findsOneWidget);
+    await tester.tap(favoriteAll);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
@@ -159,8 +162,11 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.favorite_rounded));
+    // Rows show their own favorite icons, so the header control is addressed
+    // by its tooltip rather than by icon alone.
+    final favoriteAll = find.byTooltip(l10n.removeFromFavorites);
+    expect(favoriteAll, findsOneWidget);
+    await tester.tap(favoriteAll);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 

@@ -1107,17 +1107,29 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               // Same fallback as the manual toggle: DACs without platform
               // exclusive mixer attributes can still run Pulsr's direct USB sink.
               final direct = await _tryStartDirectUsbStreaming();
-              if (direct) {
-                _bitPerfectViaDirectStream = true;
-              } else {
-                await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
-                await prefs.setBool(PrefsKeys.strictBitPerfect, false);
-                loadedState = loadedState.copyWith(
-                  bitPerfectOutput: false,
-                  strictBitPerfect: false,
-                );
-                safeEmit(state.copyWith(
-                    bitPerfectOutput: false, strictBitPerfect: false));
+              if (!direct) {
+                // An unconfirmed start may still be holding the isochronous
+                // endpoint. Clearing the preference while it lives would
+                // orphan the stream, so keep the mode on unless teardown is
+                // actually confirmed.
+                final stillClaimed =
+                    _bitPerfectViaDirectStream && !await _stopDirectUsbStreaming();
+                if (stillClaimed) {
+                  safeEmit(state.copyWith(
+                    errorMessage:
+                        'The USB stream could not be confirmed or released. '
+                        'Bit-Perfect stays enabled; turn it off to release the DAC.',
+                  ));
+                } else {
+                  await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+                  await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+                  loadedState = loadedState.copyWith(
+                    bitPerfectOutput: false,
+                    strictBitPerfect: false,
+                  );
+                  safeEmit(state.copyWith(
+                      bitPerfectOutput: false, strictBitPerfect: false));
+                }
               }
             }
           }

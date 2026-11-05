@@ -130,7 +130,9 @@ public:
     // unknown — the shared mixer owns its own last conversion and the app cannot
     // observe it. The dither stage never shapes for a finer grid than this: a
     // 24-bit-shaped signal that a 16-bit sink then rounds has its shaping partly
-    // destroyed by that final undithered requantization.
+    // destroyed by that final undithered requantization. This setter is LOCAL:
+    // independent sinks must not change other players' quantization. The shared
+    // USB route uses DspEngineRegistry::setSinkBitDepth instead.
     void setSinkBitDepth(int bits);
     int getSinkBitDepth() const { return sinkBitDepth_.load(std::memory_order_relaxed); }
 
@@ -474,6 +476,9 @@ public:
     bool registerEngine(AudioDspEngine* engine);
     void unregisterEngine(AudioDspEngine* engine);
     void broadcastParams(const std::shared_ptr<const DspParamSnapshot>& snapshot);
+    // Shared USB route only, control thread: update live engines and the value
+    // inherited at registration. Pass 0 on close. Renderers only read atomics.
+    void setSinkBitDepth(int bits);
 
     /**
      * Lock-free render/control admission. The render thread calls
@@ -546,6 +551,7 @@ private:
     AudioDspEngine* selectActiveEngineLocked() const;
     std::mutex mutex_;
     std::vector<AudioDspEngine*> engines_;
+    int sharedSinkBitDepth_ = 0;  // protected by mutex_, never read on render path
     Slot slots_[kMaxEngines];
 };
 

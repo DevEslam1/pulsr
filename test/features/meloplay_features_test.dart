@@ -48,14 +48,20 @@ void main() {
       );
 
       expect(find.byType(SpinningVinylDisc), findsOneWidget);
-      final sizedBox = tester.widget<SizedBox>(
-        find.descendant(
-          of: find.byType(SpinningVinylDisc),
-          matching: find.byType(SizedBox).first,
-        ),
-      );
-      expect(sizedBox.width, equals(60.0));
-      expect(sizedBox.height, equals(60.0));
+      // The disc itself is the sized surface; the first SizedBox inside it is
+      // the centre label, not the outer groove.
+      expect(tester.getSize(find.byType(SpinningVinylDisc)),
+          const Size(60.0, 60.0));
+      final disc = tester.widget<Container>(find
+          .descendant(
+              of: find.byType(SpinningVinylDisc),
+              matching: find.byType(Container))
+          .first);
+      final decoration = disc.decoration as BoxDecoration;
+      expect(decoration.shape, BoxShape.circle);
+      expect(decoration.border!.top.color, AppColors.vinylDiscRim);
+      expect(disc.width, 60.0);
+      expect(disc.height, 60.0);
     });
 
     testWidgets('StaggeredListItem animates its child into view',

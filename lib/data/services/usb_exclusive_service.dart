@@ -41,6 +41,12 @@ enum UsbStreamResult {
 class UsbExclusiveStatus {
   final bool attached;
   final bool permitted;
+  /// Android UsbDevice.deviceId, NOT AudioDeviceInfo.id.
+  final int? deviceId;
+  final bool hardwareVolumeApplied;
+  final int streamingSampleRate;
+  final int streamingBitDepth;
+  final int streamingChannels;
   final String? deviceName;
   final int? vendorId;
   final int? productId;
@@ -62,6 +68,11 @@ class UsbExclusiveStatus {
   const UsbExclusiveStatus({
     required this.attached,
     required this.permitted,
+    this.deviceId,
+    this.hardwareVolumeApplied = false,
+    this.streamingSampleRate = 0,
+    this.streamingBitDepth = 0,
+    this.streamingChannels = 0,
     this.deviceName,
     this.vendorId,
     this.productId,
@@ -92,6 +103,11 @@ class UsbExclusiveStatus {
     return UsbExclusiveStatus(
       attached: map['attached'] == true,
       permitted: map['permitted'] == true,
+      deviceId: i(map['deviceId']),
+      hardwareVolumeApplied: map['hardwareVolumeApplied'] == true,
+      streamingSampleRate: i(map['streamingSampleRate']) ?? 0,
+      streamingBitDepth: i(map['streamingBitDepth']) ?? 0,
+      streamingChannels: i(map['streamingChannels']) ?? 0,
       deviceName: map['deviceName'] as String?,
       vendorId: i(map['vendorId']),
       productId: i(map['productId']),
@@ -163,14 +179,24 @@ class UsbExclusiveService {
     }
   }
 
-  Future<UsbExclusiveStatus> getStatus() async {
-    if (!_isAndroid) return UsbExclusiveStatus.none;
+  Future<UsbExclusiveStatus> getStatus() async =>
+      await _readStatus() ?? UsbExclusiveStatus.none;
+
+  void _publish(UsbExclusiveStatus status) {
+    _last = status;
+    if (!_controller.isClosed) _controller.add(status);
+  }
+
+  // Null means unknown, not a confirmed inactive stream. Never use the cache
+  // to acknowledge a start/stop or a hardware volume write.
+  Future<UsbExclusiveStatus?> _readStatus() async {
+    if (!_isAndroid) return null;
     _ensureListening();
     try {
       final Map<dynamic, dynamic>? res =
           await _methodChannel.invokeMapMethod<dynamic, dynamic>('getStatus');
       if (res != null) {
-        _last = UsbExclusiveStatus.fromMap(res);
+        _publish(UsbExclusiveStatus.fromMap(res));
         return _last;
       }
     } catch (e, st) {
@@ -179,7 +205,8 @@ class UsbExclusiveService {
             error: e, stackTrace: st, category: 'UsbExclusive');
       }
     }
-    return _last;
+    _publish(UsbExclusiveStatus.none);
+    return null;
   }
 
   Future<bool> requestPermission() async {
@@ -199,7 +226,7 @@ class UsbExclusiveService {
 
   Future<bool> setExclusive(bool enabled) async {
     if (!_isAndroid) return false;
-    if (enabled && (!_last.attached || !_last.permitted)) {
+    if (enabled) {
       await getStatus();
       if (!_last.attached || !_last.permitted) return false;
     }
@@ -266,11 +293,12 @@ class UsbExclusiveService {
       return UsbStreamResult.rateUnsupported;
     }
     if (channels < 1 || channels > 8) return UsbStreamResult.invalidArgs;
-    if (!_last.permitted || !_last.streamingSupported) {
-      await getStatus();
-      if (!_last.permitted) return UsbStreamResult.claimFailed;
-      if (!_last.streamingSupported) return UsbStreamResult.invalidArgs;
+    if (![16, 24, 32].contains(bitDepth)) return UsbStreamResult.invalidArgs;
+    final before = await _readStatus();
+    if (before == null || !before.attached || !before.permitted) {
+      return UsbStreamResult.claimFailed;
     }
+    if (!before.streamingSupported) return UsbStreamResult.invalidArgs;
     try {
       final dynamic res =
           await _methodChannel.invokeMethod<dynamic>('startStreaming', {
@@ -278,9 +306,17 @@ class UsbExclusiveService {
         'channels': channels,
         'bitDepth': bitDepth,
       }).timeout(const Duration(seconds: 10));
-      await getStatus();
+      final status = await _readStatus();
       if (res is Map) {
-        if (res['success'] == true) return UsbStreamResult.ok;
+        if (res['success'] == true) {
+          return status != null && status.attached && status.permitted &&
+                  status.streamingActive && status.deviceId == before.deviceId &&
+                  status.deviceId != null &&
+                  status.streamingSampleRate == sampleRate &&
+                  status.streamingBitDepth == bitDepth &&
+                  status.streamingChannels == channels
+              ? UsbStreamResult.ok : UsbStreamResult.unknown;
+        }
         final err = res['error'] as String?;
         switch (err) {
           case 'claim_failed':
@@ -328,9 +364,9 @@ class UsbExclusiveService {
       final dynamic res = await _methodChannel
           .invokeMethod<dynamic>('stopStreaming')
           .timeout(const Duration(seconds: 5));
-      await getStatus();
-      if (res is Map) return res['success'] == true;
-      return false;
+      final status = await _readStatus();
+      return res is Map && res['success'] == true &&
+          status != null && !status.streamingActive;
     } catch (e, st) {
       ErrorLogger.log('Failed to stop USB streaming',
           error: e, stackTrace: st, category: 'UsbExclusive');

@@ -399,8 +399,8 @@ bool DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
     if (slot < 0) return false;
     slots_[slot].inFlight.store(0, std::memory_order_relaxed);
     slots_[slot].tearingDown.store(false, std::memory_order_relaxed);
-    slots_[slot].engine.store(engine, std::memory_order_release);
-
+    // Publish the render slot only after all inherited control state is ready.
+    engine->setSinkBitDepth(sharedSinkBitDepth_);
     engines_.push_back(engine);
     auto& tmpl = AudioDspEngine::instance();
     auto current = tmpl.getParams();
@@ -415,6 +415,7 @@ bool DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
     if (deg != 0) {
         engine->triggerStageAutoDegrade(deg);
     }
+    slots_[slot].engine.store(engine, std::memory_order_release);
     return true;
 }
 
@@ -519,6 +520,14 @@ void DspEngineRegistry::broadcastParams(const std::shared_ptr<const DspParamSnap
         if (engine && engine != &AudioDspEngine::instance()) {
             engine->publishParams(snapshot);
         }
+    }
+}
+
+void DspEngineRegistry::setSinkBitDepth(int bits) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    sharedSinkBitDepth_ = (bits == 16 || bits == 24 || bits == 32) ? bits : 0;
+    for (auto* engine : engines_) {
+        engine->setSinkBitDepth(sharedSinkBitDepth_);
     }
 }
 

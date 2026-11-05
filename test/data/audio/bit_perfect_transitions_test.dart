@@ -184,6 +184,30 @@ void main() {
     expect(cubit.state.aaudioOutputEnabled, false);
   });
 
+  for (final strict in [false, true]) {
+    test('direct ${strict ? "strict" : "normal"} startup rolls back on bypass failure', () async {
+      const usbChannel = MethodChannel(PulsrChannels.usbExclusive);
+      var running = false;
+      var stopped = false;
+      final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(usbChannel, (call) async {
+        if (call.method == 'startStreaming') { running = true; return {'success': true}; }
+        if (call.method == 'stopStreaming') { running = false; stopped = true; return {'success': true}; }
+        return {'attached': true, 'permitted': true, 'deviceId': 7,
+          'streamingSupported': true, 'streamingActive': running,
+          'streamingSampleRate': 48000, 'streamingBitDepth': 24, 'streamingChannels': 2};
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(usbChannel, null));
+      when(() => hires.setBitPerfectMode(any())).thenAnswer((_) async => false);
+      messenger.setMockMethodCallHandler(effectsChannel, (call) async => false);
+      if (strict) { await cubit.setStrictBitPerfect(true); }
+      else { await cubit.setBitPerfectOutput(true); }
+      expect(stopped, isTrue);
+      expect(running, isFalse);
+      expect(cubit.state.bitPerfectOutput, isFalse);
+    });
+  }
+
   test('mixer-attribute rejection falls back to Pulsr direct USB streaming',
       () async {
     const usbChannel = MethodChannel(PulsrChannels.usbExclusive);
@@ -198,6 +222,10 @@ void main() {
             'attached': true,
             'permitted': true,
             'streamingSupported': true,
+            'deviceId': 7,
+            'streamingSampleRate': 48000,
+            'streamingBitDepth': 24,
+            'streamingChannels': 2,
             'streamingActive': streamingActive,
           };
         case 'startStreaming':

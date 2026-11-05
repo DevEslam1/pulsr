@@ -98,44 +98,63 @@ mixin LibrarySongsTab on State<LibraryScreen> {
         ),
         child: Row(
           children: [
-            Text(
-              context.l10n.tracksCount(songs.length),
-              style: TextStyle(
-                color: p.textSecondary,
-                fontSize: AppFontSize.label,
-                fontWeight: FontWeight.w700,
+            // The count and badge share whatever the actions leave behind;
+            // without this they overflow at 200% text scale on narrow phones.
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      context.l10n.tracksCount(songs.length),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (losslessCount > 0) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: p.info.withValues(alpha: 0.15),
+                          borderRadius: AppRadii.r4All,
+                        ),
+                        child: Text(
+                          '$losslessCount Lossless',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppFontSize.tiny,
+                            fontWeight: FontWeight.w800,
+                            color: p.info,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            if (losslessCount > 0) ...[
-              const SizedBox(width: AppSpacing.xs),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 1,
+            Flexible(
+              child: FilledButton.tonalIcon(
+                onPressed: () =>
+                    playerCubit.playSong(songs.first, queue: songs),
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: Text(context.l10n.playAll,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  backgroundColor: p.accent.withValues(alpha: 0.15),
+                  foregroundColor: p.accent,
                 ),
-                decoration: BoxDecoration(
-                  color: p.info.withValues(alpha: 0.15),
-                  borderRadius: AppRadii.r4All,
-                ),
-                child: Text(
-                  '$losslessCount Lossless',
-                  style: TextStyle(
-                    fontSize: AppFontSize.tiny,
-                    fontWeight: FontWeight.w800,
-                    color: p.info,
-                  ),
-                ),
-              ),
-            ],
-            const Spacer(),
-            FilledButton.tonalIcon(
-              onPressed: () => playerCubit.playSong(songs.first, queue: songs),
-              icon: const Icon(Icons.play_arrow_rounded, size: 18),
-              label: Text(context.l10n.playAll),
-              style: FilledButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                backgroundColor: p.accent.withValues(alpha: 0.15),
-                foregroundColor: p.accent,
               ),
             ),
             const SizedBox(width: AppSpacing.xxs),

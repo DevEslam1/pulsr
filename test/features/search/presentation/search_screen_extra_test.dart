@@ -152,9 +152,26 @@ void main() {
     await emit(tester, const SearchState());
 
     expect(find.text('SAVED SEARCHES'), findsOneWidget);
-    await tester.tap(find.widgetWithText(InputChip, 'Rock'));
+    // Saved searches render as custom chips, not InputChips.
+    await tester.tap(find.text('Rock'));
     await tester.pump();
     verify(() => searchCubit.applySavedSearch('Rock', 'Songs')).called(1);
+
+    // Deleting goes through the bookmark chip in the filter bar, which is the
+    // affordance the screen actually offers for a saved query.
+    when(() => searchCubit.isSaved(any(), any())).thenReturn(true);
+    await emit(tester,
+        const SearchState(query: 'Rock', selectedFilter: 'Songs'));
+    await tester.pump();
+    await tester.dragUntilVisible(
+      find.text('Save Search'),
+      find.byType(ListView).first,
+      const Offset(-200, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save Search'));
+    await tester.pump();
+    verify(() => searchCubit.removeSavedSearch(entry)).called(1);
   });
 
   testWidgets('typing shows the suggestions overlay and selects one',

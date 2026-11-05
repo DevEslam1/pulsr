@@ -161,8 +161,9 @@ void main() {
 
     // pumpScreen builds the cubit so it reads the seeded history.
     await pumpScreen(tester);
-    expect(find.byType(ActionChip), findsNWidgets(2));
+    // The history renders as tappable rows, not chips.
     expect(find.text('Beatles'), findsOneWidget);
+    expect(find.text('Queen'), findsOneWidget);
 
     await tester.tap(find.text('Queen'));
     await tester.pump(const Duration(milliseconds: 350));
@@ -306,16 +307,17 @@ void main() {
         .thenAnswer((_) async => [_track('dQw4w9WgXcQ', 'Hit')]);
 
     await pumpScreen(tester);
-    searchCubit.onQueryChanged('typing');
+    // The field owns the clear affordance, so it has to be driven by real text.
+    await tester.enterText(find.byType(TextField).first, 'typing');
     await tester.pumpAndSettle();
 
-    final clearButton = find.byIcon(Icons.clear_rounded);
+    final clearButton = find.byKey(const ValueKey('clear_btn'));
     expect(clearButton, findsOneWidget);
 
     await tester.tap(clearButton);
     await tester.pumpAndSettle();
 
     expect(searchCubit.state.query, isEmpty);
-    expect(find.byIcon(Icons.clear_rounded), findsNothing);
+    expect(find.byKey(const ValueKey('clear_btn')), findsNothing);
   });
 }

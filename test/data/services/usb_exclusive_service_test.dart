@@ -19,6 +19,10 @@ Map<String, Object?> _statusMap({
   bool permitted = true,
   bool streamingSupported = true,
   bool exclusiveSupported = true,
+  bool streaming = false,
+  int sampleRate = 48000,
+  int bitDepth = 16,
+  int channels = 2,
   double? minDb = -60.0,
   double? maxDb = 6.0,
   List<int> rates = const [48000, 44100],
@@ -39,6 +43,14 @@ Map<String, Object?> _statusMap({
       'maxVolumeDb': maxDb,
       'interfaceNumber': 3,
       'streamingSupported': streamingSupported,
+      'streamingActive': streaming,
+      // Only the endpoint's actually opened format can confirm a start; the
+      // device identity is known as soon as the DAC is attached.
+      'deviceId': 7,
+      'streamingSampleRate': streaming ? sampleRate : 0,
+      'streamingBitDepth': streaming ? bitDepth : 0,
+      'streamingChannels': streaming ? channels : 0,
+      'hardwareVolumeApplied': false,
       'supportedRates': rates,
       'lastError': 0,
       'resultCode': 7,
@@ -48,12 +60,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   final service = UsbExclusiveService();
+  // Mirrors the native side: a start is only trusted once the endpoint reports
+  // the format it actually opened on this device.
+  var streamingConfirmed = false;
 
   setUp(() {
+    streamingConfirmed = false;
     _messenger.setMockMethodCallHandler(_method, (call) async {
       switch (call.method) {
         case 'getStatus':
-          return _statusMap();
+          return _statusMap(streaming: streamingConfirmed);
         case 'requestPermission':
           return true;
         case 'setExclusive':
@@ -61,8 +77,10 @@ void main() {
         case 'setHardwareVolume':
           return true;
         case 'startStreaming':
+          streamingConfirmed = true;
           return <Object?, Object?>{'success': true};
         case 'stopStreaming':
+          streamingConfirmed = false;
           return <Object?, Object?>{'success': true};
         case 'querySupportedRates':
           return <Object?>[96000, 44100, 48000];
@@ -128,11 +146,11 @@ void main() {
       expect(service.lastStatus.deviceName, 'Test DAC');
     });
 
-    test('returns the cached status when native returns null', () async {
+    test('invalidates the cached status when native returns null', () async {
       await service.getStatus();
       _messenger.setMockMethodCallHandler(_method, (call) async => null);
       final status = await service.getStatus();
-      expect(status.deviceName, 'Test DAC');
+      expect(status.attached, isFalse);
     });
   });
 
@@ -262,6 +280,29 @@ void main() {
       await service.getStatus();
       expect(await service.startStreaming(), UsbStreamResult.ok);
     });
+  });
+
+  test('stop requires fresh confirmation that the stream is inactive', () async {
+    await service.getStatus(); // cached inactive status must not prove teardown
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      if (call.method == 'stopStreaming') return {'success': true};
+      return null;
+    });
+    expect(await service.stopStreaming(), isFalse);
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      if (call.method == 'stopStreaming') return {'success': true};
+      return {..._statusMap(), 'streamingActive': true};
+    });
+    expect(await service.stopStreaming(), isFalse);
+  });
+
+  test('start does not trust cached permission or an unconfirmed success', () async {
+    await service.getStatus();
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      if (call.method == 'startStreaming') return {'success': true};
+      return null;
+    });
+    expect(await service.startStreaming(), isNot(UsbStreamResult.ok));
   });
 
   group('misc channel calls', () {

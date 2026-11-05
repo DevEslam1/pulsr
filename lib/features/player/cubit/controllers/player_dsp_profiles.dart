@@ -102,6 +102,10 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     // 2. If the current route is a USB DAC, activate Bit-Perfect mode for bit-exact highest fidelity
     final currentDevice = _settingsCubit?.state.currentOutputDevice ?? device;
     if (currentDevice.isUsbDac || currentDevice.activeDeviceType == 'usb') {
+      // Same no-conflict guard Smart Audio uses: bit-perfect bypasses the whole
+      // chain, so plugging in a DAC must not silently silence an EQ, limiter or
+      // crossfeed the user already has active.
+      if (_getState().isDspActive) return;
       if (!settings.state.bitPerfectOutput) {
         await settings.setBitPerfectOutput(true);
       }

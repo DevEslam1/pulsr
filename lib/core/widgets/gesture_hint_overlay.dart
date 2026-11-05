@@ -45,6 +45,8 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
   bool _dismissed = true;
   bool _visible = false;
   Timer? _autoHideTimer;
+  Timer? _revealTimer;
+  Timer? _finalizeTimer;
 
   String get _storageKey => 'pulsr_hint_${widget.hintKey}';
 
@@ -57,6 +59,8 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
   @override
   void dispose() {
     _autoHideTimer?.cancel();
+    _revealTimer?.cancel();
+    _finalizeTimer?.cancel();
     super.dispose();
   }
 
@@ -66,28 +70,32 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
       final seen = prefs.getBool(_storageKey) ?? false;
       if (!seen && mounted) {
         setState(() => _dismissed = false);
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted && !_dismissed) {
+        // Cancellable timers, never Future.delayed: an unmanaged delay keeps a
+        // timer pending after this State is disposed.
+        _revealTimer = Timer(const Duration(milliseconds: 500), () {
+          if (!mounted || _dismissed) return;
           setState(() => _visible = true);
           _autoHideTimer = Timer(widget.autoDismissDuration, _dismiss);
-        }
+        });
       }
     } catch (_) {}
   }
 
-  Future<void> _dismiss({bool fromUserTap = false}) async {
+  void _dismiss({bool fromUserTap = false}) {
     if (!mounted || _dismissed) return;
     if (fromUserTap) {
       HapticFeedback.selectionClick();
     }
     _autoHideTimer?.cancel();
     setState(() => _visible = false);
-    await Future.delayed(const Duration(milliseconds: 250));
-    if (mounted) setState(() => _dismissed = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_storageKey, true);
-    } catch (_) {}
+    _finalizeTimer = Timer(const Duration(milliseconds: 250), () async {
+      if (!mounted) return;
+      setState(() => _dismissed = true);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_storageKey, true);
+      } catch (_) {}
+    });
   }
 
   @override

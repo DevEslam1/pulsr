@@ -54,12 +54,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private float[] decodeScratch;
     private ByteBuffer pendingOutput;
     private ByteBuffer pendingInput;
+    private int pendingInputEnd;
+    private long pendingPresentationTimeUs;
+    private int pendingAccessUnits;
+    private AudioProcessor.AudioFormat processorOutputFormat = AudioProcessor.AudioFormat.NOT_SET;
     // Last configured (sampleRate, channelCount, pcmEncoding) so a gapless
     // same-format configure can skip the processor configure/flush cycle.
     private int lastSampleRate = -1;
     private int lastChannelCount = -1;
     private int lastPcmEncoding = C.ENCODING_INVALID;
-    private boolean loggedRemainder;
 
     FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor) {
         this(delegate, processor, true);
@@ -81,80 +84,88 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     }
 
     @Override
+    public int getFormatSupport(Format format) {
+        if (processor != null && format.pcmEncoding == C.ENCODING_PCM_32BIT) {
+            int support = super.getFormatSupport(
+                    format.buildUpon().setPcmEncoding(C.ENCODING_PCM_FLOAT).build());
+            // Float has only 24 significant bits. Accept playback, never claim
+            // a direct/exact int32 path merely because both containers are 4 bytes.
+            return support == SINK_FORMAT_UNSUPPORTED ? support
+                    : SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
+        }
+        return super.getFormatSupport(format);
+    }
+
+    @Override
+    public boolean supportsFormat(Format format) {
+        return getFormatSupport(format) != SINK_FORMAT_UNSUPPORTED;
+    }
+
+    @Override
     public void configure(Format format, int bufferSize, int[] outputChannels)
             throws ConfigurationException {
-        // Gapless same-format transition: the processor is still active with the
-        // same input format, so do NOT configure/flush it (that would reset the
-        // native state and regenerate the reverb IR). Compute this BEFORE
-        // clearing pending buffers so an unconsumed tail buffer is not dropped
-        // at the track boundary.
-        final int requestedEncoding = format.pcmEncoding;
-        final boolean sameFormat = processFloat
+        final int encoding = format.pcmEncoding;
+        final boolean sameInput = processFloat
                 && format.sampleRate == lastSampleRate
                 && format.channelCount == lastChannelCount
-                && requestedEncoding == lastPcmEncoding;
-        if (!sameFormat) {
-            pendingOutput = null;
-            pendingInput = null;
-        }
-        inputEncoding = format.pcmEncoding;
-
-        // Hi-res truth probe (see field docs): record what the DECODER actually
-        // produced for this format, before the supported/bypass branches below.
-        lastDecodedPcmEncoding = format.pcmEncoding;
+                && encoding == lastPcmEncoding;
+        inputEncoding = encoding;
+        lastDecodedPcmEncoding = encoding;
         lastDecodedSampleRate = format.sampleRate;
         lastDecodedChannelCount = format.channelCount;
-        Log.i(TAG, "decoded PCM " + pcmEncodingName(format.pcmEncoding)
+        Log.i(TAG, "decoded PCM " + pcmEncodingName(encoding)
                 + " @ " + format.sampleRate + " Hz, " + format.channelCount + "ch");
 
-        final int encoding = format.pcmEncoding;
         final boolean supported = encoding == C.ENCODING_PCM_FLOAT
                 || encoding == C.ENCODING_PCM_16BIT
                 || encoding == C.ENCODING_PCM_24BIT
                 || encoding == C.ENCODING_PCM_32BIT;
-        // A 16-bit source may bypass the wrapper when the caller opts out of
-        // forcing float for PCM16 (bit-perfect / DSP-off).
         final boolean bypass16 = !forceFloatForPcm16 && encoding == C.ENCODING_PCM_16BIT;
-
         if (processor == null || !supported || bypass16) {
             if (processor != null && !supported) {
-                // Once per configure: an unsupported encoding silently bypasses
-                // the whole DSP chain, which is worth surfacing.
                 Log.w(TAG, "Unsupported PCM encoding " + encoding
                         + "; native DSP bypassed for this format");
             }
-            // The wrapper is bypassed for this format: any processor-tail
-            // buffer from the previous configuration is no longer valid.
             pendingOutput = null;
             pendingInput = null;
             processFloat = false;
+            processorOutputFormat = AudioProcessor.AudioFormat.NOT_SET;
             super.configure(format, bufferSize, outputChannels);
             return;
         }
 
-        if (sameFormat) {
-            super.configure(format.buildUpon().setPcmEncoding(C.ENCODING_PCM_FLOAT).build(),
-                    bufferSize, outputChannels);
-            return;
-        }
-
+        final AudioProcessor.AudioFormat output;
         try {
-            processor.configure(new AudioProcessor.AudioFormat(
+            // Re-evaluate even on identical decoded input: the SRC target or
+            // native bit-perfect policy may have changed since the last track.
+            output = processor.configure(new AudioProcessor.AudioFormat(
                     format.sampleRate, format.channelCount, C.ENCODING_PCM_FLOAT));
-            processor.flush();
-            processFloat = processor.isActive();
         } catch (AudioProcessor.UnhandledAudioFormatException e) {
             throw new ConfigurationException(e, format);
         }
-        if (processFloat) {
+        final boolean active = !output.equals(AudioProcessor.AudioFormat.NOT_SET)
+                && processor.isActive();
+        final boolean sameFormat = sameInput && active && output.equals(processorOutputFormat);
+        if (!sameFormat) {
+            pendingOutput = null;
+            pendingInput = null;
+            processor.flush();
+        }
+        processFloat = active;
+        processorOutputFormat = active ? output : AudioProcessor.AudioFormat.NOT_SET;
+        if (active) {
             lastSampleRate = format.sampleRate;
             lastChannelCount = format.channelCount;
             lastPcmEncoding = encoding;
             ensureConvertCapacity(PRESIZE_SAMPLES);
+            if (encoding == C.ENCODING_PCM_32BIT) {
+                Log.w(TAG, "int32 PCM converted to float32 (24 significant bits); not bit-perfect");
+            }
         }
-        super.configure(processFloat
-                ? format.buildUpon().setPcmEncoding(C.ENCODING_PCM_FLOAT).build()
-                : format, bufferSize, outputChannels);
+        super.configure(active ? format.buildUpon()
+                .setSampleRate(output.sampleRate)
+                .setChannelCount(output.channelCount)
+                .setPcmEncoding(output.encoding).build() : format, bufferSize, outputChannels);
     }
 
     @Override
@@ -169,27 +180,26 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             if (inputEncoding != C.ENCODING_PCM_FLOAT) {
                 pcm = convertToFloat(pcm);
             }
+            final int pcmStart = pcm.position();
             processor.queueInput(pcm);
-            if (pcm.hasRemaining()) {
-                // Never silently leave bytes unconsumed: surface it once, then
-                // drop the remainder explicitly.
-                if (!loggedRemainder) {
-                    loggedRemainder = true;
-                    Log.w(TAG, "processor left " + pcm.remaining()
-                            + " bytes unconsumed; dropping the remainder");
-                }
-                pcm.position(pcm.limit());
-            }
+            final int sampleBytes = inputEncoding == C.ENCODING_PCM_16BIT ? 2
+                    : inputEncoding == C.ENCODING_PCM_24BIT ? 3 : 4;
+            pendingInputEnd = input.position() + (pcm.position() - pcmStart) / 4 * sampleBytes;
             pendingOutput = processor.getOutput();
             pendingInput = input;
+            pendingPresentationTimeUs = presentationTimeUs;
+            pendingAccessUnits = accessUnits;
         } else if (pendingInput != input) {
             throw new IllegalStateException("Retry the same PCM buffer until the sink consumes it");
         }
-        if (!super.handleBuffer(pendingOutput, presentationTimeUs, accessUnits)) return false;
-        input.position(input.limit());
+        // An SRC may buffer input without emitting frames yet. Empty output is
+        // not an AudioSink write, but the consumed source bytes still advance.
+        if (pendingOutput.hasRemaining() && !super.handleBuffer(pendingOutput,
+                pendingPresentationTimeUs, pendingAccessUnits)) return false;
+        input.position(pendingInputEnd);
         pendingOutput = null;
         pendingInput = null;
-        return true;
+        return !input.hasRemaining();
     }
 
     @Override
@@ -226,6 +236,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         lastSampleRate = -1;
         lastChannelCount = -1;
         lastPcmEncoding = C.ENCODING_INVALID;
+        processorOutputFormat = AudioProcessor.AudioFormat.NOT_SET;
         if (processFloat && processor != null) processor.reset();
         processFloat = false;
         super.reset();
@@ -273,8 +284,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         } else {
             final IntBuffer ints = pcm.asIntBuffer();
             for (int i = 0; i < samples; i++) {
-                // Widen to double before scaling: int/float rounds through
-                // float first and loses mantissa precision on hi-res 32-bit.
+                // Scaling via double does NOT preserve int32 low bits: the
+                // final float still has only 24 significant bits. This is an
+                // explicitly lossy playback path, not an exact integer bypass.
                 out[i] = (float) (ints.get(i) * (1.0 / 2147483648.0));
             }
         }

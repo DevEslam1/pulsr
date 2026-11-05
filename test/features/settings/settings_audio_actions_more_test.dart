@@ -246,6 +246,9 @@ void main() {
       }
     });
     var streaming = false;
+    var streamRate = 0;
+    var streamDepth = 0;
+    var streamChannels = 0;
     messenger.setMockMethodCallHandler(usbChannel, (call) async {
       switch (call.method) {
         case 'getStatus':
@@ -256,12 +259,25 @@ void main() {
             'streamingActive': streaming,
             'deviceName': 'USB DAC',
             'supportedRates': <int>[48000, 96000],
+            // A start is only owned once the endpoint reports the format it
+            // actually opened on this device.
+            'deviceId': 7,
+            'streamingSampleRate': streamRate,
+            'streamingBitDepth': streamDepth,
+            'streamingChannels': streamChannels,
           };
         case 'startStreaming':
+          final args = (call.arguments as Map).cast<String, dynamic>();
           streaming = true;
+          streamRate = args['sampleRate'] as int;
+          streamDepth = args['bitDepth'] as int;
+          streamChannels = args['channels'] as int? ?? 2;
           return {'success': true};
         case 'stopStreaming':
           streaming = false;
+          streamRate = 0;
+          streamDepth = 0;
+          streamChannels = 0;
           return {'success': true};
         default:
           return null;

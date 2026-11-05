@@ -62,25 +62,19 @@ class UsbExclusivePlugin(
          * endpoint. Bit-Perfect uses this as its fallback when Android does not
          * advertise exclusive mixer attributes for the DAC.
          */
-        @Volatile var directStreamingActive: Boolean = false
+        internal data class DirectStreamStatus(
+            val deviceId: Int, val deviceName: String,
+            val sampleRate: Int, val bitDepth: Int, val channels: Int,
+        )
+        @Volatile private var directOwner: UsbExclusivePlugin? = null
+        internal fun confirmedDirectStream(): DirectStreamStatus? {
+            val owner = directOwner ?: return null
+            val status = owner.directStatus ?: return null
+            return status.takeIf { owner.isNativeActive() && owner.directStatus === status }
+        }
+        val directStreamingActive: Boolean get() = confirmedDirectStream() != null
         @Volatile var directStreamingSupported: Boolean = false
 
-        // UAC class-specific request codes / audio control selectors.
-        private const val REQ_SET_CUR = 0x01
-        private const val REQ_GET_CUR = 0x81
-        private const val REQ_GET_MIN = 0x82
-        private const val REQ_GET_MAX = 0x83
-        private const val REQ_GET_RES = 0x84
-        private const val SELECTOR_VOLUME = 0x02
-        private const val BM_GET = 0xA1 // device-to-host, class, interface
-        private const val BM_SET = 0x21 // host-to-device, class, interface
-        private const val BM_SET_ENDPOINT = 0x22 // host-to-device, class, endpoint
-
-        // UAC2 Clock-Source sampling-frequency control selector (wValue high byte
-        // of SET_CUR against the AudioControl interface) and the UAC1 endpoint
-        // sampling-frequency control selector.
-        private const val CS_SAM_FREQ_CONTROL = 0x01
-        private const val UAC1_SAMPLING_FREQ_CONTROL = 0x01
         private const val CTRL_TIMEOUT_MS = 1000
     }
 
@@ -97,13 +91,12 @@ class UsbExclusivePlugin(
     private var streamInterfaceNumber: Int? = null
     private var parsedResult: UsbAudioControlParser.Result? = null
 
-    private var minRaw: Int? = null
-    private var maxRaw: Int? = null
-    private var resRaw: Int? = null
+    private var hardwareVolume: UsbHardwareVolume? = null
 
     private var nativeLoaded = false
     @Volatile private var streaming = false
-    @Volatile private var currentStreamingRate = 0
+    @Volatile private var streamFormat: UsbAudioProtocol.StreamFormat? = null
+    @Volatile private var directStatus: DirectStreamStatus? = null
     private var claimedStreamingInterface: UsbInterface? = null
 
     // Blocking USB control transfers, raw-descriptor parsing and native sink
@@ -196,10 +189,7 @@ class UsbExclusivePlugin(
         try {
             when (call.method) {
                 "getStatus" -> {
-                    // Return the cached snapshot immediately and refresh (which
-                    // issues blocking control transfers) off the main thread.
-                    result.success(cachedStatus)
-                    emitState()
+                    runAsync(call.method, result) { buildStatus().also { cachedStatus = it } }
                 }
                 "requestPermission" -> requestPermission(result)
                 "setExclusive" -> {
@@ -372,23 +362,31 @@ class UsbExclusivePlugin(
     }
 
     private fun ensureConnection(device: UsbDevice): UsbDeviceConnection? {
-        connection?.let { return it }
+        connection?.let {
+            if (openedDevice?.deviceId == device.deviceId) return it
+            closeLocked()
+        }
         val conn = try { usbManager?.openDevice(device) } catch (_: Exception) { null }
             ?: return null
         connection = conn
         openedDevice = device
         val parsed = parseViaRawDescriptors(conn) ?: parseViaInterfaces(device)
         applyParsed(parsed)
-        refreshVolumeRange()
+        hardwareVolume = parsed.volumeUnit?.let { UsbHardwareVolume(parsed.uacVersion, it, transport(conn)) }
+        hardwareVolume?.refresh()
         return conn
     }
 
     private fun buildStatus(): Map<String, Any?> {
+        if (openedDevice != null && usbManager?.deviceList?.values?.none {
+                it.deviceId == openedDevice?.deviceId
+            } != false) closeLocked()
         val device = openedDevice ?: findAudioDevice()
         if (device == null) {
             return baseStatus(attached = false, permitted = false, device = null)
         }
         val permitted = usbManager?.hasPermission(device) == true
+        if (!permitted && connection != null) closeLocked()
         // Keep the FULL parsed result: reconstructing it from the cached summary
         // fields dropped `streamingEndpoint`, so `streamingSupported` was always
         // false once a connection was open and the direct bit-perfect toggle
@@ -399,30 +397,19 @@ class UsbExclusivePlugin(
         } else {
             parseViaInterfaces(device).also { applyParsed(it) }
         }
-        if (streaming && nativeLoaded && !nativeUsbStreamIsActive()) {
-            val lastErr = nativeUsbStreamGetLastError()
-            Log.w(TAG, "USB streaming sink died asynchronously (error: $lastErr); releasing and falling back")
-            streaming = false
-            claimedStreamingInterface?.let {
-                try { connection?.releaseInterface(it) } catch (_: Exception) {}
-            }
-            claimedStreamingInterface = null
+        if (streaming && !isNativeActive()) {
+            Log.w(TAG, "USB streaming sink inactive; releasing the interface")
+            clearStreaming()
         }
-        directStreamingActive = streaming
-        // Before USB permission is granted only the interface descriptors are
-        // readable; a UAC2 AudioStreaming interface means the direct path is
-        // worth offering (the endpoint is parsed and validated on start).
-        val directCapable = parsed.streamingEndpoint != null ||
-            parsed.streamingInterface != null
+        val directCapable = parsed.uacVersion in 1..2 && parsed.altSettingFormats.isNotEmpty()
         directStreamingSupported = nativeLoaded && directCapable
-
-        val hasVolume = parsed.volumeUnit != null &&
-            (parsed.uacVersion == UsbAudioControlParser.UAC1 ||
-                parsed.uacVersion == UsbAudioControlParser.UAC2)
+        hardwareVolume?.refresh()
+        val hasVolume = permitted && hardwareVolume?.ready == true
         return mapOf(
             "attached" to true,
             "permitted" to permitted,
             "deviceName" to deviceLabel(device),
+            "deviceId" to device.deviceId,
             "vendorId" to device.vendorId,
             "productId" to device.productId,
             "uacVersion" to parsed.uacVersion,
@@ -432,9 +419,13 @@ class UsbExclusivePlugin(
             "exclusiveSupported" to hasVolume,
             "streamingActive" to streaming,
             "streamingSupported" to (nativeLoaded && directCapable),
-            "hardwareVolumeDb" to currentVolumeDb(),
-            "minVolumeDb" to (minRaw?.let { rawToDb(it) }),
-            "maxVolumeDb" to (maxRaw?.let { rawToDb(it) }),
+            "streamingSampleRate" to (streamFormat?.sampleRate ?: 0),
+            "streamingBitDepth" to (streamFormat?.bitDepth ?: 0),
+            "streamingChannels" to (streamFormat?.channels ?: 0),
+            "hardwareVolumeDb" to hardwareVolume?.currentDb,
+            "hardwareVolumeApplied" to (hardwareVolume?.applied == true),
+            "minVolumeDb" to hardwareVolume?.minDb,
+            "maxVolumeDb" to hardwareVolume?.maxDb,
             "interfaceNumber" to parsed.streamingInterface,
             "supportedRates" to parsed.supportedRates,
             "lastError" to if (nativeLoaded) nativeUsbStreamGetLastError() else 0,
@@ -454,6 +445,7 @@ class UsbExclusivePlugin(
         "attached" to attached,
         "permitted" to permitted,
         "deviceName" to (device?.let { deviceLabel(it) }),
+        "deviceId" to device?.deviceId,
         "vendorId" to device?.vendorId,
         "productId" to device?.productId,
         "uacVersion" to UsbAudioControlParser.UAC_NONE,
@@ -463,7 +455,11 @@ class UsbExclusivePlugin(
         "exclusiveSupported" to false,
         "streamingActive" to false,
         "streamingSupported" to false,
+        "streamingSampleRate" to 0,
+        "streamingBitDepth" to 0,
+        "streamingChannels" to 0,
         "hardwareVolumeDb" to null,
+        "hardwareVolumeApplied" to false,
         "minVolumeDb" to null,
         "maxVolumeDb" to null,
         "interfaceNumber" to null,
@@ -623,147 +619,55 @@ class UsbExclusivePlugin(
 
     // ---- hardware volume ----
 
+    private fun transport(conn: UsbDeviceConnection) = UsbControlTransfer { type, request, value, index, data ->
+        conn.controlTransfer(type, request, value, index, data, data.size, CTRL_TIMEOUT_MS)
+    }
+
     private fun setHardwareVolumeInternal(db: Double): Map<String, Any?> {
-        val device = openedDevice ?: findAudioDevice()
-            ?: return failure("no_usb_device")
+        hardwareVolume?.invalidate()
+        val device = openedDevice ?: findAudioDevice() ?: return failure("no_usb_device")
         if (usbManager?.hasPermission(device) != true) return failure("permission_required")
-        val conn = ensureConnection(device) ?: return failure("open_failed")
-        val unit = volumeUnit ?: return failure("no_volume_control")
-        if (uacVersion != UsbAudioControlParser.UAC1 &&
-            uacVersion != UsbAudioControlParser.UAC2
-        ) {
-            return failure("unsupported_uac")
-        }
-        refreshVolumeRange()
+        ensureConnection(device) ?: return failure("open_failed")
+        val volume = hardwareVolume ?: return failure("no_usable_volume_control")
         val offset = getVolumeCalibrationOffset(device.vendorId, device.productId)
-        val calibratedDb = db + offset
-        val target = calibratedDb.coerceIn(minDb(), maxDb())
-        val raw = dbToRaw(target)
-        val bytes = rawToBytes(raw)
-        val ok = transfer(conn, BM_SET, REQ_SET_CUR, unit, 0, bytes)
-        if (!ok) return failure("control_transfer_failed")
+        val ok = volume.setDb(db + offset)
+        val status = buildStatus()
         emitState()
-        return buildStatus()
+        return status + mapOf(
+            "success" to (ok && volume.applied),
+            "error" to if (ok && volume.applied) null else "volume_not_verified",
+        )
     }
-
-    private fun currentVolumeDb(): Double? {
-        val conn = connection ?: return null
-        val unit = volumeUnit ?: return null
-        val buf = ByteArray(volumeSize())
-        val ok = transfer(conn, BM_GET, REQ_GET_CUR, unit, 0, buf)
-        if (!ok) return null
-        return rawToDb(bytesToRaw(buf))
-    }
-
-    private fun refreshVolumeRange() {
-        val conn = connection ?: return
-        val unit = volumeUnit ?: return
-        minRaw = readRaw(conn, unit, REQ_GET_MIN)
-        maxRaw = readRaw(conn, unit, REQ_GET_MAX)
-        resRaw = readRaw(conn, unit, REQ_GET_RES)
-    }
-
-    private fun readRaw(
-        conn: UsbDeviceConnection,
-        unit: UsbAudioControlParser.FeatureUnitVolume,
-        request: Int,
-    ): Int? {
-        val buf = ByteArray(volumeSize())
-        val ok = transfer(conn, BM_GET, request, unit, 0, buf)
-        return if (ok) bytesToRaw(buf) else null
-    }
-
-    /** UAC2 volume is a 16.16 fixed-point 32-bit value; UAC1 is 16-bit. */
-    private fun volumeSize(): Int =
-        if (uacVersion == UsbAudioControlParser.UAC2) 4 else 2
-
-    /** Issues a class-specific control transfer against a Feature Unit. */
-    private fun transfer(
-        conn: UsbDeviceConnection,
-        requestType: Int,
-        request: Int,
-        unit: UsbAudioControlParser.FeatureUnitVolume,
-        channel: Int,
-        buffer: ByteArray,
-    ): Boolean {
-        return try {
-            val wValue = (SELECTOR_VOLUME shl 8) or (channel and 0xFF)
-            val wIndex = (unit.unitId shl 8) or (unit.interfaceNumber and 0xFF)
-            val sent = conn.controlTransfer(
-                requestType,
-                request,
-                wValue,
-                wIndex,
-                buffer,
-                buffer.size,
-                CTRL_TIMEOUT_MS,
-            )
-            sent >= 0
-        } catch (e: Exception) {
-            Log.w(TAG, "Control transfer failed: ${e.message}")
-            false
-        }
-    }
-
-    private fun minDb(): Double = minRaw?.let { rawToDb(it) } ?: -60.0
-    private fun maxDb(): Double = maxRaw?.let { rawToDb(it) } ?: 0.0
-
-    /** UAC1 stores 1/256 dB signed 16-bit; UAC2 uses 16.16 fixed-point dB. */
-    private fun rawToDb(raw: Int): Double = when (uacVersion) {
-        UsbAudioControlParser.UAC2 -> raw / 65536.0
-        else -> raw / 256.0
-    }
-
-    private fun dbToRaw(db: Double): Int = when (uacVersion) {
-        UsbAudioControlParser.UAC2 -> (db * 65536.0).toInt()
-        else -> (db * 256.0).toInt()
-    }
-
-    private fun bytesToRaw(buf: ByteArray): Int {
-        return if (uacVersion == UsbAudioControlParser.UAC2 && buf.size >= 4) {
-            (buf[0].toInt() and 0xFF) or
-                ((buf[1].toInt() and 0xFF) shl 8) or
-                ((buf[2].toInt() and 0xFF) shl 16) or
-                ((buf[3].toInt() and 0xFF) shl 24)
-        } else {
-            val u16 = (buf[0].toInt() and 0xFF) or ((buf[1].toInt() and 0xFF) shl 8)
-            if (u16 and 0x8000 != 0) u16 - 0x10000 else u16
-        }
-    }
-
-    private fun rawToBytes(raw: Int): ByteArray =
-        if (uacVersion == UsbAudioControlParser.UAC2) {
-            byteArrayOf(
-                (raw and 0xFF).toByte(),
-                ((raw shr 8) and 0xFF).toByte(),
-                ((raw shr 16) and 0xFF).toByte(),
-                ((raw shr 24) and 0xFF).toByte(),
-            )
-        } else {
-            byteArrayOf(
-                (raw and 0xFF).toByte(),
-                ((raw shr 8) and 0xFF).toByte(),
-            )
-        }
 
     private fun failure(reason: String): Map<String, Any?> =
         mapOf(
             "success" to false,
             "error" to reason,
             "exclusiveActive" to (claimedInterface != null),
+            "deviceId" to openedDevice?.deviceId,
+            "hasVolumeControl" to (hardwareVolume?.ready == true),
+            "hardwareVolumeDb" to hardwareVolume?.currentDb,
+            "hardwareVolumeApplied" to (hardwareVolume?.applied == true),
+            "streamingActive" to (streaming && isNativeActive()),
+            "streamingSampleRate" to (streamFormat?.sampleRate ?: 0),
+            "streamingBitDepth" to (streamFormat?.bitDepth ?: 0),
+            "streamingChannels" to (streamFormat?.channels ?: 0),
         )
 
     // ---- raw UAC2 isochronous streaming ----
 
     private fun startStreamingInternal(sampleRate: Int, channels: Int, bitDepth: Int = 16): Map<String, Any?> {
-        if (streaming) {
-            if (currentStreamingRate == sampleRate) {
+        if (streaming && streamFormat?.matches(sampleRate, bitDepth, channels, isNativeActive()) == true) {
+            val status = buildStatus()
+            if (status["streamingActive"] == true) {
                 lastStreamResultCode = 0
-                return buildStatus() + mapOf("success" to true, "resultCode" to 0)
+                return status + mapOf("success" to true, "resultCode" to 0)
             }
-            // Gapless rate switching: stop native isochronous sink worker without releasing claimed interface
-            try { nativeUsbStreamStop() } catch (_: Throwable) {}
-            streaming = false
+        }
+        clearStreaming()
+        if (bitDepth == 32) {
+            lastStreamResultCode = 3
+            return failure("source_32bit_float_conversion_not_lossless")
         }
         if (!nativeLoaded) {
             lastStreamResultCode = -1
@@ -781,57 +685,15 @@ class UsbExclusivePlugin(
             lastStreamResultCode = 1
             return failure("open_failed")
         }
-        val parsed = parseViaRawDescriptors(conn) ?: parseViaInterfaces(device)
-
-        // FIX 3: choose the alternate setting whose FORMAT_TYPE_I subslot size
-        // matches the requested bit depth (and, for UAC1, the requested rate),
-        // instead of blindly streaming the first iso-OUT endpoint with a
-        // UI-derived sample size. `streamBytes` is the device's actual wire
-        // subslot so the native sink packs the matching byte layout.
-        val requestedBytes = when (bitDepth) {
-            24 -> 3
-            32 -> 4
-            else -> 2
-        }
-        val epAddress: Int
-        val epInterface: Int
-        val epAlt: Int
-        val streamBytes: Int
-        val selected = selectStreamingFormat(parsed, sampleRate, requestedBytes)
-        if (selected != null) {
-            epAddress = selected.endpointAddress
-            epInterface = selected.interfaceNumber
-            epAlt = selected.altSetting
-            streamBytes = selected.subslotSize
-            if (selected.subslotSize != requestedBytes) {
-                Log.w(
-                    TAG,
-                    "USB: requested ${requestedBytes * 8}-bit unavailable; using " +
-                        "${selected.subslotSize * 8}-bit container (alt ${selected.altSetting})",
-                )
-            }
-        } else if (parsed.altSettingFormats.isNotEmpty()) {
-            // The DAC advertised Type I formats but none accept this rate+depth.
-            // Reject so the caller can renegotiate a supported combination.
+        val parsed = parseViaRawDescriptors(conn) ?: return failure("format_descriptors_required")
+        val selected = UsbAudioProtocol.selectFormat(parsed, sampleRate, bitDepth, channels) ?: run {
             lastStreamResultCode = 3
             return failure("format_unsupported")
-        } else {
-            // Parser found no Type I format descriptors (interface-only fallback
-            // or a non-standard DAC): best-effort using the first iso-OUT
-            // endpoint and the UI-derived sample size.
-            val ep = parsed.streamingEndpoint ?: run {
-                lastStreamResultCode = 5
-                return failure("no_iso_out_endpoint")
-            }
-            if (ep.interfaceNumber < 0) {
-                lastStreamResultCode = 5
-                return failure("no_streaming_interface")
-            }
-            epAddress = ep.address
-            epInterface = ep.interfaceNumber
-            epAlt = ep.altSetting
-            streamBytes = requestedBytes
         }
+        val epAddress = selected.endpointAddress
+        val epInterface = selected.interfaceNumber
+        val epAlt = selected.altSetting
+        val streamBytes = selected.subslotSize
 
         // Prefer the exact (interface, alternate setting) pair that exposes the
         // selected isochronous OUT endpoint.
@@ -843,252 +705,99 @@ class UsbExclusivePlugin(
                 break
             }
         }
-        if (iface == null) {
-            for (i in 0 until device.interfaceCount) {
-                val c = device.getInterface(i)
-                if (c.id == epInterface) {
-                    iface = c
-                    break
-                }
-            }
-        }
         iface ?: run {
             lastStreamResultCode = 5
             return failure("streaming_interface_not_found")
         }
 
-        // Force-claim detaches Android's kernel audio driver from this
-        // interface so the exclusive endpoint is ours. If already claimed from a gapless switch,
-        // preserve the claim.
-        val alreadyClaimed = (claimedStreamingInterface != null && claimedStreamingInterface == iface)
-        val claimed = if (alreadyClaimed) true else try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
+        releaseClaim()
+        val claimed = try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
         if (!claimed) {
-            claimedStreamingInterface = null
             lastStreamResultCode = 1
+            rebindKernelDriver(conn, iface)
             return failure("claim_failed")
         }
-
-        val watchdog = Runnable {
-            // Same monitor as the native start below: the watchdog must not
-            // release the interface while start is still in flight.
-            synchronized(this) {
-                if (!streaming) {
-                    try { conn.releaseInterface(iface) } catch (_: Exception) {}
-                    Log.w(TAG, "Watchdog: released force-claimed interface due to streaming startup timeout")
-                }
-            }
-        }
-        mainHandler.postDelayed(watchdog, 5000L)
-
+        claimedStreamingInterface = iface
+        var started = false
         try {
-            try { conn.setInterface(iface) } catch (_: Exception) {}
-
-            // FIX 1: program the DAC's sample clock. Previously the alt setting
-            // was selected but the clock was never set, so a multi-rate DAC kept
-            // running at whatever rate it last powered up in -> wrong pitch and
-            // continuous drift. Best-effort: a NAK/STALL here is logged, not fatal.
-            setDacSampleRate(conn, parsed, epAddress, sampleRate)
-
-            val fd = try { conn.fileDescriptor } catch (_: Exception) { -1 }
+            if (!conn.setInterface(iface)) {
+                lastStreamResultCode = 2
+                return failure("alt_setting_failed")
+            }
+            if (!setDacSampleRate(conn, parsed, selected, sampleRate)) {
+                lastStreamResultCode = 3
+                return failure("clock_not_verified")
+            }
+            val fd = conn.fileDescriptor
             if (fd < 0) {
-                mainHandler.removeCallbacks(watchdog)
-                rebindKernelDriver(conn, iface)
                 lastStreamResultCode = 5
                 return failure("no_fd")
             }
-            val resultCode: Int
-            synchronized(this) {
-                resultCode = try {
-                    nativeUsbStreamStartWithFormat(
-                        fd, epAddress, epInterface, epAlt,
-                        sampleRate, channels, streamBytes,
-                    )
-                } catch (e: Throwable) {
-                    Log.w(TAG, "nativeUsbStreamStartWithFormat failed: ${e.message}")
-                    -1
-                }
-                if (resultCode == 0) {
-                    streaming = true
-                    directStreamingActive = true
-                    currentStreamingRate = sampleRate
-                    claimedStreamingInterface = iface
-                }
-            }
+            val resultCode = nativeUsbStreamStartWithFormat(
+                fd, epAddress, epInterface, epAlt, sampleRate, channels, streamBytes,
+            )
             lastStreamResultCode = resultCode
-            if (resultCode != 0) {
-                mainHandler.removeCallbacks(watchdog)
-                rebindKernelDriver(conn, iface)
-                val errStr = when (resultCode) {
-                    1 -> "claim_failed"
-                    2 -> "alt_setting_failed"
-                    3 -> "rate_unsupported"
-                    4 -> "submit_failed"
-                    5 -> "invalid_args"
-                    else -> "native_start_failed"
-                }
-                return failure(errStr) + mapOf("resultCode" to resultCode)
+            if (resultCode != 0 || !isNativeActive()) {
+                return failure("native_stream_not_active") + mapOf("resultCode" to resultCode)
             }
-            mainHandler.removeCallbacks(watchdog)
+            streamFormat = UsbAudioProtocol.StreamFormat(sampleRate, selected.bitResolution, selected.channels)
+            streaming = true
+            directStatus = DirectStreamStatus(device.deviceId, deviceLabel(device),
+                sampleRate, selected.bitResolution, selected.channels)
+            directOwner = this
+            val status = buildStatus()
+            started = status["streamingActive"] == true && isNativeActive()
+            if (!started) return failure("native_stream_not_active")
             emitState()
-            return buildStatus() + mapOf("success" to true, "resultCode" to 0)
-        } catch (e: Exception) {
-            mainHandler.removeCallbacks(watchdog)
-            rebindKernelDriver(conn, iface)
-            throw e
+            return status + mapOf("success" to true, "resultCode" to 0)
+        } catch (e: Throwable) {
+            Log.w(TAG, "USB streaming startup failed: ${e.message}")
+            lastStreamResultCode = -1
+            return failure("stream_start_failed")
+        } finally {
+            if (!started) clearStreaming()
         }
     }
 
-    /**
-     * FIX 3 helper: pick the AudioStreaming alternate setting whose
-     * FORMAT_TYPE_I best matches the requested rate + bit depth.
-     *
-     * Preference among rate-compatible formats on the streaming interface:
-     * exact subslot match, then the smallest larger subslot (a lossless
-     * container up-fit, e.g. a 24-bit source into a 32-bit slot), then the
-     * device's largest subslot. Returns null when the DAC advertised Type I
-     * formats but none accept the requested rate (caller renegotiates), or when
-     * no formats were parsed at all (caller uses the legacy single-endpoint path).
-     */
-    private fun selectStreamingFormat(
-        parsed: UsbAudioControlParser.Result,
-        sampleRate: Int,
-        requestedBytes: Int,
-    ): UsbAudioControlParser.AltSettingFormat? {
-        val asInterface = parsed.streamingInterface
-        val candidates = parsed.altSettingFormats.filter { fmt ->
-            (asInterface == null || fmt.interfaceNumber == asInterface) &&
-                fmt.subslotSize in 2..4 &&
-                // UAC2 alts carry no rate table (rates live in the clock) -> an
-                // empty list means "any rate the clock supports".
-                (fmt.supportedRates.isEmpty() || fmt.supportedRates.contains(sampleRate))
-        }
-        if (candidates.isEmpty()) return null
-        candidates.firstOrNull { it.subslotSize == requestedBytes }?.let { return it }
-        candidates.filter { it.subslotSize > requestedBytes }
-            .minByOrNull { it.subslotSize }?.let { return it }
-        return candidates.maxByOrNull { it.subslotSize }
-    }
-
-    /**
-     * FIX 1: program the DAC sample clock to [sampleRate] before streaming.
-     *
-     * UAC2 issues a Clock-Source SET_CUR(CS_SAM_FREQ_CONTROL) on the
-     * AudioControl interface; UAC1 issues an endpoint SET_CUR against the
-     * iso-OUT endpoint. The request is skipped when the device exposes a single
-     * fixed rate (UAC2 read-only clock, or exactly one UAC1 rate) because
-     * SET_CUR would be rejected. Any NAK/STALL is logged, never fatal: some
-     * DACs still default to the alt setting's rate.
-     */
     private fun setDacSampleRate(
         conn: UsbDeviceConnection,
         parsed: UsbAudioControlParser.Result,
-        endpointAddress: Int,
+        selected: UsbAudioControlParser.AltSettingFormat,
         sampleRate: Int,
-    ) {
-        try {
-            when (parsed.uacVersion) {
-                UsbAudioControlParser.UAC2 -> {
-                    val clock = parsed.clockSource
-                    if (clock == null) {
-                        Log.w(TAG, "USB clock: no UAC2 Clock Source parsed; skipping SET_CUR")
-                        return
-                    }
-                    if (!clock.frequencyProgrammable) {
-                        // Read-only clock => fixed single rate; nothing to program.
-                        Log.i(TAG, "USB clock: fixed-rate UAC2 clock; skipping SET_CUR")
-                        return
-                    }
-                    // 4-byte little-endian dwSampleFreq payload.
-                    val data = byteArrayOf(
-                        (sampleRate and 0xFF).toByte(),
-                        ((sampleRate shr 8) and 0xFF).toByte(),
-                        ((sampleRate shr 16) and 0xFF).toByte(),
-                        ((sampleRate shr 24) and 0xFF).toByte(),
-                    )
-                    // Control transfer parameters (UAC2 Clock Source SET_CUR):
-                    //   bmRequestType = 0x21  host->device | class | interface
-                    //   bRequest      = 0x01  SET_CUR
-                    //   wValue        = CS_SAM_FREQ_CONTROL(0x01) << 8 = 0x0100
-                    //   wIndex        = (bClockID << 8) | AudioControl interface
-                    //   wLength       = 4  (dwSampleFreq, little-endian)
-                    val wValue = CS_SAM_FREQ_CONTROL shl 8
-                    val wIndex = (clock.clockId shl 8) or (clock.controlInterface and 0xFF)
-                    val sent = conn.controlTransfer(
-                        BM_SET, REQ_SET_CUR, wValue, wIndex, data, data.size, CTRL_TIMEOUT_MS,
-                    )
-                    if (sent < 0) {
-                        Log.w(TAG, "USB clock: UAC2 SET_CUR($sampleRate) rejected (clockId=${clock.clockId})")
-                    } else {
-                        Log.i(TAG, "USB clock: UAC2 clock set to $sampleRate Hz (clockId=${clock.clockId})")
-                    }
-                }
-                UsbAudioControlParser.UAC1 -> {
-                    // Guard: a UAC1 device advertising exactly one rate is fixed.
-                    if (parsed.supportedRates.size == 1) {
-                        Log.i(TAG, "USB clock: fixed-rate UAC1 endpoint; skipping SET_CUR")
-                        return
-                    }
-                    // 3-byte little-endian tSampleFreq payload.
-                    val data = byteArrayOf(
-                        (sampleRate and 0xFF).toByte(),
-                        ((sampleRate shr 8) and 0xFF).toByte(),
-                        ((sampleRate shr 16) and 0xFF).toByte(),
-                    )
-                    // Control transfer parameters (UAC1 endpoint SET_CUR):
-                    //   bmRequestType = 0x22  host->device | class | endpoint
-                    //   bRequest      = 0x01  SET_CUR
-                    //   wValue        = SAMPLING_FREQ_CONTROL(0x01) << 8 = 0x0100
-                    //   wIndex        = iso-OUT endpoint address
-                    //   wLength       = 3  (tSampleFreq, little-endian)
-                    val wValue = UAC1_SAMPLING_FREQ_CONTROL shl 8
-                    val wIndex = endpointAddress and 0xFF
-                    val sent = conn.controlTransfer(
-                        BM_SET_ENDPOINT, REQ_SET_CUR, wValue, wIndex, data, data.size, CTRL_TIMEOUT_MS,
-                    )
-                    if (sent < 0) {
-                        Log.w(TAG, "USB clock: UAC1 endpoint SET_CUR($sampleRate) rejected (ep=0x${endpointAddress.toString(16)})")
-                    } else {
-                        Log.i(TAG, "USB clock: UAC1 endpoint rate set to $sampleRate Hz")
-                    }
-                }
-                else -> {
-                    Log.i(TAG, "USB clock: UAC version ${parsed.uacVersion} has no programmable clock path")
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "USB clock: SET_CUR threw: ${e.message}")
-        }
-    }
+    ): Boolean = UsbAudioProtocol.setSampleRate(
+        transport(conn), parsed.uacVersion, parsed.clockSource, selected.endpointAddress,
+        sampleRate, selected.supportedRates.size == 1,
+    )
+
+    private fun isNativeActive(): Boolean = nativeLoaded && try {
+        nativeUsbStreamIsActive()
+    } catch (_: Throwable) { false }
 
     private fun rebindKernelDriver(conn: UsbDeviceConnection, iface: UsbInterface) {
-        try {
-            conn.releaseInterface(iface)
-        } catch (_: Exception) {}
-        Handler(Looper.getMainLooper()).postDelayed({
-            try {
-                conn.claimInterface(iface, false)
-                conn.releaseInterface(iface)
-            } catch (_: Exception) {}
-            emitState()
-        }, 500L)
+        val device = openedDevice
+        if (device != null) {
+            val idle = (0 until device.interfaceCount).map { device.getInterface(it) }
+                .firstOrNull { it.id == iface.id && it.alternateSetting == 0 }
+            if (idle != null) try { conn.setInterface(idle) } catch (_: Exception) {}
+        }
+        try { conn.releaseInterface(iface) } catch (_: Exception) {}
+    }
+
+    private fun clearStreaming() {
+        directStatus = null
+        if (directOwner === this) directOwner = null
+        streaming = false
+        streamFormat = null
+        if (nativeLoaded) try { nativeUsbStreamStop() } catch (_: Throwable) {}
+        val iface = claimedStreamingInterface
+        claimedStreamingInterface = null
+        val conn = connection
+        if (iface != null && conn != null) rebindKernelDriver(conn, iface)
     }
 
     private fun stopStreamingInternal(): Map<String, Any?> {
-        if (nativeLoaded) {
-            try { nativeUsbStreamStop() } catch (_: Exception) {}
-        }
-        streaming = false
-        directStreamingActive = false
-        currentStreamingRate = 0
+        clearStreaming()
         lastStreamResultCode = null
-        val iface = claimedStreamingInterface
-        val conn = connection
-        if (iface != null && conn != null) {
-            rebindKernelDriver(conn, iface)
-        } else if (iface != null) {
-            try { connection?.releaseInterface(iface) } catch (_: Exception) {}
-        }
-        claimedStreamingInterface = null
         emitState()
         return buildStatus() + mapOf("success" to true)
     }
@@ -1122,14 +831,7 @@ class UsbExclusivePlugin(
 
     @Synchronized
     private fun closeLocked() {
-        if (streaming) {
-            if (nativeLoaded) {
-                try { nativeUsbStreamStop() } catch (_: Exception) {}
-            }
-            streaming = false
-            claimedStreamingInterface = null
-        }
-        directStreamingActive = false
+        clearStreaming()
         directStreamingSupported = false
         releaseClaim()
         try { connection?.close() } catch (_: Exception) {}
@@ -1139,8 +841,8 @@ class UsbExclusivePlugin(
         uacVersion = UsbAudioControlParser.UAC_NONE
         streamInterfaceNumber = null
         parsedResult = null
-        minRaw = null
-        maxRaw = null
-        resRaw = null
+        hardwareVolume?.invalidate()
+        hardwareVolume = null
+        cachedStatus = baseStatus(attached = false, permitted = false, device = null)
     }
 }

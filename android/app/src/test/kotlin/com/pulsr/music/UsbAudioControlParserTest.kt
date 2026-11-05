@@ -12,12 +12,12 @@ class UsbAudioControlParserTest {
     private fun uac2Config(): ByteArray = byteArrayOf(
         // Audio Control interface (class 0x01 / subclass 0x01 / protocol 0x20)
         9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
-        // Feature Unit (subtype 0x06), unitId 3, source 2, controlSize 2,
-        // master + 2 channels each advertising Volume (0x02) + Mute (0x01).
-        12, 0x24, 0x06, 0x03, 0x02, 0x02,
-        0x03, 0x00,
-        0x03, 0x00,
-        0x03, 0x00,
+        // UAC2: 32-bit bmaControls, writable volume in bits 3:2; trailing iFeature.
+        18, 0x24, 0x06, 0x03, 0x02,
+        0x0F, 0x00, 0x00, 0x00,
+        0x0F, 0x00, 0x00, 0x00,
+        0x0F, 0x00, 0x00, 0x00,
+        0x00,
         // AudioStreaming interface #1
         9, 0x04, 0x01, 0x00, 0x00, 0x01, 0x02, 0x20, 0x00,
         // Isochronous OUT endpoint (addr 0x01, attrs 0x01, max packet 0x0040)
@@ -49,20 +49,68 @@ class UsbAudioControlParserTest {
         assertEquals(1, result.streamingInterface)
     }
 
+    private fun uac1Config(): ByteArray = byteArrayOf(
+        9, 0x04, 0, 0, 0, 1, 1, 0, 0,
+        13, 0x24, 6, 3, 2, 2,
+        3, 0, 3, 0, 3, 0, 0,
+    )
+
     @Test
-    fun parsesUac1Protocol() {
-        val data = uac2Config()
-        data[7] = 0x00 // Audio Control protocol -> UAC1
-        val result = UsbAudioControlParser.parse(data)
+    fun parsesRealUac1FeatureUnit() {
+        val result = UsbAudioControlParser.parse(uac1Config())
         assertEquals(UsbAudioControlParser.UAC1, result.uacVersion)
+        assertEquals(2, result.volumeUnit!!.channels)
+        assertEquals(listOf(0, 1, 2), result.volumeUnit!!.writableChannels)
+    }
+
+    @Test
+    fun uac1HighBytesAndStringIndexAreNotVolumeBits() {
+        val data = uac1Config()
+        for (offset in intArrayOf(15, 17, 19)) {
+            data[offset] = 1
+            data[offset + 1] = 2
+        }
+        data[21] = 2
+        assertFalse(UsbAudioControlParser.parse(data).hasVolumeControl)
+    }
+
+    @Test
+    fun uac2ReadOnlyAndReservedVolumeAreNotWritable() {
+        for (bits in listOf(0x04, 0x08)) {
+            val data = uac2Config()
+            for (offset in intArrayOf(14, 18, 22)) data[offset] = bits.toByte()
+            assertFalse(UsbAudioControlParser.parse(data).hasVolumeControl)
+        }
+    }
+
+    @Test
+    fun uac2PerChannelVolumeDoesNotInventMasterControl() {
+        val data = uac2Config()
+        data[14] = 0x04
+        val unit = UsbAudioControlParser.parse(data).volumeUnit!!
+        assertFalse(unit.volumeOnMaster)
+        assertEquals(listOf(1, 2), unit.writableChannels)
+        assertEquals(listOf(1, 2), unit.controlChannels)
+    }
+
+    @Test
+    fun incompletePerChannelVolumeIsNotUsable() {
+        val data = uac2Config()
+        data[14] = 0
+        data[22] = 0
+        assertFalse(UsbAudioControlParser.parse(data).hasVolumeControl)
+    }
+
+    @Test
+    fun shortInterfaceDescriptorDoesNotReadNextDescriptor() {
+        assertNull(UsbAudioControlParser.parse(byteArrayOf(2, 4, 6, 0x24, 6, 3, 2, 0)).volumeUnit)
     }
 
     @Test
     fun noFeatureUnitWhenVolumeBitAbsent() {
         val data = uac2Config()
-        // Clear the Volume bit, keep Mute (0x01) in every control bitmap.
-        // FU control bitmaps start at index 15 (master), 17 (ch1), 19 (ch2).
-        for (offset in intArrayOf(15, 17, 19)) {
+        // Keep only the UAC2 writable mute control.
+        for (offset in intArrayOf(14, 18, 22)) {
             data[offset] = 0x01
             data[offset + 1] = 0x00
         }

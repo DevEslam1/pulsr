@@ -125,6 +125,10 @@ void main() {
           createTestSong(id: 2, title: 'Beta'),
         ]));
 
+    // The field lives in the app bar and only mounts once search is opened.
+    await tester.tap(find.byIcon(Icons.search_rounded));
+    await tester.pumpAndSettle();
+
     await tester.enterText(find.byType(TextField).first, 'Alpha');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(const Duration(milliseconds: 350));

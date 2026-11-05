@@ -35,6 +35,12 @@ void main() {
       genre: 'jazz',
     );
     when(() => store.add(any())).thenAnswer((_) async {});
+    // initState reads the saved stations, and every tile asks the store for a
+    // URL collision; unstubbed they return null and the sheet never builds.
+    when(() => store.list).thenReturn(const []);
+    // The tile list asks the store for a URL collision on every row; without
+    // this stub the whole build throws and nothing renders.
+    when(() => store.hasUrlCollision(any())).thenReturn(false);
     when(() => service.isReachable(any())).thenAnswer((_) async => true);
   });
 
@@ -48,12 +54,7 @@ void main() {
       );
 
   testWidgets('lists directory results and adds a station', (tester) async {
-    when(() => service.search(
-          query: any(named: 'query'),
-          country: any(named: 'country'),
-          tag: any(named: 'tag'),
-          limit: any(named: 'limit'),
-        )).thenAnswer((_) async => [station]);
+    when(() => service.search(query: any(named: 'query'))).thenAnswer((_) async => [station]);
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
@@ -69,12 +70,7 @@ void main() {
   });
 
   testWidgets('shows a retry state when the directory fails', (tester) async {
-    when(() => service.search(
-          query: any(named: 'query'),
-          country: any(named: 'country'),
-          tag: any(named: 'tag'),
-          limit: any(named: 'limit'),
-        )).thenAnswer((_) async => throw Exception('offline'));
+    when(() => service.search(query: any(named: 'query'))).thenAnswer((_) async => throw Exception('offline'));
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
@@ -85,12 +81,7 @@ void main() {
 
   testWidgets('shows the empty state for a query with no matches',
       (tester) async {
-    when(() => service.search(
-          query: any(named: 'query'),
-          country: any(named: 'country'),
-          tag: any(named: 'tag'),
-          limit: any(named: 'limit'),
-        )).thenAnswer((_) async => const []);
+    when(() => service.search(query: any(named: 'query'))).thenAnswer((_) async => const []);
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
@@ -100,12 +91,7 @@ void main() {
 
   testWidgets('refuses a station whose stream cannot be reached',
       (tester) async {
-    when(() => service.search(
-          query: any(named: 'query'),
-          country: any(named: 'country'),
-          tag: any(named: 'tag'),
-          limit: any(named: 'limit'),
-        )).thenAnswer((_) async => [station]);
+    when(() => service.search(query: any(named: 'query'))).thenAnswer((_) async => [station]);
     when(() => service.isReachable(any())).thenAnswer((_) async => false);
 
     await tester.pumpWidget(host());

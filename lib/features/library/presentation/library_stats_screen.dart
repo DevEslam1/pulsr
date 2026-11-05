@@ -550,12 +550,15 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    Text(
-                                      '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.label,
-                                        color: p.info,
-                                        fontWeight: FontWeight.w700,
+                                    Flexible(
+                                      child: Text(
+                                        '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.label,
+                                          color: p.info,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -572,11 +575,14 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    Text(
-                                      '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.label,
-                                        color: p.textSecondary,
+                                    Flexible(
+                                      child: Text(
+                                        '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.label,
+                                          color: p.textSecondary,
+                                        ),
                                       ),
                                     ),
                                   ],

@@ -162,10 +162,13 @@ public final class AAudioAudioSink implements AudioSink {
             case C.ENCODING_PCM_16BIT:
             case C.ENCODING_PCM_FLOAT:
             case C.ENCODING_PCM_24BIT:
-            case C.ENCODING_PCM_32BIT:
-                // 32-bit integer PCM is accepted and converted to float32
-                // in-sink before being written to the AAudio stream.
                 return SINK_FORMAT_SUPPORTED_DIRECTLY;
+            case C.ENCODING_PCM_32BIT:
+                // int32 -> float32 keeps only 24 significant bits. Exclusive mode
+                // exists to deliver untouched samples, so it must decline rather
+                // than silently transcode; shared mode plays it and says so.
+                return preferExclusive ? SINK_FORMAT_UNSUPPORTED
+                        : SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
             default:
                 // Compressed/encoded and exotic PCM stay on DefaultAudioSink.
                 return SINK_FORMAT_UNSUPPORTED;
@@ -241,12 +244,13 @@ public final class AAudioAudioSink implements AudioSink {
         handle = newHandle;
         openedDeviceId = preferredDeviceId;
         routePending = false;
-        measuredStream = new int[] {bridge.getDeviceId(handle),
-                inputFormat.sampleRate, inputFormat.pcmEncoding == C.ENCODING_PCM_24BIT
-                    ? AudioFormat.ENCODING_PCM_24BIT_PACKED
-                    : inputFormat.pcmEncoding == C.ENCODING_PCM_32BIT
-                        ? AudioFormat.ENCODING_PCM_32BIT
-                        : inputFormat.pcmEncoding};
+        // Report what the stream was actually OPENED as, not what the decoder
+        // handed us: an int32 input arriving here is a float stream.
+        measuredStream = new int[] {bridge.getDeviceId(handle), inputFormat.sampleRate,
+                encoding == AaudioNativeBridge.ENCODING_PCM_I16 ? AudioFormat.ENCODING_PCM_16BIT
+                    : encoding == AaudioNativeBridge.ENCODING_PCM_I24_PACKED
+                        ? AudioFormat.ENCODING_PCM_24BIT_PACKED
+                        : AudioFormat.ENCODING_PCM_FLOAT};
         configuredFormat = inputFormat;
         sampleRate = inputFormat.sampleRate;
         channelCount = inputFormat.channelCount;
