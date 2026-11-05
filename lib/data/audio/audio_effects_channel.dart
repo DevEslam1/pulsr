@@ -1855,6 +1855,56 @@ class AudioEffectsChannel {
     }
   }
 
+  // --- DAC VOICING (opt-in reconstruction character + even-harmonic warmth) ---
+
+  /// Turns the native DAC voicing stage on or off. The stage is bit-exact
+  /// passthrough when off and settled, so this never changes the audio when the
+  /// user leaves it off. Returns false off Android.
+  Future<bool> setDacVoicingEnabled(bool enabled) async {
+    if (!_isAndroid) return false;
+    try {
+      final applied = await _channel
+          .invokeMethod<bool>('setDacVoicingEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 5));
+      return applied ?? true;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set DAC voicing enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  /// Selects the reconstruction [character] (0 = Sharp/linear-phase,
+  /// 1 = Slow/NOS-like, 2 = MinimumPhase — same magnitude as Sharp, no
+  /// pre-ringing) and how much even-order [voicingAmount] (0..1) to add.
+  /// [voicingAmount] 0 changes only the filter character.
+  Future<bool> setDacVoicingParams({
+    required int character,
+    required double voicingAmount,
+  }) async {
+    if (!_isAndroid) return false;
+    try {
+      final applied = await _channel
+          .invokeMethod<bool>('setDacVoicingParams', {
+        'character': character.clamp(0, 2),
+        'voicingAmount': voicingAmount.clamp(0.0, 1.0),
+      }).timeout(const Duration(seconds: 5));
+      return applied ?? true;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set DAC voicing params',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
   /// Mirrors bypass into the native snapshot (plus optional DoP flag).
   Future<void> setBitPerfectParams({
     required bool enabled,

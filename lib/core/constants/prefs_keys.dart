@@ -267,6 +267,12 @@ class PrefsKeys {
   // on the historical 16-bit sink path, byte-identical to today).
   static const String floatOutputEnabled = 'setting_float_output_enabled';
 
+  // Opt-in DAC voicing (default OFF: adds latency when enabled, so it stays a
+  // deliberate choice). Character is the native filter index, amount 0..1.
+  static const String dacVoicingEnabled = 'setting_dac_voicing_enabled';
+  static const String dacVoicingCharacter = 'setting_dac_voicing_character';
+  static const String dacVoicingAmount = 'setting_dac_voicing_amount';
+
   // Opt-in AAudio "Direct" output path (default OFF: the sink stays the
   // historical DefaultAudioSink + native DSP chain). When on, playback goes
   // through a native AAudio stream (EXCLUSIVE attempt, SHARED fallback) and

@@ -62,6 +62,7 @@ import '../../core/services/ytm_url_cache.dart';
 import '../../features/player/cubit/queue_slot_codec.dart';
 import 'collaborators/float_output_controller.dart';
 import 'collaborators/tap_src_controller.dart';
+import 'dac_voicing_service.dart';
 import 'collaborators/aaudio_output_controller.dart';
 import 'collaborators/playback_volume_controller.dart';
 import 'collaborators/stream_resolution_pipeline.dart';
@@ -1749,6 +1750,16 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
     } catch (e, st) {
       ErrorLogger.log('Failed to restore AAudio output setting',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+    // Restore the opt-in DAC voicing preference so a saved choice is not
+    // silently dropped until the user opens the output sheet again. Off by
+    // default; off is a bit-exact passthrough, so this cannot change the sound
+    // for anyone who never enabled it.
+    try {
+      await DacVoicingService.instance.load();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore DAC voicing preference',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
     // Unsupported optional DSP preferences must not abort player startup.

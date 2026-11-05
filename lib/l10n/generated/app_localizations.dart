@@ -9149,6 +9149,48 @@ abstract class AppLocalizations {
   /// **'Connection Successful'**
   String get settingsConnectionSuccessful;
 
+  /// No description provided for @settingsDacVoicing.
+  ///
+  /// In en, this message translates to:
+  /// **'DAC Voicing'**
+  String get settingsDacVoicing;
+
+  /// No description provided for @settingsDacVoicingDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Emulates a high-end DAC\'s selectable reconstruction filter and even-order tail. Adds latency when on; off is sample-transparent.'**
+  String get settingsDacVoicingDesc;
+
+  /// No description provided for @settingsDacVoicingSharp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sharp'**
+  String get settingsDacVoicingSharp;
+
+  /// No description provided for @settingsDacVoicingSlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow'**
+  String get settingsDacVoicingSlow;
+
+  /// No description provided for @settingsDacVoicingMinPhase.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum phase'**
+  String get settingsDacVoicingMinPhase;
+
+  /// No description provided for @settingsDacVoicingAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Warmth'**
+  String get settingsDacVoicingAmount;
+
+  /// No description provided for @settingsDacVoicingAmountDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Even-order harmonic level'**
+  String get settingsDacVoicingAmountDesc;
+
   /// No description provided for @settingsDacNoUacVolume.
   ///
   /// In en, this message translates to:

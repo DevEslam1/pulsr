@@ -527,6 +527,14 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 enabled: isAndroid && state.aaudioOutputEnabled,
                 onChanged: (v) => cubit.setAaudioTargetBufferMs(v.round()),
               ),
+              settingsCardDivider(p),
+              // Reconstruction character + even-order tail. Owns its own state
+              // through DacVoicingService, so it stays out of settings codegen.
+              const Padding(
+                padding:
+                    EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                child: _DacVoicingSelector(),
+              ),
               if (isAndroid &&
                   state.dsdDopSupported &&
                   state.dsdOutputMode == DsdOutputMode.dop) ...[

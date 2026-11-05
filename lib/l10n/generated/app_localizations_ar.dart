@@ -5077,6 +5077,28 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsConnectionSuccessful => 'نجح الاتصال';
 
   @override
+  String get settingsDacVoicing => 'طابع محوّل DAC';
+
+  @override
+  String get settingsDacVoicingDesc =>
+      'يحاكي مرشِّح الاسترجاع الاختياري والتوافقيات الزوجية في محوّل DAC الراقي. يضيف تأخيرًا عند التشغيل؛ والإيقاف لا يغيّر الإشارة.';
+
+  @override
+  String get settingsDacVoicingSharp => 'حادة';
+
+  @override
+  String get settingsDacVoicingSlow => 'بطيئة';
+
+  @override
+  String get settingsDacVoicingMinPhase => 'أقل طور';
+
+  @override
+  String get settingsDacVoicingAmount => 'الدفء';
+
+  @override
+  String get settingsDacVoicingAmountDesc => 'مستوى التوافقيات الزوجية';
+
+  @override
   String get settingsDacNoUacVolume => 'لا يوفّر DAC تحكّماً بمستوى صوت UAC';
 
   @override

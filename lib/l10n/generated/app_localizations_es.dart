@@ -5116,6 +5116,28 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsConnectionSuccessful => 'Conexión correcta';
 
   @override
+  String get settingsDacVoicing => 'Carácter del DAC';
+
+  @override
+  String get settingsDacVoicingDesc =>
+      'Emula el filtro de reconstrucción seleccionable y los armónicos pares de un DAC de alta gama. Añade latencia si está activo; desactivado es transparente.';
+
+  @override
+  String get settingsDacVoicingSharp => 'Brusco';
+
+  @override
+  String get settingsDacVoicingSlow => 'Suave';
+
+  @override
+  String get settingsDacVoicingMinPhase => 'Fase mínima';
+
+  @override
+  String get settingsDacVoicingAmount => 'Calidez';
+
+  @override
+  String get settingsDacVoicingAmountDesc => 'Nivel de armónicos pares';
+
+  @override
   String get settingsDacNoUacVolume =>
       'El DAC no expone control de volumen UAC';
 
