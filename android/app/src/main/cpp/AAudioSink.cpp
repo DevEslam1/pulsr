@@ -1,5 +1,6 @@
 // android/app/src/main/cpp/AAudioSink.cpp
 #include "AAudioSink.h"
+#include "AudioDspEngine.h"
 
 #include <android/log.h>
 
@@ -174,6 +175,13 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     recovery_.markConnected();
     lastWriteResult_.store(AAUDIO_OK, std::memory_order_relaxed);
     stream_.store(stream, std::memory_order_release);
+    // The container that actually opened is the grid the engine must shape onto.
+    // Float output reports 32: the next conversion belongs to the platform and
+    // the app cannot observe its depth, so nothing is gained by shaping for it.
+    AudioDspEngine::instance().setSinkBitDepth(
+        config_.encoding == Encoding::Int16
+            ? 16
+            : (config_.encoding == Encoding::I24Packed ? 24 : 32));
     LOGI("AAudio stream open: rate=%d ch=%d enc=%d exclusive=%d xrun=%d",
          AAudioStream_getSampleRate(stream), config_.channelCount,
          static_cast<int>(config_.encoding), exclusive ? 1 : 0,
@@ -268,6 +276,9 @@ bool AAudioSink::RecoverDisconnected() {
 void AAudioSink::CloseLocked(bool waitForWriters) {
     AAudioStream* st = stream_.exchange(nullptr, std::memory_order_acq_rel);
     if (st != nullptr) {
+        // This stream was the sink the engine was shaping for; the next one
+        // (usually the Java fallback) decides its own depth.
+        AudioDspEngine::instance().setSinkBitDepth(0);
         // Request stop immediately so any in-flight write unblocks without blocking Close
         AAudioStream_requestStop(st);
         // Wait for any in-flight lock-free queries to finish before closing
@@ -374,13 +385,9 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
             } else if (config_.encoding == Encoding::Int16) {
                 int16_t* s = reinterpret_cast<int16_t*>(scratchPtr);
                 const int n = chunkBytes / static_cast<int32_t>(sizeof(int16_t));
-                for (int i = 0; i < n; ++i) {
-                    float v = static_cast<float>(s[i]) * curVol;
-                    v = std::clamp(v, -32768.0f, 32767.0f);
-                    s[i] = static_cast<int16_t>(std::lrintf(v));
-                }
+                ApplyI16Volume(s, n, curVol, sinkDither_);
             } else if (config_.encoding == Encoding::I24Packed) {
-                ApplyI24PackedVolume(scratchPtr, chunkBytes, curVol);
+                ApplyI24PackedVolume(scratchPtr, chunkBytes, curVol, sinkDither_);
             }
             writeSrc = scratchPtr;
         }

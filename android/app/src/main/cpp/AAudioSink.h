@@ -103,6 +103,9 @@ private:
     std::atomic<bool> exclusive_{false};
     bool bitPerfect_ = false;           // exclusive/DoP: unity gain, no fallback
     int32_t bytesPerFrame_ = 0;
+    // TPDF state for the sink-side volume requantization (shared mode only).
+    // Kept per stream instance so the sequence does not restart every block.
+    SinkDitherState sinkDither_;
     std::atomic<int64_t> framesWrittenBase_{0}; // written-frame counter at last flush
     std::atomic<int64_t> framesWritten_{0}; // total written since open
     std::atomic<int64_t> readBase_{0}; // device read counter at last flush

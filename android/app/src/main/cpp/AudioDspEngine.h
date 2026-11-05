@@ -126,6 +126,14 @@ public:
 
     void resyncForTrack(double sampleRate, int channels = 2);
 
+    // The integer PCM depth the live sink actually writes (16/24/32), or 0 when
+    // unknown — the shared mixer owns its own last conversion and the app cannot
+    // observe it. The dither stage never shapes for a finer grid than this: a
+    // 24-bit-shaped signal that a 16-bit sink then rounds has its shaping partly
+    // destroyed by that final undithered requantization.
+    void setSinkBitDepth(int bits);
+    int getSinkBitDepth() const { return sinkBitDepth_.load(std::memory_order_relaxed); }
+
     void setActiveStages(uint32_t bitmask);
     uint32_t getActiveStages() const;
     void setBypassCompare(bool enabled, double gainCompensationDb);
@@ -274,6 +282,7 @@ private:
     void retireAndDrain(std::shared_ptr<const DspParamSnapshot> old);
 
     std::atomic<double> sampleRate_{48000.0};
+    std::atomic<int> sinkBitDepth_{0};
     std::atomic<int> effectiveLatencyFrames_{0};
     std::atomic<bool> limiterActive_{false};
     // A reset is a command, not a replaceable parameter. Publications may

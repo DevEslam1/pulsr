@@ -7,6 +7,8 @@
 #include <cmath>
 #include <cstdint>
 
+#include "SinkQuantizer.h"
+
 namespace pulsr {
 
 /**
@@ -74,20 +76,43 @@ inline bool CommitOpenState(bool startSucceeded, const AAudioOpenState& staged,
     return true;
 }
 
-/** Scales interleaved 24-bit packed PCM by `gain`, saturating to 24-bit. */
-inline void ApplyI24PackedVolume(uint8_t* data, int32_t byteCount, float gain) {
+/**
+ * Scales interleaved 24-bit packed PCM by `gain`, saturating to 24-bit.
+ *
+ * Scaling moves every sample off the integer grid it was quantized to, so this
+ * multiply is itself a requantization. Rounding it plainly would put a
+ * signal-correlated error after the engine's dither stage — the exact thing
+ * SinkQuantizer exists to avoid — so the requantization is dithered. Callers
+ * that skip this path entirely (exclusive/bit-perfect run at unity gain) are
+ * unaffected.
+ */
+inline void ApplyI24PackedVolume(uint8_t* data, int32_t byteCount, float gain,
+                                 SinkDitherState& st) {
     const int32_t numSamples = byteCount / 3;
     for (int32_t i = 0; i < numSamples; ++i) {
         uint8_t* p = data + i * 3;
         const int32_t raw = static_cast<int32_t>(p[0]) |
                             (static_cast<int32_t>(p[1]) << 8) |
                             (static_cast<int32_t>(static_cast<int8_t>(p[2])) << 16);
-        float v = static_cast<float>(raw) * gain;
-        v = std::clamp(v, -8388608.0f, 8388607.0f);
-        const int32_t scaled = std::lrintf(v);
+        const int64_t scaled = QuantizeLsbWithDither(
+            static_cast<double>(raw) * static_cast<double>(gain),
+            -8388608, 8388607, st);
         p[0] = static_cast<uint8_t>(scaled & 0xFF);
         p[1] = static_cast<uint8_t>((scaled >> 8) & 0xFF);
         p[2] = static_cast<uint8_t>((scaled >> 16) & 0xFF);
+    }
+}
+
+/**
+ * Scales interleaved 16-bit PCM by `gain`, saturating to the int16 range.
+ * Same requantization rule as the 24-bit path above.
+ */
+inline void ApplyI16Volume(int16_t* data, int32_t sampleCount, float gain,
+                           SinkDitherState& st) {
+    for (int32_t i = 0; i < sampleCount; ++i) {
+        const double scaled = static_cast<double>(data[i]) * static_cast<double>(gain);
+        data[i] = static_cast<int16_t>(
+            QuantizeLsbWithDither(scaled, -32768, 32767, st));
     }
 }
 

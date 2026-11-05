@@ -157,6 +157,69 @@ int main() {
         check(buf == zero, "dither flag off at 96 kHz must not touch silence");
     }
 
+    // The sink's own container wins when it is coarser than the requested
+    // depth: shaping for 24 bits and then having a 16-bit DAC round the result
+    // discards that shaping, so the engine must quantize where the bytes land.
+    {
+        auto engine = std::make_unique<AudioDspEngine>();
+        auto snap = std::make_shared<DspParamSnapshot>();
+        snap->sampleRate = 48000.0;
+        snap->activeStages = STAGE_DITHER;
+        snap->dither.enabled = true;
+        snap->dither.targetBitDepth = 24;
+        engine->setSampleRate(48000.0);
+        engine->setSinkBitDepth(16);
+        engine->publishParams(snap);
+
+        std::vector<float> buf(static_cast<size_t>(1024) * 2, 0.0f);
+        for (int b = 0; b < 16; ++b) engine->processInterleaved(buf.data(), 1024, 2);
+
+        int offGrid16 = 0;
+        for (const float s : buf) {
+            const double lsb = static_cast<double>(s) * 32768.0;
+            if (std::abs(lsb - std::rint(lsb)) > 1e-3) ++offGrid16;
+        }
+        check(offGrid16 == 0,
+              "a 16-bit sink must receive 16-bit-shaped output, not 24-bit");
+        check(engine->getSinkBitDepth() == 16, "the reported sink depth is kept");
+    }
+
+    // An unknown depth (the shared mixer, whose conversion the app cannot see)
+    // must leave the user's choice alone rather than guessing 16-bit.
+    {
+        auto engine = std::make_unique<AudioDspEngine>();
+        auto snap = std::make_shared<DspParamSnapshot>();
+        snap->sampleRate = 48000.0;
+        snap->activeStages = STAGE_DITHER;
+        snap->dither.enabled = true;
+        snap->dither.targetBitDepth = 24;
+        engine->setSampleRate(48000.0);
+        engine->setSinkBitDepth(0);
+        engine->publishParams(snap);
+
+        std::vector<float> buf(static_cast<size_t>(1024) * 2, 0.0f);
+        for (int b = 0; b < 16; ++b) engine->processInterleaved(buf.data(), 1024, 2);
+
+        int offGrid24 = 0, offGrid16 = 0;
+        for (const float s : buf) {
+            const double lsb24 = static_cast<double>(s) * 8388608.0;
+            const double lsb16 = static_cast<double>(s) * 32768.0;
+            if (std::abs(lsb24 - std::rint(lsb24)) > 1e-2) ++offGrid24;
+            if (std::abs(lsb16 - std::rint(lsb16)) > 1e-2) ++offGrid16;
+        }
+        check(offGrid24 == 0, "unknown sink depth still honors the 24-bit target");
+        check(offGrid16 > 0, "unknown sink depth must not collapse to 16-bit");
+
+        // A finer container than the target changes nothing: a 24-bit DAC still
+        // receives the 16-bit shaping the user asked for.
+        engine->setSinkBitDepth(32);
+        engine->setSinkBitDepth(24);
+        check(engine->getSinkBitDepth() == 24, "a supported depth is stored");
+        engine->setSinkBitDepth(20);
+        check(engine->getSinkBitDepth() == 0,
+              "an unsupported container depth is treated as unknown");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " dither above-48k check(s) failed." << std::endl;
         return 1;

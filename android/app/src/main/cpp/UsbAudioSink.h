@@ -29,6 +29,8 @@
 #include <thread>
 #include <vector>
 
+#include "SinkQuantizer.h"
+
 namespace pulsr {
 
 enum class UsbStreamResult : int32_t {
@@ -130,6 +132,10 @@ private:
     int sampleRate_ = 48000;
     int channels_ = 2;
     int bytesPerSample_ = 2;  // 2=S16, 3=S24_3LE, 4=S32
+    // TPDF state for the packing step. Persists across blocks on purpose: a
+    // per-call state would restart the sequence every block and make the dither
+    // noise periodic, which is a tonal artifact instead of a noise floor.
+    SinkDitherState sinkDither_;
     bool claimed_ = false;
 
     int packetsPerUrb_ = 8;

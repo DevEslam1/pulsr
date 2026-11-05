@@ -100,13 +100,23 @@ int main() {
         encodeI24(samples, 0x002000);   // 8192
 
         auto half = samples;
-        pulsr::ApplyI24PackedVolume(half.data(), static_cast<int32_t>(half.size()), 0.5f);
-        check(decodeI24(&half[0]) == 4194304, "I24 +max * 0.5");
+        // Products that land exactly on the 24-bit grid must not be dithered;
+        // only genuine half-LSB results may move by one step.
+        pulsr::SinkDitherState dither{};
+        pulsr::ApplyI24PackedVolume(half.data(), static_cast<int32_t>(half.size()), 0.5f,
+                                    dither);
+        // +max is odd, so *0.5 lands exactly between two steps. Plain rounding
+        // would always pick the same neighbour and correlate that error with the
+        // signal; dithered it is +-1 LSB around the midpoint.
+        const int32_t halfMax = decodeI24(&half[0]);
+        check(halfMax == 4194303 || halfMax == 4194304,
+              "I24 +max * 0.5 stays within 1 LSB of the midpoint");
         check(decodeI24(&half[3]) == -4194304, "I24 -max * 0.5");
         check(decodeI24(&half[6]) == 4096, "I24 +8192 * 0.5");
 
         auto doubled = samples;
-        pulsr::ApplyI24PackedVolume(doubled.data(), static_cast<int32_t>(doubled.size()), 2.0f);
+        pulsr::ApplyI24PackedVolume(doubled.data(), static_cast<int32_t>(doubled.size()), 2.0f,
+                                    dither);
         check(decodeI24(&doubled[0]) == 0x7FFFFF, "I24 +max saturates at +max");
         check(decodeI24(&doubled[3]) == -0x800000, "I24 -max saturates at -max");
         check(decodeI24(&doubled[6]) == 16384, "I24 +8192 * 2");

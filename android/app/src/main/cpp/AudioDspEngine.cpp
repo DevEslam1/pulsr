@@ -372,6 +372,14 @@ void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
     applySampleRateLocked(sampleRate);
 }
 
+void AudioDspEngine::setSinkBitDepth(int bits) {
+    // Only the depths a sink can actually be opened at. Anything else (a
+    // mis-read format, a float container reported as 0) means "unknown" and
+    // leaves the user's dither depth alone rather than silently reshaping it.
+    const int normalized = (bits == 16 || bits == 24 || bits == 32) ? bits : 0;
+    sinkBitDepth_.store(normalized, std::memory_order_relaxed);
+}
+
 DspEngineRegistry& DspEngineRegistry::instance() {
     static DspEngineRegistry sRegistry;
     return sRegistry;
@@ -1695,13 +1703,22 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // dither.bluetoothEnabled, which decorrelates the quantisation error at the
     // codec's own depth. When disabled — or the stage bit is clear — this is
     // bit-transparent: no write touches the buffer.
+    // The sink's own container may be coarser than the depth the user chose.
+    // Shaping for 24 bits and then having a 16-bit sink round the result
+    // undithered discards most of that shaping, so the shaping target follows
+    // the coarser of the two. sinkBitDepth_ is 0 (unknown) on the shared mixer,
+    // where the user's choice is kept.
+    const int sinkBits = sinkBitDepth_.load(std::memory_order_relaxed);
+    const int ditherBits = (sinkBits >= 16 && sinkBits < snapshot->dither.targetBitDepth)
+        ? sinkBits
+        : snapshot->dither.targetBitDepth;
     const bool ditherStageActive = (stages & STAGE_DITHER) != 0 &&
                                    snapshot->dither.enabled &&
-                                   snapshot->dither.targetBitDepth < 32 &&
+                                   ditherBits < 32 &&
                                    (!snapshot->dither.isBluetooth ||
                                     snapshot->dither.bluetoothEnabled);
     if (ditherStageActive) {
-        const double scale = static_cast<double>(ditherScaleForBits(snapshot->dither.targetBitDepth));
+        const double scale = static_cast<double>(ditherScaleForBits(ditherBits));
         const double invScale = 1.0 / scale;
         const double maxQuant = scale - 1.0;
         const double minQuant = -scale;

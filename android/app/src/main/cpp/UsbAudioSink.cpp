@@ -1,5 +1,7 @@
 // android/app/src/main/cpp/UsbAudioSink.cpp
 #include "UsbAudioSink.h"
+#include "AudioDspEngine.h"
+#include "SinkQuantizer.h"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -69,39 +71,6 @@ namespace pulsr {
 namespace {
 constexpr int kNumUrbs = 4;
 constexpr int kPacketsPerUrb = 8; // 8 ms of 1 ms isochronous packets
-
-// Clamp float to [-1, 1]
-inline float clampF(float v) {
-    if (v > 1.0f) return 1.0f;
-    if (v < -1.0f) return -1.0f;
-    return v;
-}
-
-// Pack one float sample into dst[] in the given bytesPerSample format (LE).
-// Returns bytesPerSample.
-inline int packSample(float v, uint8_t* dst, int bytesPerSample) {
-    v = clampF(v);
-    if (bytesPerSample == 2) {
-        // S16_LE: [-32768, 32767]
-        int32_t s = static_cast<int32_t>(std::clamp<long>(std::lround(v * 32768.0), -32768L, 32767L));
-        dst[0] = static_cast<uint8_t>(s & 0xFF);
-        dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
-    } else if (bytesPerSample == 3) {
-        // S24_3LE: [-8388608, 8388607] (packed 24-bit, no padding)
-        int32_t s = static_cast<int32_t>(std::clamp<long>(std::lround(v * 8388608.0), -8388608L, 8388607L));
-        dst[0] = static_cast<uint8_t>(s & 0xFF);
-        dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
-        dst[2] = static_cast<uint8_t>((s >> 16) & 0xFF);
-    } else {
-        // S32_LE: [-2147483648, 2147483647]
-        int64_t s = std::clamp<long long>(std::llround(v * 2147483648.0), -2147483648LL, 2147483647LL);
-        dst[0] = static_cast<uint8_t>(s & 0xFF);
-        dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
-        dst[2] = static_cast<uint8_t>((s >> 16) & 0xFF);
-        dst[3] = static_cast<uint8_t>((s >> 24) & 0xFF);
-    }
-    return bytesPerSample;
-}
 } // namespace
 
 UsbAudioSink& UsbAudioSink::instance() {
@@ -186,6 +155,10 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     sampleRate_ = sampleRate;
     channels_ = channels;
     bytesPerSample_ = std::clamp(bytesPerSample, 2, 4);
+    // Tell the engine the container depth it must satisfy. Packing here is the
+    // last quantizer on this path, so noise shaping has to target the same grid
+    // or the shaping is re-quantized away by the pack below.
+    AudioDspEngine::instance().setSinkBitDepth(bytesPerSample_ * 8);
 
 #if defined(__linux__) || defined(__ANDROID__)
     // Claim the AudioStreaming interface (force: detaches the kernel audio
@@ -312,6 +285,15 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
 }
 
 void UsbAudioSink::Close() {
+    // A live stream being handed back means the next sink has its own depth (or
+    // one the app cannot observe), so stop constraining the engine's dither
+    // target instead of inheriting this one. Only done when a stream was really
+    // active: at process exit the static destructor runs after the engine may
+    // have been torn down, and an already-closed sink must not touch it again.
+    const bool wasActive = active_.exchange(false, std::memory_order_acq_rel);
+    if (wasActive) {
+        AudioDspEngine::instance().setSinkBitDepth(0);
+    }
     // Always stop and join the worker, even if it already self-exited: a
     // joinable std::thread must never be reassigned (Open) or destroyed
     // (destructor), both of which call std::terminate().
@@ -662,7 +644,9 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
                 sample = 0.0f;
             }
             uint8_t packed[4];
-            packSample(sample, packed, bps);
+            // This pack is the last quantizer on the direct USB path: whatever
+            // the engine did, the bits written here are what the DAC receives.
+            PackPcmSample(sample, packed, bps, sinkDither_);
             for (int b = 0; b < bps; ++b) {
                 ring_[(w + b) & mask] = packed[b];
             }
