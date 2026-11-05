@@ -16,6 +16,7 @@ class UsbControlProtocolTest {
         var clockRate = 48000
         var acceptClockWrite = true
         var rangeCount = 1
+        var minRaw = -15360
         override fun transfer(type: Int, request: Int, value: Int, index: Int, buffer: ByteArray): Int {
             requests += Request(type, request, value, index, buffer.size)
             if (request == shortRequest) return buffer.size - 1
@@ -33,13 +34,13 @@ class UsbControlProtocolTest {
                 if (!ignoreWrites) values[channel] = ((buffer[0].toInt() and 255) or ((buffer[1].toInt() and 255) shl 8)).toShort().toInt()
             } else when (request) {
                 0x01, 0x81 -> put(0, values.getValue(channel))
-                0x82 -> put(0, -15360)
+                0x82 -> put(0, minRaw)
                 0x83 -> put(0, 0)
                 0x84 -> put(0, resolution)
                 0x02 -> {
                     put(0, rangeCount)
                     if (buffer.size > 2) {
-                        put(2, -15360); put(4, 0); put(6, resolution)
+                        put(2, minRaw); put(4, 0); put(6, resolution)
                         if (rangeCount == 2) {
                             put(8, 256); put(10, 512); put(12, 256)
                         }
@@ -165,11 +166,63 @@ class UsbControlProtocolTest {
         val format = UsbAudioControlParser.AltSettingFormat(1, 1, 1, 1024, 4, 16, 2, null, emptyList())
         val parsed = UsbAudioControlParser.Result(2, null, 1, altSettingFormats = listOf(format))
         assertNull(UsbAudioProtocol.selectFormat(parsed, 48000, 24, 2))
-        assertNull(UsbAudioProtocol.selectFormat(parsed, 48000, 16, 1))
         val good = format.copy(bitResolution = 24)
         assertEquals(good, UsbAudioProtocol.selectFormat(parsed.copy(altSettingFormats = listOf(good)), 48000, 24, 2))
         assertNull(UsbAudioProtocol.selectFormat(parsed.copy(altSettingFormats = emptyList()), 48000, 16, 2))
         assertNull(UsbAudioProtocol.selectFormat(parsed.copy(uacVersion = 1), 48000, 16, 2))
+    }
+
+    @Test fun formatSelectionPrefersTheAdvertisedChannelLayoutButAcceptsOthers() {
+        val stereo = UsbAudioControlParser.AltSettingFormat(1, 1, 1, 1024, 3, 24, 2, null, emptyList())
+        val mono = stereo.copy(altSetting = 2, endpointAddress = 2, channels = 1)
+        val parsed = UsbAudioControlParser.Result(2, null, 1, altSettingFormats = listOf(mono, stereo))
+        // The alt whose channel count matches is taken first ...
+        assertEquals(1, UsbAudioProtocol.selectFormat(parsed, 48000, 24, 2)!!.altSetting)
+        // ... and a DAC that only offers another layout still gets a usable
+        // endpoint, because the native sink re-frames to the alt it started on.
+        assertEquals(1, UsbAudioProtocol.selectFormat(parsed, 48000, 24, 8)!!.channels)
+        // An alt that does not advertise a channel count outranks one that
+        // advertises a different count.
+        val unadvertised = stereo.copy(altSetting = 3, endpointAddress = 3, channels = 0)
+        assertEquals(
+            unadvertised,
+            UsbAudioProtocol.selectFormat(
+                UsbAudioControlParser.Result(
+                    2, null, 1, altSettingFormats = listOf(stereo, unadvertised),
+                ),
+                48000, 24, 1,
+            ),
+        )
+    }
+
+    @Test fun captureOnlyAltSettingIsNeverAFormatCandidate() {
+        val mic = UsbAudioControlParser.AltSettingFormat(1, 1, 0x81, 1024, 2, 16, 1, null, emptyList())
+        val dac = UsbAudioControlParser.AltSettingFormat(2, 1, 0x02, 1024, 3, 24, 2, null, emptyList())
+        // Interface 2 owns the isochronous OUT endpoint, so it is the streaming
+        // interface; the microphone alt must not be selectable at all.
+        val parsed = UsbAudioControlParser.Result(2, null, 2, altSettingFormats = listOf(mic, dac))
+        assertEquals(dac, UsbAudioProtocol.selectFormat(parsed, 48000, 24, 2))
+        assertEquals(dac, UsbAudioProtocol.selectFormat(parsed, 48000, 16, 1))
+    }
+
+    @Test fun requestsBelowTheHardwareMinimumClampInsteadOfFailing() {
+        val device = Device(2)
+        val control = volume(device)
+        assertTrue(control.setDb(-90.0))
+        assertEquals(-60.0, control.currentDb!!, 0.0)
+        assertEquals(-15360, device.values.getValue(0))
+        assertTrue(control.applied)
+    }
+
+    @Test fun uac1FullScaleMinimumIsStillARealRange() {
+        val device = Device(1)
+        device.minRaw = -32768
+        val control = volume(device)
+        assertTrue(control.refresh())
+        assertEquals(-128.0, control.minDb!!, 0.0)
+        assertTrue(control.setDb(-200.0))
+        assertEquals(-128.0, control.currentDb!!, 0.0)
+        assertTrue(control.applied)
     }
 
     @Test fun mixerPreferenceAloneCannotProveActiveExclusiveFormat() {

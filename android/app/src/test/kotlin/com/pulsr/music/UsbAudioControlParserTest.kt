@@ -204,9 +204,9 @@ class UsbAudioControlParserTest {
     private fun uac2MultiAltConfig(clockControls: Int = 0x03): ByteArray = byteArrayOf(
         // AudioControl interface #0 (class 0x01 / subclass 0x01 / protocol 0x20 = UAC2)
         9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
-        // UAC2 Clock Source: subtype 0x0B, bClockID 5, bmAttributes 0x03,
+        // UAC2 Clock Source: subtype 0x0A, bClockID 5, bmAttributes 0x03,
         // bmControls (freq control), bAssocTerminal 0, iClockSource 0.
-        8, 0x24, 0x0B, 0x05, 0x03, clockControls.toByte(), 0x00, 0x00,
+        8, 0x24, 0x0A, 0x05, 0x03, clockControls.toByte(), 0x00, 0x00,
         // AudioStreaming interface #1 alt 0 (zero-bandwidth, no endpoint)
         9, 0x04, 0x01, 0x00, 0x00, 0x01, 0x02, 0x20, 0x00,
         // AudioStreaming interface #1 alt 1 (1 endpoint)
@@ -295,5 +295,152 @@ class UsbAudioControlParserTest {
         assertEquals(24, fmt.bitResolution)
         assertEquals(2, fmt.channels)
         assertEquals(listOf(96000), fmt.supportedRates)
+    }
+
+    /**
+     * A headset-shaped UAC2 configuration: the *capture* AudioStreaming
+     * interface is listed first with an asynchronous isochronous IN data
+     * endpoint, and playback lives on interface 2.
+     */
+    private fun captureFirstHeadsetConfig(): ByteArray = byteArrayOf(
+        // AudioControl interface #0 (UAC2)
+        9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+        // AudioStreaming interface #1 (microphone) alt 1
+        9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x20, 0x00,
+        6, 0x24, 0x02, 0x01, 0x02, 0x10, // FORMAT_TYPE_I: 2-byte subslot, 16 bit
+        // Isochronous IN *data* endpoint 0x81, async (attrs 0x05), 256 bytes
+        7, 0x05, 0x81.toByte(), 0x05, 0x00, 0x01, 0x01,
+        // AudioStreaming interface #2 (DAC) alt 1
+        9, 0x04, 0x02, 0x01, 0x01, 0x01, 0x02, 0x20, 0x00,
+        // AS_GENERAL, bTerminalLink = 5
+        16, 0x24, 0x01, 0x05, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+        6, 0x24, 0x02, 0x01, 0x03, 0x18, // FORMAT_TYPE_I: 3-byte subslot, 24 bit
+        // Isochronous OUT endpoint 0x02, async, 0x0300 bytes
+        7, 0x05, 0x02, 0x05, 0x00, 0x03, 0x01,
+        // Feedback IN endpoint 0x82, usage = feedback (attrs 0x15), 4 bytes
+        7, 0x05, 0x82.toByte(), 0x15, 0x04, 0x00, 0x01,
+    )
+
+    @Test
+    fun streamingInterfaceIsTheOneOwningTheIsochronousOutEndpoint() {
+        val result = UsbAudioControlParser.parse(captureFirstHeadsetConfig())
+        // Interface 1 (the microphone) is enumerated first and must lose.
+        assertEquals(2, result.streamingInterface)
+        assertEquals(0x02, result.streamingEndpoint!!.address)
+        assertEquals(2, result.streamingEndpoint!!.interfaceNumber)
+        // Only the playback alt setting is a streamable format.
+        val fmt = result.altSettingFormats.single()
+        assertEquals(2, fmt.interfaceNumber)
+        assertEquals(3, fmt.subslotSize)
+        assertEquals(0x82, fmt.feedbackEndpointAddress)
+    }
+
+    @Test
+    fun asynchronousCaptureEndpointIsNotMistakenForFeedback() {
+        val result = UsbAudioControlParser.parse(captureFirstHeadsetConfig())
+        assertEquals(0x82, result.feedbackEndpoint!!.address)
+        assertEquals(2, result.feedbackEndpoint!!.interfaceNumber)
+
+        // The same capture IN endpoint with no playback stream at all must not
+        // be reported as a feedback pipe.
+        val captureOnly = byteArrayOf(
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+            9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x20, 0x00,
+            6, 0x24, 0x02, 0x01, 0x02, 0x10,
+            7, 0x05, 0x81.toByte(), 0x05, 0x04, 0x00, 0x01,
+        )
+        val micOnly = UsbAudioControlParser.parse(captureOnly)
+        assertFalse(micOnly.hasFeedbackEndpoint)
+        assertNull(micOnly.streamingInterface)
+        assertNull(micOnly.streamingEndpoint)
+    }
+
+    /**
+     * UAC2 topology: Output Terminal 3 fed by Clock Source 7 (read-only) while
+     * Clock Source 6 (programmable) appears first in the descriptor order. A
+     * single-clock guess would tune the wrong clock and stream at the wrong
+     * rate, so the clock wired to the streaming terminal must win.
+     */
+    @Test
+    fun clockSourceIsTheOneWiredToTheStreamingTerminal() {
+        val config = byteArrayOf(
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+            // Clock Source 6: internal programmable (bmControls 0b11).
+            8, 0x24, 0x0A, 0x06, 0x03, 0x03, 0x00, 0x00,
+            // Clock Source 7: external / read-only frequency control.
+            8, 0x24, 0x0A, 0x07, 0x00, 0x01, 0x00, 0x00,
+            // Output Terminal 3 <- source 1, clock 7.
+            12, 0x24, 0x03, 0x03, 0x01, 0x03, 0x00, 0x01, 0x07, 0x00, 0x00, 0x00,
+            // Playback stream, linked to terminal 3.
+            9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x20, 0x00,
+            16, 0x24, 0x01, 0x03, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+            6, 0x24, 0x02, 0x01, 0x03, 0x18,
+            7, 0x05, 0x01, 0x05, 0x00, 0x03, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(config)
+        assertEquals(listOf(6, 7), result.clockSources.map { it.clockId })
+        assertEquals(7, result.clockSource!!.clockId)
+        assertFalse(result.clockSource!!.frequencyProgrammable)
+    }
+
+    @Test
+    fun singleInputClockSelectorResolvesToItsSource() {
+        val config = byteArrayOf(
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+            8, 0x24, 0x0A, 0x0A, 0x03, 0x03, 0x00, 0x00, // Clock Source 10
+            8, 0x24, 0x0A, 0x0B, 0x03, 0x03, 0x00, 0x00, // Clock Source 11
+            // Clock Selector 8 with a single input: Clock Source 11.
+            7, 0x24, 0x0B, 0x08, 0x01, 0x0B, 0x00,
+            // Output Terminal 3 clocked by the selector (bCSourceID 8).
+            12, 0x24, 0x03, 0x03, 0x01, 0x03, 0x00, 0x01, 0x08, 0x00, 0x00, 0x00,
+            9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x20, 0x00,
+            16, 0x24, 0x01, 0x03, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+            6, 0x24, 0x02, 0x01, 0x03, 0x18,
+            7, 0x05, 0x01, 0x05, 0x00, 0x03, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(config)
+        // Descriptor order would give 10; the terminal wiring gives 11.
+        assertEquals(11, result.clockSource!!.clockId)
+    }
+
+    @Test
+    fun volumeUnitComesFromThePlaybackPathNotTheFirstFeatureUnit() {
+        val config = byteArrayOf(
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+            // Feature Unit 2 (microphone path) with writable volume, listed FIRST.
+            18, 0x24, 0x06, 0x02, 0x01,
+            0x0F, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00,
+            // Feature Unit 4 fed by Input Terminal 5 -> the playback chain.
+            18, 0x24, 0x06, 0x04, 0x05,
+            0x0F, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00,
+            // Input Terminal 5 = USB streaming, clocked by Clock Source 8.
+            17, 0x24, 0x02, 0x05, 0x01, 0x01, 0x00, 0x08, 0x02,
+            0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            // Clock Source 8, programmable.
+            8, 0x24, 0x0A, 0x08, 0x03, 0x03, 0x00, 0x00,
+            // Output Terminal 6 <- Feature Unit 4, clocked by 8.
+            12, 0x24, 0x03, 0x06, 0x02, 0x03, 0x00, 0x04, 0x08, 0x00, 0x00, 0x00,
+            // Playback stream alt 1 linked to Output Terminal 6.
+            9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x20, 0x00,
+            16, 0x24, 0x01, 0x06, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+            6, 0x24, 0x02, 0x01, 0x03, 0x18,
+            7, 0x05, 0x01, 0x05, 0x00, 0x03, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(config)
+        assertEquals(4, result.volumeUnit!!.unitId)
+        assertEquals(8, result.clockSource!!.clockId)
+    }
+
+    @Test
+    fun clockSourceSubtypeIsNotConfusedWithClockSelector() {
+        // 0x0B is CLOCK_SELECTOR; its bClockID must never be handed to the
+        // Clock-Source SET_CUR path as if it were a Clock Source.
+        val withSelectorOnly = byteArrayOf(
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+            7, 0x24, 0x0B, 0x05, 0x01, 0x03, 0x00,
+        )
+        val result = UsbAudioControlParser.parse(withSelectorOnly)
+        assertTrue(result.clockSources.isEmpty())
+        assertNull(result.clockSource)
     }
 }
