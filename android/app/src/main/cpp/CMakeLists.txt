@@ -61,6 +61,7 @@ set(DSP_CORE_SOURCES
     LoudnessContour.cpp
     SubCrossover.cpp
     ChannelManager.cpp
+    DacVoicing.cpp
     DynamicEQ.cpp
     MultibandCompressor.cpp
     DynamicBass.cpp

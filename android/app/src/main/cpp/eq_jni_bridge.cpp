@@ -804,6 +804,25 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSaturationParams(
     });
 }
 
+// ---- DAC voicing (opt-in oversampled reconstruction character + 2nd-harmonic warmth) ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDacVoicingEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.dacVoicing.enabled = enabled;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDacVoicingParams(
+        JNIEnv* /* env */, jobject /* thiz */, jint character, jdouble voicingAmount) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.dacVoicing.character = character;
+        snap.dacVoicing.voicingAmount = voicingAmount;
+    });
+}
+
 // ---- Phase 1 DSP expansion: Stereo Width (3-Band Multiband Stereo Imager) ----
 
 JNIEXPORT void JNICALL

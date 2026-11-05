@@ -372,6 +372,16 @@ struct BypassCompareParamSet {
     bool autoGainMatch = false;
 };
 
+// DAC Voicing: an opt-in output stage emulating a premium DAC's selectable
+// reconstruction filter plus subtle even-order harmonic warmth. See DacVoicing.h
+// for the full rationale. Off by default; bit-perfect never reaches it.
+struct DacVoicingParamSet {
+    bool enabled = false;
+    int character = 0;      // 0 = Sharp (linear-phase), 1 = Slow (NOS-like),
+                            // 2 = Minimum-phase (no pre-ring)
+    double voicingAmount = 0.0; // 0..1 even-order (2nd-harmonic) warmth; 0 = none
+};
+
 struct DspParamSnapshot {
     uint64_t generation = 0;
     double sampleRate = 48000.0;
@@ -400,5 +410,6 @@ struct DspParamSnapshot {
     LiveProgParamSet liveProg;
     HeadphoneSafetyParamSet headphoneSafety;
     BypassCompareParamSet bypassCompare;
+    DacVoicingParamSet dacVoicing;
 };
 

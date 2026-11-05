@@ -154,6 +154,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var saturationTilt = 0.3
     @Volatile private var saturationMode = 0
 
+    // DAC voicing (opt-in oversampled reconstruction character + even-harmonic warmth)
+    @Volatile private var isDacVoicingEnabled = false
+    @Volatile private var dacVoicingCharacter = 0
+    @Volatile private var dacVoicingAmount = 0.0
+
     @Volatile private var isStereoWidthEnabled = false
     @Volatile private var stereoWidth = 1.0
     @Volatile private var stereoWidthMultiband = false
@@ -322,6 +327,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var lastNativeResamplerQuality: Int? = null
     private var lastNativeSaturationEnabled: Boolean? = null
     private var lastNativeSaturationParams: String? = null
+    private var lastNativeDacVoicingEnabled: Boolean? = null
+    private var lastNativeDacVoicingParams: String? = null
     private var lastNativeStereoWidthEnabled: Boolean? = null
     private var lastNativeStereoWidthParams: String? = null
     private var lastNativeLoudnessEnabled: Boolean? = null
@@ -385,6 +392,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetSaturationEnabled(enabled: Boolean)
     private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double, mode: Int, multiband: Boolean)
     private external fun nativeSetSaturationMultiband(multiband: Boolean)
+    private external fun nativeSetDacVoicingEnabled(enabled: Boolean)
+    private external fun nativeSetDacVoicingParams(character: Int, voicingAmount: Double)
     private external fun nativeSetCrossfeedMode(mode: Int)
     private external fun nativeSetViperDdcEnabled(enabled: Boolean)
     private external fun nativeLoadViperDdc(ddcContent: String, profileName: String): Boolean
@@ -900,6 +909,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isLiveProgEnabled) mask = mask or STAGE_LIVE_PROG
         if (isHeadphoneSafetyEnabled) mask = mask or STAGE_HEADPHONE_SAFETY
         if (isChannelManagerEnabled) mask = mask or STAGE_CHANNEL_MANAGER
+        if (isDacVoicingEnabled) mask = mask or STAGE_DAC_VOICING
         // Dither is a standalone stage: it must run even with every other
         // effect off, so it is gated by its own bit rather than by chain gain.
         if (isDitherEnabled) mask = mask or STAGE_DITHER
@@ -960,6 +970,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_LIVE_PROG = 1 shl 16
         const val STAGE_HEADPHONE_SAFETY = 1 shl 17
         const val STAGE_CHANNEL_MANAGER = 1 shl 18
+        // DAC voicing (must mirror DspStageMask in AudioDspEngine.h)
+        const val STAGE_DAC_VOICING = 1 shl 19
 
         /**
          * Ordinal of `ReverbPreset::Custom` in ConvolutionReverb.h — the one
@@ -1533,6 +1545,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeResamplerRates = null
         lastNativeSaturationEnabled = null
         lastNativeSaturationParams = null
+        lastNativeDacVoicingEnabled = null
+        lastNativeDacVoicingParams = null
         lastNativeStereoWidthEnabled = null
         lastNativeStereoWidthParams = null
         lastNativeLoudnessEnabled = null
@@ -1558,6 +1572,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         safeCall(TAG, "nativeSetLimiterEnabled") { nativeSetLimiterEnabled(false) }
         safeCall(TAG, "nativeSetReverbEnabled") { nativeSetReverbEnabled(false) }
         safeCall(TAG, "nativeSetSaturationEnabled") { nativeSetSaturationEnabled(false) }
+        safeCall(TAG, "nativeSetDacVoicingEnabled") { nativeSetDacVoicingEnabled(false) }
         safeCall(TAG, "nativeSetStereoWidthEnabled") { nativeSetStereoWidthEnabled(false) }
         safeCall(TAG, "nativeSetLoudnessContourEnabled") { nativeSetLoudnessContourEnabled(false) }
         safeCall(TAG, "nativeSetSubCrossoverEnabled") { nativeSetSubCrossoverEnabled(false) }
@@ -1585,6 +1600,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeLimiterEnabled = null
         lastNativeReverbEnabled = null
         lastNativeSaturationEnabled = null
+        lastNativeDacVoicingEnabled = null
         lastNativeStereoWidthEnabled = null
         lastNativeLoudnessEnabled = null
         lastNativeSubCrossoverEnabled = null
@@ -1598,6 +1614,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         safeCall(TAG, "restoreLimiter") { nativeSetLimiterEnabled(isLimiterEnabled) }
         safeCall(TAG, "restoreReverb") { nativeSetReverbEnabled(isReverbEnabled) }
         safeCall(TAG, "restoreSaturation") { nativeSetSaturationEnabled(isSaturationEnabled) }
+        safeCall(TAG, "restoreDacVoicing") {
+            nativeSetDacVoicingEnabled(isDacVoicingEnabled)
+            nativeSetDacVoicingParams(dacVoicingCharacter, dacVoicingAmount)
+        }
         safeCall(TAG, "restoreStereoWidth") { nativeSetStereoWidthEnabled(isStereoWidthEnabled) }
         safeCall(TAG, "restoreLoudness") { nativeSetLoudnessContourEnabled(isLoudnessContourEnabled) }
         safeCall(TAG, "restoreSubCrossover") { nativeSetSubCrossoverEnabled(isSubCrossoverEnabled) }
@@ -2745,6 +2765,45 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             nativeSetSaturationMultiband(multiband)
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeSetSaturationMultiband failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // ---- DAC voicing (opt-in oversampled character + even-harmonic warmth) ----
+                "setDacVoicingEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isDacVoicingEnabled = enabled
+                    if (isNativeDspLoaded && lastNativeDacVoicingEnabled != enabled) {
+                        try {
+                            nativeSetDacVoicingEnabled(enabled)
+                            lastNativeDacVoicingEnabled = enabled
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetDacVoicingEnabled failed: ${e.message}")
+                            result.error("NATIVE_ERROR", e.message, null)
+                            return
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setDacVoicingParams" -> {
+                    val character = ((call.argument<Number>("character"))?.toInt() ?: 0).coerceIn(0, 2)
+                    val amount = clamp((call.argument<Number>("voicingAmount"))?.toDouble() ?: 0.0, 0.0, 1.0)
+                    dacVoicingCharacter = character
+                    dacVoicingAmount = amount
+                    if (isNativeDspLoaded) {
+                        val key = String.format(java.util.Locale.US, "%d:%.2f", character, amount)
+                        if (lastNativeDacVoicingParams != key) {
+                            try {
+                                nativeSetDacVoicingParams(character, amount)
+                                lastNativeDacVoicingParams = key
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetDacVoicingParams failed: ${e.message}")
+                                result.error("NATIVE_ERROR", e.message, null)
+                                return
+                            }
                         }
                     }
                     result.success(true)
@@ -5067,6 +5126,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeResamplerRates = null
         lastNativeSaturationEnabled = null
         lastNativeSaturationParams = null
+        lastNativeDacVoicingEnabled = null
+        lastNativeDacVoicingParams = null
         lastNativeStereoWidthEnabled = null
         lastNativeStereoWidthParams = null
         lastNativeLoudnessEnabled = null
@@ -5104,6 +5165,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isLimiterEnabled ||
                     isReverbEnabled ||
                     isSaturationEnabled ||
+                    isDacVoicingEnabled ||
                     isStereoWidthEnabled ||
                     isLoudnessContourEnabled ||
                     isSubCrossoverEnabled ||

@@ -14,6 +14,7 @@
 #include "LoudnessContour.h"
 #include "SubCrossover.h"
 #include "ChannelManager.h"
+#include "DacVoicing.h"
 #include "DynamicEQ.h"
 #include "MultibandCompressor.h"
 #include "DynamicBass.h"
@@ -54,6 +55,10 @@ enum DspStageMask {
     STAGE_LIVE_PROG = 1 << 16,
     STAGE_HEADPHONE_SAFETY = 1 << 17,
     STAGE_CHANNEL_MANAGER = 1 << 18,
+    // Opt-in DAC voicing (oversampled reconstruction-filter character + even
+    // harmonic warmth). Adds latency when enabled, so it reports like other
+    // delaying stages rather than the zero-latency Phase 1 group.
+    STAGE_DAC_VOICING = 1 << 19,
 };
 
 enum class DspPerformanceProfile {
@@ -143,6 +148,7 @@ public:
     LoudnessContour& loudnessContour() { return loudnessContour_; }
     SubCrossover& subCrossover() { return subCrossover_; }
   ChannelManager& channelManager() { return channelManager_; }
+    DacVoicing& dacVoicing() { return dacVoicing_; }
     DynamicEQ& dynamicEq() { return dynamicEq_; }
     MultibandCompressor& multibandCompressor() { return multibandCompressor_; }
     DynamicBass& dynamicBass() { return dynamicBass_; }
@@ -420,6 +426,10 @@ private:
     ViperDdc viperDdc_;
     ArbitraryResponseEq arbitraryEq_;
     LiveProg liveProg_;
+
+    // DAC voicing (4x oversampling stage) — carries getLatencyFrames() when
+    // enabled; bit-exact passthrough when disabled and settled.
+    DacVoicing dacVoicing_;
 
     // Measured bit-exactness capture (64 KB, allocated with the engine so the
     // render thread never allocates while filling a window).
