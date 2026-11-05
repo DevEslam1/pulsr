@@ -1732,9 +1732,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
 
                 double shapedError = 0.0;
                 if (ch < maxShapedChannels) {
-                    const double rawShaped = useShaping
-                        ? (1.62 * ditherErrorHistory_[ch][0] - 0.82 * ditherErrorHistory_[ch][1])
-                        : (0.5 * ditherErrorHistory_[ch][0]);
+                    // Lipshitz-Wannamaker 2nd-order, full bandwidth. The
+                    // shaper's noise peak rides near 0.885 * Nyquist, so at
+                    // 96/192 kHz it lands further from the audible band, not
+                    // closer: the former first-order fallback above 48 kHz
+                    // left MORE in-band noise at the rate with the most room
+                    // for shaping.
+                    const double rawShaped =
+                        1.62 * ditherErrorHistory_[ch][0] - 0.82 * ditherErrorHistory_[ch][1];
                     shapedError = std::clamp(rawShaped, -0.49, 0.49);
                 }
                 const double scaledInput = static_cast<double>(x) * scale + shapedError;

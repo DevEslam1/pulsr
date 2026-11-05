@@ -94,6 +94,7 @@ pulsr_add_test(test_usb_sink ${DSP_SRCS})
 pulsr_add_test(test_safety_bypass ${DSP_SRCS})
 pulsr_add_test(test_aaudio_sink_support)
 pulsr_add_test(test_sink_quantizer)
+pulsr_add_test(test_usb_gap_fader)
 pulsr_add_test(test_ir_bounds)
 
 # ConvolutionReverb resamples its wet path above 48 kHz, so it never links alone.

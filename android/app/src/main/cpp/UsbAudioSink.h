@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "SinkQuantizer.h"
+#include "UsbGapFader.h"
 
 namespace pulsr {
 
@@ -136,6 +137,9 @@ private:
     // per-call state would restart the sequence every block and make the dither
     // noise periodic, which is a tonal artifact instead of a noise floor.
     SinkDitherState sinkDither_;
+    // Rides the output to silence on a ring underrun and back up on resume, so
+    // neither boundary is a step. Inert (pass-through) while the ring has data.
+    UsbGapFader gapFader_;
     bool claimed_ = false;
 
     int packetsPerUrb_ = 8;

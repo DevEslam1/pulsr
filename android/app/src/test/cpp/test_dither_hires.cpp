@@ -1,16 +1,17 @@
 // android/app/src/test/cpp/test_dither_hires.cpp
 //
-// The dither stage gates NOISE SHAPING on the sample rate
-// (useShaping = sampleRate_ <= 48000): above 48 kHz it falls back to the
-// gentle 0.5*e[n-1] first-order feedback instead of the 1.62/0.82 shaper.
-// That fallback must not also drop the TPDF itself or the requantization —
-// 96 kHz material still leaves the engine at 16/24-bit, and undithered
-// requantization there correlates the truncation error with the signal
-// (granular distortion on quiet passages). These cases pin the contract:
-//   * above 48 kHz the output is still on the target grid,
-//   * TPDF still decorrelates (silence in -> bounded noise out),
-//   * the lighter above-48k feedback reaches |k| = 1 LSB less often than
-//     the shaped path does at <= 48 kHz.
+// The dither stage shapes with the same 2nd-order error feedback at every
+// sample rate. It used to fall back to a gentle 0.5*e[n-1] first-order term
+// above 48 kHz, which put MORE quantization noise in the audible band at the
+// rate with the most room to push it out: the shaper's peak rides near
+// 0.885 * Nyquist, so at 96 kHz that is ~85 kHz, far above hearing.
+//
+// What must hold regardless of rate (and what previously regressed):
+//   * the output still sits on the target grid,
+//   * TPDF still fires (silence does not stay bit-exact zero),
+//   * the feedback clamp still bounds the result,
+//   * and the shaper is now rate-independent, so 48 kHz and 96 kHz produce the
+//     same distribution from the same deterministic noise sequence.
 #include "../../main/cpp/AudioDspEngine.h"
 #include <algorithm>
 #include <cmath>
@@ -99,14 +100,21 @@ int main() {
     // 0.5*e[n-1] feedback stays below the 0.49 clamp, so |quantInput| <=
     // 0.25 + 1.0 (TPDF) < 1.5 -> the requantized sample can never exceed 1 LSB.
     check(hi.maxAbsLsb <= 1.0 + 1e-3,
-          "first-order fallback must bound silence output to +/-1 LSB at 96 kHz");
+          "the feedback clamp must bound silence output to +/-1 LSB at 96 kHz");
+    check(lo.maxAbsLsb <= 1.0 + 1e-3,
+          "the same clamp bounds silence at 48 kHz");
 
-    // The shaped path at <= 48 kHz drives |k| = 1 noticeably more often than
-    // the gentle first-order feedback above 48 kHz (1.62/0.82 saturates the
-    // +/-0.49 clamp; 0.5 does not). Deterministic xorshift -> stable margin.
+    // The shaper no longer branches on sample rate, and the PRNG sequence is
+    // deterministic and rate-independent, so the two runs must agree exactly.
+    // This is the regression guard: reintroducing a per-rate fallback would
+    // split these distributions.
     const double pHi = static_cast<double>(hi.atUnitLsb) / static_cast<double>(hi.total);
     const double pLo = static_cast<double>(lo.atUnitLsb) / static_cast<double>(lo.total);
-    check(pLo > pHi, "noise shaping must push more +/-1 LSB steps than the 96k fallback");
+    std::cout << "[info] P(|k|=1) 96k=" << pHi << " 48k=" << pLo << std::endl;
+    check(pHi == pLo,
+          "noise shaping must be identical at 48 kHz and 96 kHz");
+    check(hi.total == lo.total && hi.nonZero == lo.nonZero,
+          "the shaped output must match sample-for-sample across rates");
 
     // A quiet tone below the grid still gets requantized at 96 kHz, within
     // the dither bound of the exact rounded value.
@@ -224,7 +232,7 @@ int main() {
         std::cout << "[FAIL] " << gFailures << " dither above-48k check(s) failed." << std::endl;
         return 1;
     }
-    std::cout << "[PASS] TPDF + requantization still apply above 48 kHz, with the "
-              << "documented lighter feedback." << std::endl;
+    std::cout << "[PASS] TPDF + 2nd-order shaping apply identically at every rate."
+              << std::endl;
     return 0;
 }

@@ -2047,6 +2047,50 @@ class AudioEffectsChannel {
     }
   }
 
+  // --- LIVE GAIN REDUCTION (telemetry; the sheet that shows these is the only
+  // way a user can tell that a limiter is working rather than coloring the sound)
+
+  /// Gain reduction of the lookahead limiter in dB (0 when it is idle). The
+  /// limiter only enters the chain when the graph can exceed unity gain, so a
+  /// non-zero reading is evidence that peaks are being caught.
+  Future<double> getLimiterGrDb() => _readGrDb('getLimiterGrDb');
+
+  /// Worst-case (most negative) gain reduction across the dynamic EQ's
+  /// [bandCount] bands, in dB.
+  Future<double> getDynEqGrDb({int bandCount = 4}) =>
+      _readWorstGrDb('getDynEqGrDb', bandCount);
+
+  /// Worst-case gain reduction across the multiband compressor's [bandCount]
+  /// bands, in dB.
+  Future<double> getMultibandGrDb({int bandCount = 4}) =>
+      _readWorstGrDb('getMultibandGrDb', bandCount);
+
+  Future<double> _readGrDb(String method, {int? band}) async {
+    if (!_isAndroid) return 0.0;
+    try {
+      // Same reason getWeeklyDose accepts any num: a whole-number reply arrives
+      // as an int and a typed invokeMethod<double> throws on it.
+      final dynamic res = await _channel
+          .invokeMethod<dynamic>(
+              method, band == null ? null : <String, dynamic>{'band': band})
+          .timeout(const Duration(milliseconds: 250));
+      return res is num && res.isFinite ? res.toDouble() : 0.0;
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  /// Native gain reduction is reported as a magnitude in dB; the loudest band
+  /// is the one a listener perceives, so the maximum is the useful reading.
+  Future<double> _readWorstGrDb(String method, int bandCount) async {
+    double worst = 0.0;
+    for (int band = 0; band < bandCount; ++band) {
+      final gr = await _readGrDb(method, band: band);
+      if (gr.abs() > worst.abs()) worst = gr;
+    }
+    return worst;
+  }
+
   /// Resets the weekly sound dose accumulator to 0.0.
   Future<bool> resetWeeklyDose() async {
     if (!_isAndroid) return false;

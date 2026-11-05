@@ -59,6 +59,11 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
   bool _isLoading = true;
   bool _isResyncing = false;
   int _pipelineLatencyFrames = 0;
+  // Live gain reduction, dB. Shown only when non-zero: an idle limiter is not
+  // information, and a chip that always reads 0.0 teaches people to ignore it.
+  double _limiterGrDb = 0;
+  double _dynEqGrDb = 0;
+  double _multibandGrDb = 0;
   Timer? _autoRefreshTimer;
   bool _refreshInFlight = false;
 
@@ -115,6 +120,9 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
       final results = await Future.wait<Object?>([
         channel.getDspDebugReport(),
         channel.getPipelineLatencyFrames(),
+        channel.getLimiterGrDb(),
+        channel.getDynEqGrDb(),
+        channel.getMultibandGrDb(),
       ]);
       // getDspDebugReport() is nullable (non-Android / platform failure);
       // casting it to non-null used to throw and discard the latency sample
@@ -125,6 +133,9 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
         setState(() {
           if (report != null) _report = report;
           _pipelineLatencyFrames = latencyFrames;
+          _limiterGrDb = results[2] as double? ?? 0;
+          _dynEqGrDb = results[3] as double? ?? 0;
+          _multibandGrDb = results[4] as double? ?? 0;
           _isLoading = false;
         });
       }
@@ -785,6 +796,28 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                 'LATENCY',
                 '${((_pipelineLatencyFrames / latencyRate) * 1000.0).toStringAsFixed(1)} ms ($_pipelineLatencyFrames f)',
               ),
+              // Gain reduction, shown only while a stage is actually working.
+              // Without this a limiter is invisible: the user cannot tell
+              // "nothing to catch" from "clamping every snare".
+              if (_limiterGrDb.abs() > 0.05)
+                _buildStatChip(
+                  p,
+                  'LIMITER GR',
+                  '-${_limiterGrDb.abs().toStringAsFixed(1)} dB',
+                  isWarning: _limiterGrDb.abs() > 3.0,
+                ),
+              if (_multibandGrDb.abs() > 0.05)
+                _buildStatChip(
+                  p,
+                  'MB COMP GR',
+                  '-${_multibandGrDb.abs().toStringAsFixed(1)} dB',
+                ),
+              if (_dynEqGrDb.abs() > 0.05)
+                _buildStatChip(
+                  p,
+                  'DYN EQ GR',
+                  '-${_dynEqGrDb.abs().toStringAsFixed(1)} dB',
+                ),
               _buildStatChip(
                 p,
                 'BIT-PERFECT',

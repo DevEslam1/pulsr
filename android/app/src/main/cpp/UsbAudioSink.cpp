@@ -159,6 +159,7 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     // last quantizer on this path, so noise shaping has to target the same grid
     // or the shaping is re-quantized away by the pack below.
     AudioDspEngine::instance().setSinkBitDepth(bytesPerSample_ * 8);
+    gapFader_.configure(sampleRate, channels, bytesPerSample_);
 
 #if defined(__linux__) || defined(__ANDROID__)
     // Claim the AudioStreaming interface (force: detaches the kernel audio
@@ -569,8 +570,13 @@ void UsbAudioSink::workerLoop() {
                     dst[i] = ring_[(readPos + i) & mask];
                 }
                 readPos += pktLen;
+                // Leaving a gap: ride the envelope back to unity instead of
+                // stepping straight onto the resumed audio.
+                gapFader_.applyReal(dst, framesInPacket, sinkDither_);
             } else if (pktLen > 0) {
-                std::memset(dst, 0, pktLen);
+                // Decay the last emitted frame to silence rather than cutting
+                // it off, so the gap itself cannot click.
+                gapFader_.fillGap(dst, framesInPacket, sinkDither_);
                 underrunCount_.fetch_add(1, std::memory_order_relaxed);
             }
             urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktLen);
