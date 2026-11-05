@@ -62,6 +62,21 @@ public:
     // Parses supported sample rates from raw configuration descriptors (UAC1 Format Type I).
     static std::vector<int> ParseSupportedRatesFromDescriptors(const uint8_t* desc, size_t len, int targetInterface = -1);
 
+    // Pure USB-sizing math, split out so it is host-verifiable without a device.
+    //
+    // DecodeFeedbackRatePerSec decodes one async-feedback sample and returns the
+    // clamped OUT rate (samples/sec) to steer toward, or 0 to mean "ignore this
+    // sample, keep the current rate." 3-byte samples are Q10.14 per 1 ms frame;
+    // 4-byte samples are Q16.16 per 125 us microframe. A decode outside +/-10%
+    // of nominal is rejected (buggy device / wrong fixed-point format); an
+    // accepted decode is hard-clamped to +/-0.1% of nominal.
+    static int DecodeFeedbackRatePerSec(const uint8_t* data, int len, int nominalRate);
+
+    // Advances the fractional samples-per-packet accumulator by ratePerSec and
+    // returns the whole frames for the next 1 ms packet, clamped to
+    // maxFramesPerPacket so feedback can never overflow the preallocated URB.
+    static int NextPacketFrames(uint32_t& accumulator, uint32_t ratePerSec, int maxFramesPerPacket);
+
     // Audio-thread call: packs float [-1,1] to the configured interleaved wire
     // format (S16_LE / S24_3LE / S32_LE per bytesPerSample_) and appends to the
     // ring. Non-blocking; excess data is dropped (never blocks playback).

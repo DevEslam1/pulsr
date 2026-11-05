@@ -271,9 +271,8 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         urb->usercontext = urb;
         int urbTotalBytes = 0;
         for (int p = 0; p < packetsPerUrb_; ++p) {
-            frameAccumulator_ += static_cast<uint32_t>(sampleRate_);
-            const int framesInPacket = static_cast<int>(frameAccumulator_ / 1000);
-            frameAccumulator_ %= 1000;
+            const int framesInPacket = NextPacketFrames(
+                frameAccumulator_, static_cast<uint32_t>(sampleRate_), maxFramesPerPacket_);
             const int pktBytes = framesInPacket * frameBytes;
             urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktBytes);
             urb->iso_frame_desc[p].actual_length = 0;
@@ -577,10 +576,8 @@ void UsbAudioSink::workerLoop() {
         int urbTotalBytes = 0;
         const uint32_t ratePerSec = static_cast<uint32_t>(feedbackRatePerSec_);
         for (int p = 0; p < urb->number_of_packets; ++p) {
-            frameAccumulator_ += ratePerSec;
-            int framesInPacket = static_cast<int>(frameAccumulator_ / 1000);
-            frameAccumulator_ %= 1000;
-            if (framesInPacket > maxFramesPerPacket_) framesInPacket = maxFramesPerPacket_;
+            const int framesInPacket = NextPacketFrames(
+                frameAccumulator_, ratePerSec, maxFramesPerPacket_);
             const size_t pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
 
             const size_t w = ringWrite_.load(std::memory_order_acquire);
@@ -764,7 +761,19 @@ bool UsbAudioSink::setupFeedbackUrbs() {
 }
 
 void UsbAudioSink::applyFeedback(const uint8_t* data, int len) {
-    if (data == nullptr || sampleRate_ <= 0) return;
+    const int decoded = DecodeFeedbackRatePerSec(data, len, sampleRate_);
+    if (decoded > 0) feedbackRatePerSec_ = decoded;
+    // TODO(device-test): the FS(10.14)/HS(16.16) selection and the frame vs
+    // microframe time base here follow the USB spec, but real DACs vary (some
+    // report per-frame values on a high-speed feedback endpoint, etc.). The
+    // ratio form + 0.1% clamp keep this safe regardless, but the correction
+    // loop's gain still needs tuning on hardware. The OUT path also sizes iso
+    // packets as 1 ms units; if the device is high-speed (125 us microframe
+    // packets) that pre-existing assumption must be validated on hardware too.
+}
+
+int UsbAudioSink::DecodeFeedbackRatePerSec(const uint8_t* data, int len, int nominalRate) {
+    if (data == nullptr || nominalRate <= 0) return 0;
 
     // Express the DAC's request as a ratio to nominal, independent of the
     // frame/microframe time base:
@@ -777,42 +786,42 @@ void UsbAudioSink::applyFeedback(const uint8_t* data, int len) {
                            (static_cast<uint32_t>(data[1]) << 8) |
                            (static_cast<uint32_t>(data[2]) << 16) |
                            (static_cast<uint32_t>(data[3]) << 24);
-        if (v == 0) return;
+        if (v == 0) return 0;
         const double samplesPerMicroframe = static_cast<double>(v) / 65536.0;
-        const double nominalPerMicroframe = static_cast<double>(sampleRate_) / 8000.0;
-        if (nominalPerMicroframe <= 0.0) return;
+        const double nominalPerMicroframe = static_cast<double>(nominalRate) / 8000.0;
+        if (nominalPerMicroframe <= 0.0) return 0;
         ratio = samplesPerMicroframe / nominalPerMicroframe;
     } else {
         const uint32_t v = static_cast<uint32_t>(data[0]) |
                            (static_cast<uint32_t>(data[1]) << 8) |
                            (static_cast<uint32_t>(data[2]) << 16);
-        if (v == 0) return;
+        if (v == 0) return 0;
         const double samplesPerFrame = static_cast<double>(v) / 16384.0;
-        const double nominalPerFrame = static_cast<double>(sampleRate_) / 1000.0;
-        if (nominalPerFrame <= 0.0) return;
+        const double nominalPerFrame = static_cast<double>(nominalRate) / 1000.0;
+        if (nominalPerFrame <= 0.0) return 0;
         ratio = samplesPerFrame / nominalPerFrame;
     }
 
     // Reject an implausible decode (buggy device / wrong fixed-point format): a
     // real async DAC deviates from nominal by only tens of ppm.
-    if (ratio < 0.90 || ratio > 1.10) return;
+    if (ratio < 0.90 || ratio > 1.10) return 0;
 
-    double target = static_cast<double>(sampleRate_) * ratio;
+    double target = static_cast<double>(nominalRate) * ratio;
     // Hard safety clamp to +/-0.1% of nominal: far above any real crystal error
     // yet far below anything that could run the ring away within one session.
-    const double lo = static_cast<double>(sampleRate_) * 0.999;
-    const double hi = static_cast<double>(sampleRate_) * 1.001;
+    const double lo = static_cast<double>(nominalRate) * 0.999;
+    const double hi = static_cast<double>(nominalRate) * 1.001;
     if (target < lo) target = lo;
     if (target > hi) target = hi;
-    feedbackRatePerSec_ = static_cast<int>(target + 0.5);
+    return static_cast<int>(target + 0.5);
+}
 
-    // TODO(device-test): the FS(10.14)/HS(16.16) selection and the frame vs
-    // microframe time base here follow the USB spec, but real DACs vary (some
-    // report per-frame values on a high-speed feedback endpoint, etc.). The
-    // ratio form + 0.1% clamp keep this safe regardless, but the correction
-    // loop's gain still needs tuning on hardware. The OUT path also sizes iso
-    // packets as 1 ms units; if the device is high-speed (125 us microframe
-    // packets) that pre-existing assumption must be validated on hardware too.
+int UsbAudioSink::NextPacketFrames(uint32_t& accumulator, uint32_t ratePerSec, int maxFramesPerPacket) {
+    accumulator += ratePerSec;
+    int framesInPacket = static_cast<int>(accumulator / 1000);
+    accumulator %= 1000;
+    if (framesInPacket > maxFramesPerPacket) framesInPacket = maxFramesPerPacket;
+    return framesInPacket;
 }
 
 std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(
