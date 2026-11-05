@@ -116,6 +116,7 @@ object UsbAudioControlParser {
     private const val DESC_CS_INTERFACE = 0x24
 
     private const val CLASS_AUDIO = 0x01
+    private const val CLASS_VENDOR_SPECIFIC = 0xFF
     private const val SUBCLASS_AUDIOCONTROL = 0x01
     private const val SUBCLASS_AUDIOSTREAMING = 0x02
 
@@ -165,6 +166,40 @@ object UsbAudioControlParser {
     private const val OFF_EP_MAX_PACKET = 4
     private const val XFER_ISOCHRONOUS = 0x01
     private const val EP_DIR_IN = 0x80
+
+    /**
+     * True when the interface's class/subclass/protocol triple really describes
+     * a USB Audio Class streaming (0x02) or control (0x01) interface.
+     *
+     * A vendor-specific (0xFF) class only counts when the subclass and protocol
+     * also look like audio: several non-audio accessories (ADB among them)
+     * publish class 0xFF, and accepting any of them as "a DAC" made the app
+     * open the wrong device.
+     */
+    fun isAudioFunctionInterface(
+        ifaceClass: Int,
+        ifaceSubclass: Int,
+        ifaceProtocol: Int,
+    ): Boolean =
+        (ifaceSubclass == SUBCLASS_AUDIOCONTROL || ifaceSubclass == SUBCLASS_AUDIOSTREAMING) &&
+            (ifaceClass == CLASS_AUDIO || looksLikeVendorAudio(ifaceClass, ifaceProtocol))
+
+    fun isAudioStreamingInterface(
+        ifaceClass: Int,
+        ifaceSubclass: Int,
+        ifaceProtocol: Int,
+    ): Boolean = ifaceSubclass == SUBCLASS_AUDIOSTREAMING &&
+        (ifaceClass == CLASS_AUDIO || looksLikeVendorAudio(ifaceClass, ifaceProtocol))
+
+    /**
+     * Vendor-specific (0xFF) interfaces are only audio when the subclass and
+     * protocol agree: several non-audio accessories (ADB among them) publish
+     * class 0xFF, and accepting any of them as "a DAC" made the app open the
+     * wrong device.
+     */
+    private fun looksLikeVendorAudio(ifaceClass: Int, ifaceProtocol: Int): Boolean =
+        ifaceClass == CLASS_VENDOR_SPECIFIC &&
+            (ifaceProtocol == 0x00 || ifaceProtocol == 0x20 || ifaceProtocol == 0x30)
 
     fun parse(descriptors: ByteArray?): Result {
         if (descriptors == null || descriptors.size < 8) {
@@ -758,6 +793,16 @@ internal object UsbAudioProtocol {
     fun mixerConfirmed(applied: Boolean, routedDevice: Int, rate: Int, encoding: Int, mixerRate: Int, mixerEncoding: Int): Boolean =
         applied && routedDevice > 0 && rate > 0 && encoding > 0 && rate == mixerRate && encoding == mixerEncoding
 
+    /**
+     * The stream the caller asked for, as the caller must be able to recognise
+     * it again.
+     *
+     * [bitDepth] is the *requested* depth, not the container the endpoint was
+     * opened with: comparing the request against the wire size made a 16-bit
+     * track on a 24-bit-only DAC look like a format change on every call, so
+     * the stream was torn down and restarted forever. The wire resolution is
+     * what the plugin publishes as its confirmed direct-stream status.
+     */
     data class StreamFormat(val sampleRate: Int, val bitDepth: Int, val channels: Int) {
         fun matches(rate: Int, depth: Int, count: Int, nativeActive: Boolean): Boolean =
             nativeActive && sampleRate == rate && bitDepth == depth && channels == count

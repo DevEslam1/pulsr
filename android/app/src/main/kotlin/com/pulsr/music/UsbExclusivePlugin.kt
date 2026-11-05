@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.BinaryMessenger
@@ -30,7 +31,11 @@ import io.flutter.plugin.common.MethodChannel
  *    descriptors returned by UsbDeviceConnection.
  *  - Controls the DAC's *hardware* volume directly through UAC class-specific
  *    GET/SET_CUR requests. This is the same low-distortion hardware attenuation
- *    path UAPP/Poweramp use; it does not require claiming an interface.
+ *    path UAPP/Poweramp use. Whether those requests are answered while
+ *    Android's `snd-usb-audio` driver still owns the AudioControl interface is
+ *    not assumed: usbfs may reply EBUSY, so a volume or clock is only ever
+ *    reported as applied when the exact value comes back (see
+ *    [UsbHardwareVolume.applied] and [UsbAudioProtocol.setSampleRate]).
  *  - Can optionally claim the AudioStreaming interface for an exclusive path.
  *    The claim is non-forced: if Android's kernel audio driver already owns the
  *    interface (the normal case) the claim fails cleanly and audio is left
@@ -76,6 +81,9 @@ class UsbExclusivePlugin(
         @Volatile var directStreamingSupported: Boolean = false
 
         private const val CTRL_TIMEOUT_MS = 1000
+
+        /** Minimum gap between hardware-volume range reads during polling. */
+        private const val VOLUME_REFRESH_INTERVAL_MS = 2000L
     }
 
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
@@ -92,6 +100,7 @@ class UsbExclusivePlugin(
     private var parsedResult: UsbAudioControlParser.Result? = null
 
     private var hardwareVolume: UsbHardwareVolume? = null
+    private var lastVolumeRefreshAtMs = 0L
 
     private var nativeLoaded = false
     @Volatile private var streaming = false
@@ -102,8 +111,10 @@ class UsbExclusivePlugin(
     // Blocking USB control transfers, raw-descriptor parsing and native sink
     // start/stop/query must never run on the main thread (ANR). All such work
     // is serialized onto this single worker thread; MethodChannel replies are
-    // posted back to the main thread. getStatus returns the last cached status
-    // immediately and refreshes asynchronously.
+    // posted back to the main thread. getStatus() measures a fresh status on
+    // this worker (a caller that just started or stopped a stream must not be
+    // handed a stale cache) and updates [cachedStatus] on the way out; the
+    // event stream replays that cache when a listener subscribes.
     private val workerThread = HandlerThread("UsbExclusiveWorker").apply { start() }
     private val workerHandler = Handler(workerThread.looper)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -209,10 +220,11 @@ class UsbExclusivePlugin(
                 "stopStreaming" -> runAsync(call.method, result) { stopStreamingInternal() }
                 "isStreamingSupported" -> {
                     val device = openedDevice ?: findAudioDevice()
+                    // Requiring the audio class as well as the streaming
+                    // subclass: CDC/hid devices with subclass 0x02 are not USB
+                    // audio and used to answer "yes".
                     val supported = nativeLoaded && device != null &&
-                        (0 until device.interfaceCount).any { i ->
-                            device.getInterface(i).interfaceSubclass == 0x02
-                        }
+                        device.streamingInterfaces().isNotEmpty()
                     result.success(supported)
                 }
                 "getDiagnostics" -> {
@@ -286,12 +298,19 @@ class UsbExclusivePlugin(
     }
 
     fun dispose() {
+        // A permission prompt the user never answered still has to be answered:
+        // the Dart caller awaits requestPermission(), and tearing the plugin
+        // down underneath it would leave that future pending forever.
+        val pending = pendingPermissionResult
+        pendingPermissionResult = null
         try {
             permissionReceiver?.let {
                 try { context.unregisterReceiver(it) } catch (_: Exception) {}
             }
             try { context.unregisterReceiver(deviceReceiver) } catch (_: Exception) {}
         } catch (_: Exception) {}
+        permissionReceiver = null
+        try { pending?.success(false) } catch (_: Exception) {}
         try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
         try { eventChannel.setStreamHandler(null) } catch (_: Exception) {}
         // closeLocked() closes the native sink and the usbfs connection, which
@@ -314,26 +333,48 @@ class UsbExclusivePlugin(
 
     private fun findAudioDevice(): UsbDevice? =
         try {
-            usbManager?.deviceList?.values?.firstOrNull { device ->
-                (0 until device.interfaceCount).any {
-                    val cls = device.getInterface(it).interfaceClass
-                    cls == UsbConstants.USB_CLASS_AUDIO || cls == 0xFF
+            val devices = usbManager?.deviceList?.values ?: return null
+            // An explicitly audio-classed device always wins; the vendor-specific
+            // (0xFF) shape is only a fallback, so an attached ADB/debug
+            // accessory (also 0xFF) can no longer be mistaken for the DAC.
+            var fallback: UsbDevice? = null
+            for (device in devices) {
+                var vendorAudio = false
+                for (index in 0 until device.interfaceCount) {
+                    val iface = device.getInterface(index)
+                    if (!UsbAudioControlParser.isAudioFunctionInterface(
+                            iface.interfaceClass,
+                            iface.interfaceSubclass,
+                            iface.interfaceProtocol,
+                        )
+                    ) {
+                        continue
+                    }
+                    if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO) return device
+                    vendorAudio = true
                 }
+                if (vendorAudio && fallback == null) fallback = device
             }
+            fallback
         } catch (_: Throwable) {
             null
         }
 
+    /** Interfaces of [device] that are AudioStreaming interfaces. */
+    private fun UsbDevice.streamingInterfaces(): List<UsbInterface> =
+        (0 until interfaceCount).map { getInterface(it) }.filter { iface ->
+            UsbAudioControlParser.isAudioStreamingInterface(
+                iface.interfaceClass, iface.interfaceSubclass, iface.interfaceProtocol,
+            )
+        }
+
     /** Interface-only fallback used before a device connection is available. */
     private fun parseViaInterfaces(device: UsbDevice): UsbAudioControlParser.Result {
-        var streaming: Int? = null
+        val streaming = device.streamingInterfaces().firstOrNull()?.id
         val pairs = ArrayList<Pair<Int, Int>>(device.interfaceCount)
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)
             pairs.add(Pair(iface.interfaceSubclass, iface.interfaceProtocol))
-            if (streaming == null && iface.interfaceSubclass == 0x02) {
-                streaming = iface.id
-            }
         }
         val uac = try {
             UsbDacDiagnostics.uacVersionFromUsbInterfaces(pairs)
@@ -373,8 +414,23 @@ class UsbExclusivePlugin(
         val parsed = parseViaRawDescriptors(conn) ?: parseViaInterfaces(device)
         applyParsed(parsed)
         hardwareVolume = parsed.volumeUnit?.let { UsbHardwareVolume(parsed.uacVersion, it, transport(conn)) }
+        lastVolumeRefreshAtMs = SystemClock.elapsedRealtime()
         hardwareVolume?.refresh()
         return conn
+    }
+
+    /**
+     * Reading a volume range is several control transfers with a 1 s timeout
+     * each, all on the single USB worker thread, so status polling re-reads it
+     * at most every [VOLUME_REFRESH_INTERVAL_MS]. An invalidated cache (device
+     * change, refused write, new connection) always re-reads.
+     */
+    private fun refreshHardwareVolumeIfNeeded() {
+        val volume = hardwareVolume ?: return
+        val now = SystemClock.elapsedRealtime()
+        if (volume.ready && now - lastVolumeRefreshAtMs < VOLUME_REFRESH_INTERVAL_MS) return
+        lastVolumeRefreshAtMs = now
+        volume.refresh()
     }
 
     private fun buildStatus(): Map<String, Any?> {
@@ -403,7 +459,7 @@ class UsbExclusivePlugin(
         }
         val directCapable = parsed.uacVersion in 1..2 && parsed.altSettingFormats.isNotEmpty()
         directStreamingSupported = nativeLoaded && directCapable
-        hardwareVolume?.refresh()
+        refreshHardwareVolumeIfNeeded()
         val hasVolume = permitted && hardwareVolume?.ready == true
         return mapOf(
             "attached" to true,
@@ -694,6 +750,12 @@ class UsbExclusivePlugin(
         val epInterface = selected.interfaceNumber
         val epAlt = selected.altSetting
         val streamBytes = selected.subslotSize
+        // The endpoint's own channel count is what the isochronous framing has
+        // to match. The native sink adapts whatever it is fed to it (mono is
+        // duplicated, extra channels get silence), so a track that is not
+        // stereo no longer fails here just because the DAC advertises another
+        // layout.
+        val wireChannels = selected.channels.takeIf { it > 0 } ?: channels
 
         // Prefer the exact (interface, alternate setting) pair that exposes the
         // selected isochronous OUT endpoint.
@@ -734,16 +796,19 @@ class UsbExclusivePlugin(
                 return failure("no_fd")
             }
             val resultCode = nativeUsbStreamStartWithFormat(
-                fd, epAddress, epInterface, epAlt, sampleRate, channels, streamBytes,
+                fd, epAddress, epInterface, epAlt, sampleRate, wireChannels, streamBytes,
             )
             lastStreamResultCode = resultCode
             if (resultCode != 0 || !isNativeActive()) {
                 return failure("native_stream_not_active") + mapOf("resultCode" to resultCode)
             }
-            streamFormat = UsbAudioProtocol.StreamFormat(sampleRate, selected.bitResolution, selected.channels)
+            // The request is remembered as the request (see StreamFormat): a
+            // 16-bit track whose endpoint was opened at 24-bit must be
+            // recognised as the same stream on the next track change.
+            streamFormat = UsbAudioProtocol.StreamFormat(sampleRate, bitDepth, channels)
             streaming = true
             directStatus = DirectStreamStatus(device.deviceId, deviceLabel(device),
-                sampleRate, selected.bitResolution, selected.channels)
+                sampleRate, selected.bitResolution, wireChannels)
             directOwner = this
             val status = buildStatus()
             started = status["streamingActive"] == true && isNativeActive()

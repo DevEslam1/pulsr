@@ -443,4 +443,19 @@ class UsbAudioControlParserTest {
         assertTrue(result.clockSources.isEmpty())
         assertNull(result.clockSource)
     }
+
+    @Test
+    fun vendorSpecificInterfacesAreOnlyAudioWhenTheyLookLikeAudio() {
+        // An explicitly audio-classed streaming interface is always accepted.
+        assertTrue(UsbAudioControlParser.isAudioStreamingInterface(0x01, 0x02, 0x20))
+        assertTrue(UsbAudioControlParser.isAudioFunctionInterface(0x01, 0x01, 0x00))
+        // A vendor-specific (0xFF) interface needs an audio subclass *and* an
+        // audio protocol; the ADB/debug accessory shape must not qualify.
+        assertTrue(UsbAudioControlParser.isAudioStreamingInterface(0xFF, 0x02, 0x20))
+        assertFalse(UsbAudioControlParser.isAudioFunctionInterface(0xFF, 0x42, 0x01))
+        assertFalse(UsbAudioControlParser.isAudioStreamingInterface(0xFF, 0x02, 0x01))
+        // Subclass 0x02 alone is not audio: CDC-ACM data interfaces use it.
+        assertFalse(UsbAudioControlParser.isAudioStreamingInterface(0x02, 0x02, 0x01))
+        assertFalse(UsbAudioControlParser.isAudioFunctionInterface(0x03, 0x02, 0x00))
+    }
 }

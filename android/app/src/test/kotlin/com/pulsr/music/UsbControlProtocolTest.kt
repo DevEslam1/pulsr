@@ -241,4 +241,13 @@ class UsbControlProtocolTest {
         assertFalse(format.matches(96000, 24, 2, true))
         assertFalse(format.matches(48000, 24, 2, false))
     }
+
+    @Test fun streamReuseComparesTheRequestNotTheWireContainer() {
+        // A 16-bit track on a DAC whose only usable alt setting is 24-bit: the
+        // request has not changed, so the live stream must be kept. Comparing
+        // the request against the container size restarted it on every call.
+        val format = UsbAudioProtocol.StreamFormat(48000, 16, 2)
+        assertTrue(format.matches(48000, 16, 2, true))
+        assertFalse(format.matches(48000, 24, 2, true))
+    }
 }
