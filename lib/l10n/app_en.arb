@@ -4103,7 +4103,7 @@
   "settingsPasswordLabel": "Password",
   "settingsPerAlbumEqMemory": "Per-album EQ memory",
   "settingsPerAlbumEqMemorySubtitle": "Restore EQ snapshot per album/artist",
-  "settingsPerTrackFormatDesc": "Hi-res first: requests each track's native sample rate / bit depth from the output device (device-capped). Bit-Perfect keeps its exclusive format. Turn off to use one manual output format",
+  "settingsPerTrackFormatDesc": "Hi-res first: requests each track's native sample rate / bit depth from the output device (device-capped). Bit-Perfect keeps its exclusive format. When the mixer runs a different rate, conversion happens in-app ahead of the DSP instead of by Android after it. Turn off to use one manual output format",
   "settingsPerTrackFormatNegotiation": "Per-Track Output Format Negotiation",
   "settingsPortHint": "e.g. 8080",
   "settingsPortLabel": "Port",

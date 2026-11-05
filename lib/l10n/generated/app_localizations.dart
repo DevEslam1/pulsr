@@ -9482,7 +9482,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPerTrackFormatDesc.
   ///
   /// In en, this message translates to:
-  /// **'Hi-res first: requests each track\'s native sample rate / bit depth from the output device (device-capped). Bit-Perfect keeps its exclusive format. Turn off to use one manual output format'**
+  /// **'Hi-res first: requests each track\'s native sample rate / bit depth from the output device (device-capped). Bit-Perfect keeps its exclusive format. When the mixer runs a different rate, conversion happens in-app ahead of the DSP instead of by Android after it. Turn off to use one manual output format'**
   String get settingsPerTrackFormatDesc;
 
   /// No description provided for @settingsPerTrackFormatNegotiation.

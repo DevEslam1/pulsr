@@ -348,6 +348,17 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     );
   }
 
+  /// Pushes the tap-side SRC target rate (the output mixer's rate) to every
+  /// player, so rate conversion happens in the PCM tap ahead of the native DSP
+  /// chain instead of by AudioFlinger after it. 0 restores the platform path.
+  /// Never throws.
+  Future<void> setTapSrcRate(int rate) async {
+    await pushTapSrcRateToPlayers(
+      rate,
+      [_playerA, _playerB, _prefetchPlayer],
+    );
+  }
+
   /// Restores optional native playback quality without blocking initialization.
   Future<void> setSincResamplerQuality(int quality) async {
     final effects = AudioEffectsChannel();

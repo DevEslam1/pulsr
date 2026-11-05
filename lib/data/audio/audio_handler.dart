@@ -61,6 +61,7 @@ import 'dsd_decoder_helper.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../features/player/cubit/queue_slot_codec.dart';
 import 'collaborators/float_output_controller.dart';
+import 'collaborators/tap_src_controller.dart';
 import 'collaborators/aaudio_output_controller.dart';
 import 'collaborators/playback_volume_controller.dart';
 import 'collaborators/stream_resolution_pipeline.dart';

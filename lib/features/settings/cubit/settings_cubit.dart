@@ -25,6 +25,7 @@ import '../../../core/utils/platform_capabilities.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/dsd_decoder_helper.dart';
+import '../../../data/audio/tap_src_policy.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/audio/multi_output_router.dart';
@@ -227,6 +228,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       // A DAC may have just been plugged/unplugged: re-probe DoP support so the
       // DSD output control enables/disables truthfully without a manual refresh.
       unawaited(_refreshDopSupport());
+      // Same reason for the tap-side SRC: its target is the mixer rate of the
+      // route that is now live, so a plug/unplug must re-derive it.
+      unawaited(_syncTapSrcRate(device));
       if (lostBitPerfect) unawaited(setBitPerfectOutput(false));
     });
     _initThemeScheduler();

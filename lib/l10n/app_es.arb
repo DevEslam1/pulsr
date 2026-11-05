@@ -3645,7 +3645,7 @@
   "settingsPasswordLabel": "Contraseña",
   "settingsPerAlbumEqMemory": "Memoria de EQ por álbum",
   "settingsPerAlbumEqMemorySubtitle": "Restaura la instantánea de EQ por álbum/artista",
-  "settingsPerTrackFormatDesc": "Alta resolución primero: solicita la frecuencia/profundidad nativa de cada pista al dispositivo de salida (limitado por el dispositivo). Bit-perfect mantiene su formato exclusivo. Desactívalo para usar un formato manual",
+  "settingsPerTrackFormatDesc": "Alta resolución primero: solicita la frecuencia/profundidad nativa de cada pista al dispositivo de salida (limitado por el dispositivo). Bit-perfect mantiene su formato exclusivo. Si el mezclador usa otra frecuencia, la conversión se hace en la app antes del DSP, no por Android después. Desactívalo para usar un formato manual",
   "settingsPerTrackFormatNegotiation": "Negociación de formato de salida por pista",
   "settingsPortHint": "p. ej., 8080",
   "settingsPortLabel": "Puerto",

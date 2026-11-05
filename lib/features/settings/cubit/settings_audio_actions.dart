@@ -12,6 +12,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// user learns why the fallback did not engage.
   String? _lastDirectUsbFailure;
 
+  /// Last rate pushed to the tap-side SRC, so a route refresh that changes
+  /// nothing does not re-fan-out to every player. Null = never pushed.
+  int? _lastTapSrcTargetRate;
+
   Future<void> _pushBitPerfectBypass(bool enabled) async {
     if (getIt.isRegistered<EqualizerManager>()) {
       await getIt<EqualizerManager>().setBypassDspForBitPerfect(enabled);
@@ -686,10 +690,37 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           dsdDopSupported: caps.canUseDop,
         ),
       );
+      await _syncTapSrcRate(info);
     } catch (e, st) {
       ErrorLogger.log('Failed to refresh output device or probe DoP',
           error: e, stackTrace: st, category: 'Settings');
       return;
+    }
+  }
+
+  /// Keeps the tap-side SRC target on the route's mixer rate.
+  ///
+  /// This is what stops AudioFlinger from resampling the *finished* DSP: with a
+  /// target set, the PCM tap converts to the mixer rate at Ultra quality ahead
+  /// of the chain, so the mixer becomes a 1:1 copy. A route whose rate cannot be
+  /// verified keeps the historical platform path; this never throws.
+  Future<void> _syncTapSrcRate(AudioOutputInfo? info) async {
+    if (!getIt.isRegistered<PulsrAudioHandler>()) return;
+    final rate = decideTapSrcTargetRate(
+      enabled: state.outputFormatNegotiationEnabled,
+      nativeSampleRate: info?.nativeSampleRate ?? 0,
+      bitPerfectActive: info?.isBitPerfectActive ?? false,
+      isBluetooth: info?.isBluetooth ?? false,
+      deviceSampleRates: info?.supportedSampleRates ?? const <int>[],
+    );
+    if (rate == _lastTapSrcTargetRate) return;
+    _lastTapSrcTargetRate = rate;
+    try {
+      await getIt<PulsrAudioHandler>().setTapSrcRate(rate);
+    } catch (e, st) {
+      _lastTapSrcTargetRate = null;
+      ErrorLogger.log('Failed to sync tap-side SRC rate ($rate)',
+          error: e, stackTrace: st, category: 'Settings');
     }
   }
 
@@ -832,13 +863,16 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     await prefs.setBool(PrefsKeys.audioSessionLogEnabled, enabled);
   }
 
-  /// Opt-in per-track output-format negotiation. Off by default so the manual
-  /// device-global output format is untouched unless the user asks for it.
+  /// Per-track output-format negotiation, on by default. Also the gate for
+  /// tap-side SRC: with it on, a track whose rate the mixer will not run at is
+  /// converted in-app ahead of the DSP chain instead of by AudioFlinger after
+  /// it, so turning this off restores the platform-resample path entirely.
   Future<void> setOutputFormatNegotiationEnabled(bool enabled) async {
     markDirty('outputFormatNegotiationEnabled');
     safeEmit(state.copyWith(outputFormatNegotiationEnabled: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.outputFormatNegotiationEnabled, enabled);
+    await _syncTapSrcRate(state.currentOutputDevice);
   }
 
   /// Opt-in AAudio Direct output (bit-perfect; the DSP processor chain is

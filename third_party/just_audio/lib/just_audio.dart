@@ -108,6 +108,12 @@ class AudioPlayer {
   bool _aaudioPreferExclusive = true;
   int _aaudioTargetBufferMs = 150;
 
+  /// Pulsr fork: remembered tap-side SRC target rate (the output device rate the
+  /// sink will run at). 0 = disabled, which leaves rate conversion to the
+  /// platform mixer. Replayed on every platform activation like the other
+  /// output-path preferences so a newly built sink gets it before playback.
+  int _tapSrcTargetRate = 0;
+
   /// Effective (not requested) state of the optional output paths, surfaced to
   /// the app so a native fallback is visible instead of silently diverging
   /// from the persisted preference.
@@ -1386,6 +1392,38 @@ class AudioPlayer {
     }
   }
 
+  /// Pulsr fork: sets the tap-side sample-rate conversion target for this
+  /// player's PCM tap — the sample rate the output device runs at. When it
+  /// differs from the track's rate, [NativeDspAudioProcessor] converts the
+  /// decoded PCM at Ultra quality (64-tap Blackman-Harris polyphase) BEFORE the
+  /// native DSP chain, so the whole chain — EQ coefficients, noise shaping,
+  /// dither — works at the device rate and the platform mixer becomes a 1:1
+  /// copy instead of resampling the finished audio.
+  ///
+  /// Pass 0 to disable (platform resamples, as historically). Ignored natively
+  /// while bit-perfect output is engaged, since resampled bytes cannot be
+  /// sample-identical to the source. Takes effect on the sink's next configure,
+  /// so a rate change needs a route change or mode swap to reach the hardware.
+  Future<bool> dspSetTapSrcRate(int rate) async {
+    if (_disposed) return false;
+    final int clamped = (rate >= 8000 && rate <= 768000) ? rate : 0;
+    try {
+      final channel = _activeControlChannel;
+      if (!_active || channel == null) {
+        _tapSrcTargetRate = clamped;
+        return true; // remembered; flushed on platform activation
+      }
+      final accepted = await channel
+              .invokeMethod<bool>('dspSetTapSrcRate', {'rate': clamped}) ??
+          false;
+      if (accepted) _tapSrcTargetRate = clamped;
+      return accepted;
+    } catch (_) {
+      // Not the Pulsr Android fork (web/iOS/macOS/windows).
+      return false;
+    }
+  }
+
   /// Pulsr fork: switches this player's audio sink to the native AAudio
   /// "Direct" output (bit-perfect; bypasses the DSP processor chain).
   ///
@@ -1955,6 +1993,13 @@ class AudioPlayer {
                   }) ??
                   false;
           final aaudioActive = _aaudioOutputEnabled && aaudioAccepted;
+          // Tap-side SRC target is replayed like the other output-path
+          // preferences so a sink built after a route change converts at the
+          // device rate instead of leaving it to the mixer.
+          if (_tapSrcTargetRate > 0) {
+            await control.invokeMethod<bool>(
+                'dspSetTapSrcRate', {'rate': _tapSrcTargetRate});
+          }
           String? reason;
           if (_aaudioOutputEnabled && !aaudioAccepted) {
             reason = 'aaudio_rejected';

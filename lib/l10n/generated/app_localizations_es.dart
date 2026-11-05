@@ -5308,7 +5308,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsPerTrackFormatDesc =>
-      'Alta resolución primero: solicita la frecuencia/profundidad nativa de cada pista al dispositivo de salida (limitado por el dispositivo). Bit-perfect mantiene su formato exclusivo. Desactívalo para usar un formato manual';
+      'Alta resolución primero: solicita la frecuencia/profundidad nativa de cada pista al dispositivo de salida (limitado por el dispositivo). Bit-perfect mantiene su formato exclusivo. Si el mezclador usa otra frecuencia, la conversión se hace en la app antes del DSP, no por Android después. Desactívalo para usar un formato manual';
 
   @override
   String get settingsPerTrackFormatNegotiation =>
