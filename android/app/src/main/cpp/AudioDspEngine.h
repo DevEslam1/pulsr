@@ -216,6 +216,19 @@ public:
     // noise-shaped/dithered output. nullptr = transparent unity.
     int processInterleaved(float* buffer, int frames, int channels = 2,
                            const float* transportGains = nullptr);
+
+    // Tap-side sample-rate conversion, called by the Media3 PCM tap BEFORE
+    // processInterleaved when the shared AudioTrack path would otherwise let
+    // AudioFlinger resample (source rate != device rate on API < 34 without
+    // mixer attributes). Converts one interleaved block srcRate -> dstRate
+    // through a dedicated stateful 64-tap Blackman-Harris polyphase resampler
+    // (separate instance from the reverb wet path and the stage-0 passthrough).
+    // Returns output frames written (<= maxOutFrames), or 0 on invalid input.
+    // Equal rates are a transparent copy. Chunked internally so arbitrarily
+    // large blocks never overflow the resampler FIFO.
+    int resampleForTap(const float* in, int inFrames, float* out, int maxOutFrames,
+                       int channels, double srcRate, double dstRate);
+
     void reset();
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
@@ -331,6 +344,19 @@ private:
     LookaheadLimiter limiter_;
     ConvolutionReverb reverb_;
     SincResampler resampler_;
+
+    // Tap-side SRC (resampleForTap): dedicated stateful polyphase instance and
+    // its deinterleave/interleave plane scratch. The planes only ever grow, so
+    // allocation happens exclusively when a larger block than any previous one
+    // arrives (same amortised pattern as the Java tap's direct-buffer scratch).
+    SincResampler tapResampler_;
+    double tapSrcRate_ = 0.0;
+    double tapDstRate_ = 0.0;
+    bool tapSrcEngaged_ = false;
+    static constexpr int kTapMaxChannels = 8;
+    std::vector<float> tapPlaneIn_[kTapMaxChannels];
+    std::vector<float> tapPlaneOut_[kTapMaxChannels];
+
     SpatialPanner panner_;
     DsdDecoder dsdDecoder_;
     // Real-time zero-allocation PRNG for TPDF dither

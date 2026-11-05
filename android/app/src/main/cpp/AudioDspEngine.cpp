@@ -877,6 +877,8 @@ void AudioDspEngine::resetInternal() {
     limiter_.reset();
     reverb_.reset();
     resampler_.reset();
+    tapResampler_.reset();
+    tapSrcEngaged_ = false;
     panner_.reset();
     dsdDecoder_.reset();
     saturation_.reset();
@@ -910,6 +912,77 @@ void AudioDspEngine::reset() {
     updateParams([](DspParamSnapshot& snap) {
         snap.resetRequested = true;
     });
+}
+
+int AudioDspEngine::resampleForTap(const float* in, int inFrames, float* out,
+                                   int maxOutFrames, int channels,
+                                   double srcRate, double dstRate) {
+    if (!in || !out || inFrames <= 0 || maxOutFrames <= 0) return 0;
+    if (channels <= 0 || channels > kTapMaxChannels) return 0;
+    if (!(srcRate > 0.0) || !(dstRate > 0.0)) return 0;
+
+    if (std::abs(srcRate - dstRate) < 0.5) {
+        tapSrcEngaged_ = false;
+        const int n = std::min(inFrames, maxOutFrames);
+        if (in != out) {
+            std::memcpy(out, in, static_cast<size_t>(n) * channels * sizeof(float));
+        }
+        return n;
+    }
+
+    if (std::abs(tapSrcRate_ - srcRate) > 0.5 || std::abs(tapDstRate_ - dstRate) > 0.5) {
+        tapResampler_.setRates(srcRate, dstRate);
+        tapResampler_.setEnabled(true);
+        // Ultra: the full 64-tap Blackman-Harris table. This stage exists to
+        // BEAT AudioFlinger's resampler, so it never runs truncated.
+        tapResampler_.setQuality(3);
+        tapResampler_.reset();
+        tapSrcRate_ = srcRate;
+        tapDstRate_ = dstRate;
+    }
+    tapSrcEngaged_ = true;
+
+    for (int ch = 0; ch < channels; ++ch) {
+        if (static_cast<int>(tapPlaneIn_[ch].size()) < inFrames) {
+            tapPlaneIn_[ch].resize(static_cast<size_t>(inFrames));
+        }
+        if (static_cast<int>(tapPlaneOut_[ch].size()) < maxOutFrames) {
+            tapPlaneOut_[ch].resize(static_cast<size_t>(maxOutFrames));
+        }
+    }
+    const float* inPlanes[kTapMaxChannels];
+    float* outPlanes[kTapMaxChannels];
+    for (int ch = 0; ch < channels; ++ch) {
+        inPlanes[ch] = tapPlaneIn_[ch].data();
+        outPlanes[ch] = tapPlaneOut_[ch].data();
+    }
+
+    // Chunk the input so a large Media3 block never exceeds the resampler FIFO
+    // (processPlanar drops oldest frames above ~7.9k). State (phase, ring)
+    // persists across chunks, so chunking is sample-continuous.
+    constexpr int kChunkFrames = 2048;
+    int consumed = 0;
+    int produced = 0;
+    while (consumed < inFrames && produced < maxOutFrames) {
+        const int slice = std::min(kChunkFrames, inFrames - consumed);
+        for (int f = 0; f < slice; ++f) {
+            const float* src = in + static_cast<size_t>(consumed + f) * channels;
+            for (int ch = 0; ch < channels; ++ch) {
+                tapPlaneIn_[ch][f] = src[ch];
+            }
+        }
+        const int got = tapResampler_.processPlanar(
+            inPlanes, outPlanes, slice, channels, maxOutFrames - produced);
+        for (int f = 0; f < got; ++f) {
+            float* dst = out + static_cast<size_t>(produced + f) * channels;
+            for (int ch = 0; ch < channels; ++ch) {
+                dst[ch] = tapPlaneOut_[ch][f];
+            }
+        }
+        produced += got;
+        consumed += slice;
+    }
+    return produced;
 }
 
 void AudioDspEngine::processSafetyStage(float* buffer, int frames, int channels,
@@ -1851,6 +1924,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         }
     }
 
+    // Tap-side SRC group delay belongs to the reported pipeline latency: it is
+    // real delay the position tracker must know about when the tap converts
+    // the source rate to the device rate ahead of this chain.
+    if (tapSrcEngaged_) {
+        blockLatency += tapResampler_.getLatencyFrames();
+    }
     effectiveLatencyFrames_.store(blockLatency, std::memory_order_release);
 
     // NOTE (M-6): the audio render thread no longer retires snapshots. It holds

@@ -47,6 +47,10 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private static native int nativeProcessDirectFloatBuffer(
             long engineHandle, ByteBuffer buffer, int offsetBytes, int frameCount, int channels,
             ByteBuffer gainBuffer);
+    private static native int nativeResampleTap(
+            long engineHandle, ByteBuffer inBuffer, int inFrames, int channels,
+            ByteBuffer outBuffer, int maxOutFrames, double srcRate, double dstRate);
+    private static native boolean nativeIsBitPerfect(long engineHandle);
     private static native void nativeResyncForTrack(
             long engineHandle, double sampleRate, int channels);
 
@@ -128,6 +132,33 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     public boolean isFloatOutputEnabled() {
         return floatOutputEnabled;
+    }
+
+    // Pulsr fork: tap-side SRC. The app pushes the current device output rate
+    // (AudioManager PROPERTY_OUTPUT_SAMPLE_RATE / route probe); when it differs
+    // from the source rate this processor declares it as its OUTPUT rate and
+    // converts ahead of the native DSP chain (64-tap Blackman-Harris polyphase),
+    // so the shared AudioTrack opens at the device rate and AudioFlinger's
+    // resampler stays out of the signal path. 0 (default) = disabled: the
+    // historical behaviour where AudioTrack opens at the source rate.
+    private volatile int tapSrcTargetRate = 0;
+    // Playback-thread mirror: true while the configured format is converted.
+    private boolean tapSrcActive = false;
+
+    /**
+     * Sets the device output sample rate for tap-side SRC. A change takes
+     * effect on the next configure (the media3 pipeline fixes formats then).
+     */
+    public void setTapSrcTargetRate(int rate) {
+        this.tapSrcTargetRate = (rate >= 8000 && rate <= 768000) ? rate : 0;
+    }
+
+    public int getTapSrcTargetRate() {
+        return tapSrcTargetRate;
+    }
+
+    public boolean isTapSrcActive() {
+        return tapSrcActive;
     }
 
     public NativeDspAudioProcessor() {
@@ -281,6 +312,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
         target.transitionMuted = transitionMuted;
         target.transitionGain = transitionGain;
+        target.tapSrcTargetRate = tapSrcTargetRate;
     }
 
     public boolean setTransitionMuted(boolean muted) {
@@ -302,20 +334,52 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         sampleRate = inputAudioFormat.sampleRate;
         lastResyncSampleRate = -1;
         lastResyncChannels = -1;
+        tapSrcActive = false;
         if (!NATIVE_AVAILABLE) {
             return AudioFormat.NOT_SET;
         }
         // 16-bit is the historical path and stays accepted unconditionally.
-        if (inputAudioFormat.encoding == C.ENCODING_PCM_16BIT) {
-            return inputAudioFormat;
-        }
         // Float is only accepted when the opt-in float path is enabled; when it
         // is off this returns NOT_SET exactly as before, so ExoPlayer inserts
         // ToInt16PcmAudioProcessor ahead of the chain.
-        if (floatOutputEnabled && inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT) {
-            return inputAudioFormat;
+        final boolean accepted = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT
+                || (floatOutputEnabled && inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT);
+        if (!accepted) {
+            return AudioFormat.NOT_SET;
         }
-        return AudioFormat.NOT_SET;
+        // Tap-side SRC: declare the device rate as this processor's output rate
+        // so the AudioTrack opens there and the conversion happens ahead of the
+        // DSP chain. Never for bit-perfect playback: resampled bytes cannot be
+        // sample-identical to the source, and the bit-perfect fast path copies
+        // the ORIGINAL input bytes, which would then play at the wrong rate.
+        final int target = tapSrcTargetRate;
+        if (target >= 8000 && target <= 768000
+                && inputAudioFormat.sampleRate > 0
+                && target != inputAudioFormat.sampleRate
+                && !isBitPerfectNative()) {
+            tapSrcActive = true;
+            // Gain-curve segment frames and the engine resync both run at the
+            // processing (output) rate from here on.
+            sampleRate = target;
+            return new AudioFormat(target, inputAudioFormat.channelCount,
+                    inputAudioFormat.encoding);
+        }
+        return inputAudioFormat;
+    }
+
+    private boolean isBitPerfectNative() {
+        engineLock.readLock().lock();
+        try {
+            final long handle = nativeEngineHandle.get();
+            if (handle == 0) return false;
+            try {
+                return nativeIsBitPerfect(handle);
+            } catch (RuntimeException | UnsatisfiedLinkError e) {
+                return false;
+            }
+        } finally {
+            engineLock.readLock().unlock();
+        }
     }
 
     @Override
@@ -342,6 +406,44 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             }
         }
 
+        // ---- Tap-side SRC (input side of the DSP chain) ----
+        // Runs BEFORE the engine so the whole chain (EQ coefficients, dither)
+        // works at the declared output rate and dither stays the last stage.
+        // On any failure the source-rate block is emitted 1:1 (degraded: the
+        // AudioTrack expects the output rate, but this only happens when the
+        // engine died and the sink is being torn down anyway).
+        int emitFrames = frameCount;
+        FloatBuffer emitFloats = floats;
+        ByteBuffer emitNativeBuffer = scratch;
+        if (tapSrcActive) {
+            final double ratio = (double) tapSrcTargetRate
+                    / (double) inputAudioFormat.sampleRate;
+            final int maxOut = (int) Math.ceil(frameCount * ratio)
+                    + (int) Math.ceil(64.0 * ratio) + 32;
+            FloatBuffer resampled = ensureResampleScratch(maxOut * channelCount);
+            int got = 0;
+            engineLock.readLock().lock();
+            try {
+                final long handle = nativeEngineHandle.get();
+                if (handle != 0) {
+                    try {
+                        got = nativeResampleTap(handle, scratch, frameCount, channelCount,
+                                resampleScratch, maxOut,
+                                inputAudioFormat.sampleRate, tapSrcTargetRate);
+                    } catch (RuntimeException | UnsatisfiedLinkError e) {
+                        logJniFailureOnce("nativeResampleTap", e);
+                    }
+                }
+            } finally {
+                engineLock.readLock().unlock();
+            }
+            if (got > 0) {
+                emitFrames = got;
+                emitFloats = resampled;
+                emitNativeBuffer = resampleScratch;
+            }
+        }
+
         // ---- Transport gain, computed BEFORE the native call ----
         // The per-frame gain (crossfade/sleep curve x profile transition fade)
         // is handed to the engine so it lands ahead of the native dither /
@@ -349,11 +451,11 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         // no gain is active we pass null and the bit-perfect raw-copy fast
         // path stays available.
         //
-        // Segment frames are computed from the CURRENT input rate, not captured
-        // when the curve was armed, so a reconfigure between arm and buffer is
-        // respected.
-        final int curSampleRate = inputAudioFormat.sampleRate > 0
-                ? inputAudioFormat.sampleRate : sampleRate;
+        // Segment frames are computed from the CURRENT processing rate (the
+        // tap-SRC output rate when converting, else the input rate), published
+        // by onConfigure, so a reconfigure between arm and buffer is respected.
+        final int curSampleRate = sampleRate > 0 ? sampleRate
+                : (inputAudioFormat.sampleRate > 0 ? inputAudioFormat.sampleRate : 48000);
         float[] curve;
         int segFrames;
         long startPos;
@@ -380,7 +482,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             // ramp-to-unity — which resurrected audio after a completed sleep
             // fade-out — is gone.
             if (curve != null) {
-                rampPosFrames += frameCount;
+                rampPosFrames += emitFrames;
                 if (rampPosFrames >= (long) (curve.length - 1) * segFrames) {
                     staticGain = curve[curve.length - 1];
                     rampGains = null;
@@ -396,11 +498,11 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         FloatBuffer gains = null;
         float profileGain = transitionGain;
         if (gainActive) {
-            gains = ensureGainScratch(frameCount);
+            gains = ensureGainScratch(emitFrames);
             final int lastIdx = curve == null ? 0 : curve.length - 1;
             final float profileTarget = transitionMuted ? 0.0f : 1.0f;
-            final float profileStep = 1.0f / Math.max(1, inputAudioFormat.sampleRate * 0.04f);
-            for (int f = 0; f < frameCount; f++) {
+            final float profileStep = 1.0f / Math.max(1, curSampleRate * 0.04f);
+            for (int f = 0; f < emitFrames; f++) {
                 profileGain = profileTarget < profileGain
                         ? Math.max(profileTarget, profileGain - profileStep)
                         : Math.min(profileTarget, profileGain + profileStep);
@@ -421,7 +523,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             transitionGain = profileGain;
         }
 
-        int processed = frameCount;
+        int processed = emitFrames;
         boolean bitPerfect = false;
         // Frames whose gain the engine already applied. Anything at or beyond
         // this count (engine absent, declined, or processed only a head) gets
@@ -436,7 +538,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 if (handle != 0) {
                     try {
                         processed = nativeProcessDirectFloatBuffer(
-                                handle, scratch, 0, frameCount, channelCount,
+                                handle, emitNativeBuffer, 0, emitFrames, channelCount,
                                 gains == null ? null : gainScratch);
                         bitPerfect = processed < 0;
                         if (bitPerfect) processed = -processed;
@@ -449,7 +551,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                     } catch (RuntimeException | UnsatisfiedLinkError e) {
                         // A JNI RuntimeException must never escape queueInput.
                         logJniFailureOnce("nativeProcessDirectFloatBuffer", e);
-                        processed = frameCount;
+                        processed = emitFrames;
                         bitPerfect = false;
                     }
                 }
@@ -457,23 +559,29 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 engineLock.readLock().unlock();
             }
         }
-        if (processed <= 0 || processed > frameCount) {
-            // Engine declined the block; scratch still holds the untouched input.
-            processed = frameCount;
+        if (processed <= 0 || processed > emitFrames) {
+            // Engine declined the block; the emit buffer still holds its input.
+            processed = emitFrames;
             bitPerfect = false;
             nativeGainedFrames = 0;
-        } else if (processed < frameCount) {
+        } else if (processed < emitFrames) {
             // The engine processed only part of the block. Never drop the tail:
-            // the un-processed remainder is still the original input in scratch,
-            // so emit the whole block (processed head + raw tail) and apply the
-            // gain to the un-gained tail in the output loop.
+            // the un-processed remainder is still the original input in the
+            // emit buffer, so emit the whole block (processed head + raw tail)
+            // and apply the gain to the un-gained tail in the output loop.
             if (!loggedShortProcess) {
                 loggedShortProcess = true;
-                Log.w(TAG, "nativeProcess returned " + processed + " of " + frameCount
+                Log.w(TAG, "nativeProcess returned " + processed + " of " + emitFrames
                         + " frames; passing the remainder through unprocessed");
             }
             nativeGainedFrames = processed;
-            processed = frameCount;
+            processed = emitFrames;
+            bitPerfect = false;
+        }
+        // Tap SRC already voided sample identity with the decoded source; the
+        // raw-copy fast path would also emit source-rate bytes into an
+        // output-rate AudioTrack.
+        if (tapSrcActive) {
             bitPerfect = false;
         }
 
@@ -493,7 +601,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
         final int gainedSamples = nativeGainedFrames * channelCount;
         for (int i = 0; i < processed * channelCount; i++) {
-            float value = floats.get(i);
+            float value = emitFloats.get(i);
             if (gains != null && i >= gainedSamples) {
                 // Fallback: the engine did not run (or ran only a head), so the
                 // transport gain is applied here — still before the 16-bit
@@ -513,7 +621,11 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected void onFlush() {
-        final int sr = inputAudioFormat.sampleRate;
+        // The engine runs at the PROCESSING rate: the tap-SRC output rate when
+        // converting, else the input rate. Coefficients, dither and the gain
+        // curve all live at that rate.
+        final int sr = tapSrcActive ? outputAudioFormat.sampleRate
+                : inputAudioFormat.sampleRate;
         final int ch = inputAudioFormat.channelCount;
         // Publish the rate for other threads (setGainCurve).
         sampleRate = sr;
@@ -548,10 +660,13 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     protected void onReset() {
         transitionMuted = false;
         transitionGain = 1.0f;
+        tapSrcActive = false;
         scratch = null;
         scratchFloats = null;
         gainScratch = null;
         gainScratchFloats = null;
+        resampleScratch = null;
+        resampleScratchFloats = null;
         synchronized (rampLock) {
             rampGains = null;
             rampSegmentMs = 0;
@@ -614,5 +729,19 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             gainScratchFloats = gainScratch.asFloatBuffer();
         }
         return gainScratchFloats;
+    }
+
+    // Direct buffer holding the tap-SRC output block fed to the native engine.
+    private ByteBuffer resampleScratch;
+    private FloatBuffer resampleScratchFloats;
+
+    private FloatBuffer ensureResampleScratch(int sampleCount) {
+        if (resampleScratch == null || resampleScratch.capacity() < sampleCount * 4) {
+            int targetBytes = Math.max(sampleCount * 4,
+                    resampleScratch == null ? 16384 : resampleScratch.capacity() * 2);
+            resampleScratch = ByteBuffer.allocateDirect(targetBytes).order(ByteOrder.nativeOrder());
+            resampleScratchFloats = resampleScratch.asFloatBuffer();
+        }
+        return resampleScratchFloats;
     }
 }

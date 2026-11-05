@@ -123,6 +123,12 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private volatile boolean aaudioOutputEnabled = false;
     private volatile boolean aaudioPreferExclusive = true;
     private volatile int aaudioTargetBufferMs = 150;
+    // Pulsr fork: tap-side SRC target (device output rate). 0 = disabled: the
+    // AudioTrack opens at the source rate as before and AudioFlinger performs
+    // any rate conversion. When set, the DSP processor declares this rate as
+    // its output and converts ahead of the DSP chain with the native 64-tap
+    // polyphase resampler.
+    private volatile int tapSrcTargetRate = 0;
     // Pulsr fork: stable sink that swaps its inner backend on output-mode
     // changes instead of releasing/re-preparing the whole ExoPlayer.
     private volatile OutputSinkControl sinkWrapper;
@@ -544,6 +550,22 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             Boolean requested = call.argument("enabled");
             boolean enabled = requested != null && requested;
             result.success(applyFloatOutput(enabled));
+            return;
+        }
+
+        // Pulsr fork: tap-side SRC target rate (device output rate). Handled
+        // before initialization like dspSetFloatOutput; 0 disables. Takes
+        // effect on the processor's next configure (rate changes mid-stream
+        // require a sink reconfigure, which the caller triggers via a route
+        // change or mode swap).
+        if ("dspSetTapSrcRate".equals(call.method)) {
+            Integer rate = call.argument("rate");
+            int r = rate == null ? 0 : rate;
+            tapSrcTargetRate = (r >= 8000 && r <= 768000) ? r : 0;
+            if (dspAudioProcessor != null) {
+                dspAudioProcessor.setTapSrcTargetRate(tapSrcTargetRate);
+            }
+            result.success(true);
             return;
         }
 
@@ -1106,6 +1128,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     /** Called by the sink wrapper whenever its active DSP processor changes. */
     private void onActiveDspProcessorChanged(NativeDspAudioProcessor processor) {
         dspAudioProcessor = processor;
+        if (processor != null && tapSrcTargetRate != 0) {
+            processor.setTapSrcTargetRate(tapSrcTargetRate);
+        }
     }
 
     /** Called on the playback thread when AAudio failed; fall back in place. */

@@ -1391,6 +1391,55 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
     } catch (...) {}
 }
 
+// Tap-side SRC: converts one interleaved float block srcRate -> dstRate ahead
+// of the DSP chain (see AudioDspEngine::resampleForTap). Returns output frames
+// written into outBuffer, or 0 on any validation/engine failure so the Java
+// tap can fall back to 1:1 passthrough.
+JNIEXPORT jint JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResampleTap(
+        JNIEnv* env, jclass /* clazz */, jlong engineHandle,
+        jobject inBuffer, jint inFrames, jint channels,
+        jobject outBuffer, jint maxOutFrames, jdouble srcRate, jdouble dstRate) {
+    if (!inBuffer || !outBuffer || engineHandle == 0) return 0;
+    if (inFrames <= 0 || channels <= 0 || channels > 8 || maxOutFrames <= 0) return 0;
+    void* inAddr = env->GetDirectBufferAddress(inBuffer);
+    void* outAddr = env->GetDirectBufferAddress(outBuffer);
+    if (!inAddr || !outAddr) return 0;
+    const jlong inCapacity = env->GetDirectBufferCapacity(inBuffer);
+    const jlong outCapacity = env->GetDirectBufferCapacity(outBuffer);
+    if (inCapacity < static_cast<jlong>(inFrames) * channels * static_cast<jlong>(sizeof(float))) return 0;
+    if (outCapacity < static_cast<jlong>(maxOutFrames) * channels * static_cast<jlong>(sizeof(float))) return 0;
+    EngineLease lease(static_cast<int64_t>(engineHandle));
+    auto* engine = lease.get();
+    if (!engine) return 0;
+    try {
+        return static_cast<jint>(engine->resampleForTap(
+            reinterpret_cast<const float*>(inAddr), inFrames,
+            reinterpret_cast<float*>(outAddr), maxOutFrames,
+            channels, srcRate, dstRate));
+    } catch (...) {
+        return 0;
+    }
+}
+
+// Configure-time query: bit-perfect playback must never be routed through the
+// tap SRC (the engine bypass would echo resampled bytes and silently void the
+// sample-identical contract).
+JNIEXPORT jboolean JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsBitPerfect(
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    if (engineHandle == 0) return JNI_FALSE;
+    EngineLease lease(static_cast<int64_t>(engineHandle));
+    auto* engine = lease.get();
+    if (!engine) return JNI_FALSE;
+    try {
+        auto params = engine->getParams();
+        return (params && params->bitPerfect.enabled) ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
 // ---- USB UAC2 isochronous exclusive streaming (UsbExclusivePlugin) ----
 
 JNIEXPORT jint JNICALL
