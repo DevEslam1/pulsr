@@ -208,7 +208,14 @@ public:
     void setWeeklyDose(double dose) { weeklyDose_.store(dose, std::memory_order_relaxed); }
     bool isSafetyAttenuationActive() const { return safetyAttenuationActive_.load(std::memory_order_relaxed); }
 
-    int processInterleaved(float* buffer, int frames, int channels = 2);
+    // transportGains: optional per-frame transport gain (crossfade/sleep curve
+    // x profile transition fade), one float per frame shared across channels,
+    // owned by the caller for the duration of the call. Applied inside the
+    // engine AFTER the safety stage and BEFORE the dither stage on every path
+    // (including bit-perfect and A/B bypass), so gain never scales already
+    // noise-shaped/dithered output. nullptr = transparent unity.
+    int processInterleaved(float* buffer, int frames, int channels = 2,
+                           const float* transportGains = nullptr);
     void reset();
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 

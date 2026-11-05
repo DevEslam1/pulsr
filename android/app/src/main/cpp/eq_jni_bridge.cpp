@@ -1319,7 +1319,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResetEngine(
 
 JNIEXPORT jint JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatBuffer(
-        JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels) {
+        JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels, jobject gainBuffer) {
     if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
     // FIX M-2: Reject the engineHandle==0 render fallback. The process-wide
     // singleton is the control/broadcast engine, not a render target: it never
@@ -1338,13 +1338,25 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
         static_cast<jlong>(frameCount) * channels * static_cast<jlong>(sizeof(float));
     if (capacity < 0 || requiredBytes > capacity) return 0;
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
+    // Optional per-frame transport gain (one float per frame). Null means
+    // transparent unity; an invalid non-null buffer declines the whole block so
+    // the Java tap can fall back to applying the gain itself.
+    const float* transportGains = nullptr;
+    if (gainBuffer) {
+        void* gainAddr = env->GetDirectBufferAddress(gainBuffer);
+        jlong gainCapacity = env->GetDirectBufferCapacity(gainBuffer);
+        if (!gainAddr || gainCapacity < static_cast<jlong>(frameCount) * static_cast<jlong>(sizeof(float))) {
+            return 0;
+        }
+        transportGains = reinterpret_cast<const float*>(gainAddr);
+    }
     // Lock-free admission: one atomic increment in the engine's slot, then a
     // revalidation against teardown. No locks, no shared_ptr traffic.
     EngineLease lease(static_cast<int64_t>(engineHandle));
     auto* engine = lease.get();
     if (!engine) return 0;
     try {
-        jint processed = static_cast<jint>(engine->processInterleaved(floatBuffer, frameCount, channels));
+        jint processed = static_cast<jint>(engine->processInterleaved(floatBuffer, frameCount, channels, transportGains));
         // USB exclusive streaming: tee the processed PCM to the isochronous USB
         // sink and mute the HAL path so audio is never doubled if Android
         // re-routes to another output.

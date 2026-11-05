@@ -45,7 +45,8 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private static native void nativeDestroyEngine(long engineHandle);
     private static native void nativeResetEngine(long engineHandle);
     private static native int nativeProcessDirectFloatBuffer(
-            long engineHandle, ByteBuffer buffer, int offsetBytes, int frameCount, int channels);
+            long engineHandle, ByteBuffer buffer, int offsetBytes, int frameCount, int channels,
+            ByteBuffer gainBuffer);
     private static native void nativeResyncForTrack(
             long engineHandle, double sampleRate, int channels);
 
@@ -181,9 +182,13 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     // ---- Pulsr fork: sample-accurate gain ramp ----
     // Per-instance state (one processor per AudioPlayer) so the two crossfade
-    // players ramp independently. Applied AFTER the native DSP chain so the
-    // limiter/EQ still see the un-attenuated signal and the ramp can only
-    // attenuate (gains are clamped to [0, 1]).
+    // players ramp independently. The per-frame gain is computed here but
+    // applied INSIDE the native engine (ahead of its dither/noise-shaping
+    // stage) via the gainBuffer argument of nativeProcessDirectFloatBuffer, so
+    // the limiter/EQ still see the un-attenuated signal, the ramp can only
+    // attenuate (gains are clamped to [0, 1]), and the gain never scales
+    // already noise-shaped output. Java applies the gain itself only when the
+    // native engine did not run (fallback path).
     private final Object rampLock = new Object();
     private float[] rampGains = null;   // null => no ramp armed (transparent unity)
     private int rampSegmentMs = 0;      // duration of one curve segment, ms
@@ -337,8 +342,91 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             }
         }
 
+        // ---- Transport gain, computed BEFORE the native call ----
+        // The per-frame gain (crossfade/sleep curve x profile transition fade)
+        // is handed to the engine so it lands ahead of the native dither /
+        // noise-shaping stage instead of scaling already-shaped output. When
+        // no gain is active we pass null and the bit-perfect raw-copy fast
+        // path stays available.
+        //
+        // Segment frames are computed from the CURRENT input rate, not captured
+        // when the curve was armed, so a reconfigure between arm and buffer is
+        // respected.
+        final int curSampleRate = inputAudioFormat.sampleRate > 0
+                ? inputAudioFormat.sampleRate : sampleRate;
+        float[] curve;
+        int segFrames;
+        long startPos;
+        float idleGain;
+        boolean gainActive;
+        synchronized (rampLock) {
+            curve = rampGains;
+            if (curve != null) {
+                final double sr = curSampleRate > 0 ? curSampleRate : 48000.0;
+                segFrames = Math.max(1,
+                        (int) Math.round(sr * (double) rampSegmentMs / 1000.0));
+            } else {
+                segFrames = 0;
+            }
+            startPos = rampPosFrames;
+            idleGain = staticGain;
+            gainActive = curve != null || Math.abs(idleGain - 1.0f) > 0.0001f;
+            // Consume the frames we are about to emit. When the curve is
+            // exhausted it transitions into a static gain equal to its last
+            // value, so a fade-out stays silent and a fade-in becomes
+            // transparent instead of leaving a stale curve behind. A held
+            // static gain now persists through bit-perfect blocks too (the
+            // engine applies it on the bypass path), so the old one-block
+            // ramp-to-unity — which resurrected audio after a completed sleep
+            // fade-out — is gone.
+            if (curve != null) {
+                rampPosFrames += frameCount;
+                if (rampPosFrames >= (long) (curve.length - 1) * segFrames) {
+                    staticGain = curve[curve.length - 1];
+                    rampGains = null;
+                    rampSegmentMs = 0;
+                    rampPosFrames = 0;
+                }
+            }
+        }
+        if (transitionMuted || Math.abs(transitionGain - 1.0f) > 0.0001f) {
+            gainActive = true;
+        }
+
+        FloatBuffer gains = null;
+        float profileGain = transitionGain;
+        if (gainActive) {
+            gains = ensureGainScratch(frameCount);
+            final int lastIdx = curve == null ? 0 : curve.length - 1;
+            final float profileTarget = transitionMuted ? 0.0f : 1.0f;
+            final float profileStep = 1.0f / Math.max(1, inputAudioFormat.sampleRate * 0.04f);
+            for (int f = 0; f < frameCount; f++) {
+                profileGain = profileTarget < profileGain
+                        ? Math.max(profileTarget, profileGain - profileStep)
+                        : Math.min(profileTarget, profileGain + profileStep);
+                float gain = idleGain;
+                if (curve != null) {
+                    // Piecewise-linear interpolation between curve points, per frame.
+                    double exact = (startPos + f) / (double) segFrames;
+                    int seg = (int) exact;
+                    if (seg >= lastIdx) {
+                        gain = curve[lastIdx];
+                    } else {
+                        float frac = (float) (exact - seg);
+                        gain = curve[seg] + (curve[seg + 1] - curve[seg]) * frac;
+                    }
+                }
+                gains.put(f, gain * profileGain);
+            }
+            transitionGain = profileGain;
+        }
+
         int processed = frameCount;
         boolean bitPerfect = false;
+        // Frames whose gain the engine already applied. Anything at or beyond
+        // this count (engine absent, declined, or processed only a head) gets
+        // the gain in the Java output loop below.
+        int nativeGainedFrames = 0;
         if (NATIVE_AVAILABLE) {
             // Read side: release() (write side) cannot destroy the engine while
             // we are inside the native call.
@@ -348,9 +436,16 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 if (handle != 0) {
                     try {
                         processed = nativeProcessDirectFloatBuffer(
-                                handle, scratch, 0, frameCount, channelCount);
+                                handle, scratch, 0, frameCount, channelCount,
+                                gains == null ? null : gainScratch);
                         bitPerfect = processed < 0;
                         if (bitPerfect) processed = -processed;
+                        // Any positive return means the engine ran and applied
+                        // the gain buffer itself (on every path, including the
+                        // bit-perfect bypass).
+                        if (processed > 0 && gains != null) {
+                            nativeGainedFrames = processed;
+                        }
                     } catch (RuntimeException | UnsatisfiedLinkError e) {
                         // A JNI RuntimeException must never escape queueInput.
                         logJniFailureOnce("nativeProcessDirectFloatBuffer", e);
@@ -366,33 +461,28 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             // Engine declined the block; scratch still holds the untouched input.
             processed = frameCount;
             bitPerfect = false;
+            nativeGainedFrames = 0;
         } else if (processed < frameCount) {
             // The engine processed only part of the block. Never drop the tail:
             // the un-processed remainder is still the original input in scratch,
-            // so emit the whole block (processed head + raw tail) through the
-            // gain path.
+            // so emit the whole block (processed head + raw tail) and apply the
+            // gain to the un-gained tail in the output loop.
             if (!loggedShortProcess) {
                 loggedShortProcess = true;
                 Log.w(TAG, "nativeProcess returned " + processed + " of " + frameCount
                         + " frames; passing the remainder through unprocessed");
             }
+            nativeGainedFrames = processed;
             processed = frameCount;
             bitPerfect = false;
         }
 
-        boolean hasActiveGainCurve;
-        synchronized (rampLock) {
-            hasActiveGainCurve = (rampGains != null || Math.abs(staticGain - 1.0f) > 0.0001f);
-        }
-        if (transitionMuted || Math.abs(transitionGain - 1.0f) > 0.0001f) {
-            hasActiveGainCurve = true;
-        }
-
-        if (bitPerfect && !hasActiveGainCurve) {
+        final boolean outputIsFloat = outputAudioFormat.encoding == C.ENCODING_PCM_FLOAT;
+        ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
+        if (bitPerfect && gains == null) {
             // No curve and unity static gain were already verified under
-            // rampLock above; re-taking the lock to clear a transparent curve
-            // is redundant on the per-block bit-perfect path.
-            ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
+            // rampLock above, and the engine confirmed sample-identical bypass:
+            // emit the decoded bytes verbatim.
             ByteBuffer original = inputBuffer.duplicate();
             original.limit(position + processed * inputAudioFormat.bytesPerFrame);
             output.put(original);
@@ -401,72 +491,15 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             return;
         }
 
-        // Snapshot ramp state and consume the frames we are about to emit.
-        // When the curve is exhausted it transitions into a static gain equal
-        // to its last value, so a fade-out stays silent and a fade-in becomes
-        // transparent instead of leaving a stale curve behind.
-        float[] curve;
-        int segFrames;
-        long startPos;
-        float idleGain;
-        // Segment frames are computed from the CURRENT input rate, not captured
-        // when the curve was armed, so a reconfigure between arm and buffer is
-        // respected.
-        final int curSampleRate = inputAudioFormat.sampleRate > 0
-                ? inputAudioFormat.sampleRate : sampleRate;
-        synchronized (rampLock) {
-            curve = rampGains;
-            if (curve != null) {
-                final double sr = curSampleRate > 0 ? curSampleRate : 48000.0;
-                segFrames = Math.max(1,
-                        (int) Math.round(sr * (double) rampSegmentMs / 1000.0));
-            } else {
-                segFrames = 0;
-            }
-            startPos = rampPosFrames;
-            idleGain = staticGain;
-            if (curve != null) {
-                rampPosFrames += processed;
-                if (rampPosFrames >= (long) (curve.length - 1) * segFrames) {
-                    staticGain = curve[curve.length - 1];
-                    rampGains = null;
-                    rampSegmentMs = 0;
-                    rampPosFrames = 0;
-                }
-            } else if (bitPerfect && Math.abs(staticGain - 1.0f) > 0.0001f) {
-                staticGain = 1.0f;
-            }
-        }
-
-        final int lastIdx = curve == null ? 0 : curve.length - 1;
-        final boolean outputIsFloat = outputAudioFormat.encoding == C.ENCODING_PCM_FLOAT;
-        ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
-        float profileGain = transitionGain;
-        final float profileTarget = transitionMuted ? 0.0f : 1.0f;
-        final float profileStep = 1.0f / Math.max(1, inputAudioFormat.sampleRate * 0.04f);
+        final int gainedSamples = nativeGainedFrames * channelCount;
         for (int i = 0; i < processed * channelCount; i++) {
-            if (i % channelCount == 0) {
-                profileGain = profileTarget < profileGain
-                        ? Math.max(profileTarget, profileGain - profileStep)
-                        : Math.min(profileTarget, profileGain + profileStep);
+            float value = floats.get(i);
+            if (gains != null && i >= gainedSamples) {
+                // Fallback: the engine did not run (or ran only a head), so the
+                // transport gain is applied here — still before the 16-bit
+                // requantiser's own dither.
+                value *= gains.get(i / channelCount);
             }
-            float gain = idleGain;
-            if (curve != null) {
-                // Piecewise-linear interpolation between curve points, per frame.
-                long frame = i / channelCount;
-                double exact = (startPos + frame) / (double) segFrames;
-                int seg = (int) exact;
-                if (seg >= lastIdx) {
-                    gain = curve[lastIdx];
-                } else {
-                    float frac = (float) (exact - seg);
-                    gain = curve[seg] + (curve[seg + 1] - curve[seg]) * frac;
-                }
-            } else if (bitPerfect && Math.abs(idleGain - 1.0f) > 0.0001f) {
-                float frac = (float) (i / channelCount) / Math.max(1, processed);
-                gain = idleGain + (1.0f - idleGain) * frac;
-            }
-            float value = floats.get(i) * gain * profileGain;
             if (outputIsFloat) {
                 // Emit straight float32: no 16-bit re-quantisation after DSP.
                 output.putFloat(value);
@@ -474,7 +507,6 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 output.putShort(Pcm16Quantizer.fromFloat(value));
             }
         }
-        transitionGain = profileGain;
         inputBuffer.position(limit);
         output.flip();
     }
@@ -518,6 +550,8 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         transitionGain = 1.0f;
         scratch = null;
         scratchFloats = null;
+        gainScratch = null;
+        gainScratchFloats = null;
         synchronized (rampLock) {
             rampGains = null;
             rampSegmentMs = 0;
@@ -564,5 +598,21 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             scratchFloats = scratch.asFloatBuffer();
         }
         return scratchFloats;
+    }
+
+    // Direct buffer of per-frame transport gains handed to the native engine
+    // (one float per frame). Grown like `scratch`; only written on the playback
+    // thread while a gain is active.
+    private ByteBuffer gainScratch;
+    private FloatBuffer gainScratchFloats;
+
+    private FloatBuffer ensureGainScratch(int frameCount) {
+        if (gainScratch == null || gainScratch.capacity() < frameCount * 4) {
+            int targetBytes = Math.max(frameCount * 4,
+                    gainScratch == null ? 4096 : gainScratch.capacity() * 2);
+            gainScratch = ByteBuffer.allocateDirect(targetBytes).order(ByteOrder.nativeOrder());
+            gainScratchFloats = gainScratch.asFloatBuffer();
+        }
+        return gainScratchFloats;
     }
 }

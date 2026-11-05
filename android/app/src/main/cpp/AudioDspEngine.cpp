@@ -1018,7 +1018,24 @@ void AudioDspEngine::meterDoseReadOnly(const float* buffer, int frames, int chan
                                                 std::memory_order_relaxed));
 }
 
-int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) {
+// Per-frame transport gain (crossfade/sleep curve x profile fade), one gain per
+// frame across all channels. Runs strictly inside the engine so the gain lands
+// before the dither/noise-shaping stage: applying it after dither (as the old
+// Java post-chain ramp did) scales the shaped quantisation noise and breaks the
+// shaper's transfer function, which is audible on low-impedance IEMs.
+static void applyTransportGain(float* buffer, int frames, int channels,
+                               const float* gains) {
+    if (!gains) return;
+    for (int f = 0; f < frames; ++f) {
+        const float g = gains[f];
+        for (int ch = 0; ch < channels; ++ch) {
+            buffer[f * channels + ch] *= g;
+        }
+    }
+}
+
+int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
+                                       const float* transportGains) {
     if (!buffer || frames <= 0 || channels <= 0) return frames;
 
     const auto blockStart = std::chrono::steady_clock::now();
@@ -1062,6 +1079,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     if (!snapshot) {
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterActive_.store(false, std::memory_order_relaxed);
+        applyTransportGain(buffer, frames, channels, transportGains);
         return frames;
     }
 
@@ -1171,6 +1189,10 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             meterDoseReadOnly(buffer, frames, channels, bpSr,
                               snapshot->headphoneSafety);
         }
+        // Dose is metered on the un-attenuated signal (worst case), then the
+        // transport gain rides on the bypassed bytes so a crossfade/sleep fade
+        // still renders while bit-perfect is engaged.
+        applyTransportGain(buffer, frames, channels, transportGains);
         return frames;
     }
 
@@ -1212,6 +1234,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         // The A/B path usually reports zero latency, but the safety limiter is
         // still in the signal path when enabled and contributes its lookahead.
         effectiveLatencyFrames_.store(blockLatency, std::memory_order_release);
+        applyTransportGain(buffer, frames, channels, transportGains);
         return frames;
     }
 
@@ -1563,6 +1586,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // Mask-immune: safety enforcement cannot be bypassed by activeStages bitmask dropping.
     // Placed after DVC and main limiter, before dither.
     processSafetyStage(buffer, frames, channels, currentSr, *snapshot, blockLatency);
+
+    // 11b. Transport gain (crossfade/sleep curve x profile transition fade),
+    // pushed per-block from the Java tap. Applied here — after limiter and
+    // safety, before dither — so noise shaping quantises the final signal and
+    // the gain can never scale already-shaped dither noise.
+    applyTransportGain(buffer, frames, channels, transportGains);
 
     // TPDF Dither — its own stage bit, so a lone dither toggle acts standalone
     // (previously it was nested inside the non-unity-gain block and dead when no
