@@ -338,6 +338,13 @@ void main() {
         AudioConflicts.bitPerfectReasonMessage('no_supported_mixer_attributes'),
         contains('mixer configuration'),
       );
+      // The route-only fallback used to have no message at all, so the sheet
+      // printed the raw reason code with no sentence explaining it.
+      expect(
+        AudioConflicts.bitPerfectReasonMessage(
+            'mixer_attributes_unavailable_fallback_route_only'),
+        contains('bit-perfect'),
+      );
     });
 
     test('generic guard fallbacks', () {

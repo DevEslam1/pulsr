@@ -683,6 +683,12 @@ class AudioConflicts {
       case 'no_supported_mixer_attributes':
         return L10nHolder.current?.conflictNoMixerAttributes ??
             'This USB DAC does not advertise an exclusive mixer configuration.';
+      case 'mixer_attributes_unavailable_fallback_route_only':
+        // The platform withheld exclusive attributes and the app pinned the USB
+        // route instead. That is not bit-perfect output, so it needs the same
+        // explanation rather than falling through to a generic sentence.
+        return L10nHolder.current?.conflictNoMixerAttributes ??
+            'Android does not advertise an exclusive bit-perfect mixer configuration for this USB DAC.';
       case 'target_format_unavailable':
         return 'This USB DAC does not offer the selected sample rate / bit depth in exclusive mode.';
       case 'set_mixer_attributes_failed':

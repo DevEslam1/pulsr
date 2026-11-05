@@ -1383,7 +1383,13 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         directRouteFallbackActive = true
         bitPerfectUsbDeviceId = usbDevice.id
         lastBitPerfectReason = "mixer_attributes_unavailable_fallback_route_only"
-        return true
+        // Reporting success here was the bug: callers read `true` as "the DAC is
+        // now exclusive" and never fell through to Pulsr's own UAC2 sink, which
+        // is the only path that actually delivers bit-perfect when the platform
+        // withholds exclusive mixer attributes. The result was a session that
+        // bypassed the DSP for a bit-perfect claim that was never real. The pin
+        // above is still worth keeping, so it stays — but the answer is no.
+        return false
     }
 
     /** Phase 4: enumerate USB audio devices and report the advertised UAC
