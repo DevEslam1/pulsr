@@ -118,5 +118,6 @@ pulsr_add_test(test_resampler_polyphase ${MAIN_CPP}/SincResampler.cpp)
 
 pulsr_add_test(test_channel_manager ${MAIN_CPP}/ChannelManager.cpp)
 pulsr_add_test(test_dac_voicing ${DSP_SRCS})
+pulsr_add_test(test_dither_hires ${DSP_SRCS})
 pulsr_add_test(test_dsp_effects ${DSP_SRCS})
 pulsr_add_test(test_rtf_governor ${DSP_SRCS})
