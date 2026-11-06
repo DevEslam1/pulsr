@@ -8285,7 +8285,7 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String conflictVolumeBoostClipping(
       String preampDb, String boostDb, String totalDb) {
-    return 'Riesgo de clipping: preamplificador del EQ ($preampDb dB) + refuerzo (+$boostDb dB) = +$totalDb dB > 6 dB de margen.';
+    return 'Riesgo de clipping: preamplificador del EQ ($preampDb dB) + refuerzo (+$boostDb dB) = +$totalDb dB, por encima de 0 dBFS (escala completa).';
   }
 
   @override

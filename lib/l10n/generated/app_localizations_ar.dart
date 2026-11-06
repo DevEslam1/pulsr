@@ -8166,7 +8166,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String conflictVolumeBoostClipping(
       String preampDb, String boostDb, String totalDb) {
-    return 'خطر القص: مضخم EQ المسبق ($preampDb dB) + التعزيز (+$boostDb dB) = +$totalDb dB > هامش 6 dB.';
+    return 'خطر القص: مضخم EQ المسبق ($preampDb dB) + التعزيز (+$boostDb dB) = +$totalDb dB، فوق مقياس 0 dBFS الكامل.';
   }
 
   @override
