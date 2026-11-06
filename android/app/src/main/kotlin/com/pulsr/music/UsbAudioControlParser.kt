@@ -192,10 +192,9 @@ object UsbAudioControlParser {
         (ifaceClass == CLASS_AUDIO || looksLikeVendorAudio(ifaceClass, ifaceProtocol))
 
     /**
-     * Vendor-specific (0xFF) interfaces are only audio when the subclass and
-     * protocol agree: several non-audio accessories (ADB among them) publish
-     * class 0xFF, and accepting any of them as "a DAC" made the app open the
-     * wrong device.
+     * Vendor-specific interfaces are audio only when the protocol agrees: the
+     * subclass alone (0x01/0x02) is shared with CDC and other classes, and
+     * class 0xFF alone is shared with ADB and other accessories.
      */
     private fun looksLikeVendorAudio(ifaceClass: Int, ifaceProtocol: Int): Boolean =
         ifaceClass == CLASS_VENDOR_SPECIFIC &&
