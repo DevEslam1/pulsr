@@ -13,6 +13,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
+import 'package:pulsr/domain/models/audio_quality_info.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/audio_quality_sheet.dart';
@@ -754,6 +755,63 @@ void main() {
 
     expect(find.textContaining('Bypassed'), findsWidgets);
     expect(find.textContaining(_l10n(tester).stageEq), findsNothing);
+  });
+
+  testWidgets('dither and gain stages count as sample edits in the chain',
+      (tester) async {
+    // Format agreement alone is not sample identity: the verdict used to only
+    // look at EQ, limiter, crossfeed and reverb, so a chain with dither, the
+    // panner or software gain applied still read "verified".
+    const verifiedRoute = AudioOutputInfo(
+      deviceName: 'Topping D90',
+      isUsbDac: true,
+      sampleRate: 96000,
+      bitDepth: 24,
+      isBitPerfectActive: true,
+    );
+    // A DoP carrier is never a verified PCM chain; this file's DSD case leaves
+    // the flag set, so pin it for the comparison below.
+    final dopBefore = AudioQualityInfo.dsdDopActive;
+    AudioQualityInfo.dsdDopActive = false;
+    addTearDown(() => AudioQualityInfo.dsdDopActive = dopBefore);
+    var currentDsp = const DspSlice(isDitherEnabled: true);
+    PlayerState playerState() =>
+        PlayerState(dsp: currentDsp, playback: const PlaybackSlice(currentSong: testSong));
+    final changes = StreamController<PlayerState>.broadcast();
+    final player = MockPlayerCubit();
+    when(() => player.state).thenAnswer((_) => playerState());
+    when(() => player.stream).thenAnswer((_) => changes.stream);
+    when(() => player.rawPositionStream)
+        .thenAnswer((_) => const Stream<Duration>.empty());
+    final settings = stubSettingsCubit(
+      state: const SettingsState(
+        bitPerfectOutput: true,
+        // Bypass off on purpose: then the user's stages really are in the
+        // signal path and the verdict has to know about every one of them.
+        bypassDspOnBitPerfect: false,
+        currentOutputDevice: verifiedRoute,
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+
+    expect(find.textContaining(_l10n(tester).bpChainVerified), findsNothing);
+    expect(
+      find.textContaining('Platform conversion • not measured by this app'),
+      findsWidgets,
+    );
+
+    // Same route with nothing touching the samples: the agreement is real.
+    currentDsp = const DspSlice();
+    changes.add(playerState());
+    await tester.pumpAndSettle();
+    expect(find.textContaining(_l10n(tester).bpChainVerified), findsWidgets);
+    await changes.close();
   });
 
   testWidgets('the inactive chain banner explains the reason instead of a code',

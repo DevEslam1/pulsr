@@ -21,6 +21,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../settings/presentation/widgets/bit_perfect_conflict_dialog.dart';
 import '../../cubit/player_cubit.dart';
+import '../../cubit/player_state.dart';
 import 'pulsr_cast_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -72,21 +73,7 @@ class AudioQualitySheet extends StatelessWidget {
     // builder: reading it once left the signal chain showing the stages that
     // were on when the sheet opened, so toggling the EQ with the sheet open
     // never changed the verdict.
-    final (
-      eqOn,
-      limiterOn,
-      crossfeedOn,
-      reverbOn,
-      activeStageCount,
-      anyDspActive
-    ) = context.select<PlayerCubit, (bool, bool, bool, bool, int, bool)>((c) => (
-          c.state.dsp.isEqEnabled,
-          c.state.dsp.isLimiterEnabled,
-          c.state.dsp.isCrossfeedEnabled,
-          c.state.dsp.isReverbEnabled,
-          c.state.dsp.activeDspStagesCount,
-          c.state.dsp.isDspActive,
-        ));
+    final dspSlice = context.select<PlayerCubit, DspSlice>((c) => c.state.dsp);
     final info = AudioQualityInfo.fromSong(
       currentSong ?? song,
       streamingQuality: streamingQuality,
@@ -545,15 +532,8 @@ class AudioQualitySheet extends StatelessWidget {
                     settingsState,
                     p,
                     activeColor,
-                    (
-                      eq: eqOn,
-                      limiter: limiterOn,
-                      crossfeed: crossfeedOn,
-                      reverb: reverbOn,
-                      stageCount: activeStageCount,
-                      anyActive: anyDspActive,
-                      song: currentSong,
-                    ),
+                    dspSlice,
+                    currentSong,
                   ),
 
                   const SizedBox(height: AppSpacing.s20),
@@ -1469,16 +1449,8 @@ class AudioQualitySheet extends StatelessWidget {
     SettingsState? settingsState,
     PulsrPalette p,
     Color activeColor,
-    ({
-      bool eq,
-      bool limiter,
-      bool crossfeed,
-      bool reverb,
-      int stageCount,
-      bool anyActive,
-      SongsTableData? song
-    })
-        dsp,
+    DspSlice dsp,
+    SongsTableData? currentSong,
   ) {
     final requested = settingsState?.bitPerfectOutput == true;
     final bool isBitPerfect =
@@ -1496,8 +1468,6 @@ class AudioQualitySheet extends StatelessWidget {
     final bool isDsd = info.format.toUpperCase().contains('DSD') ||
         info.codecName.toUpperCase().contains('DSD');
 
-    final SongsTableData? currentSong = dsp.song;
-
     final String sourceLabel = isDsd
         ? 'DSD Stream (${info.format})'
         : (info.bitDepth.isNotEmpty && info.bitDepth != 'Unknown'
@@ -1511,20 +1481,30 @@ class AudioQualitySheet extends StatelessWidget {
     // below must see the complete picture or it upgrades to "verified" behind a
     // stage nobody listed.
     final List<String> namedStages = [
-      if (dsp.eq) context.l10n.stageEq,
-      if (dsp.limiter) context.l10n.stageLimiter,
-      if (dsp.crossfeed) context.l10n.stageCrossfeed,
-      if (dsp.reverb) context.l10n.stageReverb,
+      if (dsp.isEqEnabled) context.l10n.stageEq,
+      if (dsp.isLimiterEnabled) context.l10n.stageLimiter,
+      if (dsp.isCrossfeedEnabled) context.l10n.stageCrossfeed,
+      if (dsp.isReverbEnabled) context.l10n.stageReverb,
     ];
-    final int unnamedStages =
-        dsp.stageCount - (dsp.eq ? 1 : 0) - (dsp.limiter ? 1 : 0) -
-            (dsp.crossfeed ? 1 : 0) - (dsp.reverb ? 1 : 0);
+    final int unnamedStages = dsp.activeDspStagesCount -
+        (dsp.isEqEnabled ? 1 : 0) -
+        (dsp.isLimiterEnabled ? 1 : 0) -
+        (dsp.isCrossfeedEnabled ? 1 : 0) -
+        (dsp.isReverbEnabled ? 1 : 0);
     final List<String> activeStages = [
       ...namedStages,
       if (unnamedStages > 0) '+$unnamedStages',
     ];
-    final bool gainActive = settingsState != null &&
-        settingsState.replayGainMode != ReplayGainMode.off;
+    // Everything that touches the samples, not only the stages with a chain
+    // label: the panner, dither, software gain (DVC) and ReplayGain are all
+    // edits, and leaving them out upgraded the verdict to "verified".
+    final bool anyStageEdits = dsp.isDspActive ||
+        dsp.stereoBalance != 0.0 ||
+        dsp.monoMix ||
+        dsp.isDitherEnabled;
+    final bool gainEdits = settingsState != null &&
+        (settingsState.replayGainMode != ReplayGainMode.off ||
+            settingsState.dvcEnabled);
     final String dspLabel = dspBypassed
         ? 'Bypassed (Bit-Perfect Guardrail)'
         : (activeStages.isEmpty
@@ -1541,7 +1521,7 @@ class AudioQualitySheet extends StatelessWidget {
       // Every Android PCM path here is float32; 32-bit integer sources cannot
       // survive that conversion, so format agreement is not sample identity.
       samplesModified: currentSong?.bitDepth == 32 ||
-          (!dspBypassed && (dsp.anyActive || gainActive)),
+          (!dspBypassed && (anyStageEdits || gainEdits)),
       failureReason: outputDevice?.bitPerfectFailureReason,
     );
     final resamplerLabel = switch (assessment.verdict) {
