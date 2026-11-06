@@ -68,6 +68,25 @@ class AudioQualitySheet extends StatelessWidget {
                 ));
     final currentSong = context
         .select<PlayerCubit, SongsTableData?>((c) => c.state.currentSong);
+    // The live DSP picture has to be *selected*, not read inside the chain
+    // builder: reading it once left the signal chain showing the stages that
+    // were on when the sheet opened, so toggling the EQ with the sheet open
+    // never changed the verdict.
+    final (
+      eqOn,
+      limiterOn,
+      crossfeedOn,
+      reverbOn,
+      activeStageCount,
+      anyDspActive
+    ) = context.select<PlayerCubit, (bool, bool, bool, bool, int, bool)>((c) => (
+          c.state.dsp.isEqEnabled,
+          c.state.dsp.isLimiterEnabled,
+          c.state.dsp.isCrossfeedEnabled,
+          c.state.dsp.isReverbEnabled,
+          c.state.dsp.activeDspStagesCount,
+          c.state.dsp.isDspActive,
+        ));
     final info = AudioQualityInfo.fromSong(
       currentSong ?? song,
       streamingQuality: streamingQuality,
@@ -526,6 +545,15 @@ class AudioQualitySheet extends StatelessWidget {
                     settingsState,
                     p,
                     activeColor,
+                    (
+                      eq: eqOn,
+                      limiter: limiterOn,
+                      crossfeed: crossfeedOn,
+                      reverb: reverbOn,
+                      stageCount: activeStageCount,
+                      anyActive: anyDspActive,
+                      song: currentSong,
+                    ),
                   ),
 
                   const SizedBox(height: AppSpacing.s20),
@@ -1441,19 +1469,34 @@ class AudioQualitySheet extends StatelessWidget {
     SettingsState? settingsState,
     PulsrPalette p,
     Color activeColor,
+    ({
+      bool eq,
+      bool limiter,
+      bool crossfeed,
+      bool reverb,
+      int stageCount,
+      bool anyActive,
+      SongsTableData? song
+    })
+        dsp,
   ) {
-    final bool isBitPerfect = settingsState?.bitPerfectOutput == true &&
-        outputDevice?.isBitPerfectActive == true;
-    // Requesting bit-perfect does not bypass the chain on its own; the user's
-    // guardrail toggle decides whether processing is actually skipped.
-    final bool dspBypassed =
-        isBitPerfect && (settingsState?.bypassDspOnBitPerfect ?? true);
+    final requested = settingsState?.bitPerfectOutput == true;
+    final bool isBitPerfect =
+        requested && outputDevice?.isBitPerfectActive == true;
+    // The bypass guardrail is what the engine acts on, so the chain has to use
+    // the same rule as the conflict helpers: Bit-Perfect plus bypass on a
+    // non-Bluetooth route. Requiring the live mixer confirmation as well made
+    // the two disagree - and the chain claimed a stage was editable while the
+    // engine was already muting it - whenever the path was armed or paused.
+    final bool dspBypassed = AudioConflicts.dspBypassActive(
+      bitPerfectOutput: requested,
+      bypassDspOnBitPerfect: settingsState?.bypassDspOnBitPerfect ?? true,
+      device: outputDevice,
+    );
     final bool isDsd = info.format.toUpperCase().contains('DSD') ||
         info.codecName.toUpperCase().contains('DSD');
 
-    // Read before the try below: the chain verdict needs the source format,
-    // not just the display strings in [info].
-    SongsTableData? currentSong;
+    final SongsTableData? currentSong = dsp.song;
 
     final String sourceLabel = isDsd
         ? 'DSD Stream (${info.format})'
@@ -1462,35 +1505,33 @@ class AudioQualitySheet extends StatelessWidget {
             : (info.sampleRate != 'Unknown' && info.sampleRate.isNotEmpty
                 ? '${info.format} (${info.sampleRate})'
                 : info.format));
-    // Derive the DSP stage list from the live state instead of hardcoding it,
-    // so the signal chain never claims processing that is switched off.
-    var eqOn = false;
-    var limiterOn = settingsState?.limiterEnabled == true;
-    var crossfeedOn = settingsState?.crossfeedEnabled == true;
-    var reverbOn = settingsState?.reverbEnabled == true;
-    try {
-      final ps = context.read<PlayerCubit>().state;
-      currentSong = ps.currentSong;
-      eqOn = ps.isEqEnabled;
-      limiterOn = ps.isLimiterEnabled;
-      crossfeedOn = ps.isCrossfeedEnabled;
-      reverbOn = ps.isReverbEnabled;
-    } catch (_) {
-      // PlayerCubit unavailable (standalone preview) — keep settings fallback.
-    }
-    final List<String> activeStages = [
-      if (eqOn) 'EQ',
-      if (limiterOn) 'True-Peak Limiter',
-      if (crossfeedOn) 'BS2B Crossfeed',
-      if (reverbOn) 'Reverb',
+    // Derived from the live state instead of being hardcoded, so the chain
+    // never claims processing that is switched off. Any stage the engine has
+    // beyond the four named ones is counted, not silently dropped: the verdict
+    // below must see the complete picture or it upgrades to "verified" behind a
+    // stage nobody listed.
+    final List<String> namedStages = [
+      if (dsp.eq) context.l10n.stageEq,
+      if (dsp.limiter) context.l10n.stageLimiter,
+      if (dsp.crossfeed) context.l10n.stageCrossfeed,
+      if (dsp.reverb) context.l10n.stageReverb,
     ];
+    final int unnamedStages =
+        dsp.stageCount - (dsp.eq ? 1 : 0) - (dsp.limiter ? 1 : 0) -
+            (dsp.crossfeed ? 1 : 0) - (dsp.reverb ? 1 : 0);
+    final List<String> activeStages = [
+      ...namedStages,
+      if (unnamedStages > 0) '+$unnamedStages',
+    ];
+    final bool gainActive = settingsState != null &&
+        settingsState.replayGainMode != ReplayGainMode.off;
     final String dspLabel = dspBypassed
         ? 'Bypassed (Bit-Perfect Guardrail)'
         : (activeStages.isEmpty
             ? 'None (Clean Path)'
             : activeStages.join(' + '));
     final assessment = assessBitPerfectChain(
-      requested: settingsState?.bitPerfectOutput == true,
+      requested: requested,
       active: outputDevice?.isBitPerfectActive == true,
       sourceSampleRate: currentSong?.sampleRate ?? 0,
       sourceBitDepth: currentSong?.bitDepth ?? 0,
@@ -1500,7 +1541,7 @@ class AudioQualitySheet extends StatelessWidget {
       // Every Android PCM path here is float32; 32-bit integer sources cannot
       // survive that conversion, so format agreement is not sample identity.
       samplesModified: currentSong?.bitDepth == 32 ||
-          (!dspBypassed && activeStages.isNotEmpty),
+          (!dspBypassed && (dsp.anyActive || gainActive)),
       failureReason: outputDevice?.bitPerfectFailureReason,
     );
     final resamplerLabel = switch (assessment.verdict) {
@@ -1678,10 +1719,13 @@ class AudioQualitySheet extends StatelessWidget {
             '${assessment.sourceBitDepth}-bit → '
             '${assessment.outputBitDepth}-bit';
       case BitPerfectChainVerdict.inactive:
-        final reason = assessment.reasonCode;
-        return reason == null
+        // The reason arrives as a native code; showing it raw put
+        // `(no_supported_mixer_attributes)` in front of the user.
+        final explained =
+            AudioConflicts.bitPerfectReasonMessage(assessment.reasonCode);
+        return explained == null
             ? context.l10n.bpChainInactive
-            : '${context.l10n.bpChainInactive} ($reason)';
+            : '${context.l10n.bpChainInactive}: $explained';
       case BitPerfectChainVerdict.verified:
       case BitPerfectChainVerdict.notRequested:
       case BitPerfectChainVerdict.unverified:

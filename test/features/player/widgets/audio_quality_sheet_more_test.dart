@@ -4,6 +4,8 @@
 // path diagnostics, every sample-rate label/tag, Bluetooth codec states
 // (permission/proxy/LE-Audio/connected/configurable), bit-perfect armed vs
 // active, and the live signal chain.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -644,8 +646,9 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('DSD Stream'), findsWidgets);
-    expect(find.textContaining('EQ'), findsWidgets);
-    expect(find.textContaining('True-Peak Limiter'), findsWidgets);
+    expect(find.textContaining(_l10n(tester).stageEq), findsWidgets);
+    expect(find.textContaining(_l10n(tester).stageLimiter), findsWidgets);
+    expect(find.textContaining(_l10n(tester).stageCrossfeed), findsWidgets);
   });
 
   testWidgets('bluetooth route carries the bit-perfect block reason',
@@ -692,5 +695,96 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('Unknown'), findsWidgets);
+  });
+
+  testWidgets('the chain follows a DSP toggle made while the sheet is open',
+      (tester) async {
+    // The chain used to read PlayerCubit once inside the builder, so toggling
+    // the EQ with the sheet open left the verdict showing the old stages.
+    var dsp = const DspSlice(isSaturationEnabled: true);
+    final changes = StreamController<PlayerState>.broadcast();
+    final player = MockPlayerCubit();
+    when(() => player.state).thenAnswer((_) => PlayerState(dsp: dsp));
+    when(() => player.stream).thenAnswer((_) => changes.stream);
+    when(() => player.rawPositionStream)
+        .thenAnswer((_) => const Stream<Duration>.empty());
+
+    final settings = stubSettingsCubit();
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+
+    // Saturation has no dedicated chain label, so it counts as an extra stage.
+    expect(find.text('+1'), findsWidgets);
+
+    dsp = const DspSlice();
+    changes.add(PlayerState(dsp: dsp));
+    await tester.pumpAndSettle();
+
+    expect(find.text('None (Clean Path)'), findsWidgets);
+    await changes.close();
+  });
+
+  testWidgets('an armed bit-perfect path reports its DSP as bypassed',
+      (tester) async {
+    // The engine mutes the stages as soon as Bit-Perfect and its bypass are
+    // enabled; the chain used to also require the live mixer confirmation, so
+    // while armed or paused it listed stages that were already silenced.
+    final player = stubPlayerCubit(
+      state: const PlayerState(dsp: DspSlice(isEqEnabled: true)),
+    );
+    final settings = stubSettingsCubit(
+      state: const SettingsState(
+        bitPerfectOutput: true,
+        bypassDspOnBitPerfect: true,
+        currentOutputDevice: _usbOutput,
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+
+    expect(find.textContaining('Bypassed'), findsWidgets);
+    expect(find.textContaining(_l10n(tester).stageEq), findsNothing);
+  });
+
+  testWidgets('the inactive chain banner explains the reason instead of a code',
+      (tester) async {
+    final player = stubPlayerCubit();
+    final settings = stubSettingsCubit(
+      state: const SettingsState(
+        bitPerfectOutput: true,
+        bypassDspOnBitPerfect: true,
+        currentOutputDevice: AudioOutputInfo(
+          deviceName: 'Topping D90',
+          isUsbDac: true,
+          sampleRate: 96000,
+          bitDepth: 24,
+          isBitPerfectActive: false,
+          bitPerfectFailureReason: 'no_supported_mixer_attributes',
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+
+    expect(find.textContaining('(no_supported_mixer_attributes)'), findsNothing);
+    expect(
+      find.textContaining('does not advertise an exclusive mixer'),
+      findsWidgets,
+    );
   });
 }
