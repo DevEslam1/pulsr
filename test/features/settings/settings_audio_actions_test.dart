@@ -1,7 +1,10 @@
 // Covers lib/features/settings/cubit/settings_audio_actions.dart branches that
 // the general SettingsCubit tests do not reach.
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
@@ -32,22 +35,75 @@ void main() {
   );
 
   group('presets', () {
+    setUp(() {
+      // The bit-perfect transport only exists on Android; without the override
+      // every path below short-circuits before reaching the platform stub.
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    });
+
+    tearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    /// Makes the platform accept exclusive output (the shared harness stub
+    /// answers `null`, i.e. refused).
+    void acceptBitPerfect() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+              const MethodChannel(PulsrChannels.hiresDac), (call) async {
+        if (call.method == 'setBitPerfectModeDetailed') {
+          return <String, dynamic>{'success': true};
+        }
+        if (call.method == 'setBitPerfectMode') return true;
+        return null;
+      });
+    }
+
     test('maximum quality / smooth / poor-network presets apply coherent state',
         () async {
+      acceptBitPerfect();
       final cubit = makeCubit();
       addTearDown(cubit.close);
+      await cubit.preferencesReady;
 
       await cubit.applyMaximumQualityPreset();
+      expect(cubit.state.bitPerfectOutput, true);
+      expect(cubit.state.bypassDspOnBitPerfect, true);
       expect(cubit.state.replayGainMode, ReplayGainMode.off);
       expect(cubit.state.gaplessPlayback, true);
 
       await cubit.applySmoothPlaybackPreset();
       expect(cubit.state.replayGainMode, ReplayGainMode.auto);
       expect(cubit.state.crossfadeSeconds, 4.0);
+      // Crossfade is refused while gapless is on, so the preset clears it first.
+      expect(cubit.state.gaplessPlayback, false);
 
       await cubit.applyPoorNetworkPreset();
       expect(cubit.state.streamingQuality, YtmAudioQuality.low);
       expect(cubit.state.crossfadeSeconds, 0.0);
+      expect(cubit.state.gaplessPlayback, false);
+    });
+
+    test('maximum quality stops without stripping DSP when Bit-Perfect fails',
+        () async {
+      // The shared harness stub refuses exclusive output.
+      final cubit = makeCubit();
+      addTearDown(cubit.close);
+      await cubit.preferencesReady;
+      final bypassBefore = cubit.state.bypassDspOnBitPerfect;
+      cubit.safeEmit(cubit.state.copyWith(
+        bitPerfectOutput: false,
+        replayGainMode: ReplayGainMode.album,
+        gaplessPlayback: false,
+      ));
+
+      await cubit.applyMaximumQualityPreset();
+
+      expect(cubit.state.bitPerfectOutput, false);
+      // Turning the user's gain and transport settings off for a mode that
+      // never came on would leave a stripped chain with no bit-perfect either.
+      expect(cubit.state.bypassDspOnBitPerfect, bypassBefore);
+      expect(cubit.state.replayGainMode, ReplayGainMode.album);
       expect(cubit.state.gaplessPlayback, false);
     });
   });

@@ -61,11 +61,19 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       }
       final song = getIt.isRegistered<PulsrAudioHandler>()
           ? getIt<PulsrAudioHandler>().currentSong : null;
+      // A track whose format is unknown (0, "not read") is not a format: asking
+      // for 0 Hz would be refused with "format_unsupported" and look like a
+      // broken DAC rather than unreadable metadata.
+      final trackRate = _usableRate(song?.sampleRate);
+      final trackDepth = _usableRate(song?.bitDepth);
       // Retain ownership even after a failed start until teardown is confirmed.
       _bitPerfectViaDirectStream = true;
       final res = await usb.startStreaming(
-        sampleRate: song?.sampleRate ?? _directStreamSampleRate(),
-        bitDepth: song?.bitDepth ?? state.currentOutputDevice?.bitDepth ?? 16,
+        sampleRate: trackRate ?? _directStreamSampleRate(),
+        bitDepth: trackDepth ??
+            _usableRate(state.currentOutputDevice?.bitDepth) ??
+            _usableRate(status.streamingBitDepth) ??
+            16,
       );
       if (!res.isOk) {
         _lastDirectUsbFailure = res.toUserMessage();
@@ -84,6 +92,11 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       return false;
     }
   }
+
+  /// A format field is only a fact when it is positive: `0` means "not read",
+  /// and forwarding it makes the transport refuse the stream as if the DAC
+  /// could not carry the track.
+  static int? _usableRate(int? value) => (value == null || value <= 0) ? null : value;
 
   int _directStreamSampleRate() {
     final deviceRate = state.currentOutputDevice?.sampleRate ?? 0;
@@ -121,25 +134,65 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
             error: e, stackTrace: st, category: 'SettingsAudioActions');
       }
     }
+    // The direct sink is the only component that knows why it refused; without
+    // its reason the user sees "not supported" for a DAC that reported a
+    // concrete failure (permission, claim, unsupported format).
+    final direct = _lastDirectUsbFailure;
+    final explained =
+        direct == null ? message : '$message Direct USB streaming: $direct.';
     safeEmit(state.copyWith(
       bitPerfectOutput: !stopped,
       strictBitPerfect: !stopped && state.strictBitPerfect,
-      errorMessage: stopped ? message : '$message Output teardown failed; retry disabling Bit-Perfect.',
+      errorMessage: stopped
+          ? explained
+          : '$explained Output teardown failed; retry disabling Bit-Perfect.',
     ));
   }
 
   /// The same owner handles track-format switches and their teardown. A failed
   /// direct switch must never strand a live USB endpoint outside Settings.
+  ///
+  /// Refusing one track's format is not a reason to leave Bit-Perfect: the
+  /// preference is only discarded when Strict Bit-Perfect made a promise this
+  /// track cannot keep. Otherwise the mode stays armed and the reason is
+  /// surfaced, so the next track can still use it.
   Future<bool> setBitPerfectTrackFormat({required int sampleRate, required int bitDepth}) =>
       _audioModeMutex.protect(() async {
         if (!state.bitPerfectOutput) return false;
-        final applied = _bitPerfectViaDirectStream
-            ? (await UsbExclusiveService().startStreaming(sampleRate: sampleRate, bitDepth: bitDepth)).isOk
-            : await _hiResAudioService.setTargetOutputFormat(sampleRate: sampleRate, bitDepth: bitDepth);
-        if (!applied && (_bitPerfectViaDirectStream || state.strictBitPerfect)) {
-          await _setBitPerfectOutput(false);
+        final direct = _bitPerfectViaDirectStream;
+        bool applied;
+        if (direct) {
+          final res = await UsbExclusiveService()
+              .startStreaming(sampleRate: sampleRate, bitDepth: bitDepth);
+          applied = res.isOk;
+          _lastDirectUsbFailure = applied ? null : res.toUserMessage();
+        } else {
+          applied =
+              await _hiResAudioService.setTargetOutputFormat(
+                  sampleRate: sampleRate, bitDepth: bitDepth);
         }
-        return applied;
+        if (applied) return true;
+        final detail = _lastDirectUsbFailure;
+        final message = 'This output refused $sampleRate Hz / $bitDepth-bit'
+            '${detail == null ? '' : ': $detail'}';
+        if (direct) {
+          // The native side already released the endpoint when the start was
+          // refused, but ownership stays claimed here so the next track retries
+          // the sink instead of silently dropping out of Bit-Perfect; the UI
+          // reads the truth from the refreshed platform state.
+          if (!isClosed) {
+            safeEmit(state.copyWith(errorMessage: '$message Bit-Perfect stays on.'));
+          }
+          await refreshOutputDevice();
+          return false;
+        }
+        if (state.strictBitPerfect) {
+          await _rollbackBitPerfectEnable(
+              '$message, which Strict Bit-Perfect promises to carry unchanged.');
+          return false;
+        }
+        if (!isClosed) safeEmit(state.copyWith(errorMessage: message));
+        return false;
       });
 
   Future<void> setReplayGainMode(ReplayGainMode mode) async {
@@ -212,18 +265,19 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Crossfade overlaps two tracks and would alter the bitstream, so turning on
   /// a bit-perfect path must clear any active crossfade rather than leaving both
   /// persisted and letting the engine overlap tracks anyway.
-  Future<void> _forceCrossfadeOffForBitPerfect() async {
+  Future<void> _forceCrossfadeOff({required String reason}) async {
     if (state.crossfadeSeconds <= 0.01) return;
     markDirty('crossfadeSeconds');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(SettingsCubit._keyCrossfade, 0.0);
     if (isClosed) return;
-    safeEmit(state.copyWith(
-      crossfadeSeconds: 0.0,
-      errorMessage:
-          'Crossfade disabled: it is not compatible with Bit-Perfect output.',
-    ));
+    safeEmit(state.copyWith(crossfadeSeconds: 0.0, errorMessage: reason));
   }
+
+  Future<void> _forceCrossfadeOffForBitPerfect() => _forceCrossfadeOff(
+        reason:
+            'Crossfade disabled: it is not compatible with Bit-Perfect output.',
+      );
 
   Future<void> setBitPerfectOutput(bool enabled) =>
       _audioModeMutex.protect(() => _setBitPerfectOutput(enabled));
@@ -440,7 +494,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     markDirty('bitPerfectOutput');
     markDirty('bypassDspOnBitPerfect');
     markDirty('followTrackSampleRate');
-    // FIX-C01: Capture pre-call follow-track rate for rollback
+    // FIX-C01: Capture the pre-call configuration so a refusal can put it back
+    // instead of switching features the user never asked to disable.
+    final prevBitPerfect = state.bitPerfectOutput;
+    final prevBypass = state.bypassDspOnBitPerfect;
     final prevFollowRate = state.followTrackSampleRate;
     if (enabled) {
       final block = AudioConflicts.strictBitPerfectBlockedReason(
@@ -474,14 +531,15 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     if (!applied) {
       // Strict bit-perfect is impossible on this device; revert rather than
-      // persist a configuration the hardware cannot honour.
-      // FIX-C01: Revert all four fields in prefs and state atomically
+      // persist a configuration the hardware cannot honour. The revert restores
+      // what the user had: forcing Bit-Perfect and the DSP bypass off as well
+      // discarded a working exclusive setup just because Strict was refused.
       try {
         await prefs.setBool(PrefsKeys.strictBitPerfect, false);
-        await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
-        await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, false);
+        await prefs.setBool(PrefsKeys.bitPerfectOutput, prevBitPerfect);
+        await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, prevBypass);
         await prefs.setBool(PrefsKeys.followTrackSampleRate, prevFollowRate);
-        await _pushBitPerfectBypass(false);
+        await _pushBitPerfectBypass(prevBitPerfect && prevBypass);
       } catch (e, st) {
         ErrorLogger.log('Failed to persist strict bit-perfect revert',
             error: e, stackTrace: st, category: 'Settings');
@@ -490,8 +548,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         final reason = _hiResAudioService.lastBitPerfectFailureReason;
         safeEmit(state.copyWith(
           strictBitPerfect: false,
-          bitPerfectOutput: false,
-          bypassDspOnBitPerfect: false,
+          bitPerfectOutput: prevBitPerfect,
+          bypassDspOnBitPerfect: prevBypass,
           followTrackSampleRate: prevFollowRate,
           errorMessage: AudioConflicts.bitPerfectReasonMessage(reason) ??
               'Strict Bit-Perfect is not supported by the current output device.',
@@ -540,93 +598,101 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// automatically open the system media-output switcher so the user can
   /// complete the route change, and return `true` so the caller does not also
   /// show a "switch unavailable" snackbar.
-  Future<bool> selectOutputDevice(int deviceId) async {
-    final wasDirect = _bitPerfectViaDirectStream;
-    final wasBitPerfect = state.bitPerfectOutput || wasDirect;
+  Future<bool> selectOutputDevice(int deviceId) =>
+      _audioModeMutex.protect(() async {
+        final wasDirect = _bitPerfectViaDirectStream;
+        final wasBitPerfect = state.bitPerfectOutput || wasDirect;
 
-    // The direct sink owns the USB endpoint and mutes the HAL. Stop it before
-    // changing routes, otherwise the HAL stays silent or the sink keeps
-    // writing to the old DAC.
-    if (wasDirect) {
-      await _stopDirectUsbStreaming();
-      _bitPerfectViaDirectStream = false;
-    }
-
-    final res = await _hiResAudioService.selectOutputDevice(deviceId);
-    if (res.requiresSystemPicker) {
-      // Retail ROM: direct routing is restricted. Hand off to the system
-      // media-output panel which the user can operate without special
-      // permissions. Return true so the sheet does not show an error snackbar.
-      if (wasBitPerfect) await _setBitPerfectOutput(false);
-      await _hiResAudioService.openOutputSwitcher();
-      await refreshOutputDevice();
-      return true;
-    }
-    if (!res.success) {
-      if (wasBitPerfect) {
-        await refreshOutputDevice();
-        if (state.currentOutputDevice?.isUsbDac == true) {
-          await _setBitPerfectOutput(true);
-        } else {
-          await _setBitPerfectOutput(false);
+        // The direct sink owns the USB endpoint and mutes the HAL. Stop it
+        // before changing routes, otherwise the HAL stays silent or the sink
+        // keeps writing to the old DAC. Only a confirmed stop releases
+        // ownership: clearing the flag after a failed one would strand a live
+        // endpoint nobody can tear down.
+        if (wasDirect && !await _stopDirectUsbStreaming()) {
+          safeEmit(state.copyWith(
+            errorMessage:
+                'The direct USB stream could not be stopped; Bit-Perfect still '
+                'owns the previous DAC output and will retry on the next change.',
+          ));
         }
-      }
-      safeEmit(state.copyWith(
-          errorMessage:
-              'Could not switch the playback output (${res.error ?? "unavailable"}).'));
-      await refreshOutputDevice();
-      return false;
-    }
 
-    await refreshOutputDevice();
-    if (wasBitPerfect) {
-      final routeIsUsb = state.currentOutputDevice?.isUsbDac == true;
-      // Re-establish exclusive/direct output on the new USB route; turn the
-      // saved preference off when the route is no longer a DAC.
-      await _setBitPerfectOutput(routeIsUsb);
-    }
-    return res.success;
-  }
+        final res = await _hiResAudioService.selectOutputDevice(deviceId);
+        if (res.requiresSystemPicker) {
+          // Retail ROM: direct routing is restricted. Hand off to the system
+          // media-output panel which the user can operate without special
+          // permissions. Return true so the sheet does not show an error snackbar.
+          if (wasBitPerfect) await _setBitPerfectOutput(false);
+          await _hiResAudioService.openOutputSwitcher();
+          await refreshOutputDevice();
+          return true;
+        }
+        if (!res.success) {
+          if (wasBitPerfect) {
+            await refreshOutputDevice();
+            if (state.currentOutputDevice?.isUsbDac == true) {
+              await _setBitPerfectOutput(true);
+            } else {
+              await _setBitPerfectOutput(false);
+            }
+          }
+          safeEmit(state.copyWith(
+              errorMessage:
+                  'Could not switch the playback output (${res.error ?? "unavailable"}).'));
+          await refreshOutputDevice();
+          return false;
+        }
+
+        await refreshOutputDevice();
+        if (wasBitPerfect) {
+          final routeIsUsb = state.currentOutputDevice?.isUsbDac == true;
+          // Re-establish exclusive/direct output on the new USB route; turn the
+          // saved preference off when the route is no longer a DAC.
+          await _setBitPerfectOutput(routeIsUsb);
+        }
+        return res.success;
+      });
 
   Future<bool> openOutputSwitcher() => _hiResAudioService.openOutputSwitcher();
 
-  Future<void> clearOutputDevice() async {
-    if (state.bitPerfectOutput || _bitPerfectViaDirectStream) {
-      await _setBitPerfectOutput(false);
-    }
-    await _hiResAudioService.clearOutputDevice();
-    await refreshOutputDevice();
-  }
+  Future<void> clearOutputDevice() => _audioModeMutex.protect(() async {
+        if (state.bitPerfectOutput || _bitPerfectViaDirectStream) {
+          await _setBitPerfectOutput(false);
+        }
+        await _hiResAudioService.clearOutputDevice();
+        await refreshOutputDevice();
+      });
 
-  Future<void> setTargetOutputSampleRate(int sampleRate) async {
-    final applied = await _hiResAudioService.setTargetOutputFormat(
-      sampleRate: sampleRate,
-      bitDepth: state.currentOutputDevice?.targetBitDepth ?? 0,
-    );
-    if (applied) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('target_output_sample_rate', sampleRate);
-    } else {
-      safeEmit(state.copyWith(
-          errorMessage: 'This output cannot apply the requested sample rate.'));
-    }
-    await refreshOutputDevice();
-  }
+  Future<void> setTargetOutputSampleRate(int sampleRate) =>
+      _audioModeMutex.protect(() async {
+        final applied = await _hiResAudioService.setTargetOutputFormat(
+          sampleRate: sampleRate,
+          bitDepth: state.currentOutputDevice?.targetBitDepth ?? 0,
+        );
+        if (applied) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('target_output_sample_rate', sampleRate);
+        } else {
+          safeEmit(state.copyWith(
+              errorMessage: 'This output cannot apply the requested sample rate.'));
+        }
+        await refreshOutputDevice();
+      });
 
-  Future<void> setTargetOutputBitDepth(int bitDepth) async {
-    final applied = await _hiResAudioService.setTargetOutputFormat(
-      sampleRate: state.currentOutputDevice?.targetSampleRate ?? 0,
-      bitDepth: bitDepth,
-    );
-    if (applied) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('target_output_bit_depth', bitDepth);
-    } else {
-      safeEmit(state.copyWith(
-          errorMessage: 'This output cannot apply the requested bit depth.'));
-    }
-    await refreshOutputDevice();
-  }
+  Future<void> setTargetOutputBitDepth(int bitDepth) =>
+      _audioModeMutex.protect(() async {
+        final applied = await _hiResAudioService.setTargetOutputFormat(
+          sampleRate: state.currentOutputDevice?.targetSampleRate ?? 0,
+          bitDepth: bitDepth,
+        );
+        if (applied) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('target_output_bit_depth', bitDepth);
+        } else {
+          safeEmit(state.copyWith(
+              errorMessage: 'This output cannot apply the requested bit depth.'));
+        }
+        await refreshOutputDevice();
+      });
 
   /// Returns true when the platform accepted the request; false means the
   /// stock ROM refused it (SystemApi) — caller must offer Developer Options.
@@ -718,12 +784,18 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
   }
 
+  /// Monotonic refresh ticket. The platform answers asynchronously, so two
+  /// overlapping refreshes (route change + player observer) can complete out of
+  /// order; only the newest one may write state.
+  int _refreshOutputSeq = 0;
+
   Future<void> refreshOutputDevice() async {
+    final seq = ++_refreshOutputSeq;
     // FIX-C02: Guard against native crash or unhandled exception during device/DOP refresh
     try {
       final info = await _hiResAudioService.getAudioOutputInfo();
       final caps = await DsdDecoderHelper.probeDopCapabilities();
-      if (isClosed) return;
+      if (isClosed || seq != _refreshOutputSeq) return;
       safeEmit(
         state.copyWith(
           currentOutputDevice: info,
@@ -880,16 +952,22 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           : DeviceProfileService();
 
   /// Restores the latency calibrated for this specific Bluetooth device when
-  /// it becomes the active output. Devices never calibrated keep the current
-  /// (global) value.
+  /// it becomes the active output. Devices never calibrated fall back to the
+  /// globally stored offset — the value the slider writes — instead of keeping
+  /// whatever was auto-applied for the device that was active before, which
+  /// leaked one headset's compensation into another's timing.
   Future<void> _applyPerDeviceBtLatency(AudioOutputInfo device) async {
     if (!device.isBluetooth) return;
     final key = DeviceProfileService.deviceKeyFromInfo(device);
     if (key == _lastBtLatencyDeviceKey) return;
     _lastBtLatencyDeviceKey = key;
     final saved = await _deviceProfileService.btLatencyFor(key);
-    if (saved == null || isClosed) return;
-    final clamped = saved.clamp(0, 500);
+    if (isClosed) return;
+    final target = saved ??
+        (await SharedPreferences.getInstance())
+            .getInt(PrefsKeys.bluetoothLatencyOffsetMs);
+    if (target == null) return;
+    final clamped = target.clamp(0, 500);
     if (clamped == state.bluetoothLatencyOffsetMs) return;
     safeEmit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
   }
@@ -932,8 +1010,6 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
                 'Turn off Bit-Perfect before enabling AAudio Direct.'));
         return;
       }
-      await _forceCrossfadeOffForBitPerfect();
-      if (state.dvcEnabled) await setDvcEnabled(false);
     }
     try {
       if (getIt.isRegistered<PulsrAudioHandler>()) {
@@ -959,9 +1035,17 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           state.copyWith(errorMessage: 'Failed to change AAudio output: $e'));
       return;
     }
+    // Only after every player accepted the change: turning crossfade and DVC
+    // off beforehand discarded settings for a mode that never came on.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.aaudioOutputEnabled, enabled);
     safeEmit(state.copyWith(aaudioOutputEnabled: enabled, errorMessage: null));
+    if (enabled) {
+      await _forceCrossfadeOff(
+          reason: 'Crossfade disabled: AAudio Direct bypasses the DSP chain it '
+              'is applied in.');
+      if (state.dvcEnabled) await setDvcEnabled(false);
+    }
   }
 
   /// Opt-in Direct Volume Control (DVC). Pins the Android media stream to
@@ -1041,24 +1125,29 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
   }
 
-  /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.  /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.
-  Future<void> setAaudioPreferExclusive(bool value) async {
-    markDirty('aaudioPreferExclusive');
-    safeEmit(state.copyWith(aaudioPreferExclusive: value));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.aaudioPreferExclusive, value);
-    try {
-      if (getIt.isRegistered<PulsrAudioHandler>()) {
-        await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
-          state.aaudioOutputEnabled,
-          preferExclusive: value,
-          targetBufferMs: state.aaudioTargetBufferMs,
-        );
-      }
-    } catch (_) {
-      // Player not available yet; boot/observer push covers it.
-    }
-  }
+  /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.
+  ///
+  /// Serialized with [setAaudioOutputEnabled] and reading the enabled flag
+  /// inside that lock: pushing the value the state held *before* an in-flight
+  /// toggle would undo it.
+  Future<void> setAaudioPreferExclusive(bool value) =>
+      _audioModeMutex.protect(() async {
+        markDirty('aaudioPreferExclusive');
+        safeEmit(state.copyWith(aaudioPreferExclusive: value));
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(PrefsKeys.aaudioPreferExclusive, value);
+        try {
+          if (getIt.isRegistered<PulsrAudioHandler>()) {
+            await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
+              state.aaudioOutputEnabled,
+              preferExclusive: value,
+              targetBufferMs: state.aaudioTargetBufferMs,
+            );
+          }
+        } catch (_) {
+          // Player not available yet; boot/observer push covers it.
+        }
+      });
 
   /// Target stream buffer capacity for the AAudio path (8-1000 ms).
   /// Re-pushed to running players so it applies without toggling output.
@@ -1066,26 +1155,27 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Practical guidance:
   ///  - USB-C / wired DAC: 8–20 ms for lowest seek latency.
   ///  - Bluetooth A2DP:    150–300 ms to absorb codec/stack jitter.
-  Future<void> setAaudioTargetBufferMs(int ms) async {
-    markDirty('aaudioTargetBufferMs');
-    // Minimum 8 ms: achievable on USB-C DACs at 48 kHz (≈384 frames).
-    // Maximum 1000 ms: generous headroom for worst-case BT stacks.
-    final clamped = ms.clamp(8, 1000);
-    safeEmit(state.copyWith(aaudioTargetBufferMs: clamped));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(PrefsKeys.aaudioTargetBufferMs, clamped);
-    try {
-      if (getIt.isRegistered<PulsrAudioHandler>()) {
-        await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
-          state.aaudioOutputEnabled,
-          preferExclusive: state.aaudioPreferExclusive,
-          targetBufferMs: clamped,
-        );
-      }
-    } catch (_) {
-      // Player not available yet; boot/observer push covers it.
-    }
-  }
+  Future<void> setAaudioTargetBufferMs(int ms) =>
+      _audioModeMutex.protect(() async {
+        markDirty('aaudioTargetBufferMs');
+        // Minimum 8 ms: achievable on USB-C DACs at 48 kHz (≈384 frames).
+        // Maximum 1000 ms: generous headroom for worst-case BT stacks.
+        final clamped = ms.clamp(8, 1000);
+        safeEmit(state.copyWith(aaudioTargetBufferMs: clamped));
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(PrefsKeys.aaudioTargetBufferMs, clamped);
+        try {
+          if (getIt.isRegistered<PulsrAudioHandler>()) {
+            await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
+              state.aaudioOutputEnabled,
+              preferExclusive: state.aaudioPreferExclusive,
+              targetBufferMs: clamped,
+            );
+          }
+        } catch (_) {
+          // Player not available yet; boot/observer push covers it.
+        }
+      });
 
   /// Opt-in 24/32-bit float DSP path. Off by default: with the flag off the
   /// vendored Android fork builds the same 16-bit sink as before. When on, the
@@ -1294,21 +1384,29 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     return clamped;
   }
 
-  /// Applies the "Maximum Quality" audiophile preset:
-  /// Bit-perfect mode enabled, all DSP/EQ/ReplayGain/crossfade bypassed, gapless active.
+  /// Applies the "Maximum Quality" audiophile preset: Bit-perfect output, then
+  /// the DSP bypass, ReplayGain off and gapless. Every step is conditional on
+  /// the one before it actually applying: when the platform refuses exclusive
+  /// output, silently bypassing the user's EQ and gain would leave a chain with
+  /// no processing and no bit-perfect either.
   Future<void> applyMaximumQualityPreset() async {
     await setBitPerfectOutput(true);
+    if (!state.bitPerfectOutput) return;
     await setBypassDspOnBitPerfect(true);
+    if (!state.bypassDspOnBitPerfect) return;
     await setReplayGainMode(ReplayGainMode.off);
     await setGapless(true);
   }
 
-  /// Applies the "Smooth Playback" preset:
-  /// Standard crossfade, auto ReplayGain, adaptive buffering.
+  /// Applies the "Smooth Playback" preset: no bit-perfect, automatic
+  /// ReplayGain and a 4 s crossfade. Gapless is turned off first because
+  /// crossfade is refused while gapless is on, and nothing here adapts the
+  /// buffer (that is the separate "adaptive quality" toggle).
   Future<void> applySmoothPlaybackPreset() async {
     await setBitPerfectOutput(false);
-    await setReplayGainMode(ReplayGainMode.auto);
+    await setGapless(false);
     await setCrossfade(4.0);
+    await setReplayGainMode(ReplayGainMode.auto);
   }
 
   /// Applies the "Poor Network" preset:
