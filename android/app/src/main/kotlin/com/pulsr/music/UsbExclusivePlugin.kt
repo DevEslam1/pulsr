@@ -107,6 +107,7 @@ class UsbExclusivePlugin(
     @Volatile private var streamFormat: UsbAudioProtocol.StreamFormat? = null
     @Volatile private var directStatus: DirectStreamStatus? = null
     private var claimedStreamingInterface: UsbInterface? = null
+    private var claimedControlInterface: UsbInterface? = null
 
     // Blocking USB control transfers, raw-descriptor parsing and native sink
     // start/stop/query must never run on the main thread (ANR). All such work
@@ -334,12 +335,25 @@ class UsbExclusivePlugin(
     private fun findAudioDevice(): UsbDevice? =
         try {
             val devices = usbManager?.deviceList?.values ?: return null
-            // An explicitly audio-classed device always wins; the vendor-specific
-            // (0xFF) shape is only a fallback, so an attached ADB/debug
-            // accessory (also 0xFF) can no longer be mistaken for the DAC.
-            var fallback: UsbDevice? = null
+            // A device this plugin already opened stays preferred while it is
+            // still attached: re-discovery must never swap the DAC out from
+            // under an open connection.
+            openedDevice?.let { open ->
+                if (devices.any { it.deviceId == open.deviceId }) return open
+            }
+            // An explicitly audio-classed device beats the vendor-specific
+            // (0xFF) shape, and a device the user already granted permission
+            // for beats one that would trigger a new dialog. Devices without
+            // any AudioStreaming interface have no playback pipe and are never
+            // candidates.
+            var audioClass: UsbDevice? = null
+            var audioClassPermitted: UsbDevice? = null
+            var vendorAudio: UsbDevice? = null
+            var vendorAudioPermitted: UsbDevice? = null
             for (device in devices) {
-                var vendorAudio = false
+                if (device.streamingInterfaces().isEmpty()) continue
+                var isAudio = false
+                var isVendor = false
                 for (index in 0 until device.interfaceCount) {
                     val iface = device.getInterface(index)
                     if (!UsbAudioControlParser.isAudioFunctionInterface(
@@ -350,15 +364,49 @@ class UsbExclusivePlugin(
                     ) {
                         continue
                     }
-                    if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO) return device
-                    vendorAudio = true
+                    if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO) isAudio = true
+                    else isVendor = true
                 }
-                if (vendorAudio && fallback == null) fallback = device
+                val permitted = usbManager?.hasPermission(device) == true
+                if (isAudio) {
+                    if (permitted && audioClassPermitted == null) audioClassPermitted = device
+                    else if (audioClass == null) audioClass = device
+                } else if (isVendor && hasVendorAudioPair(device)) {
+                    if (permitted && vendorAudioPermitted == null) vendorAudioPermitted = device
+                    else if (vendorAudio == null) vendorAudio = device
+                }
             }
-            fallback
+            audioClassPermitted ?: audioClass ?: vendorAudioPermitted ?: vendorAudio
         } catch (_: Throwable) {
             null
         }
+
+    /**
+     * A vendor-specific (0xFF) device only counts as audio when it shows BOTH
+     * an audio-shaped control and an audio-shaped streaming interface, so an
+     * ADB/debug accessory (also 0xFF) can never match on one stray interface.
+     */
+    private fun hasVendorAudioPair(device: UsbDevice): Boolean {
+        var control = false
+        var streaming = false
+        for (index in 0 until device.interfaceCount) {
+            val iface = device.getInterface(index)
+            if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO) continue
+            if (UsbAudioControlParser.isAudioControlInterface(
+                    iface.interfaceClass, iface.interfaceSubclass, iface.interfaceProtocol,
+                )
+            ) {
+                control = true
+            }
+            if (UsbAudioControlParser.isAudioStreamingInterface(
+                    iface.interfaceClass, iface.interfaceSubclass, iface.interfaceProtocol,
+                )
+            ) {
+                streaming = true
+            }
+        }
+        return control && streaming
+    }
 
     /** Interfaces of [device] that are AudioStreaming interfaces. */
     private fun UsbDevice.streamingInterfaces(): List<UsbInterface> =
@@ -374,6 +422,10 @@ class UsbExclusivePlugin(
         val pairs = ArrayList<Pair<Int, Int>>(device.interfaceCount)
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)
+            if (!UsbAudioControlParser.isAudioFunctionInterface(
+                    iface.interfaceClass, iface.interfaceSubclass, iface.interfaceProtocol,
+                )
+            ) continue
             pairs.add(Pair(iface.interfaceSubclass, iface.interfaceProtocol))
         }
         val uac = try {
@@ -476,8 +528,8 @@ class UsbExclusivePlugin(
             "streamingActive" to streaming,
             "streamingSupported" to (nativeLoaded && directCapable),
             "streamingSampleRate" to (streamFormat?.sampleRate ?: 0),
-            "streamingBitDepth" to (streamFormat?.bitDepth ?: 0),
-            "streamingChannels" to (streamFormat?.channels ?: 0),
+            "streamingBitDepth" to (streamFormat?.wireBitDepth ?: 0),
+            "streamingChannels" to (streamFormat?.wireChannels ?: 0),
             "hardwareVolumeDb" to hardwareVolume?.currentDb,
             "hardwareVolumeApplied" to (hardwareVolume?.applied == true),
             "minVolumeDb" to hardwareVolume?.minDb,
@@ -706,8 +758,8 @@ class UsbExclusivePlugin(
             "hardwareVolumeApplied" to (hardwareVolume?.applied == true),
             "streamingActive" to (streaming && isNativeActive()),
             "streamingSampleRate" to (streamFormat?.sampleRate ?: 0),
-            "streamingBitDepth" to (streamFormat?.bitDepth ?: 0),
-            "streamingChannels" to (streamFormat?.channels ?: 0),
+            "streamingBitDepth" to (streamFormat?.wireBitDepth ?: 0),
+            "streamingChannels" to (streamFormat?.wireChannels ?: 0),
         )
 
     // ---- raw UAC2 isochronous streaming ----
@@ -741,7 +793,17 @@ class UsbExclusivePlugin(
             lastStreamResultCode = 1
             return failure("open_failed")
         }
-        val parsed = parseViaRawDescriptors(conn) ?: return failure("format_descriptors_required")
+        val parsed = parseViaRawDescriptors(conn) ?: run {
+            lastStreamResultCode = 3
+            return failure("format_descriptors_required")
+        }
+        if (parsed.uacVersion == UsbAudioControlParser.UAC3) {
+            // UAC3 moves format/clock programming to different descriptors and
+            // requests than UAC1/2; rather than fail with a generic format
+            // error, say plainly that the class is not implemented.
+            lastStreamResultCode = 3
+            return failure("uac3_unsupported")
+        }
         val selected = UsbAudioProtocol.selectFormat(parsed, sampleRate, bitDepth, channels) ?: run {
             lastStreamResultCode = 3
             return failure("format_unsupported")
@@ -750,11 +812,8 @@ class UsbExclusivePlugin(
         val epInterface = selected.interfaceNumber
         val epAlt = selected.altSetting
         val streamBytes = selected.subslotSize
-        // The endpoint's own channel count is what the isochronous framing has
-        // to match. The native sink adapts whatever it is fed to it (mono is
-        // duplicated, extra channels get silence), so a track that is not
-        // stereo no longer fails here just because the DAC advertises another
-        // layout.
+        // selectFormat only returns an alt setting whose channel count equals the
+        // request (or advertises none), so no channel is ever added or dropped.
         val wireChannels = selected.channels.takeIf { it > 0 } ?: channels
 
         // Prefer the exact (interface, alternate setting) pair that exposes the
@@ -780,6 +839,7 @@ class UsbExclusivePlugin(
             return failure("claim_failed")
         }
         claimedStreamingInterface = iface
+        claimControlInterface(conn, device, parsed)
         var started = false
         try {
             if (!conn.setInterface(iface)) {
@@ -805,7 +865,10 @@ class UsbExclusivePlugin(
             // The request is remembered as the request (see StreamFormat): a
             // 16-bit track whose endpoint was opened at 24-bit must be
             // recognised as the same stream on the next track change.
-            streamFormat = UsbAudioProtocol.StreamFormat(sampleRate, bitDepth, channels)
+            streamFormat = UsbAudioProtocol.StreamFormat(
+                sampleRate, bitDepth, channels,
+                wireBitDepth = selected.bitResolution, wireChannels = wireChannels,
+            )
             streaming = true
             directStatus = DirectStreamStatus(device.deviceId, deviceLabel(device),
                 sampleRate, selected.bitResolution, wireChannels)
@@ -829,10 +892,48 @@ class UsbExclusivePlugin(
         parsed: UsbAudioControlParser.Result,
         selected: UsbAudioControlParser.AltSettingFormat,
         sampleRate: Int,
-    ): Boolean = UsbAudioProtocol.setSampleRate(
-        transport(conn), parsed.uacVersion, parsed.clockSource, selected.endpointAddress,
-        sampleRate, selected.supportedRates.size == 1,
-    )
+    ): Boolean {
+        // The clock wired to the playback terminal can sit behind a Clock
+        // Selector whose active pin is device state: read it instead of
+        // guessing. A failed pin read resolves to null and the stream is
+        // refused (clock_not_verified) rather than programming a wrong clock.
+        val clock = UsbAudioProtocol.resolveActiveClock(transport(conn), parsed)
+        return UsbAudioProtocol.setSampleRate(
+            transport(conn), parsed.uacVersion, clock, selected.endpointAddress,
+            sampleRate, selected.supportedRates.size == 1,
+        )
+    }
+
+    /**
+     * Clock and volume requests address the Audio Control interface. usbfs
+     * refuses interface-recipient requests (EBUSY) for an interface it neither
+     * owns nor sees unbound, so while direct streaming owns the device this
+     * claims it too. Best effort: a refusal is logged and the verification steps
+     * (clock read-back, volume read-back) still report the real outcome.
+     */
+    private fun claimControlInterface(
+        conn: UsbDeviceConnection,
+        device: UsbDevice,
+        parsed: UsbAudioControlParser.Result,
+    ) {
+        if (claimedControlInterface != null) return
+        val acNumber = parsed.controlInterface.takeIf { it >= 0 }
+            ?: parsed.clockSource?.controlInterface
+            ?: parsed.volumeUnit?.interfaceNumber
+            ?: return
+        for (i in 0 until device.interfaceCount) {
+            val candidate = device.getInterface(i)
+            if (candidate.id != acNumber || candidate.alternateSetting != 0) continue
+            val ok = try { conn.claimInterface(candidate, true) } catch (_: Exception) { false }
+            if (ok) {
+                claimedControlInterface = candidate
+                hardwareVolume?.refresh()
+            } else {
+                Log.w(TAG, "Could not claim Audio Control interface $acNumber")
+            }
+            return
+        }
+    }
 
     private fun isNativeActive(): Boolean = nativeLoaded && try {
         nativeUsbStreamIsActive()
@@ -856,8 +957,13 @@ class UsbExclusivePlugin(
         if (nativeLoaded) try { nativeUsbStreamStop() } catch (_: Throwable) {}
         val iface = claimedStreamingInterface
         claimedStreamingInterface = null
+        val control = claimedControlInterface
+        claimedControlInterface = null
         val conn = connection
         if (iface != null && conn != null) rebindKernelDriver(conn, iface)
+        if (control != null && conn != null) {
+            try { conn.releaseInterface(control) } catch (_: Exception) {}
+        }
     }
 
     private fun stopStreamingInternal(): Map<String, Any?> {
@@ -911,3 +1017,4 @@ class UsbExclusivePlugin(
         cachedStatus = baseStatus(attached = false, permitted = false, device = null)
     }
 }
+

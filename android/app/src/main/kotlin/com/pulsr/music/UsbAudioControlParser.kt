@@ -106,6 +106,16 @@ object UsbAudioControlParser {
         val altSettingFormats: List<AltSettingFormat> = emptyList(),
         /** Every Clock Source entity found, in descriptor order. */
         val clockSources: List<ClockSource> = emptyList(),
+        /** AudioControl interface number (wIndex low byte), or -1 when absent. */
+        val controlInterface: Int = -1,
+        /** bTerminalLink of the playback AudioStreaming interface, if any. */
+        val playbackTerminalId: Int? = null,
+        /** Terminal ID -> bCSourceID (UAC2 clock entity wired to a terminal). */
+        val terminalClockIds: Map<Int, Int> = emptyMap(),
+        /** Clock Selector ID -> its input clock entity IDs, in pin order. */
+        val clockSelectorInputs: Map<Int, List<Int>> = emptyMap(),
+        /** Clock Multiplier ID -> the clock entity ID it multiplies. */
+        val clockMultiplierSources: Map<Int, Int> = emptyMap(),
     ) {
         val hasVolumeControl: Boolean get() = volumeUnit?.controlChannels?.isNotEmpty() == true
         val hasFeedbackEndpoint: Boolean get() = feedbackEndpoint != null
@@ -136,6 +146,12 @@ object UsbAudioControlParser {
      */
     private const val SUBTYPE_CLOCK_SOURCE = 0x0A
     private const val SUBTYPE_CLOCK_SELECTOR = 0x0B
+
+    /**
+     * UAC2 CLOCK_MULTIPLIER (4.7.2.13): bClockID, bSourceID. Like a selector it
+     * is an alias — the programmable clock is the source it multiplies.
+     */
+    private const val SUBTYPE_CLOCK_MULTIPLIER = 0x0C
 
     /** AudioStreaming class-specific subtypes / format identifiers. */
     private const val SUBTYPE_AS_GENERAL = 0x01
@@ -191,6 +207,13 @@ object UsbAudioControlParser {
     ): Boolean = ifaceSubclass == SUBCLASS_AUDIOSTREAMING &&
         (ifaceClass == CLASS_AUDIO || looksLikeVendorAudio(ifaceClass, ifaceProtocol))
 
+    fun isAudioControlInterface(
+        ifaceClass: Int,
+        ifaceSubclass: Int,
+        ifaceProtocol: Int,
+    ): Boolean = ifaceSubclass == SUBCLASS_AUDIOCONTROL &&
+        (ifaceClass == CLASS_AUDIO || looksLikeVendorAudio(ifaceClass, ifaceProtocol))
+
     /**
      * Vendor-specific interfaces are audio only when the protocol agrees: the
      * subclass alone (0x01/0x02) is shared with CDC and other classes, and
@@ -226,6 +249,7 @@ object UsbAudioControlParser {
         //  - volumeCandidates: every Feature Unit with a writable volume.
         val clockSources = mutableListOf<ClockSource>()
         val clockSelectorInputs = mutableMapOf<Int, MutableList<Int>>()
+        val clockMultiplierSources = mutableMapOf<Int, Int>()
         val entitySourceIds = mutableMapOf<Int, Int>()
         val terminalClockIds = mutableMapOf<Int, Int>()
         val streamingTerminalLinks = mutableMapOf<Int, Int>()
@@ -511,6 +535,17 @@ object UsbAudioControlParser {
                                     if (inputId > 0 && inputId !in inputs) inputs.add(inputId)
                                 }
                             }
+                        } else if (subtype == SUBTYPE_CLOCK_MULTIPLIER &&
+                            uac2ClockTopology && bLength >= 5
+                        ) {
+                            // Clock Multiplier: bClockID, bSourceID (UAC2
+                            // 4.7.2.13). The frequency control lives on the
+                            // source clock, so resolution must follow the edge.
+                            val multiplierId = descriptors[i + 3].toInt() and 0xFF
+                            val sourceId = descriptors[i + 4].toInt() and 0xFF
+                            if (multiplierId > 0 && sourceId > 0) {
+                                clockMultiplierSources.putIfAbsent(multiplierId, sourceId)
+                            }
                         }
                     } else if (currentClass == CLASS_AUDIO &&
                         currentSubclass == SUBCLASS_AUDIOSTREAMING &&
@@ -600,12 +635,22 @@ object UsbAudioControlParser {
         // endpoint, the terminal it is linked to, and every entity feeding that
         // terminal. Volume units and clocks on the capture path stay out.
         val playbackTerminalId = streamingInterface?.let { streamingTerminalLinks[it] }
-        val playbackPathEntities = entityChainToSource(playbackTerminalId, entitySourceIds)
-        volumeUnit = volumeCandidates.firstOrNull { it.unitId in playbackPathEntities }
-            ?: volumeCandidates.firstOrNull()
+        // The linked terminal is normally the USB *input* terminal, which sits
+        // UPSTREAM of the Feature Unit, so the chain is walked from each
+        // candidate back towards its source and tested for that terminal. Some
+        // devices link the OUTPUT terminal instead (downstream of the Feature
+        // Unit), so the walk from the terminal is checked as well.
+        volumeUnit = playbackTerminalId?.let { terminal ->
+            val fromTerminal = entityChainToSource(terminal, entitySourceIds)
+            volumeCandidates.firstOrNull { c ->
+                terminal in entityChainToSource(c.unitId, entitySourceIds) ||
+                    c.unitId in fromTerminal
+            }
+        } ?: volumeCandidates.firstOrNull()
         val clockSource = resolvePlaybackClock(
             terminalClockIds = terminalClockIds,
             clockSelectorInputs = clockSelectorInputs,
+            clockMultiplierSources = clockMultiplierSources,
             clockSources = clockSources,
             playbackTerminalId = playbackTerminalId,
         )
@@ -620,6 +665,11 @@ object UsbAudioControlParser {
             clockSource = clockSource,
             altSettingFormats = altSettingFormats.toList(),
             clockSources = clockSources.toList(),
+            controlInterface = currentAcInterface,
+            playbackTerminalId = playbackTerminalId,
+            terminalClockIds = terminalClockIds.toMap(),
+            clockSelectorInputs = clockSelectorInputs.mapValues { it.value.toList() },
+            clockMultiplierSources = clockMultiplierSources.toMap(),
         )
     }
 
@@ -645,27 +695,31 @@ object UsbAudioControlParser {
     }
 
     /**
-     * The Clock Source that actually feeds the playback stream.
+     * The Clock Source that statically appears to feed the playback stream.
      *
-     * Preference order: the clock wired to the streaming terminal; then, when
-     * that ID belongs to a Clock Selector with a single input, that input; and
-     * only when the topology says nothing (or the selector has several inputs,
-     * whose active one is device state this parser cannot read) the single
-     * programmable clock in the configuration. The last two steps are documented
-     * guesses for devices whose AC graph is incomplete, not measured facts.
+     * Preference order: the clock wired to the streaming terminal, followed
+     * through single-input Clock Selectors and Clock Multipliers; and only when
+     * the topology says nothing (or names a multi-input selector, whose active
+     * pin is device state this parser cannot read) the single programmable
+     * clock in the configuration. The last step is a documented guess for
+     * devices whose AC graph is incomplete, not a measured fact; callers with
+     * a live connection must use `UsbAudioProtocol.resolveActiveClock` instead.
      */
     private fun resolvePlaybackClock(
         terminalClockIds: Map<Int, Int>,
         clockSelectorInputs: Map<Int, List<Int>>,
+        clockMultiplierSources: Map<Int, Int>,
         clockSources: List<ClockSource>,
         playbackTerminalId: Int?,
     ): ClockSource? {
         val wired = playbackTerminalId?.let { terminalClockIds[it] }
         if (wired != null) {
-            clockSources.firstOrNull { it.clockId == wired }?.let { return it }
-            val singleInput = clockSelectorInputs[wired]?.takeIf { it.size == 1 }
-            if (singleInput != null) {
-                clockSources.firstOrNull { it.clockId == singleInput[0] }?.let { return it }
+            var current: Int? = wired
+            val seen = mutableSetOf<Int>()
+            while (current != null && seen.add(current)) {
+                clockSources.firstOrNull { it.clockId == current }?.let { return it }
+                current = clockSelectorInputs[current]?.takeIf { it.size == 1 }?.get(0)
+                    ?: clockMultiplierSources[current]
             }
         }
         return clockSources.singleOrNull { it.frequencyProgrammable }
@@ -684,13 +738,30 @@ internal class UsbHardwareVolume(
     private val transport: UsbControlTransfer,
 ) {
     private data class Range(val min: Int, val max: Int, val res: Int)
+
+    private companion object {
+        /**
+         * Raw 0x8000 in a UAC volume range is the -inf / mute marker, not a
+         * volume step. A volume request must never write it (that would silently
+         * mute the DAC); the quietest writable step is one resolution above it.
+         */
+        const val MUTE_RAW = -32768
+    }
+
     private var ranges: Map<Int, List<Range>> = emptyMap()
     private var expected: Map<Int, Int>? = null
     var currentDb: Double? = null
         private set
     val ready: Boolean get() = ranges.isNotEmpty() && currentDb != null
     val applied: Boolean get() = ready && expected != null
-    val minDb: Double? get() = ranges.values.maxOfOrNull { rs -> rs.minOf { it.min } }?.div(256.0)
+
+    /** Quietest raw value a volume request may write for one channel's ranges. */
+    private fun effectiveMin(rs: List<Range>): Int {
+        val quietest = rs.minByOrNull { it.min } ?: return 0
+        return if (quietest.min == MUTE_RAW) quietest.min + quietest.res else quietest.min
+    }
+
+    val minDb: Double? get() = ranges.values.maxOfOrNull { effectiveMin(it) }?.div(256.0)
     val maxDb: Double? get() = ranges.values.minOfOrNull { rs -> rs.maxOf { it.max } }?.div(256.0)
 
     fun invalidate() {
@@ -749,7 +820,8 @@ internal class UsbHardwareVolume(
         val discovered = mutableMapOf<Int, List<Range>>()
         val values = mutableMapOf<Int, Int>()
         for (channel in channels) {
-            val rs = readRanges(channel) ?: return fail()
+            // Ranges are static for a connection; only the current value moves.
+            val rs = ranges[channel] ?: readRanges(channel) ?: return fail()
             val raw = read(if (version == 2) 0x01 else 0x81, channel) ?: return fail()
             if (rs.none { raw in it.min..it.max }) return fail()
             discovered[channel] = rs
@@ -768,15 +840,18 @@ internal class UsbHardwareVolume(
         val targets = mutableMapOf<Int, Int>()
         for ((channel, rs) in ranges) {
             // Clamp into what the device can actually do: a request below the
-            // most attenuated step (or above the loudest one, e.g. after a
+            // quietest writable step (or above the loudest one, e.g. after a
             // negative calibration offset) becomes that step instead of a
-            // refusal. Rounding still favours attenuation inside the range.
-            val lo = rs.minOf { it.min }.toDouble()
-            val hi = rs.maxOf { it.max }.toDouble()
-            val target = kotlin.math.floor(db * 256.0).coerceIn(lo, hi)
+            // refusal. Rounding still favours attenuation inside the range. The
+            // 0x8000 mute marker is never a write target: when a device reports
+            // it as its minimum, the floor becomes one resolution above it.
+            val lo = effectiveMin(rs)
+            val hi = rs.maxOf { it.max }
+            if (lo > hi) { invalidate(); return false }
+            val target = kotlin.math.floor(db * 256.0).coerceIn(lo.toDouble(), hi.toDouble())
             targets[channel] = rs.filter { it.min <= target }.maxOfOrNull { r ->
                 r.min + ((minOf(target, r.max.toDouble()) - r.min) / r.res).toInt() * r.res
-            } ?: rs.minOf { it.min }
+            } ?: lo
         }
         for ((channel, raw) in targets) {
             val data = byteArrayOf(raw.toByte(), (raw shr 8).toByte())
@@ -802,7 +877,17 @@ internal object UsbAudioProtocol {
      * the stream was torn down and restarted forever. The wire resolution is
      * what the plugin publishes as its confirmed direct-stream status.
      */
-    data class StreamFormat(val sampleRate: Int, val bitDepth: Int, val channels: Int) {
+    data class StreamFormat(
+        val sampleRate: Int,
+        /** Requested depth (what [matches] compares). */
+        val bitDepth: Int,
+        /** Requested channel count (what [matches] compares). */
+        val channels: Int,
+        /** Wire bit resolution of the opened alt setting (what status reports). */
+        val wireBitDepth: Int = bitDepth,
+        /** Channel count of the opened alt setting (what status reports). */
+        val wireChannels: Int = channels,
+    ) {
         fun matches(rate: Int, depth: Int, count: Int, nativeActive: Boolean): Boolean =
             nativeActive && sampleRate == rate && bitDepth == depth && channels == count
     }
@@ -811,26 +896,102 @@ internal object UsbAudioProtocol {
      * Pick the alt setting whose wire format can carry the requested sample
      * rate / bit depth / channel layout.
      *
-     * An exact channel match is preferred, but a DAC that only advertises the
-     * track layout differently (mono or multichannel alt settings) still gets a
-     * usable endpoint: the native sink re-frames whatever it is fed to the
-     * channel count of the alt setting it was started with. An alt that does
-     * not advertise a channel count at all is treated as the requested one.
+     * Every candidate is an alt setting that exposes an isochronous OUT
+     * endpoint (capture-only alts never enter [UsbAudioControlParser.Result.altSettingFormats]),
+     * so ALL playback interfaces compete, not just the one that happened to
+     * own the first iso-OUT endpoint. Ties break deterministically on
+     * bit resolution, then subslot size, then interface number, then alt
+     * setting number.
+     *
+     * The channel count must match exactly (an alt that advertises none is
+     * treated as the requested one). Duplicating, padding or dropping channels
+     * to fit a different layout would change the samples, which Bit-Perfect must
+     * never do silently, so such a track is refused with `format_unsupported`.
      */
     fun selectFormat(parsed: UsbAudioControlParser.Result, rate: Int, depth: Int, channels: Int): UsbAudioControlParser.AltSettingFormat? {
         if (rate <= 0 || channels <= 0 || depth !in listOf(16, 24, 32) || parsed.uacVersion !in 1..2) return null
         return parsed.altSettingFormats.filter { fmt ->
-            (parsed.streamingInterface == null || fmt.interfaceNumber == parsed.streamingInterface) &&
+            // Defence in depth: the parser only enumerates iso-OUT alts, but a
+            // capture endpoint address must never be selected even if one slips
+            // into the candidate list.
+            fmt.endpointAddress and 0x80 == 0 &&
                 fmt.altSetting > 0 && fmt.subslotSize in 2..4 &&
+                (fmt.channels == 0 || fmt.channels == channels) &&
                 fmt.bitResolution in depth..(fmt.subslotSize * 8) &&
                 (if (parsed.uacVersion == 2) true else rate in fmt.supportedRates)
         }.minWithOrNull(
             compareBy(
-                { if (it.channels == 0 || it.channels == channels) 0 else 1 },
                 { it.bitResolution },
                 { it.subslotSize },
+                { it.interfaceNumber },
+                { it.altSetting },
             ),
         )
+    }
+
+    /**
+     * The Clock Source actually driving the playback stream, resolved against
+     * live device state.
+     *
+     * When the streaming terminal is wired through a multi-input Clock
+     * Selector, the active pin is read with GET_CUR(CX_CLOCK_SELECTOR_CONTROL):
+     * bmRequestType 0xA1, bRequest 0x01, wValue 0x0100, wIndex
+     * (selectorClockID shl 8) or controlInterface, one byte, 1-based pin
+     * number. A failed or out-of-range pin read fails the whole resolution:
+     * programming a guessed clock would tune a different part of the DAC to
+     * the wrong rate, so the caller must refuse the stream instead. When the
+     * topology names no clock entity at all, the static best guess from
+     * [UsbAudioControlParser.Result.clockSource] is kept.
+     */
+    fun resolveActiveClock(
+        transport: UsbControlTransfer,
+        parsed: UsbAudioControlParser.Result,
+    ): UsbAudioControlParser.ClockSource? {
+        val wired = parsed.playbackTerminalId?.let { parsed.terminalClockIds[it] }
+            ?: return parsed.clockSource
+        var current: Int? = wired
+        val seen = mutableSetOf<Int>()
+        while (current != null && seen.add(current)) {
+            parsed.clockSources.firstOrNull { it.clockId == current }?.let { return it }
+            val inputs = parsed.clockSelectorInputs[current]
+            if (inputs != null) {
+                if (inputs.size == 1) {
+                    current = inputs[0]
+                    continue
+                }
+                val pin = readSelectorPin(transport, current, parsed.controlInterface)
+                    ?: return null
+                current = inputs.getOrNull(pin - 1) ?: return null
+                continue
+            }
+            val source = parsed.clockMultiplierSources[current]
+            if (source != null) {
+                current = source
+                continue
+            }
+            // Dangling reference: the descriptor graph is inconsistent, so keep
+            // the static guess rather than inventing a clock.
+            return parsed.clockSource
+        }
+        // Reference cycle in the clock graph: fail safe.
+        return null
+    }
+
+    private fun readSelectorPin(
+        transport: UsbControlTransfer,
+        selectorClockId: Int,
+        controlInterface: Int,
+    ): Int? {
+        if (controlInterface < 0) return null
+        return try {
+            val data = ByteArray(1)
+            val read = transport.transfer(
+                0xA1, 0x01, 0x0100, (selectorClockId shl 8) or controlInterface, data,
+            )
+            if (read != 1) null else data[0].toInt() and 0xFF
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun setSampleRate(
@@ -855,3 +1016,4 @@ internal object UsbAudioProtocol {
         } catch (_: Exception) { false }
     }
 }
+
