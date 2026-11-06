@@ -5803,7 +5803,7 @@
   "@conflictOemDoubleProcessing": {
     "description": "Audio conflict reason message"
   },
-  "conflictVolumeBoostClipping": "Clipping risk: EQ preamp ({preampDb} dB) + boost (+{boostDb} dB) = +{totalDb} dB > 6 dB headroom.",
+  "conflictVolumeBoostClipping": "Clipping risk: EQ preamp ({preampDb} dB) + boost (+{boostDb} dB) = +{totalDb} dB, above 0 dBFS full scale.",
   "@conflictVolumeBoostClipping": {
     "description": "Audio conflict reason warning about volume boost clipping risk",
     "placeholders": {

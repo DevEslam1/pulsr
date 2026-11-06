@@ -60,7 +60,7 @@ class BitPerfectChainAssessment {
 
   @override
   String toString() =>
-      'BitPerfectChainAssessment($verdict.name, $sourceSampleRate→'
+      'BitPerfectChainAssessment(${verdict.name}, $sourceSampleRate→'
       '$outputSampleRate, $sourceBitDepth→${outputBitDepth}bit)';
 }
 
@@ -74,7 +74,12 @@ class BitPerfectChainAssessment {
 ///
 /// [samplesModified] means something upstream is known to change the samples
 /// (an active DSP stage, or int32 source audio entering a float32 pipeline).
-/// No format agreement can make that chain bit-perfect.
+/// No format agreement can make that chain bit-perfect. It is a single bool on
+/// purpose - the verdict does not enumerate stages - so the caller must fold
+/// *every* processing and gain stage it knows about into it (EQ, limiter,
+/// crossfeed, reverb, saturation, dynamics, width, contour, crossover, volume
+/// boost, ReplayGain...); passing a partial list silently upgrades the verdict
+/// to "verified".
 BitPerfectChainAssessment assessBitPerfectChain({
   required bool requested,
   required bool active,

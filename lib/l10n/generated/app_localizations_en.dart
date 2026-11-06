@@ -8222,7 +8222,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String conflictVolumeBoostClipping(
       String preampDb, String boostDb, String totalDb) {
-    return 'Clipping risk: EQ preamp ($preampDb dB) + boost (+$boostDb dB) = +$totalDb dB > 6 dB headroom.';
+    return 'Clipping risk: EQ preamp ($preampDb dB) + boost (+$boostDb dB) = +$totalDb dB, above 0 dBFS full scale.';
   }
 
   @override

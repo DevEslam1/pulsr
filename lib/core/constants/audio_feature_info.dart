@@ -14,6 +14,11 @@ class AudioFeatureInfo {
   final String subtitle;
   final String description;
   final String? conflictsWith; // e.g. "Bit-Perfect bypass", "Gapless"
+
+  /// Stable identifier for [conflictsWith], used to pick the translated wording.
+  /// Matching on the English text would silently stop translating the moment
+  /// somebody rephrases a registry entry.
+  final String? conflictKey;
   final String? whyDisabledReason; // shown when disabled due to conflict
 
   const AudioFeatureInfo({
@@ -22,6 +27,7 @@ class AudioFeatureInfo {
     required this.subtitle,
     required this.description,
     this.conflictsWith,
+    this.conflictKey,
     this.whyDisabledReason,
   });
 
@@ -31,6 +37,9 @@ class AudioFeatureInfo {
         subtitle: _subtitle(l),
         description: _description(l),
         conflictsWith: _conflictsWith(l),
+        conflictKey: conflictKey,
+        // whyDisabledReason is deliberately passed through: the registry never
+        // fills it, and the conflict helpers already return localized text.
         whyDisabledReason: whyDisabledReason,
       );
 
@@ -248,24 +257,20 @@ class AudioFeatureInfo {
   }
 
   String? _conflictsWith(AppLocalizations l) {
-    switch (conflictsWith) {
-      case 'All DSP when “Bypass DSP” is ON':
-        return l.conflictWithAllDspBypassDsp;
-      case 'Bit-Perfect bypass':
-        return l.conflictWithBitPerfect;
-      case 'EQ / ReplayGain / Effects / Crossfade':
-        return l.conflictWithEqReplayGainEffectsCrossfade;
-      case 'Bit-Perfect bypass / Direct':
-        return l.conflictWithResampler;
-      case 'Bit-Perfect bypass, Hardware Spatializer':
-        return l.conflictWithVirtualizer;
-      case 'Crossfade (>0 s)':
-        return l.conflictWithCrossfade;
-      case 'Gapless':
-        return l.conflictWithGapless;
-      default:
-        return conflictsWith;
-    }
+    final raw = conflictsWith;
+    if (raw == null) return null;
+    return switch (conflictKey) {
+      'allDspWithBypass' => l.conflictWithAllDspBypassDsp,
+      'bitPerfectBypass' => l.conflictWithBitPerfect,
+      'bitPerfectStrictSet' => l.conflictWithEqReplayGainEffectsCrossfade,
+      'bitPerfectBypassOrDirect' => l.conflictWithResampler,
+      'bitPerfectBypassAndSpatializer' => l.conflictWithVirtualizer,
+      'crossfadeActive' => l.conflictWithCrossfade,
+      'gaplessActive' => l.conflictWithGapless,
+      // An ad-hoc conflict string from outside the registry has no key, so it
+      // is shown as written.
+      _ => raw,
+    };
   }
 }
 
@@ -278,6 +283,7 @@ class AudioFeatureRegistry {
     description:
         'Bypasses Android AudioFlinger and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr\'s own UAC2 isochronous sink when the platform exposes no exclusive mixer. No software volume or DSP is applied. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).',
     conflictsWith: 'All DSP when “Bypass DSP” is ON',
+    conflictKey: 'allDspWithBypass',
   );
 
   static const bypassDsp = AudioFeatureInfo(
@@ -303,6 +309,7 @@ class AudioFeatureRegistry {
     description:
         'Forces Bit-Perfect output and the DSP bypass, then follows each track\'s native sample rate so the DAC receives the exact source samples without resampling. Because it is strict, EQ, ReplayGain, Virtualizer/Dynamics and Crossfade cannot run: they would alter the bitstream. Requires a path that reports exclusive bit-perfect support (USB DAC on Android 14+); otherwise the toggle is disabled with the platform reason.',
     conflictsWith: 'EQ / ReplayGain / Effects / Crossfade',
+    conflictKey: 'bitPerfectStrictSet',
   );
 
   static const equalizer = AudioFeatureInfo(
@@ -312,6 +319,7 @@ class AudioFeatureRegistry {
     description:
         'Native C++ biquad cascade (32 bands max, 8 channels). Uses single bulk JNI hop (≈1 ms) with zero-cost bypass when disabled. Interpolates AutoEQ profiles log-frequency wise. Cannot be active with Bit-Perfect bypass (would re-sample and alter bits).',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const bassBoost = AudioFeatureInfo(
@@ -321,6 +329,7 @@ class AudioFeatureRegistry {
     description:
         'Adds a low-shelf lift below ~150 Hz via the native EQ biquad chain. Shares the same processing stage as the graphic EQ, so it is disabled while Bit-Perfect bypass is active. Keep moderate to avoid masking detail.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const crossfeed = AudioFeatureInfo(
@@ -330,6 +339,7 @@ class AudioFeatureRegistry {
     description:
         'Chu Moy / Linkwitz blend that makes headphones sound like speakers (reduces hard L/R separation). Adds ~0.05 ms latency. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const limiter = AudioFeatureInfo(
@@ -339,6 +349,7 @@ class AudioFeatureRegistry {
     description:
         'Adaptive true-peak limiter with 4× oversample. Protects against clipping when EQ boosts. Adds ~5 ms latency. Final stage before DAC. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const reverb = AudioFeatureInfo(
@@ -348,6 +359,7 @@ class AudioFeatureRegistry {
     description:
         'Partitioned convolution (512-frame blocks) against a synthesized room impulse or custom impulse response you load. Features adjustable cross-channel crosstalk for authentic binaural IRS stereo spatialization. Zero heap allocations in audio loop. Needs the native DSP path; disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const panner = AudioFeatureInfo(
@@ -357,6 +369,7 @@ class AudioFeatureRegistry {
     description:
         'Constant-power panner + mono downmix (L+R / 2). Useful for hearing asymmetry. Collapses soundstage when mono ON. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const resampler = AudioFeatureInfo(
@@ -366,6 +379,7 @@ class AudioFeatureRegistry {
     description:
         'Polyphase sinc interpolation engine. The in-stream playback path keeps the source frame count, so track→device rate conversion is performed by the platform output (AudioTrack); the polyphase engine is applied internally by the convolution reverb wet path above 48 kHz. Disabled during Bit-Perfect (direct 1:1 stream).',
     conflictsWith: 'Bit-Perfect bypass / Direct',
+    conflictKey: 'bitPerfectBypassOrDirect',
   );
 
   static const virtualizer = AudioFeatureInfo(
@@ -375,6 +389,7 @@ class AudioFeatureRegistry {
     description:
         'Expands stereo field via AudioEffect Virtualizer (0–1000 mB). On devices with Hardware Spatializer, Spatializer takes precedence and Virtualizer is bypassed. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass, Hardware Spatializer',
+    conflictKey: 'bitPerfectBypassAndSpatializer',
   );
 
   static const spatializer = AudioFeatureInfo(
@@ -392,6 +407,7 @@ class AudioFeatureRegistry {
     description:
         'DynamicsProcessing multiband compressor (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). Controls transients and loudness. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const roomCorrection = AudioFeatureInfo(
@@ -425,6 +441,7 @@ class AudioFeatureRegistry {
     description:
         'Joins consecutive tracks sample-accurate with no silence. Ideal for live albums. Mutually exclusive with Crossfade — enabling one forces the other OFF.',
     conflictsWith: 'Crossfade (>0 s)',
+    conflictKey: 'crossfadeActive',
   );
 
   static const crossfade = AudioFeatureInfo(
@@ -434,6 +451,7 @@ class AudioFeatureRegistry {
     description:
         'Fades out current track while fading in next via dual ExoPlayer. Requires disabling Gapless (cannot be gapless and crossfading simultaneously).',
     conflictsWith: 'Gapless',
+    conflictKey: 'gaplessActive',
   );
 
   static const replayGain = AudioFeatureInfo(
@@ -443,6 +461,7 @@ class AudioFeatureRegistry {
     description:
         'Bit-transparent native pre-gain driven by Track/Album Gain tags (20 ms smoothing, 0.5 dB inter-sample headroom, clipping-safe). The Dart mixer then carries only user volume so the gain is never applied twice; DoP and non-Android fall back to Dart math. Conflicts with Bit-Perfect bypass (any gain would alter bits). Set to Off for true exclusive.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const oem = AudioFeatureInfo(
@@ -460,6 +479,7 @@ class AudioFeatureRegistry {
     description:
         'Hardware LoudnessEnhancer gain (0–1000 mB). Capped at +6 dB combined with headphone preamp to avoid clipping. Disabled during Bit-Perfect bypass (hardware DAC volume only).',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const saturation = AudioFeatureInfo(
@@ -470,6 +490,7 @@ class AudioFeatureRegistry {
     description:
         'Generates rich analog warmth and harmonic density. Offers 3 selectable color profiles: Tape (smooth odd-order saturation), Vacuum Tube (asymmetric 6J1 triode with warm even 2nd harmonics), and Analog Class-A (full vintage transformer response). Features 4× polyphase sinc anti-aliasing and DC blocking. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const stereoWidth = AudioFeatureInfo(
@@ -479,6 +500,7 @@ class AudioFeatureRegistry {
     description:
         'Mid/Side multiband stereo imager utilizing phase-linear Linkwitz-Riley crossovers. Features dedicated low (<160 Hz), mid (160 Hz–2.5 kHz), and high (>2.5 kHz) width controls. Sub-bass mono isolation eliminates stereo low-end phase cancellation and comb filtering. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const loudnessContour = AudioFeatureInfo(
@@ -488,6 +510,7 @@ class AudioFeatureRegistry {
     description:
         'Equal-loudness approximation: as playback volume decreases, a gentle low-shelf (~100 Hz) and smaller high-shelf (~8 kHz) lift is applied, vanishing at full volume. Gain-domain but complementary to ReplayGain — ReplayGain levels tracks to a common target, while this contour adapts tone to the listening level; both can be ON together. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const subCrossover = AudioFeatureInfo(
@@ -497,6 +520,7 @@ class AudioFeatureRegistry {
     description:
         'Bass redirection for stereo rigs: a 4th-order Linkwitz-Riley low-pass mono sum is mixed into both channels. Features Bass Mono side-channel subtraction to keep sub-bass punchy and mono-centered, plus tanh anti-pop soft-limiting to eliminate clicks. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const dynamicEq = AudioFeatureInfo(
@@ -506,6 +530,7 @@ class AudioFeatureRegistry {
     description:
         'Per-band dynamic equalization supporting both Cut (resonance taming) and Boost (transient expansion) modes. Selectable between Peaking biquad, Low-Shelf, and High-Shelf dynamic responses with smooth soft-knee detection. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const multibandCompressor = AudioFeatureInfo(
@@ -516,6 +541,7 @@ class AudioFeatureRegistry {
     description:
         'Professional 4-band studio mastering compressor built directly into the C++ native DSP engine. Uses Linkwitz-Riley 4th order (LR4) crossovers for exact flat magnitude summation with zero phase distortion. Features independent threshold, ratio, attack, release, soft-knee, and makeup gain per band. Replaces fragile HAL compressor paths. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const dynamicBass = AudioFeatureInfo(
@@ -525,6 +551,7 @@ class AudioFeatureRegistry {
     description:
         'Modeled on ViPER4Android’s famous Dynamic System. Restores physical weight and tactile punch for headphones by dynamically expanding quiet bass passages and soft-saturating loud peaks. Features Mid-Side sub-bass extraction, psychoacoustic harmonic synthesis, and 9 classic headphone device calibration presets. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const viperDdc = AudioFeatureInfo(
@@ -534,6 +561,7 @@ class AudioFeatureRegistry {
     description:
         'Loads authentic ViPER-DDC (.vdc) correction profiles. Implements high-order Second-Order Sections (SOS) Direct Form II stereo filtering with real-time sample rate adaptation (44.1 kHz / 48 kHz). Precisely neutralizes earphone-specific resonances. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const arbitraryEq = AudioFeatureInfo(
@@ -543,6 +571,7 @@ class AudioFeatureRegistry {
     description:
         'Parses standard EqualizerAPO "GraphicEq: <freq> <gain>; ..." curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 512-tap windowed FIR impulse response for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 
   static const liveProg = AudioFeatureInfo(
@@ -552,6 +581,7 @@ class AudioFeatureRegistry {
     description:
         'Write custom audio DSP algorithms in Jesusonic / EEL scripting syntax right on your phone. Code compiles directly to safe, zero-latency bytecode executed per-sample inside the high-priority native audio thread. Supports @init, @sample, sliders 1..8, and comprehensive transcendental math functions. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
   );
 }
 
@@ -641,14 +671,14 @@ class AudioConflicts {
   }
 
   /// Only a route that provably cannot carry bit-perfect is a hard block:
-  /// Bluetooth transcodes, or no USB DAC at all. Every other native failure
-  /// stays attemptable — the direct UAC2 fallback may still work, and a failed
-  /// attempt surfaces the concrete reason. In particular
-  /// `no_supported_mixer_attributes` is NOT a hard block: it is exactly the
-  /// case the direct USB sink exists for.
+  /// Bluetooth transcodes, or the path is not a USB DAC at all. Every other
+  /// native failure stays attemptable — the direct UAC2 fallback may still work,
+  /// and a failed attempt surfaces the concrete reason. In particular
+  /// `no_supported_mixer_attributes` is NOT a hard block: it is exactly the case
+  /// the direct USB sink exists for, and neither is a DAC the OS simply has no
+  /// exclusive attributes for.
   static const Set<String> _hardBitPerfectFailures = {
     'exclusive_requires_usb_dac',
-    'usb_not_supported',
   };
 
   static String? bitPerfectBlockedReason(AudioOutputInfo? device) {
@@ -672,8 +702,11 @@ class AudioConflicts {
         return L10nHolder.current?.conflictRequiresAndroid14 ??
             'Requires Android 14+ for USB bit-perfect output.';
       case 'usb_not_supported':
-        return L10nHolder.current?.conflictNoMixerAttributes ??
-            'Android does not advertise an exclusive bit-perfect mixer configuration for this USB DAC.';
+        // Kept distinct from no_supported_mixer_attributes: both mean "the OS
+        // has no exclusive path here", which is when the app's own UAC2 sink is
+        // worth trying, so the message says so instead of ending the attempt.
+        return 'Android has no exclusive bit-perfect output for this USB DAC — '
+            'Pulsr will try its own UAC2 stream instead.';
       case 'exclusive_requires_usb_dac':
         return L10nHolder.current?.conflictExclusiveRequiresUsbDac ??
             'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
@@ -808,12 +841,14 @@ class AudioConflicts {
   static String? volumeBoostClippingWarning(
       double volumeBoost, double preampDb) {
     final total = preampDb + volumeBoost * 10.0;
-    if (total > 6.0) {
+    // Digital full scale is 0 dBFS: anything above it *is* the clipping point,
+    // not "+6 dB of headroom".
+    if (total > 0.0) {
       return L10nHolder.current?.conflictVolumeBoostClipping(
               preampDb.toStringAsFixed(1),
               (volumeBoost * 10).toStringAsFixed(1),
               total.toStringAsFixed(1)) ??
-          'Clipping risk: EQ preamp (${preampDb.toStringAsFixed(1)} dB) + boost (+${(volumeBoost * 10).toStringAsFixed(1)} dB) = +${total.toStringAsFixed(1)} dB > 6 dB headroom.';
+          'Clipping risk: EQ preamp (${preampDb.toStringAsFixed(1)} dB) + boost (+${(volumeBoost * 10).toStringAsFixed(1)} dB) = ${total.toStringAsFixed(1)} dB, above 0 dBFS full scale.';
     }
     if (volumeBoost > 0.6) {
       return L10nHolder.current?.conflictHighBoostDistortion ??

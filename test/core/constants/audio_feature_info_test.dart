@@ -137,6 +137,28 @@ void main() {
       );
     });
 
+    test('conflict wording is chosen by key, not by the English text', () {
+      // Rephrasing a registry entry used to silently stop translating it.
+      const rephrased = AudioFeatureInfo(
+        id: 'equalizer',
+        title: 'EQ',
+        subtitle: 'EQ subtitle',
+        description: 'EQ description',
+        conflictsWith: 'Exclusive bit-perfect output',
+        conflictKey: 'bitPerfectBypass',
+      );
+      expect(rephrased.localized(l10n).conflictsWith,
+          l10n.conflictWithBitPerfect);
+      // Every registry entry with a conflict names a key, so none of them can
+      // regress into untranslated English.
+      for (final feature in _features) {
+        if (feature.conflictsWith != null) {
+          expect(feature.conflictKey, isNotNull,
+              reason: '${feature.id} has conflictsWith without a conflictKey');
+        }
+      }
+    });
+
     test('unknown id and conflict literal fall back to the raw values', () {
       const info = AudioFeatureInfo(
         id: 'madeUpFeature',
@@ -203,9 +225,12 @@ void main() {
         l10n.conflictBtBitPerfectUnsupported,
       );
       expect(
+        // Android having no exclusive mixer for the DAC is exactly the case
+        // the direct UAC2 sink exists for; hard-blocking it disabled the only
+        // remaining bit-perfect path.
         AudioConflicts.bitPerfectBlockedReason(
             _device(reason: 'usb_not_supported')),
-        l10n.conflictNoMixerAttributes,
+        isNull,
       );
       expect(
         AudioConflicts.bitPerfectBlockedReason(
@@ -278,8 +303,10 @@ void main() {
         AudioConflicts.volumeBoostClippingWarning(0.8, 2.0),
         l10n.conflictVolumeBoostClipping('2.0', '8.0', '10.0'),
       );
+      // Total gain at or below 0 dBFS cannot clip: only then is "high boost"
+      // the right warning.
       expect(
-        AudioConflicts.volumeBoostClippingWarning(0.7, -1.0),
+        AudioConflicts.volumeBoostClippingWarning(0.7, -8.0),
         l10n.conflictHighBoostDistortion,
       );
     });
@@ -404,7 +431,11 @@ void main() {
         contains('Clipping risk'),
       );
       expect(
-        AudioConflicts.volumeBoostClippingWarning(0.7, -1.0),
+        AudioConflicts.volumeBoostClippingWarning(0.8, 2.0),
+        contains('0 dBFS'),
+      );
+      expect(
+        AudioConflicts.volumeBoostClippingWarning(0.7, -8.0),
         contains('High boost'),
       );
     });
@@ -647,6 +678,7 @@ void main() {
         'channel_error',
         'requires_android_14_for_usb',
         'no_supported_mixer_attributes',
+        'usb_not_supported',
         'reflection_method_not_found',
         'audio_mixer_class_not_found',
       ]) {
@@ -657,7 +689,6 @@ void main() {
         );
       }
       for (final reason in const [
-        'usb_not_supported',
         'exclusive_requires_usb_dac',
       ]) {
         expect(
@@ -698,12 +729,21 @@ void main() {
       );
     });
 
-    test('volumeBoostClippingWarning boundary table', () {
+    test('volumeBoostClippingWarning boundary table (0 dBFS full scale)', () {
       expect(AudioConflicts.volumeBoostClippingWarning(1.0, 0.0), isNotNull);
       expect(AudioConflicts.volumeBoostClippingWarning(0.61, 0.0), isNotNull);
-      expect(AudioConflicts.volumeBoostClippingWarning(0.6, 0.0), isNull);
-      expect(AudioConflicts.volumeBoostClippingWarning(0.2, 4.0), isNull);
-      expect(AudioConflicts.volumeBoostClippingWarning(0.0, 6.1), isNotNull);
+      // Anything above full scale is already clipping, however small.
+      expect(AudioConflicts.volumeBoostClippingWarning(0.2, 4.0), isNotNull);
+      expect(AudioConflicts.volumeBoostClippingWarning(0.0, 0.1), isNotNull);
+      // At or below 0 dBFS nothing clips...
+      expect(AudioConflicts.volumeBoostClippingWarning(0.0, 0.0), isNull);
+      expect(AudioConflicts.volumeBoostClippingWarning(0.05, -0.5), isNull);
+      // ...and below the high-boost threshold no warning is shown at all.
+      expect(AudioConflicts.volumeBoostClippingWarning(0.06, -1.0), isNull);
+      expect(
+        AudioConflicts.volumeBoostClippingWarning(0.7, -8.0),
+        isNot(contains('Clipping risk')),
+      );
     });
   });
 }

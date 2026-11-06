@@ -14666,7 +14666,7 @@ abstract class AppLocalizations {
   /// Audio conflict reason warning about volume boost clipping risk
   ///
   /// In en, this message translates to:
-  /// **'Clipping risk: EQ preamp ({preampDb} dB) + boost (+{boostDb} dB) = +{totalDb} dB > 6 dB headroom.'**
+  /// **'Clipping risk: EQ preamp ({preampDb} dB) + boost (+{boostDb} dB) = +{totalDb} dB, above 0 dBFS full scale.'**
   String conflictVolumeBoostClipping(
       String preampDb, String boostDb, String totalDb);
 
