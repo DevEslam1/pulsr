@@ -138,8 +138,21 @@ class UsbExclusivePlugin(
     private external fun nativeUsbStreamGetOverrunCount(): Long
     private external fun nativeUsbStreamGetBufferedMs(): Double
     private external fun nativeUsbQuerySupportedRates(fd: Int, interfaceNumber: Int): IntArray
+    private external fun nativeUsbGetProducerChannels(): Int
+    private external fun nativeUsbStreamGetChannelMismatchFrames(): Long
+    private external fun nativeUsbStreamResetChannelMismatchFrames()
 
     @Volatile private var lastStreamResultCode: Int? = null
+    @Volatile private var lastRateVerified: Boolean = false
+
+    private fun safeGetLastError(): Int = if (nativeLoaded) try { nativeUsbStreamGetLastError() } catch (_: Throwable) { 0 } else 0
+    private fun safeGetUnderrunCount(): Long = if (nativeLoaded) try { nativeUsbStreamGetUnderrunCount() } catch (_: Throwable) { 0L } else 0L
+    private fun safeGetOverrunCount(): Long = if (nativeLoaded) try { nativeUsbStreamGetOverrunCount() } catch (_: Throwable) { 0L } else 0L
+    private fun safeGetBufferedMs(): Double = if (nativeLoaded) try { nativeUsbStreamGetBufferedMs() } catch (_: Throwable) { 0.0 } else 0.0
+    private fun safeIsStreamActive(): Boolean = if (nativeLoaded) try { nativeUsbStreamIsActive() } catch (_: Throwable) { false } else false
+    private fun safeGetProducerChannels(): Int = if (nativeLoaded) try { nativeUsbGetProducerChannels() } catch (_: Throwable) { 0 } else 0
+    private fun safeGetChannelMismatchFrames(): Long = if (nativeLoaded) try { nativeUsbStreamGetChannelMismatchFrames() } catch (_: Throwable) { 0L } else 0L
+    private fun safeResetChannelMismatchFrames() { if (nativeLoaded) try { nativeUsbStreamResetChannelMismatchFrames() } catch (_: Throwable) {} }
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var permissionReceiver: BroadcastReceiver? = null
 
@@ -216,30 +229,36 @@ class UsbExclusivePlugin(
                     val sampleRate = call.argument<Int>("sampleRate") ?: 48000
                     val channels = call.argument<Int>("channels") ?: 2
                     val bitDepth = call.argument<Int>("bitDepth") ?: 16
-                    runAsync(call.method, result) { startStreamingInternal(sampleRate, channels, bitDepth) }
+                    val strict = call.argument<Boolean>("strict") ?: false
+                    runAsync(call.method, result) { startStreamingInternal(sampleRate, channels, bitDepth, strict) }
                 }
                 "stopStreaming" -> runAsync(call.method, result) { stopStreamingInternal() }
+                "resetChannelMismatchFrames" -> {
+                    safeResetChannelMismatchFrames()
+                    result.success(true)
+                }
                 "isStreamingSupported" -> {
                     val device = openedDevice ?: findAudioDevice()
-                    // Requiring the audio class as well as the streaming
-                    // subclass: CDC/hid devices with subclass 0x02 are not USB
-                    // audio and used to answer "yes".
                     val supported = nativeLoaded && device != null &&
                         device.streamingInterfaces().isNotEmpty()
                     result.success(supported)
                 }
                 "getDiagnostics" -> {
                     val diag = mapOf(
-                        "lastError" to if (nativeLoaded) nativeUsbStreamGetLastError() else 0,
-                        "underrunCount" to if (nativeLoaded) nativeUsbStreamGetUnderrunCount() else 0L,
-                        "overrunCount" to if (nativeLoaded) nativeUsbStreamGetOverrunCount() else 0L,
-                        "isStreamActive" to if (nativeLoaded) nativeUsbStreamIsActive() else false,
-                        "bufferedMs" to if (nativeLoaded) nativeUsbStreamGetBufferedMs() else 0.0
+                        "lastError" to safeGetLastError(),
+                        "underrunCount" to safeGetUnderrunCount(),
+                        "overrunCount" to safeGetOverrunCount(),
+                        "channelMismatchFrames" to safeGetChannelMismatchFrames(),
+                        "isStreamActive" to safeIsStreamActive(),
+                        "bufferedMs" to safeGetBufferedMs()
                     )
                     result.success(diag)
                 }
                 "getBufferedMs" -> {
-                    result.success(if (nativeLoaded) nativeUsbStreamGetBufferedMs() else 0.0)
+                    result.success(safeGetBufferedMs())
+                }
+                "getProducerChannels" -> {
+                    result.success(safeGetProducerChannels())
                 }
                 "setVolumeCalibrationOffset" -> {
                     val offsetDb = call.argument<Double>("offsetDb") ?: 0.0
@@ -536,11 +555,23 @@ class UsbExclusivePlugin(
             "maxVolumeDb" to hardwareVolume?.maxDb,
             "interfaceNumber" to parsed.streamingInterface,
             "supportedRates" to parsed.supportedRates,
-            "lastError" to if (nativeLoaded) nativeUsbStreamGetLastError() else 0,
+            "lastError" to safeGetLastError(),
             "resultCode" to lastStreamResultCode,
-            "underrunCount" to if (nativeLoaded) nativeUsbStreamGetUnderrunCount() else 0L,
-            "overrunCount" to if (nativeLoaded) nativeUsbStreamGetOverrunCount() else 0L,
-            "bufferedMs" to if (nativeLoaded) nativeUsbStreamGetBufferedMs() else 0.0,
+            "underrunCount" to safeGetUnderrunCount(),
+            "overrunCount" to safeGetOverrunCount(),
+            "channelMismatchFrames" to safeGetChannelMismatchFrames(),
+            "bufferedMs" to safeGetBufferedMs(),
+            "rateVerified" to (streamFormat != null && lastRateVerified),
+            "advertisedFormats" to parsed.altSettingFormats.map { fmt ->
+                mapOf(
+                    "interfaceNumber" to fmt.interfaceNumber,
+                    "altSetting" to fmt.altSetting,
+                    "subslotSize" to fmt.subslotSize,
+                    "bitResolution" to fmt.bitResolution,
+                    "channels" to fmt.channels,
+                    "supportedRates" to fmt.supportedRates,
+                )
+            },
             "volumeCalibrationOffsetDb" to getVolumeCalibrationOffset(device.vendorId, device.productId),
         )
     }
@@ -764,7 +795,7 @@ class UsbExclusivePlugin(
 
     // ---- raw UAC2 isochronous streaming ----
 
-    private fun startStreamingInternal(sampleRate: Int, channels: Int, bitDepth: Int = 16): Map<String, Any?> {
+    private fun startStreamingInternal(sampleRate: Int, channels: Int, bitDepth: Int = 16, strict: Boolean = false): Map<String, Any?> {
         if (streaming && streamFormat?.matches(sampleRate, bitDepth, channels, isNativeActive()) == true) {
             val status = buildStatus()
             if (status["streamingActive"] == true) {
@@ -775,49 +806,50 @@ class UsbExclusivePlugin(
         clearStreaming()
         if (bitDepth == 32) {
             lastStreamResultCode = 3
+            Log.w(TAG, "Step format: 32-bit float conversion is not bit-perfect")
             return failure("source_32bit_float_conversion_not_lossless")
         }
         if (!nativeLoaded) {
             lastStreamResultCode = -1
+            Log.w(TAG, "Step native: native library not available")
             return failure("native_unavailable")
         }
         val device = findAudioDevice() ?: run {
             lastStreamResultCode = -1
+            Log.w(TAG, "Step device: no USB audio device found")
             return failure("no_usb_device")
         }
         if (usbManager?.hasPermission(device) != true) {
             lastStreamResultCode = 1
+            Log.w(TAG, "Step permission: USB access permission required")
             return failure("permission_required")
         }
         val conn = ensureConnection(device) ?: run {
             lastStreamResultCode = 1
+            Log.w(TAG, "Step open: failed to open USB device connection")
             return failure("open_failed")
         }
         val parsed = parseViaRawDescriptors(conn) ?: run {
             lastStreamResultCode = 3
+            Log.w(TAG, "Step descriptors: format descriptors required")
             return failure("format_descriptors_required")
         }
         if (parsed.uacVersion == UsbAudioControlParser.UAC3) {
-            // UAC3 moves format/clock programming to different descriptors and
-            // requests than UAC1/2; rather than fail with a generic format
-            // error, say plainly that the class is not implemented.
             lastStreamResultCode = 3
+            Log.w(TAG, "Step uac: UAC3 is not supported for bit-perfect streaming")
             return failure("uac3_unsupported")
         }
         val selected = UsbAudioProtocol.selectFormat(parsed, sampleRate, bitDepth, channels) ?: run {
             lastStreamResultCode = 3
+            Log.w(TAG, "Step selectFormat: format unsupported: rate=$sampleRate, depth=$bitDepth, channels=$channels")
             return failure("format_unsupported")
         }
         val epAddress = selected.endpointAddress
         val epInterface = selected.interfaceNumber
         val epAlt = selected.altSetting
         val streamBytes = selected.subslotSize
-        // selectFormat only returns an alt setting whose channel count equals the
-        // request (or advertises none), so no channel is ever added or dropped.
         val wireChannels = selected.channels.takeIf { it > 0 } ?: channels
 
-        // Prefer the exact (interface, alternate setting) pair that exposes the
-        // selected isochronous OUT endpoint.
         var iface: UsbInterface? = null
         for (i in 0 until device.interfaceCount) {
             val c = device.getInterface(i)
@@ -828,6 +860,7 @@ class UsbExclusivePlugin(
         }
         iface ?: run {
             lastStreamResultCode = 5
+            Log.w(TAG, "Step alt_setting: streaming interface not found (result 5)")
             return failure("streaming_interface_not_found")
         }
 
@@ -835,6 +868,7 @@ class UsbExclusivePlugin(
         val claimed = try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
         if (!claimed) {
             lastStreamResultCode = 1
+            Log.w(TAG, "Step claim: failed to claim streaming interface (result 1)")
             rebindKernelDriver(conn, iface)
             return failure("claim_failed")
         }
@@ -844,15 +878,30 @@ class UsbExclusivePlugin(
         try {
             if (!conn.setInterface(iface)) {
                 lastStreamResultCode = 2
+                Log.w(TAG, "Step alt_setting: failed to set alternate setting (result 2)")
                 return failure("alt_setting_failed")
             }
-            if (!setDacSampleRate(conn, parsed, selected, sampleRate)) {
+            val rateResult = setDacSampleRate(conn, parsed, selected, sampleRate)
+            if (rateResult == UsbAudioProtocol.RateSetResult.FAILED) {
                 lastStreamResultCode = 3
+                Log.w(TAG, "Step clock: clock not verified (result 3)")
                 return failure("clock_not_verified")
+            }
+            if (rateResult == UsbAudioProtocol.RateSetResult.UNVERIFIED_READBACK_UNSUPPORTED) {
+                Log.i(TAG, "Step clock: UAC1 sample-rate set succeeded, readback unsupported")
+                if (strict) {
+                    lastStreamResultCode = 3
+                    Log.w(TAG, "Step clock: strict mode refused unverified readback (result 3)")
+                    return failure("uac1_rate_readback_unsupported")
+                }
+                lastRateVerified = false
+            } else {
+                lastRateVerified = true
             }
             val fd = conn.fileDescriptor
             if (fd < 0) {
                 lastStreamResultCode = 5
+                Log.w(TAG, "Step native_start: invalid file descriptor (result 5)")
                 return failure("no_fd")
             }
             val resultCode = nativeUsbStreamStartWithFormat(
@@ -860,6 +909,7 @@ class UsbExclusivePlugin(
             )
             lastStreamResultCode = resultCode
             if (resultCode != 0 || !isNativeActive()) {
+                Log.w(TAG, "Step native_start: native start failed with result $resultCode")
                 return failure("native_stream_not_active") + mapOf("resultCode" to resultCode)
             }
             // The request is remembered as the request (see StreamFormat): a
@@ -892,13 +942,9 @@ class UsbExclusivePlugin(
         parsed: UsbAudioControlParser.Result,
         selected: UsbAudioControlParser.AltSettingFormat,
         sampleRate: Int,
-    ): Boolean {
-        // The clock wired to the playback terminal can sit behind a Clock
-        // Selector whose active pin is device state: read it instead of
-        // guessing. A failed pin read resolves to null and the stream is
-        // refused (clock_not_verified) rather than programming a wrong clock.
+    ): UsbAudioProtocol.RateSetResult {
         val clock = UsbAudioProtocol.resolveActiveClock(transport(conn), parsed)
-        return UsbAudioProtocol.setSampleRate(
+        return UsbAudioProtocol.setSampleRateWithResult(
             transport(conn), parsed.uacVersion, clock, selected.endpointAddress,
             sampleRate, selected.supportedRates.size == 1,
         )

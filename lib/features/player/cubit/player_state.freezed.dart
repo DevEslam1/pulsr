@@ -802,8 +802,7 @@ class _PlaybackSlice extends PlaybackSlice {
                     currentSongVolumeOverrideDb) ||
                 other.currentSongVolumeOverrideDb ==
                     currentSongVolumeOverrideDb) &&
-            (identical(other.isMuted, isMuted) ||
-                other.isMuted == isMuted));
+            (identical(other.isMuted, isMuted) || other.isMuted == isMuted));
   }
 
   @override

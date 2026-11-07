@@ -81,6 +81,7 @@ abstract class IMusicRepository {
   Future<Result<int?>> reconcileDownloadedSong({
     required int oldId,
     required String newPath,
+    String? contentUri,
     SongsTableData? fallbackSong,
   });
 

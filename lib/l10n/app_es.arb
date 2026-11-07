@@ -2686,6 +2686,10 @@
   "bpChainResampled": "Se detectó remuestreo del sistema",
   "bpChainDepthReduced": "Profundidad de bits truncada",
   "bpChainInactive": "Bit-Perfect armado pero inactivo",
+  "bpMoreEffects": "+{count} efectos más",
+  "bpDspBypassed": "Omitido (Protección Bit-Perfect)",
+  "bpDspCleanPath": "Ninguno (Ruta limpia)",
+  "bpPlatformConversion": "Conversión de la plataforma • no medida por esta app",
   "@bpGuardrails": {
     "description": "tranche7 quality"
   },
@@ -3772,6 +3776,8 @@
   "settingsThemeVinylCircleDesc": "Portada circular centrada con animación de giro continuo",
   "settingsThemeCdTurntable": "Tocadiscos CD",
   "settingsThemeCdTurntableDesc": "CD iridiscente giratorio con carátula central y aguja animada",
+  "settingsThemeClean": "Flujo Moderno Limpio",
+  "settingsThemeCleanDesc": "Portada limpia inspirada en Apple con deslizador de c\u00e1psula y opciones inferiores r\u00e1pidas",
   "settingsThemeVinylTurntable": "Estudio de tocadiscos",
   "settingsThemeVinylTurntableDesc": "Disco de vinilo real con surcos realistas, etiqueta central y brazo",
   "settingsTurnOffGapless": "Desactivar sin pausas",
@@ -4534,6 +4540,21 @@
   "conflictRequiresAndroid14": "Requiere Android 14+ para salida bit-perfect por USB.",
   "conflictExclusiveRequiresUsbDac": "No se puede activar: Android solo expone salida exclusiva para DAC USB. La alta resolución por cable sigue reproduciéndose en directo cuando el dispositivo lo admite.",
   "conflictNoMixerAttributes": "Este DAC USB no anuncia una configuración de mezclador exclusiva.",
+  "conflictUsbNotSupported": "Android no admite salida bit-perfect exclusiva para este USB DAC.",
+  "conflictTargetFormatUnavailable": "Este USB DAC no ofrece la frecuencia de muestreo / profundidad de bits seleccionada en modo exclusivo.",
+  "conflictSetMixerAttributesFailed": "Android rechazó el modo exclusivo para este USB DAC (otra aplicación puede estar usándolo).",
+  "conflictExclusiveApiUnavailable": "La API de salida exclusiva no está disponible en este dispositivo.",
+  "strictBitPerfectUnsupportedDevice": "El dispositivo de salida actual no admite Bit-Perfect estricto.",
+  "directUsbStreamStopFailed": "No se pudo detener la transmisión USB anterior.",
+  "directUsbStreamStopFailedRetry": "No se pudo detener la transmisión USB anterior. Vuelve a intentar desactivar Bit-Perfect.",
+  "dspBypassUpdateFailed": "Error al actualizar la omisión nativa de DSP.",
+  "directUsbSinkSwitchOwnershipFailed": "No se pudo detener la transmisión USB directa; la salida no se cambió y Bit-Perfect aún posee la salida del DAC anterior.",
+  "outputCannotApplySampleRate": "Esta salida no puede aplicar la frecuencia de muestreo solicitada.",
+  "outputCannotApplyBitDepth": "Esta salida no puede aplicar la profundidad de bits solicitada.",
+  "cannotOpenBluetoothCodecSettings": "No se pudo abrir la configuración del códec Bluetooth.",
+  "directUsbSuspendedArmed": "{message} Bit-Perfect permanece preparado y se reanudará en una pista compatible.",
+  "directUsbStopFailedStillOwns": "{message} No se pudo detener la transmisión USB directa; todavía posee la salida. Vuelve a intentarlo o desactiva Bit-Perfect.",
+  "dspBypassOrCrossfadeDisableFailed": "Error al habilitar la omisión nativa de DSP o desactivar el crossfade.",
   "conflictGaplessNeedsZeroCrossfade": "Desactivado: el Crossfade es de {crossfadeSeconds} s — sin cortes requiere 0 s. Pon el Crossfade en 0 para activar la reproducción sin cortes.",
   "conflictCrossfadeNeedsGaplessOff": "Desactivado: Sin cortes está activado — el crossfade necesita que esté desactivado. Desactiva Sin cortes para habilitar el crossfade.",
   "conflictStrictBitPerfectActive": "Bit-perfect estricto está activado: EQ, ReplayGain, Virtualizer/Dynamics y Crossfade están silenciados para que las muestras exactas de origen lleguen al DAC. Desactiva Bit-perfect estricto para reactivarlos.",
@@ -4779,363 +4800,858 @@
   "ambientCancel": "Cancelar",
   "ambientAllowDuringQuran": "Seguir sonando en modo Corán",
   "discordRichPresenceTitle": "Presencia enriquecida de Discord",
-  "@discordRichPresenceTitle": {"description": "Title of the Discord Rich Presence settings sheet"},
+  "@discordRichPresenceTitle": {
+    "description": "Title of the Discord Rich Presence settings sheet"
+  },
   "discordRichPresenceSubtitle": "Muestra la canción que suena en tu perfil",
-  "@discordRichPresenceSubtitle": {"description": "Subtitle explaining Discord Rich Presence"},
+  "@discordRichPresenceSubtitle": {
+    "description": "Subtitle explaining Discord Rich Presence"
+  },
   "discordRichPresenceStatus": "Estado de la presencia enriquecida",
-  "@discordRichPresenceStatus": {"description": "Label for the Rich Presence on/off row"},
+  "@discordRichPresenceStatus": {
+    "description": "Label for the Rich Presence on/off row"
+  },
   "discordStatusStreaming": "Activa (enviando a Discord)",
-  "@discordStatusStreaming": {"description": "Status shown when Rich Presence is on"},
+  "@discordStatusStreaming": {
+    "description": "Status shown when Rich Presence is on"
+  },
   "discordStatusInactive": "Desactivada",
-  "@discordStatusInactive": {"description": "Status shown when Rich Presence is off"},
+  "@discordStatusInactive": {
+    "description": "Status shown when Rich Presence is off"
+  },
   "discordTokenRequiredFirst": "Introduce primero tu token de usuario de Discord",
-  "@discordTokenRequiredFirst": {"description": "Toast when enabling Rich Presence without a token"},
+  "@discordTokenRequiredFirst": {
+    "description": "Toast when enabling Rich Presence without a token"
+  },
   "discordUserTokenLabel": "Token de usuario de Discord",
-  "@discordUserTokenLabel": {"description": "Field label when a token is already saved"},
+  "@discordUserTokenLabel": {
+    "description": "Field label when a token is already saved"
+  },
   "discordEnterTokenLabel": "Introduce el token de Discord",
-  "@discordEnterTokenLabel": {"description": "Field label when no token is saved yet"},
+  "@discordEnterTokenLabel": {
+    "description": "Field label when no token is saved yet"
+  },
   "discordTokenHelp": "El token de usuario de tu cuenta de Discord (cabecera Authorization). Se guarda localmente en los ajustes de la aplicación.",
-  "@discordTokenHelp": {"description": "Help text under the Discord token field"},
+  "@discordTokenHelp": {
+    "description": "Help text under the Discord token field"
+  },
   "discordTokenHint": "Pega el token aquí…",
-  "@discordTokenHint": {"description": "Input hint for the Discord token field"},
+  "@discordTokenHint": {
+    "description": "Input hint for the Discord token field"
+  },
   "discordUpdateToken": "Actualizar token",
-  "@discordUpdateToken": {"description": "Button label when a token already exists"},
+  "@discordUpdateToken": {
+    "description": "Button label when a token already exists"
+  },
   "discordConnectAccount": "Conectar cuenta",
-  "@discordConnectAccount": {"description": "Button label to connect Discord for the first time"},
+  "@discordConnectAccount": {
+    "description": "Button label to connect Discord for the first time"
+  },
   "discordConnectedAs": "Conectado como {name} (@{username})",
-  "@discordConnectedAs": {"description": "Toast confirming the Discord account that was linked", "placeholders": {"name": {"type": "String"}, "username": {"type": "String"}}},
+  "@discordConnectedAs": {
+    "description": "Toast confirming the Discord account that was linked",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "username": {
+        "type": "String"
+      }
+    }
+  },
   "discordTokenVerifyFailed": "No se pudo verificar el token. Revísalo e inténtalo de nuevo.",
-  "@discordTokenVerifyFailed": {"description": "Error shown when the Discord token is rejected"},
+  "@discordTokenVerifyFailed": {
+    "description": "Error shown when the Discord token is rejected"
+  },
   "updateAvailableTitle": "Actualización disponible",
-  "@updateAvailableTitle": {"description": "Title of the app update dialog"},
+  "@updateAvailableTitle": {
+    "description": "Title of the app update dialog"
+  },
   "updateCurrentVersionSuffix": "(Actual: {version})",
-  "@updateCurrentVersionSuffix": {"description": "Current installed version next to the update version", "placeholders": {"version": {"type": "String"}}},
+  "@updateCurrentVersionSuffix": {
+    "description": "Current installed version next to the update version",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "updateDownloading": "Descargando actualización…",
-  "@updateDownloading": {"description": "Label shown while the update APK downloads"},
+  "@updateDownloading": {
+    "description": "Label shown while the update APK downloads"
+  },
   "updateLater": "Más tarde",
-  "@updateLater": {"description": "Dismiss button on the update dialog"},
+  "@updateLater": {
+    "description": "Dismiss button on the update dialog"
+  },
   "updateInstallNow": "Instalar ahora",
-  "@updateInstallNow": {"description": "Button that starts the APK install"},
+  "@updateInstallNow": {
+    "description": "Button that starts the APK install"
+  },
   "updateDownloadAndInstall": "Descargar e instalar",
-  "@updateDownloadAndInstall": {"description": "Button that downloads then installs the update"},
+  "@updateDownloadAndInstall": {
+    "description": "Button that downloads then installs the update"
+  },
   "updateChecking": "Comprobando actualizaciones…",
-  "@updateChecking": {"description": "Toast shown while manually checking for updates"},
+  "@updateChecking": {
+    "description": "Toast shown while manually checking for updates"
+  },
   "updateUpToDate": "Ya tienes la última versión ({version})",
-  "@updateUpToDate": {"description": "Toast shown when no update exists", "placeholders": {"version": {"type": "String"}}},
+  "@updateUpToDate": {
+    "description": "Toast shown when no update exists",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "pureIntegrityCheckFailed": "La comprobación de integridad de Pulsr Pure ha fallado: esta compilación puede acceder a la red.",
-  "@pureIntegrityCheckFailed": {"description": "Startup warning shown when the offline-only build has network access"},
+  "@pureIntegrityCheckFailed": {
+    "description": "Startup warning shown when the offline-only build has network access"
+  },
   "backgroundMediaControlsUnavailable": "Los controles de medios en segundo plano no están disponibles en esta sesión. La reproducción funciona, pero los controles de la pantalla de bloqueo no pudieron iniciarse.",
-  "@backgroundMediaControlsUnavailable": {"description": "Startup warning when the audio_service platform bridge failed"},
+  "@backgroundMediaControlsUnavailable": {
+    "description": "Startup warning when the audio_service platform bridge failed"
+  },
   "discordTokenEmpty": "El token no puede estar vacío",
-  "@discordTokenEmpty": {"description": "Error when saving an empty Discord token"},
+  "@discordTokenEmpty": {
+    "description": "Error when saving an empty Discord token"
+  },
   "radioCardsTitle": "Tarjetas de radio",
-  "@radioCardsTitle": {"description": "Title of the radio-cards visibility sheet"},
+  "@radioCardsTitle": {
+    "description": "Title of the radio-cards visibility sheet"
+  },
   "radioCardsRestoreHint": "Puedes restaurarlas cuando quieras desde la página de Radio",
-  "@radioCardsRestoreHint": {"description": "Subtitle explaining how to bring radio cards back"},
+  "@radioCardsRestoreHint": {
+    "description": "Subtitle explaining how to bring radio cards back"
+  },
   "hideRadioCardsFromHome": "Ocultar tarjetas de radio de Inicio",
-  "@hideRadioCardsFromHome": {"description": "Action row to hide the home radio carousel"},
+  "@hideRadioCardsFromHome": {
+    "description": "Action row to hide the home radio carousel"
+  },
   "hideRadioCardsSubtitle": "Oculta el carrusel de radio de tu pantalla de inicio",
-  "@hideRadioCardsSubtitle": {"description": "Subtitle of the hide-radio-cards row"},
+  "@hideRadioCardsSubtitle": {
+    "description": "Subtitle of the hide-radio-cards row"
+  },
   "radioCardsHiddenToast": "Tarjetas de radio ocultas. Puedes volver a mostrarlas desde la página de Radio.",
-  "@radioCardsHiddenToast": {"description": "Toast after hiding the home radio carousel"},
+  "@radioCardsHiddenToast": {
+    "description": "Toast after hiding the home radio carousel"
+  },
   "radioCardsVisibleOnHome": "Las tarjetas de radio son visibles en Inicio",
-  "@radioCardsVisibleOnHome": {"description": "Row title when radio cards are shown on Home"},
+  "@radioCardsVisibleOnHome": {
+    "description": "Row title when radio cards are shown on Home"
+  },
   "holyQuranRadio": "Radio del Santo Corán",
-  "@holyQuranRadio": {"description": "Fallback reciter title for Quran radio hero cards"},
+  "@holyQuranRadio": {
+    "description": "Fallback reciter title for Quran radio hero cards"
+  },
   "radioNowPlayingSemantics": "Reproduciendo, toca dos veces para pausar",
-  "@radioNowPlayingSemantics": {"description": "Accessibility hint while a live station plays"},
+  "@radioNowPlayingSemantics": {
+    "description": "Accessibility hint while a live station plays"
+  },
   "radioTapToPlaySemantics": "Toca dos veces para reproducir la transmisión",
-  "@radioTapToPlaySemantics": {"description": "Accessibility hint on a stopped live station"},
+  "@radioTapToPlaySemantics": {
+    "description": "Accessibility hint on a stopped live station"
+  },
   "radioLiveOnAirBadge": "EN DIRECTO",
-  "@radioLiveOnAirBadge": {"description": "Badge shown on the live Quran radio hero card"},
+  "@radioLiveOnAirBadge": {
+    "description": "Badge shown on the live Quran radio hero card"
+  },
   "radioLiveShortBadge": "DIRECTO",
-  "@radioLiveShortBadge": {"description": "Compact live badge on the radio card"},
+  "@radioLiveShortBadge": {
+    "description": "Compact live badge on the radio card"
+  },
   "radioListenNow": "Escucha ahora",
-  "@radioListenNow": {"description": "Call-to-action button on the radio hero card"},
+  "@radioListenNow": {
+    "description": "Call-to-action button on the radio hero card"
+  },
   "viewAllRadioStations": "Ver todas las emisoras de radio",
-  "@viewAllRadioStations": {"description": "Button that opens the full radio station list"},
+  "@viewAllRadioStations": {
+    "description": "Button that opens the full radio station list"
+  },
   "radioCardsHiddenFromHome": "Las tarjetas de radio están ocultas de Inicio",
-  "@radioCardsHiddenFromHome": {"description": "Row title when radio cards are hidden"},
+  "@radioCardsHiddenFromHome": {
+    "description": "Row title when radio cards are hidden"
+  },
   "tapToRestoreRadioCards": "Toca para restaurar el carrusel de radio en Inicio",
-  "@tapToRestoreRadioCards": {"description": "Subtitle of the restore-radio-cards row"},
+  "@tapToRestoreRadioCards": {
+    "description": "Subtitle of the restore-radio-cards row"
+  },
   "radioCardsRestoredToast": "Tarjetas de radio restauradas en la pantalla de Inicio",
-  "@radioCardsRestoredToast": {"description": "Toast after restoring the home radio carousel"},
+  "@radioCardsRestoredToast": {
+    "description": "Toast after restoring the home radio carousel"
+  },
   "radioShowAction": "Mostrar",
-  "@radioShowAction": {"description": "Button that restores the hidden radio cards"},
+  "@radioShowAction": {
+    "description": "Button that restores the hidden radio cards"
+  },
   "radioShowCardsTooltip": "Mostrar tarjetas de radio en Inicio",
-  "@radioShowCardsTooltip": {"description": "Tooltip for the restore-radio-cards action"},
+  "@radioShowCardsTooltip": {
+    "description": "Tooltip for the restore-radio-cards action"
+  },
   "radioCancelImageAction": "Cancelar imagen",
-  "@radioCancelImageAction": {"description": "Action that aborts picking a station artwork image"},
+  "@radioCancelImageAction": {
+    "description": "Action that aborts picking a station artwork image"
+  },
   "ambientEffectRain": "Lluvia",
-  "@ambientEffectRain": {"description": "Name of the rain ambient sound effect"},
+  "@ambientEffectRain": {
+    "description": "Name of the rain ambient sound effect"
+  },
   "ambientEffectFire": "Fuego",
-  "@ambientEffectFire": {"description": "Name of the campfire ambient sound effect"},
+  "@ambientEffectFire": {
+    "description": "Name of the campfire ambient sound effect"
+  },
   "ambientEffectForest": "Bosque",
-  "@ambientEffectForest": {"description": "Name of the forest ambient sound effect"},
+  "@ambientEffectForest": {
+    "description": "Name of the forest ambient sound effect"
+  },
   "ambientEffectOcean": "Océano",
-  "@ambientEffectOcean": {"description": "Name of the ocean ambient sound effect"},
+  "@ambientEffectOcean": {
+    "description": "Name of the ocean ambient sound effect"
+  },
   "ambientEffectWind": "Viento",
-  "@ambientEffectWind": {"description": "Name of the wind ambient sound effect"},
+  "@ambientEffectWind": {
+    "description": "Name of the wind ambient sound effect"
+  },
   "ambientEffectThunder": "Truenos",
-  "@ambientEffectThunder": {"description": "Name of the thunder ambient sound effect"},
+  "@ambientEffectThunder": {
+    "description": "Name of the thunder ambient sound effect"
+  },
   "ambientEffectBirds": "Aves",
-  "@ambientEffectBirds": {"description": "Name of the birds ambient sound effect"},
+  "@ambientEffectBirds": {
+    "description": "Name of the birds ambient sound effect"
+  },
   "ambientEffectCafe": "Café",
-  "@ambientEffectCafe": {"description": "Name of the cafe ambience sound effect"},
+  "@ambientEffectCafe": {
+    "description": "Name of the cafe ambience sound effect"
+  },
   "ambientEffectWhiteNoise": "Ruido blanco",
-  "@ambientEffectWhiteNoise": {"description": "Name of the white noise ambient sound effect"},
+  "@ambientEffectWhiteNoise": {
+    "description": "Name of the white noise ambient sound effect"
+  },
   "mediaControlUnfavorite": "Quitar de favoritos",
-  "@mediaControlUnfavorite": {"description": "Lock-screen action that removes the current track from favorites"},
+  "@mediaControlUnfavorite": {
+    "description": "Lock-screen action that removes the current track from favorites"
+  },
   "ytmFallbackTrackTitle": "Pista de YouTube",
-  "@ytmFallbackTrackTitle": {"description": "Fallback title when a YouTube stream reports no title"},
+  "@ytmFallbackTrackTitle": {
+    "description": "Fallback title when a YouTube stream reports no title"
+  },
   "fileIntentAudioFile": "Archivo de audio",
-  "@fileIntentAudioFile": {"description": "Title for an audio file opened from outside the app"},
+  "@fileIntentAudioFile": {
+    "description": "Title for an audio file opened from outside the app"
+  },
   "fileIntentExternalAudio": "Audio externo",
-  "@fileIntentExternalAudio": {"description": "Artist/album fallback for externally opened audio"},
+  "@fileIntentExternalAudio": {
+    "description": "Artist/album fallback for externally opened audio"
+  },
   "fileIntentFilesAlbum": "Archivos",
-  "@fileIntentFilesAlbum": {"description": "Album label grouping externally opened files"},
+  "@fileIntentFilesAlbum": {
+    "description": "Album label grouping externally opened files"
+  },
   "dupReasonTitleArtist": "Título y artista idénticos ({count} copias)",
-  "@dupReasonTitleArtist": {"description": "Reason shown for a duplicate group matched on metadata", "placeholders": {"count": {"type": "int"}}},
+  "@dupReasonTitleArtist": {
+    "description": "Reason shown for a duplicate group matched on metadata",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "dupReasonChecksum": "Contenido de audio idéntico (checksum verificado)",
-  "@dupReasonChecksum": {"description": "Reason shown for a duplicate group matched on audio checksum"},
+  "@dupReasonChecksum": {
+    "description": "Reason shown for a duplicate group matched on audio checksum"
+  },
   "ytmBrowseChartsTitle": "Listas top y tendencias",
-  "@ytmBrowseChartsTitle": {"description": "Title of the YouTube Music charts browse section"},
+  "@ytmBrowseChartsTitle": {
+    "description": "Title of the YouTube Music charts browse section"
+  },
   "ytmBrowseChartsSubtitle": "Las pistas más reproducidas ahora",
-  "@ytmBrowseChartsSubtitle": {"description": "Subtitle of the charts browse section"},
+  "@ytmBrowseChartsSubtitle": {
+    "description": "Subtitle of the charts browse section"
+  },
   "ytmBrowseNewReleasesTitle": "Novedades",
-  "@ytmBrowseNewReleasesTitle": {"description": "Title of the new releases browse section"},
+  "@ytmBrowseNewReleasesTitle": {
+    "description": "Title of the new releases browse section"
+  },
   "ytmBrowseNewReleasesSubtitle": "Álbumes y sencillos recién publicados",
-  "@ytmBrowseNewReleasesSubtitle": {"description": "Subtitle of the new releases browse section"},
+  "@ytmBrowseNewReleasesSubtitle": {
+    "description": "Subtitle of the new releases browse section"
+  },
   "ytmBrowseMoodsTitle": "Ánimos y géneros",
-  "@ytmBrowseMoodsTitle": {"description": "Title of the moods and genres browse section"},
+  "@ytmBrowseMoodsTitle": {
+    "description": "Title of the moods and genres browse section"
+  },
   "ytmBrowseMoodsSubtitle": "Pistas populares de ánimos y géneros de YouTube Music",
-  "@ytmBrowseMoodsSubtitle": {"description": "Subtitle of the moods and genres browse section"},
+  "@ytmBrowseMoodsSubtitle": {
+    "description": "Subtitle of the moods and genres browse section"
+  },
   "ytmUnknownTitle": "Título desconocido",
-  "@ytmUnknownTitle": {"description": "Fallback title when YouTube returns no track name"},
+  "@ytmUnknownTitle": {
+    "description": "Fallback title when YouTube returns no track name"
+  },
   "ytmAutoPlaylistAuthor": "Lista automática",
-  "@ytmAutoPlaylistAuthor": {"description": "Author label for generated playlists like Liked Music"},
+  "@ytmAutoPlaylistAuthor": {
+    "description": "Author label for generated playlists like Liked Music"
+  },
   "ytmFallbackPlaylistTitle": "Lista de reproducción",
-  "@ytmFallbackPlaylistTitle": {"description": "Fallback title when a remote playlist has no name"},
+  "@ytmFallbackPlaylistTitle": {
+    "description": "Fallback title when a remote playlist has no name"
+  },
   "suggestionHeavyRotationTitle": "Mixen rotación alta",
-  "@suggestionHeavyRotationTitle": {"description": "Title of the auto-suggested most-played playlist"},
+  "@suggestionHeavyRotationTitle": {
+    "description": "Title of the auto-suggested most-played playlist"
+  },
   "suggestionHeavyRotationDesc": "Tus pistas más reproducidas en bucle",
-  "@suggestionHeavyRotationDesc": {"description": "Description of the heavy rotation suggestion"},
+  "@suggestionHeavyRotationDesc": {
+    "description": "Description of the heavy rotation suggestion"
+  },
   "suggestionForgottenFavoritesTitle": "Favoritas olvidadas",
-  "@suggestionForgottenFavoritesTitle": {"description": "Title of the starred-but-unheard playlist suggestion"},
+  "@suggestionForgottenFavoritesTitle": {
+    "description": "Title of the starred-but-unheard playlist suggestion"
+  },
   "suggestionForgottenFavoritesDesc": "Joyas destacadas que no has oído últimamente",
-  "@suggestionForgottenFavoritesDesc": {"description": "Description of the forgotten favorites suggestion"},
+  "@suggestionForgottenFavoritesDesc": {
+    "description": "Description of the forgotten favorites suggestion"
+  },
   "suggestionHiResTitle": "Escaparate audiophile de alta resolución",
-  "@suggestionHiResTitle": {"description": "Title of the hi-res lossless playlist suggestion"},
+  "@suggestionHiResTitle": {
+    "description": "Title of the hi-res lossless playlist suggestion"
+  },
   "suggestionHiResDesc": "Fidelidad sin pérdidas de master de estudio a 24 bits",
-  "@suggestionHiResDesc": {"description": "Description of the hi-res suggestion"},
+  "@suggestionHiResDesc": {
+    "description": "Description of the hi-res suggestion"
+  },
   "suggestionEnergyBoostTitle": "Subidón de energía rápido",
-  "@suggestionEnergyBoostTitle": {"description": "Title of the upbeat playlist suggestion"},
+  "@suggestionEnergyBoostTitle": {
+    "description": "Title of the upbeat playlist suggestion"
+  },
   "suggestionEnergyBoostDesc": "Pistas rápidas y enérgicas para impulsar tu día",
-  "@suggestionEnergyBoostDesc": {"description": "Description of the energy boost suggestion"},
+  "@suggestionEnergyBoostDesc": {
+    "description": "Description of the energy boost suggestion"
+  },
   "downloadErrorGeneric": "La descarga falló",
-  "@downloadErrorGeneric": {"description": "Fallback message when a download fails for an unclassified reason"},
+  "@downloadErrorGeneric": {
+    "description": "Fallback message when a download fails for an unclassified reason"
+  },
   "fileIntentLoadTrackFailed": "No se pudo cargar la pista de YouTube: {detail}",
-  "@fileIntentLoadTrackFailed": {"description": "Error toast when a shared YouTube link cannot be resolved", "placeholders": {"detail": {"type": "String"}}},
+  "@fileIntentLoadTrackFailed": {
+    "description": "Error toast when a shared YouTube link cannot be resolved",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
   "karaokeScoreLabel": "Puntuación",
-  "@karaokeScoreLabel": {"description": "Label for the karaoke pitch accuracy score"},
+  "@karaokeScoreLabel": {
+    "description": "Label for the karaoke pitch accuracy score"
+  },
   "eqWetMixPercent": "{pct}% húmedo",
-  "@eqWetMixPercent": {"description": "Reverb wet/dry mix readout", "placeholders": {"pct": {"type": "String"}}},
+  "@eqWetMixPercent": {
+    "description": "Reverb wet/dry mix readout",
+    "placeholders": {
+      "pct": {
+        "type": "String"
+      }
+    }
+  },
   "wizardStepLabel": "Paso {step} de {total}",
-  "@wizardStepLabel": {"description": "Progress label at the top of the audio setup wizard", "placeholders": {"step": {"type": "int"}, "total": {"type": "int"}}},
+  "@wizardStepLabel": {
+    "description": "Progress label at the top of the audio setup wizard",
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "wizardUsbDacTitle": "DAC USB / Dongle",
-  "@wizardUsbDacTitle": {"description": "Audio setup wizard output option"},
+  "@wizardUsbDacTitle": {
+    "description": "Audio setup wizard output option"
+  },
   "wizardUsbDacSubtitle": "DAC externo con soporte bit-perfect y DSD",
-  "@wizardUsbDacSubtitle": {"description": "Subtitle for the USB DAC wizard option"},
+  "@wizardUsbDacSubtitle": {
+    "description": "Subtitle for the USB DAC wizard option"
+  },
   "wizardBluetoothTitle": "Audio Bluetooth",
-  "@wizardBluetoothTitle": {"description": "Audio setup wizard output option"},
+  "@wizardBluetoothTitle": {
+    "description": "Audio setup wizard output option"
+  },
   "wizardBluetoothSubtitle": "Auriculares inalámbricos, earbuds TWS o audio del coche",
-  "@wizardBluetoothSubtitle": {"description": "Subtitle for the Bluetooth wizard option"},
+  "@wizardBluetoothSubtitle": {
+    "description": "Subtitle for the Bluetooth wizard option"
+  },
   "wizardSpeakerTitle": "Altavoz / Integrado",
-  "@wizardSpeakerTitle": {"description": "Audio setup wizard output option"},
+  "@wizardSpeakerTitle": {
+    "description": "Audio setup wizard output option"
+  },
   "wizardSpeakerSubtitle": "Altavoces del teléfono con ecualización y sonoridad del sistema",
-  "@wizardSpeakerSubtitle": {"description": "Subtitle for the built-in speaker wizard option"},
+  "@wizardSpeakerSubtitle": {
+    "description": "Subtitle for the built-in speaker wizard option"
+  },
   "wizardWiredTitle": "Auriculares con cable",
-  "@wizardWiredTitle": {"description": "Audio setup wizard output option"},
+  "@wizardWiredTitle": {
+    "description": "Audio setup wizard output option"
+  },
   "wizardWiredSubtitle": "Clavija de 3,5 mm o auricular analógico pasivo",
-  "@wizardWiredSubtitle": {"description": "Subtitle for the wired headphones wizard option"},
+  "@wizardWiredSubtitle": {
+    "description": "Subtitle for the wired headphones wizard option"
+  },
   "wizardCrossfadeSubtitle": "Fusión fluida de 3,0 s entre pistas",
-  "@wizardCrossfadeSubtitle": {"description": "Subtitle for the crossfade transition wizard option"},
+  "@wizardCrossfadeSubtitle": {
+    "description": "Subtitle for the crossfade transition wizard option"
+  },
   "wizardNoOverlapSubtitle": "Separación estándar de pistas sin solapamiento",
-  "@wizardNoOverlapSubtitle": {"description": "Subtitle for the no-transition wizard option"},
+  "@wizardNoOverlapSubtitle": {
+    "description": "Subtitle for the no-transition wizard option"
+  },
   "rcSnrExcellent": "Excelente",
-  "@rcSnrExcellent": {"description": "Signal-to-noise quality rating during room correction"},
+  "@rcSnrExcellent": {
+    "description": "Signal-to-noise quality rating during room correction"
+  },
   "rcSnrGood": "Bueno",
-  "@rcSnrGood": {"description": "Signal-to-noise quality rating during room correction"},
+  "@rcSnrGood": {
+    "description": "Signal-to-noise quality rating during room correction"
+  },
   "rcSnrModerate": "Ruido moderado",
-  "@rcSnrModerate": {"description": "Signal-to-noise quality rating during room correction"},
+  "@rcSnrModerate": {
+    "description": "Signal-to-noise quality rating during room correction"
+  },
   "rcPointListeningCenter": "Posición de escucha (centro)",
-  "@rcPointListeningCenter": {"description": "First measurement point in room correction"},
+  "@rcPointListeningCenter": {
+    "description": "First measurement point in room correction"
+  },
   "rcPointOneMeterLeft": "1 metro a la izquierda",
-  "@rcPointOneMeterLeft": {"description": "Second measurement point in room correction"},
+  "@rcPointOneMeterLeft": {
+    "description": "Second measurement point in room correction"
+  },
   "rcPointOneMeterRight": "1 metro a la derecha",
-  "@rcPointOneMeterRight": {"description": "Third measurement point in room correction"},
+  "@rcPointOneMeterRight": {
+    "description": "Third measurement point in room correction"
+  },
   "rcMeasuringPoint": "Midiendo {point}",
-  "@rcMeasuringPoint": {"description": "Title while a room correction point is being measured", "placeholders": {"point": {"type": "String"}}},
+  "@rcMeasuringPoint": {
+    "description": "Title while a room correction point is being measured",
+    "placeholders": {
+      "point": {
+        "type": "String"
+      }
+    }
+  },
   "rcPointOfTotal": "Punto {point} de {total}",
-  "@rcPointOfTotal": {"description": "Room correction multi-point progress", "placeholders": {"point": {"type": "int"}, "total": {"type": "int"}}},
+  "@rcPointOfTotal": {
+    "description": "Room correction multi-point progress",
+    "placeholders": {
+      "point": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "rcPositionOfTotal": "Posición {point} de {total}",
-  "@rcPositionOfTotal": {"description": "Room correction position progress", "placeholders": {"point": {"type": "int"}, "total": {"type": "int"}}},
+  "@rcPositionOfTotal": {
+    "description": "Room correction position progress",
+    "placeholders": {
+      "point": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "rcMoveDeviceTo": "Lleva tu dispositivo a: {point}",
-  "@rcMoveDeviceTo": {"description": "Instruction to reposition the phone between measurements", "placeholders": {"point": {"type": "String"}}},
+  "@rcMoveDeviceTo": {
+    "description": "Instruction to reposition the phone between measurements",
+    "placeholders": {
+      "point": {
+        "type": "String"
+      }
+    }
+  },
   "rcMeasurePosition": "Medir posición {point}",
-  "@rcMeasurePosition": {"description": "Button that starts one room correction measurement", "placeholders": {"point": {"type": "int"}}},
+  "@rcMeasurePosition": {
+    "description": "Button that starts one room correction measurement",
+    "placeholders": {
+      "point": {
+        "type": "int"
+      }
+    }
+  },
   "rcFinishWithMeasurements": "Terminar con las mediciones actuales ({count}/3)",
-  "@rcFinishWithMeasurements": {"description": "Button that accepts a partial room correction sweep", "placeholders": {"count": {"type": "int"}}},
+  "@rcFinishWithMeasurements": {
+    "description": "Button that accepts a partial room correction sweep",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "rcSnrReading": "SNR: {db} dB ({label})",
-  "@rcSnrReading": {"description": "Live signal-to-noise readout during room correction", "placeholders": {"db": {"type": "String"}, "label": {"type": "String"}}},
+  "@rcSnrReading": {
+    "description": "Live signal-to-noise readout during room correction",
+    "placeholders": {
+      "db": {
+        "type": "String"
+      },
+      "label": {
+        "type": "String"
+      }
+    }
+  },
   "rcMaxDeviation": "máx. {db} dB",
-  "@rcMaxDeviation": {"description": "Worst-case loopback deviation shown in room correction results", "placeholders": {"db": {"type": "String"}}},
+  "@rcMaxDeviation": {
+    "description": "Worst-case loopback deviation shown in room correction results",
+    "placeholders": {
+      "db": {
+        "type": "String"
+      }
+    }
+  },
   "dspPrefNativeSubtitle": "DSP propio en tiempo real de 64 bits con ecualizador paramétrico, limitador, reverberación por convolución y audio Bit-Perfect.",
-  "@dspPrefNativeSubtitle": {"description": "Subtitle for the native Pulsr DSP preference"},
+  "@dspPrefNativeSubtitle": {
+    "description": "Subtitle for the native Pulsr DSP preference"
+  },
   "dspPrefSystemSubtitle": "Efectos de hardware del fabricante (Dolby Atmos, Dirac, Xiaomi Sound, etc.) mediante los efectos del sistema Android.",
-  "@dspPrefSystemSubtitle": {"description": "Subtitle for the system/vendor DSP preference"},
+  "@dspPrefSystemSubtitle": {
+    "description": "Subtitle for the system/vendor DSP preference"
+  },
   "dspPrefAutoSubtitle": "Usa el DSP Native Studio de forma predeterminada y recurre a AudioFX del sistema cuando el motor nativo no está disponible.",
-  "@dspPrefAutoSubtitle": {"description": "Subtitle for the automatic DSP preference"},
+  "@dspPrefAutoSubtitle": {
+    "description": "Subtitle for the automatic DSP preference"
+  },
   "badgeRecommended": "RECOMENDADO",
-  "@badgeRecommended": {"description": "All-caps badge marking the preferred option"},
+  "@badgeRecommended": {
+    "description": "All-caps badge marking the preferred option"
+  },
   "badgeSystem": "SISTEMA",
-  "@badgeSystem": {"description": "All-caps badge marking an OS-provided option"},
+  "@badgeSystem": {
+    "description": "All-caps badge marking an OS-provided option"
+  },
   "badgeAuto": "AUTO",
-  "@badgeAuto": {"description": "All-caps badge marking an automatic option"},
+  "@badgeAuto": {
+    "description": "All-caps badge marking an automatic option"
+  },
   "proxyPresetLocalHttp": "HTTP local (8080)",
-  "@proxyPresetLocalHttp": {"description": "Proxy quick-preset chip for a local HTTP proxy"},
+  "@proxyPresetLocalHttp": {
+    "description": "Proxy quick-preset chip for a local HTTP proxy"
+  },
   "proxyPresetLocalSocks": "SOCKS5 local (1080)",
-  "@proxyPresetLocalSocks": {"description": "Proxy quick-preset chip for a local SOCKS5 proxy"},
+  "@proxyPresetLocalSocks": {
+    "description": "Proxy quick-preset chip for a local SOCKS5 proxy"
+  },
   "semanticsStateOn": "Activado",
-  "@semanticsStateOn": {"description": "Accessibility value for an enabled switch"},
+  "@semanticsStateOn": {
+    "description": "Accessibility value for an enabled switch"
+  },
   "semanticsStateOff": "Desactivado",
-  "@semanticsStateOff": {"description": "Accessibility value for a disabled switch"},
+  "@semanticsStateOff": {
+    "description": "Accessibility value for a disabled switch"
+  },
   "autoEqLabel": "AutoEq",
-  "@autoEqLabel": {"description": "Tab and badge label for the AutoEq headphone-profile feature"},
+  "@autoEqLabel": {
+    "description": "Tab and badge label for the AutoEq headphone-profile feature"
+  },
   "outputBluetooth": "Bluetooth",
-  "@outputBluetooth": {"description": "Output device category label"},
+  "@outputBluetooth": {
+    "description": "Output device category label"
+  },
   "outputUsbDac": "DAC USB",
-  "@outputUsbDac": {"description": "Output device category label"},
+  "@outputUsbDac": {
+    "description": "Output device category label"
+  },
   "quranAutoDetectRecitations": "Detectar recitaciones automáticamente",
-  "@quranAutoDetectRecitations": {"description": "Button that re-enables automatic Quran recitation detection"},
+  "@quranAutoDetectRecitations": {
+    "description": "Button that re-enables automatic Quran recitation detection"
+  },
   "autoPreampActiveClipping": "Preamplificador automático: activo (protegido contra recorte)",
-  "@autoPreampActiveClipping": {"description": "Status line when the automatic preamp is preventing clipping"},
+  "@autoPreampActiveClipping": {
+    "description": "Status line when the automatic preamp is preventing clipping"
+  },
   "spotifyImportHelp": "Pega el enlace o el URI de una lista pública de Spotify para emparejarla e importar sus pistas a tu biblioteca de Pulsr.",
-  "@spotifyImportHelp": {"description": "Explanation text in the Spotify import dialog"},
+  "@spotifyImportHelp": {
+    "description": "Explanation text in the Spotify import dialog"
+  },
   "spotifyImporting": "Importando lista de reproducción…",
-  "@spotifyImporting": {"description": "Default status line while a Spotify playlist imports"},
+  "@spotifyImporting": {
+    "description": "Default status line while a Spotify playlist imports"
+  },
   "spotifyUnmatchedTracks": "Pistas sin emparejar ({count})",
-  "@spotifyUnmatchedTracks": {"description": "Header for Spotify tracks that could not be matched locally", "placeholders": {"count": {"type": "int"}}},
+  "@spotifyUnmatchedTracks": {
+    "description": "Header for Spotify tracks that could not be matched locally",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "spotifyImportFailed": "Se produjo un error durante la importación.",
-  "@spotifyImportFailed": {"description": "Default error line in the Spotify import dialog"},
+  "@spotifyImportFailed": {
+    "description": "Default error line in the Spotify import dialog"
+  },
   "partyYouLabel": "(Tú)",
-  "@partyYouLabel": {"description": "Marker next to your own name in the listen-together roster"},
+  "@partyYouLabel": {
+    "description": "Marker next to your own name in the listen-together roster"
+  },
   "partyCodeHint": "CÓDIGO DE 6 CARACTERES",
-  "@partyCodeHint": {"description": "Input hint for joining a listen-together room"},
+  "@partyCodeHint": {
+    "description": "Input hint for joining a listen-together room"
+  },
   "speedPickerAutomixTitle": "Automix / Transiciones inteligentes",
-  "@speedPickerAutomixTitle": {"description": "Row title for the automix transition feature"},
+  "@speedPickerAutomixTitle": {
+    "description": "Row title for the automix transition feature"
+  },
   "speedPickerAutomixDesc": "Iguala el tempo, alinea las rejillas de punto y intercambia los graves",
-  "@speedPickerAutomixDesc": {"description": "Description of what automix does"},
+  "@speedPickerAutomixDesc": {
+    "description": "Description of what automix does"
+  },
   "listenTogetherPartyMode": "Escuchar juntos (modo fiesta)",
-  "@listenTogetherPartyMode": {"description": "Song info row that opens party mode"},
+  "@listenTogetherPartyMode": {
+    "description": "Song info row that opens party mode"
+  },
   "onboardingAudioEngine": "Motor de audio Pulsr",
-  "@onboardingAudioEngine": {"description": "Label on the audio engine graphic in onboarding"},
+  "@onboardingAudioEngine": {
+    "description": "Label on the audio engine graphic in onboarding"
+  },
   "tagEditorBatchInterrupted": "No se actualizaron {count} archivos porque el lote se interrumpió.",
-  "@tagEditorBatchInterrupted": {"description": "Banner offering to resume an interrupted tag write batch", "placeholders": {"count": {"type": "int"}}},
+  "@tagEditorBatchInterrupted": {
+    "description": "Banner offering to resume an interrupted tag write batch",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "tagEditorRetryRemaining": "Reintentar {count} archivos restantes",
-  "@tagEditorRetryRemaining": {"description": "Button that resumes an interrupted tag write batch", "placeholders": {"count": {"type": "int"}}},
+  "@tagEditorRetryRemaining": {
+    "description": "Button that resumes an interrupted tag write batch",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "smartPlaylistValueLabel": "Valor",
-  "@smartPlaylistValueLabel": {"description": "Label of the operand field in a smart playlist rule row"},
+  "@smartPlaylistValueLabel": {
+    "description": "Label of the operand field in a smart playlist rule row"
+  },
   "smartPlaylistNameHint": "p. ej. Éxitos rock de los 80, Rotación alta…",
-  "@smartPlaylistNameHint": {"description": "Input hint for the new smart playlist name"},
+  "@smartPlaylistNameHint": {
+    "description": "Input hint for the new smart playlist name"
+  },
   "smartPlaylistTitleHint": "p. ej. Bohemian, Love…",
-  "@smartPlaylistTitleHint": {"description": "Input hint for a title-matching smart playlist rule"},
+  "@smartPlaylistTitleHint": {
+    "description": "Input hint for a title-matching smart playlist rule"
+  },
   "outputRouteUnverified": "Ruta de salida sin verificar",
-  "@outputRouteUnverified": {"description": "Shown when the app cannot determine the active audio output device"},
+  "@outputRouteUnverified": {
+    "description": "Shown when the app cannot determine the active audio output device"
+  },
   "defaultAudioOutput": "Salida de audio predeterminada",
-  "@defaultAudioOutput": {"description": "Generic name for the system default audio output"},
+  "@defaultAudioOutput": {
+    "description": "Generic name for the system default audio output"
+  },
   "containerAverageEstimated": "Media del contenedor (estimada)",
-  "@containerAverageEstimated": {"description": "Bitrate label when only the container average is known"},
+  "@containerAverageEstimated": {
+    "description": "Bitrate label when only the container average is known"
+  },
   "losslessOutputFidelityNote": "Fuente sin pérdidas (la fidelidad de salida es aparte)",
-  "@losslessOutputFidelityNote": {"description": "Sub-note under the source bitrate for lossless tracks"},
+  "@losslessOutputFidelityNote": {
+    "description": "Sub-note under the source bitrate for lossless tracks"
+  },
   "ytmQualityHighBitrate": "Alta • 160k",
-  "@ytmQualityHighBitrate": {"description": "Streaming quality option label"},
+  "@ytmQualityHighBitrate": {
+    "description": "Streaming quality option label"
+  },
   "ytmQualityMediumBitrate": "Media • 128k",
-  "@ytmQualityMediumBitrate": {"description": "Streaming quality option label"},
+  "@ytmQualityMediumBitrate": {
+    "description": "Streaming quality option label"
+  },
   "ytmQualityLowBitrate": "Baja • 64k",
-  "@ytmQualityLowBitrate": {"description": "Streaming quality option label"},
+  "@ytmQualityLowBitrate": {
+    "description": "Streaming quality option label"
+  },
   "outputRateUnknown": "Frecuencia desconocida",
-  "@outputRateUnknown": {"description": "Sample rate readout when the device reports none"},
+  "@outputRateUnknown": {
+    "description": "Sample rate readout when the device reports none"
+  },
   "exclusiveMixerPrefix": "Mezclador exclusivo • {detail}",
-  "@exclusiveMixerPrefix": {"description": "Output path readout when an exclusive mixer is active", "placeholders": {"detail": {"type": "String"}}},
+  "@exclusiveMixerPrefix": {
+    "description": "Output path readout when an exclusive mixer is active",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
   "smartPlaylistAlbumHint": "p. ej. Discovery, Rumours…",
-  "@smartPlaylistAlbumHint": {"description": "Input hint for an album-matching smart playlist rule"},
+  "@smartPlaylistAlbumHint": {
+    "description": "Input hint for an album-matching smart playlist rule"
+  },
   "smartPlaylistGenreHint": "p. ej. Rock, Pop, Jazz…",
-  "@smartPlaylistGenreHint": {"description": "Input hint for a genre-matching smart playlist rule"},
+  "@smartPlaylistGenreHint": {
+    "description": "Input hint for a genre-matching smart playlist rule"
+  },
   "smartPlaylistHintDays": "p. ej. 30 (días)",
-  "@smartPlaylistHintDays": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintDays": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintBetween": "p. ej. 5, 20 o 5..20",
-  "@smartPlaylistHintBetween": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintBetween": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintPlayCount": "p. ej. 5",
-  "@smartPlaylistHintPlayCount": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintPlayCount": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintArtist": "p. ej. Queen, Daft Punk…",
-  "@smartPlaylistHintArtist": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintArtist": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintYear": "p. ej. 2024",
-  "@smartPlaylistHintYear": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintYear": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintDecade": "p. ej. 1980, 1990, 2000, 2020…",
-  "@smartPlaylistHintDecade": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintDecade": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintLossless": "FLAC, WAV, ALAC",
-  "@smartPlaylistHintLossless": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintLossless": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintDateAdded": "p. ej. 30",
-  "@smartPlaylistHintDateAdded": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintDateAdded": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintDuration": "p. ej. 300000 (ms = 5 min)",
-  "@smartPlaylistHintDuration": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintDuration": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintLastPlayed": "p. ej. 7",
-  "@smartPlaylistHintLastPlayed": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintLastPlayed": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintRating": "p. ej. 4 (estrellas 0–5)",
-  "@smartPlaylistHintRating": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintRating": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "smartPlaylistHintValueDefault": "Valor…",
-  "@smartPlaylistHintValueDefault": {"description": "Input hint for a smart playlist rule field"},
+  "@smartPlaylistHintValueDefault": {
+    "description": "Input hint for a smart playlist rule field"
+  },
   "bitDepthValue": "{bit} bits",
-  "@bitDepthValue": {"description": "Bit depth readout", "placeholders": {"bit": {"type": "String"}}},
+  "@bitDepthValue": {
+    "description": "Bit depth readout",
+    "placeholders": {
+      "bit": {
+        "type": "String"
+      }
+    }
+  },
   "depthUnknown": "Profundidad desconocida",
-  "@depthUnknown": {"description": "Bit depth readout when the device reports none"},
+  "@depthUnknown": {
+    "description": "Bit depth readout when the device reports none"
+  },
   "usbDacConnectedSummary": "DAC USB: {device} ({uac})",
-  "@usbDacConnectedSummary": {"description": "Summary line for the attached USB DAC", "placeholders": {"device": {"type": "String"}, "uac": {"type": "String"}}},
+  "@usbDacConnectedSummary": {
+    "description": "Summary line for the attached USB DAC",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      },
+      "uac": {
+        "type": "String"
+      }
+    }
+  },
   "exclusiveMixerLabel": "Mezclador exclusivo",
-  "@exclusiveMixerLabel": {"description": "Label for the exclusive output mixer path"},
+  "@exclusiveMixerLabel": {
+    "description": "Label for the exclusive output mixer path"
+  },
   "errQuranSaveStyleAdjustments": "No se pudieron guardar los ajustes de estilo del Corán",
-  "@errQuranSaveStyleAdjustments": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranSaveStyleAdjustments": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "errQuranSaveModeSetting": "No se pudo guardar el ajuste del modo Corán",
-  "@errQuranSaveModeSetting": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranSaveModeSetting": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "errQuranApplyAudioProfile": "No se pudo aplicar el perfil de audio del Corán",
-  "@errQuranApplyAudioProfile": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranApplyAudioProfile": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "errQuranRestoreSettings": "No se pudieron restaurar los ajustes de audio del modo Corán",
-  "@errQuranRestoreSettings": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranRestoreSettings": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "errQuranSaveReciterStyle": "No se pudo guardar el estilo del recitador",
-  "@errQuranSaveReciterStyle": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranSaveReciterStyle": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "errQuranResetStyleAdjustments": "No se pudieron restablecer los ajustes de estilo",
-  "@errQuranResetStyleAdjustments": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranResetStyleAdjustments": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "errQuranSetLearningSpeed": "No se pudo ajustar la velocidad de aprendizaje",
-  "@errQuranSetLearningSpeed": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranSetLearningSpeed": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "errQuranSetVocalWarmth": "No se pudo ajustar la calidez vocal",
-  "@errQuranSetVocalWarmth": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranSetVocalWarmth": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "errQuranSetAmbience": "No se pudo ajustar el ambiente",
-  "@errQuranSetAmbience": {"description": "Quran mode failure surfaced in the player error card"},
+  "@errQuranSetAmbience": {
+    "description": "Quran mode failure surfaced in the player error card"
+  },
   "autoplayBadgeLabel": "REPRODUCCIÓN AUTOMÁTICA",
-  "@autoplayBadgeLabel": {"description": "Badge shown when the queue switches to autoplay"},
+  "@autoplayBadgeLabel": {
+    "description": "Badge shown when the queue switches to autoplay"
+  },
   "lyricsEditorFirstLine": "Primera línea de la letra…",
-  "@lyricsEditorFirstLine": {"description": "Placeholder first row when starting a new lyric file"},
+  "@lyricsEditorFirstLine": {
+    "description": "Placeholder first row when starting a new lyric file"
+  },
   "lyricsEditorNewLine": "Nueva línea…",
-  "@lyricsEditorNewLine": {"description": "Placeholder text for a newly added lyric row"},
+  "@lyricsEditorNewLine": {
+    "description": "Placeholder text for a newly added lyric row"
+  },
   "lyricsShareCardSaved": "Tarjeta guardada en: {path}",
-  "@lyricsShareCardSaved": {"description": "Toast confirming the saved lyrics share card", "placeholders": {"path": {"type": "String"}}},
+  "@lyricsShareCardSaved": {
+    "description": "Toast confirming the saved lyrics share card",
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "canvasEnabled": "Canvas y carátula en movimiento activados",
-  "@canvasEnabled": {"description": "Toast when the animated artwork canvas turns on"},
+  "@canvasEnabled": {
+    "description": "Toast when the animated artwork canvas turns on"
+  },
   "canvasDisabled": "Canvas desactivado",
-  "@canvasDisabled": {"description": "Toast when the animated artwork canvas turns off"},
+  "@canvasDisabled": {
+    "description": "Toast when the animated artwork canvas turns off"
+  },
   "aboutStatusLine": "Pulsr {version} • Motor audiófilo",
-  "@aboutStatusLine": {"description": "Version line at the bottom of the layout preview", "placeholders": {"version": {"type": "String"}}},
+  "@aboutStatusLine": {
+    "description": "Version line at the bottom of the layout preview",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "widgetNothingPlaying": "Nada en reproducción",
-  "@widgetNothingPlaying": {"description": "Home widget subtitle when nothing is playing"}
+  "@widgetNothingPlaying": {
+    "description": "Home widget subtitle when nothing is playing"
+  },
+  "conflictLiveOrLossyNotBitPerfect": "Las transmisiones de radio en vivo y con pérdidas no se pueden reproducir en Bit-Perfect.",
+  "uac1RateReadbackUnsupported": "Este DAC no admite la lectura de frecuencia de muestreo UAC1; Strict Bit-Perfect requiere frecuencias verificadas."
 }

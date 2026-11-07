@@ -50,6 +50,22 @@ Future<bool> requestBitPerfectOutput(BuildContext context, bool enable) async {
     player = context.read<PlayerCubit>();
   } catch (_) {}
 
+  final currentSong = player?.state.currentSong;
+  final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
+    path: currentSong?.path,
+    bitDepth: currentSong?.bitDepth ?? 0,
+  );
+  if (sourceBlock != null) {
+    settings.safeEmit(settings.state.copyWith(errorMessage: sourceBlock));
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(sourceBlock),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
+    );
+    return false;
+  }
+
   final l = context.l10n;
   final conflicts = <_Conflict>[];
   final s = settings.state;
@@ -190,6 +206,12 @@ Future<bool> requestBitPerfectOutput(BuildContext context, bool enable) async {
     // per-stage cubit toggle. The master effects switch turns it off, and it
     // also covers any stage added to the engine later, so the list can never
     // claim completeness while something is still processing the signal.
+    // The multiband compressor is owned by the effect manager rather than by a
+    // per-stage cubit toggle. The master effects switch turns it off, and it
+    // also covers any stage added to the engine later, so the list can never
+    // claim completeness while something is still processing the signal.
+    // By checking isDspEffectsActive, the 'Master DSP' entry never appears when
+    // no stage is active.
     if (p.isDspEffectsActive) {
       conflicts.add(_Conflict(
         l.dspStatMasterDsp,

@@ -141,14 +141,25 @@ extension PlayerQueueRadio on PlayerQueueController {
     if (!s.isAutoplayEnabled || _isClosed()) return;
     if (s.queue.isEmpty) return;
 
+    // Do not trigger online autoplay if the queue is a local/downloaded playback session
+    final isLocalQueue = s.queue.every((track) =>
+        track.source == SongSource.local ||
+        track.isDownloaded == true ||
+        !track.path.startsWith('ytmusic://'));
+    if (isLocalQueue) return;
+
     final remaining = s.queue.length - 1 - s.currentIndex;
     if (remaining > 2) return;
 
     // Use current song or last song in queue as seed
     final seedSong = s.currentSong ?? s.queue.last;
+    if (seedSong.source == SongSource.local || seedSong.isDownloaded == true) {
+      return;
+    }
     final videoId = seedSong.remoteId;
     if (videoId == null || videoId.isEmpty) return;
 
+    if (!await ConnectivityGuard.hasConnection()) return;
     await fetchAndEnqueueAutoplay(videoId, seedArtist: seedSong.artist);
   }
 

@@ -4094,6 +4094,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bpChainInactive => 'Bit-Perfect armed but not active';
 
   @override
+  String bpMoreEffects(int count) {
+    return '+$count more effects';
+  }
+
+  @override
+  String get bpDspBypassed => 'Bypassed (Bit-Perfect Guardrail)';
+
+  @override
+  String get bpDspCleanPath => 'None (Clean Path)';
+
+  @override
+  String get bpPlatformConversion =>
+      'Platform conversion • not measured by this app';
+
+  @override
   String get btAudioCodec => 'BLUETOOTH AUDIO CODEC';
 
   @override
@@ -5736,6 +5751,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsThemeCdTurntableDesc =>
       'Rotating iridescent CD with central album artwork & animated stylus stick';
+
+  @override
+  String get settingsThemeClean => 'Clean Modern Flow';
+
+  @override
+  String get settingsThemeCleanDesc =>
+      'Minimalist Apple-inspired edge artwork, sleek capsule slider and quick bottom options';
 
   @override
   String get settingsThemeVinylTurntable => 'Vinyl Turntable Studio';
@@ -8179,6 +8201,67 @@ class AppLocalizationsEn extends AppLocalizations {
       'This USB DAC does not advertise an exclusive mixer configuration.';
 
   @override
+  String get conflictUsbNotSupported =>
+      'Android does not support exclusive bit-perfect output for this USB DAC.';
+
+  @override
+  String get conflictTargetFormatUnavailable =>
+      'This USB DAC does not offer the selected sample rate / bit depth in exclusive mode.';
+
+  @override
+  String get conflictSetMixerAttributesFailed =>
+      'Android refused exclusive mode for this USB DAC (another app may be using it).';
+
+  @override
+  String get conflictExclusiveApiUnavailable =>
+      'Exclusive output API is not available on this device.';
+
+  @override
+  String get strictBitPerfectUnsupportedDevice =>
+      'Strict Bit-Perfect is not supported by the current output device.';
+
+  @override
+  String get directUsbStreamStopFailed =>
+      'Could not stop the previous USB stream.';
+
+  @override
+  String get directUsbStreamStopFailedRetry =>
+      'Could not stop the previous USB stream. Retry disabling Bit-Perfect.';
+
+  @override
+  String get dspBypassUpdateFailed => 'Failed to update the native DSP bypass.';
+
+  @override
+  String get directUsbSinkSwitchOwnershipFailed =>
+      'The direct USB stream could not be stopped; the output was not switched and Bit-Perfect still owns the previous DAC output.';
+
+  @override
+  String get outputCannotApplySampleRate =>
+      'This output cannot apply the requested sample rate.';
+
+  @override
+  String get outputCannotApplyBitDepth =>
+      'This output cannot apply the requested bit depth.';
+
+  @override
+  String get cannotOpenBluetoothCodecSettings =>
+      'Could not open Bluetooth codec settings.';
+
+  @override
+  String directUsbSuspendedArmed(String message) {
+    return '$message Bit-Perfect stays armed and resumes on a supported track.';
+  }
+
+  @override
+  String directUsbStopFailedStillOwns(String message) {
+    return '$message The direct USB stream could not be stopped; it still owns the output. Retry or disable Bit-Perfect.';
+  }
+
+  @override
+  String get dspBypassOrCrossfadeDisableFailed =>
+      'Failed to enable the native DSP bypass or disable crossfade.';
+
+  @override
   String conflictGaplessNeedsZeroCrossfade(String crossfadeSeconds) {
     return 'Disabled: Crossfade is $crossfadeSeconds s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.';
   }
@@ -9552,4 +9635,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get widgetNothingPlaying => 'Nothing playing';
+
+  @override
+  String get conflictLiveOrLossyNotBitPerfect =>
+      'Live radio and lossy streams cannot be played bit-perfect.';
+
+  @override
+  String get uac1RateReadbackUnsupported =>
+      'UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates.';
 }

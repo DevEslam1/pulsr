@@ -154,6 +154,7 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     lastError_.store(0, std::memory_order_relaxed);
     underrunCount_.store(0, std::memory_order_relaxed);
     overrunCount_.store(0, std::memory_order_relaxed);
+    channelMismatchFrames_.store(0, std::memory_order_relaxed);
 
     fd_ = fd;
     endpoint_ = endpointAddress;
@@ -684,6 +685,13 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
         }
     }
     ringWrite_.store(w, std::memory_order_release);
+
+    // Surface any channel remap (duplication/silence/drop) instead of letting it
+    // pass as sample-identical output.
+    if (channels != sinkChannels && framesToWrite > 0) {
+        channelMismatchFrames_.fetch_add(
+            static_cast<uint64_t>(framesToWrite), std::memory_order_relaxed);
+    }
 
     if (framesToWrite < static_cast<size_t>(frames)) {
         overrunCount_.fetch_add(

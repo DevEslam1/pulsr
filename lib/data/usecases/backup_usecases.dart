@@ -107,6 +107,8 @@ class ExportBackupUseCase {
           prefs.getInt('setting_custom_accent') ?? 0xFF9B9EF5,
       'playerThemeMode':
           prefs.getString('setting_player_theme_mode') ?? 'classic',
+      'playerSliderStyle':
+          prefs.getString('setting_player_slider_style') ?? 'normal',
       'visualizerStyle': prefs.getString('setting_visualizer_style') ?? 'bar',
       // Extended settings (previously missing — caused data loss on restore)
       'replayGainMode': prefs.getString('setting_replay_gain_mode') ?? 'track',
@@ -640,6 +642,11 @@ class ImportBackupUseCase {
         final rawAccent = settings['customAccentColorValue'];
         await prefs.setInt('setting_custom_accent',
             rawAccent is num ? rawAccent.toInt() : 0xFF9B9EF5);
+      }
+      if (settings.containsKey('playerSliderStyle')) {
+        final rawSliderStyle = settings['playerSliderStyle'];
+        await prefs.setString('setting_player_slider_style',
+            rawSliderStyle is String ? rawSliderStyle : 'normal');
       }
       if (settings.containsKey('playerThemeMode')) {
         final rawPlayerTheme = settings['playerThemeMode'];

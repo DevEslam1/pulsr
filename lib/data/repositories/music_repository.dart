@@ -630,7 +630,9 @@ class MusicRepository implements IMusicRepository {
         final byRemoteId = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.remoteId.equals(remoteId) &
-                  t.source.equals(SongSource.local) &
+                  (t.source.equals(SongSource.local) | t.isDownloaded.equals(true)) &
+                  t.path.equals('').not() &
+                  t.path.like('ytmusic://%').not() &
                   t.isMissing.equals(false))
               ..limit(1))
             .getSingleOrNull();
@@ -644,7 +646,9 @@ class MusicRepository implements IMusicRepository {
           artist.trim().isNotEmpty) {
         final byMeta = await (_db.select(_db.songsTable)
               ..where((t) =>
-                  t.source.equals(SongSource.local) &
+                  (t.source.equals(SongSource.local) | t.isDownloaded.equals(true)) &
+                  t.path.equals('').not() &
+                  t.path.like('ytmusic://%').not() &
                   t.isMissing.equals(false) &
                   t.title.lower().equals(title.trim().toLowerCase()) &
                   t.artist.lower().equals(artist.trim().toLowerCase()))
@@ -3115,6 +3119,7 @@ class MusicRepository implements IMusicRepository {
   Future<Result<int?>> reconcileDownloadedSong({
     required int oldId,
     required String newPath,
+    String? contentUri,
     SongsTableData? fallbackSong,
   }) async {
     try {
@@ -3139,7 +3144,9 @@ class MusicRepository implements IMusicRepository {
       if (newRow == null && matchMetadata != null) {
         newRow = await (_db.select(_db.songsTable)
               ..where((t) =>
-                  t.source.equals(SongSource.local) &
+                  (t.source.equals(SongSource.local) | t.isDownloaded.equals(true)) &
+                  t.path.equals('').not() &
+                  t.path.like('ytmusic://%').not() &
                   t.title.lower().equals(matchMetadata.title.toLowerCase()) &
                   t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
                   t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
@@ -3213,6 +3220,9 @@ class MusicRepository implements IMusicRepository {
                   isDownloaded: const Value(true),
                   dateAdded: Value(resolvedDateAdded),
                   pendingDownloadPath: const Value(null),
+                  uri: contentUri != null && contentUri.isNotEmpty
+                      ? Value(contentUri)
+                      : const Value.absent(),
                   remoteId: (oldRow.remoteId ?? '').trim().isEmpty &&
                           (fallbackSong?.remoteId ?? '').trim().isNotEmpty
                       ? Value(fallbackSong!.remoteId)
@@ -3273,6 +3283,9 @@ class MusicRepository implements IMusicRepository {
                       remoteId: Value(fallbackSong.remoteId),
                       remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
                       dateAdded: Value(nowMs),
+                      uri: contentUri != null && contentUri.isNotEmpty
+                          ? Value(contentUri)
+                          : const Value.absent(),
                       bitrateKbps: fallbackSong.bitrateKbps != null
                           ? Value(fallbackSong.bitrateKbps)
                           : const Value.absent(),
@@ -3349,6 +3362,9 @@ class MusicRepository implements IMusicRepository {
             isMissing: const Value(false),
             isDownloaded: const Value(true),
             pendingDownloadPath: const Value(null),
+            uri: contentUri != null && contentUri.isNotEmpty
+                ? Value(contentUri)
+                : const Value.absent(),
             remoteId: bestRemoteId != null && bestRemoteId.trim().isNotEmpty
                 ? Value(bestRemoteId)
                 : const Value.absent(),
@@ -3468,6 +3484,9 @@ class MusicRepository implements IMusicRepository {
             isMissing: const Value(false),
             isDownloaded: const Value(true),
             pendingDownloadPath: const Value(null),
+            uri: contentUri != null && contentUri.isNotEmpty
+                ? Value(contentUri)
+                : const Value.absent(),
           ),
         );
 

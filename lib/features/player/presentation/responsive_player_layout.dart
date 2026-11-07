@@ -980,7 +980,7 @@ class _SignalStageChip extends StatelessWidget {
     final p = context.palette;
     return AnimatedContainer(
       duration: context.motionMs(220),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
         color: isActive
             ? activeColor.withValues(alpha: 0.18)

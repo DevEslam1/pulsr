@@ -994,26 +994,45 @@ internal object UsbAudioProtocol {
         }
     }
 
-    fun setSampleRate(
+    enum class RateSetResult {
+        VERIFIED,
+        UNVERIFIED_READBACK_UNSUPPORTED,
+        FAILED;
+
+        val isSuccess: Boolean get() = this == VERIFIED || this == UNVERIFIED_READBACK_UNSUPPORTED
+    }
+
+    fun setSampleRateWithResult(
         transport: UsbControlTransfer, version: Int, clock: UsbAudioControlParser.ClockSource?,
         endpoint: Int, rate: Int, fixedUac1: Boolean,
-    ): Boolean {
-        if (rate <= 0 || version !in 1..2 || (version == 2 && clock == null)) return false
+    ): RateSetResult {
+        if (rate <= 0 || version !in 1..2 || (version == 2 && clock == null)) return RateSetResult.FAILED
         val size = if (version == 2) 4 else 3
-        if (size == 3 && rate > 0xFFFFFF) return false
+        if (size == 3 && rate > 0xFFFFFF) return RateSetResult.FAILED
         val index = if (version == 2) (clock!!.clockId shl 8) or clock.controlInterface else endpoint
         val setType = if (version == 2) 0x21 else 0x22
         val programmable = if (version == 2) clock!!.frequencyProgrammable else !fixedUac1
         return try {
             if (programmable) {
                 val data = ByteArray(size) { (rate shr (8 * it)).toByte() }
-                if (transport.transfer(setType, 1, 0x100, index, data) != size) return false
+                if (transport.transfer(setType, 1, 0x100, index, data) != size) return RateSetResult.FAILED
             }
             val data = ByteArray(size)
-            if (transport.transfer(setType or 0x80, if (version == 2) 1 else 0x81, 0x100, index, data) != size) return false
+            val readRes = transport.transfer(setType or 0x80, if (version == 2) 1 else 0x81, 0x100, index, data)
+            if (readRes != size) {
+                if (version == 1) {
+                    return RateSetResult.UNVERIFIED_READBACK_UNSUPPORTED
+                }
+                return RateSetResult.FAILED
+            }
             val actual = data.indices.fold(0L) { acc, i -> acc or ((data[i].toLong() and 255) shl (8 * i)) }
-            actual == rate.toLong()
-        } catch (_: Exception) { false }
+            if (actual == rate.toLong()) RateSetResult.VERIFIED else RateSetResult.FAILED
+        } catch (_: Exception) { RateSetResult.FAILED }
     }
+
+    fun setSampleRate(
+        transport: UsbControlTransfer, version: Int, clock: UsbAudioControlParser.ClockSource?,
+        endpoint: Int, rate: Int, fixedUac1: Boolean,
+    ): Boolean = setSampleRateWithResult(transport, version, clock, endpoint, rate, fixedUac1) == RateSetResult.VERIFIED
 }
 

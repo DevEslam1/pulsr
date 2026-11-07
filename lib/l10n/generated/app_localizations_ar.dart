@@ -4074,6 +4074,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bpChainInactive => 'وضع بت-بيرفكت مُفعّل لكنه غير نشط';
 
   @override
+  String bpMoreEffects(int count) {
+    return '+$count تأثيرات إضافية';
+  }
+
+  @override
+  String get bpDspBypassed => 'تم التجاوز (حاجز البت المثالي)';
+
+  @override
+  String get bpDspCleanPath => 'لا يوجد (مسار نظيف)';
+
+  @override
+  String get bpPlatformConversion =>
+      'تحويل المنصة • لم يتم قياسه بواسطة هذا التطبيق';
+
+  @override
   String get btAudioCodec => 'كودك البلوتوث';
 
   @override
@@ -5693,6 +5708,13 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get settingsThemeCdTurntableDesc =>
       'قرص CD عاكس يدور مع غلاف الأغنية وإبرة تشغيل متحركة';
+
+  @override
+  String get settingsThemeClean => 'التدفق العصري الأنيق';
+
+  @override
+  String get settingsThemeCleanDesc =>
+      'واجهة مستوحاة من آبل بغلاف نقي وشريط تمرير كبسولي وخيارات سفلية سريعة';
 
   @override
   String get settingsThemeVinylTurntable => 'استوديو أسطوانة دوّارة';
@@ -8123,6 +8145,67 @@ class AppLocalizationsAr extends AppLocalizations {
       'لا يعلن DAC USB هذا عن تهيئة خلاط حصرية.';
 
   @override
+  String get conflictUsbNotSupported =>
+      'لا يدعم Android الإخراج الحصري بالبت المثالي لمحول USB DAC هذا.';
+
+  @override
+  String get conflictTargetFormatUnavailable =>
+      'لا يوفر محول USB DAC هذا معدل العينات / عمق البت المحدد في الوضع الحصري.';
+
+  @override
+  String get conflictSetMixerAttributesFailed =>
+      'رفض Android الوضع الحصري لمحول USB DAC هذا (قد يستخدمه تطبيق آخر).';
+
+  @override
+  String get conflictExclusiveApiUnavailable =>
+      'واجهة برمجة تطبيقات الإخراج الحصري غير متوفرة على هذا الجهاز.';
+
+  @override
+  String get strictBitPerfectUnsupportedDevice =>
+      'البت المثالي الصارم غير مدعوم من جهاز الإخراج الحالي.';
+
+  @override
+  String get directUsbStreamStopFailed => 'تعذر إيقاف تدفق USB السابق.';
+
+  @override
+  String get directUsbStreamStopFailedRetry =>
+      'تعذر إيقاف تدفق USB السابق. أعد محاولة تعطيل البت المثالي.';
+
+  @override
+  String get dspBypassUpdateFailed =>
+      'فشل تحديث تجاوز معالجة الإشارة الرقمية الأصلية.';
+
+  @override
+  String get directUsbSinkSwitchOwnershipFailed =>
+      'تعذر إيقاف تدفق USB المباشر؛ لم يتم تبديل الإخراج ولا يزال البت المثالي يمتلك إخراج DAC السابق.';
+
+  @override
+  String get outputCannotApplySampleRate =>
+      'لا يمكن لهذا الإخراج تطبيق معدل العينات المطلوب.';
+
+  @override
+  String get outputCannotApplyBitDepth =>
+      'لا يمكن لهذا الإخراج تطبيق عمق البت المطلوب.';
+
+  @override
+  String get cannotOpenBluetoothCodecSettings =>
+      'تعذر فتح إعدادات برنامج ترميز البلوتوث.';
+
+  @override
+  String directUsbSuspendedArmed(String message) {
+    return '$message يظل البت المثالي جاهزاً ويستأنف عند تشغيل مسار مدعوم.';
+  }
+
+  @override
+  String directUsbStopFailedStillOwns(String message) {
+    return '$message تعذر إيقاف تدفق USB المباشر؛ لا يزال يمتلك الإخراج. أعد المحاولة أو عطل البت المثالي.';
+  }
+
+  @override
+  String get dspBypassOrCrossfadeDisableFailed =>
+      'فشل تفعيل تجاوز معالجة الإشارة الرقمية أو تعطيل Crossfade.';
+
+  @override
   String conflictGaplessNeedsZeroCrossfade(String crossfadeSeconds) {
     return 'معطَّل: Crossfade عند $crossfadeSeconds s — التشغيل دون فواصل يتطلب 0 s. اضبط Crossfade على 0 لتمكين التشغيل دون فواصل.';
   }
@@ -9491,4 +9574,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get widgetNothingPlaying => 'لا يوجد ما يُشغَّل الآن';
+
+  @override
+  String get conflictLiveOrLossyNotBitPerfect =>
+      'لا يمكن تشغيل بث الراديو المباشر والمسارات المضغوطة بدقة Bit-Perfect.';
+
+  @override
+  String get uac1RateReadbackUnsupported =>
+      'قراءة معدل العينات UAC1 غير مدعومة بواسطة هذا الـ DAC؛ يتطلب وضع Strict Bit-Perfect معدلات مؤكدة.';
 }

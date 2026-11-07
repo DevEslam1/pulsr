@@ -2,6 +2,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../features/settings/cubit/settings_state.dart' show PlayerSliderStyle;
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
@@ -29,6 +30,7 @@ class PulsrSlider extends StatefulWidget {
   final Color? thumbColor;
   final bool isWavy;
   final bool animateWave;
+  final PlayerSliderStyle? sliderStyle;
 
   const PulsrSlider({
     super.key,
@@ -48,6 +50,7 @@ class PulsrSlider extends StatefulWidget {
     this.thumbColor,
     this.isWavy = true,
     this.animateWave = false,
+    this.sliderStyle,
   });
 
   @override
@@ -92,9 +95,13 @@ class _PulsrSliderState extends State<PulsrSlider>
     _syncWave();
   }
 
+  PlayerSliderStyle get effectiveStyle =>
+      widget.sliderStyle ??
+      (widget.isWavy ? PlayerSliderStyle.wavy : PlayerSliderStyle.normal);
+
   void _syncWave() {
     final shouldAnimate = context.motionEnabled &&
-        widget.isWavy &&
+        effectiveStyle == PlayerSliderStyle.wavy &&
         widget.animateWave &&
         !_isTesting;
     if (shouldAnimate) {
@@ -303,6 +310,7 @@ class _PulsrSliderState extends State<PulsrSlider>
                               ? _waveController.value * 2 * pi
                               : 0.0,
                           isWavy: widget.isWavy,
+                          style: effectiveStyle,
                           inactiveColor: widget.inactiveColor ??
                               (p.isDark ? Colors.white : Colors.black)
                                   .withValues(alpha: 0.14),
@@ -337,6 +345,7 @@ class _PulsrSliderPainter extends CustomPainter {
   final double expandFactor;
   final double wavePhase;
   final bool isWavy;
+  final PlayerSliderStyle style;
   final Color inactiveColor;
   final Color activeColor;
   final Color thumbColor;
@@ -349,6 +358,7 @@ class _PulsrSliderPainter extends CustomPainter {
     required this.expandFactor,
     required this.wavePhase,
     required this.isWavy,
+    required this.style,
     required this.inactiveColor,
     required this.activeColor,
     required this.thumbColor,
@@ -368,10 +378,99 @@ class _PulsrSliderPainter extends CustomPainter {
       canvas.translate(size.width, 0);
       canvas.scale(-1, 1);
     }
-    final trackHeight = 4.2 + (3.6 * expandFactor);
-    final thumbRadius = 7.0 + (3.2 * expandFactor);
     final centerY = size.height / 2;
     final thumbX = (t * size.width).clamp(0.0, size.width);
+
+    // Style A: Apple Music continuous rounded capsule progress bar
+    if (style == PlayerSliderStyle.capsule) {
+      final trackHeight = 4.5 + (3.5 * expandFactor);
+      final radius = Radius.circular(trackHeight / 2);
+      final fullRRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, centerY - trackHeight / 2, size.width, trackHeight),
+        radius,
+      );
+
+      // Inactive capsule background across full width
+      final inactivePaint = Paint()
+        ..color = inactiveColor
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(fullRRect, inactivePaint);
+
+      // Active capsule progress bar (0 to thumbX)
+      if (thumbX > 0.0) {
+        canvas.save();
+        canvas.clipRRect(fullRRect);
+        final activeRRect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, centerY - trackHeight / 2, thumbX, trackHeight),
+          radius,
+        );
+        final activePaint = Paint()
+          ..color = activeColor
+          ..style = PaintingStyle.fill;
+        canvas.drawRRect(activeRRect, activePaint);
+        canvas.restore();
+      }
+
+      // Subtle scrub pill indicator when interacting
+      if (expandFactor > 0.05) {
+        final pillWidth = 3.5;
+        final pillHeight = trackHeight + (4.0 * expandFactor);
+        final pillRRect = RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(thumbX, centerY),
+            width: pillWidth,
+            height: pillHeight,
+          ),
+          const Radius.circular(2.0),
+        );
+        canvas.drawRRect(
+          pillRRect,
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.fill,
+        );
+      }
+
+      if (isRtl) canvas.restore();
+      return;
+    }
+
+    // Style B: Hairline minimal progress line
+    if (style == PlayerSliderStyle.minimal) {
+      final trackHeight = 2.2 + (1.6 * expandFactor);
+      canvas.drawLine(
+        Offset(0, centerY),
+        Offset(size.width, centerY),
+        Paint()
+          ..color = inactiveColor
+          ..strokeWidth = trackHeight
+          ..strokeCap = StrokeCap.round,
+      );
+      if (thumbX > 0.0) {
+        canvas.drawLine(
+          Offset(0, centerY),
+          Offset(thumbX, centerY),
+          Paint()
+            ..color = activeColor
+            ..strokeWidth = trackHeight
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+      canvas.drawCircle(
+        Offset(thumbX, centerY),
+        2.4 + (2.2 * expandFactor),
+        Paint()
+          ..color = activeColor
+          ..style = PaintingStyle.fill,
+      );
+
+      if (isRtl) canvas.restore();
+      return;
+    }
+
+    // Style C & D: Classic Studio Knob & Organic Wavy
+    final trackHeight = 4.2 + (3.6 * expandFactor);
+    final thumbRadius = 7.0 + (3.2 * expandFactor);
 
     // 1. Inactive background track (with subtle gap near thumb for modern separation)
     final inactiveStart = (thumbX + thumbRadius + 4.5).clamp(0.0, size.width);
@@ -529,6 +628,7 @@ class _PulsrSliderPainter extends CustomPainter {
       old.expandFactor != expandFactor ||
       old.wavePhase != wavePhase ||
       old.isWavy != isWavy ||
+      old.style != style ||
       old.activeColor != activeColor ||
       old.inactiveColor != inactiveColor ||
       old.thumbColor != thumbColor ||

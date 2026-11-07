@@ -603,10 +603,27 @@ mixin SettingsSearchResults
           'waveform',
           'card',
           'lyrics',
+          'clean',
+          'apple',
           'theme'
         ],
         onTap: () =>
             showThemePickerSheet(context, cubit, state.playerThemeMode),
+      ),
+      _SearchItem(
+        categoryId: 'look',
+        category: lookCat,
+        title: 'Seek Bar Slider Style',
+        subtitle: switch (state.playerSliderStyle) {
+          PlayerSliderStyle.capsule => 'Capsule (Apple Music)',
+          PlayerSliderStyle.normal => 'Classic (Knob)',
+          PlayerSliderStyle.wavy => 'Wavy (Organic Sine)',
+          PlayerSliderStyle.minimal => 'Minimal (Hairline)',
+        },
+        icon: Icons.linear_scale_rounded,
+        keywords: ['slider', 'seekbar', 'seek bar', 'wavy', 'capsule', 'normal'],
+        onTap: () => showSliderStylePickerSheet(
+            context, cubit, state.playerSliderStyle),
       ),
       _SearchItem(
         categoryId: 'look',

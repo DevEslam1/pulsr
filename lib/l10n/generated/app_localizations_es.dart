@@ -4094,6 +4094,21 @@ class AppLocalizationsEs extends AppLocalizations {
   String get bpChainInactive => 'Bit-Perfect armado pero inactivo';
 
   @override
+  String bpMoreEffects(int count) {
+    return '+$count efectos más';
+  }
+
+  @override
+  String get bpDspBypassed => 'Omitido (Protección Bit-Perfect)';
+
+  @override
+  String get bpDspCleanPath => 'Ninguno (Ruta limpia)';
+
+  @override
+  String get bpPlatformConversion =>
+      'Conversión de la plataforma • no medida por esta app';
+
+  @override
   String get btAudioCodec => 'CODEC BLUETOOTH';
 
   @override
@@ -5747,6 +5762,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsThemeCdTurntableDesc =>
       'CD iridiscente giratorio con carátula central y aguja animada';
+
+  @override
+  String get settingsThemeClean => 'Flujo Moderno Limpio';
+
+  @override
+  String get settingsThemeCleanDesc =>
+      'Portada limpia inspirada en Apple con deslizador de cápsula y opciones inferiores rápidas';
 
   @override
   String get settingsThemeVinylTurntable => 'Estudio de tocadiscos';
@@ -8242,6 +8264,68 @@ class AppLocalizationsEs extends AppLocalizations {
       'Este DAC USB no anuncia una configuración de mezclador exclusiva.';
 
   @override
+  String get conflictUsbNotSupported =>
+      'Android no admite salida bit-perfect exclusiva para este USB DAC.';
+
+  @override
+  String get conflictTargetFormatUnavailable =>
+      'Este USB DAC no ofrece la frecuencia de muestreo / profundidad de bits seleccionada en modo exclusivo.';
+
+  @override
+  String get conflictSetMixerAttributesFailed =>
+      'Android rechazó el modo exclusivo para este USB DAC (otra aplicación puede estar usándolo).';
+
+  @override
+  String get conflictExclusiveApiUnavailable =>
+      'La API de salida exclusiva no está disponible en este dispositivo.';
+
+  @override
+  String get strictBitPerfectUnsupportedDevice =>
+      'El dispositivo de salida actual no admite Bit-Perfect estricto.';
+
+  @override
+  String get directUsbStreamStopFailed =>
+      'No se pudo detener la transmisión USB anterior.';
+
+  @override
+  String get directUsbStreamStopFailedRetry =>
+      'No se pudo detener la transmisión USB anterior. Vuelve a intentar desactivar Bit-Perfect.';
+
+  @override
+  String get dspBypassUpdateFailed =>
+      'Error al actualizar la omisión nativa de DSP.';
+
+  @override
+  String get directUsbSinkSwitchOwnershipFailed =>
+      'No se pudo detener la transmisión USB directa; la salida no se cambió y Bit-Perfect aún posee la salida del DAC anterior.';
+
+  @override
+  String get outputCannotApplySampleRate =>
+      'Esta salida no puede aplicar la frecuencia de muestreo solicitada.';
+
+  @override
+  String get outputCannotApplyBitDepth =>
+      'Esta salida no puede aplicar la profundidad de bits solicitada.';
+
+  @override
+  String get cannotOpenBluetoothCodecSettings =>
+      'No se pudo abrir la configuración del códec Bluetooth.';
+
+  @override
+  String directUsbSuspendedArmed(String message) {
+    return '$message Bit-Perfect permanece preparado y se reanudará en una pista compatible.';
+  }
+
+  @override
+  String directUsbStopFailedStillOwns(String message) {
+    return '$message No se pudo detener la transmisión USB directa; todavía posee la salida. Vuelve a intentarlo o desactiva Bit-Perfect.';
+  }
+
+  @override
+  String get dspBypassOrCrossfadeDisableFailed =>
+      'Error al habilitar la omisión nativa de DSP o desactivar el crossfade.';
+
+  @override
   String conflictGaplessNeedsZeroCrossfade(String crossfadeSeconds) {
     return 'Desactivado: el Crossfade es de $crossfadeSeconds s — sin cortes requiere 0 s. Pon el Crossfade en 0 para activar la reproducción sin cortes.';
   }
@@ -9637,4 +9721,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get widgetNothingPlaying => 'Nada en reproducción';
+
+  @override
+  String get conflictLiveOrLossyNotBitPerfect =>
+      'Las transmisiones de radio en vivo y con pérdidas no se pueden reproducir en Bit-Perfect.';
+
+  @override
+  String get uac1RateReadbackUnsupported =>
+      'Este DAC no admite la lectura de frecuencia de muestreo UAC1; Strict Bit-Perfect requiere frecuencias verificadas.';
 }

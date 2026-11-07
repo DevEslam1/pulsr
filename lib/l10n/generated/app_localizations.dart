@@ -7397,6 +7397,30 @@ abstract class AppLocalizations {
   /// **'Bit-Perfect armed but not active'**
   String get bpChainInactive;
 
+  /// Label in audio quality sheet for additional active DSP effects
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more effects'**
+  String bpMoreEffects(int count);
+
+  /// DSP stage status when bypassed by Bit-Perfect
+  ///
+  /// In en, this message translates to:
+  /// **'Bypassed (Bit-Perfect Guardrail)'**
+  String get bpDspBypassed;
+
+  /// DSP stage status when no DSP effects are active
+  ///
+  /// In en, this message translates to:
+  /// **'None (Clean Path)'**
+  String get bpDspCleanPath;
+
+  /// Status when platform resampler or conversion is unmeasured
+  ///
+  /// In en, this message translates to:
+  /// **'Platform conversion • not measured by this app'**
+  String get bpPlatformConversion;
+
   /// tranche7 quality
   ///
   /// In en, this message translates to:
@@ -10240,6 +10264,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rotating iridescent CD with central album artwork & animated stylus stick'**
   String get settingsThemeCdTurntableDesc;
+
+  /// No description provided for @settingsThemeClean.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean Modern Flow'**
+  String get settingsThemeClean;
+
+  /// No description provided for @settingsThemeCleanDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimalist Apple-inspired edge artwork, sleek capsule slider and quick bottom options'**
+  String get settingsThemeCleanDesc;
 
   /// No description provided for @settingsThemeVinylTurntable.
   ///
@@ -14603,6 +14639,96 @@ abstract class AppLocalizations {
   /// **'This USB DAC does not advertise an exclusive mixer configuration.'**
   String get conflictNoMixerAttributes;
 
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Android does not support exclusive bit-perfect output for this USB DAC.'**
+  String get conflictUsbNotSupported;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'This USB DAC does not offer the selected sample rate / bit depth in exclusive mode.'**
+  String get conflictTargetFormatUnavailable;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Android refused exclusive mode for this USB DAC (another app may be using it).'**
+  String get conflictSetMixerAttributesFailed;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive output API is not available on this device.'**
+  String get conflictExclusiveApiUnavailable;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Strict Bit-Perfect is not supported by the current output device.'**
+  String get strictBitPerfectUnsupportedDevice;
+
+  /// Error message when USB stream cannot be stopped
+  ///
+  /// In en, this message translates to:
+  /// **'Could not stop the previous USB stream.'**
+  String get directUsbStreamStopFailed;
+
+  /// Error message when USB stream cannot be stopped on disable
+  ///
+  /// In en, this message translates to:
+  /// **'Could not stop the previous USB stream. Retry disabling Bit-Perfect.'**
+  String get directUsbStreamStopFailedRetry;
+
+  /// Error message when DSP bypass update fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update the native DSP bypass.'**
+  String get dspBypassUpdateFailed;
+
+  /// Error message when direct USB stream cannot be stopped on output switch
+  ///
+  /// In en, this message translates to:
+  /// **'The direct USB stream could not be stopped; the output was not switched and Bit-Perfect still owns the previous DAC output.'**
+  String get directUsbSinkSwitchOwnershipFailed;
+
+  /// Error message when output cannot set sample rate
+  ///
+  /// In en, this message translates to:
+  /// **'This output cannot apply the requested sample rate.'**
+  String get outputCannotApplySampleRate;
+
+  /// Error message when output cannot set bit depth
+  ///
+  /// In en, this message translates to:
+  /// **'This output cannot apply the requested bit depth.'**
+  String get outputCannotApplyBitDepth;
+
+  /// Error message when Bluetooth codec settings cannot open
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open Bluetooth codec settings.'**
+  String get cannotOpenBluetoothCodecSettings;
+
+  /// Message when direct USB bit-perfect is suspended for an unsupported track
+  ///
+  /// In en, this message translates to:
+  /// **'{message} Bit-Perfect stays armed and resumes on a supported track.'**
+  String directUsbSuspendedArmed(String message);
+
+  /// Message when direct USB stream could not be stopped during suspension
+  ///
+  /// In en, this message translates to:
+  /// **'{message} The direct USB stream could not be stopped; it still owns the output. Retry or disable Bit-Perfect.'**
+  String directUsbStopFailedStillOwns(String message);
+
+  /// Error message when enabling native DSP bypass or disabling crossfade fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to enable the native DSP bypass or disable crossfade.'**
+  String get dspBypassOrCrossfadeDisableFailed;
+
   /// Audio conflict reason when gapless is blocked because crossfade > 0
   ///
   /// In en, this message translates to:
@@ -16938,6 +17064,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing playing'**
   String get widgetNothingPlaying;
+
+  /// Conflict message explaining live radio and lossy streams cannot be bit-perfect
+  ///
+  /// In en, this message translates to:
+  /// **'Live radio and lossy streams cannot be played bit-perfect.'**
+  String get conflictLiveOrLossyNotBitPerfect;
+
+  /// Error message when UAC1 DAC does not support sample rate readback in strict bit-perfect
+  ///
+  /// In en, this message translates to:
+  /// **'UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates.'**
+  String get uac1RateReadbackUnsupported;
 }
 
 class _AppLocalizationsDelegate

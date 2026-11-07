@@ -38,6 +38,7 @@ class LyricsView extends StatefulWidget {
   final Color activeColor;
   final LyricsSource source;
   final ValueChanged<Duration>? onLineTapped;
+  final bool transparentBackground;
 
   const LyricsView({
     super.key,
@@ -47,6 +48,7 @@ class LyricsView extends StatefulWidget {
     this.activeColor = Colors.white,
     this.source = LyricsSource.none,
     this.onLineTapped,
+    this.transparentBackground = false,
   });
 
   @override
@@ -666,21 +668,22 @@ class _LyricsViewState extends State<LyricsView> {
 
   Widget _buildSyncedLyricView(PulsrPalette p) {
     final isInSplit = PlayerSplitViewScope.of(context);
+    final isSeamless = isInSplit || widget.transparentBackground;
     final activeCol =
         widget.activeColor == Colors.white ? p.accent : widget.activeColor;
     final preset = LyricPreset(
       textStyle: TextStyle(
-        fontSize: isInSplit ? 20.0 : 19.0,
+        fontSize: isSeamless ? 20.0 : 19.0,
         fontWeight: FontWeight.w600,
-        color: isInSplit
+        color: isSeamless
             ? Colors.white.withValues(alpha: 0.46)
             : p.textSecondary.withValues(alpha: 0.7),
-        height: isInSplit ? 1.42 : 1.4,
+        height: isSeamless ? 1.42 : 1.4,
       ),
       activeTextStyle: TextStyle(
-        fontSize: isInSplit ? 27.0 : AppFontSize.headline,
+        fontSize: isSeamless ? 27.0 : AppFontSize.headline,
         fontWeight: FontWeight.w800,
-        color: isInSplit ? Colors.white : activeCol,
+        color: isSeamless ? Colors.white : activeCol,
         height: 1.35,
         shadows: [
           Shadow(
@@ -766,28 +769,32 @@ class _LyricsViewState extends State<LyricsView> {
     final isSynced = _isSynced;
     final p = context.palette;
     final isInSplit = PlayerSplitViewScope.of(context);
+    final isSeamless = isInSplit || widget.transparentBackground;
+    final topSafe = widget.transparentBackground
+        ? MediaQuery.paddingOf(context).top
+        : 0.0;
 
     return Container(
       decoration: BoxDecoration(
-        color: isInSplit
+        color: isSeamless
             ? Colors.transparent
             : p.bg.withValues(alpha: p.isDark ? 0.40 : 0.72),
-        borderRadius: AppRadii.cardRadius,
+        borderRadius: isSeamless ? BorderRadius.zero : AppRadii.cardRadius,
       ),
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xxl),
+            padding: EdgeInsets.only(top: topSafe + AppSpacing.xxl),
             child: isSynced ? _buildSyncedLyricView(p) : _buildPlainTextList(p),
           ),
           PositionedDirectional(
-            top: 4,
+            top: topSafe + 4,
             start: 4,
             child: _buildHeaderActions(),
           ),
           if (source != LyricsSource.none)
             PositionedDirectional(
-              top: 12,
+              top: topSafe + 12,
               end: 12,
               child: IgnorePointer(
                 child: _buildSourceBadge(source, isSynced),
@@ -826,11 +833,18 @@ class _LyricsViewState extends State<LyricsView> {
 
     if (widget.lyrics.isEmpty) {
       final String noLyricsText = context.l10n.noLyricsFound;
+      final topSafe = widget.transparentBackground
+          ? MediaQuery.paddingOf(context).top
+          : 0.0;
 
       return Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+          padding: EdgeInsets.only(
+            top: topSafe,
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: AppSpacing.md,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

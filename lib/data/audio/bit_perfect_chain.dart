@@ -80,6 +80,11 @@ class BitPerfectChainAssessment {
 /// crossfeed, reverb, saturation, dynamics, width, contour, crossover, volume
 /// boost, ReplayGain...); passing a partial list silently upgrades the verdict
 /// to "verified".
+///
+/// [channelsAltered] means the sink remapped the channel layout (duplicated,
+/// silenced or dropped channels) on at least one frame. Like [samplesModified]
+/// it can never be format-agreement "verified"; it is a separate flag because
+/// the reason the user is shown differs.
 BitPerfectChainAssessment assessBitPerfectChain({
   required bool requested,
   required bool active,
@@ -89,6 +94,8 @@ BitPerfectChainAssessment assessBitPerfectChain({
   required int outputBitDepth,
   bool isDsdDop = false,
   bool samplesModified = false,
+  bool channelsAltered = false,
+  bool rateVerified = true,
   String? failureReason,
 }) {
   if (!requested) {
@@ -132,6 +139,28 @@ BitPerfectChainAssessment assessBitPerfectChain({
       outputSampleRate: outputSampleRate,
       outputBitDepth: outputBitDepth,
       reasonCode: 'samples_modified',
+    );
+  }
+
+  if (channelsAltered) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.unverified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: 'channels_remapped',
+    );
+  }
+
+  if (!rateVerified) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.unverified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: 'rate_not_verified',
     );
   }
 

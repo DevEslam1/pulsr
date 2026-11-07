@@ -681,6 +681,32 @@ class AudioConflicts {
     'exclusive_requires_usb_dac',
   };
 
+  static String? bitPerfectSourceBlockedReason({
+    String? path,
+    bool isRadio = false,
+    int bitDepth = 0,
+    bool isLossy = false,
+  }) {
+    final lower = path?.toLowerCase() ?? '';
+    final bool radio = isRadio ||
+        lower.startsWith('radio://') ||
+        ((lower.startsWith('http://') || lower.startsWith('https://')) &&
+            (lower.contains('/radio') || lower.contains('radio.')));
+    final bool lossy = isLossy ||
+        (lower.isNotEmpty &&
+            !(lower.endsWith('.flac') ||
+                lower.endsWith('.wav') ||
+                lower.endsWith('.alac') ||
+                lower.endsWith('.aiff') ||
+                lower.endsWith('.dsf') ||
+                lower.endsWith('.dff')));
+    if (radio || (lossy && bitDepth == 32)) {
+      return L10nHolder.current?.conflictLiveOrLossyNotBitPerfect ??
+          'Live radio and lossy streams cannot be played bit-perfect.';
+    }
+    return null;
+  }
+
   static String? bitPerfectBlockedReason(AudioOutputInfo? device) {
     if (device == null) return null;
     if (device.isBluetooth) {
@@ -705,8 +731,8 @@ class AudioConflicts {
         // Kept distinct from no_supported_mixer_attributes: both mean "the OS
         // has no exclusive path here", which is when the app's own UAC2 sink is
         // worth trying, so the message says so instead of ending the attempt.
-        return 'Android has no exclusive bit-perfect output for this USB DAC — '
-            'Pulsr will try its own UAC2 stream instead.';
+        return L10nHolder.current?.conflictUsbNotSupported ??
+            'Android does not support exclusive bit-perfect output for this USB DAC.';
       case 'exclusive_requires_usb_dac':
         return L10nHolder.current?.conflictExclusiveRequiresUsbDac ??
             'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
@@ -722,13 +748,22 @@ class AudioConflicts {
         // explanation rather than falling through to a generic sentence.
         return L10nHolder.current?.conflictNoMixerAttributes ??
             'Android does not advertise an exclusive bit-perfect mixer configuration for this USB DAC.';
+      case 'uac1_rate_readback_unsupported':
+        return L10nHolder.current?.uac1RateReadbackUnsupported ??
+            'UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates.';
+      case 'source_32bit_float_conversion_not_lossless':
+        return L10nHolder.current?.conflictLiveOrLossyNotBitPerfect ??
+            'Live radio and lossy streams cannot be played bit-perfect.';
       case 'target_format_unavailable':
-        return 'This USB DAC does not offer the selected sample rate / bit depth in exclusive mode.';
+        return L10nHolder.current?.conflictTargetFormatUnavailable ??
+            'This USB DAC does not offer the selected sample rate / bit depth in exclusive mode.';
       case 'set_mixer_attributes_failed':
-        return 'Android refused exclusive mode for this USB DAC (another app may be using it).';
+        return L10nHolder.current?.conflictSetMixerAttributesFailed ??
+            'Android refused exclusive mode for this USB DAC (another app may be using it).';
       case 'reflection_method_not_found':
       case 'audio_mixer_class_not_found':
-        return 'Exclusive output API is not available on this device.';
+        return L10nHolder.current?.conflictExclusiveApiUnavailable ??
+            'Exclusive output API is not available on this device.';
       default:
         return null;
     }

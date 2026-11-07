@@ -720,7 +720,7 @@ void main() {
     await tester.pump();
 
     // Saturation has no dedicated chain label, so it counts as an extra stage.
-    expect(find.text('+1'), findsWidgets);
+    expect(find.textContaining('+1'), findsWidgets);
 
     dsp = const DspSlice();
     changes.add(PlayerState(dsp: dsp));

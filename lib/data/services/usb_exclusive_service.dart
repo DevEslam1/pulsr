@@ -11,8 +11,13 @@ enum UsbStreamResult {
   claimFailed,
   altSettingFailed,
   rateUnsupported,
+  formatUnsupported,
   submitFailed,
   invalidArgs,
+  uac3Unsupported,
+  clockNotVerified,
+  uac1RateReadbackUnsupported,
+  source32BitFloatNotBitPerfect,
   unknown;
 
   bool get isOk => this == UsbStreamResult.ok;
@@ -27,10 +32,20 @@ enum UsbStreamResult {
         return 'Failed to select USB audio streaming alternate setting';
       case UsbStreamResult.rateUnsupported:
         return 'DAC does not support requested sample rate';
+      case UsbStreamResult.formatUnsupported:
+        return 'DAC does not support requested format (rate, depth, or channels)';
       case UsbStreamResult.submitFailed:
         return 'Failed to submit isochronous USB transfer URBs';
       case UsbStreamResult.invalidArgs:
         return 'Invalid audio streaming configuration parameters';
+      case UsbStreamResult.uac3Unsupported:
+        return 'USB Audio Class 3 devices are not supported for bit-perfect streaming';
+      case UsbStreamResult.clockNotVerified:
+        return 'Could not verify the DAC clock source; streaming refused';
+      case UsbStreamResult.uac1RateReadbackUnsupported:
+        return 'UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates';
+      case UsbStreamResult.source32BitFloatNotBitPerfect:
+        return 'Source format is 32-bit float; lossy conversion to integer is not bit-perfect';
       case UsbStreamResult.unknown:
         return 'Failed to initialize USB bit-perfect streaming';
     }
@@ -64,6 +79,12 @@ class UsbExclusiveStatus {
   final List<int> supportedRates;
   final int? lastError;
   final int? lastStreamErrorCode;
+  /// Frames written to the wire while the render tap's channel count differed
+  /// from the sink's. Non-zero means output is not sample-identical (channels
+  /// were duplicated, silenced or dropped) and must be surfaced.
+  final int channelMismatchFrames;
+  final bool rateVerified;
+  final List<Map<String, dynamic>> advertisedFormats;
 
   const UsbExclusiveStatus({
     required this.attached,
@@ -90,7 +111,72 @@ class UsbExclusiveStatus {
     this.supportedRates = const [],
     this.lastError,
     this.lastStreamErrorCode,
+    this.channelMismatchFrames = 0,
+    this.rateVerified = true,
+    this.advertisedFormats = const [],
   });
+
+  UsbExclusiveStatus copyWith({
+    bool? attached,
+    bool? permitted,
+    int? deviceId,
+    bool? hardwareVolumeApplied,
+    int? streamingSampleRate,
+    int? streamingBitDepth,
+    int? streamingChannels,
+    String? deviceName,
+    int? vendorId,
+    int? productId,
+    int? uacVersion,
+    String? uacLabel,
+    bool? hasVolumeControl,
+    bool? exclusiveActive,
+    bool? exclusiveSupported,
+    double? hardwareVolumeDb,
+    double? minVolumeDb,
+    double? maxVolumeDb,
+    int? interfaceNumber,
+    bool? streamingActive,
+    bool? streamingSupported,
+    List<int>? supportedRates,
+    int? lastError,
+    int? lastStreamErrorCode,
+    int? channelMismatchFrames,
+    bool? rateVerified,
+    List<Map<String, dynamic>>? advertisedFormats,
+  }) {
+    return UsbExclusiveStatus(
+      attached: attached ?? this.attached,
+      permitted: permitted ?? this.permitted,
+      deviceId: deviceId ?? this.deviceId,
+      hardwareVolumeApplied:
+          hardwareVolumeApplied ?? this.hardwareVolumeApplied,
+      streamingSampleRate: streamingSampleRate ?? this.streamingSampleRate,
+      streamingBitDepth: streamingBitDepth ?? this.streamingBitDepth,
+      streamingChannels: streamingChannels ?? this.streamingChannels,
+      deviceName: deviceName ?? this.deviceName,
+      vendorId: vendorId ?? this.vendorId,
+      productId: productId ?? this.productId,
+      uacVersion: uacVersion ?? this.uacVersion,
+      uacLabel: uacLabel ?? this.uacLabel,
+      hasVolumeControl: hasVolumeControl ?? this.hasVolumeControl,
+      exclusiveActive: exclusiveActive ?? this.exclusiveActive,
+      exclusiveSupported: exclusiveSupported ?? this.exclusiveSupported,
+      hardwareVolumeDb: hardwareVolumeDb ?? this.hardwareVolumeDb,
+      minVolumeDb: minVolumeDb ?? this.minVolumeDb,
+      maxVolumeDb: maxVolumeDb ?? this.maxVolumeDb,
+      interfaceNumber: interfaceNumber ?? this.interfaceNumber,
+      streamingActive: streamingActive ?? this.streamingActive,
+      streamingSupported: streamingSupported ?? this.streamingSupported,
+      supportedRates: supportedRates ?? this.supportedRates,
+      lastError: lastError ?? this.lastError,
+      lastStreamErrorCode: lastStreamErrorCode ?? this.lastStreamErrorCode,
+      channelMismatchFrames:
+          channelMismatchFrames ?? this.channelMismatchFrames,
+      rateVerified: rateVerified ?? this.rateVerified,
+      advertisedFormats: advertisedFormats ?? this.advertisedFormats,
+    );
+  }
 
   static const UsbExclusiveStatus none = UsbExclusiveStatus(
     attached: false,
@@ -128,6 +214,12 @@ class UsbExclusiveStatus {
           const [],
       lastError: i(map['lastError']),
       lastStreamErrorCode: i(map['resultCode']),
+      channelMismatchFrames: i(map['channelMismatchFrames']) ?? 0,
+      rateVerified: map['rateVerified'] != false,
+      advertisedFormats: (map['advertisedFormats'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          const [],
     );
   }
 }
@@ -277,6 +369,7 @@ class UsbExclusiveService {
     int sampleRate = 48000,
     int channels = 2,
     int bitDepth = 16,
+    bool strict = false,
   }) async {
     if (!_isAndroid) return UsbStreamResult.invalidArgs;
     const validRates = [
@@ -305,6 +398,7 @@ class UsbExclusiveService {
         'sampleRate': sampleRate,
         'channels': channels,
         'bitDepth': bitDepth,
+        'strict': strict,
       }).timeout(const Duration(seconds: 10));
       final status = await _readStatus();
       if (res is Map) {
@@ -323,12 +417,22 @@ class UsbExclusiveService {
             return UsbStreamResult.claimFailed;
           case 'alt_setting_failed':
             return UsbStreamResult.altSettingFailed;
+          case 'format_unsupported':
+            return UsbStreamResult.formatUnsupported;
           case 'rate_unsupported':
             return UsbStreamResult.rateUnsupported;
           case 'submit_failed':
             return UsbStreamResult.submitFailed;
           case 'invalid_args':
             return UsbStreamResult.invalidArgs;
+          case 'uac3_unsupported':
+            return UsbStreamResult.uac3Unsupported;
+          case 'clock_not_verified':
+            return UsbStreamResult.clockNotVerified;
+          case 'uac1_rate_readback_unsupported':
+            return UsbStreamResult.uac1RateReadbackUnsupported;
+          case 'source_32bit_float_conversion_not_lossless':
+            return UsbStreamResult.source32BitFloatNotBitPerfect;
           default:
             return UsbStreamResult.unknown;
         }
@@ -386,6 +490,32 @@ class UsbExclusiveService {
     }
   }
 
+  /// Channel count of the track the render tap last processed. 0 = unknown
+  /// (nothing decoded yet), in which case the caller keeps its own default.
+  Future<void> resetChannelMismatchFrames() async {
+    if (!_isAndroid) return;
+    try {
+      await _methodChannel.invokeMethod<void>('resetChannelMismatchFrames');
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reset channel mismatch frames',
+          error: e, stackTrace: st, category: 'UsbExclusive');
+    }
+  }
+
+  Future<int> getProducerChannels() async {
+    if (!_isAndroid) return 0;
+    try {
+      final dynamic res = await _methodChannel
+          .invokeMethod<dynamic>('getProducerChannels')
+          .timeout(const Duration(milliseconds: 250));
+      final value = (res as num?)?.toInt() ?? 0;
+      return (value >= 1 && value <= 8) ? value : 0;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to get producer channels', error: e, stackTrace: st, category: 'UsbExclusive');
+      return 0;
+    }
+  }
+
   Future<Map<String, dynamic>> getDiagnostics() async {
     if (!_isAndroid) return const {};
     try {
@@ -396,7 +526,8 @@ class UsbExclusiveService {
         return Map<String, dynamic>.from(res);
       }
       return const {};
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to get diagnostics', error: e, stackTrace: st, category: 'UsbExclusive');
       return const {};
     }
   }

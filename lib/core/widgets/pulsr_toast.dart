@@ -77,6 +77,7 @@ class PulsrToast {
     PulsrToastPosition position = PulsrToastPosition.aboveDock,
     VoidCallback? onDismiss,
     double? bottomOffset,
+    int? maxLines,
   }) {
     // A failure cascade (network drop, bot block) fires the *same* message
     // once per retry/skip, and each event used to tear the banner down and
@@ -145,6 +146,7 @@ class PulsrToast {
         palette: p,
         customBottomOffset: bottomOffset,
         duration: duration,
+        maxLines: maxLines,
         onDismiss: () {
           try {
             entry.remove();
@@ -186,6 +188,7 @@ class _ToastWidget extends StatefulWidget {
   final PulsrPalette palette;
   final double? customBottomOffset;
   final Duration duration;
+  final int? maxLines;
   final VoidCallback onDismiss;
   final ValueChanged<_ToastWidgetState>? onStateCreated;
 
@@ -201,6 +204,7 @@ class _ToastWidget extends StatefulWidget {
     required this.palette,
     this.customBottomOffset,
     required this.duration,
+    this.maxLines,
     required this.onDismiss,
     this.onStateCreated,
   });

@@ -21,6 +21,7 @@ import '../../../data/services/hires_audio_service.dart';
 import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/theme_scheduler_service.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/l10n_holder.dart';
 import '../../../core/utils/platform_capabilities.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
@@ -71,6 +72,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static const String _keyCustomThemeRadius = 'setting_custom_theme_radius';
   static const String _keyCustomThemeGlow = 'setting_custom_theme_glow';
   static const String _keyPlayerThemeMode = 'setting_player_theme_mode';
+  static const String _keyPlayerSliderStyle = PrefsKeys.playerSliderStyle;
   static const String _keyVisualizerStyle = 'setting_visualizer_style';
   static const String _keyMiniPlayerSwipeLeft =
       'setting_mini_player_swipe_left';
@@ -313,6 +315,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
     final playerThemeStr =
         prefs.getString(_keyPlayerThemeMode) ?? PlayerThemeMode.classic.name;
+    final playerSliderStyleStr = prefs.getString(_keyPlayerSliderStyle);
+    final playerSliderStyle = PlayerSliderStyle.values.firstWhere(
+      (e) => e.name == playerSliderStyleStr,
+      orElse: () => PlayerSliderStyle.normal,
+    );
+
     final playerThemeMode = PlayerThemeMode.values.firstWhere(
       (e) => e.name == playerThemeStr,
       orElse: () => PlayerThemeMode.classic,
@@ -387,6 +395,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       customThemeGlow:
           prefs.getBool(_keyCustomThemeGlow) ?? current.customThemeGlow,
       playerThemeMode: playerThemeMode,
+      playerSliderStyle: playerSliderStyle,
       visualizerStyle: visualizerStyle,
       miniPlayerSwipeLeft: miniPlayerSwipeLeft,
       miniPlayerSwipeRight: miniPlayerSwipeRight,
@@ -1450,6 +1459,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     safeEmit(state.copyWith(customThemeGlow: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyCustomThemeGlow, enabled);
+  }
+
+  Future<void> setPlayerSliderStyle(PlayerSliderStyle style) async {
+    markDirty('playerSliderStyle');
+    safeEmit(state.copyWith(playerSliderStyle: style));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyPlayerSliderStyle, style.name);
   }
 
   Future<void> setPlayerThemeMode(PlayerThemeMode mode) async {

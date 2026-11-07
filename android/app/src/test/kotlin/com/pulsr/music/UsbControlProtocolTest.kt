@@ -374,4 +374,68 @@ class UsbControlProtocolTest {
         assertEquals(clockTen, UsbAudioProtocol.resolveActiveClock(device, parsed))
         assertTrue(device.requests.isEmpty())
     }
+
+    private class RateDevice(
+        val version: Int,
+        var currentRate: Int = 44100,
+        var allowWrite: Boolean = true,
+        var allowReadback: Boolean = true,
+    ) : UsbControlTransfer {
+        val requests = mutableListOf<Request>()
+        override fun transfer(type: Int, request: Int, value: Int, index: Int, buffer: ByteArray): Int {
+            requests += Request(type, request, value, index, buffer.size)
+            val isRead = (type and 0x80) != 0
+            if (isRead) {
+                if (!allowReadback) return -1
+                repeat(buffer.size) { buffer[it] = (currentRate shr (it * 8)).toByte() }
+                return buffer.size
+            } else {
+                if (!allowWrite) return -1
+                currentRate = buffer.indices.fold(0) { a, i -> a or ((buffer[i].toInt() and 255) shl (8 * i)) }
+                return buffer.size
+            }
+        }
+    }
+
+    @Test fun uac1SampleRateReadbackSupportedYieldsVerified() {
+        val dev = RateDevice(1, currentRate = 44100, allowReadback = true)
+        val res = UsbAudioProtocol.setSampleRateWithResult(dev, 1, null, 0x01, 48000, false)
+        assertEquals(UsbAudioProtocol.RateSetResult.VERIFIED, res)
+        assertEquals(48000, dev.currentRate)
+    }
+
+    @Test fun uac1SampleRateReadbackUnsupportedYieldsUnverifiedReadbackUnsupported() {
+        val dev = RateDevice(1, currentRate = 44100, allowReadback = false)
+        val res = UsbAudioProtocol.setSampleRateWithResult(dev, 1, null, 0x01, 48000, false)
+        assertEquals(UsbAudioProtocol.RateSetResult.UNVERIFIED_READBACK_UNSUPPORTED, res)
+        assertEquals(48000, dev.currentRate)
+    }
+
+    @Test fun uac2SampleRateReadbackFailsWhenReadbackRefused() {
+        val dev = RateDevice(2, currentRate = 44100, allowReadback = false)
+        val clock = UsbAudioControlParser.ClockSource(5, 0, true)
+        val res = UsbAudioProtocol.setSampleRateWithResult(dev, 2, clock, 0x01, 48000, false)
+        assertEquals(UsbAudioProtocol.RateSetResult.FAILED, res)
+    }
+
+    @Test fun selectFormatStrictlyRefusesChannelMismatch() {
+        val stereoDac = UsbAudioControlParser.AltSettingFormat(1, 1, 0x01, 1024, 2, 16, 2, null, emptyList())
+        val parsed = UsbAudioControlParser.Result(2, null, 1, altSettingFormats = listOf(stereoDac))
+        // 2 channels matches
+        assertNotNull(UsbAudioProtocol.selectFormat(parsed, 48000, 16, 2))
+        // 1, 6, 8 channels are refused (returns null) rather than corrupted
+        assertNull(UsbAudioProtocol.selectFormat(parsed, 48000, 16, 1))
+        assertNull(UsbAudioProtocol.selectFormat(parsed, 48000, 16, 6))
+        assertNull(UsbAudioProtocol.selectFormat(parsed, 48000, 16, 8))
+    }
+
+    @Test fun uac3DescriptorParsesAsUac3Version() {
+        // AudioControl interface with protocol 0x30 = UAC3
+        val uac3Desc = byteArrayOf(
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x30, 0x00,
+        )
+        val parsed = UsbAudioControlParser.parse(uac3Desc)
+        assertEquals(UsbAudioControlParser.UAC3, parsed.uacVersion)
+        assertEquals("UAC3", UsbDacDiagnostics.uacLabel(parsed.uacVersion))
+    }
 }

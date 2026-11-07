@@ -72,6 +72,11 @@ class ArtworkUriResolver {
   static Uri? getCachedArtworkUri(int songId) => _cachedArtworkUris[songId];
   static Uri? getCachedAlbumArtUri(int albumId) => _cachedAlbumArtUris[albumId];
 
+  /// Stores a resolved artwork URI in memory for immediate access.
+  static void cacheArtworkUri(int songId, Uri uri) {
+    _putLru(_cachedArtworkUris, songId, uri);
+  }
+
   /// A cached file:// URI can outlive its file (the OS may purge the cache
   /// directory at any time); handing that out leaves a blank notification
   /// image until the app restarts.
@@ -200,7 +205,9 @@ class ArtworkUriResolver {
               flush: true,
             );
           }
-          return Uri.file(file.path);
+          final uri = Uri.file(file.path);
+          cacheArtworkUri(song.id, uri);
+          return uri;
         } catch (e, st) {
           ErrorLogger.log('Failed to resolve asset artwork URI: $remoteUrl',
               error: e, stackTrace: st, category: 'ArtworkUriResolver');

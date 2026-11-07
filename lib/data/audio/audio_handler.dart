@@ -1044,13 +1044,20 @@ class PulsrAudioHandler extends BaseAudioHandler
               ? song.remoteArtworkUrl!
               : null;
       if (artString != null) {
-        final parsed = Uri.tryParse(artString);
-        if (parsed != null &&
-            parsed.hasScheme &&
-            (parsed.host.isNotEmpty ||
-                parsed.scheme == 'file' ||
-                parsed.scheme == 'content')) {
-          finalArtUri = parsed;
+        if (artString.startsWith('assets/')) {
+          final cached = ArtworkUriResolver.getCachedArtworkUri(song.id);
+          if (cached != null) {
+            finalArtUri = cached;
+          }
+        } else {
+          final parsed = Uri.tryParse(artString);
+          if (parsed != null &&
+              parsed.hasScheme &&
+              (parsed.host.isNotEmpty ||
+                  parsed.scheme == 'file' ||
+                  parsed.scheme == 'content')) {
+            finalArtUri = parsed;
+          }
         }
       }
       finalArtUri ??= ArtworkUriResolver.getCachedArtworkUri(song.id) ??

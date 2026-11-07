@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
+import '../../../../core/constants/app_radii.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
@@ -100,14 +103,14 @@ class _UsbDacSectionState extends State<UsbDacSection> {
       if (!mounted) return;
       final failure = widget.cubit.state.errorMessage;
       if (enabled && failure != null) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-          content: Text('${context.l10n.usbBpFailed}: $failure'),
-          action: SnackBarAction(
-            label: 'Retry',
-            onPressed: () => _toggleStreaming(true),
-          ),
-          duration: const Duration(seconds: 5),
-        ));
+        PulsrToast.show(
+          context,
+          isError: true,
+          duration: const Duration(seconds: 8),
+          position: PulsrToastPosition.top,
+          maxLines: 6,
+          message: '${context.l10n.usbBpFailed}: $failure',
+        );
       }
       await _refresh();
     } finally {
@@ -205,6 +208,50 @@ class _UsbDacSectionState extends State<UsbDacSection> {
             disabledReason:
                 _streamingBusy ? context.l10n.settingsStarting : null,
             onChanged: _streamingBusy ? (v) {} : _toggleStreaming,
+          ),
+        if (widget.cubit.state.errorMessage != null &&
+            !widget.state.bitPerfectOutput)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: p.error.withValues(alpha: 0.12),
+                borderRadius: AppRadii.r12All,
+                border: Border.all(color: p.error.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          size: 16, color: p.error),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          'Direct Stream Diagnostics (${_status.lastStreamErrorCode != null ? "Code: ${_status.lastStreamErrorCode}" : "Refused"})',
+                          style: TextStyle(
+                            color: p.error,
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppFontSize.caption,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    widget.cubit.state.errorMessage!,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontSize: AppFontSize.label,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
       ],
     );

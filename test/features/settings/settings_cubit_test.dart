@@ -89,6 +89,25 @@ void main() {
       restored.close();
     });
 
+    test('playerSliderStyle defaults to normal and persists/restores', () async {
+      expect(const SettingsState().playerSliderStyle, PlayerSliderStyle.normal);
+
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      expect(cubit.state.playerSliderStyle, PlayerSliderStyle.normal);
+
+      await cubit.setPlayerSliderStyle(PlayerSliderStyle.wavy);
+      expect(cubit.state.playerSliderStyle, PlayerSliderStyle.wavy);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('setting_player_slider_style'), 'wavy');
+      cubit.close();
+
+      final restored = SettingsCubit(scannerService: mockScannerService);
+      await restored.reloadSettings();
+      expect(restored.state.playerSliderStyle, PlayerSliderStyle.wavy);
+      restored.close();
+    });
+
     test('USB hardware volume defaults OFF and persists', () async {
       expect(const SettingsState().usbHardwareVolumeEnabled, false);
       final cubit = SettingsCubit(scannerService: mockScannerService);

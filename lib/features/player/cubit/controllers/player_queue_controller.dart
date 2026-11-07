@@ -9,6 +9,7 @@ import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/services/radio_station_store.dart';
 import '../../../../core/services/ytm_service.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/network/connectivity_guard.dart';
 import '../../../../core/telemetry/playback_latency_tracker.dart';
 import '../../../../core/utils/async_guard.dart';
 import '../../../../core/utils/error_logger.dart';

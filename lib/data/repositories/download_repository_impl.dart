@@ -822,8 +822,31 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         }
       }
 
-      var updated = task;
-      var changed = false;
+      else if (db != null) {
+        song = await (db.select(db.songsTable)
+              ..where((s) =>
+                  s.remoteId.equals(task.videoId) &
+                  (s.source.equals(SongSource.local) |
+                      s.isDownloaded.equals(true)) &
+                  s.isMissing.equals(false))
+              ..limit(1))
+            .getSingleOrNull();
+        if (song == null && filePath != null && filePath.isNotEmpty) {
+          song = await (db.select(db.songsTable)
+                ..where((s) => s.path.equals(filePath!))
+                ..limit(1))
+              .getSingleOrNull();
+        }
+        if (song != null) {
+          filePath ??= song.path;
+          fileSize ??= song.fileSize;
+        }
+      }
+
+      var updated = song != null && task.localSongId != song.id
+          ? task.copyWith(localSongId: song.id)
+          : task;
+      var changed = updated.localSongId != task.localSongId;
 
       // MediaStore derives TITLE from the file name when tags are missing
       // ("Artist - Title"), which still passes the placeholder check.

@@ -155,9 +155,9 @@ void main() {
         (tester) async {
       await tester.pumpWidget(host(const Size(1024, 768)));
       await tester.pumpAndSettle();
-      expect(find.byType(TabBar), findsOneWidget);
+      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
 
-      await tester.tap(find.text('DSP'));
+      await tester.tap(find.byIcon(Icons.tune_rounded));
       await tester.pumpAndSettle();
 
       verify(() => cubit.resetOverlayViews()).called(greaterThanOrEqualTo(1));

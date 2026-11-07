@@ -68,14 +68,30 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       }
     }
 
-    final videoIdForLatency = song.remoteId ?? song.id.toString();
+    var effectiveSong = song;
+    if (song.source == SongSource.youtube &&
+        (song.remoteId?.isNotEmpty ?? false)) {
+      try {
+        final matchRes = await _repository.findMatchingLocalSong(
+          remoteId: song.remoteId,
+          title: song.title,
+          artist: song.artist,
+        );
+        final match = matchRes.fold((_) => null, (s) => s);
+        if (match != null) {
+          effectiveSong = match;
+        }
+      } catch (_) {}
+    }
+
+    final videoIdForLatency = effectiveSong.remoteId ?? effectiveSong.id.toString();
     try {
       _latencyTracker?.start(videoId: videoIdForLatency);
       _latencyTracker?.markStage(PlaybackStage.tap);
     } catch (_) {}
 
     try {
-      _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
+      _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(effectiveSong);
     } catch (_) {}
 
     if ((song.sampleRate == null || song.sampleRate! <= 0) &&
@@ -100,19 +116,21 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     final capturedSwapGen = _localMatchSwapGuard.next();
     _mediaItemGuard.next();
 
-    final rawQueue = queue != null ? List<SongsTableData>.from(queue) : [song];
+    final rawQueue = queue != null ? List<SongsTableData>.from(queue) : [effectiveSong];
     var targetIndex = -1;
     if (queueIndex != null &&
         queueIndex >= 0 &&
         queueIndex < rawQueue.length &&
-        _isSameTrack(rawQueue[queueIndex], song)) {
+        _isSameTrack(rawQueue[queueIndex], effectiveSong)) {
       targetIndex = queueIndex;
     } else {
-      targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, song));
+      targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, effectiveSong));
     }
     if (targetIndex == -1) {
       targetIndex = 0;
-      rawQueue.insert(0, song);
+      rawQueue.insert(0, effectiveSong);
+    } else if (rawQueue[targetIndex].id != effectiveSong.id) {
+      rawQueue[targetIndex] = effectiveSong;
     }
 
     List<SongsTableData> effectiveQueue;
@@ -210,10 +228,10 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         queueHistory: updatedHistory,
       ),
       playback: state.playback.copyWith(
-        currentSong: song,
-        duration: (song.durationMs <= 0 && isSameSong)
+        currentSong: effectiveSong,
+        duration: (effectiveSong.durationMs <= 0 && isSameSong)
             ? state.duration
-            : Duration(milliseconds: song.durationMs),
+            : Duration(milliseconds: effectiveSong.durationMs),
         position: startPos,
         // BUG-3 FIX: do NOT optimistically set isPlaying=true before loadQueue
         // is called. There is an async gap between this emit and the loadQueue
@@ -244,7 +262,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         autoPlay: preservePlaybackState ? state.isPlaying : true,
       );
       if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
-        _loadLyrics(song);
+        _loadLyrics(effectiveSong);
       }
     } catch (e, st) {
       ErrorLogger.log('Load queue failed for song ${song.id}',

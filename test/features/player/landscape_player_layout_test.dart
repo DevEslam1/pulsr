@@ -100,20 +100,10 @@ void main() {
         // Theme is present in left pane
         expect(find.byKey(const ValueKey('test_theme_widget')), findsOneWidget);
 
-        // Tablet TabBar is present in right pane
-        expect(find.byType(TabBar), findsOneWidget);
-        expect(find.text('Queue'), findsOneWidget);
-        expect(find.text('Lyrics'), findsOneWidget);
-        expect(find.text('DSP'), findsOneWidget);
-
-        // TabBar container must be constrained as a compact floating capsule
-        final constrainedBoxes = tester.widgetList<ConstrainedBox>(
-          find.byType(ConstrainedBox),
-        );
-        final tabPillConstraint = constrainedBoxes.any(
-          (box) => box.constraints.maxWidth == 320,
-        );
-        expect(tabPillConstraint, isTrue);
+        // Tablet controls dock is present in right pane
+        expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+        expect(find.byIcon(Icons.format_list_bulleted_rounded), findsOneWidget);
+        expect(find.byIcon(Icons.chat_bubble_rounded), findsOneWidget);
       },
     );
 

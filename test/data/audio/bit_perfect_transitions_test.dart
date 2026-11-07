@@ -61,9 +61,9 @@ void main() {
     expect(cubit.state.followTrackSampleRate, true);
     await cubit.setStrictBitPerfect(false);
     expect(cubit.state.strictBitPerfect, false);
-    expect(cubit.state.bitPerfectOutput, false);
+    expect(cubit.state.bitPerfectOutput, true);
     await cubit.setStrictBitPerfect(true);
-    expect(bypassCalls, [true, false, true]);
+    expect(bypassCalls, [true, true]);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool(PrefsKeys.strictBitPerfect), true);
     expect(prefs.getBool(PrefsKeys.bitPerfectOutput), true);
@@ -84,10 +84,9 @@ void main() {
     expect(bypassCalls, [true]);
   });
   test('failed hardware OFF preserves enabled state', () async {
-    await cubit.setStrictBitPerfect(true);
+    await cubit.setBitPerfectOutput(true);
     when(() => hires.setBitPerfectMode(false)).thenAnswer((_) async => false);
-    await cubit.setStrictBitPerfect(false);
-    expect(cubit.state.strictBitPerfect, true);
+    await cubit.setBitPerfectOutput(false);
     expect(cubit.state.bitPerfectOutput, true);
     expect(bypassCalls, [true]);
   });

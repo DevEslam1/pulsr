@@ -48,6 +48,15 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     }
   }
 
+  bool _safeFileExists(String path) {
+    if (path.isEmpty || path.startsWith('ytmusic://')) return false;
+    try {
+      return File(path).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
     if (PulsrAudioHandler._isStreamUrl(song.path)) {
       return AudioSource.uri(Uri.parse(song.path), tag: tag);
@@ -248,7 +257,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // Direct fast path for downloaded songs with physical file on disk or content URI
     if (!song.path.startsWith('ytmusic://') &&
         song.path.isNotEmpty &&
-        (song.path.startsWith('content:') || await File(song.path).exists())) {
+        (song.isDownloaded == true ||
+            song.path.startsWith('content:') ||
+            (song.uri != null && song.uri!.startsWith('content:')) ||
+            _safeFileExists(song.path))) {
       return _createAudioSource(song, tag);
     }
 
@@ -263,7 +275,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
           (localSong.path.startsWith('content:') ||
               (localSong.uri != null &&
                   localSong.uri!.startsWith('content:')) ||
-              await File(localSong.path).exists())) {
+              localSong.isDownloaded == true ||
+              _safeFileExists(localSong.path))) {
         return _createAudioSource(localSong, tag);
       }
     } catch (_) {

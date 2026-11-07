@@ -1336,10 +1336,18 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResetEngine(
     } catch (...) {}
 }
 
+// Channel count of the most recent render tap / track resync. The decoded
+// track's layout only exists here at runtime (no DB column), so the USB plugin
+// reads this to open the sink at the real producer channel count. 0 = unknown.
+namespace {
+std::atomic<int> g_producerChannels{0};
+}  // namespace
+
 JNIEXPORT jint JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatBuffer(
         JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels, jobject gainBuffer) {
     if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
+    g_producerChannels.store(static_cast<int>(channels), std::memory_order_relaxed);
     // FIX M-2: Reject the engineHandle==0 render fallback. The process-wide
     // singleton is the control/broadcast engine, not a render target: it never
     // runs processInterleaved, so it never sets a render-thread hazard and its
@@ -1397,6 +1405,9 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle, jdouble sampleRate, jint channels) {
+    if (channels > 0 && channels <= 8) {
+        g_producerChannels.store(static_cast<int>(channels), std::memory_order_relaxed);
+    }
     if (engineHandle == 0) {
         try {
             AudioDspEngine::instance().resyncForTrack(sampleRate, channels);
@@ -1526,6 +1537,26 @@ JNIEXPORT jdouble JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetBufferedMs(
         JNIEnv* /* env */, jobject /* thiz */) {
     return pulsr::UsbAudioSink::instance().GetBufferedMs();
+}
+
+// Decoded track's channel count as last seen by the render tap. 0 = unknown
+// (no block processed yet), so the caller falls back to its own default.
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbGetProducerChannels(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(g_producerChannels.load(std::memory_order_relaxed));
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetChannelMismatchFrames(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jlong>(pulsr::UsbAudioSink::instance().GetChannelMismatchFrames());
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamResetChannelMismatchFrames(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    pulsr::UsbAudioSink::instance().ResetChannelMismatchFrames();
 }
 
 // ---------------------------------------------------------------------------

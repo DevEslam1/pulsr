@@ -38,6 +38,8 @@ String getThemeModeTitle(PlayerThemeMode mode, AppLocalizations l10n) {
       return l10n.settingsThemeKaraoke;
     case PlayerThemeMode.cd:
       return l10n.settingsThemeCdTurntable;
+    case PlayerThemeMode.clean:
+      return l10n.settingsThemeClean;
   }
 }
 
@@ -199,6 +201,8 @@ class _ThemePreviewThumbnail extends StatelessWidget {
         return Icon(Icons.mic_external_on_rounded, size: 22, color: tint);
       case PlayerThemeMode.cd:
         return Icon(Icons.album_outlined, size: 22, color: tint);
+      case PlayerThemeMode.clean:
+        return Icon(Icons.crop_portrait_rounded, size: 22, color: tint);
     }
   }
 }
@@ -218,6 +222,12 @@ void showThemePickerSheet(
       context.palette.textSecondary;
 
   final themes = [
+    (
+      mode: PlayerThemeMode.clean,
+      title: context.l10n.settingsThemeClean,
+      subtitle: context.l10n.settingsThemeCleanDesc,
+      icon: Icons.crop_portrait_rounded,
+    ),
     (
       mode: PlayerThemeMode.classic,
       title: context.l10n.settingsThemeClassicStandard,
@@ -746,6 +756,43 @@ class _ThemeMockupCard extends StatelessWidget {
           ),
           child: Icon(Icons.play_arrow_rounded, color: primaryColor, size: 28),
         );
+      case PlayerThemeMode.clean:
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha: 0.18),
+                borderRadius: AppRadii.r12All,
+                border: Border.all(
+                  color: primaryColor.withValues(alpha: 0.4),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(Icons.music_note_rounded, color: primaryColor, size: 26),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              width: 48,
+              height: 4,
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: AppRadii.r4All,
+              ),
+            ),
+          ],
+        );
     }
   }
 }
@@ -1204,6 +1251,126 @@ void showVisualizerStylePickerSheet(
                   ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+void showSliderStylePickerSheet(
+  BuildContext context,
+  SettingsCubit cubit,
+  PlayerSliderStyle currentStyle,
+) {
+  final primaryColor = Theme.of(context).colorScheme.primary;
+  final cardColor =
+      Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+  final outlineColor = Theme.of(context).colorScheme.outline;
+  final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+      context.palette.textPrimary;
+  final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+      context.palette.textSecondary;
+
+  final styles = [
+    (
+      style: PlayerSliderStyle.capsule,
+      title: 'Capsule (Apple Music)',
+      subtitle: 'Sleek, continuous capsule progress bar without protruding knob',
+      icon: Icons.horizontal_rule_rounded,
+    ),
+    (
+      style: PlayerSliderStyle.normal,
+      title: 'Classic (Thumb Knob)',
+      subtitle: 'Traditional player track with a prominent circular thumb knob',
+      icon: Icons.radio_button_checked_rounded,
+    ),
+    (
+      style: PlayerSliderStyle.wavy,
+      title: 'Wavy (Organic Sine)',
+      subtitle: 'Dynamic animated sine wave track that reacts to playback',
+      icon: Icons.waves_rounded,
+    ),
+    (
+      style: PlayerSliderStyle.minimal,
+      title: 'Minimal (Hairline)',
+      subtitle: 'Ultra-thin modern progress line with subtle scrub indicator',
+      icon: Icons.remove_rounded,
+    ),
+  ];
+
+  PulsrSheetHelper.showPulsrSheet(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                child: Text(
+                  'Seek Bar Slider Style',
+                  style: TextStyle(
+                    fontSize: AppFontSize.title,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ...styles.map((s) {
+                final isSelected = s.style == currentStyle;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r16All,
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        s.icon,
+                        color: isSelected ? primaryColor : textSecondary,
+                      ),
+                      title: Text(
+                        s.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? primaryColor : textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        s.subtitle,
+                        style: TextStyle(
+                            fontSize: AppFontSize.label, color: textSecondary),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
+                          : null,
+                      onTap: () {
+                        cubit.setPlayerSliderStyle(s.style);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                );
+              }),
             ],
           ),
         ),

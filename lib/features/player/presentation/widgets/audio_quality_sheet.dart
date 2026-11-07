@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,6 +13,7 @@ import '../../../../data/audio/bit_perfect_chain.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../data/services/hires_audio_service.dart';
+import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
@@ -67,13 +69,20 @@ class AudioQualitySheet extends StatelessWidget {
                   c.state.currentOutputDevice,
                   c.state.bitPerfectOutput,
                 ));
-    final currentSong = context
+    SongsTableData? currentSong;
+    DspSlice dspSlice = const DspSlice();
+    try {
+      currentSong = context
         .select<PlayerCubit, SongsTableData?>((c) => c.state.currentSong);
     // The live DSP picture has to be *selected*, not read inside the chain
     // builder: reading it once left the signal chain showing the stages that
     // were on when the sheet opened, so toggling the EQ with the sheet open
     // never changed the verdict.
-    final dspSlice = context.select<PlayerCubit, DspSlice>((c) => c.state.dsp);
+      dspSlice = context.select<PlayerCubit, DspSlice>((c) => c.state.dsp);
+    } catch (_) {
+      // Safe fallback when PlayerCubit is absent from the widget tree
+      dspSlice = const DspSlice();
+    }
     final info = AudioQualityInfo.fromSong(
       currentSong ?? song,
       streamingQuality: streamingQuality,
@@ -308,14 +317,25 @@ class AudioQualitySheet extends StatelessWidget {
                       final uac = outputDevice?.usbAudioClass ?? 0;
                       final uacLabel = uac == 0 ? 'unknown' : 'UAC$uac';
                       final direct = outputDevice?.directFormats ?? const [];
+                      final advertised = UsbExclusiveService().lastStatus.advertisedFormats;
                       final supported =
                           direct.where((f) => f.supported).toList();
-                      final maxRate = supported.isEmpty
-                          ? null
-                          : supported
-                              .map((f) => f.sampleRate)
-                              .reduce((a, b) => a > b ? a : b);
-                      final bits = supported.map((f) => f.encoding).toSet();
+                      final int? maxRate = advertised.isNotEmpty
+                          ? advertised
+                              .map((f) => (f['supportedRates'] as List<dynamic>?)?.cast<int>() ?? <int>[])
+                              .expand((r) => r)
+                              .fold<int?>(null, (max, r) => max == null || r > max ? r : max)
+                          : (supported.isEmpty
+                              ? null
+                              : supported
+                                  .map((f) => f.sampleRate)
+                                  .reduce((a, b) => a > b ? a : b));
+                      final bits = advertised.isNotEmpty
+                          ? advertised
+                              .map((f) => f['bitResolution']?.toString() ?? '')
+                              .where((s) => s.isNotEmpty)
+                              .toSet()
+                          : supported.map((f) => f.encoding).toSet();
                       final bitsLabel = bits.isEmpty
                           ? '-'
                           : bits.contains('24')
@@ -525,15 +545,23 @@ class AudioQualitySheet extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.s10),
 
-                  _buildVisualSignalChain(
-                    context,
-                    info,
-                    outputDevice,
-                    settingsState,
-                    p,
-                    activeColor,
-                    dspSlice,
-                    currentSong,
+                  StreamBuilder<UsbExclusiveStatus>(
+                    stream: UsbExclusiveService().statusStream,
+                    initialData: UsbExclusiveService().lastStatus,
+                    builder: (context, usbSnapshot) {
+                      final usbStatus = usbSnapshot.data ?? UsbExclusiveService().lastStatus;
+                      return _buildVisualSignalChain(
+                        context,
+                        info,
+                        outputDevice,
+                        settingsState,
+                        p,
+                        activeColor,
+                        dspSlice,
+                        currentSong,
+                        usbStatus: usbStatus,
+                      );
+                    },
                   ),
 
                   const SizedBox(height: AppSpacing.s20),
@@ -1334,8 +1362,9 @@ class AudioQualitySheet extends StatelessWidget {
                         PulsrToast.show(
                           context,
                           isError: true,
-                          duration: const Duration(seconds: 6),
+                          duration: const Duration(seconds: 8),
                           position: PulsrToastPosition.top,
+                          maxLines: 6,
                           message: cubit.state.errorMessage ??
                               'Bit-Perfect output is not supported by the current output device.',
                         );
@@ -1450,8 +1479,9 @@ class AudioQualitySheet extends StatelessWidget {
     PulsrPalette p,
     Color activeColor,
     DspSlice dsp,
-    SongsTableData? currentSong,
-  ) {
+    SongsTableData? currentSong, {
+    UsbExclusiveStatus? usbStatus,
+  }) {
     final requested = settingsState?.bitPerfectOutput == true;
     final bool isBitPerfect =
         requested && outputDevice?.isBitPerfectActive == true;
@@ -1493,7 +1523,7 @@ class AudioQualitySheet extends StatelessWidget {
         (dsp.isReverbEnabled ? 1 : 0);
     final List<String> activeStages = [
       ...namedStages,
-      if (unnamedStages > 0) '+$unnamedStages',
+      if (unnamedStages > 0) context.l10n.bpMoreEffects(unnamedStages),
     ];
     // Everything that touches the samples, not only the stages with a chain
     // label: the panner, dither, software gain (DVC) and ReplayGain are all
@@ -1505,10 +1535,15 @@ class AudioQualitySheet extends StatelessWidget {
     final bool gainEdits = settingsState != null &&
         (settingsState.replayGainMode != ReplayGainMode.off ||
             settingsState.dvcEnabled);
+    // Direct-sink channel remap (duplication/silence/drop) is a sample edit the
+    // format comparison cannot see; the sink counts every remapped frame.
+    final effectiveUsbStatus = usbStatus ?? UsbExclusiveService().lastStatus;
+    final bool channelsAltered =
+        effectiveUsbStatus.streamingActive && effectiveUsbStatus.channelMismatchFrames > 0;
     final String dspLabel = dspBypassed
-        ? 'Bypassed (Bit-Perfect Guardrail)'
+        ? context.l10n.bpDspBypassed
         : (activeStages.isEmpty
-            ? 'None (Clean Path)'
+            ? context.l10n.bpDspCleanPath
             : activeStages.join(' + '));
     final assessment = assessBitPerfectChain(
       requested: requested,
@@ -1522,6 +1557,8 @@ class AudioQualitySheet extends StatelessWidget {
       // survive that conversion, so format agreement is not sample identity.
       samplesModified: currentSong?.bitDepth == 32 ||
           (!dspBypassed && (anyStageEdits || gainEdits)),
+      channelsAltered: channelsAltered,
+      rateVerified: effectiveUsbStatus.rateVerified,
       failureReason: outputDevice?.bitPerfectFailureReason,
     );
     final resamplerLabel = switch (assessment.verdict) {
@@ -1539,7 +1576,7 @@ class AudioQualitySheet extends StatelessWidget {
       BitPerfectChainVerdict.inactive => context.l10n.bpChainInactive,
       BitPerfectChainVerdict.notRequested ||
       BitPerfectChainVerdict.unverified =>
-        'Platform conversion • not measured by this app',
+        context.l10n.bpPlatformConversion,
     };
     final resamplerColor = assessment.isProblem
         ? p.warning
@@ -2907,7 +2944,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
   ) async {
     try {
       await cubit?.requestBluetoothPermission();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to request bluetooth permission', error: e, stackTrace: st, category: 'AudioQualitySheet');
+    }
     await Future<void>.delayed(const Duration(seconds: 2));
     await cubit?.refreshOutputDevice();
   }

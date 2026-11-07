@@ -886,8 +886,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     _currentIndex = index;
     _pendingLazyPosition = null;
 
-    final fastArtUri =
-        song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    final fastArtUri = song.artworkUri != null
+        ? Uri.tryParse(song.artworkUri!)
+        : (song.remoteArtworkUrl != null && !song.remoteArtworkUrl!.startsWith('assets/')
+            ? Uri.tryParse(song.remoteArtworkUrl!)
+            : ArtworkUriResolver.getCachedArtworkUri(song.id));
     final item = PulsrAudioHandler._songToMediaItem(song, fastArtUri);
     mediaItem.add(item);
 
@@ -1150,8 +1153,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       ..start();
 
     final song = songsSnapshot[targetIndex];
-    final fastArtUri =
-        song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    final fastArtUri = song.artworkUri != null
+        ? Uri.tryParse(song.artworkUri!)
+        : (song.remoteArtworkUrl != null && !song.remoteArtworkUrl!.startsWith('assets/')
+            ? Uri.tryParse(song.remoteArtworkUrl!)
+            : ArtworkUriResolver.getCachedArtworkUri(song.id));
     mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
     _planNextStreamResolution();
 
@@ -1377,8 +1383,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     // event that reports the same boundary.
     notifySleepTrackCompleted();
 
-    final fastArtUri =
-        song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    final fastArtUri = song.artworkUri != null
+        ? Uri.tryParse(song.artworkUri!)
+        : (song.remoteArtworkUrl != null && !song.remoteArtworkUrl!.startsWith('assets/')
+            ? Uri.tryParse(song.remoteArtworkUrl!)
+            : ArtworkUriResolver.getCachedArtworkUri(song.id));
     mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
     _notifyTrackChanged(song);
     _planNextStreamResolution();
@@ -1498,8 +1507,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     if (await _isGenerationCancelled(generation)) return;
     _pendingLazyPosition = null;
     _currentIndex = index;
-    final fastArtUri =
-        song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    final fastArtUri = song.artworkUri != null
+        ? Uri.tryParse(song.artworkUri!)
+        : (song.remoteArtworkUrl != null && !song.remoteArtworkUrl!.startsWith('assets/')
+            ? Uri.tryParse(song.remoteArtworkUrl!)
+            : ArtworkUriResolver.getCachedArtworkUri(song.id));
     final item = PulsrAudioHandler._songToMediaItem(song, fastArtUri);
     mediaItem.add(item);
 

@@ -29,7 +29,10 @@ enum PlayerThemeMode {
   waveform,
   lyricsFocus,
   cd,
+  clean,
 }
+
+enum PlayerSliderStyle { normal, wavy, capsule, minimal }
 
 enum MiniPlayerSwipeAction { next, prev, volume, none }
 
@@ -91,6 +94,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(24.0) double customThemeRadius,
     @Default(true) bool customThemeGlow,
     @Default(PlayerThemeMode.classic) PlayerThemeMode playerThemeMode,
+    @Default(PlayerSliderStyle.normal) PlayerSliderStyle playerSliderStyle,
     @Default(VisualizerStyle.bar) VisualizerStyle visualizerStyle,
     @Default(MiniPlayerSwipeAction.next)
     MiniPlayerSwipeAction miniPlayerSwipeLeft,

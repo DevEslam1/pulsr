@@ -5,7 +5,9 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/themes/card_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/cassette_player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/cd_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/circle_player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/clean_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/classic_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/lyrics_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/minimal_player_theme.dart';
@@ -68,6 +70,14 @@ void main() {
       expect(
         ThemeRegistry.build(PlayerThemeMode.lyricsFocus, dummyProps),
         isA<LyricsPlayerTheme>(),
+      );
+      expect(
+        ThemeRegistry.build(PlayerThemeMode.cd, dummyProps),
+        isA<CdPlayerTheme>(),
+      );
+      expect(
+        ThemeRegistry.build(PlayerThemeMode.clean, dummyProps),
+        isA<CleanPlayerTheme>(),
       );
     });
 

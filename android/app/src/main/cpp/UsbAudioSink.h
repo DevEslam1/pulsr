@@ -57,6 +57,11 @@ public:
     int GetLastError() const { return lastError_.load(std::memory_order_acquire); }
     uint64_t GetUnderrunCount() const { return underrunCount_.load(std::memory_order_relaxed); }
     uint64_t GetOverrunCount() const { return overrunCount_.load(std::memory_order_relaxed); }
+    // Frames written while the producer's channel count differed from the sink's.
+    // Non-zero means the wire data is not sample-identical to the engine blocks
+    // (channels were duplicated, silenced or dropped), so status must surface it.
+    uint64_t GetChannelMismatchFrames() const { return channelMismatchFrames_.load(std::memory_order_relaxed); }
+    void ResetChannelMismatchFrames() { channelMismatchFrames_.store(0, std::memory_order_relaxed); }
     double GetBufferedMs();
 
     // Queries supported sample rates for the AudioStreaming interface using USBDEVFS_CONTROL.
@@ -128,6 +133,7 @@ private:
     std::atomic<int> lastError_{0};
     std::atomic<uint64_t> underrunCount_{0};
     std::atomic<uint64_t> overrunCount_{0};
+    std::atomic<uint64_t> channelMismatchFrames_{0};
     // In-flight audio-thread producers. releaseResources() sets active_=false
     // then waits for this to drain before freeing/reassigning the ring buffer.
     std::atomic<int> activeWriters_{0};

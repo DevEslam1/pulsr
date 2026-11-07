@@ -216,7 +216,7 @@ class StreamPreResolver {
   /// Fire the moment a track is tapped or enqueued — not only on track start.
   void onTrackEnqueuedOrTapped(SongsTableData song) {
     if (_disposed) return;
-    if (song.source != SongSource.youtube) return;
+    if (song.source != SongSource.youtube || song.isDownloaded == true) return;
     final videoId = song.remoteId;
     if (videoId == null || videoId.isEmpty) return;
 
@@ -265,6 +265,7 @@ class StreamPreResolver {
     for (final song in nextSongs) {
       final videoId = song.remoteId;
       if (song.source != SongSource.youtube ||
+          song.isDownloaded == true ||
           videoId == null ||
           videoId.isEmpty) {
         continue;

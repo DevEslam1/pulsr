@@ -201,6 +201,21 @@ mixin SettingsAppearanceSection
         _divider(p),
         _navTile(
           context,
+          Icons.linear_scale_rounded,
+          'Seek Bar Slider Style',
+          switch (state.playerSliderStyle) {
+            PlayerSliderStyle.capsule => 'Capsule (Apple Music)',
+            PlayerSliderStyle.normal => 'Classic (Knob)',
+            PlayerSliderStyle.wavy => 'Wavy (Organic Sine)',
+            PlayerSliderStyle.minimal => 'Minimal (Hairline)',
+          },
+          trailingBadge: context.l10n.settingsBadgeStyle,
+          onTap: () => showSliderStylePickerSheet(
+              context, cubit, state.playerSliderStyle),
+        ),
+        _divider(p),
+        _navTile(
+          context,
           Icons.graphic_eq_rounded,
           context.l10n.visualizerStyle,
           getVisualizerStyleTitle(state.visualizerStyle, context.l10n),

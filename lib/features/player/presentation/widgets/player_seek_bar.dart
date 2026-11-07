@@ -19,6 +19,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
 import 'waveform_seek_bar.dart';
 
@@ -72,6 +73,7 @@ class PlayerSeekBar extends StatefulWidget {
 }
 
 class _PlayerSeekBarState extends State<PlayerSeekBar> {
+  bool _showRemaining = false;
   static const Duration _waveformDebounceDelay = Duration(milliseconds: 160);
 
   double? _dragValue;
@@ -408,6 +410,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
       isPlaying = fallback?.state.isPlaying ?? false;
     }
+    final sliderStyle = context.select<SettingsCubit, PlayerSliderStyle>(
+      (c) => c.state.playerSliderStyle,
+    );
     return _withPosition((position) {
       final p = context.palette;
       final double maxDuration = widget.duration.inMilliseconds.toDouble();
@@ -495,7 +500,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                                       Brightness.dark
                                   ? AppColors.specularStrong
                                   : p.hairline.withValues(alpha: 0.8),
-                              isWavy: true,
+                              sliderStyle: sliderStyle,
+                              isWavy: sliderStyle == PlayerSliderStyle.wavy,
                               animateWave: isPlaying && enabled,
                               onChangeStart: enabled
                                   ? (val) {
@@ -677,14 +683,22 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           ],
                         ),
                       ),
-                    Text(
-                      Formatters.formatDuration(widget.duration),
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        letterSpacing: AppTracking.label,
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _showRemaining = !_showRemaining),
+                      child: Text(
+                        _showRemaining
+                            ? (widget.duration > currentDuration
+                                ? '-${Formatters.formatDuration(widget.duration - currentDuration)}'
+                                : '0:00')
+                            : Formatters.formatDuration(widget.duration),
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          letterSpacing: AppTracking.label,
+                        ),
                       ),
                     ),
                   ],
