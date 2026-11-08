@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../data/db/tables.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
@@ -54,6 +55,8 @@ Future<bool> requestBitPerfectOutput(BuildContext context, bool enable) async {
   final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
     path: currentSong?.path,
     bitDepth: currentSong?.bitDepth ?? 0,
+    isRadio: currentSong?.source == SongSource.radio,
+    codec: currentSong?.codec,
   );
   if (sourceBlock != null) {
     settings.safeEmit(settings.state.copyWith(errorMessage: sourceBlock));
@@ -202,10 +205,6 @@ Future<bool> requestBitPerfectOutput(BuildContext context, bool enable) async {
         () => pl.setVolumeBoost(0.0),
       ));
     }
-    // The multiband compressor is owned by the effect manager rather than by a
-    // per-stage cubit toggle. The master effects switch turns it off, and it
-    // also covers any stage added to the engine later, so the list can never
-    // claim completeness while something is still processing the signal.
     // The multiband compressor is owned by the effect manager rather than by a
     // per-stage cubit toggle. The master effects switch turns it off, and it
     // also covers any stage added to the engine later, so the list can never

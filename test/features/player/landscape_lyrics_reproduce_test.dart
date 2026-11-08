@@ -201,10 +201,17 @@ void main() {
 
       expect(tester.takeException(), isNull,
           reason: '$themeMode threw exception in landscape');
-      expect(find.byType(PlayerControls), findsOneWidget,
-          reason: '$themeMode missing controls in landscape');
-      expect(find.byType(PlayerSeekBar), findsOneWidget,
-          reason: '$themeMode missing seekbar in landscape');
+      if (themeMode == PlayerThemeMode.clean) {
+        expect(find.byIcon(Icons.fast_rewind_rounded), findsOneWidget,
+            reason: '$themeMode missing rewind in landscape');
+        expect(find.byIcon(Icons.pause_rounded), findsOneWidget,
+            reason: '$themeMode missing play/pause in landscape');
+      } else {
+        expect(find.byType(PlayerControls), findsOneWidget,
+            reason: '$themeMode missing controls in landscape');
+        expect(find.byType(PlayerSeekBar), findsOneWidget,
+            reason: '$themeMode missing seekbar in landscape');
+      }
 
       // Rotate to portrait phone (390x844)
       tester.view.physicalSize = const Size(390, 844);
@@ -218,16 +225,30 @@ void main() {
 
       expect(tester.takeException(), isNull,
           reason: '$themeMode threw exception in portrait');
-      expect(find.byType(PlayerControls), findsOneWidget,
-          reason: '$themeMode missing controls in portrait');
-      expect(find.byType(PlayerSeekBar), findsOneWidget,
-          reason: '$themeMode missing seekbar in portrait');
+      if (themeMode == PlayerThemeMode.clean) {
+        expect(find.byIcon(Icons.fast_rewind_rounded), findsOneWidget,
+            reason: '$themeMode missing rewind in portrait');
+        expect(find.byIcon(Icons.pause_rounded), findsOneWidget,
+            reason: '$themeMode missing play/pause in portrait');
 
-      final portraitControlsRect = tester.getRect(find.byType(PlayerControls));
-      expect(portraitControlsRect.bottom, lessThanOrEqualTo(844.0),
-          reason: '$themeMode controls pushed below screen bottom in portrait');
-      expect(portraitControlsRect.top, greaterThanOrEqualTo(0.0),
-          reason: '$themeMode controls pushed above screen top in portrait');
+        final portraitControlsRect =
+            tester.getRect(find.byIcon(Icons.pause_rounded));
+        expect(portraitControlsRect.bottom, lessThanOrEqualTo(844.0),
+            reason: '$themeMode controls pushed below screen bottom in portrait');
+        expect(portraitControlsRect.top, greaterThanOrEqualTo(0.0),
+            reason: '$themeMode controls pushed above screen top in portrait');
+      } else {
+        expect(find.byType(PlayerControls), findsOneWidget,
+            reason: '$themeMode missing controls in portrait');
+        expect(find.byType(PlayerSeekBar), findsOneWidget,
+            reason: '$themeMode missing seekbar in portrait');
+
+        final portraitControlsRect = tester.getRect(find.byType(PlayerControls));
+        expect(portraitControlsRect.bottom, lessThanOrEqualTo(844.0),
+            reason: '$themeMode controls pushed below screen bottom in portrait');
+        expect(portraitControlsRect.top, greaterThanOrEqualTo(0.0),
+            reason: '$themeMode controls pushed above screen top in portrait');
+      }
     });
   }
 

@@ -542,6 +542,14 @@
   "themeAndAppearance": "Theme & Appearance",
   "accentColor": "Accent Color",
   "nowPlayingTheme": "Now Playing Style",
+  "buttonStyleTitle": "Button & Chip Style",
+  "buttonStyleSubtitle": "Select the visual styling for buttons and filter chips across the app",
+  "buttonStyleRectangular": "Rectangular (Frosted Glass)",
+  "buttonStyleRectangularSubtitle": "Crisp frosted glass with subtle rounded corners matching the player badge",
+  "buttonStyleCapsule": "Capsule (Frosted Glass)",
+  "buttonStyleCapsuleSubtitle": "Translucent Apple Music style frosted glass capsules",
+  "buttonStyleClassic": "Classic",
+  "buttonStyleClassicSubtitle": "Traditional Pulsr styled buttons with themed accents and borders",
   "colorSource": "Color Source",
   "gestures": "Gestures",
   "miniPlayerSwipeLeft": "Mini Player Swipe Left",
@@ -4281,6 +4289,8 @@
   "settingsThemeCdTurntableDesc": "Rotating iridescent CD with central album artwork & animated stylus stick",
   "settingsThemeClean": "Clean Modern Flow",
   "settingsThemeCleanDesc": "Minimalist Apple-inspired edge artwork, sleek capsule slider and quick bottom options",
+  "settingsThemeMilkdrop": "Milkdrop Visualizer",
+  "settingsThemeMilkdropDesc": "White translucent fluid visualizer across the entire screen behind the artwork",
   "settingsThemeVinylTurntable": "Vinyl Turntable Studio",
   "settingsThemeVinylTurntableDesc": "True vinyl record with realistic grooves, center label & tonearm",
   "settingsTurnOffGapless": "Turn off Gapless",
@@ -7347,5 +7357,17 @@
   "uac1RateReadbackUnsupported": "UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates.",
   "@uac1RateReadbackUnsupported": {
     "description": "Error message when UAC1 DAC does not support sample rate readback in strict bit-perfect"
+  },
+  "uac3Unsupported": "USB Audio Class 3 (UAC3) is not supported for bit-perfect playback.",
+  "@uac3Unsupported": {
+    "description": "Error message when device is UAC3 which is unsupported for direct bit-perfect streaming"
+  },
+  "conflictSource32BitFloatNotBitPerfect": "32-bit floating point audio requires lossy conversion and cannot be played bit-perfect.",
+  "@conflictSource32BitFloatNotBitPerfect": {
+    "description": "Conflict message explaining 32-bit float audio requires conversion and cannot be bit-perfect"
+  },
+  "bpSourceCodecUnconfirmed": "Source codec not confirmed",
+  "@bpSourceCodecUnconfirmed": {
+    "description": "Verdict reason when the audio source container is ambiguous and the decoder codec is unconfirmed"
   }
 }

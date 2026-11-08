@@ -585,6 +585,12 @@ class AudioFeatureRegistry {
   );
 }
 
+enum AudioSourceCodecState {
+  lossless,
+  lossy,
+  unknown,
+}
+
 /// Pure-logic conflict checker. Returns null if allowed, otherwise a human reason why the action must be blocked.
 class AudioConflicts {
   /// True when the native DSP bypass is active: Bit-Perfect output + its DSP
@@ -681,29 +687,234 @@ class AudioConflicts {
     'exclusive_requires_usb_dac',
   };
 
+
+  static const Set<String> _losslessCodecs = {
+    'flac',
+    'alac',
+    'wav',
+    'wave',
+    'pcm',
+    'aiff',
+    'aif',
+    'dsd',
+    'dsf',
+    'dff',
+    'wavpack',
+    'wv',
+    'ape',
+    'monkeysaudio',
+    'tta',
+  };
+
+  static const Set<String> _lossyCodecs = {
+    'mp3',
+    'aac',
+    'opus',
+    'vorbis',
+    'wma',
+    'ac3',
+    'eac3',
+    'dts',
+    'mp4a.40.2',
+    'pcm_alaw',
+    'pcm_mulaw',
+  };
+
+  static const Set<String> _losslessMimeTypes = {
+    'audio/flac',
+    'audio/x-flac',
+    'audio/wav',
+    'audio/x-wav',
+    'audio/wave',
+    'audio/vnd.wave',
+    'audio/l16',
+    'audio/l24',
+    'audio/alac',
+    'audio/x-alac',
+    'audio/aiff',
+    'audio/x-aiff',
+    'audio/dsf',
+    'audio/x-dsf',
+    'audio/dff',
+    'audio/x-dff',
+    'audio/x-wavpack',
+    'audio/x-ape',
+    'audio/x-tta',
+  };
+
+  static const Set<String> _lossyMimeTypes = {
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/aac',
+    'audio/aacp',
+    'audio/mp4a-latm',
+    'audio/x-ms-wma',
+  };
+
+  static const Set<String> _ambiguousMimeTypes = {
+    'audio/mp4',
+    'audio/x-m4a',
+    'audio/ogg',
+    'audio/webm',
+    'audio/x-matroska',
+    'video/mp4',
+    'video/webm',
+    'video/ogg',
+  };
+
+  static const Set<String> _losslessExtensions = {
+    '.flac',
+    '.wav',
+    '.wave',
+    '.alac',
+    '.aiff',
+    '.aif',
+    '.dsf',
+    '.dff',
+    '.wv',
+    '.ape',
+    '.tta',
+  };
+
+  static const Set<String> _ambiguousExtensions = {
+    '.m4a',
+    '.mp4',
+    '.ogg',
+    '.oga',
+    '.mka',
+    '.webm',
+  };
+
+  static const Set<String> _lossyExtensions = {
+    '.mp3',
+    '.aac',
+    '.opus',
+    '.wma',
+    '.mp2',
+    '.m4p',
+    '.m4b',
+  };
+
+  static AudioSourceCodecState classifySourceCodec({
+    String? path,
+    String? codec,
+    String? mimeType,
+    bool isLossy = false,
+  }) {
+    if (isLossy) return AudioSourceCodecState.lossy;
+
+    // Normalize: lowercase, trim, drop parameters after ';'
+    var normCodec = codec?.trim().toLowerCase();
+    if (normCodec != null && normCodec.contains('codecs=')) {
+      final match = RegExp(r'''codecs=["']?([^"'\s;]+)''').firstMatch(normCodec);
+      if (match != null) {
+        normCodec = match.group(1)?.trim();
+      }
+    } else {
+      normCodec = normCodec?.split(';').first.trim();
+    }
+    if ((normCodec == null || normCodec.isEmpty || normCodec.startsWith('audio/')) &&
+        mimeType != null &&
+        mimeType.contains('codecs=')) {
+      final match = RegExp(r'''codecs=["']?([^"'\s;]+)''')
+          .firstMatch(mimeType.toLowerCase());
+      if (match != null) {
+        normCodec = match.group(1)?.trim();
+      }
+    }
+    final normMime = mimeType?.trim().toLowerCase().split(';').first.trim();
+    final lowerPath = path?.trim().toLowerCase().split('?').first.split('#').first ?? '';
+
+    // 1. Codec matching (if present)
+    if (normCodec != null && normCodec.isNotEmpty) {
+      if (normCodec == 'pcm_alaw' || normCodec == 'pcm_mulaw') {
+        return AudioSourceCodecState.lossy;
+      }
+      if (normCodec.startsWith('pcm_') ||
+          normCodec.startsWith('dsd') ||
+          _losslessCodecs.contains(normCodec)) {
+        return AudioSourceCodecState.lossless;
+      }
+      if (_lossyCodecs.contains(normCodec) ||
+          normCodec.startsWith('mp4a.') ||
+          normCodec.startsWith('aac') ||
+          normCodec.startsWith('mp3') ||
+          normCodec.startsWith('opus') ||
+          normCodec.startsWith('vorbis')) {
+        return AudioSourceCodecState.lossy;
+      }
+      if (_ambiguousExtensions.any((ext) => normCodec == ext.replaceFirst('.', ''))) {
+        return AudioSourceCodecState.unknown;
+      }
+    }
+
+    // 2. MIME type matching (if present)
+    if (normMime != null && normMime.isNotEmpty) {
+      if (_losslessMimeTypes.contains(normMime)) {
+        return AudioSourceCodecState.lossless;
+      }
+      if (_lossyMimeTypes.contains(normMime) ||
+          normMime.contains('mp3') ||
+          normMime.contains('mpeg') ||
+          normMime.contains('opus') ||
+          normMime.contains('vorbis')) {
+        return AudioSourceCodecState.lossy;
+      }
+      if (_ambiguousMimeTypes.contains(normMime)) {
+        return AudioSourceCodecState.unknown;
+      }
+    }
+
+    // 3. Extension matching
+    if (lowerPath.isNotEmpty && !lowerPath.startsWith('content://')) {
+      if (_losslessExtensions.any((ext) => lowerPath.endsWith(ext))) {
+        return AudioSourceCodecState.lossless;
+      }
+      if (_ambiguousExtensions.any((ext) => lowerPath.endsWith(ext))) {
+        return AudioSourceCodecState.unknown;
+      }
+      if (_lossyExtensions.any((ext) => lowerPath.endsWith(ext))) {
+        return AudioSourceCodecState.lossy;
+      }
+    }
+
+    return AudioSourceCodecState.unknown;
+  }
+
   static String? bitPerfectSourceBlockedReason({
     String? path,
     bool isRadio = false,
     int bitDepth = 0,
     bool isLossy = false,
+    String? codec,
+    String? mimeType,
   }) {
     final lower = path?.toLowerCase() ?? '';
-    final bool radio = isRadio ||
-        lower.startsWith('radio://') ||
-        ((lower.startsWith('http://') || lower.startsWith('https://')) &&
-            (lower.contains('/radio') || lower.contains('radio.')));
-    final bool lossy = isLossy ||
-        (lower.isNotEmpty &&
-            !(lower.endsWith('.flac') ||
-                lower.endsWith('.wav') ||
-                lower.endsWith('.alac') ||
-                lower.endsWith('.aiff') ||
-                lower.endsWith('.dsf') ||
-                lower.endsWith('.dff')));
-    if (radio || (lossy && bitDepth == 32)) {
+    // Radio detection: explicit flag or radio:// scheme only.
+    // Never guess from HTTP URLs containing 'radio' (e.g. tracks named radiohead or radio folder).
+    final bool radio = isRadio || lower.startsWith('radio://');
+
+    // 32-bit float PCM requires integer conversion in the USB sink, which is lossy.
+    // Surface the native rejection code early so the UI can show the dedicated 32-bit message.
+    if (bitDepth == 32) {
+      return bitPerfectReasonMessage('source_32bit_float_conversion_not_lossless');
+    }
+
+    final state = classifySourceCodec(
+      path: path,
+      codec: codec,
+      mimeType: mimeType,
+      isLossy: isLossy,
+    );
+
+    // Policy: Live radio and lossy streams/files (MP3, AAC, Ogg, Opus, etc.)
+    // are blocked from Bit-Perfect playback with conflictLiveOrLossyNotBitPerfect.
+    if (radio || state == AudioSourceCodecState.lossy) {
       return L10nHolder.current?.conflictLiveOrLossyNotBitPerfect ??
           'Live radio and lossy streams cannot be played bit-perfect.';
     }
+
+    // AudioSourceCodecState.lossless and AudioSourceCodecState.unknown both return null (allowed through)
     return null;
   }
 
@@ -751,9 +962,15 @@ class AudioConflicts {
       case 'uac1_rate_readback_unsupported':
         return L10nHolder.current?.uac1RateReadbackUnsupported ??
             'UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates.';
+      case 'uac3_unsupported':
+        return L10nHolder.current?.uac3Unsupported ??
+            'USB Audio Class 3 (UAC3) is not supported for bit-perfect playback.';
+      case 'source_codec_unconfirmed':
+        return L10nHolder.current?.bpSourceCodecUnconfirmed ??
+            'Source codec not confirmed';
       case 'source_32bit_float_conversion_not_lossless':
-        return L10nHolder.current?.conflictLiveOrLossyNotBitPerfect ??
-            'Live radio and lossy streams cannot be played bit-perfect.';
+        return L10nHolder.current?.conflictSource32BitFloatNotBitPerfect ??
+            '32-bit floating point audio requires lossy conversion and cannot be played bit-perfect.';
       case 'target_format_unavailable':
         return L10nHolder.current?.conflictTargetFormatUnavailable ??
             'This USB DAC does not offer the selected sample rate / bit depth in exclusive mode.';
@@ -817,11 +1034,19 @@ class AudioConflicts {
 
   /// Reason shown while strict bit-perfect is active (or armed with the DSP
   /// bypass): the stages below are intentionally muted.
+  ///
+  /// [strictBitPerfect] must be passed explicitly so the message is not
+  /// displayed when standard Bit-Perfect + Bypass DSP is on without the user
+  /// having enabled Strict Bit-Perfect — both conditions share [dspBypassActive]
+  /// but only Strict warrants the "Turn Strict bit-perfect off" instruction.
   static String? strictBitPerfectActiveReason({
+    bool strictBitPerfect = true,
     required bool bitPerfectOutput,
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
   }) {
+    // Only emit the strict-specific message when Strict is actually on.
+    if (!strictBitPerfect) return null;
     if (!dspBypassActive(
       bitPerfectOutput: bitPerfectOutput,
       bypassDspOnBitPerfect: bypassDspOnBitPerfect,

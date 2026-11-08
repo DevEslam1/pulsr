@@ -196,23 +196,26 @@ object UsbAudioControlParser {
         ifaceClass: Int,
         ifaceSubclass: Int,
         ifaceProtocol: Int,
+        allowVendor: Boolean = true,
     ): Boolean =
         (ifaceSubclass == SUBCLASS_AUDIOCONTROL || ifaceSubclass == SUBCLASS_AUDIOSTREAMING) &&
-            (ifaceClass == CLASS_AUDIO || looksLikeVendorAudio(ifaceClass, ifaceProtocol))
+            (ifaceClass == CLASS_AUDIO || (allowVendor && looksLikeVendorAudio(ifaceClass, ifaceProtocol)))
 
     fun isAudioStreamingInterface(
         ifaceClass: Int,
         ifaceSubclass: Int,
         ifaceProtocol: Int,
+        allowVendor: Boolean = true,
     ): Boolean = ifaceSubclass == SUBCLASS_AUDIOSTREAMING &&
-        (ifaceClass == CLASS_AUDIO || looksLikeVendorAudio(ifaceClass, ifaceProtocol))
+        (ifaceClass == CLASS_AUDIO || (allowVendor && looksLikeVendorAudio(ifaceClass, ifaceProtocol)))
 
     fun isAudioControlInterface(
         ifaceClass: Int,
         ifaceSubclass: Int,
         ifaceProtocol: Int,
+        allowVendor: Boolean = true,
     ): Boolean = ifaceSubclass == SUBCLASS_AUDIOCONTROL &&
-        (ifaceClass == CLASS_AUDIO || looksLikeVendorAudio(ifaceClass, ifaceProtocol))
+        (ifaceClass == CLASS_AUDIO || (allowVendor && looksLikeVendorAudio(ifaceClass, ifaceProtocol)))
 
     /**
      * Vendor-specific interfaces are audio only when the protocol agrees: the
@@ -221,18 +224,53 @@ object UsbAudioControlParser {
      */
     private fun looksLikeVendorAudio(ifaceClass: Int, ifaceProtocol: Int): Boolean =
         ifaceClass == CLASS_VENDOR_SPECIFIC &&
-            (ifaceProtocol == 0x00 || ifaceProtocol == 0x20 || ifaceProtocol == 0x30)
+            (ifaceProtocol == 0x00 || ifaceProtocol == 0x20)
+
+    /**
+     * A vendor-specific (0xFF) configuration only qualifies for audio parsing
+     * when it contains BOTH an audio-shaped Audio Control and AudioStreaming pair.
+     */
+    fun hasVendorAudioPair(descriptors: ByteArray): Boolean {
+        var hasControl = false
+        var hasStreaming = false
+        var i = 0
+        while (i + 2 <= descriptors.size) {
+            val bLength = descriptors[i].toInt() and 0xFF
+            if (bLength < 2 || i + bLength > descriptors.size) {
+                i += 1
+                continue
+            }
+            val bType = descriptors[i + 1].toInt() and 0xFF
+            if (bType == DESC_INTERFACE && bLength >= 9) {
+                val ifClass = descriptors[i + OFF_IF_CLASS].toInt() and 0xFF
+                val ifSubclass = descriptors[i + OFF_IF_SUBCLASS].toInt() and 0xFF
+                val ifProtocol = descriptors[i + OFF_IF_PROTOCOL].toInt() and 0xFF
+                if (ifClass == CLASS_VENDOR_SPECIFIC) {
+                    if (isAudioControlInterface(ifClass, ifSubclass, ifProtocol, allowVendor = true)) {
+                        hasControl = true
+                    }
+                    if (isAudioStreamingInterface(ifClass, ifSubclass, ifProtocol, allowVendor = true)) {
+                        hasStreaming = true
+                    }
+                }
+            }
+            i += bLength
+        }
+        return hasControl && hasStreaming
+    }
 
     fun parse(descriptors: ByteArray?): Result {
         if (descriptors == null || descriptors.size < 8) {
             return Result(UAC_NONE, null, null)
         }
+        val allowVendor = hasVendorAudioPair(descriptors)
         var uacVersion = UAC_NONE
         var currentAcInterface = -1
         var currentAsInterface = -1
         var currentClass = 0
         var currentSubclass = 0
         var currentAltSetting = 0
+        var currentProtocol = 0
         var volumeUnit: FeatureUnitVolume? = null
         var streamingInterface: Int? = null
         var streamingEndpoint: StreamingEndpoint? = null
@@ -325,32 +363,38 @@ object UsbAudioControlParser {
                     currentClass = descriptors[i + OFF_IF_CLASS].toInt() and 0xFF
                     currentSubclass = descriptors[i + OFF_IF_SUBCLASS].toInt() and 0xFF
                     currentAltSetting = descriptors[i + OFF_IF_ALT].toInt() and 0xFF
-                    if (currentClass == CLASS_AUDIO) {
-                        when (currentSubclass) {
-                            SUBCLASS_AUDIOCONTROL -> {
-                                currentAcInterface = ifaceNumber
-                                val protocol =
-                                    descriptors[i + OFF_IF_PROTOCOL].toInt() and 0xFF
-                                val v = when (protocol) {
-                                    0x20 -> UAC2
-                                    0x30 -> UAC3
-                                    0x00 -> UAC1
-                                    else -> UAC_NONE
-                                }
-                                if (v > uacVersion) uacVersion = v
-                            }
-                            SUBCLASS_AUDIOSTREAMING -> {
-                                currentAsInterface = ifaceNumber
-                                // The playback interface is only known once an
-                                // isochronous OUT endpoint shows up below: a
-                                // combo DAC that lists its capture interface
-                                // first must not become the streaming target.
-                                // Begin accumulating this alt setting's format.
-                                curAsAlt = true
-                                curIface = ifaceNumber
-                                curAlt = currentAltSetting
-                            }
+                    currentProtocol = descriptors[i + OFF_IF_PROTOCOL].toInt() and 0xFF
+                    // Accept both standard audio class (0x01) and vendor-specific
+                    // interfaces (0xFF) that carry UAC protocol codes so that
+                    // vendor-class DACs are parsed the same way as standard ones.
+                    if (isAudioControlInterface(currentClass, currentSubclass, currentProtocol, allowVendor)) {
+                        currentAcInterface = ifaceNumber
+                        val v = when (currentProtocol) {
+                            0x20 -> UAC2
+                            0x30 -> UAC3
+                            0x00 -> UAC1
+                            else -> UAC_NONE
                         }
+                        if (v > uacVersion) uacVersion = v
+                    } else if (isAudioStreamingInterface(currentClass, currentSubclass, currentProtocol, allowVendor)) {
+                        currentAsInterface = ifaceNumber
+                        if (uacVersion == UAC_NONE) {
+                            val v = when (currentProtocol) {
+                                0x20 -> UAC2
+                                0x30 -> UAC3
+                                0x00 -> UAC1
+                                else -> UAC_NONE
+                            }
+                            if (v != UAC_NONE) uacVersion = v
+                        }
+                        // The playback interface is only known once an
+                        // isochronous OUT endpoint shows up below: a
+                        // combo DAC that lists its capture interface
+                        // first must not become the streaming target.
+                        // Begin accumulating this alt setting's format.
+                        curAsAlt = true
+                        curIface = ifaceNumber
+                        curAlt = currentAltSetting
                     }
                 }
 
@@ -358,8 +402,9 @@ object UsbAudioControlParser {
                     // First isochronous OUT endpoint on an AudioStreaming
                     // interface is the exclusive playback target. Also detect
                     // asynchronous feedback IN endpoints (Pillar 3).
-                    if (currentClass == CLASS_AUDIO &&
-                        currentSubclass == SUBCLASS_AUDIOSTREAMING &&
+                    // Use the helper so vendor-specific (0xFF) AudioStreaming
+                    // interfaces are accepted alongside standard CLASS_AUDIO ones.
+                    if (isAudioStreamingInterface(currentClass, currentSubclass, currentProtocol, allowVendor) &&
                         bLength >= 7
                     ) {
                         val address = descriptors[i + OFF_EP_ADDRESS].toInt() and 0xFF
@@ -428,12 +473,12 @@ object UsbAudioControlParser {
                     // look for Feature Units (volume) and Clock Sources (UAC2
                     // sample-clock programming); on an AudioStreaming interface
                     // we decode the per-alt FORMAT_TYPE_I wire format.
-                    if (currentClass == CLASS_AUDIO &&
-                        currentSubclass == SUBCLASS_AUDIOCONTROL &&
+                    // Use helpers to accept vendor-specific (0xFF) interfaces.
+                    if (isAudioControlInterface(currentClass, currentSubclass, currentProtocol, allowVendor) &&
                         bLength >= 4
                     ) {
                         val subtype = descriptors[i + 2].toInt() and 0xFF
-                        val uac2ClockTopology = uacVersion == UAC2
+                        val uac2ClockTopology = (uacVersion == UAC2)
 
                         // Entity ID -> the entity that feeds it (bSourceID), so
                         // the playback path can be walked backwards from the
@@ -473,9 +518,9 @@ object UsbAudioControlParser {
 
                         if (subtype == SUBTYPE_FEATURE_UNIT && bLength >= 7) {
                             val unitId = descriptors[i + 3].toInt() and 0xFF
-                            val uac2 = uacVersion == UAC2
-                            val controlSize = if (uac2) 4 else descriptors[i + 5].toInt() and 0xFF
-                            val prefix = if (uac2) 5 else 6
+                            val isUac2 = (uacVersion == UAC2)
+                            val controlSize = if (isUac2) 4 else descriptors[i + 5].toInt() and 0xFF
+                            val prefix = if (isUac2) 5 else 6
                             val bitmapBytes = bLength - prefix - 1 // Exclude iFeature.
                             if (uacVersion in UAC1..UAC2 && unitId > 0 &&
                                 controlSize in 1..4 && bitmapBytes >= controlSize &&
@@ -484,7 +529,7 @@ object UsbAudioControlParser {
                                 val count = bitmapBytes / controlSize
                                 val writable = (0 until count).filter { channel ->
                                     val low = descriptors[i + prefix + channel * controlSize].toInt() and 0xFF
-                                    if (uac2) ((low shr 2) and 3) == 3 else (low and CONTROL_VOLUME) != 0
+                                    if (isUac2) ((low shr 2) and 3) == 3 else (low and CONTROL_VOLUME) != 0
                                 }
                                 val candidate = FeatureUnitVolume(
                                     unitId, currentAcInterface, count - 1, 0 in writable, writable,
@@ -547,8 +592,7 @@ object UsbAudioControlParser {
                                 clockMultiplierSources.putIfAbsent(multiplierId, sourceId)
                             }
                         }
-                    } else if (currentClass == CLASS_AUDIO &&
-                        currentSubclass == SUBCLASS_AUDIOSTREAMING &&
+                    } else if (isAudioStreamingInterface(currentClass, currentSubclass, currentProtocol, allowVendor) &&
                         bLength >= 4
                     ) {
                         val subtype = descriptors[i + 2].toInt() and 0xFF
@@ -591,7 +635,7 @@ object UsbAudioControlParser {
                             // Sample-rate table: UAC1 / unknown FORMAT_TYPE_I and
                             // FORMAT_TYPE_III embed rates after bSamFreqType @ i+7.
                             if ((formatType == FORMAT_TYPE_I || formatType == FORMAT_TYPE_III) &&
-                                uacVersion != UAC2 && bLength >= 8
+                                (uacVersion == UAC1 || (uacVersion == UAC_NONE && currentProtocol == 0x00)) && bLength >= 8
                             ) {
                                 val samFreqType = descriptors[i + 7].toInt() and 0xFF
                                 if (samFreqType == 0 && bLength >= 14) {
@@ -829,7 +873,22 @@ internal class UsbHardwareVolume(
         }
         ranges = discovered
         currentDb = values.values.maxOrNull()!! / 256.0
-        if (expected != values) expected = null
+        // Use per-channel tolerance instead of strict map equality: many DACs
+        // quantize SET_CUR writes to an internal lookup table that may differ
+        // from the integer floor we computed by ±1 LSB (1/256 dB) or half a
+        // `res` step. Without tolerance, expected != values clears the flag and
+        // setDb reports "volume_not_verified" even though attenuation was applied.
+        if (expected != null) {
+            val exp = expected!!
+            val withinTolerance = exp.keys == values.keys && exp.all { (ch, expRaw) ->
+                val actual = values[ch] ?: return@all false
+                // Narrow tolerance to ±1 raw LSB (1/256 dB). A full resolution step (res)
+                // must not count as applied.
+                val tol = 1
+                kotlin.math.abs(actual - expRaw) <= tol
+            }
+            if (!withinTolerance) expected = null
+        }
         return true
     }
 

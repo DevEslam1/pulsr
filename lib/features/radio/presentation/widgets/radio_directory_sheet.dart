@@ -192,17 +192,21 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
               fontSize: AppFontSize.bodySmall,
             ),
           ),
-          subtitle: station.genre == null
-              ? null
-              : Text(
-                  station.genre!,
+          subtitle: (station.genre != null || station.qualityLabel != null)
+              ? Text(
+                  [
+                    if (station.genre != null && station.genre!.isNotEmpty)
+                      station.genre!,
+                    if (station.qualityLabel != null) station.qualityLabel!,
+                  ].join(' • '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: AppFontSize.caption,
                   ),
-                ),
+                )
+              : null,
           trailing: TextButton.icon(
             onPressed: added || checking ? null : () => _add(station),
             icon: checking

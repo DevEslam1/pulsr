@@ -320,16 +320,27 @@ class AudioQualitySheet extends StatelessWidget {
                       final advertised = UsbExclusiveService().lastStatus.advertisedFormats;
                       final supported =
                           direct.where((f) => f.supported).toList();
-                      final int? maxRate = advertised.isNotEmpty
+                      // UAC2 DACs report sample rates on the Clock Source entity, not
+                      // in FORMAT_TYPE_I descriptors, so altSettingFormats.supportedRates
+                      // is always empty even when altSettingFormats is non-empty. Compute
+                      // the max from advertised first; if that yields null, fall back to
+                      // UsbExclusiveService().lastStatus.supportedRates (the rates the
+                      // driver read back from the hardware), and finally to directFormats.
+                      final int? maxRateAdvertised = advertised.isNotEmpty
                           ? advertised
                               .map((f) => (f['supportedRates'] as List<dynamic>?)?.cast<int>() ?? <int>[])
                               .expand((r) => r)
                               .fold<int?>(null, (max, r) => max == null || r > max ? r : max)
-                          : (supported.isEmpty
-                              ? null
-                              : supported
-                                  .map((f) => f.sampleRate)
-                                  .reduce((a, b) => a > b ? a : b));
+                          : null;
+                      final int? maxRateStatus = UsbExclusiveService()
+                          .lastStatus
+                          .supportedRates
+                          .fold<int?>(null, (max, r) => max == null || r > max ? r : max);
+                      final int? maxRateSupported = supported.isEmpty
+                          ? null
+                          : supported.map((f) => f.sampleRate).reduce((a, b) => a > b ? a : b);
+                      final int? maxRate =
+                          maxRateAdvertised ?? maxRateStatus ?? maxRateSupported;
                       final bits = advertised.isNotEmpty
                           ? advertised
                               .map((f) => f['bitResolution']?.toString() ?? '')
@@ -1550,15 +1561,33 @@ class AudioQualitySheet extends StatelessWidget {
       active: outputDevice?.isBitPerfectActive == true,
       sourceSampleRate: currentSong?.sampleRate ?? 0,
       sourceBitDepth: currentSong?.bitDepth ?? 0,
-      outputSampleRate: outputDevice?.sampleRate ?? 0,
-      outputBitDepth: outputDevice?.bitDepth ?? 0,
+      // Prefer the direct USB sink's negotiated rate/depth when it is active;
+      // fall back to the AudioTrack output device values otherwise.
+      outputSampleRate: (effectiveUsbStatus.streamingActive &&
+              effectiveUsbStatus.streamingSampleRate > 0)
+          ? effectiveUsbStatus.streamingSampleRate
+          : (outputDevice?.sampleRate ?? 0),
+      outputBitDepth: (effectiveUsbStatus.streamingActive &&
+              effectiveUsbStatus.streamingBitDepth > 0)
+          ? effectiveUsbStatus.streamingBitDepth
+          : (outputDevice?.bitDepth ?? 0),
       isDsdDop: AudioQualityInfo.dsdDopActive,
       // Every Android PCM path here is float32; 32-bit integer sources cannot
       // survive that conversion, so format agreement is not sample identity.
       samplesModified: currentSong?.bitDepth == 32 ||
           (!dspBypassed && (anyStageEdits || gainEdits)),
       channelsAltered: channelsAltered,
-      rateVerified: effectiveUsbStatus.rateVerified,
+      // Bug fix: when bit-perfect is active via Android 14 AudioMixerAttributes
+      // (native exclusive path), the direct USB sink is NOT running and
+      // rateVerified stays false. Gate the verified flag on the transport: only
+      // require the direct-sink readback when the direct sink is actually open.
+      rateVerified: !effectiveUsbStatus.streamingActive ||
+          effectiveUsbStatus.rateVerified,
+      sourceCodecUnconfirmed: AudioConflicts.classifySourceCodec(
+            path: currentSong?.path,
+            codec: currentSong?.codec,
+          ) ==
+          AudioSourceCodecState.unknown,
       failureReason: outputDevice?.bitPerfectFailureReason,
     );
     final resamplerLabel = switch (assessment.verdict) {
@@ -1576,14 +1605,20 @@ class AudioQualitySheet extends StatelessWidget {
       BitPerfectChainVerdict.inactive => context.l10n.bpChainInactive,
       BitPerfectChainVerdict.notRequested ||
       BitPerfectChainVerdict.unverified =>
-        context.l10n.bpPlatformConversion,
+        assessment.reasonCode == 'source_codec_unconfirmed'
+            ? context.l10n.bpSourceCodecUnconfirmed
+            : context.l10n.bpPlatformConversion,
     };
     final resamplerColor = assessment.isProblem
         ? p.warning
         : (assessment.isVerified ? p.success : p.textSecondary);
-    final driverLabel = settingsState?.aaudioOutputEnabled == true
-        ? 'AAudio • ${_outputStreamDescription(outputDevice)}'
-        : 'Media3 AudioTrack • ${_outputStreamDescription(outputDevice)}';
+    // When the direct UAC2 isochronous sink is running it owns the USB
+    // endpoint; label it explicitly rather than showing the AudioTrack driver.
+    final driverLabel = effectiveUsbStatus.streamingActive
+        ? 'Pulsr UAC2 Isochronous Sink • ${_outputStreamDescription(outputDevice)}'
+        : (settingsState?.aaudioOutputEnabled == true
+            ? 'AAudio • ${_outputStreamDescription(outputDevice)}'
+            : 'Media3 AudioTrack • ${_outputStreamDescription(outputDevice)}');
     final dacLabel = outputDevice?.deviceName ??
         (outputDevice?.isUsbDac == true ? 'USB Hi-Res DAC' : 'Internal DAC');
 

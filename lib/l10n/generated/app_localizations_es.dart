@@ -1209,6 +1209,34 @@ class AppLocalizationsEs extends AppLocalizations {
   String get nowPlayingTheme => 'Estilo de reproducción';
 
   @override
+  String get buttonStyleTitle => 'Estilo de botones y chips';
+
+  @override
+  String get buttonStyleSubtitle =>
+      'Selecciona el estilo visual de los botones y chips en la app';
+
+  @override
+  String get buttonStyleRectangular => 'Rectangular (Vidrio esmerilado)';
+
+  @override
+  String get buttonStyleRectangularSubtitle =>
+      'Vidrio translúcido con bordes rectangulares a juego con el reproductor';
+
+  @override
+  String get buttonStyleCapsule => 'Cápsula (Vidrio esmerilado)';
+
+  @override
+  String get buttonStyleCapsuleSubtitle =>
+      'Cápsulas translúcidas estilo Apple Music';
+
+  @override
+  String get buttonStyleClassic => 'Clásico';
+
+  @override
+  String get buttonStyleClassicSubtitle =>
+      'Botones tradicionales de Pulsr con acentos y bordes temáticos';
+
+  @override
   String get colorSource => 'Fuente de color';
 
   @override
@@ -5771,6 +5799,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Portada limpia inspirada en Apple con deslizador de cápsula y opciones inferiores rápidas';
 
   @override
+  String get settingsThemeMilkdrop => 'Visualizador Milkdrop';
+
+  @override
+  String get settingsThemeMilkdropDesc =>
+      'Visualizador fluido blanco translúcido en toda la pantalla detrás de la portada';
+
+  @override
   String get settingsThemeVinylTurntable => 'Estudio de tocadiscos';
 
   @override
@@ -9729,4 +9764,15 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get uac1RateReadbackUnsupported =>
       'Este DAC no admite la lectura de frecuencia de muestreo UAC1; Strict Bit-Perfect requiere frecuencias verificadas.';
+
+  @override
+  String get uac3Unsupported =>
+      'USB Audio Class 3 (UAC3) no es compatible con la reproducción Bit-Perfect.';
+
+  @override
+  String get conflictSource32BitFloatNotBitPerfect =>
+      'El audio de punto flotante de 32 bits requiere una conversión con pérdidas y no se puede reproducir en Bit-Perfect.';
+
+  @override
+  String get bpSourceCodecUnconfirmed => 'Códec de origen no confirmado';
 }

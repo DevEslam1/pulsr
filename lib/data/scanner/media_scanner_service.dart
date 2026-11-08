@@ -917,6 +917,27 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     final dateAdded = parseInt(raw['date_added']) ?? parseInt(raw['dateAdded']);
     final size = parseInt(raw['_size']) ?? parseInt(raw['size']);
 
+    final String? fileExt =
+        parseString(raw['file_extension'])?.trim().toLowerCase();
+    final String? mime = (parseString(raw['mime_type']) ??
+            parseString(raw['mimeType']))
+        ?.trim()
+        .toLowerCase();
+    final String? displayName =
+        parseString(raw['_display_name']) ?? parseString(raw['displayName']);
+    String? initialCodec;
+    if (fileExt != null && fileExt.isNotEmpty) {
+      initialCodec = fileExt.toUpperCase();
+    } else if (mime != null && mime.isNotEmpty) {
+      initialCodec =
+          mime.split('/').last.split(';').first.trim().toUpperCase();
+    } else if (displayName != null && displayName.contains('.')) {
+      initialCodec = displayName.split('.').last.trim().toUpperCase();
+    } else if (path.contains('.')) {
+      initialCodec =
+          path.split('.').last.split('?').first.trim().toUpperCase();
+    }
+
     validSongIds.add(id);
 
     songCompanions.add(
@@ -937,6 +958,9 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
         fileSize: Value(size),
         genre: Value(genre),
         year: Value(year),
+        codec: (initialCodec != null && initialCodec.isNotEmpty)
+            ? Value(initialCodec)
+            : const Value.absent(),
       ),
     );
 

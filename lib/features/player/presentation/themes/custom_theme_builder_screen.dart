@@ -573,6 +573,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         return l10n.settingsThemeKaraoke;
       case PlayerThemeMode.clean:
         return l10n.settingsThemeClean;
+      case PlayerThemeMode.milkdrop:
+        return l10n.settingsThemeMilkdrop;
     }
   }
 
@@ -598,6 +600,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         return Icons.lyrics_rounded;
       case PlayerThemeMode.clean:
         return Icons.crop_portrait_rounded;
+      case PlayerThemeMode.milkdrop:
+        return Icons.blur_on_rounded;
     }
   }
 }

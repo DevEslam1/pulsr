@@ -93,9 +93,11 @@ BitPerfectChainAssessment assessBitPerfectChain({
   required int outputSampleRate,
   required int outputBitDepth,
   bool isDsdDop = false,
+  bool isDsdNative = false,
   bool samplesModified = false,
   bool channelsAltered = false,
   bool rateVerified = true,
+  bool sourceCodecUnconfirmed = false,
   String? failureReason,
 }) {
   if (!requested) {
@@ -161,6 +163,28 @@ BitPerfectChainAssessment assessBitPerfectChain({
       outputSampleRate: outputSampleRate,
       outputBitDepth: outputBitDepth,
       reasonCode: 'rate_not_verified',
+    );
+  }
+
+  if (sourceCodecUnconfirmed) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.unverified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: 'source_codec_unconfirmed',
+    );
+  }
+
+  // Direct Native DSD (Raw Bitstream): 1-bit DSD without PCM markers or downsampling.
+  if (isDsdNative) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.verified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
     );
   }
 

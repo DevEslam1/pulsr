@@ -8,6 +8,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/ambient_sound_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_switch.dart';
 
 /// Icon for each ambient effect.
 IconData iconForEffect(AmbientSoundEffect effect) {
@@ -41,11 +42,13 @@ IconData iconForEffect(AmbientSoundEffect effect) {
 class AmbientSoundPanel extends StatefulWidget {
   final EdgeInsetsGeometry? padding;
   final bool showContainerDecoration;
+  final bool showHeader;
 
   const AmbientSoundPanel({
     super.key,
     this.padding,
     this.showContainerDecoration = true,
+    this.showHeader = true,
   });
 
   @override
@@ -140,104 +143,81 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
       mainAxisSize: MainAxisSize.min,
       children: [
         // ── Header ────────────────────────────────────────────────────────────
-        Row(
-          children: [
-            Icon(
-              _service.isEnabled
-                  ? Icons.water_drop_rounded
-                  : Icons.water_drop_outlined,
-              color: _service.isEnabled ? p.accent : p.textSecondary,
-              size: 22,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        context.l10n.ambientSounds,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.body,
-                          fontWeight: FontWeight.w700,
+        if (widget.showHeader) ...[
+          Row(
+            children: [
+              Icon(
+                _service.isEnabled
+                    ? Icons.water_drop_rounded
+                    : Icons.water_drop_outlined,
+                color: _service.isEnabled ? p.accent : p.textSecondary,
+                size: 22,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          context.l10n.ambientSounds,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.body,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      if (_service.isEnabled) ...[
-                        const SizedBox(width: AppSpacing.xs),
-                        _StatusBadge(
-                          isPlaying: _service.isAudioPlaying,
-                          palette: p,
-                        ),
+                        if (_service.isEnabled) ...[
+                          const SizedBox(width: AppSpacing.xs),
+                          _StatusBadge(
+                            isPlaying: _service.isAudioPlaying,
+                            palette: p,
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          _ActiveBadge(
+                            count: _service.activeEffects.length,
+                            palette: p,
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  Text(
-                    _service.isEnabled && !_service.isPlayerPlaying
-                        ? context.l10n.ambientPausedWithPlayer
-                        : _service.isEnabled
-                            ? _service.activeEffects
-                                .map((e) => e.emoji)
-                                .join(' ')
-                            : context.l10n.ambientSoundsDesc,
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.label,
                     ),
-                  ),
-                ],
-              ),
-            ),
-            // Active count badge
-            if (_service.isEnabled)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: p.accent.withValues(alpha: 0.15),
-                  borderRadius: AppRadii.r12All,
-                  border: Border.all(
-                    color: p.accent.withValues(alpha: 0.3),
-                    width: 0.8,
-                  ),
-                ),
-                child: Text(
-                  context.l10n
-                      .ambientActiveCount(_service.activeEffects.length)
-                      .toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: p.accent,
-                    letterSpacing: 0.5,
-                  ),
+                    Text(
+                      _service.isEnabled && !_service.isPlayerPlaying
+                          ? context.l10n.ambientPausedWithPlayer
+                          : _service.isEnabled
+                              ? _service.activeEffects
+                                  .map((e) => e.emoji)
+                                  .join(' ')
+                              : context.l10n.ambientSoundsDesc,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-          ],
-        ),
-
-        // ── Quran mode behaviour ──────────────────────────────────────────────
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                context.l10n.ambientAllowDuringQuran,
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w600,
+              Semantics(
+                label: context.l10n.ambientSounds,
+                toggled: _service.isEnabled,
+                value: _service.isEnabled
+                    ? context.l10n.semanticsStateOn
+                    : context.l10n.semanticsStateOff,
+                child: PulsrSwitch(
+                  value: _service.isEnabled,
+                  onChanged: (v) {
+                    HapticFeedback.selectionClick();
+                    unawaited(_service.setEnabled(v));
+                  },
                 ),
               ),
-            ),
-            Switch(
-              value: _service.allowDuringQuran,
-              onChanged: (v) => unawaited(_service.setAllowDuringQuran(v)),
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          Divider(height: 1, color: p.hairline),
+          const SizedBox(height: AppSpacing.s10),
+        ],
 
         // ── Error ─────────────────────────────────────────────────────────────
         if (_service.errorMessage != null) ...[
@@ -247,10 +227,6 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
             style: TextStyle(color: p.error, fontSize: AppFontSize.label),
           ),
         ],
-
-        const SizedBox(height: AppSpacing.s10),
-        Divider(height: 1, color: p.hairline),
-        const SizedBox(height: AppSpacing.s10),
 
         // ── Effect chips ──────────────────────────────────────────────────────
         Text(
@@ -400,6 +376,35 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
             ],
           ),
         ],
+
+        // ── Options (Quran mode behaviour) ────────────────────────────────────
+        const SizedBox(height: AppSpacing.s10),
+        Divider(height: 1, color: p.hairline),
+        const SizedBox(height: AppSpacing.s10),
+        Row(
+          children: [
+            Icon(
+              Icons.auto_stories_rounded,
+              size: 20,
+              color: _service.allowDuringQuran ? p.accent : p.textSecondary,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                context.l10n.ambientAllowDuringQuran,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            PulsrSwitch(
+              value: _service.allowDuringQuran,
+              onChanged: (v) => unawaited(_service.setAllowDuringQuran(v)),
+            ),
+          ],
+        ),
       ],
     );
 
@@ -432,11 +437,11 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
-class _StatusBadge extends StatelessWidget {
+class AmbientStatusBadge extends StatelessWidget {
   final bool isPlaying;
   final dynamic palette;
 
-  const _StatusBadge({required this.isPlaying, required this.palette});
+  const AmbientStatusBadge({super.key, required this.isPlaying, required this.palette});
 
   @override
   Widget build(BuildContext context) {
@@ -466,6 +471,47 @@ class _StatusBadge extends StatelessWidget {
     );
   }
 }
+
+typedef _StatusBadge = AmbientStatusBadge;
+
+// ─── Active count badge ───────────────────────────────────────────────────────
+
+class AmbientActiveBadge extends StatelessWidget {
+  final int count;
+  final dynamic palette;
+
+  const AmbientActiveBadge({super.key, required this.count, required this.palette});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: p.accent.withValues(alpha: 0.15),
+        borderRadius: AppRadii.r12All,
+        border: Border.all(
+          color: p.accent.withValues(alpha: 0.3),
+          width: 0.8,
+        ),
+      ),
+      child: Text(
+        context.l10n.ambientActiveCount(count).toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: p.accent,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+typedef _ActiveBadge = AmbientActiveBadge;
 
 // ─── Master volume row ────────────────────────────────────────────────────────
 

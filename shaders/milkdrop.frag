@@ -17,6 +17,7 @@ uniform float uZoom;
 uniform float uRot;
 uniform float uWarp;
 uniform float uDecay;
+uniform float uTransparent;
 
 out vec4 fragColor;
 
@@ -47,12 +48,21 @@ void main() {
 
     // Decay drives the contrast of the composite.
     float contrast = mix(0.6, 1.4, clamp(uDecay, 0.0, 1.0));
-    vec3 base = mix(vec3(0.02, 0.02, 0.05), uColor, 0.3 + 0.45 * uBass);
-    vec3 col = base + uWave * energy * contrast;
 
-    // Vignette toward the edges.
-    col *= smoothstep(1.15, 0.05, r);
-    col = pow(max(col, 0.0), vec3(0.85));
+    if (uTransparent > 0.5) {
+        // Translucent white mode: fluid audio-reactive visuals across screen behind image.
+        vec3 lightCol = mix(uColor, vec3(1.0), 0.75);
+        float alpha = clamp((energy * 0.65 + uBass * 0.35) * contrast * smoothstep(1.4, 0.05, r), 0.0, 0.85);
+        vec3 col = lightCol * (0.6 + 0.4 * energy);
+        fragColor = vec4(col * alpha, alpha);
+    } else {
+        vec3 base = mix(vec3(0.02, 0.02, 0.05), uColor, 0.3 + 0.45 * uBass);
+        vec3 col = base + uWave * energy * contrast;
 
-    fragColor = vec4(col, 1.0);
+        // Vignette toward the edges.
+        col *= smoothstep(1.15, 0.05, r);
+        col = pow(max(col, 0.0), vec3(0.85));
+
+        fragColor = vec4(col, 1.0);
+    }
 }

@@ -126,12 +126,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           bool dynamicThemingEnabled,
           Color customAccentColor,
           PlayerThemeMode playerThemeMode,
+          AppThemeMode themeMode,
           bool canvasEnabled,
           bool canvasAsBackdrop,
         })>((c) => (
           dynamicThemingEnabled: c.state.dynamicThemingEnabled,
           customAccentColor: c.state.customAccentColor,
           playerThemeMode: c.state.playerThemeMode,
+          themeMode: c.state.themeMode,
           canvasEnabled: c.state.canvasEnabled,
           canvasAsBackdrop: c.state.canvasAsBackdrop,
         ));
@@ -174,11 +176,22 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             ? dynamicThemeConfig.primaryColor
             : settingsConfig.customAccentColor;
         final isDark = Theme.of(context).brightness == Brightness.dark;
-        final bgColor = settingsConfig.dynamicThemingEnabled
-            ? dynamicThemeConfig.backgroundColor
-            : (isDark
-                ? AppColors.darkSurface
-                : Theme.of(context).colorScheme.surface);
+        final isAmoled = settingsConfig.themeMode == AppThemeMode.amoled;
+        final isCleanOverlay =
+            settingsConfig.playerThemeMode == PlayerThemeMode.clean &&
+                (state.isLyricsVisible || state.isQueueVisible);
+        final baseBgColor = isAmoled
+            ? Colors.black
+            : (settingsConfig.dynamicThemingEnabled
+                ? dynamicThemeConfig.backgroundColor
+                : (isDark
+                    ? AppColors.darkSurface
+                    : Theme.of(context).colorScheme.surface));
+        final bgColor = isCleanOverlay
+            ? (isAmoled
+                ? Colors.black
+                : (isDark ? const Color(0xFF0D0E15) : baseBgColor))
+            : baseBgColor;
 
         final props = PlayerThemeProps(
           state: state,
@@ -220,7 +233,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
 
                     // Subtle top status-bar protection vignette for legibility (portrait only)
                     if (MediaQuery.orientationOf(context) !=
-                        Orientation.landscape)
+                            Orientation.landscape &&
+                        ((!state.isLyricsVisible && !state.isQueueVisible) ||
+                            settingsConfig.playerThemeMode !=
+                                PlayerThemeMode.clean))
                       PositionedDirectional(
                       top: 0,
                       start: 0,

@@ -180,5 +180,39 @@ void main() {
       await service.onQuranModeDisabled();
       expect(service.isEnabled, before);
     });
+
+    test('setEnabled(false) disables all active effects and stops players',
+        () async {
+      final service = AmbientSoundService();
+      await service.toggleEffect(AmbientSoundEffect.ocean);
+      await service.toggleEffect(AmbientSoundEffect.fire);
+      expect(service.isEnabled, isTrue);
+      expect(service.activeEffects.length, 2);
+
+      await service.setEnabled(false);
+
+      expect(service.isEnabled, isFalse);
+      expect(service.activeEffects, isEmpty);
+    });
+
+    test('setEnabled(true) restores previously active effects or defaults to rain',
+        () async {
+      final service = AmbientSoundService();
+      // First enable ocean
+      await service.toggleEffect(AmbientSoundEffect.ocean);
+      expect(service.isEffectActive(AmbientSoundEffect.ocean), isTrue);
+
+      // Disable via setEnabled
+      await service.setEnabled(false);
+      expect(service.isEnabled, isFalse);
+
+      // Re-enable via setEnabled - should restore ocean
+      await service.setEnabled(true);
+      expect(service.isEnabled, isTrue);
+      expect(service.isEffectActive(AmbientSoundEffect.ocean), isTrue);
+
+      // Clean up
+      await service.setEnabled(false);
+    });
   });
 }

@@ -2,7 +2,6 @@
 import 'dart:ui' show DisplayFeature, DisplayFeatureType;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../../../core/constants/app_radii.dart';
@@ -69,10 +68,21 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    // M-1: Sync manual tab swipes back to PlayerCubit so isLyricsVisible /
-    // isQueueVisible always reflects the tab that is actually on screen.
     _tabController.addListener(_onTabChanged);
+    // If lyrics or queue was active prior to entering split view, open that tab
+    if (widget.state.isLyricsVisible) {
+      _tabController.index = 0;
+    } else if (widget.state.isQueueVisible) {
+      _tabController.index = 1;
+    }
     _checkQuranMetadata();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    if (_tabController.index == 2) {
+      widget.cubit.resetOverlayViews();
+    }
   }
 
   void _checkQuranMetadata() {
@@ -97,22 +107,6 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     });
   }
 
-  void _onTabChanged() {
-    if (_tabController.indexIsChanging) return;
-    final cubit = context.read<PlayerCubit>();
-    switch (_tabController.index) {
-      case 0:
-        if (!widget.state.isLyricsVisible) cubit.toggleLyricsVisibility();
-      case 1:
-        if (!widget.state.isQueueVisible) cubit.toggleQueueVisibility();
-      case 2:
-        // The DSP tab is not represented by an overlay flag: leaving both set
-        // would surface a stale lyrics/queue overlay once the phone layout
-        // reads the flags again after rotation.
-        cubit.resetOverlayViews();
-    }
-  }
-
   @override
   void didUpdateWidget(ResponsivePlayerLayout oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -134,6 +128,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -204,6 +199,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
 
       return PlayerSplitViewScope(
         isInSplitView: true,
+        tabController: _tabController,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -1335,7 +1331,10 @@ class _TabletLandscapeFloatingDock extends StatelessWidget {
                   icon: Icons.tune_rounded,
                   tooltip: context.l10n.dspLabel,
                   isSelected: currentIdx == 2,
-                  onTap: () => controller.animateTo(2),
+                  onTap: () {
+                    cubit.resetOverlayViews();
+                    controller.animateTo(2);
+                  },
                 ),
                 const SizedBox(width: 3),
                 dockButton(

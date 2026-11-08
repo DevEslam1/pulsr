@@ -1210,6 +1210,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String get nowPlayingTheme => 'نمط شاشة التشغيل';
 
   @override
+  String get buttonStyleTitle => 'نمط الأزرار والشرائح';
+
+  @override
+  String get buttonStyleSubtitle =>
+      'اختر النمط البصري للأزرار وشرائح التصفية في التطبيق';
+
+  @override
+  String get buttonStyleRectangular => 'مستطيل زجاجي (Apple Music)';
+
+  @override
+  String get buttonStyleRectangularSubtitle =>
+      'زجاج مصنفر أنيق بحواف مستطيلة ناعمة مطابقة للشارة تحت شريط التقدم';
+
+  @override
+  String get buttonStyleCapsule => 'كبسولة زجاجية';
+
+  @override
+  String get buttonStyleCapsuleSubtitle =>
+      'كبسولات زجاجية شفافة مستوحاة من نمط الشارة تحت شريط التقدم';
+
+  @override
+  String get buttonStyleClassic => 'تقليدي';
+
+  @override
+  String get buttonStyleClassicSubtitle =>
+      'تصميم Pulsr التقليدي بألوان التمييز والحدود';
+
+  @override
   String get colorSource => 'مصدر الألوان';
 
   @override
@@ -5717,6 +5745,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'واجهة مستوحاة من آبل بغلاف نقي وشريط تمرير كبسولي وخيارات سفلية سريعة';
 
   @override
+  String get settingsThemeMilkdrop => 'مُصوّر Milkdrop';
+
+  @override
+  String get settingsThemeMilkdropDesc =>
+      'مُصوّر موسيقي أبيض شفاف يمتد عبر الشاشة بأكملها خلف صورة الألبوم';
+
+  @override
   String get settingsThemeVinylTurntable => 'استوديو أسطوانة دوّارة';
 
   @override
@@ -9582,4 +9617,15 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get uac1RateReadbackUnsupported =>
       'قراءة معدل العينات UAC1 غير مدعومة بواسطة هذا الـ DAC؛ يتطلب وضع Strict Bit-Perfect معدلات مؤكدة.';
+
+  @override
+  String get uac3Unsupported =>
+      'فئة صوت USB 3 (UAC3) غير مدعومة للتشغيل بدقة Bit-Perfect.';
+
+  @override
+  String get conflictSource32BitFloatNotBitPerfect =>
+      'يتطلب الصوت ذو الفاصلة العائمة 32 بت تحويلاً غير متطابق ولا يمكن تشغيله بدقة Bit-Perfect.';
+
+  @override
+  String get bpSourceCodecUnconfirmed => 'ترميز المصدر غير مؤكد';
 }

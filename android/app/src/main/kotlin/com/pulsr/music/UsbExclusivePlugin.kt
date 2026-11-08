@@ -238,10 +238,13 @@ class UsbExclusivePlugin(
                     result.success(true)
                 }
                 "isStreamingSupported" -> {
-                    val device = openedDevice ?: findAudioDevice()
-                    val supported = nativeLoaded && device != null &&
-                        device.streamingInterfaces().isNotEmpty()
-                    result.success(supported)
+                    // openedDevice is mutated on workerThread; reading it on the
+                    // main thread is a data race. Dispatch to the worker thread.
+                    runAsync(call.method, result) {
+                        val device = openedDevice ?: findAudioDevice()
+                        nativeLoaded && device != null &&
+                            device.streamingInterfaces().isNotEmpty()
+                    }
                 }
                 "getDiagnostics" -> {
                     val diag = mapOf(
@@ -262,21 +265,28 @@ class UsbExclusivePlugin(
                 }
                 "setVolumeCalibrationOffset" -> {
                     val offsetDb = call.argument<Double>("offsetDb") ?: 0.0
-                    val device = openedDevice ?: findAudioDevice()
-                    if (device != null) {
-                        setVolumeCalibrationOffset(device.vendorId, device.productId, offsetDb)
-                        emitState()
-                        result.success(true)
-                    } else {
-                        result.success(false)
+                    // openedDevice is mutated on workerThread; dispatch there to
+                    // avoid a data race and so emitState() runs on the worker.
+                    runAsync(call.method, result) {
+                        val device = openedDevice ?: findAudioDevice()
+                        if (device != null) {
+                            setVolumeCalibrationOffset(device.vendorId, device.productId, offsetDb)
+                            emitState()
+                            true
+                        } else {
+                            false
+                        }
                     }
                 }
                 "getVolumeCalibrationOffset" -> {
-                    val device = openedDevice ?: findAudioDevice()
-                    val offset = if (device != null) {
-                        getVolumeCalibrationOffset(device.vendorId, device.productId)
-                    } else 0.0
-                    result.success(offset)
+                    // openedDevice is mutated on workerThread; dispatch there to
+                    // avoid a data race.
+                    runAsync(call.method, result) {
+                        val device = openedDevice ?: findAudioDevice()
+                        if (device != null) {
+                            getVolumeCalibrationOffset(device.vendorId, device.productId)
+                        } else 0.0
+                    }
                 }
                 "querySupportedRates" -> runAsync(call.method, result) { querySupportedRatesInternal() }
                 else -> result.notImplemented()
@@ -561,7 +571,7 @@ class UsbExclusivePlugin(
             "overrunCount" to safeGetOverrunCount(),
             "channelMismatchFrames" to safeGetChannelMismatchFrames(),
             "bufferedMs" to safeGetBufferedMs(),
-            "rateVerified" to (streamFormat != null && lastRateVerified),
+            "rateVerified" to (streaming && lastRateVerified),
             "advertisedFormats" to parsed.altSettingFormats.map { fmt ->
                 mapOf(
                     "interfaceNumber" to fmt.interfaceNumber,
@@ -603,7 +613,14 @@ class UsbExclusivePlugin(
         "maxVolumeDb" to null,
         "interfaceNumber" to null,
         "supportedRates" to emptyList<Int>(),
+        "lastError" to null,
+        "resultCode" to null,
+        "underrunCount" to 0L,
+        "overrunCount" to 0L,
+        "channelMismatchFrames" to 0L,
         "bufferedMs" to 0.0,
+        "rateVerified" to false,
+        "advertisedFormats" to emptyList<Map<String, Any?>>(),
         "volumeCalibrationOffsetDb" to (device?.let { getVolumeCalibrationOffset(it.vendorId, it.productId) } ?: 0.0),
     )
 
@@ -797,9 +814,18 @@ class UsbExclusivePlugin(
 
     private fun startStreamingInternal(sampleRate: Int, channels: Int, bitDepth: Int = 16, strict: Boolean = false): Map<String, Any?> {
         if (streaming && streamFormat?.matches(sampleRate, bitDepth, channels, isNativeActive()) == true) {
+            if (strict && !lastRateVerified) {
+                lastStreamResultCode = 3
+                Log.w(TAG, "Step clock: strict mode refused unverified readback on existing stream")
+                return failure("uac1_rate_readback_unsupported")
+            }
             val status = buildStatus()
             if (status["streamingActive"] == true) {
                 lastStreamResultCode = 0
+                // Update the cache and notify listeners so the event stream
+                // reflects the current state even on the early-return path.
+                cachedStatus = status
+                emitState()
                 return status + mapOf("success" to true, "resultCode" to 0)
             }
         }
@@ -1000,6 +1026,7 @@ class UsbExclusivePlugin(
         if (directOwner === this) directOwner = null
         streaming = false
         streamFormat = null
+        lastRateVerified = false
         if (nativeLoaded) try { nativeUsbStreamStop() } catch (_: Throwable) {}
         val iface = claimedStreamingInterface
         claimedStreamingInterface = null

@@ -16,6 +16,9 @@ void main() {
         genre: 'Jazz',
         artworkUrl: 'https://example.com/art.png',
         lastPlayed: 123456,
+        bitrate: 320,
+        codec: 'mp3',
+        stationUuid: 'station-uuid-1',
       );
 
       final restored = RadioStation.fromJson(station.toJson());
@@ -26,6 +29,10 @@ void main() {
       expect(restored.genre, 'Jazz');
       expect(restored.artworkUrl, 'https://example.com/art.png');
       expect(restored.lastPlayed, 123456);
+      expect(restored.bitrate, 320);
+      expect(restored.codec, 'MP3');
+      expect(restored.stationUuid, 'station-uuid-1');
+      expect(restored.qualityLabel, '320 kbps MP3');
     });
 
     test('derives a stable id from the url', () {
@@ -52,6 +59,28 @@ void main() {
       expect(RadioStation.isHttpUrl('ytmusic://abc'), isFalse);
       expect(RadioStation.isHttpUrl('http://'), isFalse);
       expect(RadioStation.isHttpUrl(''), isFalse);
+    });
+
+    test('isSafeHost checks syntactic host and resolved IP addresses', () async {
+      expect(await RadioStation.isSafeHost('localhost'), isFalse);
+      expect(await RadioStation.isSafeHost('127.0.0.1'), isFalse);
+      expect(await RadioStation.isSafeHost('192.168.1.1'), isFalse);
+      expect(await RadioStation.isSafeHost('10.0.0.1'), isFalse);
+      expect(await RadioStation.isSafeHost('172.16.0.1'), isFalse);
+      expect(await RadioStation.isSafeHost('stream.example'), isTrue);
+
+      // Rejects DNS rebinding if resolved IP is private
+      final rebindingUnsafe = await RadioStation.isSafeHost(
+        'rebinding.example.com',
+        lookup: (_) async => ['10.200.1.5'],
+      );
+      expect(rebindingUnsafe, isFalse);
+
+      final legitimateSafe = await RadioStation.isSafeHost(
+        'stream.safe.com',
+        lookup: (_) async => ['93.184.216.34'],
+      );
+      expect(legitimateSafe, isTrue);
     });
   });
 

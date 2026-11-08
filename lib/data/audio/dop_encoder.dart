@@ -108,3 +108,73 @@ class DopEncoder {
     return dopBuffer;
   }
 }
+
+/// Implements raw Native DSD bitstream packing (Direct DSD / DSD-Raw).
+/// Streams 1-bit DSD audio samples directly to capable USB DAC endpoints
+/// without DoP marker overhead, supporting high-rate DSD up to DSD512 (22.5792 MHz).
+class DsdRawEncoder {
+  const DsdRawEncoder._();
+
+  /// Returns the native 1-bit DSD bitstream sample rate for a given DSD multiple
+  /// (DSD64 = 64, DSD128 = 128, DSD256 = 256, DSD512 = 512).
+  static int nativeDsdSampleRate(int dsdRate) {
+    if (dsdRate <= 0) return 0;
+    return dsdRate * 44100;
+  }
+
+  /// Encodes 1-bit DSD stereo stream into raw byte-interleaved channel frames
+  /// (Left byte, Right byte) matching standard ALSA SNDRV_PCM_FORMAT_DSD_U8 layout.
+  static Uint8List encodeToDsdRawInterleaved({
+    required Uint8List dsdLeft,
+    required Uint8List dsdRight,
+  }) {
+    if (dsdLeft.length != dsdRight.length) {
+      throw ArgumentError(
+        'DSD channels must have equal length '
+        '(left=${dsdLeft.length}, right=${dsdRight.length}).',
+      );
+    }
+    final int byteCount = dsdLeft.length;
+    final Uint8List rawBuffer = Uint8List(byteCount * 2);
+
+    int outOffset = 0;
+    for (int i = 0; i < byteCount; i++) {
+      rawBuffer[outOffset++] = dsdLeft[i];
+      rawBuffer[outOffset++] = dsdRight[i];
+    }
+    return rawBuffer;
+  }
+
+  /// Encodes 1-bit DSD stereo stream into 32-bit native DSD words (DSD_U32_LE)
+  /// matching the Linux USB Audio / ALSA Native DSD specification for DACs
+  /// requiring 32-bit word alignment.
+  static Uint8List encodeToDsdRawU32Le({
+    required Uint8List dsdLeft,
+    required Uint8List dsdRight,
+  }) {
+    if (dsdLeft.length != dsdRight.length) {
+      throw ArgumentError(
+        'DSD channels must have equal length '
+        '(left=${dsdLeft.length}, right=${dsdRight.length}).',
+      );
+    }
+    final int alignedLen = (dsdLeft.length ~/ 4) * 4;
+    final Uint8List rawBuffer = Uint8List(alignedLen * 2);
+
+    int outOffset = 0;
+    for (int i = 0; i < alignedLen; i += 4) {
+      // 4 bytes of Left channel (32 bits)
+      rawBuffer[outOffset++] = dsdLeft[i + 0];
+      rawBuffer[outOffset++] = dsdLeft[i + 1];
+      rawBuffer[outOffset++] = dsdLeft[i + 2];
+      rawBuffer[outOffset++] = dsdLeft[i + 3];
+
+      // 4 bytes of Right channel (32 bits)
+      rawBuffer[outOffset++] = dsdRight[i + 0];
+      rawBuffer[outOffset++] = dsdRight[i + 1];
+      rawBuffer[outOffset++] = dsdRight[i + 2];
+      rawBuffer[outOffset++] = dsdRight[i + 3];
+    }
+    return rawBuffer;
+  }
+}

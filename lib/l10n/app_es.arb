@@ -498,6 +498,14 @@
   "themeAndAppearance": "Tema y apariencia",
   "accentColor": "Color de acento",
   "nowPlayingTheme": "Estilo de reproducción",
+  "buttonStyleTitle": "Estilo de botones y chips",
+  "buttonStyleSubtitle": "Selecciona el estilo visual de los botones y chips en la app",
+  "buttonStyleRectangular": "Rectangular (Vidrio esmerilado)",
+  "buttonStyleRectangularSubtitle": "Vidrio translúcido con bordes rectangulares a juego con el reproductor",
+  "buttonStyleCapsule": "Cápsula (Vidrio esmerilado)",
+  "buttonStyleCapsuleSubtitle": "Cápsulas translúcidas estilo Apple Music",
+  "buttonStyleClassic": "Clásico",
+  "buttonStyleClassicSubtitle": "Botones tradicionales de Pulsr con acentos y bordes temáticos",
   "colorSource": "Fuente de color",
   "gestures": "Gestos",
   "miniPlayerSwipeLeft": "Deslizar mini reproductor a la izquierda",
@@ -3778,6 +3786,8 @@
   "settingsThemeCdTurntableDesc": "CD iridiscente giratorio con carátula central y aguja animada",
   "settingsThemeClean": "Flujo Moderno Limpio",
   "settingsThemeCleanDesc": "Portada limpia inspirada en Apple con deslizador de c\u00e1psula y opciones inferiores r\u00e1pidas",
+  "settingsThemeMilkdrop": "Visualizador Milkdrop",
+  "settingsThemeMilkdropDesc": "Visualizador fluido blanco translúcido en toda la pantalla detrás de la portada",
   "settingsThemeVinylTurntable": "Estudio de tocadiscos",
   "settingsThemeVinylTurntableDesc": "Disco de vinilo real con surcos realistas, etiqueta central y brazo",
   "settingsTurnOffGapless": "Desactivar sin pausas",
@@ -5653,5 +5663,8 @@
     "description": "Home widget subtitle when nothing is playing"
   },
   "conflictLiveOrLossyNotBitPerfect": "Las transmisiones de radio en vivo y con pérdidas no se pueden reproducir en Bit-Perfect.",
-  "uac1RateReadbackUnsupported": "Este DAC no admite la lectura de frecuencia de muestreo UAC1; Strict Bit-Perfect requiere frecuencias verificadas."
+  "uac1RateReadbackUnsupported": "Este DAC no admite la lectura de frecuencia de muestreo UAC1; Strict Bit-Perfect requiere frecuencias verificadas.",
+  "uac3Unsupported": "USB Audio Class 3 (UAC3) no es compatible con la reproducción Bit-Perfect.",
+  "conflictSource32BitFloatNotBitPerfect": "El audio de punto flotante de 32 bits requiere una conversión con pérdidas y no se puede reproducir en Bit-Perfect.",
+  "bpSourceCodecUnconfirmed": "Códec de origen no confirmado"
 }

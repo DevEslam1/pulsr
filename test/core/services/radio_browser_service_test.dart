@@ -19,6 +19,9 @@ void main() {
               'url_resolved': 'https://stream.example/jazz',
               'favicon': 'https://art.example/jazz.png',
               'tags': 'jazz, smooth',
+              'bitrate': 320,
+              'codec': 'MP3',
+              'stationuuid': 'uuid-1234',
             },
             {
               'name': 'Private',
@@ -48,6 +51,10 @@ void main() {
       expect(stations.single.url, 'https://stream.example/jazz');
       expect(stations.single.genre, 'jazz');
       expect(stations.single.artworkUrl, 'https://art.example/jazz.png');
+      expect(stations.single.bitrate, 320);
+      expect(stations.single.codec, 'MP3');
+      expect(stations.single.stationUuid, 'uuid-1234');
+      expect(stations.single.qualityLabel, '320 kbps MP3');
 
       final params = requested.single.queryParameters;
       expect(params['name'], 'jazz');
@@ -129,6 +136,80 @@ void main() {
               .isReachable('https://stream.example/live'),
           isFalse,
         );
+      });
+
+      test('falls back to non-range probe if 416 Range Not Satisfiable', () async {
+        var attempts = 0;
+        final client = MockClient((request) async {
+          attempts++;
+          if (request.headers.containsKey('Range')) {
+            return http.Response('range not supported', 416);
+          }
+          return http.Response('', 200);
+        });
+
+        final service = RadioBrowserService(client: client);
+        expect(await service.isReachable('https://stream.example/hls'), isTrue);
+        expect(attempts, 2);
+      });
+
+      test('rejects host resolving to private IP via DNS rebinding', () async {
+        var networkCalls = 0;
+        final client = MockClient((_) async {
+          networkCalls++;
+          return http.Response('', 200);
+        });
+
+        final service = RadioBrowserService(
+          client: client,
+          hostLookup: (host) async => ['192.168.1.100'],
+        );
+
+        expect(
+          await service.isReachable('https://malicious-rebinding.com/live'),
+          isFalse,
+        );
+        expect(networkCalls, 0);
+      });
+    });
+
+    group('Mirror failover and voting', () {
+      test('fails over to secondary mirror when primary returns 503', () async {
+        final requested = <Uri>[];
+        final client = MockClient((request) async {
+          requested.add(request.url);
+          if (request.url.host == 'de1.api.radio-browser.info') {
+            return http.Response('server error', 503);
+          }
+          return http.Response('[]', 200);
+        });
+
+        final service = RadioBrowserService(client: client);
+        final results = await service.search(query: 'test');
+        expect(results, isEmpty);
+        expect(requested.length, 2);
+        expect(requested[0].host, 'de1.api.radio-browser.info');
+        expect(requested[1].host, 'nl1.api.radio-browser.info');
+      });
+
+      test('voteForStation issues vote request and parses confirmation', () async {
+        Uri? requested;
+        final client = MockClient((request) async {
+          requested = request.url;
+          return http.Response(jsonEncode({'ok': true, 'message': 'voted'}), 200);
+        });
+
+        final service = RadioBrowserService(client: client);
+        final ok = await service.voteForStation('uuid-999');
+        expect(ok, isTrue);
+        expect(requested!.path, '/json/vote/uuid-999');
+      });
+
+      test('voteForStation returns false on non-200 or failure', () async {
+        final client = MockClient((_) async => http.Response('not found', 404));
+        final service = RadioBrowserService(client: client);
+        expect(await service.voteForStation('uuid-missing'), isFalse);
+        expect(await service.voteForStation(''), isFalse);
       });
     });
   });

@@ -8,6 +8,7 @@ import 'cd_player_theme.dart';
 import 'classic_player_theme.dart';
 import 'lyrics_player_theme.dart';
 import 'minimal_player_theme.dart';
+import 'milkdrop_player_theme.dart';
 import 'player_theme.dart';
 import 'vinyl_player_theme.dart';
 import 'waveform_player_theme.dart';
@@ -29,6 +30,7 @@ class ThemeRegistry {
     PlayerThemeMode.waveform: (props) => WaveformPlayerTheme(props: props),
     PlayerThemeMode.lyricsFocus: (props) => LyricsPlayerTheme(props: props),
     PlayerThemeMode.clean: (props) => CleanPlayerTheme(props: props),
+    PlayerThemeMode.milkdrop: (props) => MilkdropPlayerTheme(props: props),
   };
 
   static final Map<PlayerThemeMode, PlayerThemeBuilder> _builders =

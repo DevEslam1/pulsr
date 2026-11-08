@@ -15,6 +15,7 @@ class MilkdropRenderer extends StatelessWidget {
   final Color color;
   final MilkdropPreset preset;
   final bool forceCanvasFallback;
+  final bool transparentBackground;
 
   const MilkdropRenderer({
     super.key,
@@ -23,6 +24,7 @@ class MilkdropRenderer extends StatelessWidget {
     required this.color,
     required this.preset,
     this.forceCanvasFallback = false,
+    this.transparentBackground = false,
   });
 
   bool get isFallback =>
@@ -39,11 +41,13 @@ class MilkdropRenderer extends StatelessWidget {
                 data: data,
                 color: color,
                 preset: preset,
+                transparentBackground: transparentBackground,
               )
             : MilkdropCanvasPainter(
                 data: data,
                 color: color,
                 preset: preset,
+                transparentBackground: transparentBackground,
               ),
       ),
     );
@@ -56,12 +60,14 @@ class MilkdropGpuPainter extends CustomPainter {
   final List<double> data;
   final Color color;
   final MilkdropPreset preset;
+  final bool transparentBackground;
 
   MilkdropGpuPainter({
     required this.shader,
     required this.data,
     required this.color,
     required this.preset,
+    this.transparentBackground = false,
   });
 
   double _avg(int a, int b) {
@@ -96,6 +102,7 @@ class MilkdropGpuPainter extends CustomPainter {
     shader.setFloat(13, preset.rot);
     shader.setFloat(14, preset.warp);
     shader.setFloat(15, preset.decay.clamp(0.0, 1.0));
+    shader.setFloat(16, transparentBackground ? 1.0 : 0.0);
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
@@ -108,11 +115,13 @@ class MilkdropCanvasPainter extends CustomPainter {
   final List<double> data;
   final Color color;
   final MilkdropPreset preset;
+  final bool transparentBackground;
 
   MilkdropCanvasPainter({
     required this.data,
     required this.color,
     required this.preset,
+    this.transparentBackground = false,
   });
 
   double _avg(int a, int b) {
@@ -136,25 +145,32 @@ class MilkdropCanvasPainter extends CustomPainter {
     final treb = _avg(22, 32);
     final center = Offset(size.width / 2, size.height / 2);
 
-    final waveColor = Color.fromARGB(
-      255,
-      (preset.waveR.clamp(0.0, 1.0) * 255).round(),
-      (preset.waveG.clamp(0.0, 1.0) * 255).round(),
-      (preset.waveB.clamp(0.0, 1.0) * 255).round(),
-    );
-    final tint = Color.lerp(color, waveColor, 0.55)!;
+    final isWhiteTransparent = transparentBackground || color == Colors.white;
+    final waveColor = isWhiteTransparent
+        ? Colors.white
+        : Color.fromARGB(
+            255,
+            (preset.waveR.clamp(0.0, 1.0) * 255).round(),
+            (preset.waveG.clamp(0.0, 1.0) * 255).round(),
+            (preset.waveB.clamp(0.0, 1.0) * 255).round(),
+          );
+    final tint = isWhiteTransparent
+        ? Colors.white
+        : Color.lerp(color, waveColor, 0.55)!;
 
-    final bg = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          Color.lerp(Colors.black, tint, 0.18 + bass * 0.30)!,
-          Colors.black,
-        ],
-        stops: const [0.0, 1.0],
-      ).createShader(
-        Rect.fromCircle(center: center, radius: size.longestSide * 0.75),
-      );
-    canvas.drawRect(Offset.zero & size, bg);
+    if (!transparentBackground) {
+      final bg = Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(Colors.black, tint, 0.18 + bass * 0.30)!,
+            Colors.black,
+          ],
+          stops: const [0.0, 1.0],
+        ).createShader(
+          Rect.fromCircle(center: center, radius: size.longestSide * 0.75),
+        );
+      canvas.drawRect(Offset.zero & size, bg);
+    }
 
     final ringPaint = Paint()
       ..style = PaintingStyle.stroke
@@ -167,7 +183,11 @@ class MilkdropCanvasPainter extends CustomPainter {
       final depth = math.pow(phase, 1.5).toDouble();
       final radius = size.shortestSide * 0.52 * depth * preset.zoom;
       if (radius < 2) continue;
-      final alpha = ((1.0 - phase) * (0.35 + bass * 0.65)).clamp(0.02, 0.9);
+      final rawAlpha =
+          ((1.0 - phase) * (0.35 + bass * 0.65)).clamp(0.02, 0.9);
+      final alpha = isWhiteTransparent
+          ? (rawAlpha * 0.55).clamp(0.04, 0.70)
+          : rawAlpha;
       ringPaint
         ..color = tint.withValues(alpha: alpha.toDouble())
         ..strokeWidth = 1.0 + depth * 2.5;
@@ -188,11 +208,14 @@ class MilkdropCanvasPainter extends CustomPainter {
     }
 
     if (data.isNotEmpty && data.length > 1) {
+      final waveAlpha = isWhiteTransparent
+          ? (0.35 + bass * 0.45).clamp(0.15, 0.85)
+          : 0.85;
       final wavePaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2 + bass * 2.0
         ..strokeCap = StrokeCap.round
-        ..color = tint.withValues(alpha: 0.85);
+        ..color = tint.withValues(alpha: waveAlpha);
       final path = Path();
       final n = data.length;
       for (var i = 0; i < n; i++) {
@@ -215,7 +238,10 @@ class MilkdropCanvasPainter extends CustomPainter {
       final dist = size.shortestSide * 0.5 * math.pow(m, 1.3).toDouble();
       final x = center.dx + dist * math.cos(angle);
       final y = center.dy + dist * math.sin(angle);
-      particlePaint.color = tint.withValues(alpha: (m * 0.5).clamp(0.0, 0.6));
+      final particleAlpha = isWhiteTransparent
+          ? (m * 0.45 + bass * 0.25).clamp(0.05, 0.65)
+          : (m * 0.5).clamp(0.0, 0.6);
+      particlePaint.color = tint.withValues(alpha: particleAlpha);
       canvas.drawCircle(Offset(x, y), 1.0 + m * 3.0, particlePaint);
     }
   }

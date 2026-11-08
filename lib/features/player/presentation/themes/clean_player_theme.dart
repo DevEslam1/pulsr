@@ -6,6 +6,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../../core/widgets/cached_artwork.dart';
@@ -54,7 +55,8 @@ class CleanPlayerTheme extends StatelessWidget {
       :nowPlayingArtworkSwipe,
       :playerSliderStyle,
       :canvasEnabled,
-      :canvasAsBackdrop
+      :canvasAsBackdrop,
+      :themeMode,
     ) = context.select<
         SettingsCubit,
         ({
@@ -63,12 +65,14 @@ class CleanPlayerTheme extends StatelessWidget {
           PlayerSliderStyle playerSliderStyle,
           bool canvasEnabled,
           bool canvasAsBackdrop,
+          AppThemeMode themeMode,
         })>((c) => (
           nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
           playerSliderStyle: c.state.playerSliderStyle,
           canvasEnabled: c.state.canvasEnabled,
           canvasAsBackdrop: c.state.canvasAsBackdrop,
+          themeMode: c.state.themeMode,
         ));
 
     final isInSplitView = PlayerSplitViewScope.of(context);
@@ -79,27 +83,45 @@ class CleanPlayerTheme extends StatelessWidget {
         final isLandscape = metrics.isLandscape;
 
         // 1. Upper stage: Full-bleed Artwork with gradient fade, Lyrics, or Queue
-        // Lyrics and Queue cover the exact same full-bleed bounds as the artwork.
+        // In tablet split-view, the right pane is dedicated to lyrics / queue / DSP.
+        // Therefore, the left deck must ALWAYS display the showcase artwork,
+        // never an inline lyrics or queue overlay.
         final Widget upperStage;
-        if (state.isLyricsVisible) {
+        if (!isInSplitView && state.isLyricsVisible) {
           upperStage = KeyedSubtree(
             key: const ValueKey('lyrics_stage'),
-            child: SizedBox.expand(
-              child: LyricsView(
-                key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                lyrics: state.lyrics,
-                isLoading: state.isLoadingLyrics,
-                activeColor: activeColor,
-                source: state.lyricsSource,
-                transparentBackground: true,
+            child: SafeArea(
+              top: true,
+              bottom: false,
+              child: SizedBox.expand(
+                child: LyricsView(
+                  key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                  lyrics: state.lyrics,
+                  isLoading: state.isLoadingLyrics,
+                  activeColor: activeColor,
+                  source: state.lyricsSource,
+                  transparentBackground: true,
+                ),
               ),
             ),
           );
-        } else if (state.isQueueVisible) {
+        } else if (!isInSplitView && state.isQueueVisible) {
           upperStage = KeyedSubtree(
             key: const ValueKey('queue_stage'),
-            child: const SizedBox.expand(
-              child: NowPlayingQueueView(key: ValueKey('queue_view')),
+            child: SafeArea(
+              top: true,
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  top: AppSpacing.sm,
+                  left: AppSpacing.md,
+                  right: AppSpacing.md,
+                  bottom: AppSpacing.xs,
+                ),
+                child: const SizedBox.expand(
+                  child: NowPlayingQueueView(key: ValueKey('queue_view')),
+                ),
+              ),
             ),
           );
         } else {
@@ -196,16 +218,39 @@ class CleanPlayerTheme extends StatelessWidget {
           );
         }
 
-        final animatedUpperStage = AnimatedSwitcher(
-          duration: context.motionMs(320),
-          transitionBuilder: (child, animation) =>
-              playerOverlayTransitionBuilder(context, child, animation),
-          child: upperStage,
+        final animatedUpperStage = ClipRect(
+          child: AnimatedSwitcher(
+            duration: context.motionMs(320),
+            transitionBuilder: (child, animation) =>
+                playerOverlayTransitionBuilder(context, child, animation),
+            child: upperStage,
+          ),
         );
+
+        final isShort =
+            metrics.isShortHeight || (isInSplitView && constraints.maxHeight < 540);
+        final isVeryShort =
+            metrics.isVeryShortHeight || (isInSplitView && constraints.maxHeight < 460);
+
+        final spacingTrackToSeek = isVeryShort
+            ? 4.0
+            : (isShort ? 8.0 : 18.0);
+        final spacingSeekToControls = isVeryShort
+            ? 6.0
+            : (isShort ? 10.0 : 22.0);
+        final spacingControlsToDock = isVeryShort
+            ? 6.0
+            : (isShort ? 12.0 : 26.0);
+        final paddingBottom = isVeryShort
+            ? 4.0
+            : (isShort ? 8.0 : 12.0);
+
+        final horizontalPadding =
+            (constraints.maxWidth * 0.06).clamp(12.0, 24.0);
 
         // 2. Track Header: Title and Artist with Star (Favorite) & More (...) circles
         final trackHeader = Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -218,7 +263,8 @@ class CleanPlayerTheme extends StatelessWidget {
                       text: song?.title ?? 'No Track Playing',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: (metrics.titleFontSize + 2.0).clamp(20.0, 24.0),
+                        fontSize:
+                            (metrics.titleFontSize + 2.0).clamp(16.0, 24.0),
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.4,
                       ),
@@ -230,7 +276,8 @@ class CleanPlayerTheme extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: (metrics.artistFontSize + 1.0).clamp(14.0, 16.5),
+                        fontSize:
+                            (metrics.artistFontSize + 1.0).clamp(12.0, 16.5),
                         fontWeight: FontWeight.w500,
                         letterSpacing: -0.1,
                       ),
@@ -276,18 +323,22 @@ class CleanPlayerTheme extends StatelessWidget {
           song: song,
           activeColor: activeColor,
           sliderStyle: playerSliderStyle,
+          horizontalPadding: horizontalPadding,
+          isCompact: isShort,
         );
 
         // 4. Playback Controls (Rewind, Play/Pause without circle, Fast-Forward)
         final transportControls = _CleanTransportControls(
           props: props,
           activeColor: activeColor,
+          isCompact: isShort,
         );
 
         // 5. Down Bar (Lyrics on left, AirPlay/Output centered, Queue on right)
         final downBar = _CleanDownBar(
           props: props,
           activeColor: activeColor,
+          horizontalPadding: horizontalPadding,
         );
 
         // Layout composition
@@ -305,14 +356,23 @@ class CleanPlayerTheme extends StatelessWidget {
                   child: Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        trackHeader,
-                        cleanSeekBar,
-                        transportControls,
-                        downBar,
-                      ],
+                    child: Center(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            trackHeader,
+                            SizedBox(height: spacingTrackToSeek),
+                            cleanSeekBar,
+                            SizedBox(height: spacingSeekToControls),
+                            transportControls,
+                            SizedBox(height: spacingControlsToDock),
+                            downBar,
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -331,16 +391,16 @@ class CleanPlayerTheme extends StatelessWidget {
                 top: false,
                 bottom: true,
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
+                  padding: EdgeInsets.only(bottom: paddingBottom),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       trackHeader,
-                      const SizedBox(height: 18),
+                      SizedBox(height: spacingTrackToSeek),
                       cleanSeekBar,
-                      const SizedBox(height: 22),
+                      SizedBox(height: spacingSeekToControls),
                       transportControls,
-                      const SizedBox(height: 26),
+                      SizedBox(height: spacingControlsToDock),
                       downBar,
                     ],
                   ),
@@ -354,6 +414,31 @@ class CleanPlayerTheme extends StatelessWidget {
           return content;
         }
 
+        final p = context.palette;
+        final isAmoled = themeMode == AppThemeMode.amoled;
+
+        final Color topBg;
+        final Color bottomBg;
+        if (state.isLyricsVisible || state.isQueueVisible) {
+          final darkLyricsBg = isAmoled ? Colors.black : p.bg;
+          topBg = isDark ? darkLyricsBg : p.bg;
+          bottomBg = topBg;
+        } else {
+          if (isAmoled) {
+            topBg = Color.alphaBlend(
+              Colors.black.withValues(alpha: 0.40),
+              props.bgColor,
+            );
+            bottomBg = Colors.black;
+          } else {
+            topBg = props.bgColor;
+            bottomBg = Color.alphaBlend(
+              Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+              props.bgColor,
+            );
+          }
+        }
+
         // Rich, dynamic ambient backdrop matching the artwork palette
         return Stack(
           children: [
@@ -364,13 +449,7 @@ class CleanPlayerTheme extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [
-                        props.bgColor,
-                        Color.alphaBlend(
-                          Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-                          props.bgColor,
-                        ),
-                      ],
+                      colors: [topBg, bottomBg],
                     ),
                   ),
                 ),
@@ -431,6 +510,8 @@ class _CleanSeekBar extends StatefulWidget {
   final SongsTableData? song;
   final Color activeColor;
   final PlayerSliderStyle sliderStyle;
+  final double horizontalPadding;
+  final bool isCompact;
 
   const _CleanSeekBar({
     required this.props,
@@ -438,6 +519,8 @@ class _CleanSeekBar extends StatefulWidget {
     required this.song,
     required this.activeColor,
     required this.sliderStyle,
+    this.horizontalPadding = 24.0,
+    this.isCompact = false,
   });
 
   @override
@@ -474,18 +557,18 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
         : widget.sliderStyle;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      padding: EdgeInsets.symmetric(horizontal: widget.horizontalPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Sleek slider line
           SizedBox(
-            height: 28.0,
+            height: widget.isCompact ? 22.0 : 28.0,
             child: PulsrSlider(
               value: effectiveValue,
               min: 0.0,
               max: maxDuration > 0 ? maxDuration : 1.0,
-              height: 28.0,
+              height: widget.isCompact ? 22.0 : 28.0,
               activeColor: Colors.white,
               inactiveColor: Colors.white.withValues(alpha: 0.22),
               thumbColor: Colors.white,
@@ -588,12 +671,16 @@ class _CleanLosslessBadgePill extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => AudioQualitySheet.show(context, song!, activeColor),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(10),
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.12),
+              width: 0.8,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -627,10 +714,12 @@ class _CleanLosslessBadgePill extends StatelessWidget {
 class _CleanTransportControls extends StatelessWidget {
   final PlayerThemeProps props;
   final Color activeColor;
+  final bool isCompact;
 
   const _CleanTransportControls({
     required this.props,
     required this.activeColor,
+    this.isCompact = false,
   });
 
   @override
@@ -640,61 +729,68 @@ class _CleanTransportControls extends StatelessWidget {
     final isPlaying = state.isPlaying;
     final isBuffering = state.isBuffering;
 
+    final double mainIconSize = isCompact ? 46.0 : 56.0;
+    final double sideIconSize = isCompact ? 34.0 : 42.0;
+    final double buttonGap = isCompact ? 20.0 : 44.0;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Previous / Rewind
-          IconButton(
-            iconSize: 42,
-            icon: const Icon(Icons.fast_rewind_rounded),
-            color: Colors.white,
-            tooltip: 'Previous track',
-            onPressed: () {
-              PulsrHaptics.selection();
-              cubit.previous();
-            },
-          ),
-          const SizedBox(width: 44),
-          // Play / Pause (bare, large, solid white — no circle backdrop)
-          IconButton(
-            iconSize: 56,
-            icon: isBuffering
-                ? const SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Previous / Rewind
+            IconButton(
+              iconSize: sideIconSize,
+              icon: const Icon(Icons.fast_rewind_rounded),
+              color: Colors.white,
+              tooltip: 'Previous track',
+              onPressed: () {
+                PulsrHaptics.selection();
+                cubit.previous();
+              },
+            ),
+            SizedBox(width: buttonGap),
+            // Play / Pause (bare, large, solid white — no circle backdrop)
+            IconButton(
+              iconSize: mainIconSize,
+              icon: isBuffering
+                  ? SizedBox(
+                      width: isCompact ? 24 : 32,
+                      height: isCompact ? 24 : 32,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
                       color: Colors.white,
                     ),
-                  )
-                : Icon(
-                    isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    color: Colors.white,
-                  ),
-            tooltip: isPlaying ? 'Pause' : 'Play',
-            onPressed: () {
-              PulsrHaptics.light();
-              cubit.togglePlayPause();
-            },
-          ),
-          const SizedBox(width: 44),
-          // Next / Fast-Forward
-          IconButton(
-            iconSize: 42,
-            icon: const Icon(Icons.fast_forward_rounded),
-            color: Colors.white,
-            tooltip: 'Next track',
-            onPressed: () {
-              PulsrHaptics.selection();
-              cubit.next();
-            },
-          ),
-        ],
+              tooltip: isPlaying ? 'Pause' : 'Play',
+              onPressed: () {
+                PulsrHaptics.light();
+                cubit.togglePlayPause();
+              },
+            ),
+            SizedBox(width: buttonGap),
+            // Next / Fast-Forward
+            IconButton(
+              iconSize: sideIconSize,
+              icon: const Icon(Icons.fast_forward_rounded),
+              color: Colors.white,
+              tooltip: 'Next track',
+              onPressed: () {
+                PulsrHaptics.selection();
+                cubit.next();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -705,10 +801,12 @@ class _CleanTransportControls extends StatelessWidget {
 class _CleanDownBar extends StatelessWidget {
   final PlayerThemeProps props;
   final Color activeColor;
+  final double horizontalPadding;
 
   const _CleanDownBar({
     required this.props,
     required this.activeColor,
+    this.horizontalPadding = 24.0,
   });
 
   @override
@@ -719,6 +817,8 @@ class _CleanDownBar extends StatelessWidget {
     final outputDevice = context.select<SettingsCubit, AudioOutputInfo?>(
       (c) => c.state.currentOutputDevice,
     );
+    final isInSplit = PlayerSplitViewScope.of(context);
+    final splitTabCtrl = PlayerSplitViewScope.tabControllerOf(context);
 
     final IconData outputIcon = isCast
         ? Icons.cast_connected_rounded
@@ -728,50 +828,80 @@ class _CleanDownBar extends StatelessWidget {
                 ? Icons.speaker_rounded
                 : Icons.airplay_rounded));
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // 1. Lyrics Button (Left)
-          _DownBarItem(
-            icon: state.isLyricsVisible
-                ? Icons.chat_bubble_rounded
-                : Icons.chat_bubble_outline_rounded,
-            isActive: state.isLyricsVisible,
-            tooltip: 'Lyrics',
-            onTap: () {
-              PulsrHaptics.selection();
-              cubit.toggleLyricsVisibility();
-            },
+    Widget buildBar(BuildContext context) {
+      final bool isLyricsActive = isInSplit
+          ? (splitTabCtrl?.index == 0)
+          : state.isLyricsVisible;
+      final bool isQueueActive = isInSplit
+          ? (splitTabCtrl?.index == 1)
+          : state.isQueueVisible;
+
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 1. Lyrics Button (Left)
+              _DownBarItem(
+                icon: isLyricsActive
+                    ? Icons.chat_bubble_rounded
+                    : Icons.chat_bubble_outline_rounded,
+                isActive: isLyricsActive,
+                tooltip: 'Lyrics',
+                onTap: () {
+                  PulsrHaptics.selection();
+                  if (isInSplit && splitTabCtrl != null) {
+                    splitTabCtrl.animateTo(0);
+                  } else {
+                    cubit.toggleLyricsVisibility();
+                  }
+                },
+              ),
+              const SizedBox(width: 24),
+              // 2. Audio Output / Cast / AirPlay Button (Center)
+              _DownBarItem(
+                icon: outputIcon,
+                isActive: isCast,
+                tooltip: isCast ? 'Google Cast' : 'Audio Output',
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  if (state.currentSong != null) {
+                    AudioQualitySheet.show(
+                        context, state.currentSong!, activeColor);
+                  }
+                },
+              ),
+              const SizedBox(width: 24),
+              // 3. Queue / Playlist Button (Right)
+              _DownBarItem(
+                icon: Icons.format_list_bulleted_rounded,
+                isActive: isQueueActive,
+                tooltip: 'Queue',
+                onTap: () {
+                  PulsrHaptics.selection();
+                  if (isInSplit && splitTabCtrl != null) {
+                    splitTabCtrl.animateTo(1);
+                  } else {
+                    cubit.toggleQueueVisibility();
+                  }
+                },
+              ),
+            ],
           ),
-          // 2. Audio Output / Cast / AirPlay Button (Center)
-          _DownBarItem(
-            icon: outputIcon,
-            isActive: isCast,
-            tooltip: isCast ? 'Google Cast' : 'Audio Output',
-            onTap: () {
-              HapticFeedback.lightImpact();
-              if (state.currentSong != null) {
-                AudioQualitySheet.show(
-                    context, state.currentSong!, activeColor);
-              }
-            },
-          ),
-          // 3. Queue / Playlist Button (Right)
-          _DownBarItem(
-            icon: Icons.format_list_bulleted_rounded,
-            isActive: state.isQueueVisible,
-            tooltip: 'Queue',
-            onTap: () {
-              PulsrHaptics.selection();
-              cubit.toggleQueueVisibility();
-            },
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
+
+    if (isInSplit && splitTabCtrl != null) {
+      return AnimatedBuilder(
+        animation: splitTabCtrl.animation ?? splitTabCtrl,
+        builder: (context, _) => buildBar(context),
+      );
+    }
+    return buildBar(context);
   }
 }
 

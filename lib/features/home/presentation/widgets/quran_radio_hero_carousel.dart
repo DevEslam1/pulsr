@@ -9,6 +9,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/radio_station_store.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/theme/pulsr_button_style.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -462,55 +463,69 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                 label: context.l10n.viewAllRadioStations,
                 child: Material(
                   color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: AppRadii.circular(999),
-                    onTap: widget.onMoreStations ??
-                        () {
-                          HapticFeedback.selectionClick();
-                          context.push('/radio');
-                        },
-                    child: Container(
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                        8.0,
-                        3.0,
-                        5.0,
-                        3.0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.10),
-                        borderRadius: AppRadii.circular(999),
-                        border: Border.all(
-                          color: p.accent.withValues(alpha: 0.24),
-                          width: 0.8,
+                  child: Builder(
+                    builder: (context) {
+                      final isCapsule = context.isCapsuleButtons;
+                      final radius = context.buttonRadius(rectRadius: 6.0);
+                      final fg = isCapsule
+                          ? PulsrCapsuleStyle.foregroundColor(p)
+                          : p.accent;
+                      return InkWell(
+                        borderRadius: radius,
+                        onTap: widget.onMoreStations ??
+                            () {
+                              HapticFeedback.selectionClick();
+                              context.push('/radio');
+                            },
+                        child: Container(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
+                            8.0,
+                            3.0,
+                            5.0,
+                            3.0,
+                          ),
+                          decoration: isCapsule
+                              ? PulsrCapsuleStyle.decoration(p,
+                                  borderRadius: radius)
+                              : BoxDecoration(
+                                  color: p.accent.withValues(alpha: 0.10),
+                                  borderRadius: AppRadii.circular(999),
+                                  border: Border.all(
+                                    color: p.accent.withValues(alpha: 0.24),
+                                    width: 0.8,
+                                  ),
+                                ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.radio_rounded,
+                                size: 12.0,
+                                color: fg,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                context.l10n.radioTitle,
+                                style: TextStyle(
+                                  color: fg,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                              const SizedBox(width: 1),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 14,
+                                color: isCapsule
+                                    ? PulsrCapsuleStyle.secondaryForegroundColor(p)
+                                    : p.accent,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.radio_rounded,
-                            size: 12.5,
-                            color: p.accent,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.radioTitle,
-                            style: TextStyle(
-                              color: p.accent,
-                              fontSize: AppFontSize.tiny,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.25,
-                            ),
-                          ),
-                          const SizedBox(width: 1),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            size: 14,
-                            color: p.accent,
-                          ),
-                        ],
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -642,6 +657,7 @@ class _QuranHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCapsule = context.isCapsuleButtons;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (prev, curr) {
@@ -933,18 +949,20 @@ class _QuranHeroCard extends StatelessWidget {
                                     horizontal: 8,
                                     vertical: 3,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: isPlaying
-                                        ? p.accent.withValues(alpha: 0.16)
-                                        : p.accent.withValues(alpha: 0.14),
-                                    borderRadius: AppRadii.circular(999),
-                                    border: Border.all(
-                                      color: isPlaying
-                                          ? p.accent.withValues(alpha: 0.40)
-                                          : p.accent.withValues(alpha: 0.30),
-                                      width: 0.8,
-                                    ),
-                                  ),
+                                  decoration: isCapsule
+                                      ? PulsrCapsuleStyle.decoration(p)
+                                      : BoxDecoration(
+                                          color: isPlaying
+                                              ? p.accent.withValues(alpha: 0.16)
+                                              : p.accent.withValues(alpha: 0.14),
+                                          borderRadius: AppRadii.circular(999),
+                                          border: Border.all(
+                                            color: isPlaying
+                                                ? p.accent.withValues(alpha: 0.40)
+                                                : p.accent.withValues(alpha: 0.30),
+                                            width: 0.8,
+                                          ),
+                                        ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -957,7 +975,9 @@ class _QuranHeroCard extends StatelessWidget {
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              color: p.accent,
+                                              color: isCapsule
+                                                  ? PulsrCapsuleStyle.foregroundColor(p)
+                                                  : p.accent,
                                               fontSize: AppFontSize.tiny,
                                               fontWeight: FontWeight.w800,
                                               letterSpacing: 0.5,
@@ -968,7 +988,9 @@ class _QuranHeroCard extends StatelessWidget {
                                         Icon(
                                           Icons.radio_rounded,
                                           size: 11,
-                                          color: p.accent,
+                                          color: isCapsule
+                                              ? PulsrCapsuleStyle.foregroundColor(p)
+                                              : p.accent,
                                         ),
                                         const SizedBox(width: 4),
                                         Flexible(
@@ -977,7 +999,9 @@ class _QuranHeroCard extends StatelessWidget {
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              color: p.accent,
+                                              color: isCapsule
+                                                  ? PulsrCapsuleStyle.foregroundColor(p)
+                                                  : p.accent,
                                               fontSize: AppFontSize.tiny,
                                               fontWeight: FontWeight.w800,
                                               letterSpacing: 0.4,
@@ -996,19 +1020,24 @@ class _QuranHeroCard extends StatelessWidget {
                                   horizontal: 5.5,
                                   vertical: 1.5,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: p.surfaceContainerHighest
-                                      .withValues(alpha: 0.65),
-                                  borderRadius: AppRadii.r6All,
-                                  border: Border.all(
-                                    color: p.hairline.withValues(alpha: 0.6),
-                                    width: 0.6,
-                                  ),
-                                ),
+                                decoration: isCapsule
+                                    ? PulsrCapsuleStyle.decoration(p,
+                                        borderRadius: AppRadii.r6All)
+                                    : BoxDecoration(
+                                        color: p.surfaceContainerHighest
+                                            .withValues(alpha: 0.65),
+                                        borderRadius: AppRadii.r6All,
+                                        border: Border.all(
+                                          color: p.hairline.withValues(alpha: 0.6),
+                                          width: 0.6,
+                                        ),
+                                      ),
                                 child: Text(
                                   '${index + 1}/$total',
                                   style: TextStyle(
-                                    color: p.textSecondary,
+                                    color: isCapsule
+                                        ? PulsrCapsuleStyle.foregroundColor(p)
+                                        : p.textSecondary,
                                     fontSize: AppFontSize.tiny,
                                     fontWeight: FontWeight.w700,
                                     fontFeatures: const [
@@ -1168,32 +1197,38 @@ class _QuranHeroCard extends StatelessWidget {
                                   horizontal: 8.5,
                                   vertical: 4.5,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: isPlaying
-                                      ? p.accent.withValues(alpha: 0.14)
-                                      : p.surfaceContainerHighest
-                                          .withValues(alpha: 0.55),
-                                  borderRadius: AppRadii.circular(999),
-                                  border: Border.all(
-                                    color: isPlaying
-                                        ? p.accent.withValues(alpha: 0.38)
-                                        : p.hairline.withValues(alpha: 0.65),
-                                    width: 0.75,
-                                  ),
-                                ),
+                                decoration: isCapsule
+                                    ? PulsrCapsuleStyle.decoration(p)
+                                    : BoxDecoration(
+                                        color: isPlaying
+                                            ? p.accent.withValues(alpha: 0.14)
+                                            : p.surfaceContainerHighest
+                                                .withValues(alpha: 0.55),
+                                        borderRadius: AppRadii.circular(999),
+                                        border: Border.all(
+                                          color: isPlaying
+                                              ? p.accent.withValues(alpha: 0.38)
+                                              : p.hairline.withValues(alpha: 0.65),
+                                          width: 0.75,
+                                        ),
+                                      ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     if (isPlaying) ...[
                                       _MiniEqualizerBars(
                                         isPlaying: true,
-                                        color: p.accent,
+                                        color: isCapsule
+                                            ? PulsrCapsuleStyle.foregroundColor(p)
+                                            : p.accent,
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
                                         context.l10n.radioLiveShortBadge,
                                         style: TextStyle(
-                                          color: p.accent,
+                                          color: isCapsule
+                                              ? PulsrCapsuleStyle.foregroundColor(p)
+                                              : p.accent,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w800,
                                           letterSpacing: 0.3,
@@ -1203,13 +1238,17 @@ class _QuranHeroCard extends StatelessWidget {
                                       Icon(
                                         Icons.volume_up_rounded,
                                         size: 13,
-                                        color: p.textSecondary,
+                                        color: isCapsule
+                                            ? PulsrCapsuleStyle.foregroundColor(p)
+                                            : p.textSecondary,
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
                                         context.l10n.radioListenNow,
                                         style: TextStyle(
-                                          color: p.textSecondary,
+                                          color: isCapsule
+                                              ? PulsrCapsuleStyle.foregroundColor(p)
+                                              : p.textSecondary,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                         ),

@@ -508,4 +508,41 @@ class UsbAudioControlParserTest {
         assertFalse(UsbAudioControlParser.isAudioStreamingInterface(0x02, 0x02, 0x01))
         assertFalse(UsbAudioControlParser.isAudioFunctionInterface(0x03, 0x02, 0x00))
     }
+
+    @Test
+    fun parsesVendorSpecificClassDac() {
+        // Vendor-specific class (0xFF) DAC declaring UAC2 protocol (0x20)
+        val config = byteArrayOf(
+            // Audio Control interface (class 0xFF, subclass 0x01, protocol 0x20)
+            9, 0x04, 0x00, 0x00, 0x00, 0xFF.toByte(), 0x01, 0x20, 0x00,
+            18, 0x24, 0x06, 0x03, 0x02,
+            0x0F, 0x00, 0x00, 0x00,
+            0x0F, 0x00, 0x00, 0x00,
+            0x0F, 0x00, 0x00, 0x00,
+            0x00,
+            // AudioStreaming interface #1 (class 0xFF, subclass 0x02, protocol 0x20)
+            9, 0x04, 0x01, 0x00, 0x00, 0xFF.toByte(), 0x02, 0x20, 0x00,
+            // Isochronous OUT endpoint
+            7, 0x05, 0x01, 0x01, 0x40, 0x00, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(config)
+        assertEquals(UsbAudioControlParser.UAC2, result.uacVersion)
+        assertNotNull(result.streamingEndpoint)
+        assertEquals(0x01, result.streamingEndpoint!!.address)
+        assertTrue(result.hasVolumeControl)
+        assertEquals(3, result.volumeUnit!!.unitId)
+    }
+
+    @Test
+    fun vendorClassNonAudioDeviceIsIgnoredWithoutPair() {
+        // Vendor device with only an interface 0xFF/0x02/0x00 and no AudioControl pair
+        val vendorNonAudio = byteArrayOf(
+            9, 0x04, 0x00, 0x00, 0x01, 0xFF.toByte(), 0x02, 0x00, 0x00,
+            7, 0x05, 0x01, 0x01, 0x40, 0x00, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(vendorNonAudio)
+        assertNull(result.streamingEndpoint)
+        assertNull(result.streamingInterface)
+        assertEquals(UsbAudioControlParser.UAC_NONE, result.uacVersion)
+    }
 }

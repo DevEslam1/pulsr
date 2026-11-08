@@ -2332,6 +2332,54 @@ abstract class AppLocalizations {
   /// **'Now Playing Style'**
   String get nowPlayingTheme;
 
+  /// No description provided for @buttonStyleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Button & Chip Style'**
+  String get buttonStyleTitle;
+
+  /// No description provided for @buttonStyleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the visual styling for buttons and filter chips across the app'**
+  String get buttonStyleSubtitle;
+
+  /// No description provided for @buttonStyleRectangular.
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangular (Frosted Glass)'**
+  String get buttonStyleRectangular;
+
+  /// No description provided for @buttonStyleRectangularSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Crisp frosted glass with subtle rounded corners matching the player badge'**
+  String get buttonStyleRectangularSubtitle;
+
+  /// No description provided for @buttonStyleCapsule.
+  ///
+  /// In en, this message translates to:
+  /// **'Capsule (Frosted Glass)'**
+  String get buttonStyleCapsule;
+
+  /// No description provided for @buttonStyleCapsuleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Translucent Apple Music style frosted glass capsules'**
+  String get buttonStyleCapsuleSubtitle;
+
+  /// No description provided for @buttonStyleClassic.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic'**
+  String get buttonStyleClassic;
+
+  /// No description provided for @buttonStyleClassicSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Traditional Pulsr styled buttons with themed accents and borders'**
+  String get buttonStyleClassicSubtitle;
+
   /// No description provided for @colorSource.
   ///
   /// In en, this message translates to:
@@ -10277,6 +10325,18 @@ abstract class AppLocalizations {
   /// **'Minimalist Apple-inspired edge artwork, sleek capsule slider and quick bottom options'**
   String get settingsThemeCleanDesc;
 
+  /// No description provided for @settingsThemeMilkdrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Milkdrop Visualizer'**
+  String get settingsThemeMilkdrop;
+
+  /// No description provided for @settingsThemeMilkdropDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'White translucent fluid visualizer across the entire screen behind the artwork'**
+  String get settingsThemeMilkdropDesc;
+
   /// No description provided for @settingsThemeVinylTurntable.
   ///
   /// In en, this message translates to:
@@ -17076,6 +17136,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates.'**
   String get uac1RateReadbackUnsupported;
+
+  /// Error message when device is UAC3 which is unsupported for direct bit-perfect streaming
+  ///
+  /// In en, this message translates to:
+  /// **'USB Audio Class 3 (UAC3) is not supported for bit-perfect playback.'**
+  String get uac3Unsupported;
+
+  /// Conflict message explaining 32-bit float audio requires conversion and cannot be bit-perfect
+  ///
+  /// In en, this message translates to:
+  /// **'32-bit floating point audio requires lossy conversion and cannot be played bit-perfect.'**
+  String get conflictSource32BitFloatNotBitPerfect;
+
+  /// Verdict reason when the audio source container is ambiguous and the decoder codec is unconfirmed
+  ///
+  /// In en, this message translates to:
+  /// **'Source codec not confirmed'**
+  String get bpSourceCodecUnconfirmed;
 }
 
 class _AppLocalizationsDelegate

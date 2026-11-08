@@ -18,6 +18,7 @@ class UsbControlProtocolTest {
         var rangeCount = 1
         var minRaw = -15360
         var maxRaw = 0
+        var quantizationOffset = 0
         override fun transfer(type: Int, request: Int, value: Int, index: Int, buffer: ByteArray): Int {
             requests += Request(type, request, value, index, buffer.size)
             if (request == shortRequest) return buffer.size - 1
@@ -32,7 +33,7 @@ class UsbControlProtocolTest {
             val channel = value and 255
             if (channel == failChannel) return -1
             if (type == 0x21) {
-                if (!ignoreWrites) values[channel] = ((buffer[0].toInt() and 255) or ((buffer[1].toInt() and 255) shl 8)).toShort().toInt()
+                if (!ignoreWrites) values[channel] = (((buffer[0].toInt() and 255) or ((buffer[1].toInt() and 255) shl 8)).toShort().toInt() + quantizationOffset)
             } else when (request) {
                 0x01, 0x81 -> put(0, values.getValue(channel))
                 0x82 -> put(0, minRaw)
@@ -72,6 +73,23 @@ class UsbControlProtocolTest {
         assertTrue(device.requests.contains(Request(0x21, 1, 0x200, 0x302, 2)))
         assertTrue(device.requests.contains(Request(0xA1, 1, 0x200, 0x302, 2)))
         assertFalse(device.requests.any { it.request in 0x81..0x84 })
+    }
+
+    @Test fun volumeVerificationToleratesQuantizationRoundingWithinResolution() {
+        val device = Device(2)
+        val control = volume(device)
+        assertTrue(control.refresh())
+        // Set volume normally first
+        assertTrue(control.setDb(-12.0))
+        assertTrue(control.applied)
+        // Now simulate a DAC whose internal quantization rounds written raw value by 1 LSB (within ±1 LSB tolerance)
+        device.quantizationOffset = 1
+        assertTrue(control.setDb(-10.0))
+        assertTrue(control.applied)
+        // A read-back one res step away must NOT count as applied (narrowed to ±1 raw LSB)
+        device.quantizationOffset = device.resolution
+        assertFalse(control.setDb(-8.0))
+        assertFalse(control.applied)
     }
 
     @Test fun uac1RetainsLegacyRequestsAndTwoBytePayloads() {
@@ -411,6 +429,12 @@ class UsbControlProtocolTest {
         assertEquals(48000, dev.currentRate)
     }
 
+    @Test fun uac1SampleRateFailedWhenTransferFails() {
+        val dev = RateDevice(1, currentRate = 44100, allowWrite = false)
+        val res = UsbAudioProtocol.setSampleRateWithResult(dev, 1, null, 0x01, 96000, false)
+        assertEquals(UsbAudioProtocol.RateSetResult.FAILED, res)
+    }
+
     @Test fun uac2SampleRateReadbackFailsWhenReadbackRefused() {
         val dev = RateDevice(2, currentRate = 44100, allowReadback = false)
         val clock = UsbAudioControlParser.ClockSource(5, 0, true)
@@ -437,5 +461,19 @@ class UsbControlProtocolTest {
         val parsed = UsbAudioControlParser.parse(uac3Desc)
         assertEquals(UsbAudioControlParser.UAC3, parsed.uacVersion)
         assertEquals("UAC3", UsbDacDiagnostics.uacLabel(parsed.uacVersion))
+    }
+
+    @Test fun uac3FormatSelectionIsRefused() {
+        val stereoDac = UsbAudioControlParser.AltSettingFormat(1, 1, 0x01, 1024, 3, 24, 2, null, emptyList())
+        val parsed = UsbAudioControlParser.Result(3, null, 1, altSettingFormats = listOf(stereoDac))
+        val selected = UsbAudioProtocol.selectFormat(parsed, 96000, 24, 2)
+        assertNull(selected)
+    }
+
+    @Test fun uac3SampleRateProgrammingIsRefused() {
+        val dev = RateDevice(3, currentRate = 44100, allowReadback = true)
+        val clock = UsbAudioControlParser.ClockSource(clockId = 4, controlInterface = 0, frequencyProgrammable = true)
+        val res = UsbAudioProtocol.setSampleRateWithResult(dev, 3, clock, 0x01, 96000, false)
+        assertEquals(UsbAudioProtocol.RateSetResult.FAILED, res)
     }
 }

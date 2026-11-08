@@ -48,6 +48,7 @@ class AudioVisualizer extends StatefulWidget {
   final VisualizerPreset? customPreset;
   final VoidCallback? onPermissionDenied;
   final bool preferSimulated;
+  final bool transparentBackground;
 
   const AudioVisualizer({
     super.key,
@@ -64,6 +65,7 @@ class AudioVisualizer extends StatefulWidget {
     this.customPreset,
     this.onPermissionDenied,
     this.preferSimulated = false,
+    this.transparentBackground = false,
   });
 
   /// Deterministic per-track seed (defect 16-05): prefers explicit trackSeed,
@@ -627,12 +629,16 @@ class AudioVisualizerState extends State<AudioVisualizer>
                                     color: activeColor,
                                     preset:
                                         widget.milkdropPreset ?? _milkPreset,
+                                    transparentBackground:
+                                        widget.transparentBackground,
                                   )
                                 : MilkdropCanvasPainter(
                                     data: data,
                                     color: activeColor,
                                     preset:
                                         widget.milkdropPreset ?? _milkPreset,
+                                    transparentBackground:
+                                        widget.transparentBackground,
                                   ),
                             VisualizerStyle.off => null,
                           },

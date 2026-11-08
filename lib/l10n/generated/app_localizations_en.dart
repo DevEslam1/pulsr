@@ -1201,6 +1201,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nowPlayingTheme => 'Now Playing Style';
 
   @override
+  String get buttonStyleTitle => 'Button & Chip Style';
+
+  @override
+  String get buttonStyleSubtitle =>
+      'Select the visual styling for buttons and filter chips across the app';
+
+  @override
+  String get buttonStyleRectangular => 'Rectangular (Frosted Glass)';
+
+  @override
+  String get buttonStyleRectangularSubtitle =>
+      'Crisp frosted glass with subtle rounded corners matching the player badge';
+
+  @override
+  String get buttonStyleCapsule => 'Capsule (Frosted Glass)';
+
+  @override
+  String get buttonStyleCapsuleSubtitle =>
+      'Translucent Apple Music style frosted glass capsules';
+
+  @override
+  String get buttonStyleClassic => 'Classic';
+
+  @override
+  String get buttonStyleClassicSubtitle =>
+      'Traditional Pulsr styled buttons with themed accents and borders';
+
+  @override
   String get colorSource => 'Color Source';
 
   @override
@@ -5760,6 +5788,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Minimalist Apple-inspired edge artwork, sleek capsule slider and quick bottom options';
 
   @override
+  String get settingsThemeMilkdrop => 'Milkdrop Visualizer';
+
+  @override
+  String get settingsThemeMilkdropDesc =>
+      'White translucent fluid visualizer across the entire screen behind the artwork';
+
+  @override
   String get settingsThemeVinylTurntable => 'Vinyl Turntable Studio';
 
   @override
@@ -9643,4 +9678,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get uac1RateReadbackUnsupported =>
       'UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates.';
+
+  @override
+  String get uac3Unsupported =>
+      'USB Audio Class 3 (UAC3) is not supported for bit-perfect playback.';
+
+  @override
+  String get conflictSource32BitFloatNotBitPerfect =>
+      '32-bit floating point audio requires lossy conversion and cannot be played bit-perfect.';
+
+  @override
+  String get bpSourceCodecUnconfirmed => 'Source codec not confirmed';
 }

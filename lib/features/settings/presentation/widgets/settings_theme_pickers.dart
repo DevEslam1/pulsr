@@ -40,6 +40,8 @@ String getThemeModeTitle(PlayerThemeMode mode, AppLocalizations l10n) {
       return l10n.settingsThemeCdTurntable;
     case PlayerThemeMode.clean:
       return l10n.settingsThemeClean;
+    case PlayerThemeMode.milkdrop:
+      return l10n.settingsThemeMilkdrop;
   }
 }
 
@@ -203,6 +205,8 @@ class _ThemePreviewThumbnail extends StatelessWidget {
         return Icon(Icons.album_outlined, size: 22, color: tint);
       case PlayerThemeMode.clean:
         return Icon(Icons.crop_portrait_rounded, size: 22, color: tint);
+      case PlayerThemeMode.milkdrop:
+        return Icon(Icons.blur_on_rounded, size: 22, color: tint);
     }
   }
 }
@@ -281,6 +285,12 @@ void showThemePickerSheet(
       title: context.l10n.settingsThemeKaraoke,
       subtitle: context.l10n.settingsThemeKaraokeDesc,
       icon: Icons.mic_rounded,
+    ),
+    (
+      mode: PlayerThemeMode.milkdrop,
+      title: context.l10n.settingsThemeMilkdrop,
+      subtitle: context.l10n.settingsThemeMilkdropDesc,
+      icon: Icons.blur_on_rounded,
     ),
   ];
 
@@ -789,6 +799,49 @@ class _ThemeMockupCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: primaryColor,
                 borderRadius: AppRadii.r4All,
+              ),
+            ),
+          ],
+        );
+      case PlayerThemeMode.milkdrop:
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.35),
+                    primaryColor.withValues(alpha: 0.18),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: AppRadii.r8All,
+                color: primaryColor.withValues(alpha: 0.35),
+                border: Border.all(color: Colors.white70, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.blur_on_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ],
@@ -1365,6 +1418,121 @@ void showSliderStylePickerSheet(
                           : null,
                       onTap: () {
                         cubit.setPlayerSliderStyle(s.style);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+void showButtonStylePickerSheet(
+  BuildContext context,
+  SettingsCubit cubit,
+  AppButtonStyle currentStyle,
+) {
+  final primaryColor = Theme.of(context).colorScheme.primary;
+  final cardColor =
+      Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+  final outlineColor = Theme.of(context).colorScheme.outline;
+  final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+      context.palette.textPrimary;
+  final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+      context.palette.textSecondary;
+  final l10n = context.l10n;
+
+  final styles = [
+    (
+      style: AppButtonStyle.rectangular,
+      title: l10n.buttonStyleRectangular,
+      subtitle: l10n.buttonStyleRectangularSubtitle,
+      icon: Icons.crop_square_rounded,
+    ),
+    (
+      style: AppButtonStyle.capsule,
+      title: l10n.buttonStyleCapsule,
+      subtitle: l10n.buttonStyleCapsuleSubtitle,
+      icon: Icons.stadium_rounded,
+    ),
+    (
+      style: AppButtonStyle.classic,
+      title: l10n.buttonStyleClassic,
+      subtitle: l10n.buttonStyleClassicSubtitle,
+      icon: Icons.crop_16_9_rounded,
+    ),
+  ];
+
+  PulsrSheetHelper.showPulsrSheet(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                child: Text(
+                  l10n.buttonStyleTitle,
+                  style: TextStyle(
+                    fontSize: AppFontSize.title,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ...styles.map((s) {
+                final isSelected = s.style == currentStyle;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r16All,
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        s.icon,
+                        color: isSelected ? primaryColor : textSecondary,
+                      ),
+                      title: Text(
+                        s.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? primaryColor : textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        s.subtitle,
+                        style: TextStyle(
+                            fontSize: AppFontSize.label, color: textSecondary),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
+                          : null,
+                      onTap: () {
+                        cubit.setAppButtonStyle(s.style);
                         Navigator.pop(ctx);
                       },
                     ),

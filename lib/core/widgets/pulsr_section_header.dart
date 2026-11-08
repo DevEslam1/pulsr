@@ -5,6 +5,7 @@ import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../theme/aura_theme.dart';
+import '../theme/pulsr_button_style.dart';
 import '../utils/adaptive.dart';
 import 'pulsr_pressable.dart';
 import 'pulsr_text.dart';
@@ -37,6 +38,7 @@ class PulsrSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCapsule = context.isCapsuleButtons;
     final gutter = Adaptive.pagePadding(context);
     final isLargeHeader = overline != null;
 
@@ -120,25 +122,29 @@ class PulsrSectionHeader extends StatelessWidget {
                           horizontal: 7.0,
                           vertical: 2.0,
                         ),
-                        decoration: BoxDecoration(
-                          color: p.isDark
-                              ? AppColors.specularAt(0.08)
-                              : p.surfaceContainerHigh,
-                          borderRadius: AppRadii.full,
-                          border: Border.all(
-                            color: p.isDark
-                                ? AppColors.specularAt(0.14)
-                                : p.hairline,
-                            width: 0.8,
-                          ),
-                        ),
+                        decoration: isCapsule
+                            ? PulsrCapsuleStyle.decoration(p)
+                            : BoxDecoration(
+                                color: p.isDark
+                                    ? AppColors.specularAt(0.08)
+                                    : p.surfaceContainerHigh,
+                                borderRadius: AppRadii.full,
+                                border: Border.all(
+                                  color: p.isDark
+                                      ? AppColors.specularAt(0.14)
+                                      : p.hairline,
+                                  width: 0.8,
+                                ),
+                              ),
                         child: Text(
                           '$count',
                           style: TextStyle(
                             fontFamily: 'Manrope',
                             fontSize: AppFontSize.tiny,
                             fontWeight: FontWeight.w800,
-                            color: p.textSecondary,
+                            color: isCapsule
+                                ? PulsrCapsuleStyle.secondaryForegroundColor(p)
+                                : p.textSecondary,
                           ),
                         ),
                       ),
@@ -158,7 +164,8 @@ class PulsrSectionHeader extends StatelessWidget {
               ),
               child: PulsrPressable(
                 pressedScale: 0.95,
-                focusBorderRadius: AppRadii.full,
+                focusBorderRadius:
+                    isCapsule ? context.buttonRadius(rectRadius: 6.0) : AppRadii.full,
                 onTap: onAction,
                 child: Align(
                   alignment: AlignmentDirectional.centerEnd,
@@ -170,14 +177,17 @@ class PulsrSectionHeader extends StatelessWidget {
                       top: 6,
                       bottom: 6,
                     ),
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: p.isDark ? 0.14 : 0.09),
-                      borderRadius: AppRadii.full,
-                      border: Border.all(
-                        color: p.accent.withValues(alpha: 0.30),
-                        width: 0.8,
-                      ),
-                    ),
+                    decoration: isCapsule
+                        ? PulsrCapsuleStyle.decoration(p,
+                            borderRadius: context.buttonRadius(rectRadius: 6.0))
+                        : BoxDecoration(
+                            color: p.accent.withValues(alpha: p.isDark ? 0.14 : 0.09),
+                            borderRadius: AppRadii.full,
+                            border: Border.all(
+                              color: p.accent.withValues(alpha: 0.30),
+                              width: 0.8,
+                            ),
+                          ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -188,10 +198,12 @@ class PulsrSectionHeader extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontFamily: 'Manrope',
-                              color: p.accent,
+                              color: isCapsule
+                                  ? PulsrCapsuleStyle.foregroundColor(p)
+                                  : p.accent,
                               fontWeight: FontWeight.w800,
-                              fontSize: AppFontSize.label,
-                              letterSpacing: AppTracking.label,
+                              fontSize: isCapsule ? 11.5 : AppFontSize.label,
+                              letterSpacing: isCapsule ? 0.2 : AppTracking.label,
                             ),
                           ),
                         ),
@@ -199,7 +211,9 @@ class PulsrSectionHeader extends StatelessWidget {
                         Icon(
                           Icons.chevron_right_rounded,
                           size: 16,
-                          color: p.accent,
+                          color: isCapsule
+                              ? PulsrCapsuleStyle.secondaryForegroundColor(p)
+                              : p.accent,
                         ),
                       ],
                     ),

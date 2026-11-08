@@ -628,6 +628,33 @@ mixin SettingsSearchResults
       _SearchItem(
         categoryId: 'look',
         category: lookCat,
+        title: context.l10n.buttonStyleTitle,
+        subtitle: switch (state.appButtonStyle) {
+          AppButtonStyle.rectangular => context.l10n.buttonStyleRectangular,
+          AppButtonStyle.capsule => context.l10n.buttonStyleCapsule,
+          AppButtonStyle.classic => context.l10n.buttonStyleClassic,
+        },
+        icon: Icons.smart_button_rounded,
+        keywords: [
+          'button',
+          'buttons',
+          'rectangular',
+          'rectangle',
+          'chip',
+          'chips',
+          'pill',
+          'capsule',
+          'frosted',
+          'glass',
+          'style',
+          'radio button'
+        ],
+        onTap: () => showButtonStylePickerSheet(
+            context, cubit, state.appButtonStyle),
+      ),
+      _SearchItem(
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsSearchVisualizerStyleTitle,
         subtitle: getVisualizerStyleTitle(state.visualizerStyle, context.l10n),
         icon: Icons.graphic_eq_rounded,

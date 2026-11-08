@@ -11,7 +11,8 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
       :nowPlayingDoubleTap,
       :nowPlayingArtworkSwipe,
       :visualizerStyle,
-      :waveformSeekBarEnabled
+      :waveformSeekBarEnabled,
+      :playerSliderStyle,
     ) = context.select<
         SettingsCubit,
         ({
@@ -19,11 +20,13 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
           NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
           VisualizerStyle visualizerStyle,
           bool waveformSeekBarEnabled,
+          PlayerSliderStyle playerSliderStyle,
         })>((c) => (
           nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
           visualizerStyle: c.state.visualizerStyle,
           waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
+          playerSliderStyle: c.state.playerSliderStyle,
         ));
     final isTablet = context.isTablet;
 
@@ -180,8 +183,10 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                                 ),
                     );
 
+              final isWaveformActive = waveformSeekBarEnabled &&
+                  playerSliderStyle == PlayerSliderStyle.normal;
               final showVisualizer = visualizerStyle != VisualizerStyle.off &&
-                  !waveformSeekBarEnabled &&
+                  !isWaveformActive &&
                   !state.isLyricsVisible &&
                   !state.isQueueVisible &&
                   !isInSplitView;

@@ -241,6 +241,8 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                     ),
                     Text(
                       '${surah.nameEnglish} • ${surah.revelationPlace} (${surah.totalAyahs} Verses)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                           fontSize: AppFontSize.caption,
                           color: p.textSecondary),

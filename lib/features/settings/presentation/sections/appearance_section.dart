@@ -216,6 +216,20 @@ mixin SettingsAppearanceSection
         _divider(p),
         _navTile(
           context,
+          Icons.smart_button_rounded,
+          context.l10n.buttonStyleTitle,
+          switch (state.appButtonStyle) {
+            AppButtonStyle.rectangular => context.l10n.buttonStyleRectangular,
+            AppButtonStyle.capsule => context.l10n.buttonStyleCapsule,
+            AppButtonStyle.classic => context.l10n.buttonStyleClassic,
+          },
+          trailingBadge: context.l10n.settingsBadgeStyle,
+          onTap: () => showButtonStylePickerSheet(
+              context, cubit, state.appButtonStyle),
+        ),
+        _divider(p),
+        _navTile(
+          context,
           Icons.graphic_eq_rounded,
           context.l10n.visualizerStyle,
           getVisualizerStyleTitle(state.visualizerStyle, context.l10n),

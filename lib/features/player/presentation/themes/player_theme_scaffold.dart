@@ -547,7 +547,8 @@ class PlayerThemeScaffold extends StatelessWidget {
                         resolvedSeekBar,
                         SizedBox(height: metrics.spacingSeekToControls),
                         resolvedControls,
-                        PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+                        if (!metrics.isVeryShortHeight)
+                          PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
                         SizedBox(height: metrics.spacingControlsToDock),
                         resolvedDock,
                         SizedBox(height: metrics.spacingBelowDock),

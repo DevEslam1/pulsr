@@ -140,6 +140,7 @@ class AmbientSoundService extends ChangeNotifier {
 
   // ─── State ─────────────────────────────────────────────────────────────────
   final Set<AmbientSoundEffect> _activeEffects = {};
+  Set<AmbientSoundEffect> _lastActiveEffects = {AmbientSoundEffect.rain};
   final Map<AmbientSoundEffect, double> _volumes = {
     for (final e in AmbientSoundEffect.values) e: 0.5,
   };
@@ -149,10 +150,10 @@ class AmbientSoundService extends ChangeNotifier {
   bool _quranModeActive = false;
   bool _allowDuringQuran = false;
 
-  /// True when the sounds should currently be audible: the main player is
-  /// playing and Quran Mode is not asking for a clean, undisturbed recitation.
+  /// True when the sounds should currently be audible: at least one effect is active,
+  /// the main player is playing, and Quran Mode is not asking for a clean, undisturbed recitation.
   bool get _shouldPlay =>
-      _isPlayerPlaying && (!_quranModeActive || _allowDuringQuran);
+      isEnabled && _isPlayerPlaying && (!_quranModeActive || _allowDuringQuran);
 
   /// Whether ambient sounds keep playing while Quran Mode is on.
   bool get allowDuringQuran => _allowDuringQuran;
@@ -264,6 +265,9 @@ class AmbientSoundService extends ChangeNotifier {
     _sleepEndsAt = null;
     final epoch = ++_fadeEpoch;
     await _fadeAll(0, epoch);
+    if (_activeEffects.isNotEmpty) {
+      _lastActiveEffects = Set.from(_activeEffects);
+    }
     for (final e in List.of(_activeEffects)) {
       _activeEffects.remove(e);
       await _stopEffectPlayer(e);
@@ -398,10 +402,16 @@ class AmbientSoundService extends ChangeNotifier {
   Future<void> toggleEffect(AmbientSoundEffect effect) async {
     if (_activeEffects.contains(effect)) {
       _activeEffects.remove(effect);
+      if (_activeEffects.isEmpty) {
+        _lastActiveEffects = {effect};
+      } else {
+        _lastActiveEffects = Set.from(_activeEffects);
+      }
       notifyListeners();
       await _stopEffectPlayer(effect);
     } else {
       _activeEffects.add(effect);
+      _lastActiveEffects = Set.from(_activeEffects);
       notifyListeners();
       await _startEffectPlayer(effect);
     }
@@ -430,16 +440,34 @@ class AmbientSoundService extends ChangeNotifier {
     await setEffectVolume(_activeEffects.last, volume);
   }
 
-  /// Legacy: enable/disable ambient sounds (uses rain as the default effect).
-  @Deprecated('Use toggleEffect() instead')
+  /// Enables or disables ambient sounds.
+  ///
+  /// When [enabled] is false, remembers the current active effects, clears
+  /// [_activeEffects], and stops all active ambient players.
+  /// When [enabled] is true, restores previously active effects (or defaults to [AmbientSoundEffect.rain]).
   Future<void> setEnabled(bool enabled) async {
-    if (enabled && _activeEffects.isEmpty) {
-      await toggleEffect(AmbientSoundEffect.rain);
-    } else if (!enabled && _activeEffects.isNotEmpty) {
-      final toStop = Set<AmbientSoundEffect>.from(_activeEffects);
-      for (final e in toStop) {
-        await toggleEffect(e);
+    if (enabled == isEnabled) return;
+    if (!enabled) {
+      if (_activeEffects.isNotEmpty) {
+        _lastActiveEffects = Set.from(_activeEffects);
       }
+      final toStop = List.of(_activeEffects);
+      _activeEffects.clear();
+      notifyListeners();
+      for (final e in toStop) {
+        await _stopEffectPlayer(e);
+      }
+      _persist();
+    } else {
+      final toRestore = _lastActiveEffects.isNotEmpty
+          ? _lastActiveEffects
+          : {AmbientSoundEffect.rain};
+      for (final e in toRestore) {
+        _activeEffects.add(e);
+        unawaited(_startEffectPlayer(e));
+      }
+      notifyListeners();
+      _persist();
     }
   }
 
@@ -527,11 +555,18 @@ class AmbientSoundService extends ChangeNotifier {
       // Load active effects
       final activeNames = prefs.getStringList(_keyActiveEffects) ?? [];
       for (final name in activeNames) {
-        final effect = AmbientSoundEffect.values.firstWhere(
-          (e) => e.name == name,
-          orElse: () => AmbientSoundEffect.rain,
-        );
-        _activeEffects.add(effect);
+        final effect = AmbientSoundEffect.values
+            .cast<AmbientSoundEffect?>()
+            .firstWhere(
+              (e) => e?.name == name,
+              orElse: () => null,
+            );
+        if (effect != null) {
+          _activeEffects.add(effect);
+        }
+      }
+      if (_activeEffects.isNotEmpty) {
+        _lastActiveEffects = Set.from(_activeEffects);
       }
 
       // Start players for all persisted active effects

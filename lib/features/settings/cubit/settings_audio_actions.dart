@@ -16,6 +16,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// nothing does not re-fan-out to every player. Null = never pushed.
   int? _lastTapSrcTargetRate;
 
+  /// Restores user DSP/follow preferences when Strict Bit-Perfect is turned OFF.
+  bool? _preStrictBypass;
+  bool? _preStrictFollowRate;
+
+  /// Last source blocked reason emitted on the mixer path, so repeated tracks
+  /// with the same blocker do not flood the UI with duplicate error emissions.
+  String? _lastSourceBlockReason;
+
   Future<void> _pushBitPerfectBypass(bool enabled) async {
     if (getIt.isRegistered<EqualizerManager>()) {
       await getIt<EqualizerManager>().setBypassDspForBitPerfect(enabled);
@@ -27,7 +35,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Last-resort Bit-Perfect path for DACs/OS builds without exclusive mixer
   /// attributes: the direct UAC2 sink writes the PCM straight to the DAC while
   /// the native DSP tee mutes the HAL path. Returns true when the stream runs.
-  Future<bool> _tryStartDirectUsbStreaming() async {
+  Future<bool> _tryStartDirectUsbStreaming({bool strict = false}) async {
     _lastDirectUsbFailure = null;
     if (!PlatformCapabilities.isAndroid) return false;
     // AAudio Direct bypasses the ExoPlayer DSP chain the USB tee lives in.
@@ -66,6 +74,11 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       // broken DAC rather than unreadable metadata.
       final trackRate = _usableRate(song?.sampleRate);
       final trackDepth = _usableRate(song?.bitDepth);
+      // Channels: prefer what the native producer is currently supplying, then
+      // the track metadata, then the safe stereo default. Without this the sink
+      // always opens in 2-channel mode even for multichannel tracks.
+      final producerChannels = await UsbExclusiveService().getProducerChannels();
+      final effectiveChannels = producerChannels > 0 ? producerChannels : 2;
       // Retain ownership even after a failed start until teardown is confirmed.
       _bitPerfectViaDirectStream = true;
       final res = await usb.startStreaming(
@@ -74,6 +87,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
             _usableRate(state.currentOutputDevice?.bitDepth) ??
             _usableRate(status.streamingBitDepth) ??
             16,
+        channels: effectiveChannels,
+        strict: strict,
       );
       if (!res.isOk) {
         _lastDirectUsbFailure = res.toUserMessage();
@@ -154,10 +169,22 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     bool? restoreFollowRate,
   }) async {
     final stopped = await _teardownBitPerfect();
-    final targetBypass = restoreBypass ?? state.bypassDspOnBitPerfect;
-    final targetFollowRate = restoreFollowRate ?? state.followTrackSampleRate;
+    final prefs = await SharedPreferences.getInstance();
+    final savedPreBypass = _preStrictBypass ??
+        (prefs.containsKey(PrefsKeys.preStrictBypass)
+            ? prefs.getBool(PrefsKeys.preStrictBypass)
+            : null);
+    final savedPreFollow = _preStrictFollowRate ??
+        (prefs.containsKey(PrefsKeys.preStrictFollowRate)
+            ? prefs.getBool(PrefsKeys.preStrictFollowRate)
+            : null);
+    final targetBypass = restoreBypass ?? savedPreBypass ?? state.bypassDspOnBitPerfect;
+    final targetFollowRate = restoreFollowRate ?? savedPreFollow ?? state.followTrackSampleRate;
     if (stopped) {
-      final prefs = await SharedPreferences.getInstance();
+      _preStrictBypass = null;
+      _preStrictFollowRate = null;
+      await prefs.remove(PrefsKeys.preStrictBypass);
+      await prefs.remove(PrefsKeys.preStrictFollowRate);
       await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
       await prefs.setBool(PrefsKeys.strictBitPerfect, false);
       await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, targetBypass);
@@ -200,6 +227,36 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }) =>
       _audioModeMutex.protect(() async {
         if (!state.bitPerfectOutput) return false;
+        final song = getIt.isRegistered<PulsrAudioHandler>()
+            ? getIt<PulsrAudioHandler>().currentSong
+            : null;
+        final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
+          path: song?.path,
+          bitDepth: song?.bitDepth ?? bitDepth,
+          isRadio: song?.source == SongSource.radio,
+          codec: song?.codec,
+        );
+        if (sourceBlock != null) {
+          if (state.strictBitPerfect) {
+            await _rollbackBitPerfectEnable(
+              '$sourceBlock, which Strict Bit-Perfect promises to carry unchanged.',
+            );
+            return false;
+          }
+          if (_bitPerfectViaDirectStream) {
+            await _suspendDirectBitPerfectForTrack(sourceBlock);
+            return false;
+          }
+          if (!isClosed) {
+            if (_lastSourceBlockReason != sourceBlock) {
+              _lastSourceBlockReason = sourceBlock;
+              safeEmit(state.copyWith(errorMessage: sourceBlock));
+            }
+          }
+          await refreshOutputDevice();
+          return false;
+        }
+
         final direct = _bitPerfectViaDirectStream;
         bool applied;
         if (direct) {
@@ -210,6 +267,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
             sampleRate: sampleRate,
             channels: effectiveChannels,
             bitDepth: bitDepth,
+            strict: state.strictBitPerfect,
           );
           applied = res.isOk;
           _lastDirectUsbFailure = applied ? null : res.toUserMessage();
@@ -220,6 +278,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         }
         if (applied) {
           _lastDirectUsbFailure = null;
+          final wasSourceBlock = _lastSourceBlockReason != null &&
+              state.errorMessage == _lastSourceBlockReason;
+          _lastSourceBlockReason = null;
+          if (wasSourceBlock) {
+            safeEmit(state.copyWith(errorMessage: null));
+          }
           await refreshOutputDevice();
           return true;
         }
@@ -339,6 +403,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
         path: song?.path,
         bitDepth: song?.bitDepth ?? 0,
+        isRadio: song?.source == SongSource.radio,
+        codec: song?.codec,
       );
       if (sourceBlock != null) {
         safeEmit(state.copyWith(errorMessage: sourceBlock));
@@ -568,6 +634,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
         path: song?.path,
         bitDepth: song?.bitDepth ?? 0,
+        isRadio: song?.source == SongSource.radio,
+        codec: song?.codec,
       );
       if (sourceBlock != null) {
         safeEmit(state.copyWith(errorMessage: sourceBlock));
@@ -584,7 +652,38 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     if (!enabled) {
       await prefs.setBool(PrefsKeys.strictBitPerfect, false);
-      safeEmit(state.copyWith(strictBitPerfect: false, errorMessage: null));
+      final restoreBypass = _preStrictBypass ??
+          (prefs.containsKey(PrefsKeys.preStrictBypass)
+              ? prefs.getBool(PrefsKeys.preStrictBypass)
+              : null);
+      final restoreFollowRate = _preStrictFollowRate ??
+          (prefs.containsKey(PrefsKeys.preStrictFollowRate)
+              ? prefs.getBool(PrefsKeys.preStrictFollowRate)
+              : null);
+      _preStrictBypass = null;
+      _preStrictFollowRate = null;
+      await prefs.remove(PrefsKeys.preStrictBypass);
+      await prefs.remove(PrefsKeys.preStrictFollowRate);
+      if (restoreBypass != null && restoreFollowRate != null) {
+        // Restore bypass and follow-rate to what they were before Strict was
+        // enabled. Without this, the user's EQ/ReplayGain/Crossfade remain muted
+        // even after they turn Strict off, because bypassDspOnBitPerfect is left
+        // as `true` from the Strict enable path.
+        await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, restoreBypass);
+        await prefs.setBool(PrefsKeys.followTrackSampleRate, restoreFollowRate);
+        await _pushBitPerfectBypass(state.bitPerfectOutput && restoreBypass);
+        safeEmit(state.copyWith(
+          strictBitPerfect: false,
+          bypassDspOnBitPerfect: restoreBypass,
+          followTrackSampleRate: restoreFollowRate,
+          errorMessage: null,
+        ));
+      } else {
+        safeEmit(state.copyWith(
+          strictBitPerfect: false,
+          errorMessage: null,
+        ));
+      }
       await refreshOutputDevice();
       return;
     }
@@ -596,7 +695,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       return;
     }
     var applied = await _hiResAudioService.setBitPerfectMode(true);
-    if (!applied) applied = await _tryStartDirectUsbStreaming();
+    if (!applied) applied = await _tryStartDirectUsbStreaming(strict: true);
     if (!applied && _bitPerfectViaDirectStream) {
       await _rollbackBitPerfectEnable('Direct USB startup could not be confirmed.', restoreBypass: prevBypass, restoreFollowRate: prevFollowRate);
       return;
@@ -641,6 +740,21 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       );
       await refreshOutputDevice();
       return;
+    }
+    // Only capture pre-Strict values if they are not already set (prevents double-enable overwrite and survives restarts)
+    final bool hasPersistedBypass = prefs.containsKey(PrefsKeys.preStrictBypass);
+    final bool hasPersistedFollow = prefs.containsKey(PrefsKeys.preStrictFollowRate);
+    if (_preStrictBypass == null && !hasPersistedBypass) {
+      _preStrictBypass = prevBypass;
+      await prefs.setBool(PrefsKeys.preStrictBypass, prevBypass);
+    } else if (_preStrictBypass == null && hasPersistedBypass) {
+      _preStrictBypass = prefs.getBool(PrefsKeys.preStrictBypass);
+    }
+    if (_preStrictFollowRate == null && !hasPersistedFollow) {
+      _preStrictFollowRate = prevFollowRate;
+      await prefs.setBool(PrefsKeys.preStrictFollowRate, prevFollowRate);
+    } else if (_preStrictFollowRate == null && hasPersistedFollow) {
+      _preStrictFollowRate = prefs.getBool(PrefsKeys.preStrictFollowRate);
     }
     await prefs.setBool(PrefsKeys.strictBitPerfect, true);
     await prefs.setBool(PrefsKeys.bitPerfectOutput, true);

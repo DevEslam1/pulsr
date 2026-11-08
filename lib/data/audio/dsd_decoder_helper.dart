@@ -51,6 +51,7 @@ class DsdDacCapabilities {
   final bool dsd512;
   final bool dop;
   final bool nativeDac;
+  final bool nativeDsd;
 
   const DsdDacCapabilities({
     required this.dsd64,
@@ -59,6 +60,7 @@ class DsdDacCapabilities {
     this.dsd512 = false,
     required this.dop,
     required this.nativeDac,
+    this.nativeDsd = false,
   });
 
   static const DsdDacCapabilities none = DsdDacCapabilities(
@@ -67,12 +69,16 @@ class DsdDacCapabilities {
     dsd256: false,
     dop: false,
     nativeDac: false,
+    nativeDsd: false,
   );
 
   /// True when DoP is possible on this output path: a USB DAC is present and it
   /// advertises at least one carrier rate DoP can use. A DAC that exposes none
   /// of the carrier rates cannot carry DoP, so the UI must not enable it.
   bool get canUseDop => dop && (dsd64 || dsd128 || dsd256);
+
+  /// True when Direct Native DSD (raw bitstream without DoP encapsulation) is supported.
+  bool get canUseNativeDsd => nativeDac && (nativeDsd || dsd512);
 
   /// Whether this device advertises the DoP carrier rate for [dsdRate]
   /// (the DSD multiple of 44.1 kHz: 64, 128 or 256). Rates above DSD256 have no
@@ -89,7 +95,7 @@ class DsdDacCapabilities {
   @override
   String toString() =>
       'DsdDacCapabilities(dsd64: $dsd64, dsd128: $dsd128, dsd256: $dsd256, '
-      'dsd512: $dsd512, dop: $dop, nativeDac: $nativeDac)';
+      'dsd512: $dsd512, dop: $dop, nativeDac: $nativeDac, nativeDsd: $nativeDsd)';
 }
 
 /// Streams in-memory WAV data produced by decoding DSD (DSF/DFF) files.
@@ -145,6 +151,7 @@ class DsdDecoderHelper {
         dsd512: map['dsd512'] == true,
         dop: map['dop'] == true,
         nativeDac: map['nativeDac'] == true,
+        nativeDsd: map['nativeDsd'] == true || map['dsd512'] == true,
       );
     } catch (_) {
       return DsdDacCapabilities.none;
@@ -171,6 +178,7 @@ class DsdDecoderHelper {
     SongsTableData song,
     MediaItem tag, {
     bool forceDop = false,
+    bool forceNativeDsd = false,
     DsdDacCapabilities? dopCapabilities,
     int dopContainerBits = 24,
   }) async {
@@ -208,12 +216,45 @@ class DsdDecoderHelper {
     }
 
     final int dopSampleRate = DopEncoder.dopPcmSampleRate(dsdRate);
-    final bool useDop = forceDop &&
+    final bool useNativeDsd = forceNativeDsd &&
+        (dopCapabilities == null || dopCapabilities.canUseNativeDsd);
+    final bool useDop = !useNativeDsd &&
+        forceDop &&
         dopSampleRate > 0 &&
         (dopCapabilities == null || dopCapabilities.supportsRate(dsdRate));
-    // Only claim DoP once the framing has actually been built (set below);
-    // a decode failure must not leave the global flag stuck on true.
+
+    // Reset transport flags until framing is verified
     AudioQualityInfo.dsdDopActive = false;
+    AudioQualityInfo.dsdNativeActive = false;
+
+    if (useNativeDsd) {
+      // Direct Native DSD (Raw bitstream without DoP marker overhead)
+      var left = dsdL;
+      var right = dsdR;
+      if (left.length != right.length) {
+        final minLen = math.min(left.length, right.length);
+        left = Uint8List.sublistView(left, 0, minLen);
+        right = Uint8List.sublistView(right, 0, minLen);
+      }
+      if (bitOrder == 0) {
+        left = _reverseBits(left);
+        right = _reverseBits(right);
+      }
+      final rawBytes = DsdRawEncoder.encodeToDsdRawInterleaved(
+        dsdLeft: left,
+        dsdRight: right,
+      );
+      final nativeRate = DsdRawEncoder.nativeDsdSampleRate(dsdRate);
+      final wavBytes = buildDopWavContainer(
+        dopPcmBytes: rawBytes,
+        sampleRate: nativeRate > 0 ? nativeRate : 2822400,
+        channels: 2,
+        bitsPerSample: 8,
+      );
+      AudioQualityInfo.dsdNativeActive = true;
+      return DsdPcmStreamAudioSource(wavBytes, tag: tag);
+    }
+
     if (useDop) {
       // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
       var left = dsdL;

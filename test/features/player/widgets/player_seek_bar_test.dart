@@ -235,6 +235,46 @@ void main() {
     expect(find.byType(WaveformSeekBar), findsOneWidget);
   });
 
+  testWidgets(
+      'renders the capsule Apple slider when capsule style is set even if waveform is enabled',
+      (tester) async {
+    await tester.pumpWidget(host(
+      playerState: stateWith(currentId: 1),
+      settingsState: const SettingsState(
+        waveformSeekBarEnabled: true,
+        playerSliderStyle: PlayerSliderStyle.capsule,
+      ),
+      position: const Duration(seconds: 30),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byType(PulsrSlider), findsOneWidget);
+    expect(find.byType(WaveformSeekBar), findsNothing);
+    final slider = tester.widget<PulsrSlider>(find.byType(PulsrSlider));
+    expect(slider.sliderStyle, PlayerSliderStyle.capsule);
+  });
+
+  testWidgets(
+      'renders the wavy slider when wavy style is set even if waveform is enabled',
+      (tester) async {
+    await tester.pumpWidget(host(
+      playerState: stateWith(currentId: 1),
+      settingsState: const SettingsState(
+        waveformSeekBarEnabled: true,
+        playerSliderStyle: PlayerSliderStyle.wavy,
+      ),
+      position: const Duration(seconds: 30),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byType(PulsrSlider), findsOneWidget);
+    expect(find.byType(WaveformSeekBar), findsNothing);
+    final slider = tester.widget<PulsrSlider>(find.byType(PulsrSlider));
+    expect(slider.sliderStyle, PlayerSliderStyle.wavy);
+  });
+
   testWidgets('falls back to the standard slider when no song id is known',
       (tester) async {
     await tester.pumpWidget(host(

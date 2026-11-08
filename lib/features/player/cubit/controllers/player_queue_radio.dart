@@ -107,6 +107,7 @@ extension PlayerQueueRadio on PlayerQueueController {
       path: station.url,
       source: SongSource.radio,
       remoteArtworkUrl: artwork,
+      bitrateKbps: station.bitrate,
       isFavorite: false,
       isMissing: false,
       isDownloaded: false,

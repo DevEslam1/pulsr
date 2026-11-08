@@ -108,6 +108,25 @@ void main() {
       restored.close();
     });
 
+    test('appButtonStyle defaults to rectangular and persists/restores', () async {
+      expect(const SettingsState().appButtonStyle, AppButtonStyle.rectangular);
+
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      expect(cubit.state.appButtonStyle, AppButtonStyle.rectangular);
+
+      await cubit.setAppButtonStyle(AppButtonStyle.classic);
+      expect(cubit.state.appButtonStyle, AppButtonStyle.classic);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('setting_app_button_style'), 'classic');
+      cubit.close();
+
+      final restored = SettingsCubit(scannerService: mockScannerService);
+      await restored.reloadSettings();
+      expect(restored.state.appButtonStyle, AppButtonStyle.classic);
+      restored.close();
+    });
+
     test('USB hardware volume defaults OFF and persists', () async {
       expect(const SettingsState().usbHardwareVolumeEnabled, false);
       final cubit = SettingsCubit(scannerService: mockScannerService);

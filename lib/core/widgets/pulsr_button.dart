@@ -6,6 +6,7 @@ import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import '../theme/pulsr_button_style.dart';
 import 'pulsr_pressable.dart';
 
 /// {@category DesignSystem}
@@ -95,7 +96,18 @@ class _PulsrButtonState extends State<PulsrButton> {
     }
   }
 
-  BorderRadius get _radius {
+  BorderRadius _resolveRadius(BuildContext context, bool isCapsule) {
+    if (context.isRectangularButtons) {
+      switch (widget.size) {
+        case PulsrButtonSize.sm:
+          return BorderRadius.circular(6.0);
+        case PulsrButtonSize.md:
+          return BorderRadius.circular(8.0);
+        case PulsrButtonSize.lg:
+          return BorderRadius.circular(10.0);
+      }
+    }
+    if (isCapsule) return AppRadii.full;
     switch (widget.size) {
       case PulsrButtonSize.sm:
         return AppRadii.r10All;
@@ -109,6 +121,8 @@ class _PulsrButtonState extends State<PulsrButton> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCapsule = context.isCapsuleButtons;
+    final radius = _resolveRadius(context, isCapsule);
     final enabled = widget.onPressed != null && !widget.loading;
 
     Color bg;
@@ -147,27 +161,51 @@ class _PulsrButtonState extends State<PulsrButton> {
         break;
 
       case PulsrButtonVariant.secondary:
-        bg = _hovered && enabled ? p.surfaceContainerHigh : p.surfaceContainer;
-        fg = enabled ? p.textPrimary : p.textTertiary;
-        border = Border.all(
-          color: _hovered && enabled ? p.borderStrong : p.hairline,
-          width: 1.0,
-        );
+        if (isCapsule) {
+          bg = _hovered && enabled
+              ? (p.isDark
+                  ? Colors.white.withValues(alpha: 0.22)
+                  : Colors.black.withValues(alpha: 0.12))
+              : PulsrCapsuleStyle.backgroundColor(p);
+          fg = enabled ? PulsrCapsuleStyle.foregroundColor(p) : p.textTertiary;
+          border = PulsrCapsuleStyle.border(p);
+        } else {
+          bg = _hovered && enabled ? p.surfaceContainerHigh : p.surfaceContainer;
+          fg = enabled ? p.textPrimary : p.textTertiary;
+          border = Border.all(
+            color: _hovered && enabled ? p.borderStrong : p.hairline,
+            width: 1.0,
+          );
+        }
         break;
 
       case PulsrButtonVariant.tonal:
-        bg = enabled
-            ? (_hovered
-                ? p.accent.withValues(alpha: p.isDark ? 0.24 : 0.18)
-                : p.accentSoft)
-            : p.accentSoft.withValues(alpha: 0.4);
-        fg = enabled ? p.accent : p.accent.withValues(alpha: 0.45);
-        border = Border.all(
-          color: enabled
-              ? p.accent.withValues(alpha: _hovered ? 0.35 : 0.18)
-              : Colors.transparent,
-          width: 1.0,
-        );
+        if (isCapsule) {
+          bg = enabled
+              ? (_hovered
+                  ? p.accent.withValues(alpha: p.isDark ? 0.30 : 0.22)
+                  : PulsrCapsuleStyle.backgroundColor(p))
+              : (p.isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.04));
+          fg = enabled
+              ? PulsrCapsuleStyle.foregroundColor(p)
+              : p.accent.withValues(alpha: 0.45);
+          border = PulsrCapsuleStyle.border(p);
+        } else {
+          bg = enabled
+              ? (_hovered
+                  ? p.accent.withValues(alpha: p.isDark ? 0.24 : 0.18)
+                  : p.accentSoft)
+              : p.accentSoft.withValues(alpha: 0.4);
+          fg = enabled ? p.accent : p.accent.withValues(alpha: 0.45);
+          border = Border.all(
+            color: enabled
+                ? p.accent.withValues(alpha: _hovered ? 0.35 : 0.18)
+                : Colors.transparent,
+            width: 1.0,
+          );
+        }
         break;
 
       case PulsrButtonVariant.ghost:
@@ -246,7 +284,7 @@ class _PulsrButtonState extends State<PulsrButton> {
       decoration: BoxDecoration(
         color: gradient == null ? bg : null,
         gradient: gradient,
-        borderRadius: _radius,
+        borderRadius: radius,
         border: border,
         boxShadow: shadows,
       ),
@@ -273,7 +311,7 @@ class _PulsrButtonState extends State<PulsrButton> {
       enabled: enabled,
       label: widget.label,
       child: PulsrPressable(
-        focusBorderRadius: _radius,
+        focusBorderRadius: radius,
         onTap: enabled ? widget.onPressed : null,
         child: buttonWidget,
       ),

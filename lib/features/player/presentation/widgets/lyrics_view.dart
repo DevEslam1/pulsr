@@ -8,6 +8,7 @@ import 'package:flutter_lyric/flutter_lyric.dart' hide LrcParser;
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/theme/pulsr_button_style.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/lrc_parser.dart';
@@ -838,55 +839,103 @@ class _LyricsViewState extends State<LyricsView> {
           : 0.0;
 
       return Center(
-        child: Container(
-          padding: EdgeInsets.only(
-            top: topSafe,
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            bottom: AppSpacing.md,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.lyrics_outlined, size: 48, color: p.textTertiary),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                noLyricsText,
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: AppFontSize.bodyLarge,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Container(
+            padding: EdgeInsets.only(
+              top: topSafe,
+              left: AppSpacing.lg,
+              right: AppSpacing.lg,
+              bottom: AppSpacing.md,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lyrics_outlined, size: 48, color: p.textTertiary),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  noLyricsText,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: AppFontSize.bodyLarge,
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                context.l10n.placeLrcHint,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: p.textSecondary,
-                    fontSize: AppFontSize.bodySmall,
-                    height: 1.4),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              OutlinedButton.icon(
-                onPressed: () {
-                  try {
-                    context.read<PlayerCubit>().refreshLyrics();
-                  } catch (_) {}
-                },
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: Text(context.l10n.searchLyrics,
-                    style: TextStyle(fontSize: AppFontSize.label)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: widget.activeColor,
-                  side: BorderSide(
-                      color: widget.activeColor.withValues(alpha: 0.4)),
-                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  context.l10n.placeLrcHint,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.bodySmall,
+                      height: 1.4),
                 ),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.md),
+                Builder(
+                  builder: (context) {
+                    final isCapsule = context.isCapsuleButtons;
+                    if (isCapsule) {
+                      final lrcRadius = context.buttonRadius(rectRadius: 6.0);
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: lrcRadius,
+                          onTap: () {
+                            try {
+                              context.read<PlayerCubit>().refreshLyrics();
+                            } catch (_) {}
+                          },
+                          child: Ink(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 7),
+                            decoration: PulsrCapsuleStyle.decoration(p,
+                                borderRadius: lrcRadius),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.refresh_rounded,
+                                  size: 14,
+                                  color: PulsrCapsuleStyle.foregroundColor(p),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  context.l10n.searchLyrics,
+                                  style: TextStyle(
+                                    color: PulsrCapsuleStyle.foregroundColor(p),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return OutlinedButton.icon(
+                      onPressed: () {
+                        try {
+                          context.read<PlayerCubit>().refreshLyrics();
+                        } catch (_) {}
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: Text(context.l10n.searchLyrics,
+                          style: TextStyle(fontSize: AppFontSize.label)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: widget.activeColor,
+                        side: BorderSide(
+                            color: widget.activeColor.withValues(alpha: 0.4)),
+                        shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       );

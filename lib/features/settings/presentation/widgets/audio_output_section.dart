@@ -344,6 +344,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 if (state.strictBitPerfect)
                   SettingsConflictCard(
                     reason: AudioConflicts.strictBitPerfectActiveReason(
+                          strictBitPerfect: state.strictBitPerfect,
                           bitPerfectOutput: state.bitPerfectOutput,
                           bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
                           device: dev,

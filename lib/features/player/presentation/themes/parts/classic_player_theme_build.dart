@@ -12,6 +12,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
       :nowPlayingArtworkSwipe,
       :visualizerStyle,
       :waveformSeekBarEnabled,
+      :playerSliderStyle,
       :canvasEnabled,
       :canvasAsBackdrop
     ) = context.select<
@@ -21,6 +22,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
           NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
           VisualizerStyle visualizerStyle,
           bool waveformSeekBarEnabled,
+          PlayerSliderStyle playerSliderStyle,
           bool canvasEnabled,
           bool canvasAsBackdrop,
         })>((c) => (
@@ -28,6 +30,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
           visualizerStyle: c.state.visualizerStyle,
           waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
+          playerSliderStyle: c.state.playerSliderStyle,
           canvasEnabled: c.state.canvasEnabled,
           canvasAsBackdrop: c.state.canvasAsBackdrop,
         ));
@@ -39,8 +42,10 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
 
     // Only show standalone audio visualizer if waveform seekbar is NOT already
     // visualizing the audio and the visualizer is explicitly turned on.
+    final isWaveformActive = waveformSeekBarEnabled &&
+        playerSliderStyle == PlayerSliderStyle.normal;
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
-        !waveformSeekBarEnabled &&
+        !isWaveformActive &&
         !state.isLyricsVisible &&
         !state.isQueueVisible;
 
@@ -257,12 +262,12 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                     final double availableWidth =
                         splitConstraints.maxWidth - (isTablet ? 48.0 : 32.0);
                     final double availableHeight =
-                        splitConstraints.maxHeight - 330.0;
+                        splitConstraints.maxHeight - (metrics.isShortHeight ? 240.0 : 300.0);
                     final double rawSize =
                         math.min(availableWidth, availableHeight);
                     final double dynamicArtSize =
-                        (rawSize <= 0 ? 180.0 : math.min(rawSize, 400.0))
-                            .clamp(120.0, 400.0);
+                        (rawSize <= 0 ? 120.0 : math.min(rawSize, 400.0))
+                            .clamp(80.0, 400.0);
 
                     return Padding(
                       padding:
@@ -271,12 +276,15 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                         children: [
                           Expanded(
                             child: Center(
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth: dynamicArtSize,
-                                  maxHeight: dynamicArtSize,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: dynamicArtSize,
+                                    maxHeight: dynamicArtSize,
+                                  ),
+                                  child: centerDisplay,
                                 ),
-                                child: centerDisplay,
                               ),
                             ),
                           ),

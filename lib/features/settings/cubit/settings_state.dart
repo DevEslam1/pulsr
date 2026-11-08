@@ -30,9 +30,19 @@ enum PlayerThemeMode {
   lyricsFocus,
   cd,
   clean,
+  milkdrop,
 }
 
 enum PlayerSliderStyle { normal, wavy, capsule, minimal }
+
+enum AppButtonStyle {
+  classic,
+  rectangular,
+  capsule;
+
+  static AppButtonStyle fromName(String? name) => AppButtonStyle.values
+      .firstWhere((e) => e.name == name, orElse: () => AppButtonStyle.rectangular);
+}
 
 enum MiniPlayerSwipeAction { next, prev, volume, none }
 
@@ -95,6 +105,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(true) bool customThemeGlow,
     @Default(PlayerThemeMode.classic) PlayerThemeMode playerThemeMode,
     @Default(PlayerSliderStyle.normal) PlayerSliderStyle playerSliderStyle,
+    @Default(AppButtonStyle.rectangular) AppButtonStyle appButtonStyle,
     @Default(VisualizerStyle.bar) VisualizerStyle visualizerStyle,
     @Default(MiniPlayerSwipeAction.next)
     MiniPlayerSwipeAction miniPlayerSwipeLeft,

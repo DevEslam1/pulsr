@@ -204,5 +204,66 @@ void main() {
       expect(dsd512Native.canUseDop, isFalse);
       expect(DopEncoder.dopPcmSampleRate(512), 0);
     });
+
+    test('canUseNativeDsd is true when USB DAC supports native DSD or DSD512', () {
+      const nativeCapable = DsdDacCapabilities(
+        dsd64: true,
+        dsd128: true,
+        dsd256: true,
+        dsd512: true,
+        dop: true,
+        nativeDac: true,
+        nativeDsd: true,
+      );
+      expect(nativeCapable.canUseNativeDsd, isTrue);
+
+      const dacWithoutNative = DsdDacCapabilities(
+        dsd64: true,
+        dsd128: false,
+        dsd256: false,
+        dop: true,
+        nativeDac: true,
+        nativeDsd: false,
+      );
+      expect(dacWithoutNative.canUseNativeDsd, isFalse);
+    });
+  });
+
+  group('DsdRawEncoder Direct Native DSD packing', () {
+    test('interleaves raw L/R channels byte-for-byte without marker overhead', () {
+      final raw = DsdRawEncoder.encodeToDsdRawInterleaved(
+        dsdLeft: _dsdL,
+        dsdRight: _dsdR,
+      );
+      expect(raw.length, _dsdL.length + _dsdR.length);
+      for (int i = 0; i < _dsdL.length; i++) {
+        expect(raw[i * 2 + 0], _dsdL[i], reason: 'L byte $i');
+        expect(raw[i * 2 + 1], _dsdR[i], reason: 'R byte $i');
+      }
+    });
+
+    test('encodes 32-bit aligned native DSD words (DSD_U32_LE)', () {
+      final left = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8]);
+      final right = Uint8List.fromList([10, 20, 30, 40, 50, 60, 70, 80]);
+      final rawU32 = DsdRawEncoder.encodeToDsdRawU32Le(
+        dsdLeft: left,
+        dsdRight: right,
+      );
+      expect(rawU32.length, 16);
+      // First 4 bytes left, first 4 bytes right
+      expect(rawU32.sublist(0, 4), [1, 2, 3, 4]);
+      expect(rawU32.sublist(4, 8), [10, 20, 30, 40]);
+      // Second 4 bytes left, second 4 bytes right
+      expect(rawU32.sublist(8, 12), [5, 6, 7, 8]);
+      expect(rawU32.sublist(12, 16), [50, 60, 70, 80]);
+    });
+
+    test('nativeDsdSampleRate maps DSD rate multiples accurately', () {
+      expect(DsdRawEncoder.nativeDsdSampleRate(64), 2822400);
+      expect(DsdRawEncoder.nativeDsdSampleRate(128), 5644800);
+      expect(DsdRawEncoder.nativeDsdSampleRate(256), 11289600);
+      expect(DsdRawEncoder.nativeDsdSampleRate(512), 22579200);
+      expect(DsdRawEncoder.nativeDsdSampleRate(0), 0);
+    });
   });
 }

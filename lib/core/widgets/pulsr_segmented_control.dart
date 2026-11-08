@@ -10,6 +10,7 @@ import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import '../theme/pulsr_button_style.dart';
 import 'pulsr_pressable.dart';
 
 /// {@category DesignSystem}
@@ -52,6 +53,7 @@ class PulsrSegmentedControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCapsule = context.isCapsuleButtons;
     if (segments.length < 2) return const SizedBox.shrink();
 
     final clampedIndex = selectedIndex.clamp(0, segments.length - 1);
@@ -60,21 +62,24 @@ class PulsrSegmentedControl extends StatelessWidget {
       return Container(
         margin: margin,
         padding: const EdgeInsets.all(3.5),
-        decoration: BoxDecoration(
-          color: p.surfaceContainer,
-          borderRadius: AppRadii.r16All,
-          border: Border.all(
-            color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
-            width: 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: p.isDark ? 0.22 : 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+        decoration: isCapsule
+            ? PulsrCapsuleStyle.decoration(p,
+                borderRadius: context.buttonRadius(rectRadius: 10.0))
+            : BoxDecoration(
+                color: p.surfaceContainer,
+                borderRadius: AppRadii.r16All,
+                border: Border.all(
+                  color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: p.isDark ? 0.22 : 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final innerWidth = constraints.maxWidth;
@@ -126,7 +131,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                           p.accent,
                         ],
                       ),
-                      borderRadius: AppRadii.r12All,
+                      borderRadius: context.buttonRadius(rectRadius: 7.0),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.24),
                         width: 0.8,
@@ -375,6 +380,7 @@ class _SegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCapsule = context.isCapsuleButtons;
     final content = AnimatedContainer(
       constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
       duration: context.motionMs(200),
@@ -384,21 +390,26 @@ class _SegmentButton extends StatelessWidget {
         vertical: AppSpacing.s10,
       ),
       decoration: BoxDecoration(
+        color: !isSelected && isCapsule ? PulsrCapsuleStyle.backgroundColor(p) : null,
         gradient: isSelected
             ? LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  p.accent.withValues(alpha: 0.24),
-                  p.accent.withValues(alpha: 0.12),
+                  p.accent.withValues(alpha: isCapsule ? 0.35 : 0.24),
+                  p.accent.withValues(alpha: isCapsule ? 0.20 : 0.12),
                 ],
               )
             : null,
-        borderRadius: AppRadii.r12All,
+        borderRadius: context.buttonRadius(rectRadius: 7.0),
         border: Border.all(
           color: isSelected
               ? p.accent.withValues(alpha: 0.48)
-              : Colors.transparent,
+              : (isCapsule
+                  ? (p.isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.black.withValues(alpha: 0.08))
+                  : Colors.transparent),
         ),
       ),
       child: Row(

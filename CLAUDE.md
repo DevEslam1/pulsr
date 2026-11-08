@@ -13,7 +13,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            PRESENTATION LAYER                               │
-│  GoRouter · AppShell · MiniPlayer · NowPlayingScreen (9 Skeuomorphic Themes)│
+│  GoRouter · AppShell · MiniPlayer · NowPlayingScreen (10 Themes)            │
 │  BLoC / Cubits: PlayerCubit, LibraryCubit, SettingsCubit, DownloadsCubit... │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
@@ -42,9 +42,14 @@
 2. **State Management:** `flutter_bloc` (`Cubit` pattern) with `freezed` immutable states. Side effects and async guards are managed via functional programming concepts (`fpdart` / `Result<T>`).
 3. **Dependency Injection:** `get_it` + `injectable` (`lib/core/di/injection.dart`). All major services, repositories, and handlers are registered as lazy singletons or factories.
 4. **Local Database:** `drift` (SQLite ORM) with type-safe queries, streams, reactive tables, and automated schema migration.
-5. **Dual Audio Playback Pipelines:**
+5. **Dual Audio Playback Pipelines & Bit-Perfect Source Policy:**
    - **ExoPlayer / Media3 (via vendored `just_audio`):** Standard playback with decoded PCM stream forwarded directly to `libpulsr_dsp`.
    - **Native Low-Latency AAudio / USB Exclusive Engine:** Directly buffers PCM audio from C++ sinks to hardware endpoints without Android audio flinger resampling.
+   - **Bit-Perfect Source Policy:**
+     - **Lossless Sources:** True lossless codecs (FLAC, ALAC, WAV, AIFF, DSD, WavPack, APE, TTA, integer PCM prefixes like `pcm_s16le`, `pcm_s24le`) are eligible for verified Bit-Perfect output.
+     - **Lossy Sources Blocked:** Compressed lossy formats (MP3, AAC, Ogg Vorbis, Opus, `pcm_alaw`, `pcm_mulaw`) and live radio streams are blocked from Bit-Perfect mode with explicit user-facing localization. Bit-Perfect mode guarantees bit-exact bitstream transmission, which cannot be truthfully claimed for lossy-compressed audio.
+     - **Ambiguous Containers:** Containers such as `.m4a`, `.mp4`, `.ogg`, `.oga`, `.mka`, `.webm` without explicit decoder/codec metadata are allowed through rather than prematurely blocked, but the bit-perfect chain truthfully returns an `unverified` verdict (`source_codec_unconfirmed`) rather than `verified`.
+     - **32-Bit Float Sources:** 32-bit float PCM requires conversion before transmission to integer-based DAC hardware endpoints and is rejected with an explicit notice (`source_32bit_float_conversion_not_lossless`).
 
 ---
 
@@ -56,7 +61,7 @@
 | **Native C++ DSP Engine** | 10-band graphic & arbitrary frequency EQ, 128-band parametric EQ, multichannel Channel Manager (2–8 channels, per-channel trim and delay), DSD512 decoder (to 768 kHz PCM), convolution reverb (IR files), lookahead peak limiter, multiband compressor, dynamic bass boost, loudness contour, sinc resampler, spatial panner, stereo widener, ViPER-DDC presets, and LiveProg JSFX scripting. | `android/app/src/main/cpp/`, `lib/features/player/cubit/controllers/` |
 | **Local Music Library** | Complete MediaStore & filesystem scanner, metadata enrichment, embedded ID3 tag editor with artwork extraction, album/artist/genre/folder/year indexer, duplicate audio finder, and library statistics. | `lib/data/scanner/`, `lib/features/library/`, `lib/features/tag_editor/` |
 | **YouTube Music Integration** | InnerTube catalog search, stream pre-resolution, modern Rhino JS signature transform (`solveSig`) + `n`-throttling solver (`solveN`), authenticated `WEB` client fallback for age-restricted (+18) tracks, chunked background audio downloader with resumable storage, rate limiting, circuit breaker, OAuth / WebView session login, and geo-block recovery. | `lib/core/services/ytm_*`, `lib/core/services/yt_download_*`, `lib/features/ytm_search/` |
-| **Skeuomorphic Player Themes** | 9 distinct Now Playing designs: Vinyl Deck (spinning disc), Cassette Tape (custom animated spools), CD Player (reflective surface), Circle, Classic, Minimal, Card, Waveform, and Lyrics-focused. Custom Theme Builder included. | `lib/features/player/presentation/themes/` |
+| **Player Themes** | 10 distinct Now Playing designs: Clean (modern borderless), Vinyl Deck (spinning disc), Cassette Tape (custom animated spools), CD Player (reflective surface), Circle, Classic, Minimal, Card, Waveform, and Lyrics-focused. Custom Theme Builder included. | `lib/features/player/presentation/themes/` |
 | **Synchronized Lyrics & Karaoke** | Real-time synchronized LRC parser, LRCLIB API client, millisecond offset manual editor, multi-language lyrics translation, lyric card sharing, and Karaoke mode screen. | `lib/data/lyrics/`, `lib/features/player/presentation/widgets/lyrics*` |
 | **Pulsr Party (Listen Together)** | Low-latency room-based group listening over WebSockets; sub-millisecond drift clock synchronization, host-only or democratic queue control. | `server/pulsr_party/`, `lib/data/party/`, `lib/features/party/` |
 | **Visualizers & Shaders** | Real-time audio reactive Milkdrop visualizer powered by a custom OpenGL fragment shader (`shaders/milkdrop.frag`) and platform audio visualizer taps. | `shaders/milkdrop.frag`, `lib/features/player/presentation/widgets/visualizer/` |
@@ -231,7 +236,8 @@ pulsr/
 - **`features/player/cubit/controllers/`**: Granular controllers handling specific player sub-tasks (`player_dsp_controller.dart`, `player_queue_controller.dart`, `player_lyrics_manager.dart`, `player_sponsorblock_manager.dart`, `player_quran_manager.dart`).
 - **`features/player/presentation/now_playing_screen.dart`**: Main player screen supporting swipe-down dismissal, lyrics view, queue overlay, and responsive layouts.
 - **`features/player/presentation/mini_player.dart`**: Persistent bottom mini player widget with progress bar, play/pause, and swipe to skip.
-- **`features/player/presentation/themes/` (The 9 Player Themes)**:
+- **`features/player/presentation/themes/` (The 10 Player Themes)**:
+  - `clean_player_theme.dart`: Modern borderless design with edge-to-edge album artwork.
   - `vinyl_player_theme.dart`: Realistic rotating vinyl record on turntable deck.
   - `cassette_player_theme.dart`: Retro cassette tape with spinning spools and magnetic tape rendering.
   - `cd_player_theme.dart`: Compact disc with iridescent rainbow reflection.

@@ -10,7 +10,8 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
       :nowPlayingDoubleTap,
       :nowPlayingArtworkSwipe,
       :visualizerStyle,
-      :waveformSeekBarEnabled
+      :waveformSeekBarEnabled,
+      :playerSliderStyle,
     ) = context.select<
         SettingsCubit,
         ({
@@ -18,11 +19,13 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
           NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
           VisualizerStyle visualizerStyle,
           bool waveformSeekBarEnabled,
+          PlayerSliderStyle playerSliderStyle,
         })>((c) => (
           nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
           visualizerStyle: c.state.visualizerStyle,
           waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
+          playerSliderStyle: c.state.playerSliderStyle,
         ));
     final isTablet = context.isTablet;
     final isInSplitView = PlayerSplitViewScope.of(context);
@@ -51,8 +54,10 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
               barHeight: metrics.dockBarHeight,
             );
 
+            final isWaveformActive = waveformSeekBarEnabled &&
+                playerSliderStyle == PlayerSliderStyle.normal;
             final showVisualizer = visualizerStyle != VisualizerStyle.off &&
-                !waveformSeekBarEnabled &&
+                !isWaveformActive &&
                 !state.isLyricsVisible &&
                 !state.isQueueVisible &&
                 !isInSplitView;

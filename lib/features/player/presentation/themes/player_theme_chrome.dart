@@ -1864,7 +1864,8 @@ class PlayerControlsColumn extends StatelessWidget {
           onToggleShuffle: () => cubit.toggleShuffle(),
           onToggleRepeat: () => cubit.toggleRepeat(),
         ),
-        if (isInSplitView || isTablet) ...[
+        if ((isInSplitView || isTablet) &&
+            !(metrics?.isVeryShortHeight ?? false)) ...[
           const SizedBox(height: AppSpacing.s8),
           PlayerVolumeBar(cubit: cubit, activeColor: props.activeColor),
         ],

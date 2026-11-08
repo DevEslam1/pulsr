@@ -7,6 +7,7 @@ import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import '../theme/pulsr_button_style.dart';
 import 'pulsr_pressable.dart';
 
 /// {@category DesignSystem}
@@ -45,22 +46,37 @@ class PulsrChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCapsule = context.isCapsuleButtons;
     final effectiveAccent = activeColor ?? p.accent;
     final isActionSelected = selected && variant == PulsrChipVariant.action;
 
     final Color bgColor = selected
-        ? (isActionSelected ? effectiveAccent : p.accentSoft)
-        : p.surfaceContainer;
+        ? (isActionSelected
+            ? effectiveAccent
+            : (isCapsule
+                ? effectiveAccent.withValues(alpha: p.isDark ? 0.32 : 0.22)
+                : p.accentSoft))
+        : (isCapsule
+            ? PulsrCapsuleStyle.backgroundColor(p)
+            : p.surfaceContainer);
 
     final Color borderColor = selected
         ? (isActionSelected
             ? effectiveAccent
             : effectiveAccent.withValues(alpha: 0.55))
-        : (p.isDark ? AppColors.specularAt(0.12) : p.borderSubtle);
+        : (isCapsule
+            ? (p.isDark
+                ? Colors.white.withValues(alpha: 0.12)
+                : Colors.black.withValues(alpha: 0.08))
+            : (p.isDark ? AppColors.specularAt(0.12) : p.borderSubtle));
 
     final Color textColor = selected
-        ? (isActionSelected ? p.textOnAccent : effectiveAccent)
-        : p.textSecondary;
+        ? (isActionSelected
+            ? p.textOnAccent
+            : (isCapsule
+                ? (p.isDark ? Colors.white : effectiveAccent)
+                : effectiveAccent))
+        : (isCapsule ? PulsrCapsuleStyle.foregroundColor(p) : p.textSecondary);
 
     final Color iconColor = textColor;
     final bool showLeadingIcon =
@@ -76,6 +92,10 @@ class PulsrChip extends StatelessWidget {
           )
         : const SizedBox.shrink();
 
+    final chipRadius = isCapsule
+        ? context.buttonRadius(rectRadius: 6.0)
+        : AppRadii.full;
+
     return Semantics(
       button: true,
       selected: selected,
@@ -83,7 +103,7 @@ class PulsrChip extends StatelessWidget {
       child: PulsrPressable(
         onTap: onTap,
         hapticStyle: PulsrHapticStyle.selection,
-        focusBorderRadius: AppRadii.full,
+        focusBorderRadius: chipRadius,
         child: ConstrainedBox(
           constraints: const BoxConstraints(
             minHeight: AppSpacing.minTouchTarget,
@@ -100,50 +120,61 @@ class PulsrChip extends StatelessWidget {
                 top: AppSpacing.xs,
                 bottom: AppSpacing.xs,
               ),
-              decoration: BoxDecoration(
-                color: selected ? null : bgColor,
-                gradient: selected
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: isActionSelected
-                            ? [
-                                Color.lerp(
+              decoration: isCapsule && !selected
+                  ? PulsrCapsuleStyle.decoration(
+                      p,
+                      customBg: bgColor,
+                      borderRadius: chipRadius,
+                      customBorder: Border.all(color: borderColor, width: 0.8),
+                    )
+                  : BoxDecoration(
+                      color: selected ? null : bgColor,
+                      gradient: selected
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: isActionSelected
+                                  ? [
+                                      Color.lerp(
+                                            effectiveAccent,
+                                            Colors.white,
+                                            0.12,
+                                          ) ??
+                                          effectiveAccent,
                                       effectiveAccent,
-                                      Colors.white,
-                                      0.12,
-                                    ) ??
-                                    effectiveAccent,
-                                effectiveAccent,
-                              ]
-                            : [
-                                effectiveAccent.withValues(
-                                  alpha: p.isDark ? 0.24 : 0.16,
+                                    ]
+                                  : [
+                                      effectiveAccent.withValues(
+                                        alpha: p.isDark
+                                            ? (isCapsule ? 0.35 : 0.24)
+                                            : (isCapsule ? 0.25 : 0.16),
+                                      ),
+                                      effectiveAccent.withValues(
+                                        alpha: p.isDark
+                                            ? (isCapsule ? 0.20 : 0.12)
+                                            : (isCapsule ? 0.14 : 0.08),
+                                      ),
+                                    ],
+                            )
+                          : null,
+                      borderRadius: chipRadius,
+                      border: Border.all(
+                        color: borderColor,
+                        width: selected ? 1.3 : 1.0,
+                      ),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: effectiveAccent.withValues(
+                                  alpha: isActionSelected ? 0.28 : 0.16,
                                 ),
-                                effectiveAccent.withValues(
-                                  alpha: p.isDark ? 0.12 : 0.08,
-                                ),
-                              ],
-                      )
-                    : null,
-                borderRadius: AppRadii.full,
-                border: Border.all(
-                  color: borderColor,
-                  width: selected ? 1.3 : 1.0,
-                ),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: effectiveAccent.withValues(
-                            alpha: isActionSelected ? 0.28 : 0.16,
-                          ),
-                          blurRadius: 12,
-                          spreadRadius: -2,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
-              ),
+                                blurRadius: 12,
+                                spreadRadius: -2,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,

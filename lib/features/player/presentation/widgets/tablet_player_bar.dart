@@ -11,6 +11,7 @@ import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'audio_quality_badge.dart';
@@ -932,6 +933,16 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                               ),
                                                                               semanticLabel: context.l10n.seekLabel,
                                                                               activeColor: activeColor,
+                                                                              inactiveColor: Theme.of(context).brightness == Brightness.dark
+                                                                                  ? (settingsState.playerSliderStyle == PlayerSliderStyle.capsule
+                                                                                      ? Colors.white.withValues(alpha: 0.22)
+                                                                                      : AppColors.specularStrong)
+                                                                                  : (settingsState.playerSliderStyle == PlayerSliderStyle.capsule
+                                                                                      ? Colors.black.withValues(alpha: 0.15)
+                                                                                      : p.hairline.withValues(alpha: 0.8)),
+                                                                              sliderStyle: settingsState.playerSliderStyle,
+                                                                              isWavy: settingsState.playerSliderStyle == PlayerSliderStyle.wavy,
+                                                                              animateWave: state.isPlaying,
                                                                               onChangeStart: (val) {
                                                                                 _dragSeekNotifier.value = val;
                                                                               },

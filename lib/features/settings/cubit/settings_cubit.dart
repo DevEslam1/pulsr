@@ -73,6 +73,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static const String _keyCustomThemeGlow = 'setting_custom_theme_glow';
   static const String _keyPlayerThemeMode = 'setting_player_theme_mode';
   static const String _keyPlayerSliderStyle = PrefsKeys.playerSliderStyle;
+  static const String _keyAppButtonStyle = PrefsKeys.appButtonStyle;
   static const String _keyVisualizerStyle = 'setting_visualizer_style';
   static const String _keyMiniPlayerSwipeLeft =
       'setting_mini_player_swipe_left';
@@ -320,6 +321,11 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       (e) => e.name == playerSliderStyleStr,
       orElse: () => PlayerSliderStyle.normal,
     );
+    final appButtonStyleStr = prefs.getString(_keyAppButtonStyle);
+    final appButtonStyle = AppButtonStyle.values.firstWhere(
+      (e) => e.name == appButtonStyleStr,
+      orElse: () => AppButtonStyle.rectangular,
+    );
 
     final playerThemeMode = PlayerThemeMode.values.firstWhere(
       (e) => e.name == playerThemeStr,
@@ -396,6 +402,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getBool(_keyCustomThemeGlow) ?? current.customThemeGlow,
       playerThemeMode: playerThemeMode,
       playerSliderStyle: playerSliderStyle,
+      appButtonStyle: appButtonStyle,
       visualizerStyle: visualizerStyle,
       miniPlayerSwipeLeft: miniPlayerSwipeLeft,
       miniPlayerSwipeRight: miniPlayerSwipeRight,
@@ -438,6 +445,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     // breaking. Bit-Perfect/Strict stay opt-in (see SettingsState).
     final strictBitPerfectLoaded =
         prefs.getBool(PrefsKeys.strictBitPerfect) ?? false;
+    _preStrictBypass = prefs.containsKey(PrefsKeys.preStrictBypass)
+        ? prefs.getBool(PrefsKeys.preStrictBypass)
+        : null;
+    _preStrictFollowRate = prefs.containsKey(PrefsKeys.preStrictFollowRate)
+        ? prefs.getBool(PrefsKeys.preStrictFollowRate)
+        : null;
     final followTrackSampleRateLoaded =
         prefs.getBool(PrefsKeys.followTrackSampleRate) ?? true;
     final dsdOutputModeLoaded = DsdOutputMode.values.firstWhere(
@@ -1466,6 +1479,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     safeEmit(state.copyWith(playerSliderStyle: style));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyPlayerSliderStyle, style.name);
+  }
+
+  Future<void> setAppButtonStyle(AppButtonStyle style) async {
+    markDirty('appButtonStyle');
+    safeEmit(state.copyWith(appButtonStyle: style));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyAppButtonStyle, style.name);
   }
 
   Future<void> setPlayerThemeMode(PlayerThemeMode mode) async {

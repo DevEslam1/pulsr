@@ -169,6 +169,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         context.select<PlayerCubit, String?>((c) => c.state.currentSong?.path);
     final waveformEnabled = context
         .select<SettingsCubit, bool>((c) => c.state.waveformSeekBarEnabled);
+    final sliderStyle = context.select<SettingsCubit, PlayerSliderStyle>(
+      (c) => c.state.playerSliderStyle,
+    );
     final isBuffering =
         context.select<PlayerCubit, bool>((c) => c.state.isBuffering);
 
@@ -200,8 +203,13 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     }
 
     final Widget seekWidget;
-    // Check if Waveform Seek Bar is enabled in settings and song ID is available
-    if (waveformEnabled && effectiveSongId != null) {
+    // Check if Waveform Seek Bar is enabled in settings and song ID is available.
+    // When a specific slider style (e.g. Capsule/Apple Music, Wavy, Minimal) is active,
+    // it takes precedence so the user's chosen slider theme applies across all player themes.
+    final showWaveform = waveformEnabled &&
+        effectiveSongId != null &&
+        sliderStyle == PlayerSliderStyle.normal;
+    if (showWaveform) {
       final instantSamples = WaveformService.instance.getInstantWaveform(
         songId: effectiveSongId,
         filePath: effectiveFilePath,
@@ -498,8 +506,12 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                               activeColor: widget.activeColor,
                               inactiveColor: Theme.of(context).brightness ==
                                       Brightness.dark
-                                  ? AppColors.specularStrong
-                                  : p.hairline.withValues(alpha: 0.8),
+                                  ? (sliderStyle == PlayerSliderStyle.capsule
+                                      ? Colors.white.withValues(alpha: 0.22)
+                                      : AppColors.specularStrong)
+                                  : (sliderStyle == PlayerSliderStyle.capsule
+                                      ? Colors.black.withValues(alpha: 0.15)
+                                      : p.hairline.withValues(alpha: 0.8)),
                               sliderStyle: sliderStyle,
                               isWavy: sliderStyle == PlayerSliderStyle.wavy,
                               animateWave: isPlaying && enabled,
@@ -573,7 +585,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                         ),
                       ),
                       // Floating dual-tone timestamp pill above thumb while dragging
-                      if (isDragging && trackWidth > 70)
+                      if (isDragging && trackWidth > 70 && sliderStyle != PlayerSliderStyle.capsule)
                         PositionedDirectional(
                           top: -36,
                           start: (ratio * trackWidth - 54).clamp(

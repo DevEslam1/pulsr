@@ -40,6 +40,7 @@ class PrefsKeys {
   static const String dynamicThemingEnabled = 'setting_dynamic_theme';
   static const String playerThemeMode = 'setting_player_theme_mode';
   static const String playerSliderStyle = 'setting_player_slider_style';
+  static const String appButtonStyle = 'setting_app_button_style';
   // Mini-player dock stacking style (DockStackMode.name). See StackedBottomDock.
   static const String dockStackMode = 'setting_dock_stack_mode';
   static const String playbackSpeed = 'setting_playback_speed';
@@ -303,6 +304,8 @@ class PrefsKeys {
   // the DSP bypass, then follows each track's exact rate. Enabled only on a
   // path that reports exclusive bit-perfect support.
   static const String strictBitPerfect = 'setting_strict_bit_perfect';
+  static const String preStrictBypass = 'setting_pre_strict_bypass';
+  static const String preStrictFollowRate = 'setting_pre_strict_follow_rate';
 
   // T4: DSD (DSF/DFF) output transport. 'dop' (default, frame as DSD over PCM
   // for a compatible USB DAC) or 'pcm' (decode to PCM). The DoP path is gated

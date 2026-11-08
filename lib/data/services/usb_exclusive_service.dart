@@ -112,7 +112,7 @@ class UsbExclusiveStatus {
     this.lastError,
     this.lastStreamErrorCode,
     this.channelMismatchFrames = 0,
-    this.rateVerified = true,
+    this.rateVerified = false,
     this.advertisedFormats = const [],
   });
 
@@ -215,7 +215,7 @@ class UsbExclusiveStatus {
       lastError: i(map['lastError']),
       lastStreamErrorCode: i(map['resultCode']),
       channelMismatchFrames: i(map['channelMismatchFrames']) ?? 0,
-      rateVerified: map['rateVerified'] != false,
+      rateVerified: map['streamingActive'] == true && map['rateVerified'] == true,
       advertisedFormats: (map['advertisedFormats'] as List<dynamic>?)
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??

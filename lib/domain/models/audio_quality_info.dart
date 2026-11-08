@@ -21,6 +21,10 @@ class AudioQualityInfo {
   /// the quality sheet reports the transport that is actually in use.
   static bool dsdDopActive = false;
 
+  /// Whether the most recent DSD (DSF/DFF) track was routed via Direct Native DSD
+  /// (raw bitstream without DoP encapsulation). Written by [DsdDecoderHelper].
+  static bool dsdNativeActive = false;
+
   final String format;
   final String codecName;
   final int? bitrateKbps;
@@ -53,6 +57,12 @@ class AudioQualityInfo {
 
   /// The audio rendering pipeline configuration based on source format and bit-depth.
   String get renderEngineDescription {
+    if (dsdNativeActive) {
+      return 'Direct Native DSD (Raw Bitstream) • Bit-Perfect USB DAC';
+    }
+    if (dsdDopActive) {
+      return 'DSD over PCM (DoP v1.1) • Bit-Perfect USB DAC';
+    }
     if (AudioFormats.requiresNativeDecoder(format)) {
       return 'Unavailable • native decoder not bundled in this build';
     }

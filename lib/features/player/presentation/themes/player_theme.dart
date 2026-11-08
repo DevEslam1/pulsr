@@ -46,10 +46,12 @@ class PlayerThemeProps {
 /// inside the tablet split-view left pane (persistent artwork + controls).
 class PlayerSplitViewScope extends InheritedWidget {
   final bool isInSplitView;
+  final TabController? tabController;
 
   const PlayerSplitViewScope({
     super.key,
     required this.isInSplitView,
+    this.tabController,
     required super.child,
   });
 
@@ -60,7 +62,14 @@ class PlayerSplitViewScope extends InheritedWidget {
         false;
   }
 
+  static TabController? tabControllerOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<PlayerSplitViewScope>()
+        ?.tabController;
+  }
+
   @override
   bool updateShouldNotify(PlayerSplitViewScope oldWidget) =>
-      isInSplitView != oldWidget.isInSplitView;
+      isInSplitView != oldWidget.isInSplitView ||
+      tabController != oldWidget.tabController;
 }

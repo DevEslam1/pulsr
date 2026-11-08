@@ -109,6 +109,8 @@ class ExportBackupUseCase {
           prefs.getString('setting_player_theme_mode') ?? 'classic',
       'playerSliderStyle':
           prefs.getString('setting_player_slider_style') ?? 'normal',
+      'appButtonStyle':
+          prefs.getString('setting_app_button_style') ?? 'rectangular',
       'visualizerStyle': prefs.getString('setting_visualizer_style') ?? 'bar',
       // Extended settings (previously missing — caused data loss on restore)
       'replayGainMode': prefs.getString('setting_replay_gain_mode') ?? 'track',
@@ -647,6 +649,11 @@ class ImportBackupUseCase {
         final rawSliderStyle = settings['playerSliderStyle'];
         await prefs.setString('setting_player_slider_style',
             rawSliderStyle is String ? rawSliderStyle : 'normal');
+      }
+      if (settings.containsKey('appButtonStyle')) {
+        final rawButtonStyle = settings['appButtonStyle'];
+        await prefs.setString('setting_app_button_style',
+            rawButtonStyle is String ? rawButtonStyle : 'rectangular');
       }
       if (settings.containsKey('playerThemeMode')) {
         final rawPlayerTheme = settings['playerThemeMode'];

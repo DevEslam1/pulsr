@@ -9,6 +9,7 @@ import 'package:pulsr/features/player/presentation/themes/cd_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/circle_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/clean_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/classic_player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/milkdrop_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/lyrics_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/minimal_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
@@ -78,6 +79,10 @@ void main() {
       expect(
         ThemeRegistry.build(PlayerThemeMode.clean, dummyProps),
         isA<CleanPlayerTheme>(),
+      );
+      expect(
+        ThemeRegistry.build(PlayerThemeMode.milkdrop, dummyProps),
+        isA<MilkdropPlayerTheme>(),
       );
     });
 

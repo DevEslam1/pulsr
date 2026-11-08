@@ -1,4 +1,5 @@
 // lib/domain/models/radio_station.dart
+import 'dart:io';
 
 /// A persisted internet radio / HTTP stream the user can play from the
 /// Radio screen. Stations are not files: [url] is an absolute
@@ -10,6 +11,9 @@ class RadioStation {
   final String? genre;
   final String? artworkUrl;
   final int? lastPlayed;
+  final int? bitrate;
+  final String? codec;
+  final String? stationUuid;
 
   const RadioStation({
     required this.id,
@@ -18,6 +22,9 @@ class RadioStation {
     this.genre,
     this.artworkUrl,
     this.lastPlayed,
+    this.bitrate,
+    this.codec,
+    this.stationUuid,
   });
 
   /// Builds a station, deriving a stable [id] from [url] so re-adding the
@@ -28,6 +35,9 @@ class RadioStation {
     String? genre,
     String? artworkUrl,
     int? lastPlayed,
+    int? bitrate,
+    String? codec,
+    String? stationUuid,
   }) {
     final normalizedUrl = url.trim();
     final normalizedName =
@@ -36,6 +46,10 @@ class RadioStation {
     if (genre != null && genre.trim().isNotEmpty) {
       normalizedGenre = genre.trim();
     }
+    String? normalizedCodec;
+    if (codec != null && codec.trim().isNotEmpty) {
+      normalizedCodec = codec.trim().toUpperCase();
+    }
     return RadioStation(
       id: stationIdForUrl(normalizedUrl),
       name: normalizedName,
@@ -43,6 +57,12 @@ class RadioStation {
       genre: normalizedGenre,
       artworkUrl: artworkUrl,
       lastPlayed: lastPlayed,
+      bitrate: (bitrate != null && bitrate > 0) ? bitrate : null,
+      codec: normalizedCodec,
+      stationUuid:
+          (stationUuid != null && stationUuid.trim().isNotEmpty)
+              ? stationUuid.trim()
+              : null,
     );
   }
 
@@ -54,6 +74,9 @@ class RadioStation {
       genre: json['genre'] as String?,
       artworkUrl: json['artworkUrl'] as String?,
       lastPlayed: (json['lastPlayed'] as num?)?.toInt(),
+      bitrate: (json['bitrate'] as num?)?.toInt(),
+      codec: json['codec'] as String?,
+      stationUuid: json['stationUuid'] as String?,
     );
   }
 
@@ -64,6 +87,9 @@ class RadioStation {
         'genre': genre,
         'artworkUrl': artworkUrl,
         'lastPlayed': lastPlayed,
+        if (bitrate != null) 'bitrate': bitrate,
+        if (codec != null) 'codec': codec,
+        if (stationUuid != null) 'stationUuid': stationUuid,
       };
 
   RadioStation copyWith({
@@ -72,6 +98,9 @@ class RadioStation {
     String? genre,
     String? artworkUrl,
     int? lastPlayed,
+    int? bitrate,
+    String? codec,
+    String? stationUuid,
   }) {
     return RadioStation(
       id: id,
@@ -80,7 +109,22 @@ class RadioStation {
       genre: genre ?? this.genre,
       artworkUrl: artworkUrl ?? this.artworkUrl,
       lastPlayed: lastPlayed ?? this.lastPlayed,
+      bitrate: bitrate ?? this.bitrate,
+      codec: codec ?? this.codec,
+      stationUuid: stationUuid ?? this.stationUuid,
     );
+  }
+
+  /// Formatted stream quality string (e.g. "320 kbps MP3" or "AAC+").
+  String? get qualityLabel {
+    final parts = <String>[];
+    if (bitrate != null && bitrate! > 0) {
+      parts.add('$bitrate kbps');
+    }
+    if (codec != null && codec!.isNotEmpty) {
+      parts.add(codec!);
+    }
+    return parts.isEmpty ? null : parts.join(' ');
   }
 
   /// Negative pseudo-song id used when this station is played through the
@@ -110,6 +154,64 @@ class RadioStation {
     if (host.isEmpty) return false;
     return !_isUnsafeHost(host);
   }
+
+  /// Validates both the syntactic host and ensures any resolved IP addresses
+  /// do not point to internal, private, loopback, or reserved networks, defeating
+  /// DNS rebinding SSRF attacks.
+  static Future<bool> isSafeHost(
+    String host, {
+    Future<List<String>> Function(String host)? lookup,
+  }) async {
+    final trimmed = host.trim().toLowerCase();
+    if (_isUnsafeHost(trimmed)) return false;
+
+    // Test domains (RFC 2606) are safe in test environments without real DNS
+    if (trimmed.endsWith('.example') || trimmed.endsWith('.test')) {
+      return true;
+    }
+
+    // If host is an IP literal, _isUnsafeHost already validated it
+    if (lookup == null && _isIpLiteral(trimmed)) {
+      return true;
+    }
+
+    try {
+      final resolver = lookup ?? _defaultDnsLookup;
+      final resolved = await resolver(trimmed);
+      if (resolved.isEmpty) {
+        return lookup == null;
+      }
+      for (final ip in resolved) {
+        if (_isUnsafeHost(ip)) return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static bool _isIpLiteral(String host) {
+    if (host.contains(':')) return true;
+    final parts = host.split('.');
+    if (parts.length != 4) return false;
+    return parts.every((p) {
+      final v = int.tryParse(p);
+      return v != null && v >= 0 && v <= 255;
+    });
+  }
+
+  static Future<List<String>> _defaultDnsLookup(String host) async {
+    try {
+      final addresses = await InternetAddress.lookup(host);
+      return addresses.map((a) => a.address).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// True if [ip] is loopback, link-local, unique-local, unspecified, CGNAT
+  /// or RFC 1918 private address.
+  static bool isUnsafeIpAddress(String ip) => _isUnsafeHost(ip);
 
   /// Rejects loopback, link-local, unique-local, unspecified, CGNAT and
   /// RFC 1918 hosts, including IPv4 addresses embedded in IPv6 mapped

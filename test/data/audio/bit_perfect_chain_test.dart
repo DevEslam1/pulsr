@@ -171,5 +171,38 @@ void main() {
       expect(result.verdict, BitPerfectChainVerdict.unverified);
       expect(result.reasonCode, 'depth_unknown');
     });
+
+    test('direct Native DSD bitstream without DSP yields verified bit-perfect', () {
+      final result = assessBitPerfectChain(
+        requested: true,
+        active: true,
+        sourceSampleRate: 2822400, // DSD64 (1-bit 2.8224 MHz)
+        sourceBitDepth: 1,
+        outputSampleRate: 2822400,
+        outputBitDepth: 1,
+        isDsdNative: true,
+      );
+
+      expect(result.verdict, BitPerfectChainVerdict.verified);
+      expect(result.isVerified, isTrue);
+      expect(result.isProblem, isFalse);
+    });
+
+    test('direct Native DSD refuses verification if samples were modified', () {
+      final result = assessBitPerfectChain(
+        requested: true,
+        active: true,
+        sourceSampleRate: 11289600, // DSD256
+        sourceBitDepth: 1,
+        outputSampleRate: 11289600,
+        outputBitDepth: 1,
+        isDsdNative: true,
+        samplesModified: true,
+      );
+
+      expect(result.verdict, BitPerfectChainVerdict.unverified);
+      expect(result.reasonCode, 'samples_modified');
+      expect(result.isVerified, isFalse);
+    });
   });
 }

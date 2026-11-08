@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/ambient_sound_service.dart';
+import 'package:pulsr/core/widgets/pulsr_switch.dart';
 import 'package:pulsr/features/player/presentation/widgets/ambient_sound_panel.dart';
 import 'package:pulsr/features/player/presentation/widgets/ambient_sound_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
@@ -126,6 +127,33 @@ void main() {
 
       expect(find.text('1 ON'), findsOneWidget);
     });
+
+    testWidgets('master switch toggles ambient sounds on and off in panel',
+        (tester) async {
+      final service = AmbientSoundService();
+      expect(service.isEnabled, isFalse);
+
+      await tester.pumpWidget(_wrap(const AmbientSoundPanel(showHeader: true)));
+      await tester.pumpAndSettle();
+
+      // Find the master switch in the header
+      final masterSwitchFinder = find.byType(PulsrSwitch).first;
+      expect(masterSwitchFinder, findsOneWidget);
+
+      // Tap master switch to turn ON
+      await tester.tap(masterSwitchFinder);
+      await tester.pumpAndSettle();
+
+      expect(service.isEnabled, isTrue);
+      expect(service.activeEffects, isNotEmpty);
+
+      // Tap master switch to turn OFF
+      await tester.tap(masterSwitchFinder);
+      await tester.pumpAndSettle();
+
+      expect(service.isEnabled, isFalse);
+      expect(service.activeEffects, isEmpty);
+    });
   });
 
   group('AmbientSoundSheet', () {
@@ -135,6 +163,34 @@ void main() {
 
       expect(find.text('Ambient Sounds'), findsAtLeastNWidgets(1));
       expect(find.byType(AmbientSoundPanel), findsOneWidget);
+    });
+
+    testWidgets('master switch in sheet header toggles ambient sounds',
+        (tester) async {
+      final service = AmbientSoundService();
+      await service.toggleEffect(AmbientSoundEffect.ocean);
+      expect(service.isEnabled, isTrue);
+
+      await tester.pumpWidget(_wrap(const AmbientSoundSheet()));
+      await tester.pumpAndSettle();
+
+      // Find master switch in sheet header
+      final masterSwitchFinder = find.byType(PulsrSwitch).first;
+      expect(masterSwitchFinder, findsOneWidget);
+
+      // Tap switch to disable ambient sounds
+      await tester.tap(masterSwitchFinder);
+      await tester.pumpAndSettle();
+
+      expect(service.isEnabled, isFalse);
+      expect(service.activeEffects, isEmpty);
+
+      // Tap switch to re-enable ambient sounds
+      await tester.tap(masterSwitchFinder);
+      await tester.pumpAndSettle();
+
+      expect(service.isEnabled, isTrue);
+      expect(service.isEffectActive(AmbientSoundEffect.ocean), isTrue);
     });
   });
 }
