@@ -105,6 +105,12 @@ class RecordingAudioHandler extends TestPulsrAudioHandler {
   }
 
   @override
+  Future<void> setSpeedWithoutPersisting(double speed) async {
+    _record('setSpeedWithoutPersisting');
+    await super.setSpeedWithoutPersisting(speed);
+  }
+
+  @override
   Future<void> setPitch(double pitch) async {
     _record('setPitch');
     await super.setPitch(pitch);

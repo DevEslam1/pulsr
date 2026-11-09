@@ -502,7 +502,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                                   ExcludeSemantics(
                                     excluding: shouldBlur,
                                     child: Text(
-                                      '${ayah.textArabic} \u06dd${ayah.ayahNumber}\u06de',
+                                      '${ayah.textArabic} ﴿${ayah.ayahNumber}﴾',
                                       style: TextStyle(
                                         fontSize: AppFontSize.titleLarge,
                                         fontWeight: FontWeight.w700,

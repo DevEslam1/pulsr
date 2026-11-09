@@ -611,7 +611,13 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   }
 
   @override
-  Future<void> setSpeed(double speed) async {
+  Future<void> setSpeed(double speed) =>
+      _setSpeedInternal(speed, persist: true);
+
+  Future<void> setSpeedWithoutPersisting(double speed) =>
+      _setSpeedInternal(speed, persist: false);
+
+  Future<void> _setSpeedInternal(double speed, {required bool persist}) async {
     if (!speed.isFinite) return;
     if (await playbackRateMustRemainUnity()) {
       await _applyPlaybackSpeed(1.0);
@@ -619,12 +625,14 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
     final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
     await _applyPlaybackSpeed(clamped);
-    try {
-      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
-      await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to persist playback speed preference',
-          error: e, stackTrace: st, category: 'AudioHandler');
+    if (persist) {
+      try {
+        final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+        await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to persist playback speed preference',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
     }
   }
 

@@ -807,7 +807,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           tunedProfile.dynamicsPreset,
           enabled: tunedProfile.dynamicsEnabled,
         );
-        await _audioHandler.setSpeed(tunedProfile.playbackSpeed);
+        await _audioHandler
+            .setSpeedWithoutPersisting(tunedProfile.playbackSpeed);
       });
       if (!isClosed &&
           (expectedGen == null || expectedGen == _quranToggleGen) &&
@@ -909,7 +910,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           state.playback.copyWith(playbackSpeed: clamped, errorMessage: null),
     ));
     try {
-      await _audioHandler.setSpeed(clamped);
+      await _audioHandler.setSpeedWithoutPersisting(clamped);
       if (_isCurrentQuranContext(toggleGen, styleGen) &&
           gen == _quranSpeedGen &&
           _getState().isQuranModeEnabled &&

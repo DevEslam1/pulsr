@@ -2,28 +2,43 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/services/ambient_sound_service.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
+import '../../../sheets/add_to_playlist_sheet.dart';
+import '../../../sheets/sleep_timer_sheet.dart';
+import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../../cubit/player_cubit.dart';
+import '../../cubit/player_state.dart';
+import '../widgets/ambient_sound_sheet.dart';
 import '../widgets/audio_quality_sheet.dart';
 import '../widgets/canvas_backdrop.dart';
+import '../widgets/equalizer_sheet.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import '../widgets/player_more_sheet.dart';
+import '../widgets/player_volume_bar.dart';
+import '../widgets/quran_mode_sheet.dart';
+import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
@@ -57,6 +72,7 @@ class CleanPlayerTheme extends StatelessWidget {
       :canvasEnabled,
       :canvasAsBackdrop,
       :themeMode,
+      :experienceMode,
     ) = context.select<
         SettingsCubit,
         ({
@@ -66,6 +82,7 @@ class CleanPlayerTheme extends StatelessWidget {
           bool canvasEnabled,
           bool canvasAsBackdrop,
           AppThemeMode themeMode,
+          ExperienceMode experienceMode,
         })>((c) => (
           nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
@@ -73,9 +90,16 @@ class CleanPlayerTheme extends StatelessWidget {
           canvasEnabled: c.state.canvasEnabled,
           canvasAsBackdrop: c.state.canvasAsBackdrop,
           themeMode: c.state.themeMode,
+          experienceMode: c.state.experienceMode,
         ));
 
     final isInSplitView = PlayerSplitViewScope.of(context);
+    final showAbControls = experienceMode == ExperienceMode.professional ||
+        state.abPointA != null ||
+        state.abPointB != null;
+    final hasDownload = song != null &&
+        (song.source == SongSource.youtube ||
+            (song.remoteId != null && song.remoteId!.isNotEmpty));
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -248,7 +272,7 @@ class CleanPlayerTheme extends StatelessWidget {
         final horizontalPadding =
             (constraints.maxWidth * 0.06).clamp(12.0, 24.0);
 
-        // 2. Track Header: Title and Artist with Star (Favorite) & More (...) circles
+        // 2. Track Header: Title and Artist with Download/Add to Playlist, Star (Favorite) & More (...) circles
         final trackHeader = Padding(
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Row(
@@ -260,7 +284,7 @@ class CleanPlayerTheme extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     MarqueeText(
-                      text: song?.title ?? 'No Track Playing',
+                      text: song?.title ?? context.l10n.noTrackSelected,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize:
@@ -271,7 +295,7 @@ class CleanPlayerTheme extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      song?.artist ?? 'Unknown Artist',
+                      song?.artist ?? context.l10n.unknownArtist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -285,8 +309,31 @@ class CleanPlayerTheme extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 14),
-              // Action buttons on right: Star (Favorite) & More (...)
+              const SizedBox(width: 10),
+              // Action buttons on right: Download / Add to Playlist, Star (Favorite) & More (...)
+              if (song != null) ...[
+                if (hasDownload)
+                  _CleanActionCircleButton(
+                    tooltip: 'Download',
+                    child: YtmDownloadButton(
+                      song: song,
+                      activeColor: activeColor,
+                      iconColor: Colors.white,
+                      iconSize: 19,
+                    ),
+                  )
+                else
+                  _CleanActionCircleButton(
+                    icon: Icons.playlist_add_rounded,
+                    iconColor: Colors.white,
+                    tooltip: context.l10n.addToPlaylist,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      AddToPlaylistSheet.show(context, song: song);
+                    },
+                  ),
+                const SizedBox(width: 8),
+              ],
               _CleanActionCircleButton(
                 icon: (song?.isFavorite == true)
                     ? Icons.star_rounded
@@ -294,7 +341,9 @@ class CleanPlayerTheme extends StatelessWidget {
                 iconColor: (song?.isFavorite == true)
                     ? const Color(0xFFFFB800)
                     : Colors.white,
-                tooltip: 'Favorite',
+                tooltip: (song?.isFavorite == true)
+                    ? context.l10n.unlike
+                    : context.l10n.like,
                 onTap: () {
                   if (song != null) {
                     PulsrHaptics.selection();
@@ -302,14 +351,15 @@ class CleanPlayerTheme extends StatelessWidget {
                   }
                 },
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 8),
               _CleanActionCircleButton(
                 icon: Icons.more_horiz_rounded,
                 iconColor: Colors.white,
-                tooltip: 'More options',
+                tooltip: context.l10n.moreOptions,
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  PlayerMoreSheet.show(context, activeColor: activeColor);
+                  PlayerMoreSheet.show(context,
+                      song: song, activeColor: activeColor);
                 },
               ),
             ],
@@ -327,14 +377,36 @@ class CleanPlayerTheme extends StatelessWidget {
           isCompact: isShort,
         );
 
-        // 4. Playback Controls (Rewind, Play/Pause without circle, Fast-Forward)
+        // Bookmark Prompt Banner (Resume playback from saved position)
+        final Widget? bookmarkBanner = state.bookmarkPosition != null
+            ? Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: PlayerBookmarkPromptBanner(
+                  cubit: cubit,
+                  position: state.bookmarkPosition!,
+                ),
+              )
+            : null;
+
+        // 4. Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat, AB Loop)
         final transportControls = _CleanTransportControls(
           props: props,
           activeColor: activeColor,
           isCompact: isShort,
+          showAbControls: showAbControls,
         );
 
-        // 5. Down Bar (Lyrics on left, AirPlay/Output centered, Queue on right)
+        // Volume Bar for tablet / split-view
+        final Widget? volumeBar =
+            ((isInSplitView || context.isTablet) && !isVeryShort)
+                ? Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                    child:
+                        PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+                  )
+                : null;
+
+        // 5. Down Bar (Lyrics, EQ, Speed, Audio Output/Cast, Quran, Ambient, Timer, Queue)
         final downBar = _CleanDownBar(
           props: props,
           activeColor: activeColor,
@@ -366,9 +438,21 @@ class CleanPlayerTheme extends StatelessWidget {
                             trackHeader,
                             SizedBox(height: spacingTrackToSeek),
                             cleanSeekBar,
-                            SizedBox(height: spacingSeekToControls),
+                            if (bookmarkBanner != null) ...[
+                              const SizedBox(height: 8.0),
+                              bookmarkBanner,
+                              const SizedBox(height: 8.0),
+                            ] else ...[
+                              SizedBox(height: spacingSeekToControls),
+                            ],
                             transportControls,
-                            SizedBox(height: spacingControlsToDock),
+                            if (volumeBar != null) ...[
+                              const SizedBox(height: 8.0),
+                              volumeBar,
+                              const SizedBox(height: 8.0),
+                            ] else ...[
+                              SizedBox(height: spacingControlsToDock),
+                            ],
                             downBar,
                           ],
                         ),
@@ -398,9 +482,21 @@ class CleanPlayerTheme extends StatelessWidget {
                       trackHeader,
                       SizedBox(height: spacingTrackToSeek),
                       cleanSeekBar,
-                      SizedBox(height: spacingSeekToControls),
+                      if (bookmarkBanner != null) ...[
+                        const SizedBox(height: 8.0),
+                        bookmarkBanner,
+                        const SizedBox(height: 8.0),
+                      ] else ...[
+                        SizedBox(height: spacingSeekToControls),
+                      ],
                       transportControls,
-                      SizedBox(height: spacingControlsToDock),
+                      if (volumeBar != null) ...[
+                        const SizedBox(height: 8.0),
+                        volumeBar,
+                        const SizedBox(height: 8.0),
+                      ] else ...[
+                        SizedBox(height: spacingControlsToDock),
+                      ],
                       downBar,
                     ],
                   ),
@@ -456,6 +552,42 @@ class CleanPlayerTheme extends StatelessWidget {
               ),
             ),
             content,
+            // Top bar affordance: Dismiss chevron (left) and grab handle (center)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                top: true,
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 6.0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _CleanActionCircleButton(
+                        icon: Icons.keyboard_arrow_down_rounded,
+                        iconColor: Colors.white,
+                        tooltip: context.l10n.close,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/');
+                          }
+                        },
+                      ),
+                      const PlayerPlayHandle(),
+                      const SizedBox(width: 36, height: 36),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         );
       },
@@ -465,16 +597,18 @@ class CleanPlayerTheme extends StatelessWidget {
 
 /// Circular frosted translucent button matching the reference photo (Star and More ...)
 class _CleanActionCircleButton extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final Widget? child;
   final Color iconColor;
   final String tooltip;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _CleanActionCircleButton({
-    required this.icon,
-    required this.iconColor,
+    this.icon,
+    this.child,
+    this.iconColor = Colors.white,
     required this.tooltip,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
@@ -494,7 +628,7 @@ class _CleanActionCircleButton extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.16),
             ),
             child: Center(
-              child: Icon(icon, size: 20, color: iconColor),
+              child: child ?? Icon(icon, size: 20, color: iconColor),
             ),
           ),
         ),
@@ -708,18 +842,18 @@ class _CleanLosslessBadgePill extends StatelessWidget {
   }
 }
 
-/// Bare Apple Music Transport Controls (Rewind, Play/Pause, Fast-Forward)
-///
-/// Play/Pause has NO circular background container — pure, bold icons.
+/// Bare Apple Music Transport Controls with Shuffle, Repeat & AB Loop affordances
 class _CleanTransportControls extends StatelessWidget {
   final PlayerThemeProps props;
   final Color activeColor;
   final bool isCompact;
+  final bool showAbControls;
 
   const _CleanTransportControls({
     required this.props,
     required this.activeColor,
     this.isCompact = false,
+    this.showAbControls = false,
   });
 
   @override
@@ -728,10 +862,17 @@ class _CleanTransportControls extends StatelessWidget {
     final cubit = props.cubit;
     final isPlaying = state.isPlaying;
     final isBuffering = state.isBuffering;
+    final isShuffle = state.isShuffle;
+    final repeatMode = state.repeatMode;
+    final hasPrev = state.hasPreviousNeighbour;
+    final hasNext = state.hasNextNeighbour;
+    final abLoopActive = state.abPointA != null && state.abPointB != null;
 
-    final double mainIconSize = isCompact ? 46.0 : 56.0;
-    final double sideIconSize = isCompact ? 34.0 : 42.0;
-    final double buttonGap = isCompact ? 20.0 : 44.0;
+    final double mainIconSize = isCompact ? 44.0 : 54.0;
+    final double sideIconSize = isCompact ? 32.0 : 40.0;
+    final double auxIconSize = isCompact ? 22.0 : 25.0;
+    final double abButtonSize = isCompact ? 24.0 : 28.0;
+    final double buttonGap = isCompact ? 10.0 : 18.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -741,21 +882,113 @@ class _CleanTransportControls extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Previous / Rewind
+            // 1. Shuffle Button
             IconButton(
-              iconSize: sideIconSize,
-              icon: const Icon(Icons.fast_rewind_rounded),
-              color: Colors.white,
-              tooltip: 'Previous track',
+              iconSize: auxIconSize,
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: auxIconSize + 14,
+                minHeight: auxIconSize + 14,
+              ),
+              icon: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    Icons.shuffle_rounded,
+                    color: isShuffle
+                        ? activeColor
+                        : Colors.white.withValues(alpha: 0.65),
+                  ),
+                  if (isShuffle)
+                    Positioned(
+                      bottom: 0,
+                      child: Container(
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: activeColor,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              tooltip: context.l10n.shuffle,
               onPressed: () {
                 PulsrHaptics.selection();
-                cubit.previous();
+                cubit.toggleShuffle();
               },
             ),
             SizedBox(width: buttonGap),
-            // Play / Pause (bare, large, solid white — no circle backdrop)
+
+            // 2. Point A Button (if AB controls active)
+            if (showAbControls) ...[
+              _CleanAbButton(
+                label: 'A',
+                point: state.abPointA,
+                isActive: state.abPointA != null,
+                isLoopActive: abLoopActive,
+                activeColor: activeColor,
+                buttonSize: abButtonSize,
+                tooltip: state.abPointA != null && state.abPointB != null
+                    ? context.l10n.repeat
+                    : state.abPointA != null
+                        ? 'Point A: ${Formatters.formatDuration(state.abPointA!)} (${context.l10n.clearAbLoop})'
+                        : context.l10n.abLoopSetA,
+                onPressed: () {
+                  PulsrHaptics.selection();
+                  if (state.abPointA != null && state.abPointB != null) {
+                    cubit.toggleAbLoop();
+                  } else {
+                    cubit.setAbPointA();
+                  }
+                },
+                onLongPress: () {
+                  if (state.abPointA != null || state.abPointB != null) {
+                    PulsrHaptics.confirm();
+                    cubit.clearAbLoop();
+                    PulsrToast.show(
+                      context,
+                      message: context.l10n.clearAbLoop,
+                      icon: Icons.clear_rounded,
+                      duration: const Duration(milliseconds: 1200),
+                    );
+                  }
+                },
+              ),
+              SizedBox(width: buttonGap),
+            ],
+
+            // 3. Previous / Rewind Button
+            IconButton(
+              iconSize: sideIconSize,
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: sideIconSize + 8,
+                minHeight: sideIconSize + 8,
+              ),
+              icon: const Icon(Icons.fast_rewind_rounded),
+              color: hasPrev
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.35),
+              tooltip: context.l10n.previous,
+              onPressed: hasPrev
+                  ? () {
+                      PulsrHaptics.selection();
+                      cubit.previous();
+                    }
+                  : null,
+            ),
+            SizedBox(width: buttonGap),
+
+            // 4. Play / Pause Button
             IconButton(
               iconSize: mainIconSize,
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: mainIconSize + 8,
+                minHeight: mainIconSize + 8,
+              ),
               icon: isBuffering
                   ? SizedBox(
                       width: isCompact ? 24 : 32,
@@ -771,22 +1004,132 @@ class _CleanTransportControls extends StatelessWidget {
                           : Icons.play_arrow_rounded,
                       color: Colors.white,
                     ),
-              tooltip: isPlaying ? 'Pause' : 'Play',
+              tooltip: isPlaying ? context.l10n.pause : context.l10n.play,
               onPressed: () {
                 PulsrHaptics.light();
                 cubit.togglePlayPause();
               },
             ),
             SizedBox(width: buttonGap),
-            // Next / Fast-Forward
+
+            // 5. Next / Fast-Forward Button
             IconButton(
               iconSize: sideIconSize,
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: sideIconSize + 8,
+                minHeight: sideIconSize + 8,
+              ),
               icon: const Icon(Icons.fast_forward_rounded),
-              color: Colors.white,
-              tooltip: 'Next track',
+              color: hasNext
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.35),
+              tooltip: context.l10n.next,
+              onPressed: hasNext
+                  ? () {
+                      PulsrHaptics.selection();
+                      cubit.next();
+                    }
+                  : null,
+            ),
+            SizedBox(width: buttonGap),
+
+            // 6. Point B Button (if AB controls active)
+            if (showAbControls) ...[
+              _CleanAbButton(
+                label: 'B',
+                point: state.abPointB,
+                isActive: state.abPointB != null,
+                isLoopActive: abLoopActive,
+                activeColor: activeColor,
+                buttonSize: abButtonSize,
+                tooltip: state.abPointA != null && state.abPointB != null
+                    ? context.l10n.repeat
+                    : state.abPointB != null
+                        ? 'Point B: ${Formatters.formatDuration(state.abPointB!)} (${context.l10n.clearAbLoop})'
+                        : 'Set loop point B',
+                onPressed: () {
+                  PulsrHaptics.selection();
+                  if (state.abPointA != null && state.abPointB != null) {
+                    cubit.toggleAbLoop();
+                  } else {
+                    cubit.setAbPointB();
+                  }
+                },
+                onLongPress: () {
+                  if (state.abPointA != null || state.abPointB != null) {
+                    PulsrHaptics.confirm();
+                    cubit.clearAbLoop();
+                    PulsrToast.show(
+                      context,
+                      message: context.l10n.clearAbLoop,
+                      icon: Icons.clear_rounded,
+                      duration: const Duration(milliseconds: 1200),
+                    );
+                  }
+                },
+              ),
+              SizedBox(width: buttonGap),
+            ],
+
+            // 7. Repeat Button
+            IconButton(
+              iconSize: auxIconSize,
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: auxIconSize + 14,
+                minHeight: auxIconSize + 14,
+              ),
+              icon: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    repeatMode == PlayerRepeatMode.one
+                        ? Icons.repeat_one_rounded
+                        : Icons.repeat_rounded,
+                    color: repeatMode != PlayerRepeatMode.off
+                        ? activeColor
+                        : Colors.white.withValues(alpha: 0.65),
+                  ),
+                  if (repeatMode != PlayerRepeatMode.off)
+                    Positioned(
+                      bottom: 0,
+                      child: Container(
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: activeColor,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              tooltip: context.l10n.repeat,
               onPressed: () {
                 PulsrHaptics.selection();
-                cubit.next();
+                cubit.toggleRepeat();
+                final nextMode = switch (repeatMode) {
+                  PlayerRepeatMode.off => PlayerRepeatMode.all,
+                  PlayerRepeatMode.all => PlayerRepeatMode.one,
+                  PlayerRepeatMode.one => PlayerRepeatMode.off,
+                };
+                final nextLabel = switch (nextMode) {
+                  PlayerRepeatMode.one => context.l10n.repeatOne,
+                  PlayerRepeatMode.all => context.l10n.repeatAll,
+                  PlayerRepeatMode.off => context.l10n.repeatOff,
+                };
+                final nextIcon = switch (nextMode) {
+                  PlayerRepeatMode.one => Icons.repeat_one_rounded,
+                  PlayerRepeatMode.all => Icons.repeat_rounded,
+                  PlayerRepeatMode.off => Icons.repeat_rounded,
+                };
+                PulsrToast.show(
+                  context,
+                  message: nextLabel,
+                  icon: nextIcon,
+                  duration: const Duration(milliseconds: 1200),
+                );
               },
             ),
           ],
@@ -796,8 +1139,75 @@ class _CleanTransportControls extends StatelessWidget {
   }
 }
 
-/// Down Bar matching reference photo:
-/// Lyrics (Left), AirPlay / Audio Output (Center), Queue (Right)
+/// Circular pill button for setting & displaying loop points A & B
+class _CleanAbButton extends StatelessWidget {
+  final String label;
+  final Duration? point;
+  final bool isActive;
+  final bool isLoopActive;
+  final Color activeColor;
+  final VoidCallback onPressed;
+  final VoidCallback onLongPress;
+  final String tooltip;
+  final double buttonSize;
+
+  const _CleanAbButton({
+    required this.label,
+    required this.point,
+    required this.isActive,
+    required this.isLoopActive,
+    required this.activeColor,
+    required this.onPressed,
+    required this.onLongPress,
+    required this.tooltip,
+    this.buttonSize = 28.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          onLongPress: onLongPress,
+          borderRadius: BorderRadius.circular(buttonSize / 2),
+          child: Container(
+            width: buttonSize,
+            height: buttonSize,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isActive
+                  ? activeColor.withValues(alpha: 0.28)
+                  : Colors.white.withValues(alpha: 0.12),
+              border: Border.all(
+                color: isLoopActive
+                    ? activeColor
+                    : (isActive
+                        ? activeColor.withValues(alpha: 0.6)
+                        : Colors.white.withValues(alpha: 0.2)),
+                width: isLoopActive ? 1.5 : 1.0,
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.white70,
+                fontSize: buttonSize * 0.44,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Down Bar matching reference photo & loaded with all dock features:
+/// Lyrics, Equalizer, Speed, Output / Cast, Quran, Ambient, Timer, Queue
 class _CleanDownBar extends StatelessWidget {
   final PlayerThemeProps props;
   final Color activeColor;
@@ -820,13 +1230,39 @@ class _CleanDownBar extends StatelessWidget {
     final isInSplit = PlayerSplitViewScope.of(context);
     final splitTabCtrl = PlayerSplitViewScope.tabControllerOf(context);
 
+    final isUsb = outputDevice?.isUsbDac == true;
     final IconData outputIcon = isCast
         ? Icons.cast_connected_rounded
-        : (outputDevice?.deviceName.contains('Bluetooth') == true
-            ? Icons.bluetooth_audio_rounded
-            : (outputDevice?.deviceName.contains('Speaker') == true
-                ? Icons.speaker_rounded
-                : Icons.airplay_rounded));
+        : (isUsb
+            ? Icons.usb_rounded
+            : (outputDevice?.deviceName.contains('Bluetooth') == true ||
+                    outputDevice?.deviceName.contains('A2DP') == true
+                ? Icons.bluetooth_audio_rounded
+                : (outputDevice?.deviceName.contains('Speaker') == true
+                    ? Icons.speaker_rounded
+                    : (outputDevice?.deviceName.contains('Headphones') == true ||
+                            outputDevice?.deviceName.contains('Headset') == true
+                        ? Icons.headphones_rounded
+                        : Icons.airplay_rounded))));
+
+    int? remainingTracks;
+    try {
+      remainingTracks = props.state.sleepTimerRemainingTracks ??
+          props.cubit.sleepTimerRemainingTracks;
+    } catch (_) {
+      remainingTracks = props.state.sleepTimerRemainingTracks;
+    }
+    bool isEndQ = false;
+    try {
+      isEndQ = props.cubit.isEndOfQueueSleepTimer == true;
+    } catch (_) {
+      isEndQ = false;
+    }
+    final hasTimer = props.state.sleepTimerRemaining != null ||
+        remainingTracks != null ||
+        isEndQ;
+    final isEqActive = state.isEqEnabled;
+    final speed = state.playbackSpeed;
 
     Widget buildBar(BuildContext context) {
       final bool isLyricsActive = isInSplit
@@ -838,58 +1274,186 @@ class _CleanDownBar extends StatelessWidget {
 
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 1. Lyrics Button (Left)
-              _DownBarItem(
-                icon: isLyricsActive
-                    ? Icons.chat_bubble_rounded
-                    : Icons.chat_bubble_outline_rounded,
-                isActive: isLyricsActive,
-                tooltip: 'Lyrics',
-                onTap: () {
-                  PulsrHaptics.selection();
-                  if (isInSplit && splitTabCtrl != null) {
-                    splitTabCtrl.animateTo(0);
-                  } else {
-                    cubit.toggleLyricsVisibility();
-                  }
-                },
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                color: Colors.white.withValues(alpha: 0.12),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.20),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              const SizedBox(width: 24),
-              // 2. Audio Output / Cast / AirPlay Button (Center)
-              _DownBarItem(
-                icon: outputIcon,
-                isActive: isCast,
-                tooltip: isCast ? 'Google Cast' : 'Audio Output',
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  if (state.currentSong != null) {
-                    AudioQualitySheet.show(
-                        context, state.currentSong!, activeColor);
-                  }
-                },
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 1. Lyrics Button (Left)
+                    _DownBarItem(
+                      icon: isLyricsActive
+                          ? Icons.chat_bubble_rounded
+                          : Icons.chat_bubble_outline_rounded,
+                      isActive: isLyricsActive,
+                      activeColor: activeColor,
+                      tooltip: context.l10n.lyrics,
+                      onTap: () {
+                        PulsrHaptics.selection();
+                        if (isInSplit && splitTabCtrl != null) {
+                          splitTabCtrl.animateTo(0);
+                        } else {
+                          cubit.toggleLyricsVisibility();
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 2. Equalizer & DSP Button
+                    _DownBarItem(
+                      icon: Icons.tune_rounded,
+                      isActive: isEqActive,
+                      activeColor: activeColor,
+                      tooltip: context.l10n.equalizer,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        EqualizerSheet.show(context);
+                      },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 3. Playback Speed Button
+                    _DownBarItem(
+                      icon: Icons.speed_rounded,
+                      isActive: speed != 1.0,
+                      badgeText: speed != 1.0
+                          ? '${speed.toStringAsFixed(1)}x'
+                          : null,
+                      activeColor: activeColor,
+                      tooltip: context.l10n.playbackSpeed,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        SpeedPickerSheet.show(context);
+                      },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 4. Audio Output / Cast / AirPlay Button
+                    _DownBarItem(
+                      icon: outputIcon,
+                      isActive: isCast || isUsb,
+                      badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
+                      activeColor: isCast
+                          ? AppColors.accentCyan
+                          : (isUsb ? AppColors.dacGold : activeColor),
+                      tooltip: isCast
+                          ? 'Google Cast'
+                          : context.l10n.audioOutputAndDac,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        if (state.currentSong != null) {
+                          AudioQualitySheet.show(
+                              context, state.currentSong!, activeColor);
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 5. Quran Mode Button
+                    _DownBarItem(
+                      icon: Icons.auto_stories_rounded,
+                      isActive: state.isQuranModeEnabled,
+                      activeColor: AppColors.quranEmerald,
+                      tooltip: context.l10n.quranMode,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        QuranModeSheet.show(context);
+                      },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 6. Ambient Sounds Button
+                    AnimatedBuilder(
+                      animation: AmbientSoundService(),
+                      builder: (context, _) {
+                        final isAmbientActive =
+                            AmbientSoundService().isEnabled;
+                        return _DownBarItem(
+                          icon: Icons.water_drop_rounded,
+                          isActive: isAmbientActive,
+                          activeColor: activeColor,
+                          tooltip: context.l10n.ambientSounds,
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            AmbientSoundSheet.show(context);
+                          },
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 7. Sleep Timer Button
+                    _DownBarItem(
+                      icon: Icons.timer_outlined,
+                      isActive: hasTimer,
+                      badgeText: hasTimer
+                          ? (remainingTracks != null
+                              ? '$remainingTracks tr'
+                              : (isEndQ
+                                  ? 'End'
+                                  : (state.sleepTimerRemaining != null
+                                      ? formatSleepTimerRemaining(
+                                          state.sleepTimerRemaining!)
+                                      : '')))
+                          : null,
+                      activeColor: activeColor,
+                      tooltip: isEndQ
+                          ? 'Sleep Timer: End of Queue'
+                          : (remainingTracks != null
+                              ? 'Sleep Timer: $remainingTracks tracks remaining'
+                              : (state.sleepTimerRemaining != null
+                                  ? 'Sleep Timer: ${formatSleepTimerRemaining(state.sleepTimerRemaining!)} remaining'
+                                  : context.l10n.sleepTimer)),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        SleepTimerSheet.show(context);
+                      },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // 8. Queue / Playlist Button (Right)
+                    _DownBarItem(
+                      icon: Icons.format_list_bulleted_rounded,
+                      isActive: isQueueActive,
+                      badgeText: state.queue.isNotEmpty
+                          ? '${state.queue.length}'
+                          : null,
+                      activeColor: activeColor,
+                      tooltip: context.l10n.queue,
+                      onTap: () {
+                        PulsrHaptics.selection();
+                        if (isInSplit && splitTabCtrl != null) {
+                          splitTabCtrl.animateTo(1);
+                        } else {
+                          cubit.toggleQueueVisibility();
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 24),
-              // 3. Queue / Playlist Button (Right)
-              _DownBarItem(
-                icon: Icons.format_list_bulleted_rounded,
-                isActive: isQueueActive,
-                tooltip: 'Queue',
-                onTap: () {
-                  PulsrHaptics.selection();
-                  if (isInSplit && splitTabCtrl != null) {
-                    splitTabCtrl.animateTo(1);
-                  } else {
-                    cubit.toggleQueueVisibility();
-                  }
-                },
-              ),
-            ],
+            ),
           ),
         ),
       );
@@ -908,41 +1472,84 @@ class _CleanDownBar extends StatelessWidget {
 class _DownBarItem extends StatelessWidget {
   final IconData icon;
   final bool isActive;
+  final Color? activeColor;
+  final String? badgeText;
   final String tooltip;
   final VoidCallback onTap;
 
   const _DownBarItem({
     required this.icon,
     required this.isActive,
+    this.activeColor,
+    this.badgeText,
     required this.tooltip,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final resolvedColor = activeColor ?? Colors.white;
     return Material(
       color: Colors.transparent,
       child: Tooltip(
         message: tooltip,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: AnimatedContainer(
-            duration: context.motionMs(200),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: isActive
-                  ? Colors.white.withValues(alpha: 0.20)
-                  : Colors.transparent,
-            ),
-            child: Icon(
-              icon,
-              size: 24,
-              color: isActive
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.65),
-            ),
+          borderRadius: BorderRadius.circular(14),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              AnimatedContainer(
+                duration: context.motionMs(200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: isActive
+                      ? resolvedColor.withValues(alpha: 0.22)
+                      : Colors.transparent,
+                  border: isActive
+                      ? Border.all(
+                          color: resolvedColor.withValues(alpha: 0.40),
+                          width: 1.0,
+                        )
+                      : null,
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: isActive
+                      ? resolvedColor
+                      : Colors.white.withValues(alpha: 0.70),
+                ),
+              ),
+              if (badgeText != null && badgeText!.isNotEmpty)
+                PositionedDirectional(
+                  top: -2,
+                  end: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4.0,
+                      vertical: 1.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: resolvedColor,
+                      borderRadius: BorderRadius.circular(6.0),
+                    ),
+                    child: Text(
+                      badgeText!,
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        color: resolvedColor.computeLuminance() > 0.4
+                            ? Colors.black
+                            : Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

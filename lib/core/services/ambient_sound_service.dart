@@ -397,6 +397,11 @@ class AmbientSoundService extends ChangeNotifier {
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
+  /// Maximum number of simultaneously active ambient audio effects to protect
+  /// mobile audio hardware decoders. When exceeded, the oldest active effect is
+  /// gracefully replaced.
+  static const int maxConcurrentEffects = 4;
+
   /// Toggle an effect on or off. When turning on, starts the player.
   /// When turning off, stops and disposes the player.
   Future<void> toggleEffect(AmbientSoundEffect effect) async {
@@ -410,6 +415,11 @@ class AmbientSoundService extends ChangeNotifier {
       notifyListeners();
       await _stopEffectPlayer(effect);
     } else {
+      if (_activeEffects.length >= maxConcurrentEffects) {
+        final oldest = _activeEffects.first;
+        _activeEffects.remove(oldest);
+        unawaited(_stopEffectPlayer(oldest));
+      }
       _activeEffects.add(effect);
       _lastActiveEffects = Set.from(_activeEffects);
       notifyListeners();

@@ -516,6 +516,12 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     await prefs.setDouble(PrefsKeys.playbackSpeed, speed);
   }
 
+  @override
+  Future<void> setSpeedWithoutPersisting(double speed) async {
+    lastSetSpeed = speed;
+    playbackState.add(playbackState.value.copyWith(speed: speed));
+  }
+
   double _pitch = 1.0;
   @override
   double get pitch => _pitch;

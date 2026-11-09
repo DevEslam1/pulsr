@@ -113,6 +113,29 @@ void main() {
       }
     });
 
+    test('enforces maxConcurrentEffects by rotating out oldest effect', () async {
+      final service = AmbientSoundService();
+
+      await service.toggleEffect(AmbientSoundEffect.rain);
+      await service.toggleEffect(AmbientSoundEffect.fire);
+      await service.toggleEffect(AmbientSoundEffect.forest);
+      await service.toggleEffect(AmbientSoundEffect.ocean);
+
+      expect(service.activeEffects.length, 4);
+
+      // Activating a 5th effect replaces the oldest (rain)
+      await service.toggleEffect(AmbientSoundEffect.wind);
+
+      expect(service.activeEffects.length, 4);
+      expect(service.isEffectActive(AmbientSoundEffect.rain), isFalse);
+      expect(service.isEffectActive(AmbientSoundEffect.wind), isTrue);
+
+      // Clean up
+      for (final e in List.of(service.activeEffects)) {
+        await service.toggleEffect(e);
+      }
+    });
+
     test('setEffectVolume clamps and notifies', () async {
       final service = AmbientSoundService();
 

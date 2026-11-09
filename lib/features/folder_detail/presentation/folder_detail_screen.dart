@@ -367,123 +367,114 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     );
   }
 
-  Widget _buildGlassCircleButton({
-    required IconData icon,
-    required VoidCallback? onTap,
-    required PulsrPalette p,
-    Color? iconColor,
-    String? tooltip,
-    double size = 44,
-    double iconSize = 20,
-    bool active = false,
-  }) {
-    final surface = active
-        ? p.accent.withValues(alpha: 0.16)
-        : p.surfaceContainerHigh.withValues(alpha: 0.88);
-    final border = active ? p.accent.withValues(alpha: 0.45) : p.hairline;
-
-    final button = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: AppRadii.full,
-        onTap: onTap != null
-            ? () {
-                HapticFeedback.lightImpact();
-                onTap();
-              }
-            : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: surface,
-            shape: BoxShape.circle,
-            border: Border.all(color: border, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: p.isDark ? 0.24 : 0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+  Widget _actionButtons(BuildContext context, List<SongsTableData> songs) {
+    final p = context.palette;
+    final allFavorited = _isAllFavorited(songs);
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: p.accent,
+              foregroundColor: p.onAccent,
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadii.r14All,
               ),
-            ],
-          ),
-          child: Center(
-            child: Icon(
-              icon,
-              size: iconSize,
-              color: iconColor ?? p.textPrimary,
+            ),
+            onPressed: songs.isEmpty
+                ? null
+                : () {
+                    HapticFeedback.mediumImpact();
+                    context
+                        .read<PlayerCubit>()
+                        .playSong(songs.first, queue: songs);
+                  },
+            icon: const Icon(Icons.play_arrow_rounded, size: 22),
+            label: Text(
+              context.l10n.playAll,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
         ),
-      ),
-    );
-
-    if (tooltip != null) {
-      return Tooltip(message: tooltip, child: button);
-    }
-    return button;
-  }
-
-  Widget _buildPrimaryPlayButton(
-    BuildContext context,
-    PulsrPalette p,
-    List<SongsTableData> songs, {
-    double size = 58,
-    double iconSize = 34,
-  }) {
-    final isEnabled = songs.isNotEmpty;
-    final bgColor =
-        isEnabled ? p.accent : p.surfaceContainerHigh.withValues(alpha: 0.5);
-    final fgColor = isEnabled
-        ? (ThemeData.estimateBrightnessForColor(p.accent) == Brightness.dark
-            ? Colors.white
-            : Colors.black)
-        : p.textTertiary;
-
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: isEnabled
-            ? [
-                BoxShadow(
-                  color: p.accent.withValues(alpha: 0.38),
-                  blurRadius: 20,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 6),
-                ),
-              ]
-            : const [],
-      ),
-      child: Material(
-        color: bgColor,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: isEnabled
-              ? () {
-                  HapticFeedback.mediumImpact();
-                  context
-                      .read<PlayerCubit>()
-                      .playSong(songs.first, queue: songs);
-                }
-              : null,
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(start: 3),
-                child: Icon(
-                  Icons.play_arrow_rounded,
-                  color: fgColor,
-                  size: iconSize,
-                ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: FilledButton.tonalIcon(
+            style: FilledButton.styleFrom(
+              backgroundColor: p.surfaceContainerHigh,
+              foregroundColor: p.textPrimary,
+              side: BorderSide(color: p.hairline),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadii.r14All,
               ),
+            ),
+            onPressed: songs.isEmpty
+                ? null
+                : () {
+                    HapticFeedback.mediumImpact();
+                    final shuffled = List<SongsTableData>.from(songs)
+                      ..shuffle();
+                    context
+                        .read<PlayerCubit>()
+                        .playSong(shuffled.first, queue: shuffled);
+                  },
+            icon: Icon(Icons.shuffle_rounded, color: p.accent, size: 20),
+            label: Text(
+              context.l10n.shuffle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ),
-      ),
+        const SizedBox(width: AppSpacing.xs),
+        IconButton.filledTonal(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          style: IconButton.styleFrom(
+            backgroundColor: p.surfaceContainerHigh,
+            foregroundColor: allFavorited ? p.favorite : p.textPrimary,
+            side: BorderSide(color: p.hairline),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadii.r14All,
+            ),
+          ),
+          onPressed: songs.isEmpty ? null : () => _toggleFavoriteFolder(songs),
+          icon: Icon(
+            allFavorited
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            color: allFavorited ? p.favorite : p.textPrimary,
+            size: 20,
+          ),
+          tooltip: allFavorited
+              ? context.l10n.removeFromFavorites
+              : context.l10n.favorite,
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        IconButton.filledTonal(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          style: IconButton.styleFrom(
+            backgroundColor: p.surfaceContainerHigh,
+            foregroundColor: p.textPrimary,
+            side: BorderSide(color: p.hairline),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadii.r14All,
+            ),
+          ),
+          onPressed: () => _showFolderOptionsMenu(context, songs, p),
+          icon: const Icon(Icons.info_outline_rounded, size: 20),
+          tooltip: context.l10n.browseOpenFolderDetails,
+        ),
+      ],
     );
   }
 
@@ -630,37 +621,45 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           children: [
             Row(
               children: [
-                CachedArtwork(
-                  id: distinctArts[0].id,
-                  albumId: distinctArts[0].albumId,
-                  remoteUrl: distinctArts[0].remoteUrl,
-                  size: half,
-                  borderRadius: 0,
+                Expanded(
+                  child: CachedArtwork(
+                    id: distinctArts[0].id,
+                    albumId: distinctArts[0].albumId,
+                    remoteUrl: distinctArts[0].remoteUrl,
+                    size: half,
+                    borderRadius: 0,
+                  ),
                 ),
-                CachedArtwork(
-                  id: distinctArts[1].id,
-                  albumId: distinctArts[1].albumId,
-                  remoteUrl: distinctArts[1].remoteUrl,
-                  size: half,
-                  borderRadius: 0,
+                Expanded(
+                  child: CachedArtwork(
+                    id: distinctArts[1].id,
+                    albumId: distinctArts[1].albumId,
+                    remoteUrl: distinctArts[1].remoteUrl,
+                    size: half,
+                    borderRadius: 0,
+                  ),
                 ),
               ],
             ),
             Row(
               children: [
-                CachedArtwork(
-                  id: distinctArts[2].id,
-                  albumId: distinctArts[2].albumId,
-                  remoteUrl: distinctArts[2].remoteUrl,
-                  size: half,
-                  borderRadius: 0,
+                Expanded(
+                  child: CachedArtwork(
+                    id: distinctArts[2].id,
+                    albumId: distinctArts[2].albumId,
+                    remoteUrl: distinctArts[2].remoteUrl,
+                    size: half,
+                    borderRadius: 0,
+                  ),
                 ),
-                CachedArtwork(
-                  id: distinctArts[3].id,
-                  albumId: distinctArts[3].albumId,
-                  remoteUrl: distinctArts[3].remoteUrl,
-                  size: half,
-                  borderRadius: 0,
+                Expanded(
+                  child: CachedArtwork(
+                    id: distinctArts[3].id,
+                    albumId: distinctArts[3].albumId,
+                    remoteUrl: distinctArts[3].remoteUrl,
+                    size: half,
+                    borderRadius: 0,
+                  ),
                 ),
               ],
             ),
@@ -769,95 +768,94 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         horizontal: compact ? AppSpacing.sm : Adaptive.pagePadding(context),
         vertical: compact ? AppSpacing.xxs : AppSpacing.xs,
       ),
-      padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: compact ? AppSpacing.xs : AppSpacing.s10,
-      ),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.65),
         borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline, width: 1),
       ),
-      child: Row(
-        children: [
-          CachedArtwork(
-            id: featuredSong.id,
-            albumId: featuredSong.albumId,
-            remoteUrl: featuredSong.remoteArtworkUrl ?? featuredSong.artworkUri,
-            size: artSize,
-            borderRadius: AppRadii.r12,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: AppRadii.r16All,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            context.read<PlayerCubit>().playSong(featuredSong, queue: songs);
+          },
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: compact ? AppSpacing.xs : AppSpacing.s10,
+            ),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.auto_awesome_mosaic_rounded,
-                      size: 12,
-                      color: p.accent,
-                    ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        '${context.l10n.tracksCount(songs.length).toUpperCase()} • ${_formatTotalDuration(totalDurationMs).toUpperCase()}',
+                CachedArtwork(
+                  id: featuredSong.id,
+                  albumId: featuredSong.albumId,
+                  remoteUrl:
+                      featuredSong.remoteArtworkUrl ?? featuredSong.artworkUri,
+                  size: artSize,
+                  borderRadius: AppRadii.r12,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.auto_awesome_mosaic_rounded,
+                            size: 12,
+                            color: p.accent,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '${context.l10n.tracksCount(songs.length).toUpperCase()} • ${_formatTotalDuration(totalDurationMs).toUpperCase()}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppFontSize.tiny,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.6,
+                                color: p.accent,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        featuredSong.album.isNotEmpty
+                            ? featuredSong.album
+                            : featuredSong.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: AppFontSize.tiny,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.6,
-                          color: p.accent,
+                          fontSize: AppFontSize.body,
+                          fontWeight: FontWeight.w700,
+                          color: p.textPrimary,
+                          letterSpacing: -0.2,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  featuredSong.album.isNotEmpty
-                      ? featuredSong.album
-                      : featuredSong.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: AppFontSize.body,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  featuredSong.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: AppFontSize.label,
-                    color: p.textSecondary,
+                      const SizedBox(height: 1),
+                      Text(
+                        featuredSong.artist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: AppFontSize.label,
+                          color: p.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.xs),
-          _buildGlassCircleButton(
-            icon: Icons.shuffle_rounded,
-            size: 38,
-            iconSize: 18,
-            p: p,
-            iconColor: p.accent,
-            onTap: () {
-              final shuffled = List<SongsTableData>.from(songs)..shuffle();
-              context
-                  .read<PlayerCubit>()
-                  .playSong(shuffled.first, queue: shuffled);
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1254,7 +1252,6 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   ) {
     final screenHeight = MediaQuery.sizeOf(context).height;
     final isShort = screenHeight < 480;
-    final allFavorited = _isAllFavorited(songs);
     final coverSize = isShort
         ? (screenHeight * 0.28).clamp(96.0, 130.0)
         : (screenHeight * 0.28).clamp(130.0, 230.0);
@@ -1289,41 +1286,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildGlassCircleButton(
-              icon: Icons.info_outline_rounded,
-              size: isShort ? 38 : 42,
-              iconSize: isShort ? 18 : 20,
-              p: p,
-              tooltip: context.l10n.browseOpenFolderDetails,
-              onTap: () => _showFolderOptionsMenu(context, songs, p),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            _buildPrimaryPlayButton(
-              context,
-              p,
-              songs,
-              size: isShort ? 48 : 54,
-              iconSize: isShort ? 26 : 30,
-            ),
-            const SizedBox(width: AppSpacing.md),
-            _buildGlassCircleButton(
-              icon: allFavorited
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded,
-              iconColor: allFavorited ? p.favorite : p.textPrimary,
-              active: allFavorited,
-              size: isShort ? 38 : 42,
-              iconSize: isShort ? 18 : 20,
-              p: p,
-              tooltip: allFavorited
-                  ? context.l10n.removeFromFavorites
-                  : context.l10n.favorite,
-              onTap: () => _toggleFavoriteFolder(songs),
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          child: _actionButtons(context, songs),
         ),
         const SizedBox(height: AppSpacing.xs),
         _buildFeaturedCard(context, songs, p, totalDurationMs, compact: true),
@@ -1399,8 +1364,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
 
     final textScale =
         MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.3);
-    final headerHeight = (screenHeight * (isTablet ? 0.34 : 0.38) * textScale)
-        .clamp(280.0, isTablet ? 420.0 : 360.0);
+    final headerHeight = (screenHeight * (isTablet ? 0.30 : 0.32) * textScale)
+        .clamp(240.0, isTablet ? 360.0 : 300.0);
 
     return PulsrPagePopScope(
       child: Scaffold(
@@ -1412,7 +1377,6 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               final songs = _sortedSongs(rawSongs);
               final totalDurationMs =
                   songs.fold<int>(0, (sum, s) => sum + s.durationMs);
-              final allFavorited = _isAllFavorited(songs);
 
               if (shouldSplit) {
                 return DetailScaffold(
@@ -1566,58 +1530,24 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                               : null,
                                         ),
                                       ),
-                                      const SizedBox(height: AppSpacing.sm),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          _buildGlassCircleButton(
-                                            icon: Icons.info_outline_rounded,
-                                            size: 42,
-                                            iconSize: 20,
-                                            p: p,
-                                            tooltip: context
-                                                .l10n.browseOpenFolderDetails,
-                                            onTap: () => _showFolderOptionsMenu(
-                                              context,
-                                              songs,
-                                              p,
-                                            ),
-                                          ),
-                                          SizedBox(
-                                            width: screenWidth < 360
-                                                ? AppSpacing.md
-                                                : AppSpacing.xl,
-                                          ),
-                                          _buildPrimaryPlayButton(
-                                            context,
-                                            p,
-                                            songs,
-                                          ),
-                                          SizedBox(
-                                            width: screenWidth < 360
-                                                ? AppSpacing.md
-                                                : AppSpacing.xl,
-                                          ),
-                                          _buildGlassCircleButton(
-                                            icon: allFavorited
-                                                ? Icons.favorite_rounded
-                                                : Icons.favorite_border_rounded,
-                                            iconColor: allFavorited
-                                                ? p.favorite
-                                                : p.textPrimary,
-                                            active: allFavorited,
-                                            size: 42,
-                                            iconSize: 21,
-                                            p: p,
-                                            tooltip: allFavorited
-                                                ? context
-                                                    .l10n.removeFromFavorites
-                                                : context.l10n.favorite,
-                                            onTap: () =>
-                                                _toggleFavoriteFolder(songs),
-                                          ),
-                                        ],
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        '${context.l10n.tracksCount(songs.length)} • ${_formatTotalDuration(totalDurationMs)}',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.caption,
+                                          fontWeight: FontWeight.w600,
+                                          shadows: p.isDark
+                                              ? const [
+                                                  Shadow(
+                                                    color: Colors.black54,
+                                                    blurRadius: 10,
+                                                    offset: Offset(0, 1),
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1637,6 +1567,15 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                Adaptive.pagePadding(context),
+                                AppSpacing.sm,
+                                Adaptive.pagePadding(context),
+                                AppSpacing.xs,
+                              ),
+                              child: _actionButtons(context, songs),
+                            ),
                             const SizedBox(height: AppSpacing.xs),
                             _buildFeaturedCard(
                               context,

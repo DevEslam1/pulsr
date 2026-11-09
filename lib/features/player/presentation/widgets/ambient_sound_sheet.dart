@@ -52,11 +52,13 @@ class AmbientSoundSheet extends StatelessWidget {
             ],
           ),
           subtitle: Text(
-            service.isEnabled && !service.isPlayerPlaying
-                ? l10n.ambientPausedWithPlayer
-                : service.isEnabled
-                    ? service.activeEffects.map((e) => e.emoji).join(' ')
-                    : l10n.ambientSoundsDesc,
+            service.isEnabled && service.isSuppressedByQuran
+                ? l10n.ambientAllowDuringQuran
+                : service.isEnabled && !service.isPlayerPlaying
+                    ? l10n.ambientPausedWithPlayer
+                    : service.isEnabled
+                        ? service.activeEffects.map((e) => e.emoji).join(' ')
+                        : l10n.ambientSoundsDesc,
           ),
           trailing: Semantics(
             label: l10n.ambientSounds,

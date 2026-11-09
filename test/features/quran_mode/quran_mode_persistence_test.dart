@@ -146,7 +146,7 @@ class _OutOfOrderSpeedHandler extends _QuranAudioHandler {
   bool delayNextCall = false;
 
   @override
-  Future<void> setSpeed(double speed) async {
+  Future<void> setSpeedWithoutPersisting(double speed) async {
     if (delayNextCall) {
       delayNextCall = false;
       await firstCallGate.future;

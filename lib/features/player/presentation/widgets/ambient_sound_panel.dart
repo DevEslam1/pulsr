@@ -183,13 +183,15 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                       ],
                     ),
                     Text(
-                      _service.isEnabled && !_service.isPlayerPlaying
-                          ? context.l10n.ambientPausedWithPlayer
-                          : _service.isEnabled
-                              ? _service.activeEffects
-                                  .map((e) => e.emoji)
-                                  .join(' ')
-                              : context.l10n.ambientSoundsDesc,
+                      _service.isEnabled && _service.isSuppressedByQuran
+                          ? context.l10n.ambientAllowDuringQuran
+                          : _service.isEnabled && !_service.isPlayerPlaying
+                              ? context.l10n.ambientPausedWithPlayer
+                              : _service.isEnabled
+                                  ? _service.activeEffects
+                                      .map((e) => e.emoji)
+                                      .join(' ')
+                                  : context.l10n.ambientSoundsDesc,
                       style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.label,
